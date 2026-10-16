@@ -1,13 +1,16 @@
 """Calibration of a model against observed data."""
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
+
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import (
         CalibrationParameterProtocol,
         CalibrationParameterTypeProtocol,
-        CalibrationResultWithHistoryProtocol,
+        CalibrationProblemProtocol,
+        CalibrationResultProtocol,
         EngineProtocol,
         LossConfigProtocol,
         OptimizationConfigProtocol,
@@ -21,9 +24,11 @@ try:
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
 
-from commol.api.simulation import Simulation
+from commol.api.simulation import Simulation, check_seed, draw_seed
 from commol.context._model import engine_state
 from commol.context.calibration import (
+    CalibrationEvaluation,
+    CalibrationHistory,
     CalibrationProblem,
     CalibrationResult,
     NelderMeadConfig,
@@ -32,18 +37,26 @@ from commol.context.calibration import (
     PSOConstantAcceleration,
     PSOConstantInertia,
     PSOTimeVaryingAcceleration,
+    StartSummary,
 )
 from commol.context.constants import (
     CalibrationParameterType,
     OptimizationAlgorithm,
 )
+from commol.context.inference.method import UncertaintyMethod
 
 logger = logging.getLogger(__name__)
+
+ResultT = TypeVar("ResultT", bound=BaseModel)
 
 
 class Calibrator:
     """
-    A Facade for running parameter calibration from a defined CalibrationProblem.
+    Calibrate the parameters of a simulation against observed data.
+
+    The calibration problem is built in Rust once, when the calibrator is
+    created, and every optimization, prediction and uncertainty method reads
+    that one problem.
     """
 
     def __init__(
@@ -60,6 +73,12 @@ class Calibrator:
             A fully initialized Simulation object with the model to calibrate.
         problem : CalibrationProblem
             A fully constructed and validated calibration problem definition.
+
+        Raises
+        ------
+        ValueError
+            If a parameter, observation, position or constraint does not fit
+            the model.
         """
         logger.info(
             f"Initializing Calibration for model: '{simulation.model_definition.name}'"
@@ -75,145 +94,212 @@ class Calibrator:
             )
         )
 
-        # Validate calibration parameters against model
-        self._build_loss_config()
+        loss_config = self._build_loss_config()
         self._validate_calibration_parameters()
         self._validate_observed_data()
         self._warn_constraint_positions_beyond_observations()
+        self._rust_problem: "CalibrationProblemProtocol" = (
+            commol_rs.inference.CalibrationProblem(
+                self._engine,
+                engine_state.rust_observed_data(problem.observed_data),
+                self._rust_parameters(),
+                engine_state.rust_constraints(problem.constraints),
+                loss_config,
+                initial_condition_remainder=problem.initial_condition_remainder,
+            )
+        )
 
-    def run(self) -> CalibrationResult:
+    @property
+    def rust_problem(self) -> "CalibrationProblemProtocol":
         """
-        Runs the calibration optimization.
+        The calibration problem built in Rust, for the runners of methods.
+
+        Returns
+        -------
+        CalibrationProblemProtocol
+            The problem every optimization, prediction and method reads.
+        """
+        return self._rust_problem
+
+    @property
+    def seed(self) -> int:
+        """
+        The seed of the calibration's random numbers.
+
+        Returns
+        -------
+        int
+            ``problem.seed``, or a seed drawn from the operating system once
+            per calibrator and logged.
+        """
+        if self.problem.seed is not None:
+            return check_seed(self.problem.seed)
+        if not hasattr(self, "_drawn_seed"):
+            self._drawn_seed = draw_seed()
+            logger.info(
+                "No seed set; drew the seed %d, which repeats this calibration.",
+                self._drawn_seed,
+            )
+        return self._drawn_seed
+
+    def run(self, starts: int = 1) -> CalibrationResult:
+        """
+        Runs the calibration optimization from one or more starts.
+
+        Start 0 is the initial guess of each parameter. Each further start is a
+        row of a Latin hypercube over the bounds, drawn from `seed`, so the
+        starts cover the parameter space. They run in parallel; the result is
+        the best of them, and lists every start. Distinct ends with equal
+        losses are a sign that the data do not identify the parameters.
+
+        Parameters
+        ----------
+        starts : int, optional
+            Number of starts, at least 1 (default 1). A verbose optimizer
+            shows one start, so it needs ``starts=1``.
 
         Returns
         -------
         CalibrationResult
-            Object containing the optimized parameter values, final loss,
-            convergence status, and other optimization statistics.
+            The best start: the optimized parameter values, in the order of
+            the problem's parameters, its final loss and convergence, every
+            start (``starts``) and the reason of each start that failed
+            (``failed_runs``, also logged as warnings).
 
         Raises
         ------
-        ImportError
-            If Rust extension is not available.
         ValueError
-            If calibration problem setup is invalid.
+            If `starts` is below 1, or a verbose optimizer has more than one
+            start.
         RuntimeError
-            If optimization fails.
+            If every start fails.
         """
-        # Determine algorithm name from config type
         algorithm_name = (
             OptimizationAlgorithm.NELDER_MEAD
             if isinstance(self.problem.optimization_config, NelderMeadConfig)
             else OptimizationAlgorithm.PARTICLE_SWARM
         )
         logger.info(
-            (
-                f"Starting calibration with "
-                f"{algorithm_name} algorithm and "
-                f"{self.problem.loss_function} loss function."
+            f"Starting calibration with {algorithm_name} algorithm, "
+            f"{self.problem.loss_function} loss function and {starts} start(s)."
+        )
+        if starts < 1:
+            raise ValueError(f"A calibration needs at least one start, got {starts}.")
+        seed = self.seed if starts > 1 else 0
+        outcomes = self._rust_problem.optimize(
+            self._build_optimization_config(), starts, seed
+        )
+        names = self.parameter_names
+        summaries: list[tuple[StartSummary, "CalibrationResultProtocol"]] = []
+        failed_runs: list[str] = []
+        for index, outcome in enumerate(outcomes):
+            if outcome.result is None:
+                reason = f"Start {index} failed: {outcome.error}"
+                logger.warning(reason)
+                failed_runs.append(reason)
+                continue
+            summaries.append(
+                (
+                    StartSummary(
+                        start=dict(zip(names, outcome.start, strict=True)),
+                        end=dict(outcome.result.best_parameters),
+                        loss=outcome.result.final_loss,
+                        converged=outcome.result.converged,
+                    ),
+                    outcome.result,
+                )
             )
-        )
-
-        rust_observed_data = engine_state.rust_observed_data(self.problem.observed_data)
-
-        # Convert parameters to Rust types
-        rust_parameters = self._rust_parameters()
-
-        rust_constraints = engine_state.rust_constraints(self.problem.constraints)
-
-        # Convert loss config to Rust type
-        rust_loss_config = self._build_loss_config()
-
-        # Convert optimization config to Rust type
-        rust_optimization_config = self._build_optimization_config()
-
-        logger.info("Converted problem definition to Rust types.")
-        logger.info("Running optimization...")
-
-        # Call the Rust calibrate function
-        rust_result = rust_calibration.calibrate(
-            self._engine,
-            rust_observed_data,
-            rust_parameters,
-            rust_constraints,
-            rust_loss_config,
-            rust_optimization_config,
-            initial_condition_remainder=self.problem.initial_condition_remainder,
-        )
-
-        # Convert result back to Python CalibrationResult
+        if not summaries:
+            raise RuntimeError("Every start failed: " + "; ".join(failed_runs))
+        best = min(summaries, key=lambda summary: summary[0].loss)[1]
         result = CalibrationResult(
-            best_parameters=rust_result.best_parameters,
-            final_loss=rust_result.final_loss,
-            iterations=rust_result.iterations,
-            converged=rust_result.converged,
-            termination_reason=rust_result.termination_reason,
+            best_parameters=dict(best.best_parameters),
+            final_loss=best.final_loss,
+            iterations=best.iterations,
+            converged=best.converged,
+            termination_reason=best.termination_reason,
+            starts=[summary for summary, _ in summaries],
+            failed_runs=failed_runs,
         )
-
         logger.info(
             (
                 f"Calibration finished after {result.iterations} iterations. "
                 f"Final loss: {result.final_loss:.6f}"
             )
         )
-
         return result
 
-    def run_with_history(self) -> "CalibrationResultWithHistoryProtocol":
+    def run_with_history(self) -> CalibrationHistory:
         """
-        Runs the calibration optimization and returns evaluation history.
-
-        Returns all objective function evaluations that occurred during
-        optimization, not just the final best result. This is useful for
-        probabilistic calibration where we want to explore the parameter space.
+        Runs the calibration from the initial guess and keeps every evaluation.
 
         Returns
         -------
-        CalibrationResultWithHistory
-            Object containing optimized parameters, final loss, and all evaluations.
+        CalibrationHistory
+            The result, and every evaluation of a feasible point the optimizer
+            made, in order. Infeasible points, which the objective penalizes,
+            are not kept.
 
         Raises
         ------
-        ImportError
-            If Rust extension is not available.
-        ValueError
-            If calibration problem setup is invalid.
         RuntimeError
             If optimization fails.
         """
         logger.info("Starting calibration with history tracking")
-
-        rust_observed_data = engine_state.rust_observed_data(self.problem.observed_data)
-
-        # Convert parameters to Rust types
-        rust_parameters = self._rust_parameters()
-
-        rust_constraints = engine_state.rust_constraints(self.problem.constraints)
-
-        # Convert loss config to Rust type
-        rust_loss_config = self._build_loss_config()
-
-        # Convert optimization config to Rust type
-        rust_optimization_config = self._build_optimization_config()
-
-        # Call the Rust calibrate_with_history function
-        rust_result = rust_calibration.calibrate_with_history(
-            self._engine,
-            rust_observed_data,
-            rust_parameters,
-            rust_constraints,
-            rust_loss_config,
-            rust_optimization_config,
-            initial_condition_remainder=self.problem.initial_condition_remainder,
+        history = self._rust_problem.optimize_with_history(
+            self._build_optimization_config()
         )
-
+        names = self.parameter_names
+        rust_result = history.result
+        result = CalibrationResult(
+            best_parameters=dict(rust_result.best_parameters),
+            final_loss=rust_result.final_loss,
+            iterations=rust_result.iterations,
+            converged=rust_result.converged,
+            termination_reason=rust_result.termination_reason,
+        )
+        evaluations = [
+            CalibrationEvaluation(
+                parameters=dict(zip(names, evaluation.parameters, strict=True)),
+                loss=evaluation.loss,
+            )
+            for evaluation in history.evaluations
+        ]
         logger.info(
-            f"Calibration finished after {rust_result.iterations} iterations. "
-            f"Final loss: {rust_result.final_loss:.6f}. "
-            f"Collected {len(rust_result.evaluations)} evaluations."
+            f"Calibration finished after {result.iterations} iterations. "
+            f"Final loss: {result.final_loss:.6f}. "
+            f"Collected {len(evaluations)} evaluations."
         )
+        return CalibrationHistory(result=result, evaluations=evaluations)
 
-        return rust_result
+    def uncertainty(self, method: UncertaintyMethod[ResultT]) -> ResultT:
+        """
+        Run an uncertainty method on this calibration problem.
+
+        Each method is a configuration (a subclass of `UncertaintyMethod`)
+        whose type sets the result type; its runner is registered in
+        `commol.api.inference.registry`. The guide's table "Which method
+        answers which question" lists them.
+
+        Parameters
+        ----------
+        method : UncertaintyMethod[ResultT]
+            The configuration of the method.
+
+        Returns
+        -------
+        ResultT
+            The result of the method.
+
+        Raises
+        ------
+        ValueError
+            If no runner is registered for the configuration's type; the
+            message names the registered ones.
+        """
+        from commol.api.inference.registry import run_method
+
+        return run_method(self, method)
 
     def _to_rust_parameter_type(
         self, param_type: str
@@ -440,33 +526,3 @@ class Calibrator:
                     constraint.id,
                     max_observed_position,
                 )
-
-    def run_probabilistic(self):
-        """Run probabilistic calibration.
-
-        Returns
-        -------
-        ProbabilisticCalibrationResult
-            Object containing the ensemble of parameter sets, statistics,
-            predictions with confidence intervals, and coverage metrics.
-
-        Raises
-        ------
-        ValueError
-            If probabilistic_config is not set in the CalibrationProblem.
-        RuntimeError
-            If calibration or ensemble selection fails.
-        """
-        if self.problem.probabilistic_config is None:
-            raise ValueError(
-                "probabilistic_config must be set in CalibrationProblem to run "
-                "probabilistic calibration. Please set problem.probabilistic_config "
-                "to a ProbabilisticCalibrationConfig instance."
-            )
-
-        # Import ProbabilisticCalibrator implementation
-        from commol.api.probabilistic_calibrator import ProbabilisticCalibrator
-
-        # Create a probabilistic calibrator instance and delegate to it
-        prob_calibrator = ProbabilisticCalibrator(self.simulation, self.problem)
-        return prob_calibrator.run()

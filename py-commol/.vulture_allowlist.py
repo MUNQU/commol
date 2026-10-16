@@ -12,7 +12,9 @@ CalibrationParameterProtocol
 CalibrationParameterTypeProtocol
 CalibrationConstraintProtocol
 ObservedDataPointProtocol
-CalibrationResultWithHistoryProtocol
+CalibrationProblemProtocol
+CalibrationResultProtocol
+ObservationDrawsProtocol
 LossConfigProtocol
 OptimizationConfigProtocol
 EngineTypeProtocol

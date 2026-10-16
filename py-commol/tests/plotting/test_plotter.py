@@ -7,10 +7,20 @@ import numpy as np
 import pytest
 from matplotlib.figure import Figure
 
-from commol import ObservedDataPoint, PlotConfig, Simulation
+from commol import (
+    CalibrationProblem,
+    Calibrator,
+    NelderMeadConfig,
+    ObservedDataPoint,
+    ParameterSample,
+    PlotConfig,
+    Predictive,
+    SampleMethod,
+    Simulation,
+)
 from commol.api.plotter import SimulationPlotter
 from commol.context.calibration import CalibrationResult
-from tests.support import a_to_b_builder, build, build_ode, abc_builder
+from tests.support import a_to_b_builder, abc_builder, bounded, build, build_ode
 
 BINS = ["A", "B", "C"]
 TITLES = {"A": "State A", "B": "State B", "C": "State C"}
@@ -268,85 +278,65 @@ class TestSimulationPlotter:
         assert fig.dpi == dpi
 
 
-class TestWindowedProbabilisticSeries:
+class TestPredictiveSeries:
     """
-    Windowed ensemble bands are plotted against the steps they were taken at.
-
-    `windowed_prediction_*` is anchored at the observation steps, which need
-    not be every multiple of the window, so pairing it with a grid of multiples
-    would mismatch the axis.
+    A predictive plots the weighted median and band of its draws, each read
+    through the observation operator of the problem.
     """
 
-    def _model(self):
-        return build(
-            a_to_b_builder(parameters={"k1": 0.05}, rate="k1", accumulator="events")
-        )
+    window = 5
 
-    def test_plots_when_observations_are_sparser_than_the_window_grid(self) -> None:
-        from commol.context.probabilistic_calibration import (
-            EnsembleSolution,
-            ProbabilisticCalibrationResult,
+    def _calibrator(self) -> Calibrator:
+        model = build(
+            a_to_b_builder(parameters={"k1": None}, rate="k1", accumulator="events")
         )
+        problem = CalibrationProblem(
+            observed_data=[
+                ObservedDataPoint(at=10, output="events", value=1.0, window=5)
+            ],
+            parameters=[bounded("k1", 0.0, 0.5)],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=1),
+        )
+        return Calibrator(Simulation(model), problem)
 
-        window = 5
-        simulation = Simulation(self._model())
-        results = simulation.run(40)
-        # Only three windows are observed, while the grid of multiples has eight.
-        steps = [10, 25, 40]
+    def _predictive(self, values: list[float]) -> Predictive:
+        sample = ParameterSample.equally_weighted(
+            ["k1"], [(0.0, 0.5)], [[value] for value in values], SampleMethod(name="t")
+        )
+        return Predictive(self._calibrator(), sample, list(range(41)))
+
+    def test_a_windowed_band_of_one_draw_is_its_windowed_run(self) -> None:
+        predictive = self._predictive([0.05])
+        run = predictive.runs()[0]
         observed = [
-            ObservedDataPoint(
-                at=step,
-                output="events",
-                value=results["events"][step] - results["events"][step - window],
-                window=window,
-            )
-            for step in steps
+            ObservedDataPoint(at=at, output="events", value=1.0, window=self.window)
+            for at in (10, 25, 40)
         ]
-        windowed = [
-            results["events"][step] - results["events"][step - window] for step in steps
-        ]
-        ensemble = EnsembleSolution(
-            ensemble_size=1,
-            selected_indices=[0],
-            ensemble_parameters=[{"k1": 0.05}],
-            parameter_statistics={},
-            prediction_positions=results.positions,
-            prediction_median={k: list(v) for k, v in results.items()},
-            prediction_ci_lower={k: list(v) for k, v in results.items()},
-            prediction_ci_upper={k: list(v) for k, v in results.items()},
-            windowed_prediction_positions={"events": steps},
-            windowed_prediction_median={"events": windowed},
-            windowed_prediction_ci_lower={"events": windowed},
-            windowed_prediction_ci_upper={"events": windowed},
-            coverage_percentage=100.0,
-            average_ci_width=0.0,
-            ci_width=0.0,
-            coverage=1.0,
-            point_parameters={"k1": 0.05},
-            point_loss=0.0,
-            central_loss=0.0,
-            observation_diagnostics={},
-            selection_diagnostics={},
-        )
-        result = ProbabilisticCalibrationResult(
-            selected_ensemble=ensemble,
-            selection_algorithm="nsga2",
-            n_runs_performed=1,
-            n_unique_evaluations=1,
-            n_clusters_used=1,
-            confidence_level=0.95,
-        )
+        plotter = SimulationPlotter(predictive.calibrator.simulation, run)
 
-        plotter = SimulationPlotter(simulation, results)
         figure = plotter.plot_series(
-            observed_data=observed, calibration_result=result, series=["events"]
+            observed_data=observed, calibration_result=predictive, series=["events"]
         )
 
+        ends = list(range(5, 41, 5))
         line = figure.axes[0].lines[0]
-        assert np.asarray(line.get_xdata(), dtype=float).tolist() == steps
+        assert np.asarray(line.get_xdata(), dtype=float).tolist() == ends
         assert np.asarray(line.get_ydata(), dtype=float).tolist() == pytest.approx(
-            windowed
+            [run["events"][end] - run["events"][end - 5] for end in ends]
         )
+
+    def test_the_band_of_two_draws_spans_their_runs(self) -> None:
+        predictive = self._predictive([0.02, 0.1])
+        low, high = predictive.runs()
+        plotter = SimulationPlotter(predictive.calibrator.simulation, low)
+
+        figure = plotter.plot_series(calibration_result=predictive, series=["B"])
+
+        filled = [c for c in figure.axes[0].collections if c.get_paths()]
+        band = filled[0].get_paths()[0].vertices[:, 1]
+        assert band.min() == pytest.approx(min(low["B"]))
+        assert band.max() == pytest.approx(max(high["B"]))
 
 
 class TestSeriesSelection:

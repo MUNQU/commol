@@ -345,11 +345,7 @@ class OptimizationConfigProtocol(Protocol):
 
 class CalibrationResultProtocol(Protocol):
     @property
-    def best_parameters(self) -> dict[str, float]: ...
-    @property
-    def best_parameters_list(self) -> list[float]: ...
-    @property
-    def parameter_names(self) -> list[str]: ...
+    def best_parameters(self) -> list[tuple[str, float]]: ...
     @property
     def final_loss(self) -> float: ...
     @property
@@ -358,65 +354,26 @@ class CalibrationResultProtocol(Protocol):
     def converged(self) -> bool: ...
     @property
     def termination_reason(self) -> str: ...
-    def to_dict(self) -> dict[str, object]: ...
 
 class CalibrationEvaluationProtocol(Protocol):
-    def __init__(
-        self,
-        parameters: list[float],
-        loss: float,
-        predictions: list[list[float]],
-    ) -> None: ...
     @property
     def parameters(self) -> list[float]: ...
     @property
     def loss(self) -> float: ...
-    @property
-    def predictions(self) -> list[list[float]]: ...
 
 class CalibrationResultWithHistoryProtocol(Protocol):
     @property
-    def best_parameters(self) -> dict[str, float]: ...
-    @property
-    def best_parameters_list(self) -> list[float]: ...
-    @property
-    def parameter_names(self) -> list[str]: ...
-    @property
-    def final_loss(self) -> float: ...
-    @property
-    def iterations(self) -> int: ...
-    @property
-    def converged(self) -> bool: ...
-    @property
-    def termination_reason(self) -> str: ...
+    def result(self) -> CalibrationResultProtocol: ...
     @property
     def evaluations(self) -> list[CalibrationEvaluationProtocol]: ...
 
-class ParetoSolutionProtocol(Protocol):
+class StartOutcomeProtocol(Protocol):
     @property
-    def ensemble_size(self) -> int: ...
+    def start(self) -> list[float]: ...
     @property
-    def ci_width(self) -> float: ...
+    def result(self) -> CalibrationResultProtocol | None: ...
     @property
-    def coverage(self) -> float: ...
-    @property
-    def central_loss(self) -> float: ...
-    @property
-    def selected_indices(self) -> list[int]: ...
-
-class EnsembleSelectionResultProtocol(Protocol):
-    @property
-    def selected_ensemble(self) -> list[int]: ...
-    @property
-    def pareto_front(self) -> list[ParetoSolutionProtocol]: ...
-    @property
-    def selected_pareto_index(self) -> int | None: ...
-    @property
-    def ci_width(self) -> float: ...
-    @property
-    def coverage(self) -> float: ...
-    @property
-    def diagnostics(self) -> dict[str, float]: ...
+    def error(self) -> str | None: ...
 
 class CalibrationModule(Protocol):
     ObservedDataPoint: type[ObservedDataPointProtocol]
@@ -436,18 +393,7 @@ class CalibrationModule(Protocol):
     CalibrationResult: type[CalibrationResultProtocol]
     CalibrationEvaluation: type[CalibrationEvaluationProtocol]
     CalibrationResultWithHistory: type[CalibrationResultWithHistoryProtocol]
-    ParetoSolution: type[ParetoSolutionProtocol]
-    EnsembleSelectionResult: type[EnsembleSelectionResultProtocol]
-    def calibrate(
-        self,
-        engine: EngineProtocol,
-        observed_data: list[ObservedDataPointProtocol],
-        parameters: list[CalibrationParameterProtocol],
-        constraints: list[CalibrationConstraintProtocol],
-        loss_config: LossConfigProtocol,
-        optimization_config: OptimizationConfigProtocol,
-        initial_condition_remainder: str | None = None,
-    ) -> CalibrationResultProtocol: ...
+    StartOutcome: type[StartOutcomeProtocol]
     def check_positions(
         self,
         engine: EngineProtocol,
@@ -467,108 +413,113 @@ class CalibrationModule(Protocol):
         values: list[float],
         initial_condition_remainder: str | None = None,
     ) -> tuple[list[float], list[float], list[int]]: ...
-    def calibrate_with_history(
+
+class CalibrationProblemProtocol(Protocol):
+    def __init__(
         self,
         engine: EngineProtocol,
         observed_data: list[ObservedDataPointProtocol],
         parameters: list[CalibrationParameterProtocol],
         constraints: list[CalibrationConstraintProtocol],
         loss_config: LossConfigProtocol,
-        optimization_config: OptimizationConfigProtocol,
         initial_condition_remainder: str | None = None,
+    ) -> None: ...
+    @property
+    def parameter_names(self) -> list[str]: ...
+    @property
+    def observation_count(self) -> int: ...
+    @property
+    def replicate_count(self) -> int: ...
+    def optimize(
+        self, config: OptimizationConfigProtocol, starts: int, seed: int
+    ) -> list[StartOutcomeProtocol]: ...
+    def optimize_with_history(
+        self, config: OptimizationConfigProtocol
     ) -> CalibrationResultWithHistoryProtocol: ...
-    def run_multiple_calibrations(
-        self,
-        engine: EngineProtocol,
-        observed_data: list[ObservedDataPointProtocol],
-        parameters: list[CalibrationParameterProtocol],
-        constraints: list[CalibrationConstraintProtocol],
-        loss_config: LossConfigProtocol,
-        optimization_config: OptimizationConfigProtocol,
-        n_runs: int,
-        seed: int,
-        evaluation_retention: str = "all",
-        top_k_per_run: int | None = None,
-        initial_condition_remainder: str | None = None,
-    ) -> list[CalibrationResultWithHistoryProtocol]: ...
-    def deduplicate_evaluations(
-        self,
-        evaluations: list[CalibrationEvaluationProtocol],
-        tolerance: float,
-    ) -> list[CalibrationEvaluationProtocol]: ...
-    def generate_predictions_parallel(
-        self,
-        engine: EngineProtocol,
-        parameter_sets: list[list[float]],
-        parameter_names: list[str],
-        positions: list[float],
+    def predict_observations(
+        self, parameter_sets: list[list[float]]
     ) -> list[list[list[float]]]: ...
-    def generate_calibrated_predictions_parallel(
+    def predict_positions(
+        self, parameter_sets: list[list[float]], positions: list[float]
+    ) -> list[list[list[list[float]]]]: ...
+    def predictive(
+        self, sample: ParameterSampleProtocol, positions: list[float]
+    ) -> PredictiveProtocol: ...
+    def observation_draws(
         self,
-        engine: EngineProtocol,
-        observed_data: list[ObservedDataPointProtocol],
-        parameters: list[CalibrationParameterProtocol],
-        constraints: list[CalibrationConstraintProtocol],
-        loss_config: LossConfigProtocol,
-        parameter_sets: list[list[float]],
-        positions: list[float],
-        initial_condition_remainder: str | None = None,
-    ) -> list[list[list[float]]]: ...
-    def generate_predictions_at_points_parallel(
+        sample: ParameterSampleProtocol,
+        observations: list[ObservedDataPointProtocol],
+    ) -> ObservationDrawsProtocol: ...
+
+class ParameterSampleProtocol(Protocol):
+    def __init__(
         self,
-        engine: EngineProtocol,
-        parameter_sets: list[list[float]],
-        parameter_names: list[str],
-        metric_points: list[tuple[float, int]],
-    ) -> list[list[float]]: ...
-    def generate_calibrated_predictions_at_points_parallel(
-        self,
-        engine: EngineProtocol,
-        observed_data: list[ObservedDataPointProtocol],
-        parameters: list[CalibrationParameterProtocol],
-        constraints: list[CalibrationConstraintProtocol],
-        loss_config: LossConfigProtocol,
-        parameter_sets: list[list[float]],
-        metric_points: list[tuple[float, int]],
-        initial_condition_remainder: str | None = None,
-    ) -> list[list[float]]: ...
-    def select_compact_ensemble(
-        self,
-        candidates: list[CalibrationEvaluationProtocol],
-        observed_values: list[float],
-        weights: list[float],
-        normalization: list[float],
-        series_ids: list[str],
-        confidence_level: float,
-        seed: int,
-        central_loss_metric: str = "sse",
-        ensemble_algorithm: str = "nsga2",
-        ensemble_size_mode: str = "automatic",
-        ensemble_size: int | None = None,
-        ensemble_size_min: int | None = None,
-        ensemble_size_max: int | None = None,
-        central_fit_max_loss_ratio: float = 1.25,
-        search_beam_width: int = 32,
-        population_size: int = 100,
-        generations: int = 100,
-        crossover_probability: float = 0.9,
-        pareto_preference: float = 0.5,
-    ) -> EnsembleSelectionResultProtocol: ...
-    def select_cluster_representatives(
-        self,
-        evaluations: list[CalibrationEvaluationProtocol],
-        cluster_labels: list[int],
-        max_representatives: int,
-        elite_fraction: float,
-        strategy: str,
-        selection_method: str = "crowding_distance",
-        quality_temperature: float = 1.0,
-        seed: int = 42,
-        k_neighbors_min: int = 5,
-        k_neighbors_max: int = 10,
-        sparsity_weight: float = 2.0,
-        stratum_fit_weight: float = 10.0,
-    ) -> list[int]: ...
+        names: list[str],
+        bounds: list[tuple[float, float]],
+        values: list[list[float]],
+        log_weights: list[float],
+        groups: list[int] | None = None,
+    ) -> None: ...
+    @property
+    def weights(self) -> list[float]: ...
+    @property
+    def log_weights(self) -> list[float]: ...
+    def mean(self) -> list[float]: ...
+    def covariance(self) -> list[list[float]]: ...
+    def correlation(self) -> list[list[float]]: ...
+    def quantiles(self, levels: list[float]) -> list[list[float]]: ...
+    def interval(self, confidence_level: float) -> tuple[list[float], list[float]]: ...
+    def effective_size(self) -> float: ...
+    def resample(self, count: int, seed: int) -> list[int]: ...
+
+type _Band2 = tuple[
+    list[list[float]], list[list[float]], list[list[float]], list[list[float]]
+]
+type _Band1 = tuple[list[float], list[float], list[float], list[float]]
+
+class PredictiveProtocol(Protocol):
+    @property
+    def positions(self) -> list[float]: ...
+    @property
+    def trajectories(self) -> list[list[list[float]]]: ...
+    @property
+    def weights(self) -> list[float]: ...
+    def band(self, confidence_level: float) -> _Band2: ...
+    def series_band(
+        self, outputs: list[int], cumulative: bool, confidence_level: float
+    ) -> _Band1: ...
+
+class ObservationDrawsProtocol(Protocol):
+    @property
+    def values(self) -> list[list[float]]: ...
+    @property
+    def weights(self) -> list[float]: ...
+    def quantiles(self, levels: list[float]) -> list[list[float]]: ...
+    def band(self, confidence_level: float) -> _Band1: ...
+    def coverage(
+        self, observed: list[float], confidence_level: float
+    ) -> list[float]: ...
+    def interval_score(
+        self, observed: list[float], confidence_level: float
+    ) -> list[float]: ...
+    def weighted_interval_score(
+        self, observed: list[float], confidence_levels: list[float]
+    ) -> list[float]: ...
+    def crps(self, observed: list[float]) -> list[float]: ...
+    def pit(self, observed: list[float], seed: int) -> list[float]: ...
+
+class InferenceModule(Protocol):
+    CalibrationProblem: type[CalibrationProblemProtocol]
+    ParameterSample: type[ParameterSampleProtocol]
+    Predictive: type[PredictiveProtocol]
+    ObservationDraws: type[ObservationDrawsProtocol]
+    def weighted_quantiles(
+        self, values: list[float], weights: list[float], levels: list[float]
+    ) -> list[float]: ...
+    def weighted_mean(self, values: list[float], weights: list[float]) -> float: ...
+    def by_series(
+        self, labels: list[str], values: list[float]
+    ) -> list[tuple[str, float]]: ...
 
 class MathExpressionProtocol(Protocol):
     def __init__(self, expression: str) -> None: ...
@@ -606,9 +557,11 @@ class RustCommolModule(Protocol):
     model: ModelModule
     engine: EngineModule
     calibration: CalibrationModule
+    inference: InferenceModule
 
 core: CoreModule
 model: ModelModule
 engine: EngineModule
 calibration: CalibrationModule
+inference: InferenceModule
 rust_commol: RustCommolModule

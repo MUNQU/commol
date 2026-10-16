@@ -11,7 +11,8 @@ from commol import (
     Model,
     NelderMeadConfig,
     ObservedDataPoint,
-    ParameterSetStatistics,
+    ParameterSample,
+    SampleMethod,
     applied_parameters_report,
 )
 from tests.support import (
@@ -54,19 +55,14 @@ def _problem(scale: bool = False) -> CalibrationProblem:
     )
 
 
-def _statistics(*ids: str) -> dict[str, ParameterSetStatistics]:
-    return {
-        entry_id: ParameterSetStatistics(
-            mean=1.0,
-            median=1.0,
-            std=0.1,
-            percentile_lower=0.9,
-            percentile_upper=1.1,
-            min=0.8,
-            max=1.2,
-        )
-        for entry_id in ids
-    }
+def _sample(entry_id: str, values: list[float]) -> ParameterSample:
+    """Equal draws of one parameter."""
+    return ParameterSample.equally_weighted(
+        [entry_id],
+        [(0.0, 10.0)],
+        [[value] for value in values],
+        SampleMethod(name="test"),
+    )
 
 
 class TestParameters:
@@ -271,23 +267,34 @@ class TestCompartmentOverrides:
 
 
 class TestIntervals:
-    def test_entries_gain_an_interval_when_statistics_are_given(self) -> None:
+    def test_entries_gain_the_statistics_of_a_sample(self) -> None:
         report = applied_parameters_report(
             _model(),
             {"k1": 0.3},
-            parameter_statistics=_statistics("k1"),
+            sample=_sample("k1", [0.8, 1.0, 1.2]),
             confidence_level=0.95,
         )
 
-        assert report["parameters"]["k1"]["interval"] == {
-            "mean": 1.0,
-            "median": 1.0,
-            "ci_lower": 0.9,
-            "ci_upper": 1.1,
-            "min": 0.8,
-            "max": 1.2,
-            "std": 0.1,
-        }
+        # Three equal draws: the 2.5 % and 97.5 % quantiles lie outside the
+        # first and last midpoints (1/6, 5/6), so they are the extremes; the
+        # sample variance is 0.08 / 2.
+        assert report["parameters"]["k1"]["interval"] == pytest.approx(
+            {
+                "mean": 1.0,
+                "median": 1.0,
+                "ci_lower": 0.8,
+                "ci_upper": 1.2,
+                "min": 0.8,
+                "max": 1.2,
+                "std": 0.2,
+            }
+        )
+
+    def test_a_sample_needs_a_confidence_level(self) -> None:
+        with pytest.raises(ValueError, match="needs a confidence_level"):
+            applied_parameters_report(
+                _model(), {"k1": 0.3}, sample=_sample("k1", [0.8, 1.2])
+            )
 
     def test_conditional_category_interval_is_rescaled_to_the_total(
         self,
@@ -295,22 +302,10 @@ class TestIntervals:
         # A conditional category is calibrated as a fraction of its subgroup but
         # reported as a fraction of the total. The interval must be
         # rescaled by the group share so it brackets the reported fraction.
-        statistics = {
-            "s1": ParameterSetStatistics(
-                mean=0.25,
-                median=0.25,
-                std=0.05,
-                percentile_lower=0.2,
-                percentile_upper=0.3,
-                min=0.15,
-                max=0.35,
-            )
-        }
-
         report = applied_parameters_report(
             _model(conditional=True),
             {},
-            parameter_statistics=statistics,
+            sample=_sample("s1", [0.2, 0.25, 0.3]),
             confidence_level=0.95,
         )
 
@@ -324,7 +319,10 @@ class TestIntervals:
 
     def test_entries_without_statistics_have_no_interval(self) -> None:
         report = applied_parameters_report(
-            _model(), {"k1": 0.3}, parameter_statistics=_statistics("k1")
+            _model(),
+            {"k1": 0.3},
+            sample=_sample("k1", [0.8, 1.2]),
+            confidence_level=0.95,
         )
 
         assert "interval" not in report["initial_conditions"]["A"]

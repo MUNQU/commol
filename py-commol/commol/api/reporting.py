@@ -5,7 +5,8 @@ from typing import NotRequired, TypedDict, cast
 
 import numpy as np
 
-from commol.api.probabilistic.intervals import member_statistics
+from commol.api.inference.intervals import member_statistics
+from commol.api.inference.predictive import Predictive
 from commol.api.results import SimulationResults, sample
 from commol.api.simulation import Simulation
 from commol.api.windows import window_end, window_index, windowed_totals
@@ -18,10 +19,7 @@ from commol.context.calibration import (
 from commol.context._model.report import InitialConditionEntry
 from commol.context.constants import CalibrationParameterType
 from commol.context.model import Model
-from commol.context.probabilistic_calibration import (
-    ParameterSetStatistics,
-    ProbabilisticCalibrationResult,
-)
+from commol.context.inference.sample import ParameterSample, ParameterSummary
 from commol.context.report_entry import Interval, entry_interval
 
 
@@ -50,7 +48,7 @@ def _parameter_entry(
     entry_id: str,
     value: float,
     calibrated_ids: set[str],
-    statistics: Mapping[str, ParameterSetStatistics] | None,
+    statistics: Mapping[str, ParameterSummary] | None,
 ) -> ParameterEntry:
     """One reported parameter, with its interval when there is one."""
     entry: ParameterEntry = {
@@ -63,26 +61,23 @@ def _parameter_entry(
     return entry
 
 
-def _ensemble_details(
-    result: CalibrationResult | ProbabilisticCalibrationResult | Mapping[str, float],
-    statistics: Mapping[str, ParameterSetStatistics] | None,
+def _sample_statistics(
+    sample: ParameterSample | None,
     confidence_level: float | None,
-) -> tuple[Mapping[str, ParameterSetStatistics] | None, float | None]:
-    """Fill statistics and confidence level from a probabilistic result."""
-    if not isinstance(result, ProbabilisticCalibrationResult):
-        return statistics, confidence_level
-    if statistics is None:
-        statistics = result.selected_ensemble.parameter_statistics
+) -> Mapping[str, ParameterSummary] | None:
+    """The statistics of each parameter of a sample, at a confidence level."""
+    if sample is None:
+        return None
     if confidence_level is None:
-        confidence_level = result.confidence_level
-    return statistics, confidence_level
+        raise ValueError("A report of a sample needs a confidence_level.")
+    return sample.summary(confidence_level)
 
 
 def applied_parameters_report(
     model: Model,
-    result: CalibrationResult | ProbabilisticCalibrationResult | Mapping[str, float],
+    result: CalibrationResult | Mapping[str, float],
     problem: CalibrationProblem | None = None,
-    parameter_statistics: Mapping[str, ParameterSetStatistics] | None = None,
+    sample: ParameterSample | None = None,
     confidence_level: float | None = None,
 ) -> AppliedParametersReport:
     """
@@ -109,8 +104,9 @@ def applied_parameters_report(
     uncalibrated keeps a ``None`` fraction and ``None`` value as its "needs
     calibration" marker even when overrides touch some of its compartments.
 
-    For a probabilistic result each entry gains an ``interval`` holding the
-    ensemble spread. A parameter is in the unit it was calibrated in. An
+    With a `sample` each entry gains an ``interval`` holding the weighted
+    statistics of its draws (`ParameterSample.summary`). A parameter is in
+    the unit it was calibrated in. An
     initial-condition entry is in the fraction the row reports: a conditional
     stratification's category is calibrated as a group fraction but reported
     over the total, so its interval is rescaled by the group's share of the
@@ -120,17 +116,15 @@ def applied_parameters_report(
     ----------
     model : Model
         The model carrying the applied values.
-    result : CalibrationResult | ProbabilisticCalibrationResult | Mapping
-        The calibration outcome, or a mapping of parameter id to value such as
-        one ensemble member's parameters.
+    result : CalibrationResult | Mapping
+        The calibration result, or a mapping of parameter id to value such as
+        one draw of a sample.
     problem : CalibrationProblem | None, optional
         The problem the result came from, used to report factor parameters.
-    parameter_statistics : Mapping[str, ParameterSetStatistics] | None, optional
-        Ensemble spread per entry. Taken from `result` when it is a
-        probabilistic result and this is not given.
+    sample : ParameterSample | None, optional
+        Draws of the parameters, such as the sample of an uncertainty method.
     confidence_level : float | None, optional
-        Confidence level the intervals describe. Taken from `result` when it is
-        a probabilistic result and this is not given.
+        Confidence level of the intervals; required with a sample.
 
     Returns
     -------
@@ -138,11 +132,14 @@ def applied_parameters_report(
         Key ``parameters`` and the sections of the kind (``initial_conditions``
         for an aggregate model), preceded by ``confidence_level`` when there
         is one.
+
+    Raises
+    ------
+    ValueError
+        If a sample is given without a confidence level.
     """
     calibrated = calibrated_values(result)
-    parameter_statistics, confidence_level = _ensemble_details(
-        result, parameter_statistics, confidence_level
-    )
+    parameter_statistics = _sample_statistics(sample, confidence_level)
     calibrated_ids = set(calibrated)
 
     parameters: dict[str, ParameterEntry] = {
@@ -218,7 +215,7 @@ class SimulationReport(TypedDict):
 def _reduce(
     reduce_fn: Callable[[SimulationResults], float | list[float]],
     results: SimulationResults,
-    ensemble_runs: Sequence[SimulationResults] | None,
+    ensemble_runs: "Sequence[SimulationResults] | Predictive | None",
     confidence_level: float | None,
 ) -> ReportLeaf:
     """
@@ -228,10 +225,16 @@ def _reduce(
     quantity computed per member and reduced to statistics, so both layouts
     differ only in what sits at the leaves.
     """
-    if not ensemble_runs or confidence_level is None:
+    if ensemble_runs is None or confidence_level is None:
         return reduce_fn(results)
-    members = np.asarray([reduce_fn(run) for run in ensemble_runs], dtype=float)
-    return member_statistics(members, confidence_level)
+    if isinstance(ensemble_runs, Predictive):
+        runs, weights = ensemble_runs.runs(), ensemble_runs.weights
+    else:
+        runs, weights = list(ensemble_runs), None
+    if not runs:
+        return reduce_fn(results)
+    members = np.asarray([reduce_fn(run) for run in runs], dtype=float)
+    return member_statistics(members, confidence_level, weights)
 
 
 def observed_report(
@@ -293,7 +296,7 @@ def series_report(
     results: SimulationResults,
     at: Sequence[float],
     accumulators: Iterable[str] = (),
-    ensemble_runs: Sequence[SimulationResults] | None = None,
+    ensemble_runs: "Sequence[SimulationResults] | Predictive | None" = None,
     confidence_level: float | None = None,
 ) -> dict[str, ReportLeaf]:
     """
@@ -313,8 +316,9 @@ def series_report(
         results.
     accumulators : Iterable[str], optional
         Accumulator ids whose outputs are left out.
-    ensemble_runs : Sequence[SimulationResults] | None, optional
-        One results mapping per ensemble member.
+    ensemble_runs : Sequence[SimulationResults] | Predictive | None, optional
+        One results mapping per member, such as the replicates of a stochastic
+        engine, or a `Predictive`, whose draws carry their weights.
     confidence_level : float | None, optional
         Confidence level of the reported intervals.
 
@@ -352,7 +356,7 @@ def accumulators_report(
     at: Sequence[float],
     window: float,
     num_windows: int,
-    ensemble_runs: Sequence[SimulationResults] | None = None,
+    ensemble_runs: "Sequence[SimulationResults] | Predictive | None" = None,
     confidence_level: float | None = None,
 ) -> dict[str, AccumulatorReport]:
     """
@@ -378,8 +382,9 @@ def accumulators_report(
         Length of one window on the axis.
     num_windows : int
         Number of windows on the reported axis.
-    ensemble_runs : Sequence[SimulationResults] | None, optional
-        One results mapping per ensemble member.
+    ensemble_runs : Sequence[SimulationResults] | Predictive | None, optional
+        One results mapping per member, such as the replicates of a stochastic
+        engine, or a `Predictive`, whose draws carry their weights.
     confidence_level : float | None, optional
         Confidence level of the reported intervals.
 
@@ -454,7 +459,7 @@ def simulation_report(
     num_windows: int,
     observed_data: Iterable[ObservedDataPoint] = (),
     accumulators: Iterable[str] = (),
-    ensemble_runs: Sequence[SimulationResults] | None = None,
+    ensemble_runs: "Sequence[SimulationResults] | Predictive | None" = None,
     confidence_level: float | None = None,
 ) -> SimulationReport:
     """
@@ -485,8 +490,9 @@ def simulation_report(
         The calibration targets to report alongside the run.
     accumulators : Iterable[str], optional
         Accumulator ids to report.
-    ensemble_runs : Sequence[SimulationResults] | None, optional
-        One results mapping per ensemble member.
+    ensemble_runs : Sequence[SimulationResults] | Predictive | None, optional
+        One results mapping per member, such as the replicates of a stochastic
+        engine, or a `Predictive`, whose draws carry their weights.
     confidence_level : float | None, optional
         Confidence level of the reported intervals.
 

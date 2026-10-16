@@ -30,7 +30,6 @@ from commol.context.constants import CalibrationParameterType
 from commol.context.description import Layout, ModelDescription
 from commol.context.engine import ModelEngine
 from commol.context.parameter import Parameter
-from commol.context.probabilistic_calibration import ProbabilisticCalibrationResult
 from commol.context.process import Process
 from commol.context.structure import ModelStructure
 
@@ -228,9 +227,7 @@ class Model(BaseModel, Generic[StructureT]):
 
     def apply_calibration_parameters(
         self,
-        result: CalibrationResult
-        | ProbabilisticCalibrationResult
-        | Mapping[str, float],
+        result: CalibrationResult | Mapping[str, float],
         problem: CalibrationProblem,
     ) -> None:
         """
@@ -246,10 +243,9 @@ class Model(BaseModel, Generic[StructureT]):
 
         Parameters
         ----------
-        result : CalibrationResult | ProbabilisticCalibrationResult | Mapping
-            The calibration outcome, or a mapping of parameter id to value.
-            For a probabilistic result the point parameters of the selected
-            ensemble are applied.
+        result : CalibrationResult | Mapping
+            The calibration result, or a mapping of parameter id to value such
+            as one draw of a `ParameterSample` (``sample.draws()``).
         problem : CalibrationProblem
             The problem the result came from, used to resolve parameter types.
 
@@ -258,6 +254,9 @@ class Model(BaseModel, Generic[StructureT]):
         ValueError
             If an id is not declared in ``problem``, or the structure cannot
             write back a value of its kind.
+        TypeError
+            If `result` is a `ParameterSample`, which has no single set of
+            parameters.
         """
         values = calibrated_values(result)
         types = {param.id: param.parameter_type for param in problem.parameters}

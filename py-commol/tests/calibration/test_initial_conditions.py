@@ -10,7 +10,6 @@ from commol import (
     ParticleSwarmConfig,
     Simulation,
 )
-from commol.api.probabilistic_calibrator import ProbabilisticCalibrator
 from commol.context.model import Model
 from tests.support import a_to_b_builder, bounded, build, observed, abc_builder
 
@@ -50,14 +49,9 @@ class TestIds:
         with pytest.raises(ValueError, match="needs a binary stratification"):
             Calibrator(Simulation(_model()), _problem(parameter_id))
 
-    def test_the_probabilistic_calibrator_gives_the_same_message(self) -> None:
-        with pytest.raises(ValueError, match="needs a binary stratification"):
-            ProbabilisticCalibrator(Simulation(_model()), _problem("y"))
-
     @pytest.mark.parametrize("parameter_id", ["B", "B_g1", "B_g1_y", "g1", "group:g1"])
     def test_every_documented_id_kind_is_accepted(self, parameter_id: str) -> None:
         Calibrator(Simulation(_model()), _problem(parameter_id))
-        ProbabilisticCalibrator(Simulation(_model()), _problem(parameter_id))
 
     def test_an_unknown_id_is_rejected(self) -> None:
         with pytest.raises(

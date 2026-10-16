@@ -1,10 +1,8 @@
 //! Python bindings for commol-calibration (parameter optimization).
 
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use std::collections::HashMap;
 
-use crate::engine::{InfeasibleStateError, PyEngine};
+use crate::engine::PyEngine;
 
 /// Type of value being calibrated
 #[pyclass(name = "CalibrationParameterType", from_py_object)]
@@ -324,6 +322,7 @@ impl PyLossConfig {
 #[derive(Clone)]
 pub struct PyNelderMeadConfig {
     pub inner: commol_calibration::NelderMeadConfig,
+    pub verbose: bool,
     pub header_interval: u64,
 }
 
@@ -364,8 +363,8 @@ impl PyNelderMeadConfig {
                 gamma,
                 rho,
                 sigma,
-                verbose,
             },
+            verbose,
             header_interval,
         }
     }
@@ -510,6 +509,7 @@ impl PyPSOVelocity {
 #[derive(Clone)]
 pub struct PyParticleSwarmConfig {
     pub inner: commol_calibration::ParticleSwarmConfig,
+    pub verbose: bool,
     pub header_interval: u64,
 }
 
@@ -574,7 +574,6 @@ impl PyParticleSwarmConfig {
                 mutation_probability: 0.0,
                 mutation_application: commol_calibration::MutationApplication::None,
                 seed,
-                verbose,
             };
 
             // Handle inertia strategy
@@ -657,6 +656,7 @@ impl PyParticleSwarmConfig {
 
             Ok(Self {
                 inner: config,
+                verbose,
                 header_interval: 100,
             })
         })
@@ -785,6 +785,8 @@ impl PyParticleSwarmConfig {
 #[derive(Clone)]
 pub struct PyOptimizationConfig {
     pub inner: commol_calibration::OptimizationConfig,
+    /// Whether the optimization writes its progress to Python's stdout.
+    pub verbose: bool,
     pub header_interval: u64,
 }
 
@@ -794,10 +796,12 @@ impl PyOptimizationConfig {
     #[staticmethod]
     fn nelder_mead(config: Option<PyNelderMeadConfig>) -> Self {
         let header_interval = config.as_ref().map(|c| c.header_interval).unwrap_or(100);
+        let verbose = config.as_ref().is_some_and(|c| c.verbose);
         Self {
             inner: commol_calibration::OptimizationConfig::NelderMead(
                 config.map(|c| c.inner).unwrap_or_default(),
             ),
+            verbose,
             header_interval,
         }
     }
@@ -806,16 +810,18 @@ impl PyOptimizationConfig {
     #[staticmethod]
     fn particle_swarm(config: Option<PyParticleSwarmConfig>) -> Self {
         let header_interval = config.as_ref().map(|c| c.header_interval).unwrap_or(100);
+        let verbose = config.as_ref().is_some_and(|c| c.verbose);
         Self {
             inner: commol_calibration::OptimizationConfig::ParticleSwarm(
                 config.map(|c| c.inner).unwrap_or_default(),
             ),
+            verbose,
             header_interval,
         }
     }
 }
 
-/// Calibration evaluation (single optimization run)
+/// One evaluation of a feasible point during an optimization
 #[pyclass(name = "CalibrationEvaluation", from_py_object)]
 #[derive(Clone)]
 pub struct PyCalibrationEvaluation {
@@ -824,250 +830,66 @@ pub struct PyCalibrationEvaluation {
 
 #[pymethods]
 impl PyCalibrationEvaluation {
-    #[new]
-    fn new(parameters: Vec<f64>, loss: f64, predictions: Vec<Vec<f64>>) -> Self {
-        Self {
-            inner: commol_calibration::CalibrationEvaluation {
-                parameters,
-                loss,
-                predictions,
-            },
-        }
-    }
-
+    /// The parameter values the objective scored, in problem order
     #[getter]
     fn parameters(&self) -> Vec<f64> {
         self.inner.parameters.clone()
     }
 
+    /// The loss at these values
     #[getter]
     fn loss(&self) -> f64 {
         self.inner.loss
     }
 
-    #[getter]
-    fn predictions(&self) -> Vec<Vec<f64>> {
-        self.inner.predictions.clone()
-    }
-
     fn __repr__(&self) -> String {
         format!(
-            "CalibrationEvaluation(loss={:.6}, num_params={})",
-            self.inner.loss,
-            self.inner.parameters.len()
-        )
-    }
-}
-
-/// Compact Pareto-front solution returned by ensemble selection.
-#[pyclass(name = "ParetoSolution", from_py_object)]
-#[derive(Clone)]
-pub struct PyParetoSolution {
-    pub inner: commol_calibration::ParetoSolution,
-}
-
-#[pymethods]
-impl PyParetoSolution {
-    #[getter]
-    fn ensemble_size(&self) -> usize {
-        self.inner.ensemble_size
-    }
-
-    #[getter]
-    fn ci_width(&self) -> f64 {
-        self.inner.ci_width
-    }
-
-    #[getter]
-    fn coverage(&self) -> f64 {
-        self.inner.coverage
-    }
-
-    #[getter]
-    fn central_loss(&self) -> f64 {
-        self.inner.central_loss
-    }
-
-    #[getter]
-    fn selected_indices(&self) -> Vec<usize> {
-        self.inner.selected_indices.clone()
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "ParetoSolution(size={}, ci_width={:.6}, coverage={:.4})",
-            self.inner.ensemble_size, self.inner.ci_width, self.inner.coverage
-        )
-    }
-}
-
-/// Result returned by compact ensemble selection.
-#[pyclass(name = "EnsembleSelectionResult", from_py_object)]
-#[derive(Clone)]
-pub struct PyEnsembleSelectionResult {
-    pub inner: commol_calibration::EnsembleSelectionResult,
-}
-
-#[pymethods]
-impl PyEnsembleSelectionResult {
-    #[getter]
-    fn selected_ensemble(&self) -> Vec<usize> {
-        self.inner.selected_ensemble.clone()
-    }
-
-    #[getter]
-    fn pareto_front(&self) -> Vec<PyParetoSolution> {
-        self.inner
-            .pareto_front
-            .iter()
-            .map(|solution| PyParetoSolution {
-                inner: solution.clone(),
-            })
-            .collect()
-    }
-
-    #[getter]
-    fn selected_pareto_index(&self) -> Option<usize> {
-        self.inner.selected_pareto_index
-    }
-
-    #[getter]
-    fn ci_width(&self) -> f64 {
-        self.inner.ci_width
-    }
-
-    #[getter]
-    fn coverage(&self) -> f64 {
-        self.inner.coverage
-    }
-
-    #[getter]
-    fn diagnostics(&self) -> HashMap<String, f64> {
-        self.inner.diagnostics.iter().cloned().collect()
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "EnsembleSelectionResult(selected_size={}, pareto_front_size={})",
-            self.inner.selected_ensemble.len(),
-            self.inner.pareto_front.len()
-        )
-    }
-}
-
-/// Calibration result with evaluation history
-#[pyclass(name = "CalibrationResultWithHistory")]
-pub struct PyCalibrationResultWithHistory {
-    inner: commol_calibration::CalibrationResultWithHistory,
-}
-
-#[pymethods]
-impl PyCalibrationResultWithHistory {
-    #[getter]
-    fn best_parameters(&self) -> HashMap<String, f64> {
-        self.inner
-            .parameter_names
-            .iter()
-            .zip(self.inner.best_parameters.iter())
-            .map(|(name, &value)| (name.clone(), value))
-            .collect()
-    }
-
-    #[getter]
-    fn best_parameters_list(&self) -> Vec<f64> {
-        self.inner.best_parameters.clone()
-    }
-
-    #[getter]
-    fn parameter_names(&self) -> Vec<String> {
-        self.inner.parameter_names.clone()
-    }
-
-    #[getter]
-    fn final_loss(&self) -> f64 {
-        self.inner.final_loss
-    }
-
-    #[getter]
-    fn iterations(&self) -> usize {
-        self.inner.iterations
-    }
-
-    #[getter]
-    fn converged(&self) -> bool {
-        self.inner.converged
-    }
-
-    #[getter]
-    fn termination_reason(&self) -> String {
-        self.inner.termination_reason.clone()
-    }
-
-    #[getter]
-    fn evaluations(&self) -> Vec<PyCalibrationEvaluation> {
-        self.inner
-            .evaluations
-            .iter()
-            .map(|e| PyCalibrationEvaluation { inner: e.clone() })
-            .collect()
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "CalibrationResultWithHistory(loss={:.6}, iterations={}, converged={}, num_evaluations={})",
-            self.inner.final_loss,
-            self.inner.iterations,
-            self.inner.converged,
-            self.inner.evaluations.len()
+            "CalibrationEvaluation(loss={:.6}, parameters={:?})",
+            self.inner.loss, self.inner.parameters
         )
     }
 }
 
 /// Calibration result
-#[pyclass(name = "CalibrationResult")]
+#[pyclass(name = "CalibrationResult", from_py_object)]
+#[derive(Clone)]
 pub struct PyCalibrationResult {
-    inner: commol_calibration::CalibrationResult,
+    pub inner: commol_calibration::CalibrationResult,
 }
 
 #[pymethods]
 impl PyCalibrationResult {
-    /// Get the best parameter values as a dictionary
+    /// The best value of each parameter, as `(name, value)` pairs in problem
+    /// order
     #[getter]
-    fn best_parameters(&self) -> HashMap<String, f64> {
-        self.inner.parameters_map()
+    fn best_parameters(&self) -> Vec<(String, f64)> {
+        self.inner
+            .parameter_names
+            .iter()
+            .cloned()
+            .zip(self.inner.best_parameters.iter().copied())
+            .collect()
     }
 
-    /// Get the best parameter values as a list
-    #[getter]
-    fn best_parameters_list(&self) -> Vec<f64> {
-        self.inner.best_parameters.clone()
-    }
-
-    /// Get the parameter names
-    #[getter]
-    fn parameter_names(&self) -> Vec<String> {
-        self.inner.parameter_names.clone()
-    }
-
-    /// Get the final loss value
+    /// The final loss value
     #[getter]
     fn final_loss(&self) -> f64 {
         self.inner.final_loss
     }
 
-    /// Get the number of iterations performed
+    /// The number of iterations performed
     #[getter]
     fn iterations(&self) -> usize {
         self.inner.iterations
     }
 
-    /// Check if the optimization converged
+    /// Whether the optimization converged
     #[getter]
     fn converged(&self) -> bool {
         self.inner.converged
     }
 
-    /// Get the termination reason
+    /// Why the optimization stopped
     #[getter]
     fn termination_reason(&self) -> String {
         self.inner.termination_reason.clone()
@@ -1079,364 +901,72 @@ impl PyCalibrationResult {
             self.inner.final_loss, self.inner.iterations, self.inner.converged
         )
     }
-
-    /// Convert to Python dictionary
-    fn to_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
-        let dict = PyDict::new(py);
-        dict.set_item("best_parameters", self.best_parameters())?;
-        dict.set_item("parameter_names", self.parameter_names())?;
-        dict.set_item("final_loss", self.final_loss())?;
-        dict.set_item("iterations", self.iterations())?;
-        dict.set_item("converged", self.converged())?;
-        dict.set_item("termination_reason", self.termination_reason())?;
-        Ok(dict.into())
-    }
 }
 
-/// Name the initial-condition remainder of a problem, when one is given.
-fn with_remainder<E: commol_core::SimulationEngine>(
-    problem: commol_calibration::CalibrationProblem<E>,
-    remainder: Option<String>,
-) -> PyResult<commol_calibration::CalibrationProblem<E>> {
-    match remainder {
-        Some(remainder) => problem
-            .with_initial_condition_remainder(&remainder)
-            .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>),
-        None => Ok(problem),
-    }
+/// Calibration result with every evaluation of a feasible point
+#[pyclass(name = "CalibrationResultWithHistory")]
+pub struct PyCalibrationResultWithHistory {
+    pub inner: commol_calibration::CalibrationResultWithHistory,
 }
 
-/// Calibrate a model against observed data
-///
-/// Args:
-///     engine: The simulation engine built from the model
-///     observed_data: List of observed data points
-///     parameters: List of parameters to calibrate
-///     constraints: List of calibration constraints
-///     loss_config: Loss function configuration
-///     optimization_config: Optimization algorithm configuration
-///     initial_condition_remainder: Compartment or bin that absorbs the
-///         difference to the total, if any
-///
-/// Returns:
-///     CalibrationResult with best parameters and optimization statistics
-#[pyfunction]
-#[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_condition_remainder=None))]
-fn calibrate(
-    engine: PyRef<'_, PyEngine>,
-    observed_data: Vec<PyObservedDataPoint>,
-    parameters: Vec<PyCalibrationParameter>,
-    constraints: Vec<PyCalibrationConstraint>,
-    loss_config: &PyLossConfig,
-    optimization_config: &PyOptimizationConfig,
-    initial_condition_remainder: Option<String>,
-) -> PyResult<PyCalibrationResult> {
-    // Extract inner Rust types
-    let observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
-    let parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
-    let constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
+#[pymethods]
+impl PyCalibrationResultWithHistory {
+    /// The result of the optimization
+    #[getter]
+    fn result(&self) -> PyCalibrationResult {
+        PyCalibrationResult {
+            inner: self.inner.result.clone(),
+        }
+    }
 
-    // Clone the engine since CalibrationProblem takes ownership
-    let engine_clone = engine.engine();
+    /// Every evaluation of a feasible point, in the order they were made
+    #[getter]
+    fn evaluations(&self) -> Vec<PyCalibrationEvaluation> {
+        self.inner
+            .evaluations
+            .iter()
+            .map(|e| PyCalibrationEvaluation { inner: e.clone() })
+            .collect()
+    }
 
-    // Create calibration problem
-    let problem = commol_calibration::CalibrationProblem::new(
-        engine_clone,
-        observed_data,
-        parameters,
-        constraints,
-        loss_config.inner,
-    )
-    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
-    .with_observation_normalization(loss_config.normalize_observations)
-    .with_replicates(loss_config.replicates.clone());
-    let problem = with_remainder(problem, initial_condition_remainder)?;
-
-    // Check if verbose mode is enabled
-    let verbose = match &optimization_config.inner {
-        commol_calibration::OptimizationConfig::NelderMead(config) => config.verbose,
-        commol_calibration::OptimizationConfig::ParticleSwarm(config) => config.verbose,
-    };
-
-    // Run optimization with Python observer if verbose, otherwise use standard optimize
-    let result = if verbose {
-        crate::python_observer::optimize_with_python_observer(
-            problem,
-            optimization_config.inner.clone(),
-            optimization_config.header_interval,
+    fn __repr__(&self) -> String {
+        format!(
+            "CalibrationResultWithHistory(loss={:.6}, evaluations={})",
+            self.inner.result.final_loss,
+            self.inner.evaluations.len()
         )
-    } else {
-        commol_calibration::optimize(problem, optimization_config.inner.clone())
-    }
-    .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
-
-    Ok(PyCalibrationResult { inner: result })
-}
-
-/// Calibrate model parameters with evaluation history tracking
-///
-/// This function performs the same optimization as `calibrate`, but returns
-/// all objective function evaluations that occurred during optimization,
-/// not just the final best result.
-///
-/// Args:
-///     engine: The simulation engine built from the model
-///     observed_data: List of observed data points to fit
-///     parameters: List of parameters to calibrate with bounds
-///     constraints: List of constraints on parameters/compartments
-///     loss_config: Loss function configuration
-///     optimization_config: Optimization algorithm configuration
-///     initial_condition_remainder: Compartment or bin that absorbs the
-///         difference to the total, if any
-///
-/// Returns:
-///     CalibrationResultWithHistory containing best parameters and all evaluations
-#[pyfunction]
-#[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_condition_remainder=None))]
-fn calibrate_with_history(
-    engine: PyRef<'_, PyEngine>,
-    observed_data: Vec<PyObservedDataPoint>,
-    parameters: Vec<PyCalibrationParameter>,
-    constraints: Vec<PyCalibrationConstraint>,
-    loss_config: &PyLossConfig,
-    optimization_config: &PyOptimizationConfig,
-    initial_condition_remainder: Option<String>,
-) -> PyResult<PyCalibrationResultWithHistory> {
-    // Extract inner Rust types
-    let observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
-    let parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
-    let constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
-
-    // Clone the engine since CalibrationProblem takes ownership
-    let engine_clone = engine.engine();
-
-    // Create calibration problem
-    let problem = commol_calibration::CalibrationProblem::new(
-        engine_clone,
-        observed_data,
-        parameters,
-        constraints,
-        loss_config.inner,
-    )
-    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
-    .with_observation_normalization(loss_config.normalize_observations)
-    .with_replicates(loss_config.replicates.clone());
-    let problem = with_remainder(problem, initial_condition_remainder)?;
-
-    // Run optimization with history tracking
-    let result =
-        commol_calibration::optimize_with_history(problem, optimization_config.inner.clone())
-            .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
-
-    Ok(PyCalibrationResultWithHistory { inner: result })
-}
-
-/// Run multiple calibration attempts in parallel (for probabilistic calibration)
-///
-/// This is the performance-critical bottleneck of probabilistic calibration.
-/// Runs N calibration runs in parallel using Rayon, each with a different seed.
-///
-/// Args:
-///     engine: The simulation engine built from the model
-///     observed_data: List of observed data points
-///     parameters: List of parameters to calibrate
-///     constraints: List of constraints on parameters/compartments
-///     loss_config: Loss function configuration
-///     optimization_config: Optimization algorithm configuration
-///     initial_condition_remainder: Compartment or bin that absorbs the
-///         difference to the total, if any
-///     n_runs: Number of calibration runs to perform
-///     seed: Base random seed (each run gets seed + run_index)
-///
-/// Returns:
-///     List of CalibrationResultWithHistory for each successful run
-#[pyfunction]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, n_runs, seed, evaluation_retention="all", top_k_per_run=None, initial_condition_remainder=None))]
-#[allow(clippy::too_many_arguments)]
-fn run_multiple_calibrations(
-    engine: PyRef<'_, PyEngine>,
-    observed_data: Vec<PyObservedDataPoint>,
-    parameters: Vec<PyCalibrationParameter>,
-    constraints: Vec<PyCalibrationConstraint>,
-    loss_config: &PyLossConfig,
-    optimization_config: &PyOptimizationConfig,
-    n_runs: usize,
-    seed: u64,
-    evaluation_retention: &str,
-    top_k_per_run: Option<usize>,
-    initial_condition_remainder: Option<String>,
-) -> PyResult<Vec<PyCalibrationResultWithHistory>> {
-    // Convert to Rust types
-    let rust_observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
-    let rust_parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
-    let rust_constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
-
-    // Create the base calibration problem
-    let engine_clone = engine.engine();
-    let base_problem = commol_calibration::CalibrationProblem::new(
-        engine_clone,
-        rust_observed_data,
-        rust_parameters,
-        rust_constraints,
-        loss_config.inner,
-    )
-    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
-    .with_observation_normalization(loss_config.normalize_observations)
-    .with_replicates(loss_config.replicates.clone());
-    let base_problem = with_remainder(base_problem, initial_condition_remainder)?;
-
-    let evaluation_retention = match evaluation_retention {
-        "all" => commol_calibration::EvaluationRetention::All,
-        "best_per_run" => commol_calibration::EvaluationRetention::BestPerRun,
-        "top_k_per_run" => {
-            let k = top_k_per_run.ok_or_else(|| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "top_k_per_run must be specified when evaluation_retention='top_k_per_run'",
-                )
-            })?;
-            commol_calibration::EvaluationRetention::TopKPerRun(k)
-        }
-        _ => {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Invalid evaluation_retention: '{}'. Must be 'all', 'best_per_run', or 'top_k_per_run'",
-                evaluation_retention
-            )));
-        }
-    };
-
-    // Run multiple calibrations in parallel
-    let results = commol_calibration::run_multiple_calibrations(
-        &base_problem,
-        &optimization_config.inner,
-        n_runs,
-        seed,
-        evaluation_retention,
-    )
-    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-
-    // Convert to Python types
-    Ok(results
-        .into_iter()
-        .map(|r| PyCalibrationResultWithHistory { inner: r })
-        .collect())
-}
-
-/// Deduplicate calibration evaluations using grid-based spatial hashing
-///
-/// This is a performance-critical operation that uses O(n) average-case
-/// grid-based spatial hashing to remove duplicate parameter sets.
-///
-/// Args:
-///     evaluations: List of CalibrationEvaluation objects to deduplicate
-///     tolerance: Relative tolerance for considering parameters as duplicates
-///
-/// Returns:
-///     List of unique CalibrationEvaluation objects
-#[pyfunction]
-fn deduplicate_evaluations(
-    evaluations: Vec<PyCalibrationEvaluation>,
-    tolerance: f64,
-) -> PyResult<Vec<PyCalibrationEvaluation>> {
-    // Convert Python evaluations to Rust
-    let rust_evaluations: Vec<_> = evaluations.into_iter().map(|e| e.inner).collect();
-
-    // Run deduplication in Rust (fast!)
-    let unique_evaluations =
-        commol_calibration::deduplicate_evaluations(rust_evaluations, tolerance);
-
-    // Convert back to Python
-    Ok(unique_evaluations
-        .into_iter()
-        .map(|e| PyCalibrationEvaluation { inner: e })
-        .collect())
-}
-
-/// The Python error for predictions that stopped: [`InfeasibleStateError`]
-/// for a run that left the values its model allows, `RuntimeError` for any
-/// other error.
-fn prediction_error(error: commol_calibration::CalibrationError) -> PyErr {
-    match error {
-        commol_calibration::CalibrationError::Infeasible(message) => {
-            InfeasibleStateError::new_err(message)
-        }
-        error => PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(error.to_string()),
     }
 }
 
-/// Generate predictions for multiple parameter sets in parallel
-///
-/// This function runs simulations for each parameter set in parallel using Rust/Rayon,
-/// which is much faster than sequential execution in Python.
-///
-/// Args:
-///     engine: Simulation engine built from the model
-///     parameter_sets: List of parameter value lists (one per parameter set)
-///     parameter_names: List of parameter names (must match model parameter IDs)
-///     positions: Sorted, unique positions on the axis to report at
-///
-/// Returns:
-///     List of predictions, where each prediction is a 2D list
-///     [position_idx][output_idx], aligned with `positions`
-#[pyfunction]
-fn generate_predictions_parallel(
-    engine: PyRef<'_, PyEngine>,
-    parameter_sets: Vec<Vec<f64>>,
-    parameter_names: Vec<String>,
-    positions: Vec<f64>,
-) -> PyResult<Vec<Vec<Vec<f64>>>> {
-    let base_engine = &engine.engine();
-
-    let predictions = commol_calibration::generate_predictions_parallel(
-        base_engine,
-        parameter_sets,
-        parameter_names,
-        positions,
-    )
-    .map_err(prediction_error)?;
-
-    Ok(predictions)
+/// The outcome of one start of a multi-start optimization
+#[pyclass(name = "StartOutcome")]
+pub struct PyStartOutcome {
+    pub inner: commol_calibration::StartOutcome,
 }
 
-/// Generate predictions for calibration parameter sets, including calibrated
-/// initial conditions, with one row per position, aligned with `positions`.
-#[pyfunction]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, parameter_sets, positions, initial_condition_remainder=None))]
-#[allow(clippy::too_many_arguments)]
-fn generate_calibrated_predictions_parallel(
-    engine: PyRef<'_, PyEngine>,
-    observed_data: Vec<PyObservedDataPoint>,
-    parameters: Vec<PyCalibrationParameter>,
-    constraints: Vec<PyCalibrationConstraint>,
-    loss_config: &PyLossConfig,
-    parameter_sets: Vec<Vec<f64>>,
-    positions: Vec<f64>,
-    initial_condition_remainder: Option<String>,
-) -> PyResult<Vec<Vec<Vec<f64>>>> {
-    let rust_observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
-    let rust_parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
-    let rust_constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
-    let problem = commol_calibration::CalibrationProblem::new(
-        engine.engine(),
-        rust_observed_data,
-        rust_parameters,
-        rust_constraints,
-        loss_config.inner,
-    )
-    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
-    .with_observation_normalization(loss_config.normalize_observations)
-    .with_replicates(loss_config.replicates.clone());
-    let problem = with_remainder(problem, initial_condition_remainder)?;
+#[pymethods]
+impl PyStartOutcome {
+    /// The start point, in problem order
+    #[getter]
+    fn start(&self) -> Vec<f64> {
+        self.inner.start.clone()
+    }
 
-    let predictions = commol_calibration::generate_calibrated_predictions_parallel(
-        &problem,
-        parameter_sets,
-        positions,
-    )
-    .map_err(prediction_error)?;
+    /// The result, or None when the start failed
+    #[getter]
+    fn result(&self) -> Option<PyCalibrationResult> {
+        self.inner
+            .result
+            .as_ref()
+            .ok()
+            .map(|r| PyCalibrationResult { inner: r.clone() })
+    }
 
-    Ok(predictions)
+    /// Why the start failed, or None
+    #[getter]
+    fn error(&self) -> Option<String> {
+        self.inner.result.as_ref().err().cloned()
+    }
 }
 
 /// Initial state a compartmental engine starts from once calibration
@@ -1536,244 +1066,6 @@ fn check_positions(
         .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
 }
 
-/// Generate compact predictions for selected metric points.
-#[pyfunction]
-fn generate_predictions_at_points_parallel(
-    engine: PyRef<'_, PyEngine>,
-    parameter_sets: Vec<Vec<f64>>,
-    parameter_names: Vec<String>,
-    metric_points: Vec<(f64, usize)>,
-) -> PyResult<Vec<Vec<f64>>> {
-    let predictions = commol_calibration::generate_predictions_at_points_parallel(
-        &engine.engine(),
-        parameter_sets,
-        parameter_names,
-        metric_points,
-    )
-    .map_err(prediction_error)?;
-
-    Ok(predictions)
-}
-
-/// Generate compact predictions for calibration parameter sets, including
-/// calibrated initial conditions.
-#[pyfunction]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, parameter_sets, metric_points, initial_condition_remainder=None))]
-#[allow(clippy::too_many_arguments)]
-fn generate_calibrated_predictions_at_points_parallel(
-    engine: PyRef<'_, PyEngine>,
-    observed_data: Vec<PyObservedDataPoint>,
-    parameters: Vec<PyCalibrationParameter>,
-    constraints: Vec<PyCalibrationConstraint>,
-    loss_config: &PyLossConfig,
-    parameter_sets: Vec<Vec<f64>>,
-    metric_points: Vec<(f64, usize)>,
-    initial_condition_remainder: Option<String>,
-) -> PyResult<Vec<Vec<f64>>> {
-    let rust_observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
-    let rust_parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
-    let rust_constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
-    let problem = commol_calibration::CalibrationProblem::new(
-        engine.engine(),
-        rust_observed_data,
-        rust_parameters,
-        rust_constraints,
-        loss_config.inner,
-    )
-    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
-    .with_observation_normalization(loss_config.normalize_observations)
-    .with_replicates(loss_config.replicates.clone());
-    let problem = with_remainder(problem, initial_condition_remainder)?;
-
-    let predictions = commol_calibration::generate_calibrated_predictions_at_points_parallel(
-        &problem,
-        parameter_sets,
-        metric_points,
-    )
-    .map_err(prediction_error)?;
-
-    Ok(predictions)
-}
-
-/// Select an ensemble from compact observation-space predictions.
-#[pyfunction]
-#[pyo3(signature = (candidates, observed_values, weights, normalization, series_ids, confidence_level, seed, central_loss_metric="sse", ensemble_algorithm="nsga2", ensemble_size_mode="automatic", ensemble_size=None, ensemble_size_min=None, ensemble_size_max=None, central_fit_max_loss_ratio=1.25, search_beam_width=32, population_size=100, generations=100, crossover_probability=0.9, pareto_preference=0.5))]
-#[allow(clippy::too_many_arguments)]
-fn select_compact_ensemble(
-    candidates: Vec<PyCalibrationEvaluation>,
-    observed_values: Vec<f64>,
-    weights: Vec<f64>,
-    normalization: Vec<f64>,
-    series_ids: Vec<String>,
-    confidence_level: f64,
-    seed: u64,
-    central_loss_metric: &str,
-    ensemble_algorithm: &str,
-    ensemble_size_mode: &str,
-    ensemble_size: Option<usize>,
-    ensemble_size_min: Option<usize>,
-    ensemble_size_max: Option<usize>,
-    central_fit_max_loss_ratio: f64,
-    search_beam_width: usize,
-    population_size: usize,
-    generations: usize,
-    crossover_probability: f64,
-    pareto_preference: f64,
-) -> PyResult<PyEnsembleSelectionResult> {
-    let algorithm = match ensemble_algorithm {
-        "nsga2" => commol_calibration::EnsembleAlgorithm::Nsga2,
-        "greedy" | "greedy_local_search" => {
-            commol_calibration::EnsembleAlgorithm::GreedyLocalSearch
-        }
-        _ => {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Invalid ensemble_algorithm: '{}'. Must be 'nsga2' or 'greedy_local_search'",
-                ensemble_algorithm
-            )));
-        }
-    };
-
-    // Keep the gate's central loss coherent with the optimizer's member loss:
-    // the same loss family is used on both sides of the fit gate.
-    let central_loss_metric = match central_loss_metric {
-        "sse" => commol_calibration::CentralLossMetric::WeightedSumOfSquares,
-        "rmse" => commol_calibration::CentralLossMetric::RootMeanSquared,
-        "mae" => commol_calibration::CentralLossMetric::MeanAbsolute,
-        _ => {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Invalid central_loss_metric: '{}'. Must be 'sse', 'rmse', or 'mae'",
-                central_loss_metric
-            )));
-        }
-    };
-
-    let size_mode = match ensemble_size_mode {
-        "fixed" => {
-            let size = ensemble_size.ok_or_else(|| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "ensemble_size must be specified for fixed ensemble size mode",
-                )
-            })?;
-            commol_calibration::EnsembleSizeMode::Fixed { size }
-        }
-        "bounded" => {
-            let min = ensemble_size_min.ok_or_else(|| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "ensemble_size_min must be specified for bounded ensemble size mode",
-                )
-            })?;
-            let max = ensemble_size_max.ok_or_else(|| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "ensemble_size_max must be specified for bounded ensemble size mode",
-                )
-            })?;
-            commol_calibration::EnsembleSizeMode::Bounded { min, max }
-        }
-        "automatic" => commol_calibration::EnsembleSizeMode::Automatic,
-        _ => {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Invalid ensemble_size_mode: '{}'. Must be 'fixed', 'bounded', or 'automatic'",
-                ensemble_size_mode
-            )));
-        }
-    };
-
-    let rust_candidates: Vec<_> = candidates
-        .into_iter()
-        .map(|candidate| candidate.inner)
-        .collect();
-    let config = commol_calibration::EnsembleSelectionConfig {
-        algorithm,
-        confidence_level,
-        seed,
-        size_mode,
-        central_loss_metric,
-        central_fit_max_loss_ratio,
-        search_beam_width,
-        population_size,
-        generations,
-        crossover_probability,
-        pareto_preference,
-    };
-    let result = commol_calibration::select_compact_ensemble(
-        rust_candidates,
-        observed_values,
-        weights,
-        normalization,
-        series_ids,
-        &config,
-    )
-    .map_err(|error| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(error.to_string()))?;
-
-    Ok(PyEnsembleSelectionResult { inner: result })
-}
-
-/// Select cluster representatives using Rust for performance
-///
-/// Args:
-///     evaluations: List of CalibrationEvaluation objects
-///     cluster_labels: Cluster assignment for each evaluation (from KMeans)
-///     max_representatives: Maximum total representatives to select
-///     elite_fraction: Fraction of best solutions to always include (0.0-1.0)
-///     strategy: Distribution strategy ("proportional" or "equal")
-///     selection_method: Diversity method ("crowding_distance" or "maximin_distance")
-///     quality_temperature: Temperature for quality weighting in maximin (default: 1.0)
-///     seed: Random seed for reproducibility (default: 42)
-///     k_neighbors_min: Minimum k for k-NN density estimation (default: 5)
-///     k_neighbors_max: Maximum k for k-NN density estimation (default: 10)
-///     sparsity_weight: Exponential weight for sparsity bonus (default: 2.0)
-///     stratum_fit_weight: Weight for stratum fit in latin_hypercube (default: 10.0)
-///
-/// Returns:
-///     List of indices of selected representatives
-#[pyfunction]
-#[pyo3(signature = (evaluations, cluster_labels, max_representatives, elite_fraction, strategy, selection_method="crowding_distance", quality_temperature=1.0, seed=42, k_neighbors_min=5, k_neighbors_max=10, sparsity_weight=2.0, stratum_fit_weight=10.0))]
-#[allow(clippy::too_many_arguments)]
-fn select_cluster_representatives(
-    evaluations: Vec<PyCalibrationEvaluation>,
-    cluster_labels: Vec<usize>,
-    max_representatives: usize,
-    elite_fraction: f64,
-    strategy: &str,
-    selection_method: &str,
-    quality_temperature: f64,
-    seed: u64,
-    k_neighbors_min: usize,
-    k_neighbors_max: usize,
-    sparsity_weight: f64,
-    stratum_fit_weight: f64,
-) -> PyResult<Vec<usize>> {
-    // Convert to Rust types
-    let rust_evaluations: Vec<_> = evaluations.into_iter().map(|e| e.inner).collect();
-
-    // Build config from parameters
-    let config = commol_calibration::RepresentativeSelectionConfig {
-        k_neighbors_min,
-        k_neighbors_max,
-        sparsity_weight,
-        stratum_fit_weight,
-    };
-
-    let cluster_config = commol_calibration::ClusterRepresentativeConfig {
-        max_representatives,
-        elite_fraction,
-        strategy,
-        selection_method,
-        quality_temperature,
-        seed,
-        representative_config: &config,
-    };
-
-    let indices = commol_calibration::select_cluster_representatives(
-        rust_evaluations,
-        cluster_labels,
-        &cluster_config,
-    )
-    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-
-    Ok(indices)
-}
-
 /// Register calibration module with the Python module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCalibrationParameterType>()?;
@@ -1793,29 +1085,9 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCalibrationEvaluation>()?;
     m.add_class::<PyCalibrationResultWithHistory>()?;
     m.add_class::<PyCalibrationResult>()?;
-    m.add_class::<PyParetoSolution>()?;
-    m.add_class::<PyEnsembleSelectionResult>()?;
-    m.add_function(wrap_pyfunction!(calibrate, m)?)?;
+    m.add_class::<PyStartOutcome>()?;
     m.add_function(wrap_pyfunction!(calibrated_initial_state, m)?)?;
     m.add_function(wrap_pyfunction!(check_model_values, m)?)?;
-    m.add_function(wrap_pyfunction!(calibrate_with_history, m)?)?;
-    m.add_function(wrap_pyfunction!(run_multiple_calibrations, m)?)?;
-    m.add_function(wrap_pyfunction!(deduplicate_evaluations, m)?)?;
-    m.add_function(wrap_pyfunction!(generate_predictions_parallel, m)?)?;
     m.add_function(wrap_pyfunction!(check_positions, m)?)?;
-    m.add_function(wrap_pyfunction!(
-        generate_calibrated_predictions_parallel,
-        m
-    )?)?;
-    m.add_function(wrap_pyfunction!(
-        generate_predictions_at_points_parallel,
-        m
-    )?)?;
-    m.add_function(wrap_pyfunction!(
-        generate_calibrated_predictions_at_points_parallel,
-        m
-    )?)?;
-    m.add_function(wrap_pyfunction!(select_compact_ensemble, m)?)?;
-    m.add_function(wrap_pyfunction!(select_cluster_representatives, m)?)?;
     Ok(())
 }

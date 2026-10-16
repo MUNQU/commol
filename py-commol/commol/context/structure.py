@@ -2,7 +2,7 @@
 
 A `Model` holds a header, a `Process` written once, an engine and one
 `ModelStructure`, which changes between kinds of model. The generic layers
-(simulation, calibration, ensembles, reports, plots) use only `Model` and the
+(simulation, calibration, uncertainty, reports, plots) use only `Model` and the
 methods of `ModelStructure`, so a new kind of model is a new subclass with its
 engines in the engine's list (``commol_rs.engine.EngineType``).
 
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from commol.context.calibration import CalibrationProblem
     from commol.context.description import Section
     from commol.context.model import Model
-    from commol.context.probabilistic_calibration import ParameterSetStatistics
+    from commol.context.inference.sample import ParameterSummary
 
 
 type ReportSections = dict[str, Mapping[str, Mapping[str, object]]]
@@ -252,7 +252,7 @@ class ModelStructure(BaseModel, ABC):
         self,
         model: "Model[Self]",  # noqa: ARG002
         calibrated_ids: set[str],  # noqa: ARG002
-        parameter_statistics: "Mapping[str, ParameterSetStatistics] | None",  # noqa: ARG002
+        parameter_statistics: "Mapping[str, ParameterSummary] | None",  # noqa: ARG002
     ) -> ReportSections:
         """
         Sections of this kind in a report of applied values.
@@ -263,8 +263,8 @@ class ModelStructure(BaseModel, ABC):
             The model that holds the applied values.
         calibrated_ids : set[str]
             Ids that calibration set.
-        parameter_statistics : Mapping[str, ParameterSetStatistics] | None
-            Ensemble spread per id, or None without an ensemble.
+        parameter_statistics : Mapping[str, ParameterSummary] | None
+            Statistics of each id from a sample, or None without one.
 
         Returns
         -------

@@ -356,25 +356,44 @@ fn quantile(values: &mut [f64], level: f64) -> f64 {
 /// drawn from the predictions. A proper scoring rule; with one prediction it
 /// is the absolute error. The predictions are sorted.
 pub fn crps(predictions: &mut [f64], observed: f64) -> f64 {
-    let n = predictions.len();
-    if n == 0 {
-        return 0.0;
-    }
     predictions.sort_by(f64::total_cmp);
-    let count = n as f64;
-    let to_observed = predictions
-        .iter()
-        .map(|value| (value - observed).abs())
-        .sum::<f64>()
-        / count;
-    // Σ_ij |x_i - x_j| = 2 Σ_i (2i - n + 1) x_(i) for the sorted values.
-    let pairs: f64 = predictions
-        .iter()
-        .enumerate()
-        .map(|(index, value)| (2.0 * index as f64 - count + 1.0) * value)
-        .sum::<f64>()
-        * 2.0;
-    to_observed - 0.5 * pairs / (count * count)
+    let weight = 1.0 / predictions.len().max(1) as f64;
+    sorted_crps(predictions.iter().map(|&value| (value, weight)), observed)
+}
+
+/// The continuous ranked probability score of a weighted sample at
+/// `observed`: `Σ wᵢ|xᵢ - y| - ½ Σᵢⱼ wᵢwⱼ|xᵢ - xⱼ|`. The weights sum to 1;
+/// with equal weights it is [`crps`].
+///
+/// # Panics
+///
+/// Panics when `values` and `weights` differ in length.
+pub fn weighted_crps(values: &[f64], weights: &[f64], observed: f64) -> f64 {
+    assert_eq!(values.len(), weights.len(), "one weight per value");
+    let mut order: Vec<usize> = (0..values.len()).collect();
+    order.sort_by(|&a, &b| values[a].total_cmp(&values[b]));
+    sorted_crps(order.into_iter().map(|i| (values[i], weights[i])), observed)
+}
+
+/// The CRPS of `(value, weight)` pairs sorted by value, whose weights sum
+/// to 1. For sorted values, `Σᵢⱼ wᵢwⱼ|xᵢ - xⱼ| = 2 Σᵢ wᵢxᵢ (Cᵢ₋₁ - (1 - Cᵢ))`
+/// with `Cᵢ` the cumulative weight.
+fn sorted_crps(pairs: impl Iterator<Item = (f64, f64)>, observed: f64) -> f64 {
+    let mut to_observed = 0.0;
+    let mut pairs_sum = 0.0;
+    let mut below = 0.0;
+    let mut total = 0.0;
+    let collected: Vec<(f64, f64)> = pairs.collect();
+    for &(_, weight) in &collected {
+        total += weight;
+    }
+    for (value, weight) in collected {
+        to_observed += weight * (value - observed).abs();
+        let above = total - below - weight;
+        pairs_sum += 2.0 * weight * value * (below - above);
+        below += weight;
+    }
+    to_observed - 0.5 * pairs_sum
 }
 
 /// The replicates of each evaluation of a stochastic engine: common random
@@ -511,7 +530,8 @@ pub struct CalibrationConstraint {
     /// Penalty weight multiplier (default 1.0)
     ///
     /// Higher values make this constraint more important relative to others.
-    /// The penalty for violating this constraint is: weight * violation^2
+    /// The violation of this constraint is `weight × (−value)` when its
+    /// expression evaluates to `value < 0`.
     pub weight: f64,
 
     /// Optional positions on the axis at which to evaluate this constraint
@@ -585,77 +605,24 @@ pub struct CalibrationResult {
     pub termination_reason: String,
 }
 
-impl CalibrationResult {
-    /// Get parameters as a HashMap for easy lookup
-    pub fn parameters_map(&self) -> std::collections::HashMap<String, f64> {
-        self.parameter_names
-            .iter()
-            .zip(self.best_parameters.iter())
-            .map(|(name, value)| (name.clone(), *value))
-            .collect()
-    }
-}
-
-/// A single evaluation during calibration optimization
+/// A single evaluation of a feasible point during an optimization
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CalibrationEvaluation {
-    /// Parameter values for this evaluation
+    /// Parameter values the objective scored, in problem order
     pub parameters: Vec<f64>,
 
     /// Loss value for this parameter set
     pub loss: f64,
-
-    /// Model predictions at each position for all compartments
-    /// `predictions[position_idx][compartment_idx]`
-    pub predictions: Vec<Vec<f64>>,
 }
 
-/// Result from a calibration run with history of all evaluations
+/// Result of an optimization with every evaluation of a feasible point
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CalibrationResultWithHistory {
-    /// Best parameter values found
-    pub best_parameters: Vec<f64>,
+    /// The result of the optimization
+    pub result: CalibrationResult,
 
-    /// Parameter names (in same order as best_parameters)
-    pub parameter_names: Vec<String>,
-
-    /// Final loss value achieved
-    pub final_loss: f64,
-
-    /// Number of iterations performed
-    pub iterations: usize,
-
-    /// Whether the optimization converged
-    pub converged: bool,
-
-    /// Termination reason
-    pub termination_reason: String,
-
-    /// All unique evaluations performed during optimization (deduplicated)
+    /// Every evaluation of a feasible point, in the order they were made
     pub evaluations: Vec<CalibrationEvaluation>,
-}
-
-impl CalibrationResultWithHistory {
-    /// Convert to a standard CalibrationResult (without history)
-    pub fn to_standard_result(&self) -> CalibrationResult {
-        CalibrationResult {
-            best_parameters: self.best_parameters.clone(),
-            parameter_names: self.parameter_names.clone(),
-            final_loss: self.final_loss,
-            iterations: self.iterations,
-            converged: self.converged,
-            termination_reason: self.termination_reason.clone(),
-        }
-    }
-
-    /// Get parameters as a HashMap for easy lookup
-    pub fn parameters_map(&self) -> std::collections::HashMap<String, f64> {
-        self.parameter_names
-            .iter()
-            .zip(self.best_parameters.iter())
-            .map(|(name, value)| (name.clone(), *value))
-            .collect()
-    }
 }
 
 #[cfg(test)]
@@ -705,7 +672,7 @@ mod loss_tests {
 
 #[cfg(test)]
 mod replicate_tests {
-    use super::{crps, LossConfig, ReplicateSummary, Replicates};
+    use super::{crps, weighted_crps, LossConfig, ReplicateSummary, Replicates};
 
     #[test]
     fn the_crps_of_one_replicate_is_the_absolute_error() {
@@ -729,6 +696,15 @@ mod replicate_tests {
         let mut predictions = values;
         assert!((crps(&mut predictions, observed) - expected).abs() < 1e-12);
         assert!((expected - 0.8125).abs() < 1e-12);
+    }
+
+    #[test]
+    fn the_weighted_crps_of_equal_weights_is_the_crps() {
+        let values = [1.0, 4.0, 2.0, 8.0];
+        assert!((weighted_crps(&values, &[0.25; 4], 3.0) - 0.8125).abs() < 1e-12);
+        // A member of twice the weight counts as two equal members.
+        let doubled = weighted_crps(&[1.0, 4.0], &[2.0 / 3.0, 1.0 / 3.0], 3.0);
+        assert!((doubled - crps(&mut [1.0, 1.0, 4.0], 3.0)).abs() < 1e-12);
     }
 
     #[test]

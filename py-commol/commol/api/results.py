@@ -280,6 +280,9 @@ class SimulationReplicates(list[SimulationResults]):
         """
         Quantiles of the replicates at each position, for each output.
 
+        The quantile is the one convention of commol (`weighted_quantiles`
+        with equal weights, NumPy's ``method="hazen"``).
+
         Parameters
         ----------
         levels : Sequence[float]
@@ -301,16 +304,25 @@ class SimulationReplicates(list[SimulationResults]):
                 raise ValueError(f"A quantile level is between 0 and 1, got {level}.")
         if not self:
             raise ValueError("There are no replicates.")
+        from commol.api.inference.intervals import weighted_quantiles
+
         names = list(self[0])
+        per_name = {
+            name: [
+                weighted_quantiles(column.tolist(), levels)
+                for column in self._values(name).T
+            ]
+            for name in names
+        }
         return {
             level: SimulationResults(
                 self.positions,
                 {
-                    name: np.quantile(self._values(name), level, axis=0).tolist()
+                    name: [at_position[index] for at_position in per_name[name]]
                     for name in names
                 },
             )
-            for level in levels
+            for index, level in enumerate(levels)
         }
 
     def member_statistics(
@@ -340,7 +352,7 @@ class SimulationReplicates(list[SimulationResults]):
             If the confidence level is out of range or there are no
             replicates.
         """
-        from commol.api.probabilistic.intervals import member_statistics
+        from commol.api.inference.intervals import member_statistics
 
         if self and output not in self[0]:
             raise KeyError(

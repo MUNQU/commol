@@ -23,10 +23,6 @@ from commol.context.constants import (
     PSOMutationApplication,
     PSOMutationStrategy,
 )
-from commol.context.probabilistic_calibration import (
-    ProbabilisticCalibrationConfig,
-    ProbabilisticCalibrationResult,
-)
 from commol.utils.security import validate_expression_security
 
 
@@ -927,25 +923,54 @@ class ParticleSwarmConfig(BaseModel):
         return self._velocity
 
 
+class StartSummary(BaseModel):
+    """
+    One start of a multi-start optimization.
+
+    Distinct ends with equal losses are a sign that the data do not identify
+    the parameters.
+
+    Attributes
+    ----------
+    start : dict[str, float]
+        The point the optimizer started from.
+    end : dict[str, float]
+        The best point it found.
+    loss : float
+        The loss at the end.
+    converged : bool
+        Whether the optimizer met its convergence criterion.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    start: dict[str, float] = Field(description="Start point")
+    end: dict[str, float] = Field(description="Best point found")
+    loss: float = Field(description="Loss at the end")
+    converged: bool = Field(description="Whether the optimizer converged")
+
+
 class CalibrationResult(BaseModel):
     """
-    Result of a calibration run.
-
-    This is a simple data class that holds the results returned from the
-    Rust calibration function.
+    Result of a calibration: the best of its starts.
 
     Attributes
     ----------
     best_parameters : dict[str, float]
-        Dictionary mapping parameter IDs to their calibrated values
+        The calibrated value of each parameter, in the order of the problem's
+        parameters.
     final_loss : float
-        Final loss value achieved
+        Loss at the best parameters.
     iterations : int
-        Number of iterations performed
+        Iterations of the best start.
     converged : bool
-        Whether the optimization converged
+        Whether the best start converged.
     termination_reason : str
-        Explanation of why optimization terminated
+        Why the best start stopped.
+    starts : list[StartSummary]
+        Every start that finished, in order; the first is the initial guess.
+    failed_runs : list[str]
+        Why each start that failed did, with its number.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -961,6 +986,12 @@ class CalibrationResult(BaseModel):
     termination_reason: str = Field(
         default=..., description="Reason for optimization termination"
     )
+    starts: list[StartSummary] = Field(
+        default_factory=list, description="Every start that finished"
+    )
+    failed_runs: list[str] = Field(
+        default_factory=list, description="Why each failed start failed"
+    )
 
     @override
     def __str__(self) -> str:
@@ -971,9 +1002,49 @@ class CalibrationResult(BaseModel):
             f"  final_loss={self.final_loss:.6f},\n"
             f"  iterations={self.iterations},\n"
             f"  best_parameters={self.best_parameters},\n"
-            f"  termination_reason='{self.termination_reason}'\n"
+            f"  termination_reason='{self.termination_reason}',\n"
+            f"  starts={len(self.starts)},\n"
+            f"  failed_runs={len(self.failed_runs)}\n"
             f")"
         )
+
+
+class CalibrationEvaluation(BaseModel):
+    """
+    One evaluation of a feasible point during an optimization.
+
+    Attributes
+    ----------
+    parameters : dict[str, float]
+        The values the objective scored.
+    loss : float
+        The loss at these values.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    parameters: dict[str, float] = Field(description="Values the objective scored")
+    loss: float = Field(description="Loss at these values")
+
+
+class CalibrationHistory(BaseModel):
+    """
+    A calibration and every evaluation of a feasible point it made.
+
+    Attributes
+    ----------
+    result : CalibrationResult
+        The result of the calibration.
+    evaluations : list[CalibrationEvaluation]
+        Every evaluation of a feasible point, in the order they were made.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    result: CalibrationResult = Field(description="The result")
+    evaluations: list[CalibrationEvaluation] = Field(
+        description="Every evaluation of a feasible point"
+    )
 
 
 class Quantile(BaseModel):
@@ -1041,10 +1112,6 @@ class CalibrationProblem(BaseModel):
         sum of the initial amounts always equals ``total``; without one,
         calibrated initial conditions are applied as given and only a sum
         above ``total`` is penalized.
-    probabilistic_config : ProbabilisticCalibrationConfig | None
-        Optional configuration for probabilistic calibration (default: None).
-        When provided, enables ensemble-based parameter estimation with
-        uncertainty quantification instead of single-point optimization.
     replicates : int | None
         For a stochastic engine: how many replicates each evaluation runs,
         with common random numbers (the same seeds, derived from ``seed``, at
@@ -1059,15 +1126,11 @@ class CalibrationProblem(BaseModel):
         Required with a stochastic engine, with no default: what to fit is a
         modelling choice.
     seed : int | None
-        Random seed for reproducibility across all stochastic processes
-        (default: None, uses system entropy). Required with a stochastic
-        engine.
-        Controls randomness in:
-        - Optimization algorithms (e.g., Particle Swarm initialization)
-        - Probabilistic calibration runs
-        - Clustering algorithms
-        - Ensemble selection
-        When set, all random operations become deterministic and reproducible.
+        Seed of every random number of a calibration (default: None, a seed
+        drawn from the operating system, which `Calibrator.run` logs):
+        the replicates of a stochastic engine, the starts of
+        ``Calibrator.run(starts=n)``, a particle swarm, and the uncertainty
+        methods. Required with a stochastic engine.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1091,8 +1154,7 @@ class CalibrationProblem(BaseModel):
         description=(
             "Normalize each residual by the RMS of its observation series before "
             "applying the loss metric. Keeps series measured on very different "
-            "scales comparable in both the optimization loss and fit-gated "
-            "ensemble selection."
+            "scales comparable in the loss."
         ),
     )
     optimization_config: NelderMeadConfig | ParticleSwarmConfig = Field(
@@ -1104,10 +1166,6 @@ class CalibrationProblem(BaseModel):
             "Expanded compartment or bin that absorbs the difference to the "
             "total once the calibrated initial conditions are applied."
         ),
-    )
-    probabilistic_config: ProbabilisticCalibrationConfig | None = Field(
-        default=None,
-        description="Optional configuration for probabilistic calibration",
     )
     replicates: int | None = Field(
         default=None,
@@ -1122,8 +1180,8 @@ class CalibrationProblem(BaseModel):
         default=None,
         ge=0,
         description=(
-            "Random seed for reproducibility across all stochastic processes "
-            "(optimization, probabilistic calibration, clustering, ensemble selection)"
+            "Seed of every random number of a calibration: the replicates of a "
+            "stochastic engine, the starts, a particle swarm and the methods"
         ),
     )
 
@@ -1147,24 +1205,35 @@ class CalibrationProblem(BaseModel):
 
 
 def calibrated_values(
-    result: "CalibrationResult | ProbabilisticCalibrationResult | Mapping[str, float]",
+    result: "CalibrationResult | Mapping[str, float]",
 ) -> "Mapping[str, float]":
     """
     Return the parameter values carried by a calibration outcome.
 
     Parameters
     ----------
-    result : CalibrationResult | ProbabilisticCalibrationResult | Mapping
-        A calibration outcome, or a mapping of parameter id to value.
+    result : CalibrationResult | Mapping
+        A calibration result, or a mapping of parameter id to value such as
+        one draw of a `ParameterSample`.
 
     Returns
     -------
     Mapping[str, float]
-        The values. For a probabilistic result these are the point parameters
-        of the selected ensemble.
+        The values.
+
+    Raises
+    ------
+    TypeError
+        If `result` is a `ParameterSample`, which has no single set of
+        parameters.
     """
+    from commol.context.inference.sample import ParameterSample
+
     if isinstance(result, CalibrationResult):
         return result.best_parameters
-    if isinstance(result, ProbabilisticCalibrationResult):
-        return result.selected_ensemble.point_parameters
+    if isinstance(result, ParameterSample):
+        raise TypeError(
+            "A ParameterSample has no single set of parameters; pass one of "
+            "sample.draws() instead."
+        )
     return result

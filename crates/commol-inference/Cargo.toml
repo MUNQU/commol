@@ -1,0 +1,21 @@
+[package]
+name = "commol-inference"
+version = "0.1.0"
+edition = "2021"
+authors = ["Commol Contributors"]
+description = "Uncertainty and identifiability methods for Commol calibration problems"
+license = "MIT"
+
+[lib]
+name = "commol_inference"
+crate-type = ["rlib"]
+
+[dependencies]
+commol-calibration = { path = "../commol-calibration" }
+commol-core = { path = "../commol-core" }
+commol-random = { path = "../commol-random" }
+rayon = "1.11"
+
+[dev-dependencies]
+commol-difference = { path = "../commol-difference" }
+serde_json = "1.0"

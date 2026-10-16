@@ -4,7 +4,7 @@
 use argmin::core::CostFunction;
 use commol_calibration::{
     optimize, CalibrationParameter, CalibrationParameterType, CalibrationProblem, LossConfig,
-    NelderMeadConfig, ObservedDataPoint, OptimizationConfig,
+    NelderMeadConfig, ObservedDataPoint, OptimizationConfig, OptimizationObjective,
 };
 use commol_core::Model;
 use commol_difference::DifferenceEquations;
@@ -50,13 +50,14 @@ fn problem(rate: &str, guess: f64) -> CalibrationProblem<DifferenceEquations> {
 }
 
 #[test]
-fn an_infeasible_run_gets_the_base_penalty_and_no_history() {
+fn an_infeasible_run_gets_the_base_penalty_and_is_not_feasible() {
     let problem = problem("k", 0.5);
+    let objective = OptimizationObjective::new(&problem);
 
-    let infeasible = problem.cost(&vec![2.0]).unwrap();
+    let infeasible = objective.cost(&vec![2.0]).unwrap();
 
     assert!(infeasible > 1e9, "{infeasible}");
-    assert!(problem.get_evaluations().is_empty());
+    assert!(!objective.score(&[2.0]).unwrap().feasible);
 }
 
 #[test]
@@ -67,7 +68,7 @@ fn a_calibration_whose_bounds_include_infeasible_rates_finds_the_rate_of_the_dat
             .with_sd_tolerance(1e-12),
     );
 
-    let result = optimize(problem("k", 0.5), config).unwrap();
+    let result = optimize(&problem("k", 0.5), &config).unwrap();
 
     assert!(
         (result.best_parameters[0] - 0.2).abs() < 1e-4,
@@ -80,7 +81,10 @@ fn a_calibration_whose_bounds_include_infeasible_rates_finds_the_rate_of_the_dat
 fn a_rate_that_cannot_be_evaluated_stops_the_calibration_with_its_message() {
     let problem = problem("k * missing", 0.5);
 
-    let error = problem.cost(&vec![0.5]).unwrap_err().to_string();
+    let error = OptimizationObjective::new(&problem)
+        .cost(&vec![0.5])
+        .unwrap_err()
+        .to_string();
 
     assert!(error.contains("missing"), "{error}");
 }
