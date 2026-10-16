@@ -2829,7 +2829,7 @@ merges into it, through the merge queue, and a release is a tag on it.</p>
 <ul>
 <li><strong><code>main</code></strong>: The integration branch, always tested and releasable. Protected
   by its ruleset: pull requests only, squash merges through the merge queue,
-  the required checks and a code-owner review.</li>
+  and the required checks. A review is welcome and not required.</li>
 <li><strong><code>release/X.Y</code></strong>: Only to fix a version that <code>main</code> has left behind. It is
   cut from the tag <code>vX.Y.Z</code>, receives fixes copied from <code>main</code>
   (<code>git cherry-pick</code>), and releases <code>vX.Y.(Z+1)</code>. A fix lands on <code>main</code> first.</li>
@@ -3071,14 +3071,13 @@ the same zones (<code>gh issue list --label area:inference -s open</code>).</p>
 <ul>
 <li>The required checks must pass: <code>Python Code Quality</code>, <code>Rust Code Quality</code>,
   <code>Build Documentation</code> and <code>Build Passed</code> (the whole test matrix)</li>
-<li>An approving review from a code owner</li>
 <li>No merge conflicts with target branch</li>
 <li>The merge queue: it merges each pull request on top of the ones queued
   before it, after the required checks pass on that result</li>
 <li>Code coverage should be &gt;95%</li>
 </ul>
 <h3 id="7-merging">7. Merging<a class="headerlink" href="#7-merging" title="Permanent link">&para;</a></h3>
-<p>Once approved, add the pull request to the merge queue ("Merge when ready", or
+<p>Once its checks pass, add the pull request to the merge queue ("Merge when ready", or
 <code>gh pr merge &lt;number&gt; --squash</code>): the queue squash-merges it, the only method
 <code>main</code> allows, once the required checks pass on top of the pull requests before
 it. GitHub deletes the branch after the merge (<code>delete_branch_on_merge</code>);
@@ -3103,19 +3102,19 @@ Updating the file there also triggers a version-update check right away.</p>
 <tbody>
 <tr>
 <td>Code Quality (<code>code-quality.yaml</code>)</td>
-<td>Every push and pull request</td>
+<td>Pull requests, the merge queue and on demand</td>
 <td>Python: Ruff (lint, format, docstrings <code>D1</code>/<code>D417</code>), Ty, Pytest with the documentation checks (<code>pytest -m docs</code>). Rust: rustfmt, Clippy (<code>-D warnings</code>, so <code>missing_docs</code> too), rustdoc without broken links, cargo test.</td>
 <td><code>Python Code Quality</code>, <code>Rust Code Quality</code></td>
 </tr>
 <tr>
 <td>Build (<code>build.yaml</code>)</td>
-<td>Every push and pull request</td>
-<td>Tests on Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14, except the documentation checks. On pushes to <code>main</code>, wheels for every target architecture.</td>
+<td>Pull requests, the merge queue, every Monday on <code>main</code> and on demand</td>
+<td>Tests on Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14, except the documentation checks. A change of only documentation or planning files (<code>docs/</code>, Markdown at the root, <code>mkdocs.yaml</code>, <code>.github/ISSUE_TEMPLATE/</code>, <code>.github/scripts/</code>) skips the tests. The wheels of every architecture are built by the release (<code>release.yaml</code>).</td>
 <td><code>Build Passed</code></td>
 </tr>
 <tr>
 <td>Documentation (<code>docs.yaml</code>)</td>
-<td>Every push and pull request</td>
+<td>Pull requests, the merge queue, pushes to <code>main</code> and release tags</td>
 <td><code>mkdocs build --strict</code>: no broken internal link or anchor. Deploys the site with mike: a release tag as <code>latest</code>, a push to <code>main</code> as <code>dev</code>.</td>
 <td><code>Build Documentation</code></td>
 </tr>
@@ -3128,7 +3127,7 @@ Updating the file there also triggers a version-update check right away.</p>
 <tr>
 <td>Merge queue (<code>merge_group</code> in Code Quality, Build and Documentation)</td>
 <td>A pull request queued for <code>main</code></td>
-<td>The same required checks, on the pull request merged on top of the ones queued before it</td>
+<td>The same required checks, on the pull request merged on top of the ones queued before it, at most 2 groups at a time and up to 5 pull requests per group. The tree that reaches <code>main</code> is the tree the queue tested, so a push to <code>main</code> runs no tests again.</td>
 <td>The same</td>
 </tr>
 <tr>

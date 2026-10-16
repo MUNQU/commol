@@ -2086,10 +2086,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-3-wait-for-the-build-of-main" class="md-nav__link">
+  <a href="#step-3-create-the-tag" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3: Wait for the Build of main
+        Step 3: Create the Tag
       
     </span>
   </a>
@@ -2097,10 +2097,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-4-create-the-tag" class="md-nav__link">
+  <a href="#step-4-publish-the-github-release" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 4: Create the Tag
+        Step 4: Publish the GitHub Release
       
     </span>
   </a>
@@ -2108,10 +2108,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-5-publish-the-github-release" class="md-nav__link">
+  <a href="#step-5-watch-the-pypi-publication" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 5: Publish the GitHub Release
+        Step 5: Watch the PyPI Publication
       
     </span>
   </a>
@@ -2119,21 +2119,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-6-watch-the-pypi-publication" class="md-nav__link">
+  <a href="#step-6-verify-the-release" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 6: Watch the PyPI Publication
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-7-verify-the-release" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 7: Verify the Release
+        Step 6: Verify the Release
       
     </span>
   </a>
@@ -2509,10 +2498,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-3-wait-for-the-build-of-main" class="md-nav__link">
+  <a href="#step-3-create-the-tag" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3: Wait for the Build of main
+        Step 3: Create the Tag
       
     </span>
   </a>
@@ -2520,10 +2509,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-4-create-the-tag" class="md-nav__link">
+  <a href="#step-4-publish-the-github-release" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 4: Create the Tag
+        Step 4: Publish the GitHub Release
       
     </span>
   </a>
@@ -2531,10 +2520,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-5-publish-the-github-release" class="md-nav__link">
+  <a href="#step-5-watch-the-pypi-publication" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 5: Publish the GitHub Release
+        Step 5: Watch the PyPI Publication
       
     </span>
   </a>
@@ -2542,21 +2531,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-6-watch-the-pypi-publication" class="md-nav__link">
+  <a href="#step-6-verify-the-release" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 6: Watch the PyPI Publication
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-7-verify-the-release" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 7: Verify the Release
+        Step 6: Verify the Release
       
     </span>
   </a>
@@ -2743,15 +2721,12 @@ release:</p>
    notes.</li>
 <li>Add the version to the Version History list.</li>
 </ol>
-<p>Check the notes the release will have (Step 5):</p>
+<p>Check the notes the release will have (Step 4):</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>.github/scripts/release_notes.py<span class="w"> </span>X.Y.Z
 </span></code></pre></div>
 <p>Open the pull request to <code>main</code> (<code>docs(changelog): release X.Y.Z</code>) and merge
 it through the merge queue.</p>
-<h3 id="step-3-wait-for-the-build-of-main">Step 3: Wait for the Build of <code>main</code><a class="headerlink" href="#step-3-wait-for-the-build-of-main" title="Permanent link">&para;</a></h3>
-<p>Wait until the <strong>Build</strong> run of the push of that merge to <code>main</code> passes: it is
-the only run that builds the wheels for every target architecture.</p>
-<h3 id="step-4-create-the-tag">Step 4: Create the Tag<a class="headerlink" href="#step-4-create-the-tag" title="Permanent link">&para;</a></h3>
+<h3 id="step-3-create-the-tag">Step 3: Create the Tag<a class="headerlink" href="#step-3-create-the-tag" title="Permanent link">&para;</a></h3>
 <p>Tag the commit at the top of <code>main</code> with an annotated tag:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>checkout<span class="w"> </span>main
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>git<span class="w"> </span>pull<span class="w"> </span>--ff-only<span class="w"> </span>origin<span class="w"> </span>main
@@ -2759,7 +2734,7 @@ the only run that builds the wheels for every target architecture.</p>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>vX.Y.Z
 </span></code></pre></div>
 <p>The tag must start with <code>v</code>. Pushing a tag does not publish anything.</p>
-<h3 id="step-5-publish-the-github-release">Step 5: Publish the GitHub Release<a class="headerlink" href="#step-5-publish-the-github-release" title="Permanent link">&para;</a></h3>
+<h3 id="step-4-publish-the-github-release">Step 4: Publish the GitHub Release<a class="headerlink" href="#step-4-publish-the-github-release" title="Permanent link">&para;</a></h3>
 <p>The notes come from the changelog of <code>main</code>, never by hand: its section
 <code>[X.Y.Z]</code>, with the links turned into links to the site, the install command
 and the comparison with the previous release
@@ -2769,7 +2744,7 @@ release", tag <code>vX.Y.Z</code>, title <code>Version X.Y.Z</code>) or with the
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python<span class="w"> </span>.github/scripts/release_notes.py<span class="w"> </span>X.Y.Z<span class="w"> </span>&gt;<span class="w"> </span>notes.md
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>gh<span class="w"> </span>release<span class="w"> </span>create<span class="w"> </span>vX.Y.Z<span class="w"> </span>--verify-tag<span class="w"> </span>--title<span class="w"> </span><span class="s2">&quot;Version X.Y.Z&quot;</span><span class="w"> </span>--notes-file<span class="w"> </span>notes.md<span class="w"> </span>--latest
 </span></code></pre></div>
-<h3 id="step-6-watch-the-pypi-publication">Step 6: Watch the PyPI Publication<a class="headerlink" href="#step-6-watch-the-pypi-publication" title="Permanent link">&para;</a></h3>
+<h3 id="step-5-watch-the-pypi-publication">Step 5: Watch the PyPI Publication<a class="headerlink" href="#step-5-watch-the-pypi-publication" title="Permanent link">&para;</a></h3>
 <p>The <strong>Release to PyPI</strong> workflow:</p>
 <ol>
 <li>Builds the wheels for Linux and macOS (x86_64 and aarch64) and Windows
@@ -2780,7 +2755,7 @@ release", tag <code>vX.Y.Z</code>, title <code>Version X.Y.Z</code>) or with the
 <p>Watch it in the <a href="https://github.com/MUNQU/commol/actions">Actions tab</a> or with:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>gh<span class="w"> </span>run<span class="w"> </span>watch<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>gh<span class="w"> </span>run<span class="w"> </span>list<span class="w"> </span>--workflow<span class="w"> </span>release.yaml<span class="w"> </span>--limit<span class="w"> </span><span class="m">1</span><span class="w"> </span>--json<span class="w"> </span>databaseId<span class="w"> </span>--jq<span class="w"> </span><span class="s1">&#39;.[0].databaseId&#39;</span><span class="k">)</span><span class="s2">&quot;</span>
 </span></code></pre></div>
-<h3 id="step-7-verify-the-release">Step 7: Verify the Release<a class="headerlink" href="#step-7-verify-the-release" title="Permanent link">&para;</a></h3>
+<h3 id="step-6-verify-the-release">Step 6: Verify the Release<a class="headerlink" href="#step-6-verify-the-release" title="Permanent link">&para;</a></h3>
 <p>Check that the version appears at <a href="https://pypi.org/project/commol/">https://pypi.org/project/commol/</a>. Then
 install it in a clean environment and run a model:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>uv<span class="w"> </span>venv<span class="w"> </span>/tmp/commol-check
@@ -2843,7 +2818,6 @@ publisher on PyPI first, or the upload fails.</p>
 <li>[ ] Every issue of the milestone closed</li>
 <li>[ ] Version chosen</li>
 <li>[ ] Changelog dated on <code>main</code>, with its opening paragraph</li>
-<li>[ ] <strong>Build</strong> run on <code>main</code> passed</li>
 <li>[ ] Annotated tag <code>vX.Y.Z</code> created on <code>main</code> and pushed</li>
 <li>[ ] GitHub release published with the notes of <code>release_notes.py</code></li>
 <li>[ ] <strong>Release to PyPI</strong> workflow passed</li>
