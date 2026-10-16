@@ -84,8 +84,8 @@ An issue is ready when every issue that blocks it is closed.
 
 The project adds a new issue as `Todo` and moves it to `Done` when it closes.
 A pull request that says `Closes #N` links to its issue and closes it when it
-merges. `In Progress` is set by whoever starts the work, from the project or
-from a terminal:
+merges. `In Progress` is set when the work starts, by `.github/scripts/start.sh`
+(see below), or by hand from the project or a terminal:
 
 ```bash
 gh project item-list 1 --owner MUNQU                    # the items and their status
@@ -106,10 +106,18 @@ gh project item-edit --project-id PVT_kwDODcfAw84BnXyo --id "$item" \
 2. Settle its decisions when its implementation starts, not before. A
    decision that changes what an earlier proposal built, or what a later one
    relies on, updates those issues too, with a comment in each.
-3. Set the item to `In Progress`, and create the branch from the issue, so
-   GitHub lists it under the issue: `gh issue develop <number> --base main
-   --name <type>/<name> --checkout`. Work one task after the other, the tests
-   of a requirement before its code. Tick the tasks of the body as they land.
+3. Start it with one command, which takes it, sets it to `In Progress` and
+   creates its branch from `main`, linked to the issue, in a sibling worktree:
+
+   ```bash
+   .github/scripts/start.sh <number> <type>/<name>   # --here: in this checkout
+   ```
+
+   It refuses an issue that is closed, blocked by an open issue, or taken by
+   someone else, and `--dry-run` shows what it would do. Never start by hand:
+   a started issue that is not `In Progress` and assigned looks free to the
+   next one who runs `next.sh`. Work one task after the other, the tests of a
+   requirement before its code. Tick the tasks of the body as they land.
 4. Open the pull request with `Closes #N` and the evidence. The merge closes
    the issue.
 
@@ -133,12 +141,11 @@ the same zones (`gh issue list --label area:inference -s open`).
 
 To take a proposal while others run:
 
-1. Assign the issue to yourself (or to the agent that works on it) and set it
-   to `In Progress`: an assigned issue is taken.
-2. Work in its own worktree, a sibling of the repository, with its own
-   CodeGraph index: `gh issue develop <number> --base main --name
-   <type>/<name> --worktree ../commol-worktrees/<name>`.
-3. Open the pull request as usual. The merge queue of `main` tests it on
+1. Start it with `.github/scripts/start.sh <number> <type>/<name>`: it assigns
+   the issue (an assigned issue is taken), sets it to `In Progress` and
+   creates its worktree, a sibling of the repository, which needs its own
+   CodeGraph index.
+2. Open the pull request as usual. The merge queue of `main` tests it on
    top of the pull requests queued before it, so a conflict in meaning fails
    there and never reaches `main`; a conflict in the lines of a shared
    index (the changelog, `AGENTS.md`) is solved by keeping both.
