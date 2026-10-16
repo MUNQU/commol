@@ -16,7 +16,7 @@ and no rule, so it is the first real second kind to test the generic layers.
 `Agents` with a `Graph` neighborhood and the variant `Network`, and the
 agent ODD adds attributes, `Complete`, `Groups` and Python rules.
 Branch: `feat/network-models` from `develop`, after
-`odd/tasks/model-kind-foundation.md`,
+`odd/archive/tasks/model-kind-foundation.md`,
 `odd/tasks/stochastic-compartmental.md` and `odd/tasks/integral-outputs.md`
 are merged.
 Engram mirror: topic `odd/network-models/tasks` (project `commol`).

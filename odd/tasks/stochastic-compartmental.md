@@ -12,7 +12,7 @@ so it is the cheapest addition, and the closest libraries have it: epydemix
 (stochastic simulation) and odin2 + dust2 (deterministic or stochastic)
 (`odd/tasks/library-benchmark.md`, Context).
 Branch: `feat/stochastic-compartmental` from `develop`, after
-`odd/tasks/model-kind-foundation.md` is merged.
+`odd/archive/tasks/model-kind-foundation.md` is merged.
 Engram mirror: topic `odd/stochastic-compartmental/tasks` (project `commol`).
 Runners: the Rust tests, clippy and rustdoc (from the root), `maturin develop
 --release --features test-kind`, then `pytest`, `pytest -m docs`, `ruff check

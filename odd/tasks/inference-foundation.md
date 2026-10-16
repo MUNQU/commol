@@ -32,7 +32,7 @@ architecture (section "Architecture") and never bypass it:
 | 14 | `emulation-discrepancy.md` | Gaussian-process emulators, history matching, model discrepancy, delayed acceptance |
 
 Branch: `refactor/inference-foundation` from `develop`, after
-`odd/tasks/model-kind-foundation.md` and `odd/tasks/stochastic-compartmental.md`
+`odd/archive/tasks/model-kind-foundation.md` and `odd/tasks/stochastic-compartmental.md`
 are merged (`odd/execution-order.md`).
 Engram mirror: topic `odd/inference-foundation/tasks` (project `commol`).
 Runners: the Rust tests, clippy and rustdoc (from the root), `maturin develop
