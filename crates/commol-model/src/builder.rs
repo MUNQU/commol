@@ -17,7 +17,7 @@ use commol_core::math_expression::preprocessing::{
 };
 use commol_core::{
     Aggregate, MathExpression, MathExpressionContext, Model, NEIGHBORS, NEIGHBORS_PREFIX, Process,
-    RateMathExpression,
+    RateMathExpression, Rounding,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -309,6 +309,65 @@ impl CompiledModel {
             requires_compartment_context,
         })
     }
+}
+
+/// Relative tolerance with which an amount is a whole number: the rounding
+/// of a fraction times the total.
+const WHOLE_TOLERANCE: f64 = 1e-9;
+
+/// The whole number `value` is, within the rounding of a fraction times a
+/// total, or `None` when it is not one.
+pub fn as_whole(value: f64) -> Option<f64> {
+    let whole = value.round();
+    ((value - whole).abs() <= WHOLE_TOLERANCE * whole.abs().max(1.0)).then_some(whole)
+}
+
+/// Check that a stochastic engine can start the model from whole units.
+///
+/// A stochastic engine moves whole units, so the total must be a whole
+/// number. When an initial amount is not, the settings of the engine must
+/// name how to make it whole ([`commol_core::Rounding`]); there is no
+/// default.
+fn check_whole_units(model: &Model, aggregate: &Aggregate) -> Result<(), String> {
+    let engine = model.engine.engine_type();
+    if !engine.is_stochastic() {
+        return Ok(());
+    }
+    let total = aggregate.initial_conditions.total;
+    if as_whole(total).is_none() {
+        return Err(format!(
+            "The {} engine moves whole units, so the total must be a whole number, \
+             got {total}",
+            engine.name()
+        ));
+    }
+    if model.engine.settings().rounding().is_some() {
+        return Ok(());
+    }
+    let fractional: Vec<String> = initial_state(&model.process, aggregate)?
+        .into_iter()
+        .filter(|compartment| as_whole(compartment.amount).is_none())
+        .map(|compartment| format!("'{}' ({})", compartment.name, compartment.amount))
+        .collect();
+    if fractional.is_empty() {
+        return Ok(());
+    }
+    let shown = fractional.len().min(5);
+    let more = if fractional.len() > shown {
+        format!(" and {} more", fractional.len() - shown)
+    } else {
+        String::new()
+    };
+    Err(format!(
+        "The {} engine moves whole units, and the initial amounts of {}{more} are not \
+         whole. Name a rounding in the settings of the engine: \"{}\" (the same whole \
+         amounts in every run, which sum to the total) or \"{}\" (each run draws its \
+         amounts from a multinomial of the total with the fractions of the model)",
+        engine.name(),
+        fractional[..shown].join(", "),
+        Rounding::LargestRemainder.name(),
+        Rounding::Random.name(),
+    ))
 }
 
 /// The impulse schedule of each impulse transition, by transition id.
@@ -802,6 +861,7 @@ pub fn check_model(model: &Model) -> Result<(), String> {
     aggregate.check(process)?;
     check_engine_variable_ids(model, process)?;
     check_neighbor_terms(model, aggregate)?;
+    check_whole_units(model, aggregate)?;
     let layout = CompartmentLayout::new(process);
     check_bin_names_against_subgroup_totals(&layout, process)?;
     let compartments: HashSet<&str> = layout.names().iter().map(String::as_str).collect();

@@ -48,8 +48,8 @@ mod system;
 mod types;
 
 pub use builder::{
-    ExpandedOutput, InitialCompartment, check_model, expand_accumulators, expand_compartments,
-    initial_state, subgroup_total_names,
+    ExpandedOutput, InitialCompartment, as_whole, check_model, expand_accumulators,
+    expand_compartments, initial_state, subgroup_total_names,
 };
 pub use engine::CompartmentalEngine;
 pub use flows::{FlowDescription, describe_flows};
