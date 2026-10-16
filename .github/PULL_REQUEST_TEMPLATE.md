@@ -2,9 +2,12 @@
 
 <!-- What changes, and why. Put the outcome first. -->
 
+Closes #<!-- the issue this delivers; delete the line if there is none -->
+
 ## Testing
 
-<!-- The commands you ran and their results. -->
+<!-- Each requirement of the issue (R1, R2, …) and the tests that check it,
+then the commands you ran and their results. -->
 
 - [ ] Rust: `cargo clippy --workspace --all-targets -- -D warnings` and the Rust tests pass
 - [ ] Python: `maturin develop --release`, then `pytest`, `ruff` and `ty` pass

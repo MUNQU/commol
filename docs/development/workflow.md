@@ -35,6 +35,56 @@ We use a simplified Git Flow approach:
 - **`test/*`**: Test additions or improvements (e.g., `test/add-conditional-stratification-tests`)
 - **`chore/*`**: Maintenance tasks, dependencies (e.g., `chore/update-dependencies`)
 
+## Planning
+
+Planned work lives in GitHub issues, written from the templates of
+`.github/ISSUE_TEMPLATE/`:
+
+| Template | Label | For |
+|---|---|---|
+| Proposal (`proposal.md`) | `proposal` | A feature, a refactor or a breaking change: goal, current state, requirements with the tests that check them, decisions, tasks |
+| Bug or small change (`change.md`) | `change` | A defect or a change that needs no proposal: the behavior, a reproduction and the test that will show it |
+| Release (`release.md`) | `release` | The checklist of one release, blocked by the issues it ships |
+
+| What | Where |
+|---|---|
+| The specification of a change | The body of its issue |
+| Decisions and findings during the work | Comments of the issue (`L<n> (user|implementation): …`), and the Decisions table of the body |
+| Order and dependencies | "Blocked by" links between issues; "Why here" in the Delivery of a proposal |
+| Releases | A milestone per release, and its release issue |
+| Evidence of the delivery | The body of the pull request: each requirement and the tests that pass |
+| What lasts after the delivery | The guide, [Design decisions](../codebase/design-decisions.md) and the changelog, as the [definition of done](../codebase/conventions.md#documentation-definition-of-done) requires |
+
+To find the next piece of work:
+
+```bash
+gh issue list --label proposal --state open
+gh issue list --milestone 0.5.0
+gh api repos/MUNQU/commol/issues/<number>/dependencies/blocked_by --jq '.[].number'
+```
+
+An issue is ready when every issue that blocks it is closed.
+
+### Lifecycle of a proposal
+
+1. Open the issue from the template: a scoped goal, the current state with
+   paths and symbols, one requirement per behavior (`The <component> SHALL …`,
+   with `WHEN … THEN …` scenarios), each scenario with the test that checks
+   it. Add `breaking` when it breaks the public API, the milestone of its
+   release and its blockers. A large proposal splits into sub-issues.
+2. Settle its decisions when its implementation starts, not before. A
+   decision that changes what an earlier proposal built, or what a later one
+   relies on, updates those issues too, with a comment in each.
+3. Work on a branch from `develop`, one task after the other, the tests of a
+   requirement before its code. Tick the tasks of the body as they land.
+4. Open the pull request with `Closes #N` and the evidence. The merge closes
+   the issue (`close-issues.yaml`).
+
+The proposals run one after the other, each from `develop` after the previous
+pull request merges, so each is written against the merged code of the one
+before. Two proposals that touch different modules may run in parallel on two
+branches; their issues say so.
+
 ## Development Process
 
 ### 1. Starting New Work
@@ -119,12 +169,12 @@ git push origin feature/your-feature-name
 
 # Create a Pull Request on GitHub
 # - Target the 'develop' branch
-# - Fill in the PR template with:
-#   - Description of changes
-#   - Related issues
-#   - Testing performed
-#   - Screenshots (if UI changes)
+# - Fill in the PR template; "Closes #N" names the issue it delivers
 ```
+
+`.github/workflows/close-issues.yaml` closes the issues that the body names
+with `Closes`, `Fixes` or `Resolves` when the pull request merges into
+`develop`. GitHub does it by itself only for the default branch, `main`.
 
 ### 6. Code Review and CI
 
@@ -147,10 +197,9 @@ When you create a PR, automated checks run:
 
 Once approved:
 
-```bash
-# Merge using "Squash and merge" on GitHub (the only method develop allows)
-# Delete the feature branch after merging
-```
+Merge with "Squash and merge" on GitHub, the only method `develop` allows.
+GitHub deletes the branch after the merge (`delete_branch_on_merge`); delete
+your local copy with `git branch -D <branch>` after `git fetch --prune`.
 
 ### 8. Promoting Develop to Main
 
@@ -178,6 +227,7 @@ already tests the result of merging it into `main`.
 | Build (`build.yaml`) | Every push and pull request | Tests on Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14, except the documentation checks. On pushes to `main`, wheels for every target architecture. | `Build Passed` |
 | Documentation (`docs.yaml`) | Every push and pull request | `mkdocs build --strict`: no broken internal link or anchor. Deploys the site with mike on pushes to `main` (`latest`) and `develop` (`dev`). | `Build Documentation` |
 | Links (`links.yaml`) | Pull requests that change `docs/`, `README.md` or `AGENTS.md`; every Monday; on demand | External links, with lychee. | None: a site that is down for a while must not block a pull request |
+| Close Issues (`close-issues.yaml`) | A pull request merged into `develop` | Closes the issues its body names with `Closes`, `Fixes` or `Resolves`. | — |
 | Release (`release.yaml`) | A published GitHub release | Builds wheels and the sdist, and publishes them to PyPI. See [Release Process](release.md). | — |
 
 ## Local Development Tips
@@ -215,9 +265,14 @@ On every commit, the hooks in `.pre-commit-config.yaml` run:
 | `cargo-fmt` | Rust formatting |
 | `cargo-clippy` | Rust lints with `-D warnings`, including `missing_docs` |
 | `ty-check` | Python types of `commol` |
+| `vulture` | Dead Python code |
 | `ruff-check` | Python lints, including docstrings (`D1`, `D417`) |
 | `ruff-format` | Python formatting |
 | `uv-lock` | `uv.lock` matches `pyproject.toml` |
+
+The Python hooks run their tool with `uv run` from `py-commol/`, so they use
+the versions of `uv.lock`, the same as CI. Dependabot updates `uv.lock`, not the
+`rev` of a pre-commit repository, so a hook pinned there would drift from CI.
 
 ### The Rust toolchain
 
