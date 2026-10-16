@@ -421,6 +421,9 @@ pub struct FlowDescription {
     /// Compartment a proportional rate is multiplied by, or `None` when the rate
     /// is an absolute flow. Every piece of a transition shares the same flow.
     pub proportional_to: Option<String>,
+    /// Index of the planned flow the piece belongs to: the pieces of one flow
+    /// move together, as one event in a stochastic engine.
+    pub flow: usize,
 }
 
 /// Every transition flow of a process laid out in compartments, exactly as
@@ -450,7 +453,8 @@ pub fn describe_flows(
     let name = |idx: Option<usize>| idx.map(|idx| layout.name(idx).to_string());
     Ok(flows
         .into_iter()
-        .flat_map(|flow| {
+        .enumerate()
+        .flat_map(|(index, flow)| {
             let proportional_to = if flow.absolute {
                 None
             } else {
@@ -464,6 +468,7 @@ pub fn describe_flows(
                     target: name(target),
                     rate: flow.rate.clone(),
                     proportional_to: proportional_to.clone(),
+                    flow: index,
                 })
                 .collect::<Vec<_>>()
         })

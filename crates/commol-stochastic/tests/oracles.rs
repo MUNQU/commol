@@ -544,3 +544,26 @@ fn a_rate_that_switches_on_at_a_threshold_waits_for_it() {
         "{share} against {expected} ± {error}"
     );
 }
+
+#[test]
+fn calibrated_initial_conditions_go_through_the_rounding() {
+    use commol_core::{ModelValue, ModelValueType};
+    let values = [ModelValue {
+        value_type: ModelValueType::InitialCondition,
+        id: "B".to_string(),
+    }];
+    // 0.0123 of the total is 12.3 units of B; A takes the rest.
+    let rounded = chain("StochasticSteps", r#"{"rounding":"largest_remainder"}"#);
+    let mut engine = steps(&rounded);
+    let plan = engine.plan_values(&values, Some("A")).unwrap();
+    assert_eq!(engine.apply_values(&plan, &[0.0123]).unwrap(), 0.0);
+    let start = &engine.run_at(&[0.0]).unwrap()[0];
+    assert_eq!(start, &vec![988.0, 12.0, 0.0]);
+
+    let mut whole_only = steps(&chain("StochasticSteps", "null"));
+    let plan = whole_only.plan_values(&values, Some("A")).unwrap();
+    let error = whole_only.apply_values(&plan, &[0.0123]).unwrap_err();
+    for part in ["StochasticSteps", "largest_remainder", "random"] {
+        assert!(error.contains(part), "{part} in {error}");
+    }
+}

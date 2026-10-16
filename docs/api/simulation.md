@@ -14,6 +14,10 @@ Runs a model and reads its outputs. Guide: [Running Simulations](../guide/simula
 
 ::: commol.context.engine.OdeSolver
 
+::: commol.context.engine.StochasticEventsSettings
+
+::: commol.context.engine.StochasticStepsSettings
+
 ::: commol.InfeasibleStateError
 
 ## Windows

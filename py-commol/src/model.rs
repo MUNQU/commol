@@ -84,11 +84,13 @@ fn expanded_outputs(
 ///         model
 ///
 /// Returns:
-///     One `(transition, source, target, rate, proportional_to)` tuple per flow
-///     piece, in transition order. `source` or `target` is None for a
+///     One `(transition, source, target, rate, proportional_to, flow)` tuple
+///     per flow piece, in transition order. `source` or `target` is None for a
 ///     source-less or target-less transition. `proportional_to` is the
 ///     compartment a proportional rate is multiplied by, or None for an absolute
-///     flow; the pieces of a transition with several sources share it.
+///     flow; the pieces of a transition with several sources share it. `flow`
+///     is the index of the flow the piece belongs to: its pieces move
+///     together.
 ///
 /// Raises:
 ///     ValueError: If a transition mixes bins and categories, a category
@@ -106,6 +108,7 @@ fn transition_flows(
         Option<String>,
         String,
         Option<String>,
+        usize,
     )>,
 > {
     let flows = commol_model::describe_flows(&process.inner, structure.inner.neighbors.as_ref())
@@ -119,6 +122,7 @@ fn transition_flows(
                 flow.target,
                 flow.rate,
                 flow.proportional_to,
+                flow.flow,
             )
         })
         .collect())

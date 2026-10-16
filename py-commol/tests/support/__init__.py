@@ -10,9 +10,12 @@ from .flows import Flow, flow_model, increments
 from .models import (
     FactoryBuilder,
     a_to_b_builder,
+    MEAN_FIELD,
+    STOCHASTIC_ENGINES,
     TIGHT,
     build,
     build_ode,
+    build_stochastic,
     conditional_pathway_builder,
     override_builder,
     abcd_builder,
@@ -34,6 +37,9 @@ from .simulation import initial_state, run
 
 __all__ = [
     "ENGINE_REL",
+    "MEAN_FIELD",
+    "STOCHASTIC_ENGINES",
+    "build_stochastic",
     "FactoryBuilder",
     "Flow",
     "ODE_REL",

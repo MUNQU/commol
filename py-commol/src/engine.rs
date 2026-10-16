@@ -916,13 +916,31 @@ mod tests {
     }
 
     #[test]
-    fn a_deterministic_engine_ignores_the_seed() {
+    fn an_aggregate_stochastic_engine_repeats_a_run_from_its_seed() {
         for &engine_type in EngineType::ALL {
-            if !engine_type.runs(ModelKind::Aggregate) {
+            if !engine_type.runs(ModelKind::Aggregate) || !engine_type.is_stochastic() {
                 continue;
             }
             let mut engine = Engine::build(&decay_model(engine_type)).unwrap();
-            assert!(!engine_type.is_stochastic());
+            assert_eq!(engine.engine_type(), engine_type);
+            let mut run = |seed| {
+                engine.set_seed(seed);
+                engine.reset();
+                SimulationEngine::run(&mut engine, 20).unwrap().rows
+            };
+            let first = run(1);
+            assert_eq!(run(1), first);
+            assert_ne!(run(2), first);
+        }
+    }
+
+    #[test]
+    fn a_deterministic_engine_ignores_the_seed() {
+        for &engine_type in EngineType::ALL {
+            if !engine_type.runs(ModelKind::Aggregate) || engine_type.is_stochastic() {
+                continue;
+            }
+            let mut engine = Engine::build(&decay_model(engine_type)).unwrap();
             engine.set_seed(1);
             let first = SimulationEngine::run(&mut engine, 3).unwrap().rows;
             engine.set_seed(2);

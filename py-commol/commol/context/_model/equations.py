@@ -20,12 +20,14 @@ from commol.context._model.engine_state import TransitionFlow
 from commol.context._model.helpers import ModelCompartmentHelper
 from commol.context.description import (
     Block,
+    Cell,
     Equation,
     EquationGroup,
     Equations,
     GraphEdge,
     GraphNode,
     StateGraph,
+    Table,
     Text,
 )
 from commol.utils.security import get_expression_variables
@@ -66,14 +68,16 @@ class DynamicsDescription:
         -------
         list[Block]
             The state graphs, the compact form, the expanded form when the
-            engine has equations, and the impulses.
+            engine has equations or the events when it draws them, and the
+            impulses.
         """
         blocks: list[Block] = [self.state_graph(), self.expanded_graph()]
         blocks.extend(self.compact_form())
-        if commol_rs.engine.EngineType(self._model.engine.type).equation_lhs(
-            "X", False
-        ):
+        engine = commol_rs.engine.EngineType(self._model.engine.type)
+        if engine.equation_lhs("X", False):
             blocks.append(self.expanded_form())
+        if engine.dynamics_form == "stochastic_events":
+            blocks.extend(self.events(engine.rate_meaning == "continuous"))
         impulses = self.impulses()
         if impulses is not None:
             blocks.append(impulses)
@@ -340,6 +344,73 @@ class DynamicsDescription:
             heading="Expanded form", groups=[EquationGroup(equations=equations)]
         )
 
+    # ------------------------------------------------------------------
+    # Events
+    # ------------------------------------------------------------------
+
+    def events(self, continuous: bool) -> list[Block]:
+        """
+        The event table: one row per flow, with the change of one event and
+        its propensity (continuous time) or its draw (discrete time).
+
+        An event moves one unit: it takes one from each source of the flow
+        and adds one to each target. The pieces of a flow with several
+        sources or targets are one event.
+
+        Parameters
+        ----------
+        continuous : bool
+            Whether the engine runs in continuous time, where a flow has a
+            propensity, or steps, where it has a draw.
+
+        Returns
+        -------
+        list[Block]
+            The table, and the rule of the draws of a step.
+        """
+        impulses = {t.id for t in self._model.process.transitions if t.is_impulse}
+        flows: dict[int, list[TransitionFlow]] = {}
+        for flow in self._transition_flows():
+            if flow.transition not in impulses:
+                flows.setdefault(flow.flow, []).append(flow)
+        rows: list[list[Cell]] = []
+        for pieces in flows.values():
+            first = pieces[0]
+            change: dict[str, int] = {}
+            for piece in pieces:
+                if piece.source is not None:
+                    change[piece.source] = change.get(piece.source, 0) - 1
+                if piece.target is not None:
+                    change[piece.target] = change.get(piece.target, 0) + 1
+            rows.append(
+                [
+                    first.transition,
+                    ", ".join(
+                        f"{name} {units:+d}" for name, units in change.items() if units
+                    )
+                    or "none",
+                    first.term if continuous else _draw(pieces),
+                ]
+            )
+        table = Table(
+            heading="Events",
+            columns=["Transition", "Change", "Propensity" if continuous else "Draw"],
+            rows=rows,
+        )
+        if continuous:
+            rule = (
+                "Each event moves one unit. A flow has no events while one of its "
+                "sources holds fewer units than an event takes."
+            )
+        else:
+            rule = (
+                "The draws of a step read the state at its start. The proportional "
+                "flows out of one compartment are one multinomial draw, so a unit "
+                "leaves by one flow at most; an absolute flow is capped by what its "
+                "sources still hold, in the order of the table."
+            )
+        return [table, Text(text=rule)]
+
     def impulses(self) -> Equations | None:
         """
         Each impulse transition: where it acts and the amounts it moves.
@@ -389,6 +460,17 @@ def _rate_text(transition: "Transition") -> str:
     if transition.stratified_rates:
         return "stratified rates"
     return "no rate"
+
+
+def _draw(pieces: list[TransitionFlow]) -> str:
+    """How many units a flow moves in a step of the chain binomial."""
+    first = pieces[0]
+    if first.proportional_to is not None:
+        return f"Binomial({first.proportional_to}, {first.rate})"
+    sources = [piece.source for piece in pieces if piece.source is not None]
+    if not sources:
+        return f"Poisson({first.rate})"
+    return f"Poisson({first.rate}), at most {', '.join(dict.fromkeys(sources))}"
 
 
 def _text_arrow(flow: TransitionFlow) -> str:
