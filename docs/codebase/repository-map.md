@@ -85,6 +85,7 @@ Use this page when you know what to change but not where it belongs.
 | `crates/*/tests/`, `#[cfg(test)]` modules | Rust tests. |
 | `docs/` | This site. `docs/codebase/` is for maintainers; the rest is for users. |
 | `.github/ISSUE_TEMPLATE/` | The templates of a proposal, a bug or small change, and a release ([Planning](../development/workflow.md#planning)). |
+| `.github/scripts/parallel.py` | The proposals that can run in parallel, from the Touches and the links of the open issues. |
 | `.github/scripts/release_notes.py` | The notes of a GitHub release, from its section of the changelog. |
 | `.github/workflows/` | CI: code quality, build, docs, release. |
 
