@@ -3157,7 +3157,9 @@ the same zones (<code>gh issue list --label area:inference -s open</code>).</p>
 <ul>
 <li><strong>Code Quality Pipeline</strong>: Linting, formatting, type checking for both Python and Rust</li>
 <li><strong>Build Pipeline</strong>: Builds on Ubuntu, Windows, and macOS with Python versions</li>
-<li><strong>Test Coverage</strong>: Runs all tests and reports coverage</li>
+<li><strong>Test Coverage</strong>: The Code Quality jobs measure the coverage of Python
+  (<code>pytest --cov</code>) and of Rust (<code>cargo llvm-cov</code>) and upload it to Codecov,
+  which feeds the coverage badges of the README</li>
 </ul>
 <p><strong>PR Requirements</strong>:</p>
 <ul>
@@ -3195,7 +3197,7 @@ Updating the file there also triggers a version-update check right away.</p>
 <tr>
 <td>Code Quality (<code>code-quality.yaml</code>)</td>
 <td>Pull requests, the merge queue and on demand</td>
-<td>Python: Ruff (lint, format, docstrings <code>D1</code>/<code>D417</code>), Ty, Pytest with the documentation checks (<code>pytest -m docs</code>). Rust: rustfmt, Clippy (<code>-D warnings</code>, so <code>missing_docs</code> too), rustdoc without broken links, cargo test.</td>
+<td>Python: Ruff (lint, format, docstrings <code>D1</code>/<code>D417</code>), Ty, Pytest with the documentation checks (<code>pytest -m docs</code>) and its coverage. Rust: rustfmt, Clippy (<code>-D warnings</code>, so <code>missing_docs</code> too), rustdoc without broken links, cargo test with its coverage (<code>cargo llvm-cov</code>). Both upload their coverage to Codecov (flags <code>python</code> and <code>rust</code>) with the OIDC token of the run, so no secret is needed; <code>.github/codecov.yml</code> makes its checks informational.</td>
 <td><code>Python Code Quality</code>, <code>Rust Code Quality</code></td>
 </tr>
 <tr>
@@ -3251,8 +3253,13 @@ Updating the file there also triggers a version-update check right away.</p>
 </span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="c1"># Coverage studies (slow), from py-commol/</span>
 </span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>pytest<span class="w"> </span>-m<span class="w"> </span>coverage_study
 </span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>
-</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="c1"># Documentation, from the repository root</span>
-</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>mkdocs<span class="w"> </span>build<span class="w"> </span>--strict
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="c1"># Test coverage, as CI measures it (Rust needs `cargo install cargo-llvm-cov` and</span>
+</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="c1"># `rustup component add llvm-tools-preview`)</span>
+</span><span id="__span-10-16"><a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>pytest<span class="w"> </span>--cov<span class="o">=</span>commol<span class="w">                           </span><span class="c1"># from py-commol/</span>
+</span><span id="__span-10-17"><a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a>cargo<span class="w"> </span>llvm-cov<span class="w"> </span>--all-features<span class="w"> </span>--workspace<span class="w">     </span><span class="c1"># from the repository root</span>
+</span><span id="__span-10-18"><a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a>
+</span><span id="__span-10-19"><a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a><span class="c1"># Documentation, from the repository root</span>
+</span><span id="__span-10-20"><a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a>mkdocs<span class="w"> </span>build<span class="w"> </span>--strict
 </span></code></pre></div>
 <h3 id="pre-commit-hooks">Pre-commit Hooks<a class="headerlink" href="#pre-commit-hooks" title="Permanent link">&para;</a></h3>
 <p>Install pre-commit hooks to automatically check code before committing:</p>
