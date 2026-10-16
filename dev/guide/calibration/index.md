@@ -28,7 +28,7 @@ from commol import (
     Simulation,
 )
 
-def basic_model(k1: float | None, k2: float | None):
+def basic_model(k1: float | None, k2: float | None, engine="DifferenceEquations"):
     return (
         ModelBuilder(name="Basic Model")
         .add_bin(id="A", name="State A")
@@ -43,7 +43,7 @@ def basic_model(k1: float | None, k2: float | None):
                 total=1000,
                 bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
             ),
-            engine="DifferenceEquations",
+            engine=engine,
         )
     )
 
@@ -155,14 +155,22 @@ You choose what each observation is compared with; there is no default, because 
 | `"crps"`            | The empirical distribution of the replicates | The continuous ranked probability score, \`E |
 
 ```python
+stochastic = basic_model(None, 0.1, engine="StochasticSteps")
+runs = Simulation(basic_model(0.4, 0.1)).run(num_steps=50)
 problem = CalibrationProblem(
-    observed_data=observed,
+    observed_data=[
+        ObservedDataPoint(at=step, output="B", value=runs["B"][step])
+        for step in range(5, 51, 5)
+    ],
     parameters=[CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0)],
-    optimization_config=NelderMeadConfig(),
+    loss_function="sse",
+    optimization_config=NelderMeadConfig(max_iterations=200),
     replicates=50,
     replicate_summary="crps",  # or "mean", "median", Quantile(0.9)
     seed=7,
 )
+result = Calibrator(Simulation(stochastic), problem).run()
+print(round(result.best_parameters["k1"], 1))  # 0.4
 ```
 
 | Rule                                                                                                                                         | Where                                                                    |

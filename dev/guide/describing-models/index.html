@@ -1032,6 +1032,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../stochastic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stochastic Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -1049,10 +1077,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
         
           
-          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="">
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="">
             
   
   
@@ -1070,8 +1098,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_4">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2391,8 +2419,8 @@ adds the sections of its kind (<code>ModelStructure.describe</code>):</p>
 </tr>
 <tr>
 <td><code>schedule</code></td>
-<td>How the engine advances</td>
-<td>From the engine (<code>EngineType.schedule</code>)</td>
+<td>How the engine advances, and the settings it advances with</td>
+<td>From the engine (<code>EngineType.schedule</code>) and <code>Model.engine.settings</code></td>
 </tr>
 <tr>
 <td><code>initialization</code></td>
@@ -2520,6 +2548,10 @@ plans, after it has decided which rates are proportional (see
 <td>One equation per compartment. The left-hand side comes from the engine: <code>[A(t+Dt) - A(t)] / Dt</code> for <code>DifferenceEquations</code>, <code>dA/dt</code> for <code>DifferentialEquations</code>.</td>
 </tr>
 <tr>
+<td>Events</td>
+<td>For a stochastic engine, instead of the expanded form: one row per flow, with the change of the state of one event and its propensity (<code>StochasticEvents</code>) or its draw in a step (<code>StochasticSteps</code>). See <a href="../stochastic/#how-a-rate-becomes-an-event">Stochastic Simulation</a>.</td>
+</tr>
+<tr>
 <td>Impulses</td>
 <td>Each impulse transition, the positions where it acts and the amounts it moves; an impulse is not part of the equations.</td>
 </tr>
@@ -2573,7 +2605,7 @@ paper can describe an aggregate model and an agent model in one format.</p>
 </tr>
 <tr>
 <td>Process overview and scheduling</td>
-<td>Each transition, where it moves, whether it is an impulse; the schedule of the engine</td>
+<td>Each transition, where it moves, whether it is an impulse; the schedule of the engine and its settings</td>
 </tr>
 <tr>
 <td>Design concepts</td>

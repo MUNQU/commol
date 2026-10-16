@@ -10,8 +10,10 @@ A model has a header, a **process** written once, a **structure** that lays the 
 Model                      name, description, version, step_unit
 ├── parameters: [Parameter]                (a value may be a SeriesValue)
 ├── engine: ModelEngine
-│   ├── type: "DifferenceEquations" or "DifferentialEquations"
-│   └── settings: OdeSolver | None          (settings of that engine; None: its defaults)
+│   ├── type: "DifferenceEquations", "DifferentialEquations",
+│   │         "StochasticEvents" or "StochasticSteps"
+│   └── settings: OdeSolver | StochasticEventsSettings | StochasticStepsSettings | None
+│                                           (settings of that engine; None: its defaults)
 ├── process: Process
 │   ├── bins: [Bin]
 │   ├── accumulators: [Accumulator]
@@ -1070,8 +1072,10 @@ class ModelEngine(BaseModel):
         ``"DifferentialEquations"`` (continuous time). The engine must run the
         kind of the structure of the model.
     settings : EngineSettings | None
-        Settings of that engine; None uses its defaults. Only
-        ``DifferentialEquations`` takes settings (`OdeSolver`).
+        Settings of that engine; None uses its defaults.
+        ``DifferentialEquations`` takes `OdeSolver`, ``StochasticEvents``
+        takes `StochasticEventsSettings` and ``StochasticSteps`` takes
+        `StochasticStepsSettings`.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1080,6 +1084,15 @@ class ModelEngine(BaseModel):
     settings: EngineSettings | None = Field(
         default=None, description="Settings of the engine; None uses its defaults."
     )
+
+    @field_validator("settings", mode="before")
+    @classmethod
+    def settings_of_the_engine(cls, value: Any, info: ValidationInfo) -> Any:
+        """Read settings given as a mapping with the class of their engine."""
+        settings_class = _SETTINGS.get(info.data.get("type", ""))
+        if isinstance(value, dict) and settings_class is not None:
+            return settings_class.model_validate(value)
+        return value
 
     @model_validator(mode="after")
     def check_settings(self) -> Self:
@@ -1092,6 +1105,27 @@ class ModelEngine(BaseModel):
 ```
 
 ### Methods:
+
+#### settings_of_the_engine
+
+```python
+settings_of_the_engine(value: Any, info: ValidationInfo) -> Any
+```
+
+Read settings given as a mapping with the class of their engine.
+
+Source code in `commol/context/engine.py`
+
+```python
+@field_validator("settings", mode="before")
+@classmethod
+def settings_of_the_engine(cls, value: Any, info: ValidationInfo) -> Any:
+    """Read settings given as a mapping with the class of their engine."""
+    settings_class = _SETTINGS.get(info.data.get("type", ""))
+    if isinstance(value, dict) and settings_class is not None:
+        return settings_class.model_validate(value)
+    return value
+```
 
 #### check_settings
 

@@ -1130,6 +1130,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../stochastic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stochastic Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -1147,10 +1175,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
         
           
-          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="">
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="">
             
   
   
@@ -1168,8 +1196,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_4">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2718,7 +2746,7 @@ every kind its process fits. Here <code>model.structure</code> is an <code>Aggre
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nb">print</span><span class="p">([</span><span class="n">b</span><span class="o">.</span><span class="n">id</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">process</span><span class="o">.</span><span class="n">bins</span><span class="p">])</span>   <span class="c1"># [&#39;A&#39;, &#39;B&#39;, &#39;C&#39;]</span>
 </span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">total</span><span class="p">)</span>                <span class="c1"># 1000.0</span>
 </span></code></pre></div>
-<p>Two engines run an aggregate model, with the same process and structure:</p>
+<p>Four engines run an aggregate model, with the same process and structure:</p>
 <table>
 <thead>
 <tr>
@@ -2738,9 +2766,20 @@ every kind its process fits. Here <code>model.structure</code> is an <code>Aggre
 <td>Continuous: the engine integrates <code>dX/dt = Σ flows</code> with an ODE solver.</td>
 <td><code>commol-differential</code></td>
 </tr>
+<tr>
+<td><code>StochasticEvents</code></td>
+<td>Continuous, at random: whole units move one event at a time.</td>
+<td><code>commol-stochastic</code></td>
+</tr>
+<tr>
+<td><code>StochasticSteps</code></td>
+<td>Whole steps, at random: each step draws how many units each flow moves.</td>
+<td><code>commol-stochastic</code></td>
+</tr>
 </tbody>
 </table>
-<p>See <a href="../simulations/#differential-equations">Differential equations</a>.</p>
+<p>See <a href="../simulations/#differential-equations">Differential equations</a> and
+<a href="../stochastic/">Stochastic Simulation</a>.</p>
 <h3 id="what-a-rate-means">What a rate means<a class="headerlink" href="#what-a-rate-means" title="Permanent link">&para;</a></h3>
 <p>A flow is per unit of the axis in every engine, and the unit check is the same
 for both. What its value means is the engine's (<code>rate_meaning</code> of the engine's
@@ -2766,6 +2805,18 @@ list, <code>EngineType</code> in <code>crates/commol-core/src/types/engine.rs</c
 <td><code>continuous</code></td>
 <td>Is the instantaneous rate of change: over a short span <code>Δ</code> it moves about <code>f × Δ</code></td>
 <td><code>dX/dt = Σ flows</code></td>
+</tr>
+<tr>
+<td><code>StochasticEvents</code></td>
+<td><code>continuous</code></td>
+<td>Is the propensity of its events: the expected number of units it moves per unit of the axis</td>
+<td><code>dX/dt = Σ flows</code>, in the mean</td>
+</tr>
+<tr>
+<td><code>StochasticSteps</code></td>
+<td><code>per_step</code></td>
+<td>Is the expected number of units it moves in one step; a proportional rate is the probability that one unit moves</td>
+<td><code>X(n+1) = X(n) + Σ flows</code>, in the mean</td>
 </tr>
 </tbody>
 </table>

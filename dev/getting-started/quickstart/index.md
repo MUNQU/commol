@@ -166,11 +166,12 @@ See [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/
 
 ## Next steps
 
-| To learn                        | Read                                                                                                      |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| The concepts behind models      | [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md)                       |
-| Every builder option            | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)                   |
-| What rate formulas can contain  | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) |
-| Running and reading simulations | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md)                   |
-| Calibration in depth            | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                     |
-| Complete models                 | [Examples](https://munqu.github.io/commol/latest/guide/examples/index.md)                                 |
+| To learn                         | Read                                                                                                      |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| The concepts behind models       | [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md)                       |
+| Every builder option             | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)                   |
+| What rate formulas can contain   | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) |
+| Running and reading simulations  | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md)                   |
+| Runs at random, with whole units | [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md)                  |
+| Calibration in depth             | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                     |
+| Complete models                  | [Examples](https://munqu.github.io/commol/latest/guide/examples/index.md)                                 |

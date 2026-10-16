@@ -900,6 +900,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../guide/stochastic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stochastic Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -914,10 +942,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
         
           
-          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
             
   
   
@@ -935,8 +963,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_4">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2326,7 +2354,8 @@
 <h1 id="mental-model">Mental Model<a class="headerlink" href="#mental-model" title="Permanent link">&para;</a></h1>
 <p><a href="../">Back to Codebase Guide</a></p>
 <p>Commol builds compartment models from a declarative definition and runs them
-as difference equations or as ordinary differential equations. Python owns the
+as difference equations, as ordinary differential equations, or as stochastic
+processes of whole units. Python owns the
 user-facing API and validation; Rust owns every rule about how a model becomes
 numbers. A model has a <strong>process</strong> written once (bins, stratifications,
 transitions), a <strong>structure</strong> that lays it out and sets its <strong>kind</strong> (today
@@ -2354,7 +2383,7 @@ generic layers work with any kind.</p>
 <td><code>Simulation</code>, <code>Calibrator</code>, reports and plots use only <code>ModelStructure</code>; Rust calibration uses only <code>SimulationEngine</code> (see <a href="../design-decisions/#one-interface-for-every-model-kind">Design decisions</a>)</td>
 </tr>
 <tr>
-<td>One model compiler for both engines: expansion, flows, rates, the right-hand side</td>
+<td>One model compiler for every engine: expansion, flows, rates, the change of one event of each flow, the right-hand side</td>
 <td><code>crates/commol-model/</code></td>
 </tr>
 <tr>
@@ -2364,6 +2393,10 @@ generic layers work with any kind.</p>
 <tr>
 <td>A Rust ODE engine on <code>diffsol</code></td>
 <td><code>crates/commol-differential/</code></td>
+</tr>
+<tr>
+<td>Two Rust stochastic engines of whole units: events in continuous time (direct method, tau-leaping) and the chain binomial</td>
+<td><code>crates/commol-stochastic/</code></td>
 </tr>
 <tr>
 <td>Reproducible random numbers for stochastic engines: the generator, replicate seeds, samplers and a sum tree of rates</td>
@@ -2428,7 +2461,7 @@ generic layers work with any kind.</p>
 </tr>
 <tr>
 <td>Engine</td>
-<td>A method: how a model advances along the axis, and what a rate means: <code>DifferenceEquations</code>, <code>DifferentialEquations</code>.</td>
+<td>A method: how a model advances along the axis, and what a rate means: <code>DifferenceEquations</code>, <code>DifferentialEquations</code>, <code>StochasticEvents</code>, <code>StochasticSteps</code>.</td>
 <td><code>EngineType</code>, the one list (<code>engine.rs</code>); <code>Model.engine</code></td>
 </tr>
 </tbody>
@@ -2451,15 +2484,18 @@ of its kind.</p>
 </span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>                                        expand the bins of the process over its stratifications
 </span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>                                        build the initial state
 </span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>                                        plan the transition flows, resolve the neighbors, compile the rates
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>                                        derivatives(step, t, X) = Σ flows
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>Simulation.run(n) / run_at(at)     -&gt; difference: X += derivatives, once per step
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>                                      differential: diffsol integrates derivatives
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                                      (a stochastic engine: set_seed, then reset)
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>Simulation.replicates(n).run(…)    -&gt; Engine.run_replicates: one seed per replicate,
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>                                      run in parallel (run_replicates, rayon)
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>Calibrator(simulation, problem)    -&gt; commol_rs.calibration.calibrate(engine, ...):
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>                                      parameters by id; values of the kind, such as
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>                                      initial conditions, through the engine
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>                                        flow_rates and flow_changes (one event of each flow)
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>                                        derivatives(step, t, X) = Σ changes × flows
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>Simulation.run(n) / run_at(at)     -&gt; difference: X += derivatives, once per step
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                                      differential: diffsol integrates derivatives
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>                                      stochastic events: one event (or a leap) at a time
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>                                      stochastic steps: a chain binomial draw per step
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>                                      (a stochastic engine: set_seed, then reset)
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>Simulation.replicates(n).run(…)    -&gt; Engine.run_replicates: one seed per replicate,
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>                                      run in parallel (run_replicates, rayon)
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>Calibrator(simulation, problem)    -&gt; commol_rs.calibration.calibrate(engine, ...):
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>                                      parameters by id; values of the kind, such as
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>                                      initial conditions, through the engine
 </span></code></pre></div>
 <p>The same model functions also answer questions about a process and its
 aggregate structure without a simulation:

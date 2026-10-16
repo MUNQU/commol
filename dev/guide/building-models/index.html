@@ -1110,6 +1110,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../stochastic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stochastic Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -1127,10 +1155,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
         
           
-          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="">
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="">
             
   
   
@@ -1148,8 +1176,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_4">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2609,7 +2637,7 @@ which have their own page:</p>
 <tr>
 <td><code>build(structure, engine, settings=None)</code></td>
 <td><code>Model</code> of the class of <code>structure</code></td>
-<td>Joins the process with a <a href="#the-structure-aggregate">structure</a> and an engine, validates the model and returns it. The engine must run the kind of the structure: <code>"DifferenceEquations"</code> (discrete time) or <code>"DifferentialEquations"</code> (continuous time) run <code>Aggregate</code>. <code>settings</code> are the settings of that engine (<code>OdeSolver</code> for <code>"DifferentialEquations"</code>); None uses its defaults. One builder builds the model for each engine and each structure. See <a href="../simulations/#differential-equations">Differential equations</a>.</td>
+<td>Joins the process with a <a href="#the-structure-aggregate">structure</a> and an engine, validates the model and returns it. The engine must run the kind of the structure: <code>"DifferenceEquations"</code> (discrete time), <code>"DifferentialEquations"</code> (continuous time), <code>"StochasticEvents"</code> and <code>"StochasticSteps"</code> (<a href="../stochastic/">at random</a>) run <code>Aggregate</code>. <code>settings</code> are the settings of that engine (<code>OdeSolver</code> for <code>"DifferentialEquations"</code>, <code>StochasticEventsSettings</code> and <code>StochasticStepsSettings</code> for the stochastic engines); None uses its defaults. One builder builds the model for each engine and each structure. See <a href="../simulations/#differential-equations">Differential equations</a>.</td>
 </tr>
 <tr>
 <td><code>process()</code></td>

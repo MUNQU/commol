@@ -124,11 +124,24 @@ Replicate `i` takes the seed derived from `seed` and `i`, the SplitMix64 of `see
 | `member_statistics(output, confidence_level)` | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate as [`ci_percentiles`](https://munqu.github.io/commol/latest/codebase/design-decisions/#one-confidence-interval-convention) requires |
 
 ```python
-replicates = simulation.replicates(200, seed=42).run(num_steps=50)
+from commol.api.plotter import SimulationPlotter
+
+stochastic = Simulation(
+    ModelBuilder(name="Stochastic Model")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_parameter(id="k", value=0.1)
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
+    .build(Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}), engine="StochasticEvents")
+)
+replicates = stochastic.replicates(200, seed=42).run(num_steps=50)
 mean = replicates.mean()
 band = replicates.member_statistics("B", confidence_level=0.9)
-SimulationPlotter(simulation, replicates).plot_series()  # the mean and a 95 % band
+SimulationPlotter(stochastic, replicates).plot_series()  # the mean and a 95 % band
+print(replicates.seeds[:2] == [run.seed for run in replicates[:2]])  # True
 ```
+
+The stochastic engines and what they draw are in [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md).
 
 A run is reproducible from its model and its seed, on one platform and one commol version:
 

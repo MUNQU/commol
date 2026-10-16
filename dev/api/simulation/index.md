@@ -2013,6 +2013,100 @@ class OdeSolver(BaseModel):
     atol: float = Field(default=1e-6, gt=0.0, description="Absolute tolerance.")
 ```
 
+## StochasticEventsSettings
+
+Bases: `BaseModel`
+
+Settings of the `StochasticEvents` engine.
+
+Attributes:
+
+| Name        | Type                               | Description                                                                                                                                                                                 |
+| ----------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `method`    | `Literal['direct', 'tau_leaping']` | "direct": Gillespie's direct method, one event at a time, exact. "tau_leaping": a Poisson number of events of each flow in each leap, an approximation that is faster when events are many. |
+| `tau`       | \`float                            | None\`                                                                                                                                                                                      |
+| `epsilon`   | `float`                            | How much a propensity may change in one chosen leap, relative to its value.                                                                                                                 |
+| `tolerance` | `float`                            | Relative tolerance of the time of an event when a rate reads t.                                                                                                                             |
+| `rounding`  | \`Rounding                         | None\`                                                                                                                                                                                      |
+
+Source code in `commol/context/engine.py`
+
+```python
+class StochasticEventsSettings(BaseModel):
+    """
+    Settings of the ``StochasticEvents`` engine.
+
+    Attributes
+    ----------
+    method : Literal["direct", "tau_leaping"]
+        ``"direct"``: Gillespie's direct method, one event at a time, exact.
+        ``"tau_leaping"``: a Poisson number of events of each flow in each
+        leap, an approximation that is faster when events are many.
+    tau : float | None
+        The length of a leap of ``"tau_leaping"``. None chooses each leap as
+        Cao, Gillespie and Petzold (2006) do, from `epsilon`.
+    epsilon : float
+        How much a propensity may change in one chosen leap, relative to its
+        value.
+    tolerance : float
+        Relative tolerance of the time of an event when a rate reads ``t``.
+    rounding : Rounding | None
+        How to make whole the initial amounts that are not. None requires
+        whole amounts.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    method: Literal["direct", "tau_leaping"] = Field(
+        default="direct", description="Simulation method."
+    )
+    tau: float | None = Field(
+        default=None, gt=0.0, description="Length of a leap of tau-leaping."
+    )
+    epsilon: float = Field(
+        default=0.03, gt=0.0, lt=1.0, description="Bound of an adaptive leap."
+    )
+    tolerance: float = Field(
+        default=1e-8, gt=0.0, description="Relative tolerance of an event time."
+    )
+    rounding: Rounding | None = Field(
+        default=None, description="How to make the initial amounts whole."
+    )
+```
+
+## StochasticStepsSettings
+
+Bases: `BaseModel`
+
+Settings of the `StochasticSteps` engine.
+
+Attributes:
+
+| Name       | Type       | Description |
+| ---------- | ---------- | ----------- |
+| `rounding` | \`Rounding | None\`      |
+
+Source code in `commol/context/engine.py`
+
+```python
+class StochasticStepsSettings(BaseModel):
+    """
+    Settings of the ``StochasticSteps`` engine.
+
+    Attributes
+    ----------
+    rounding : Rounding | None
+        How to make whole the initial amounts that are not. None requires
+        whole amounts.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    rounding: Rounding | None = Field(
+        default=None, description="How to make the initial amounts whole."
+    )
+```
+
 ## InfeasibleStateError
 
 ```python

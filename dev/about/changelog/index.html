@@ -896,6 +896,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../guide/stochastic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stochastic Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -910,10 +938,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
         
           
-          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
             
   
   
@@ -931,8 +959,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_4">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2749,8 +2777,22 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>Quantile(q)</code> or <code>"crps"</code> (the continuous ranked probability score). A
   stochastic engine needs them and a <code>seed</code>; there is no default summary.</li>
 <li>The crate <code>commol-random</code>: a portable generator (<code>Xoshiro256PlusPlus</code>), the
-  derivation of replicate seeds, samplers and a sum tree of rates, for the
-  stochastic engines to come.</li>
+  derivation of replicate seeds, samplers and a sum tree of rates, for every
+  stochastic engine.</li>
+<li>Two stochastic engines of an aggregate model, in the crate
+  <code>commol-stochastic</code>, that run the process of any model as whole units moved
+  at random, with no change to it: <code>"StochasticEvents"</code> (continuous time:
+  Gillespie's direct method, exact also when a rate reads <code>t</code>, or
+  <code>method="tau_leaping"</code>) and <code>"StochasticSteps"</code> (the chain binomial, with
+  per-step probabilities). Their settings are <code>StochasticEventsSettings</code> and
+  <code>StochasticStepsSettings</code>. A total must be whole, and initial amounts that
+  are not whole need <code>rounding="largest_remainder"</code> or <code>"random"</code>, with no
+  default. A per-step probability outside <code>[0, 1]</code>, or probabilities out of
+  one compartment that sum to more than 1, raise <code>InfeasibleStateError</code>. See
+  <a href="../../guide/stochastic/">Stochastic Simulation</a>.</li>
+<li>The <code>dynamics</code> section of a stochastic model is an event table: each flow,
+  the change of one event and its propensity or its draw; the <code>schedule</code>
+  section lists the settings of the engine.</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>

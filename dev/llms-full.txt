@@ -72,17 +72,18 @@ results = Simulation(model).run(num_steps=100)
 
 ## Features
 
-| Feature                                                                                     | Guide                                                                                                                                                  |
-| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Fluent, validated model building                                                            | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)                                                                |
-| Stratifications, conditional stratifications, per-compartment initial conditions            | [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#stratifications)                                                            |
-| Rate formulas compiled with Cranelift                                                       | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md)                                              |
-| Pulses, windows, ramps, sinusoids and schedules per subgroup                                | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)                                                                    |
-| Unit checking                                                                               | [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md)                                                                      |
-| A description of a model: equations, state graphs, the ODD protocol (text, Markdown, LaTeX) | [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md)                                                           |
-| Calibration of parameters, initial conditions and scale factors                             | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                                                                  |
-| Ensembles and prediction intervals                                                          | [Probabilistic Calibration](https://munqu.github.io/commol/latest/guide/probabilistic-calibration/index.md)                                            |
-| JSON-ready reports and seaborn plots                                                        | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md), [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting) |
+| Feature                                                                                                | Guide                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Fluent, validated model building                                                                       | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)                                                                |
+| Stratifications, conditional stratifications, per-compartment initial conditions                       | [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#stratifications)                                                            |
+| Rate formulas compiled with Cranelift                                                                  | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md)                                              |
+| Pulses, windows, ramps, sinusoids and schedules per subgroup                                           | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)                                                                    |
+| Unit checking                                                                                          | [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md)                                                                      |
+| One process run as difference equations, differential equations or a stochastic process of whole units | [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md)                                                               |
+| A description of a model: equations, state graphs, the ODD protocol (text, Markdown, LaTeX)            | [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md)                                                           |
+| Calibration of parameters, initial conditions and scale factors                                        | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                                                                  |
+| Ensembles and prediction intervals                                                                     | [Probabilistic Calibration](https://munqu.github.io/commol/latest/guide/probabilistic-calibration/index.md)                                            |
+| JSON-ready reports and seaborn plots                                                                   | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md), [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting) |
 
 ## License and authors
 
@@ -321,14 +322,15 @@ See [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/
 
 ## Next steps
 
-| To learn                        | Read                                                                                                      |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| The concepts behind models      | [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md)                       |
-| Every builder option            | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)                   |
-| What rate formulas can contain  | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) |
-| Running and reading simulations | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md)                   |
-| Calibration in depth            | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                     |
-| Complete models                 | [Examples](https://munqu.github.io/commol/latest/guide/examples/index.md)                                 |
+| To learn                         | Read                                                                                                      |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| The concepts behind models       | [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md)                       |
+| Every builder option             | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)                   |
+| What rate formulas can contain   | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) |
+| Running and reading simulations  | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md)                   |
+| Runs at random, with whole units | [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md)                  |
+| Calibration in depth             | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                     |
+| Complete models                  | [Examples](https://munqu.github.io/commol/latest/guide/examples/index.md)                                 |
 # User guide
 
 # Core Concepts
@@ -453,23 +455,27 @@ print([b.id for b in model.process.bins])   # ['A', 'B', 'C']
 print(model.structure.total)                # 1000.0
 ```
 
-Two engines run an aggregate model, with the same process and structure:
+Four engines run an aggregate model, with the same process and structure:
 
 | Engine                  | Time                                                                    | Crate                 |
 | ----------------------- | ----------------------------------------------------------------------- | --------------------- |
 | `DifferenceEquations`   | Advances in whole steps; each step applies every flow once.             | `commol-difference`   |
 | `DifferentialEquations` | Continuous: the engine integrates `dX/dt = Σ flows` with an ODE solver. | `commol-differential` |
+| `StochasticEvents`      | Continuous, at random: whole units move one event at a time.            | `commol-stochastic`   |
+| `StochasticSteps`       | Whole steps, at random: each step draws how many units each flow moves. | `commol-stochastic`   |
 
-See [Differential equations](https://munqu.github.io/commol/latest/guide/simulations/#differential-equations).
+See [Differential equations](https://munqu.github.io/commol/latest/guide/simulations/#differential-equations) and [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md).
 
 ### What a rate means
 
 A flow is per unit of the axis in every engine, and the unit check is the same for both. What its value means is the engine's (`rate_meaning` of the engine's list, `EngineType` in `crates/commol-core/src/types/engine.rs`):
 
-| Engine                  | `rate_meaning` | A flow of value `f`                                                                          | Equation                  |
-| ----------------------- | -------------- | -------------------------------------------------------------------------------------------- | ------------------------- |
-| `DifferenceEquations`   | `per_step`     | Moves `f` in one step: the flow of an absolute rate, or `f × source` for a proportional rate | `X(n+1) = X(n) + Σ flows` |
-| `DifferentialEquations` | `continuous`   | Is the instantaneous rate of change: over a short span `Δ` it moves about `f × Δ`            | `dX/dt = Σ flows`         |
+| Engine                  | `rate_meaning` | A flow of value `f`                                                                                              | Equation                               |
+| ----------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `DifferenceEquations`   | `per_step`     | Moves `f` in one step: the flow of an absolute rate, or `f × source` for a proportional rate                     | `X(n+1) = X(n) + Σ flows`              |
+| `DifferentialEquations` | `continuous`   | Is the instantaneous rate of change: over a short span `Δ` it moves about `f × Δ`                                | `dX/dt = Σ flows`                      |
+| `StochasticEvents`      | `continuous`   | Is the propensity of its events: the expected number of units it moves per unit of the axis                      | `dX/dt = Σ flows`, in the mean         |
+| `StochasticSteps`       | `per_step`     | Is the expected number of units it moves in one step; a proportional rate is the probability that one unit moves | `X(n+1) = X(n) + Σ flows`, in the mean |
 
 So one rate gives two different dynamics: a proportional rate `k` keeps `(1 - k)^n` of its source after `n` steps in a difference model, and `exp(-k n)` in a differential model. To find the rate that gives a mean span or a probability over a period in the engine of a model, use [`AxisUnits`](#units-of-the-axis): it asks the engine.
 
@@ -797,13 +803,13 @@ builder = ModelBuilder(
 
 Every `add_*` method returns the builder, so calls chain. The other methods:
 
-| Method                                    | Returns                             | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| ----------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `build(structure, engine, settings=None)` | `Model` of the class of `structure` | Joins the process with a [structure](#the-structure-aggregate) and an engine, validates the model and returns it. The engine must run the kind of the structure: `"DifferenceEquations"` (discrete time) or `"DifferentialEquations"` (continuous time) run `Aggregate`. `settings` are the settings of that engine (`OdeSolver` for `"DifferentialEquations"`); None uses its defaults. One builder builds the model for each engine and each structure. See [Differential equations](https://munqu.github.io/commol/latest/guide/simulations/#differential-equations). |
-| `process()`                               | `Process`                           | The bins, accumulators, stratifications and transitions written so far.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `clone()`                                 | `ModelBuilder`                      | A deep copy of everything, accumulators included, to build variants of one model.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `reset()`                                 | `ModelBuilder`                      | Removes bins, accumulators, stratifications, transitions and parameters; keeps the name, description, version and `bin_unit`.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `get_summary()`                           | `dict`                              | The name, description, version and the ids added so far.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Method                                    | Returns                             | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `build(structure, engine, settings=None)` | `Model` of the class of `structure` | Joins the process with a [structure](#the-structure-aggregate) and an engine, validates the model and returns it. The engine must run the kind of the structure: `"DifferenceEquations"` (discrete time), `"DifferentialEquations"` (continuous time), `"StochasticEvents"` and `"StochasticSteps"` ([at random](https://munqu.github.io/commol/latest/guide/stochastic/index.md)) run `Aggregate`. `settings` are the settings of that engine (`OdeSolver` for `"DifferentialEquations"`, `StochasticEventsSettings` and `StochasticStepsSettings` for the stochastic engines); None uses its defaults. One builder builds the model for each engine and each structure. See [Differential equations](https://munqu.github.io/commol/latest/guide/simulations/#differential-equations). |
+| `process()`                               | `Process`                           | The bins, accumulators, stratifications and transitions written so far.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `clone()`                                 | `ModelBuilder`                      | A deep copy of everything, accumulators included, to build variants of one model.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `reset()`                                 | `ModelBuilder`                      | Removes bins, accumulators, stratifications, transitions and parameters; keeps the name, description, version and `bin_unit`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `get_summary()`                           | `dict`                              | The name, description, version and the ids added so far.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ```python
 variant = builder.clone()
@@ -2207,7 +2213,7 @@ A `ModelDescription` has a `title`, a `layout` and a list of `sections`. Each se
 | `overview`       | Name, description, version, kind, engine, its settings and the step unit | From `Model`                                                                                   |
 | `entities`       | What holds the state                                                     | Bins, accumulators, stratifications and their categories, the expanded compartments            |
 | `dynamics`       | How the state changes                                                    | The state graphs, the compact and expanded forms of the equations, the impulses, the neighbors |
-| `schedule`       | How the engine advances                                                  | From the engine (`EngineType.schedule`)                                                        |
+| `schedule`       | How the engine advances, and the settings it advances with               | From the engine (`EngineType.schedule`) and `Model.engine.settings`                            |
 | `initialization` | The state the model starts from                                          | Bin and stratification fractions, overrides, and the initial state the engine builds           |
 | `parameters`     | Every parameter                                                          | Value, unit, whether calibration sets it, description                                          |
 | `outputs`        | What a run returns                                                       | The outputs of each bin and accumulator                                                        |
@@ -2250,11 +2256,12 @@ The LaTeX document uses only standard packages (`amsmath`, `amssymb`, `longtable
 
 The `dynamics` section of an aggregate model holds the flows that the engine plans, after it has decided which rates are proportional (see [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-proportional-rates)):
 
-| Part          | Content                                                                                                                                                         |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Compact form  | Each transition and its flows, `source -> target: rate`. With units, each symbol shows its unit and each flow its resulting unit.                               |
-| Expanded form | One equation per compartment. The left-hand side comes from the engine: `[A(t+Dt) - A(t)] / Dt` for `DifferenceEquations`, `dA/dt` for `DifferentialEquations`. |
-| Impulses      | Each impulse transition, the positions where it acts and the amounts it moves; an impulse is not part of the equations.                                         |
+| Part          | Content                                                                                                                                                                                                                                                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Compact form  | Each transition and its flows, `source -> target: rate`. With units, each symbol shows its unit and each flow its resulting unit.                                                                                                                                                                                       |
+| Expanded form | One equation per compartment. The left-hand side comes from the engine: `[A(t+Dt) - A(t)] / Dt` for `DifferenceEquations`, `dA/dt` for `DifferentialEquations`.                                                                                                                                                         |
+| Events        | For a stochastic engine, instead of the expanded form: one row per flow, with the change of the state of one event and its propensity (`StochasticEvents`) or its draw in a step (`StochasticSteps`). See [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/#how-a-rate-becomes-an-event). |
+| Impulses      | Each impulse transition, the positions where it acts and the amounts it moves; an impulse is not part of the equations.                                                                                                                                                                                                 |
 
 For the model above, the text rendering holds:
 
@@ -2294,7 +2301,7 @@ odd.save("model_odd.tex")
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Purpose and patterns                 | `Model.description`; without one, the marker                                                                                                                                                                       |
 | Entities, state variables and scales | Bins, accumulators, stratifications, compartments; the step unit and how the engine advances                                                                                                                       |
-| Process overview and scheduling      | Each transition, where it moves, whether it is an impulse; the schedule of the engine                                                                                                                              |
+| Process overview and scheduling      | Each transition, where it moves, whether it is an impulse; the schedule of the engine and its settings                                                                                                             |
 | Design concepts                      | Interaction (when the structure has [neighbors](https://munqu.github.io/commol/latest/guide/building-models/#neighbors)), stochasticity (from the engine) and observation (the outputs); the marker for the others |
 | Initialization                       | The fractions, the overrides and the initial state                                                                                                                                                                 |
 | Input data                           | The series parameters, or "None"                                                                                                                                                                                   |
@@ -2448,11 +2455,24 @@ Replicate `i` takes the seed derived from `seed` and `i`, the SplitMix64 of `see
 | `member_statistics(output, confidence_level)` | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate as [`ci_percentiles`](https://munqu.github.io/commol/latest/codebase/design-decisions/#one-confidence-interval-convention) requires |
 
 ```python
-replicates = simulation.replicates(200, seed=42).run(num_steps=50)
+from commol.api.plotter import SimulationPlotter
+
+stochastic = Simulation(
+    ModelBuilder(name="Stochastic Model")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_parameter(id="k", value=0.1)
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
+    .build(Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}), engine="StochasticEvents")
+)
+replicates = stochastic.replicates(200, seed=42).run(num_steps=50)
 mean = replicates.mean()
 band = replicates.member_statistics("B", confidence_level=0.9)
-SimulationPlotter(simulation, replicates).plot_series()  # the mean and a 95 % band
+SimulationPlotter(stochastic, replicates).plot_series()  # the mean and a 95 % band
+print(replicates.seeds[:2] == [run.seed for run in replicates[:2]])  # True
 ```
+
+The stochastic engines and what they draw are in [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md).
 
 A run is reproducible from its model and its seed, on one platform and one commol version:
 
@@ -2721,6 +2741,242 @@ plotter.plot_series(output_file="with_data.png", observed_data=observed)
 | Complete models         | [Examples](https://munqu.github.io/commol/latest/guide/examples/index.md)                  |
 | Signatures              | [API reference: Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md) |
 
+# Stochastic Simulation
+
+[Back to Home](https://munqu.github.io/commol/latest/index.md)
+
+A stochastic engine runs the process of a model as whole units that move at random, with no change to the process: the rates of the model become the probabilities or the hazards of its events. Use it when the variability between runs, an extinction or the behaviour of small amounts matters. This page covers the two stochastic engines of an aggregate model, how a rate becomes an event, whole units, the methods and their cost, and calibration with replicates.
+
+## Quick path
+
+```python
+from commol import Aggregate, ModelBuilder, Simulation
+
+builder = (
+    ModelBuilder(name="Stochastic Model")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=0.3)
+    .add_parameter(id="k2", value=0.1)
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
+    .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
+)
+structure = Aggregate(total=1000, bin_fractions={"A": 0.999, "B": 0.001, "C": 0.0})
+
+model = builder.build(structure, engine="StochasticEvents")
+simulation = Simulation(model)
+
+one_run = simulation.run(num_steps=100, seed=1)
+print(one_run["C"][-1] == int(one_run["C"][-1]))  # True: whole units
+
+replicates = simulation.replicates(100, seed=2).run(num_steps=100)
+print(len(replicates))  # 100 runs, one seed each
+died_out = sum(run["C"][-1] < 10 for run in replicates)
+print(died_out)  # about a third of the runs: the one unit of B leaves before it spreads
+```
+
+The same `builder` and `structure` build the deterministic model with `engine="DifferentialEquations"`: only the engine changes.
+
+## When to use it
+
+| You need                                                            | Engine                                           |
+| ------------------------------------------------------------------- | ------------------------------------------------ |
+| The mean behaviour of a large amount                                | `DifferentialEquations` or `DifferenceEquations` |
+| How much runs vary, and the spread of an output                     | `StochasticEvents` or `StochasticSteps`          |
+| The chance that an amount reaches zero and stays there (extinction) | `StochasticEvents` or `StochasticSteps`          |
+| Small amounts, where a unit more or less changes the outcome        | `StochasticEvents` or `StochasticSteps`          |
+
+## The two engines
+
+| Engine             | Time           | Method                                                                               | Rate meaning                                | Positions                         | Crate               |
+| ------------------ | -------------- | ------------------------------------------------------------------------------------ | ------------------------------------------- | --------------------------------- | ------------------- |
+| `StochasticEvents` | Continuous     | Gillespie's direct method (the stochastic simulation algorithm, SSA), or tau-leaping | `continuous`: a hazard per unit of the axis | Any finite, non-negative position | `commol-stochastic` |
+| `StochasticSteps`  | Discrete steps | The chain binomial                                                                   | `per_step`: a probability per step          | Integer steps                     | `commol-stochastic` |
+
+Their mean-field limits are the deterministic engines: the expected change of the state of `StochasticEvents` is the right-hand side of `DifferentialEquations`, and the expected step of `StochasticSteps` is the step of `DifferenceEquations` while no cap acts (see below). A rate keeps its meaning: a `per_step` rate of a difference model is the probability of the chain binomial, and a `continuous` rate of a differential model is the hazard of the events ([What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means)).
+
+## How a rate becomes an event
+
+Each flow of the model is one kind of event. An event moves one unit: it takes one from each source of the flow, and adds one to each target and to each accumulator that counts the flow (`CompiledModel::flow_changes` in `crates/commol-model/src/system.rs`).
+
+| Rate                    | `StochasticEvents` (propensity)                                       | `StochasticSteps` (draw of a step)                           |
+| ----------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Proportional, `k`       | Each unit of the source leaves at hazard `k`: propensity `k × source` | Each unit leaves with probability `k`: `Binomial(source, k)` |
+| Absolute, `r`           | Events at rate `r`                                                    | `Poisson(r)`, capped by what the sources still hold          |
+| No source (inflow), `r` | Events at rate `r`                                                    | `Poisson(r)`                                                 |
+
+- `StochasticEvents`: a flow has no events while a source holds fewer units than an event takes. A negative propensity is an error that names the flow.
+- `StochasticSteps`: every draw reads the state at the start of the step. The units of one compartment leave by its proportional flows in one multinomial draw (each flow with its probability, staying with `1 − Σ k`), so a unit never leaves twice and an amount never goes below zero. The absolute flows then draw in the order of the model, each capped by what its sources still hold. A negative rate, a proportional rate above 1, or proportional rates out of one compartment that sum to more than 1 raise `InfeasibleStateError`, which names the compartment, the step and the flows (`StochasticSteps::step` in `crates/commol-stochastic/src/steps.rs`).
+
+```python
+from commol import InfeasibleStateError
+
+too_likely = (
+    ModelBuilder(name="Too likely")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=0.7)
+    .add_parameter(id="k2", value=0.5)
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
+    .add_transition(id="t_ac", source=["A"], target=["C"], rate="k2")
+    .build(structure, engine="StochasticSteps")
+)
+try:
+    Simulation(too_likely).run(num_steps=5, seed=1)
+except InfeasibleStateError as error:
+    print(error)  # At step 0, the proportional rates out of compartment 'A': flows 't_ab' 0.7, 't_ac' 0.5 sum to 1.2, above 1. ...
+```
+
+`Model.describe()` shows the events in its `dynamics` section: one row per flow with its change of the state and its propensity or its draw ([Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md)):
+
+```python
+print(model.describe().render("markdown").split("### Events")[1].split("\n\n")[1])
+# | Transition | Change | Propensity |
+# |---|---|---|
+# | t_ab | A -1, B +1 | k1 * A * B / total |
+# | t_bc | B -1, C +1 | k2 * B |
+```
+
+## Whole units
+
+A stochastic engine moves whole units, so it starts from whole amounts (`check_model` in `crates/commol-model/src/builder.rs`):
+
+| Initial amounts                 | What happens                                                                                             |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| The total is not a whole number | `build` raises `ValueError` and names the engine                                                         |
+| Every amount is whole           | Nothing more is needed                                                                                   |
+| An amount is not whole          | `build` raises `ValueError`, unless the settings of the engine name a `rounding`; the message lists both |
+
+There is no default rounding: with small amounts the rounding decides which compartments start with a unit, so it is a modelling choice. Half a unit in each of ten groups starts five groups with one unit and five with none.
+
+| `rounding`            | Start of each run                                                                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `"largest_remainder"` | The same whole amounts in every run: each amount rounded down, and the units left over to the largest remainders, so they sum to the total |
+| `"random"`            | A multinomial draw of the total with the fractions of the model, in each run, so the mean start equals the amounts of the model            |
+
+```python
+from commol import StochasticEventsSettings
+
+groups = (
+    ModelBuilder(name="Groups")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_stratification(id="group", categories=[f"g{i}" for i in range(10)])
+    .add_parameter(id="k1", value=0.3)
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * B / total")
+)
+seeded = Aggregate(
+    total=1000,
+    bin_fractions={"A": 0.995, "B": 0.005},
+    stratification_fractions={"group": {f"g{i}": 0.1 for i in range(10)}},
+)
+try:
+    groups.build(seeded, engine="StochasticEvents")
+except ValueError as error:
+    print("largest_remainder" in str(error), "random" in str(error))  # True True
+
+grouped = groups.build(
+    seeded,
+    engine="StochasticEvents",
+    settings=StochasticEventsSettings(rounding="random"),
+)
+start = Simulation(grouped).run_at([0.0], seed=3)
+print(sum(start[f"B_g{i}"][0] for i in range(10)) + sum(start[f"A_g{i}"][0] for i in range(10)))
+# 1000.0
+```
+
+Initial conditions that calibration sets go through the same rounding. With no rounding, a calibrated value that is not whole is an error that lists the two options.
+
+## Seeds and replicates
+
+A run is reproducible from its model and its seed: `simulation.run(…, seed=s)` gives one run, and `simulation.replicates(n, seed=s).run(…)` gives `n` runs with one seed each, in parallel. A run does not depend on the positions it reports at: the output at a position is the state after the last event before it. See [Randomness, seeds and replicates](https://munqu.github.io/commol/latest/guide/simulations/#randomness-seeds-and-replicates) for the seeds, `SimulationReplicates` and its statistics, plots of the mean and a band, and reports.
+
+```python
+again = simulation.run(num_steps=100, seed=1)
+print(again == one_run)  # True
+print(replicates.member_statistics("C", confidence_level=0.9)["ci_lower"][-1] >= 0)  # True
+```
+
+## Methods and their cost
+
+`StochasticEvents` takes `StochasticEventsSettings`, and `StochasticSteps` takes `StochasticStepsSettings` (only `rounding`):
+
+| Setting     | Default    | Meaning                                                                                                                      |
+| ----------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `method`    | `"direct"` | `"direct"`: one event at a time, exact. `"tau_leaping"`: a Poisson number of events of each flow in a leap, an approximation |
+| `tau`       | `None`     | The length of a leap of `"tau_leaping"`; `None` chooses each leap as Cao, Gillespie and Petzold (2006) do                    |
+| `epsilon`   | `0.03`     | How much a propensity may change in a chosen leap, relative to its value                                                     |
+| `tolerance` | `1e-8`     | Relative tolerance of the time of an event when a rate reads `t`                                                             |
+| `rounding`  | `None`     | See [Whole units](#whole-units)                                                                                              |
+
+- **Cost of the direct method.** The number of events grows with the total and with the rates: every unit that moves is one event. For a large total, use `"tau_leaping"` or a deterministic engine.
+- **Tau-leaping.** A chosen leap is as long as the propensities allow while they change by less than `epsilon`; a leap that would hold fewer than ten events is one exact event instead, and a leap that leaves an amount below zero is halved and drawn again. A fixed `tau` is first-order accurate: a smaller `tau` is closer to the direct method.
+- **Rates that read `t`.** Between events the state is fixed, but a rate that reads `t`, such as `k * (1 + sin(t))`, still changes. The direct method then integrates the total propensity from the last event until it reaches an exponential draw (a time change, Anderson 2007), within `tolerance`. A model whose rates do not read `t` pays nothing for it.
+- **Breakpoints.** The engine stops at every position where a rate can jump (the impulses, the values a rate compares `t` with, the points of a series read at `t`, and every integer when a rate reads `step`), so no wait and no leap crosses one (`CompiledModel::breakpoints`).
+- **Impulses.** At its positions, before the events there, a proportional impulse moves a binomial draw of its source (its rate is the probability that one unit moves, between 0 and 1); an absolute impulse moves its rate, a whole number of units. Each moves at most what its sources still hold.
+
+```python
+leaping = builder.build(
+    structure,
+    engine="StochasticEvents",
+    settings=StochasticEventsSettings(method="tau_leaping"),
+)
+leaped = Simulation(leaping).replicates(100, seed=2).run(num_steps=100)
+print(abs(leaped.mean()["C"][-1] - replicates.mean()["C"][-1]) < 150)  # True
+```
+
+## Calibration with replicates
+
+A calibration of a stochastic model runs `replicates` runs per evaluation with common random numbers, and compares the observations with the summary of the replicates you choose: `"mean"`, `"median"`, `Quantile(q)` or `"crps"` ([Stochastic engines](https://munqu.github.io/commol/latest/guide/calibration/#stochastic-engines)).
+
+```python
+from commol import (
+    CalibrationParameter,
+    CalibrationProblem,
+    Calibrator,
+    NelderMeadConfig,
+    ObservedDataPoint,
+)
+
+mean = replicates.mean()
+observed = [
+    ObservedDataPoint(at=at, output="C", value=mean["C"][at]) for at in (40, 70, 100)
+]
+unknown = builder.build(structure, engine="StochasticEvents")
+unknown.update_parameters({"k2": None})
+problem = CalibrationProblem(
+    observed_data=observed,
+    parameters=[
+        CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.01, max_bound=0.5)
+    ],
+    loss_function="sse",
+    optimization_config=NelderMeadConfig(max_iterations=100),
+    replicates=50,
+    replicate_summary="mean",
+    seed=7,
+)
+result = Calibrator(Simulation(unknown), problem).run()
+print(0.05 < result.best_parameters["k2"] < 0.2)  # True: near 0.1
+```
+
+## Checklist
+
+- [ ] The engine is `StochasticEvents` (continuous time) or `StochasticSteps` (per-step probabilities), as the rates of the model mean.
+- [ ] The total is whole, and the settings name a `rounding` when an amount is not.
+- [ ] Every run has a seed, or keeps the one commol drew (`results.seed`).
+- [ ] A large total uses `"tau_leaping"` or a deterministic engine.
+- [ ] A calibration sets `replicates`, `replicate_summary` and `seed`.
+
+## Next steps
+
+| To learn                             | Read                                                                                                            |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| Seeds, replicates, plots and reports | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/#randomness-seeds-and-replicates) |
+| Calibration of a stochastic model    | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/#stochastic-engines)                |
+| Signatures                           | [API reference: Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)                      |
+
 # Model Calibration
 
 [Back to Home](https://munqu.github.io/commol/latest/index.md)
@@ -2751,7 +3007,7 @@ from commol import (
     Simulation,
 )
 
-def basic_model(k1: float | None, k2: float | None):
+def basic_model(k1: float | None, k2: float | None, engine="DifferenceEquations"):
     return (
         ModelBuilder(name="Basic Model")
         .add_bin(id="A", name="State A")
@@ -2766,7 +3022,7 @@ def basic_model(k1: float | None, k2: float | None):
                 total=1000,
                 bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
             ),
-            engine="DifferenceEquations",
+            engine=engine,
         )
     )
 
@@ -2878,14 +3134,22 @@ You choose what each observation is compared with; there is no default, because 
 | `"crps"`            | The empirical distribution of the replicates | The continuous ranked probability score, \`E |
 
 ```python
+stochastic = basic_model(None, 0.1, engine="StochasticSteps")
+runs = Simulation(basic_model(0.4, 0.1)).run(num_steps=50)
 problem = CalibrationProblem(
-    observed_data=observed,
+    observed_data=[
+        ObservedDataPoint(at=step, output="B", value=runs["B"][step])
+        for step in range(5, 51, 5)
+    ],
     parameters=[CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0)],
-    optimization_config=NelderMeadConfig(),
+    loss_function="sse",
+    optimization_config=NelderMeadConfig(max_iterations=200),
     replicates=50,
     replicate_summary="crps",  # or "mean", "median", Quantile(0.9)
     seed=7,
 )
+result = Calibrator(Simulation(stochastic), problem).run()
+print(round(result.best_parameters["k1"], 1))  # 0.4
 ```
 
 | Rule                                                                                                                                         | Where                                                                    |
@@ -4686,7 +4950,7 @@ Every public name of `commol`, generated from the docstrings. The guide pages ex
 | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md)                         | `ModelBuilder`                                                                                                                                                                                                                                                                                                                                   |
 | [Model](https://munqu.github.io/commol/latest/api/model/index.md)                                        | `Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete`, `Groups`, `ModelDescription`, `InitialCompartment`, `UnitConsistencyError`                                                                                                                                                                                                        |
-| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)                              | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `OdeSolver`, `InfeasibleStateError`, `window_start`, `window_end`, `window_index`, `window_ends`, `windowed_totals`                                                                                                                                                  |
+| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)                              | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `OdeSolver`, `StochasticEventsSettings`, `StochasticStepsSettings`, `InfeasibleStateError`, `window_start`, `window_end`, `window_index`, `window_ends`, `windowed_totals`                                                                                           |
 | [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)                                  | `SimulationPlotter`, `PlotConfig`                                                                                                                                                                                                                                                                                                                |
 | [AxisPattern](https://munqu.github.io/commol/latest/api/axis-patterns/index.md)                          | `AxisPattern`                                                                                                                                                                                                                                                                                                                                    |
 | [AxisUnits](https://munqu.github.io/commol/latest/api/axis-units/index.md)                               | `AxisUnits`                                                                                                                                                                                                                                                                                                                                      |
@@ -19558,6 +19822,100 @@ class OdeSolver(BaseModel):
     atol: float = Field(default=1e-6, gt=0.0, description="Absolute tolerance.")
 ```
 
+## StochasticEventsSettings
+
+Bases: `BaseModel`
+
+Settings of the `StochasticEvents` engine.
+
+Attributes:
+
+| Name        | Type                               | Description                                                                                                                                                                                 |
+| ----------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `method`    | `Literal['direct', 'tau_leaping']` | "direct": Gillespie's direct method, one event at a time, exact. "tau_leaping": a Poisson number of events of each flow in each leap, an approximation that is faster when events are many. |
+| `tau`       | \`float                            | None\`                                                                                                                                                                                      |
+| `epsilon`   | `float`                            | How much a propensity may change in one chosen leap, relative to its value.                                                                                                                 |
+| `tolerance` | `float`                            | Relative tolerance of the time of an event when a rate reads t.                                                                                                                             |
+| `rounding`  | \`Rounding                         | None\`                                                                                                                                                                                      |
+
+Source code in `commol/context/engine.py`
+
+```python
+class StochasticEventsSettings(BaseModel):
+    """
+    Settings of the ``StochasticEvents`` engine.
+
+    Attributes
+    ----------
+    method : Literal["direct", "tau_leaping"]
+        ``"direct"``: Gillespie's direct method, one event at a time, exact.
+        ``"tau_leaping"``: a Poisson number of events of each flow in each
+        leap, an approximation that is faster when events are many.
+    tau : float | None
+        The length of a leap of ``"tau_leaping"``. None chooses each leap as
+        Cao, Gillespie and Petzold (2006) do, from `epsilon`.
+    epsilon : float
+        How much a propensity may change in one chosen leap, relative to its
+        value.
+    tolerance : float
+        Relative tolerance of the time of an event when a rate reads ``t``.
+    rounding : Rounding | None
+        How to make whole the initial amounts that are not. None requires
+        whole amounts.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    method: Literal["direct", "tau_leaping"] = Field(
+        default="direct", description="Simulation method."
+    )
+    tau: float | None = Field(
+        default=None, gt=0.0, description="Length of a leap of tau-leaping."
+    )
+    epsilon: float = Field(
+        default=0.03, gt=0.0, lt=1.0, description="Bound of an adaptive leap."
+    )
+    tolerance: float = Field(
+        default=1e-8, gt=0.0, description="Relative tolerance of an event time."
+    )
+    rounding: Rounding | None = Field(
+        default=None, description="How to make the initial amounts whole."
+    )
+```
+
+## StochasticStepsSettings
+
+Bases: `BaseModel`
+
+Settings of the `StochasticSteps` engine.
+
+Attributes:
+
+| Name       | Type       | Description |
+| ---------- | ---------- | ----------- |
+| `rounding` | \`Rounding | None\`      |
+
+Source code in `commol/context/engine.py`
+
+```python
+class StochasticStepsSettings(BaseModel):
+    """
+    Settings of the ``StochasticSteps`` engine.
+
+    Attributes
+    ----------
+    rounding : Rounding | None
+        How to make whole the initial amounts that are not. None requires
+        whole amounts.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    rounding: Rounding | None = Field(
+        default=None, description="How to make the initial amounts whole."
+    )
+```
+
 ## InfeasibleStateError
 
 ```python
@@ -19907,8 +20265,10 @@ A model has a header, a **process** written once, a **structure** that lays the 
 Model                      name, description, version, step_unit
 ├── parameters: [Parameter]                (a value may be a SeriesValue)
 ├── engine: ModelEngine
-│   ├── type: "DifferenceEquations" or "DifferentialEquations"
-│   └── settings: OdeSolver | None          (settings of that engine; None: its defaults)
+│   ├── type: "DifferenceEquations", "DifferentialEquations",
+│   │         "StochasticEvents" or "StochasticSteps"
+│   └── settings: OdeSolver | StochasticEventsSettings | StochasticStepsSettings | None
+│                                           (settings of that engine; None: its defaults)
 ├── process: Process
 │   ├── bins: [Bin]
 │   ├── accumulators: [Accumulator]
@@ -20967,8 +21327,10 @@ class ModelEngine(BaseModel):
         ``"DifferentialEquations"`` (continuous time). The engine must run the
         kind of the structure of the model.
     settings : EngineSettings | None
-        Settings of that engine; None uses its defaults. Only
-        ``DifferentialEquations`` takes settings (`OdeSolver`).
+        Settings of that engine; None uses its defaults.
+        ``DifferentialEquations`` takes `OdeSolver`, ``StochasticEvents``
+        takes `StochasticEventsSettings` and ``StochasticSteps`` takes
+        `StochasticStepsSettings`.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -20977,6 +21339,15 @@ class ModelEngine(BaseModel):
     settings: EngineSettings | None = Field(
         default=None, description="Settings of the engine; None uses its defaults."
     )
+
+    @field_validator("settings", mode="before")
+    @classmethod
+    def settings_of_the_engine(cls, value: Any, info: ValidationInfo) -> Any:
+        """Read settings given as a mapping with the class of their engine."""
+        settings_class = _SETTINGS.get(info.data.get("type", ""))
+        if isinstance(value, dict) and settings_class is not None:
+            return settings_class.model_validate(value)
+        return value
 
     @model_validator(mode="after")
     def check_settings(self) -> Self:
@@ -20989,6 +21360,27 @@ class ModelEngine(BaseModel):
 ```
 
 ### Methods:
+
+#### settings_of_the_engine
+
+```python
+settings_of_the_engine(value: Any, info: ValidationInfo) -> Any
+```
+
+Read settings given as a mapping with the class of their engine.
+
+Source code in `commol/context/engine.py`
+
+```python
+@field_validator("settings", mode="before")
+@classmethod
+def settings_of_the_engine(cls, value: Any, info: ValidationInfo) -> Any:
+    """Read settings given as a mapping with the class of their engine."""
+    settings_class = _SETTINGS.get(info.data.get("type", ""))
+    if isinstance(value, dict) and settings_class is not None:
+        return settings_class.model_validate(value)
+    return value
+```
 
 #### check_settings
 
@@ -21897,7 +22289,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Variants of a structure: a subclass with the same kind, fields and engines, saved with its `variant` and loaded back as its own class.
 - Seeds and replicates for stochastic engines: `Simulation.run(…, seed=)` and `run_at(…, seed=)` (`SimulationResults.seed` keeps the seed, drawn when none is given), `Simulation.replicates(n, seed=)` with `run` and `run_at` that return `SimulationReplicates` (runs in parallel, one seed each; `mean`, `quantiles`, `member_statistics`), `Simulation.is_stochastic`, and `EngineType.is_stochastic`. `SimulationPlotter` draws the mean and a band of replicates, and `simulation_report` takes them as `ensemble_runs`.
 - `CalibrationProblem(replicates=…, replicate_summary=…)` calibrates a stochastic engine with common random numbers: `"mean"`, `"median"`, `Quantile(q)` or `"crps"` (the continuous ranked probability score). A stochastic engine needs them and a `seed`; there is no default summary.
-- The crate `commol-random`: a portable generator (`Xoshiro256PlusPlus`), the derivation of replicate seeds, samplers and a sum tree of rates, for the stochastic engines to come.
+- The crate `commol-random`: a portable generator (`Xoshiro256PlusPlus`), the derivation of replicate seeds, samplers and a sum tree of rates, for every stochastic engine.
+- Two stochastic engines of an aggregate model, in the crate `commol-stochastic`, that run the process of any model as whole units moved at random, with no change to it: `"StochasticEvents"` (continuous time: Gillespie's direct method, exact also when a rate reads `t`, or `method="tau_leaping"`) and `"StochasticSteps"` (the chain binomial, with per-step probabilities). Their settings are `StochasticEventsSettings` and `StochasticStepsSettings`. A total must be whole, and initial amounts that are not whole need `rounding="largest_remainder"` or `"random"`, with no default. A per-step probability outside `[0, 1]`, or probabilities out of one compartment that sum to more than 1, raise `InfeasibleStateError`. See [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md).
+- The `dynamics` section of a stochastic model is an event table: each flow, the change of one event and its propensity or its draw; the `schedule` section lists the settings of the engine.
 
 ### Changed
 

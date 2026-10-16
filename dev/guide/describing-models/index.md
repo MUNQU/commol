@@ -42,7 +42,7 @@ A `ModelDescription` has a `title`, a `layout` and a list of `sections`. Each se
 | `overview`       | Name, description, version, kind, engine, its settings and the step unit | From `Model`                                                                                   |
 | `entities`       | What holds the state                                                     | Bins, accumulators, stratifications and their categories, the expanded compartments            |
 | `dynamics`       | How the state changes                                                    | The state graphs, the compact and expanded forms of the equations, the impulses, the neighbors |
-| `schedule`       | How the engine advances                                                  | From the engine (`EngineType.schedule`)                                                        |
+| `schedule`       | How the engine advances, and the settings it advances with               | From the engine (`EngineType.schedule`) and `Model.engine.settings`                            |
 | `initialization` | The state the model starts from                                          | Bin and stratification fractions, overrides, and the initial state the engine builds           |
 | `parameters`     | Every parameter                                                          | Value, unit, whether calibration sets it, description                                          |
 | `outputs`        | What a run returns                                                       | The outputs of each bin and accumulator                                                        |
@@ -85,11 +85,12 @@ The LaTeX document uses only standard packages (`amsmath`, `amssymb`, `longtable
 
 The `dynamics` section of an aggregate model holds the flows that the engine plans, after it has decided which rates are proportional (see [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-proportional-rates)):
 
-| Part          | Content                                                                                                                                                         |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Compact form  | Each transition and its flows, `source -> target: rate`. With units, each symbol shows its unit and each flow its resulting unit.                               |
-| Expanded form | One equation per compartment. The left-hand side comes from the engine: `[A(t+Dt) - A(t)] / Dt` for `DifferenceEquations`, `dA/dt` for `DifferentialEquations`. |
-| Impulses      | Each impulse transition, the positions where it acts and the amounts it moves; an impulse is not part of the equations.                                         |
+| Part          | Content                                                                                                                                                                                                                                                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Compact form  | Each transition and its flows, `source -> target: rate`. With units, each symbol shows its unit and each flow its resulting unit.                                                                                                                                                                                       |
+| Expanded form | One equation per compartment. The left-hand side comes from the engine: `[A(t+Dt) - A(t)] / Dt` for `DifferenceEquations`, `dA/dt` for `DifferentialEquations`.                                                                                                                                                         |
+| Events        | For a stochastic engine, instead of the expanded form: one row per flow, with the change of the state of one event and its propensity (`StochasticEvents`) or its draw in a step (`StochasticSteps`). See [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/#how-a-rate-becomes-an-event). |
+| Impulses      | Each impulse transition, the positions where it acts and the amounts it moves; an impulse is not part of the equations.                                                                                                                                                                                                 |
 
 For the model above, the text rendering holds:
 
@@ -129,7 +130,7 @@ odd.save("model_odd.tex")
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Purpose and patterns                 | `Model.description`; without one, the marker                                                                                                                                                                       |
 | Entities, state variables and scales | Bins, accumulators, stratifications, compartments; the step unit and how the engine advances                                                                                                                       |
-| Process overview and scheduling      | Each transition, where it moves, whether it is an impulse; the schedule of the engine                                                                                                                              |
+| Process overview and scheduling      | Each transition, where it moves, whether it is an impulse; the schedule of the engine and its settings                                                                                                             |
 | Design concepts                      | Interaction (when the structure has [neighbors](https://munqu.github.io/commol/latest/guide/building-models/#neighbors)), stochasticity (from the engine) and observation (the outputs); the marker for the others |
 | Initialization                       | The fractions, the overrides and the initial state                                                                                                                                                                 |
 | Input data                           | The series parameters, or "None"                                                                                                                                                                                   |

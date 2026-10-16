@@ -900,6 +900,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../guide/stochastic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stochastic Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -914,10 +942,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
         
           
-          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
             
   
   
@@ -935,8 +963,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_4">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2898,6 +2926,11 @@ kind that is not aggregate through every generic layer.</p>
 <td><a href="../../guide/simulations/">Running Simulations</a></td>
 </tr>
 <tr>
+<td><code>stochastic/</code></td>
+<td>The stochastic engines of an aggregate model through the layers: their means against the deterministic engines, whole units, calibration with replicates (the closed forms are in <code>crates/commol-stochastic/tests/oracles.rs</code>)</td>
+<td><a href="../../guide/stochastic/">Stochastic Simulation</a></td>
+</tr>
+<tr>
 <td><code>units/</code></td>
 <td>Unit checks</td>
 <td><a href="../../guide/units-and-equations/">Units</a></td>
@@ -2962,7 +2995,9 @@ topic inside its package.</p>
   (<code>builder.structure</code>, which <code>set_structure</code> replaces). A keyword overrides
   one part of the default model, so a test names only what it changes. <code>build</code> builds for difference
   equations; <code>build_ode</code> builds for differential equations, with the tight
-  solver settings <code>TIGHT</code> by default; <code>run</code> builds and simulates.</li>
+  solver settings <code>TIGHT</code> by default; <code>build_stochastic</code> builds for a
+  stochastic engine (<code>STOCHASTIC_ENGINES</code>, and <code>MEAN_FIELD</code>, the deterministic
+  engine of each); <code>run</code> builds and simulates.</li>
 <li>Build a model by hand only when one test needs it and no factory keyword
   expresses it. A model that a second file needs goes to <code>support/</code>.</li>
 <li>Test models use abstract names, as examples do: bins <code>A</code>, <code>B</code>, <code>C</code>,

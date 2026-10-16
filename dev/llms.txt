@@ -21,6 +21,7 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 - [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md): Unit checking of rates, impulses and the step unit
 - [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md): Model.describe, its sections and blocks, text, Markdown, LaTeX, JSON and DOT renderings, the ODD layout
 - [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md): Simulation.run, output formats, totals by bin and category, windowed totals, plotting
+- [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md): The StochasticEvents and StochasticSteps engines, how rates become events, whole units, methods, calibration with replicates
 - [Calibration Basics](https://munqu.github.io/commol/latest/guide/calibration/index.md): CalibrationProblem, observations, unknowns, losses, results and writing results back
 - [Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md): Calibrating bins, categories and compartments, the remainder and the order of application
 - [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md): Several outputs, sums of outputs, weights, scale factors and windowed observations

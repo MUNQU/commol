@@ -900,6 +900,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../guide/stochastic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stochastic Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -914,10 +942,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
         
           
-          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
             
   
   
@@ -935,8 +963,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_4">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2156,10 +2184,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#one-right-hand-side-two-engines" class="md-nav__link">
+  <a href="#every-engine-reads-one-set-of-flows" class="md-nav__link">
     <span class="md-ellipsis">
       
-        One right-hand side, two engines
+        Every engine reads one set of flows
       
     </span>
   </a>
@@ -2182,6 +2210,17 @@
     <span class="md-ellipsis">
       
         Stochastic engines and seeds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#whole-units-in-a-stochastic-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Whole units in a stochastic engine
       
     </span>
   </a>
@@ -3038,10 +3077,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#one-right-hand-side-two-engines" class="md-nav__link">
+  <a href="#every-engine-reads-one-set-of-flows" class="md-nav__link">
     <span class="md-ellipsis">
       
-        One right-hand side, two engines
+        Every engine reads one set of flows
       
     </span>
   </a>
@@ -3064,6 +3103,17 @@
     <span class="md-ellipsis">
       
         Stochastic engines and seeds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#whole-units-in-a-stochastic-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Whole units in a stochastic engine
       
     </span>
   </a>
@@ -3302,7 +3352,7 @@ test that guards it. Read the ones of your area before you change it.</p>
 </tr>
 <tr>
 <td>Engines</td>
-<td><a href="#one-right-hand-side-two-engines">One right-hand side</a>, <a href="#stochastic-engines-and-seeds">seeds</a>, <a href="#the-solver-is-diffsol">solver</a></td>
+<td><a href="#every-engine-reads-one-set-of-flows">One set of flows</a>, <a href="#stochastic-engines-and-seeds">seeds</a>, <a href="#whole-units-in-a-stochastic-engine">whole units</a>, <a href="#the-solver-is-diffsol">solver</a></td>
 </tr>
 <tr>
 <td>Calibration</td>
@@ -3859,9 +3909,9 @@ every observation position and window start.</p>
 <h3 id="one-list-of-engines">One list of engines<a class="headerlink" href="#one-list-of-engines" title="Permanent link">&para;</a></h3>
 <p><code>EngineType</code> (<code>crates/commol-core/src/types/engine.rs</code>) is the one list of
 model types. An entry is an engine, named by its type
-(<code>DifferenceEquations</code>, <code>DifferentialEquations</code>): a method, not a kind. It
-names the model kinds it runs (<code>EngineType::kinds</code>; today both run
-<code>aggregate</code>). Each entry validates its settings and
+(<code>DifferenceEquations</code>, <code>DifferentialEquations</code>, <code>StochasticEvents</code>,
+<code>StochasticSteps</code>): a method, not a kind. It names the model kinds it runs
+(<code>EngineType::kinds</code>; today all four run <code>aggregate</code>). Each entry validates its settings and
 says the form of its dynamics (<code>DynamicsForm</code>: the schedule a description
 shows and the left-hand side of its equations) and the meaning of a rate (<code>per_step</code> or
 <code>continuous</code>). <code>Engine::build</code> (<code>py-commol/src/engine.rs</code>) builds the engine of
@@ -3875,8 +3925,10 @@ never branches on an engine name. It keeps the names of the engines only as
 the <code>Literal</code> <code>EngineName</code> (<code>context/engine.py</code>), for static typing and
 completion of <code>ModelBuilder.build</code>; a test checks that it equals the entries of
 the list (<code>test_the_python_names_equal_the_engines_of_the_list</code>). <code>ModelEngine.type</code> is a <code>str</code> that
-the list checks, so a model can name an engine of any kind. Generating the <code>Literal</code> from Rust would need
-a code-generation step for two names; the test catches the same drift. An
+the list checks, so a model can name an engine of any kind; its settings are read
+with the class of that engine (<code>ModelEngine.settings_of_the_engine</code>), so a model
+loads back with the class it was saved with. Generating the <code>Literal</code> from Rust would need
+a code-generation step for four names; the test catches the same drift. An
 entry names the kinds it runs, so another kind (for example an agent network)
 adds kinds to an entry or new entries, not a second meaning of the type; see
 <a href="#one-interface-for-every-model-kind">One interface for every model kind</a>.</p>
@@ -3887,16 +3939,50 @@ from the engine that names both.</p>
 <p><strong>Guards:</strong> <code>crates/commol-core/src/types/engine.rs</code> (tests),
 <code>py-commol/src/engine.rs::every_entry_builds_its_engine_and_runs</code>,
 <code>tests/building/test_engine.py</code>.</p>
-<h3 id="one-right-hand-side-two-engines">One right-hand side, two engines<a class="headerlink" href="#one-right-hand-side-two-engines" title="Permanent link">&para;</a></h3>
-<p><code>CompiledModel::derivatives</code> (<code>crates/commol-model/src/system.rs</code>) computes
-every flow from one snapshot of the state: it is the right-hand side
-<code>dX/dt = Σ flows</code>. The difference engine adds it once per step
-(<code>X(n + 1) = X(n) + derivatives(n, X(n))</code>); the differential engine integrates
-it. Neither engine has flow logic of its own, so both run the same model.
-Accumulators are state components: a difference step adds the counted flows, a
-differential engine integrates them.</p>
-<p><strong>Guard:</strong>
-<code>crates/commol-difference/src/simulation.rs::one_step_adds_the_derivatives_exactly</code>.</p>
+<h3 id="every-engine-reads-one-set-of-flows">Every engine reads one set of flows<a class="headerlink" href="#every-engine-reads-one-set-of-flows" title="Permanent link">&para;</a></h3>
+<p>A compiled model is a set of flows (<code>crates/commol-model/src/system.rs</code>):
+<code>CompiledModel::flow_rates</code> gives the value of each flow, its rate times its
+source for a proportional rate (<code>transition_rates</code> gives the rate alone), and
+<code>CompiledModel::flow_changes</code> gives the change of the state of one event of
+each flow: <code>−1</code> for each source piece, <code>+1</code> for each target piece and each
+accumulator. Every engine reads them, and none has flow logic of its own:</p>
+<table>
+<thead>
+<tr>
+<th>Engine</th>
+<th>Reads</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DifferenceEquations</code></td>
+<td><code>derivatives</code>, <code>Σ changes × flow</code>, added once per step</td>
+</tr>
+<tr>
+<td><code>DifferentialEquations</code></td>
+<td><code>derivatives</code>, integrated</td>
+</tr>
+<tr>
+<td><code>StochasticEvents</code></td>
+<td><code>flow_rates</code> as propensities, and one event of <code>flow_changes</code> at a time</td>
+</tr>
+<tr>
+<td><code>StochasticSteps</code></td>
+<td><code>transition_rates</code> as per-step probabilities, and the drawn number of events of each flow</td>
+</tr>
+</tbody>
+</table>
+<p><code>derivatives</code> is <code>flow_changes</code>ᵀ · <code>flow_rates</code>, computed piece by piece in the
+order of the old right-hand side, so the deterministic runs did not change by
+a bit. The deterministic engines are the mean-field limits of the stochastic
+ones, which gives the main test oracle. The positions where a rate can jump
+come from the same model (<code>CompiledModel::breakpoints</code>), so the differential
+and the continuous-time stochastic engines stop at the same positions.</p>
+<p><strong>Guards:</strong> <code>crates/commol-model/tests/flows.rs</code>,
+<code>crates/commol-difference/src/simulation.rs::one_step_adds_the_derivatives_exactly</code>,
+<code>crates/commol-stochastic/tests/oracles.rs</code>
+(<code>the_mean_of_many_runs_is_the_solution_of_the_ode</code>,
+<code>the_mean_of_many_chain_binomial_runs_is_the_difference_engine</code>).</p>
 <h3 id="a-difference-step-never-leaves-an-amount-below-zero">A difference step never leaves an amount below zero<a class="headerlink" href="#a-difference-step-never-leaves-an-amount-below-zero" title="Permanent link">&para;</a></h3>
 <p><code>DifferenceEquations</code> checks every compartment after the impulses of a step and
 after its flows (<code>DifferenceEquations::step</code>, <code>settle</code> in
@@ -3962,7 +4048,11 @@ there.</p>
 <code>SimulationEngine::set_seed</code> (<code>crates/commol-core/src/simulation_engine.rs</code>);
 <code>reset</code> restores it, so a run is reproducible from its seed. The default
 <code>set_seed</code> does nothing, so the deterministic engines did not change.
-<code>EngineType::is_stochastic</code> says which engines draw.</p>
+<code>EngineType::is_stochastic</code> says which engines draw: <code>StochasticEvents</code> and
+<code>StochasticSteps</code> (<code>crates/commol-stochastic/</code>). A run does not depend on the
+positions it reports at: <code>StochasticEvents</code> measures each wait from the last
+change of the state, never from a reported position, and draws the flow of an
+event only when the event happens.</p>
 <table>
 <thead>
 <tr>
@@ -4032,9 +4122,74 @@ version may change a run, and the changelog says so.</p>
 <p><strong>Guards:</strong> <code>crates/commol-random/</code> (tests, with the stored first values of each
 sampler in <code>tests/reference_values.txt</code>), <code>py-commol/src/engine.rs</code>
 (<code>a_stochastic_engine_repeats_a_run_from_its_seed</code>,
+<code>an_aggregate_stochastic_engine_repeats_a_run_from_its_seed</code>,
 <code>a_deterministic_engine_ignores_the_seed</code>),
+<code>crates/commol-stochastic/tests/oracles.rs::a_run_depends_on_its_seed_and_not_on_where_it_reports</code>,
 <code>crates/commol-calibration/src/types.rs</code> (<code>replicate_tests</code>),
 <code>tests/model_kinds/test_stochastic.py</code>.</p>
+<h3 id="whole-units-in-a-stochastic-engine">Whole units in a stochastic engine<a class="headerlink" href="#whole-units-in-a-stochastic-engine" title="Permanent link">&para;</a></h3>
+<p>A stochastic engine moves whole units, so it starts from whole amounts.
+<code>check_model</code> (<code>crates/commol-model/src/builder.rs</code>, called by <code>build</code> and by
+every engine) rejects a total that is not whole, and initial amounts that are
+not whole unless the settings of the engine name a <code>Rounding</code>
+(<code>crates/commol-core/src/types/engine.rs</code>); the message lists both. There is no
+default:</p>
+<table>
+<thead>
+<tr>
+<th><code>rounding</code></th>
+<th>Start of each run (<code>Units::begin</code> in <code>crates/commol-stochastic/src/units.rs</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"largest_remainder"</code></td>
+<td>The same whole amounts: each amount rounded down, the units left over to the largest remainders, the first compartment first on a tie</td>
+</tr>
+<tr>
+<td><code>"random"</code></td>
+<td>A multinomial draw of the total with the fractions of the model, from the generator of the run</td>
+</tr>
+</tbody>
+</table>
+<p>The engine rounds at the start of a run, not when it is built, so a value that
+calibration writes (<code>InitialConditionPlan</code>) goes through the same rounding, and
+<code>"random"</code> draws after the values are written. With no rounding, a written
+value that is not whole is an error.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Largest remainder by default</td>
+<td>With small amounts the rounding is a modelling choice: half a unit in each of ten groups starts five groups with one unit and five with none, which decides which groups can start a process at all. The library would choose it without notice.</td>
+</tr>
+<tr>
+<td>Random rounding by default</td>
+<td>The same objection, the other way.</td>
+</tr>
+<tr>
+<td>Reject every amount that is not whole</td>
+<td>Most stratified models would fail, with no way out but to compute whole amounts by hand.</td>
+</tr>
+</tbody>
+</table>
+<p>A per-step probability of <code>StochasticSteps</code> outside <code>[0, 1]</code>, or proportional
+rates out of one compartment that sum to more than 1, are an error that names
+the compartment, the step and the flows (<code>SimulationError::Infeasible</code>), not a
+clamp: a binomial draw has no meaning outside <code>[0, 1]</code>, and a clamp would change
+the model without notice.</p>
+<p><strong>Guards:</strong> <code>crates/commol-stochastic/tests/oracles.rs</code>
+(<code>amounts_that_are_not_whole_need_a_rounding</code>,
+<code>the_largest_remainder_starts_every_run_from_the_same_whole_amounts</code>,
+<code>a_random_rounding_starts_on_average_from_the_amounts_of_the_model</code>,
+<code>calibrated_initial_conditions_go_through_the_rounding</code>,
+<code>a_negative_rate_or_probabilities_above_one_fail_at_their_step</code>),
+<code>tests/stochastic/test_whole_units.py</code>.</p>
 <h3 id="the-solver-is-diffsol">The solver is <code>diffsol</code><a class="headerlink" href="#the-solver-is-diffsol" title="Permanent link">&para;</a></h3>
 <p>The differential engine keeps no numerical method of its own: <code>diffsol</code>
 (pinned to a minor version, <code>~0.17.1</code>) solves the system with <code>tsit45</code> or

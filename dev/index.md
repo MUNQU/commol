@@ -63,17 +63,18 @@ results = Simulation(model).run(num_steps=100)
 
 ## Features
 
-| Feature                                                                                     | Guide                                                                                                                                                  |
-| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Fluent, validated model building                                                            | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)                                                                |
-| Stratifications, conditional stratifications, per-compartment initial conditions            | [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#stratifications)                                                            |
-| Rate formulas compiled with Cranelift                                                       | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md)                                              |
-| Pulses, windows, ramps, sinusoids and schedules per subgroup                                | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)                                                                    |
-| Unit checking                                                                               | [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md)                                                                      |
-| A description of a model: equations, state graphs, the ODD protocol (text, Markdown, LaTeX) | [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md)                                                           |
-| Calibration of parameters, initial conditions and scale factors                             | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                                                                  |
-| Ensembles and prediction intervals                                                          | [Probabilistic Calibration](https://munqu.github.io/commol/latest/guide/probabilistic-calibration/index.md)                                            |
-| JSON-ready reports and seaborn plots                                                        | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md), [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting) |
+| Feature                                                                                                | Guide                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Fluent, validated model building                                                                       | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)                                                                |
+| Stratifications, conditional stratifications, per-compartment initial conditions                       | [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#stratifications)                                                            |
+| Rate formulas compiled with Cranelift                                                                  | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md)                                              |
+| Pulses, windows, ramps, sinusoids and schedules per subgroup                                           | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)                                                                    |
+| Unit checking                                                                                          | [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md)                                                                      |
+| One process run as difference equations, differential equations or a stochastic process of whole units | [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md)                                                               |
+| A description of a model: equations, state graphs, the ODD protocol (text, Markdown, LaTeX)            | [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md)                                                           |
+| Calibration of parameters, initial conditions and scale factors                                        | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                                                                  |
+| Ensembles and prediction intervals                                                                     | [Probabilistic Calibration](https://munqu.github.io/commol/latest/guide/probabilistic-calibration/index.md)                                            |
+| JSON-ready reports and seaborn plots                                                                   | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md), [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting) |
 
 ## License and authors
 
