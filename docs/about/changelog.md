@@ -74,7 +74,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A failed run of a multi-start optimization was written to the standard error
   and dropped; it is now part of the result.
 - An error of the model at a vertex of the initial Nelder-Mead simplex made
-  the optimizer panic; it now stops the calibration with its message.
+  the optimizer panic; it now stops the calibration with its message (the
+  argmin fork returns the error).
 
 ### Removed
 

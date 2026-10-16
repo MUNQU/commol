@@ -728,14 +728,6 @@ where
         cost,
         transform: transform.clone(),
     };
-    // argmin's Nelder-Mead unwraps the cost of each initial vertex, so an
-    // error there would panic. The cost is deterministic: score the vertices
-    // first and return the first error instead.
-    for vertex in transform.initial_simplex(start, config.initial_simplex_size) {
-        bounded
-            .cost(&vertex)
-            .map_err(|e| format!("Optimization failed: {e}"))?;
-    }
     let mut executor = Executor::new(bounded, solver)
         .configure(|state| state.max_iters(config.max_iterations).counting(true))
         .timer(true);

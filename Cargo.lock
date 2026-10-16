@@ -41,7 +41,7 @@ checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
 [[package]]
 name = "argmin"
 version = "0.11.0"
-source = "git+https://github.com/MUNQU/argmin?branch=development#141b11b3a78d60d226378eba063990c8a963f195"
+source = "git+https://github.com/MUNQU/argmin?branch=development#8a8472ae967c0fc30059ef6bebe30b3c10eeb6cf"
 dependencies = [
  "anyhow",
  "argmin-math",
@@ -57,7 +57,7 @@ dependencies = [
 [[package]]
 name = "argmin-math"
 version = "0.5.1"
-source = "git+https://github.com/MUNQU/argmin?branch=development#141b11b3a78d60d226378eba063990c8a963f195"
+source = "git+https://github.com/MUNQU/argmin?branch=development#8a8472ae967c0fc30059ef6bebe30b3c10eeb6cf"
 dependencies = [
  "anyhow",
  "cfg-if",

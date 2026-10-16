@@ -742,10 +742,9 @@ and a simplex that crosses a bound collapses there. Nelder-Mead therefore
 searches an unbounded `u` and scores `x = lo + (hi − lo)·(sin u + 1)/2`
 (`SineTransform` and `BoundedProblem` in `optimization.rs`). Its evaluations
 and its result are recorded in `x`. `converged` is true only for
-`SolverConverged` and `TargetCostReached` (`optimization::converged`). The
-initial simplex is scored before argmin runs, because argmin's Nelder-Mead
-unwraps the cost of each initial vertex: an error there returns as an error,
-not a panic.
+`SolverConverged` and `TargetCostReached` (`optimization::converged`). An
+error of the model at a vertex of the initial simplex stops the run with its
+message (`NelderMead::init` of the argmin fork returns it).
 
 **Rule:** report and record values in `x`, never in `u`. Every optimizer run,
 the verbose one included, goes through `optimization::run`.

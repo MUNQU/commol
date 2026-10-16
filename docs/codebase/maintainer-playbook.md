@@ -206,9 +206,7 @@ To add a kind of model, such as an agent network (see
 - [ ] For a major update that needs code changes, open your own pull request
       and close the Dependabot one with a link to it.
 - [ ] The argmin dependency is a fork (`MUNQU/argmin`, branch `development`):
-      change the fork first, then update `Cargo.lock`. Its Nelder-Mead unwraps
-      the cost of each initial vertex, so `optimize_nelder_mead` scores the
-      vertices first.
+      change the fork first, then update `Cargo.lock`.
 
 ### Releases
 
