@@ -37,6 +37,7 @@ use pyo3::prelude::*;
 mod calibration;
 mod core;
 mod engine;
+mod identifiability;
 mod inference;
 mod model;
 pub(crate) mod python_observer;
