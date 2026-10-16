@@ -87,7 +87,7 @@ def product(truth: dict[str, list[float]]) -> Calibrator:
 
 
 class TestStructuralRank:
-    def test_a_product_of_rate_and_factor_is_identifiable_in_combination(
+    def test_a_product_of_two_parameters_is_identifiable_in_combination(
         self, product: Calibrator
     ) -> None:
         report = product.identifiability(
