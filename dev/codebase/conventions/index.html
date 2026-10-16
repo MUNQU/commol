@@ -1757,6 +1757,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../repository-map/" class="md-nav__link">
         
   
@@ -2753,6 +2781,10 @@ agents, to features, fixes, refactors, dependency updates and CI changes.</p>
 <td><a href="../repository-map/">Repository map</a>; <code>AGENTS.md</code> if a "If you need to…" row changes</td>
 </tr>
 <tr>
+<td>Adds or removes a crate, an engine or a layer, or changes the path of a simulation or a calibration</td>
+<td>The diagrams and tables of <a href="../architecture/">Architecture</a></td>
+</tr>
+<tr>
 <td>Adds or changes a rule that is not obvious from the code</td>
 <td><a href="../design-decisions/">Design decisions</a>, with the test that guards it</td>
 </tr>
@@ -2845,6 +2877,11 @@ every match.</p>
 </tr>
 <tr>
 <td>Every name in <code>commol.__all__</code> has an API entry (<code>…</code> under <code>docs/api/</code>)</td>
+<td><code>pytest -m docs</code> (<code>tests/docs/test_reference.py</code>)</td>
+<td>CI (Code Quality)</td>
+</tr>
+<tr>
+<td>Every crate under <code>crates/</code> is named in <a href="../architecture/">Architecture</a></td>
 <td><code>pytest -m docs</code> (<code>tests/docs/test_reference.py</code>)</td>
 <td>CI (Code Quality)</td>
 </tr>

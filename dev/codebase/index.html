@@ -1859,6 +1859,34 @@
   
   
     <li class="md-nav__item">
+      <a href="architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="repository-map/" class="md-nav__link">
         
   
@@ -2346,7 +2374,7 @@ unreleased code. The <code>latest</code> version is built from the last release 
 </tbody>
 </table>
 <h2 id="90-second-mental-model">90-second mental model<a class="headerlink" href="#90-second-mental-model" title="Permanent link">&para;</a></h2>
-<p>Commol has three layers. The user writes a model in Python. Python validates
+<p>Commol has three layers (<a href="architecture/">Architecture</a> draws them). The user writes a model in Python. Python validates
 it and serializes it to JSON. The Rust engine builds and runs it.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>User code
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  |
@@ -2384,6 +2412,10 @@ it asks the engine through a binding. It never re-implements the rule.</p>
 <td>What Commol is, what it is not, and the invariants every change must keep.</td>
 </tr>
 <tr>
+<td><a href="architecture/">Architecture</a></td>
+<td>Diagrams of the two halves, the Rust crates, and the path of a simulation and a calibration.</td>
+</tr>
+<tr>
 <td><a href="repository-map/">Repository map</a></td>
 <td>Which module owns which behavior, and where new code goes.</td>
 </tr>
@@ -2404,6 +2436,7 @@ it asks the engine through a binding. It never re-implements the rule.</p>
 <h2 id="recommended-reading-path">Recommended reading path<a class="headerlink" href="#recommended-reading-path" title="Permanent link">&para;</a></h2>
 <ol>
 <li><a href="mental-model/">Mental model</a>.</li>
+<li><a href="architecture/">Architecture</a> for the picture of the code.</li>
 <li><a href="repository-map/">Repository map</a> before you edit code.</li>
 <li>The <a href="design-decisions/">Design decisions</a> of the area you change.</li>
 <li><a href="maintainer-playbook/">Maintainer playbook</a> before you open or review a
