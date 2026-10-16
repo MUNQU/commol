@@ -243,7 +243,9 @@ When you create a PR, automated checks run:
 
 - **Code Quality Pipeline**: Linting, formatting, type checking for both Python and Rust
 - **Build Pipeline**: Builds on Ubuntu, Windows, and macOS with Python versions
-- **Test Coverage**: Runs all tests and reports coverage
+- **Test Coverage**: The Code Quality jobs measure the coverage of Python
+  (`pytest --cov`) and of Rust (`cargo llvm-cov`) and upload it to Codecov,
+  which feeds the coverage badges of the README
 
 **PR Requirements**:
 
@@ -273,7 +275,7 @@ Process](release.md)).
 
 | Workflow | Runs on | Checks | Required check |
 |---|---|---|---|
-| Code Quality (`code-quality.yaml`) | Pull requests, the merge queue and on demand | Python: Ruff (lint, format, docstrings `D1`/`D417`), Ty, Pytest with the documentation checks (`pytest -m docs`). Rust: rustfmt, Clippy (`-D warnings`, so `missing_docs` too), rustdoc without broken links, cargo test. | `Python Code Quality`, `Rust Code Quality` |
+| Code Quality (`code-quality.yaml`) | Pull requests, the merge queue and on demand | Python: Ruff (lint, format, docstrings `D1`/`D417`), Ty, Pytest with the documentation checks (`pytest -m docs`) and its coverage. Rust: rustfmt, Clippy (`-D warnings`, so `missing_docs` too), rustdoc without broken links, cargo test with its coverage (`cargo llvm-cov`). Both upload their coverage to Codecov (flags `python` and `rust`) with the OIDC token of the run, so no secret is needed; `.github/codecov.yml` makes its checks informational. | `Python Code Quality`, `Rust Code Quality` |
 | Build (`build.yaml`) | Pull requests, the merge queue, every Monday on `main` and on demand | Tests, except the documentation checks and the coverage studies. A pull request runs one job, Ubuntu with Python 3.12, for a fast answer; the merge queue, the weekly and the manual runs test Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14. A failure that only one operating system shows appears in the queue, which then removes the pull request. A change of only documentation or planning files (`docs/`, Markdown at the root, `mkdocs.yaml`, `.github/ISSUE_TEMPLATE/`, `.github/scripts/`) skips the tests. The wheels of every architecture are built by the release (`release.yaml`). | `Build Passed` |
 | Documentation (`docs.yaml`) | Pull requests, the merge queue, pushes to `main` and release tags | `mkdocs build --strict`: no broken internal link or anchor. Deploys the site with mike: a release tag as `latest`, a push to `main` as `dev`. | `Build Documentation` |
 | Coverage Studies (`coverage.yaml`) | Every Monday; on demand | `pytest -m coverage_study`: the intervals of each uncertainty method cover the truth at their level ([Design decisions](../codebase/design-decisions.md#methods-plug-into-one-entry-point)). | None: each study runs many fits |
@@ -298,6 +300,11 @@ cargo test -p commol --features test-kind   # the engine of the test model kind
 
 # Coverage studies (slow), from py-commol/
 pytest -m coverage_study
+
+# Test coverage, as CI measures it (Rust needs `cargo install cargo-llvm-cov` and
+# `rustup component add llvm-tools-preview`)
+pytest --cov=commol                           # from py-commol/
+cargo llvm-cov --all-features --workspace     # from the repository root
 
 # Documentation, from the repository root
 mkdocs build --strict

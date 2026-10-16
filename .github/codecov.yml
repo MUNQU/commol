@@ -1,0 +1,22 @@
+# Codecov reports the coverage of Python (flag `python`) and of Rust (flag
+# `rust`) for the badges of the README. Its checks inform and never fail a
+# pull request, and it writes no comment on it.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+comment: false
+
+flags:
+  python:
+    paths:
+      - py-commol/commol/
+  rust:
+    paths:
+      - crates/
+      - py-commol/src/
