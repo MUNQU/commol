@@ -15,6 +15,10 @@ Use this page before you make or review a change. It turns the
 5. Run both test suites (see [`AGENTS.md`](https://github.com/MUNQU/commol/blob/main/AGENTS.md#commands)).
 6. Update the documentation as the mandatory
    [definition of done](conventions.md#documentation-definition-of-done) requires.
+7. Run `python .github/scripts/affected.py --closes <number>` and update each
+   open issue it lists whose current state, paths or assumptions the change
+   alters: its body, and a comment that says what changed
+   ([Planning](../development/workflow.md#lifecycle-of-a-proposal), step 4).
 
 ## Guardrails
 
@@ -221,6 +225,7 @@ To add a kind of model, such as an agent network (see
 - [ ] Every new claim in the docs names a file, function or test.
 - [ ] The diagrams of [Architecture](architecture.md) still describe the code.
 - [ ] The tests that guard the touched [design decisions](design-decisions.md) still pass.
+- [ ] Each open issue that `.github/scripts/affected.py` lists is updated, or does not depend on what changed.
 
 ## Navigation
 

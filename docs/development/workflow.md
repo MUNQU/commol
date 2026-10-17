@@ -120,8 +120,18 @@ gh project item-edit --project-id PVT_kwDODcfAw84BnXyo --id "$item" \
    next one who runs `next.sh`. Work one task after the other, the tests of a
    requirement before its code. Tick the tasks of the body as they land.
 4. Update every open issue the change affects, before the pull request
-   merges: edit the body of an issue whose current state, paths or
-   assumptions the change alters, and add a comment that says what changed.
+   merges. To find them, run:
+
+   ```bash
+   python .github/scripts/affected.py --closes <number>
+   ```
+
+   It lists the open issues whose body names a path that the branch changes,
+   in its section Touches or anywhere else, with the items that match. Edit
+   the body of each one whose current state, paths or assumptions the change
+   alters, and add a comment that says what changed. The script finds
+   candidates by path; an issue that relies on a behavior without naming its
+   path needs your own check.
    Work the change leaves undone goes to an open issue (the one that will do
    it, or a new one from a template), never only to a comment of the issue
    that closes: a closed issue is not read again.
