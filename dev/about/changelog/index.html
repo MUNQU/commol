@@ -1254,6 +1254,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/resampling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -3022,12 +3050,15 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   back equal.</li>
 <li><code>Predictive(calibrator, sample, positions)</code>: the run of every draw, in
   parallel, its band (<code>band</code>, <code>series_band</code>) and every draw's value of a set
-  of observations through the observation operator of the loss
-  (<code>at_observations</code>). <code>SimulationPlotter</code> and <code>simulation_report</code> take a
+  of observations through the observation operator of the loss, with an
+  observation noise that has no default (<code>at_observations(observed_data,
+  noise)</code>: <code>NoNoise()</code> for a band of the model, <code>ResidualNoise(...)</code> for a
+  prediction interval). <code>SimulationPlotter</code> and <code>simulation_report</code> take a
   predictive.</li>
 <li><code>commol.scores</code>: empirical coverage, interval score, weighted interval score,
   the CRPS of a weighted sample and PIT values of a predictive, per
-  observation and per series.</li>
+  observation and per series. Each takes the observation noise, so a band of
+  the model is never scored as a prediction interval by accident.</li>
 <li><code>Calibrator.uncertainty(method)</code>: one entry point for every uncertainty
   method. A method's configuration subclasses <code>UncertaintyMethod[R]</code> and
   registers its runner; the result type follows the configuration's type.</li>
@@ -3049,6 +3080,19 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>Calibrator.run_with_history()</code>.</li>
 <li>The crate <code>commol-inference</code>: the parameter sample, the one quantile, the
   predictive and the scores. See <a href="../../guide/uncertainty/">Uncertainty</a>.</li>
+<li>Resampling methods with no noise model, through <code>Calibrator.uncertainty</code>:
+  <code>BayesianBootstrap</code>, <code>ResidualBootstrap</code> and <code>WildBootstrap</code> return a
+  <code>BootstrapResult</code> (the fit, one draw per replicate, diagnostics, and the
+  Monte Carlo error of each interval bound, <code>interval_error</code>);
+  <code>BlockJackknife</code> returns a <code>JackknifeResult</code> (estimate, bias, standard
+  error, pseudo-values and the influence of each block). Blocks of consecutive
+  positions span every series; <code>block_length</code> is an integer or <code>"auto"</code>
+  (Politis and White). See <a href="../../guide/uncertainty/resampling/">Resampling</a>.</li>
+<li><code>ResidualNoise</code>: observation noise made of blocks of residuals of a fit,
+  which gives a prediction interval with no noise model; <code>NoNoise</code> gives a
+  band of the model.</li>
+<li><code>CalibrationProblem::with_data</code> (Rust): a copy of a problem with other
+  observed values and weights.</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3094,7 +3138,9 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   their settings classes. Its intervals had no statistical meaning: its members
   were points the optimizer visited, and the selection maximized the coverage
   of the data it was fitted to. The closest replacement with no noise model is
-  <code>Calibrator.uncertainty(BayesianBootstrap(...))</code>, in the next release.</li>
+  <code>Calibrator.uncertainty(BayesianBootstrap(replicates=..., block_length=...))</code>:
+  the same parallel fits, each on randomly weighted data, with a stated
+  meaning.</li>
 <li>The dependency on <code>scikit-learn</code>.</li>
 </ul>
 <h2 id="040-2026-10-16">[0.4.0] - 2026-10-16<a class="headerlink" href="#040-2026-10-16" title="Permanent link">&para;</a></h2>

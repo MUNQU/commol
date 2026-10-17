@@ -29,6 +29,7 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 - [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md): Constraints on unknowns and outputs, and how violations count
 - [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md): The three questions, bands and prediction intervals, which method answers which question, the parameter sample, the predictive, scores and the entry point
 - [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md): Structural against practical identifiability, the structural rank, collinearity, a sample, starts, combinations and the report
+- [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md): The Bayesian, residual and wild block bootstraps, the block jackknife, block lengths and prediction intervals from residuals
 - [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md): applied_parameters_report and simulation_report
 - [Examples](https://munqu.github.io/commol/latest/guide/examples/index.md): Complete models
 

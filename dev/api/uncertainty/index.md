@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-What every uncertainty method takes and returns: the configuration base, the weighted parameter sample, the predictive, the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
+What every uncertainty method takes and returns: the configuration base, the weighted parameter sample, the predictive and its observation noise, the resampling methods, the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
 
 ## InferenceMethod
 
@@ -1182,18 +1182,25 @@ class Predictive:
         )
 
     def at_observations(
-        self, observed_data: Sequence[ObservedDataPoint]
+        self,
+        observed_data: Sequence[ObservedDataPoint],
+        noise: ObservationNoise,
     ) -> ObservationDraws:
         """
-        Every draw's value of each observation.
+        Every draw's value of each observation, with observation noise.
 
         The observations need not be the ones the problem was fitted to: held
         out data are read the same way, through the observation operator.
+        The noise is drawn from the calibrator's seed.
 
         Parameters
         ----------
         observed_data : Sequence[ObservedDataPoint]
             The observations.
+        noise : NoNoise | ResidualNoise
+            What an observation shows around a draw's prediction, with no
+            default: ``NoNoise()`` gives a band of the model,
+            ``ResidualNoise(...)`` a prediction interval.
 
         Returns
         -------
@@ -1203,13 +1210,26 @@ class Predictive:
         Raises
         ------
         ValueError
-            If an observation names an unknown output or factor.
+            If an observation names an unknown output or factor, or a series
+            the residual noise has no residuals of.
         InfeasibleStateError
             If a draw leaves the values its model allows.
         """
+        residual_noise = None
+        if isinstance(noise, ResidualNoise):
+            residual_noise = (
+                [
+                    noise.fit.best_parameters[name]
+                    for name in self.calibrator.parameter_names
+                ],
+                noise.block_length,
+                noise.residual_scale,
+            )
         draws = self.calibrator.rust_problem.observation_draws(
             self.sample.rust_sample,
             engine_state.rust_observed_data(list(observed_data)),
+            self.calibrator.seed,
+            residual_noise=residual_noise,
         )
         return ObservationDraws(observed_data, draws)
 ```
@@ -1471,18 +1491,19 @@ def series_band(
 #### at_observations
 
 ```python
-at_observations(observed_data: Sequence[ObservedDataPoint]) -> ObservationDraws
+at_observations(observed_data: Sequence[ObservedDataPoint], noise: ObservationNoise) -> ObservationDraws
 ```
 
-Every draw's value of each observation.
+Every draw's value of each observation, with observation noise.
 
-The observations need not be the ones the problem was fitted to: held out data are read the same way, through the observation operator.
+The observations need not be the ones the problem was fitted to: held out data are read the same way, through the observation operator. The noise is drawn from the calibrator's seed.
 
 Parameters:
 
-| Name            | Type                          | Description       | Default    |
-| --------------- | ----------------------------- | ----------------- | ---------- |
-| `observed_data` | `Sequence[ObservedDataPoint]` | The observations. | *required* |
+| Name            | Type                          | Description       | Default                                                                                                                                               |
+| --------------- | ----------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `observed_data` | `Sequence[ObservedDataPoint]` | The observations. | *required*                                                                                                                                            |
+| `noise`         | \`NoNoise                     | ResidualNoise\`   | What an observation shows around a draw's prediction, with no default: NoNoise() gives a band of the model, ResidualNoise(...) a prediction interval. |
 
 Returns:
 
@@ -1492,27 +1513,34 @@ Returns:
 
 Raises:
 
-| Type                   | Description                                          |
-| ---------------------- | ---------------------------------------------------- |
-| `ValueError`           | If an observation names an unknown output or factor. |
-| `InfeasibleStateError` | If a draw leaves the values its model allows.        |
+| Type                   | Description                                                                                              |
+| ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| `ValueError`           | If an observation names an unknown output or factor, or a series the residual noise has no residuals of. |
+| `InfeasibleStateError` | If a draw leaves the values its model allows.                                                            |
 
 Source code in `commol/api/inference/predictive.py`
 
 ```python
 def at_observations(
-    self, observed_data: Sequence[ObservedDataPoint]
+    self,
+    observed_data: Sequence[ObservedDataPoint],
+    noise: ObservationNoise,
 ) -> ObservationDraws:
     """
-    Every draw's value of each observation.
+    Every draw's value of each observation, with observation noise.
 
     The observations need not be the ones the problem was fitted to: held
     out data are read the same way, through the observation operator.
+    The noise is drawn from the calibrator's seed.
 
     Parameters
     ----------
     observed_data : Sequence[ObservedDataPoint]
         The observations.
+    noise : NoNoise | ResidualNoise
+        What an observation shows around a draw's prediction, with no
+        default: ``NoNoise()`` gives a band of the model,
+        ``ResidualNoise(...)`` a prediction interval.
 
     Returns
     -------
@@ -1522,13 +1550,26 @@ def at_observations(
     Raises
     ------
     ValueError
-        If an observation names an unknown output or factor.
+        If an observation names an unknown output or factor, or a series
+        the residual noise has no residuals of.
     InfeasibleStateError
         If a draw leaves the values its model allows.
     """
+    residual_noise = None
+    if isinstance(noise, ResidualNoise):
+        residual_noise = (
+            [
+                noise.fit.best_parameters[name]
+                for name in self.calibrator.parameter_names
+            ],
+            noise.block_length,
+            noise.residual_scale,
+        )
     draws = self.calibrator.rust_problem.observation_draws(
         self.sample.rust_sample,
         engine_state.rust_observed_data(list(observed_data)),
+        self.calibrator.seed,
+        residual_noise=residual_noise,
     )
     return ObservationDraws(observed_data, draws)
 ```
@@ -1831,11 +1872,590 @@ def band(self, confidence_level: float) -> SeriesBand:
     )
 ```
 
+## NoNoise
+
+Bases: `BaseModel`
+
+No observation noise: an observation shows the prediction of each draw.
+
+The band of a predictive with `NoNoise` is a band of the model. It says where the model curve lies, not where the next observation falls, so its coverage of data is below its level.
+
+Source code in `commol/context/inference/noise.py`
+
+```python
+class NoNoise(BaseModel):
+    """
+    No observation noise: an observation shows the prediction of each draw.
+
+    The band of a predictive with `NoNoise` is a band of the model. It says
+    where the model curve lies, not where the next observation falls, so its
+    coverage of data is below its level.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+```
+
+## ResidualNoise
+
+Bases: `BaseModel`
+
+Observation noise made of the residuals of a fit, with no noise model.
+
+Each draw adds moving blocks of `block_length` positions of residuals of the fit, drawn with replacement across every series at once, to its predictions, on `residual_scale`. The band is then a prediction interval. It serves the series the fit has residuals of, at any position: the residual of a series at a drawn position is the one at the nearest position where the series was observed.
+
+Attributes:
+
+| Name             | Type                         | Description                                                                                                                                                            |
+| ---------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`            | `CalibrationResult`          | The fit whose residuals are added.                                                                                                                                     |
+| `block_length`   | `int`                        | Positions per block, at least 1 and at most the number of distinct positions of the problem's observations. A bootstrap reports the length it used in its diagnostics. |
+| `residual_scale` | `{additive, multiplicative}` | "additive" adds r = y − ŷ; "multiplicative" multiplies by exp(r) with r = log(y / ŷ) and needs positive observed and fitted values.                                    |
+
+Source code in `commol/context/inference/noise.py`
+
+```python
+class ResidualNoise(BaseModel):
+    """
+    Observation noise made of the residuals of a fit, with no noise model.
+
+    Each draw adds moving blocks of `block_length` positions of residuals of
+    the fit, drawn with replacement across every series at once, to its
+    predictions, on `residual_scale`. The band is then a prediction interval.
+    It serves the series the fit has residuals of, at any position: the
+    residual of a series at a drawn position is the one at the nearest
+    position where the series was observed.
+
+    Attributes
+    ----------
+    fit : CalibrationResult
+        The fit whose residuals are added.
+    block_length : int
+        Positions per block, at least 1 and at most the number of distinct
+        positions of the problem's observations. A bootstrap reports the
+        length it used in its diagnostics.
+    residual_scale : {"additive", "multiplicative"}
+        ``"additive"`` adds ``r = y − ŷ``; ``"multiplicative"`` multiplies by
+        ``exp(r)`` with ``r = log(y / ŷ)`` and needs positive observed and
+        fitted values.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    fit: CalibrationResult = Field(description="The fit whose residuals are added.")
+    block_length: int = Field(ge=1, description="Positions per block.")
+    residual_scale: Literal["additive", "multiplicative"] = Field(
+        description="The scale of the residuals."
+    )
+```
+
+## Resampling
+
+Guide: [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md).
+
+## BayesianBootstrap
+
+Bases: `UncertaintyMethod[BootstrapResult]`
+
+The Bayesian (weighted) bootstrap by blocks.
+
+Each replicate draws one Dirichlet(1, …, 1) weight per block, scaled to mean 1, multiplies the weight of every observation of the block by it, and fits. With a loss it is the loss-likelihood bootstrap of Lyddon, Holmes and Walker (2019); with one position per block, the Bayesian bootstrap of Rubin (1981) and the weighted likelihood bootstrap of Newton and Raftery (1994). The observed values never change.
+
+Attributes:
+
+| Name           | Type  | Description                                                                                                   |
+| -------------- | ----- | ------------------------------------------------------------------------------------------------------------- |
+| `replicates`   | `int` | Number of replicates, at least 1.                                                                             |
+| `block_length` | \`int | auto\`                                                                                                        |
+| `starts`       | `int` | Starts of the fit and of each replicate (default 1): the fit, then rows of a Latin hypercube over the bounds. |
+
+Source code in `commol/context/inference/resampling.py`
+
+```python
+class BayesianBootstrap(UncertaintyMethod[BootstrapResult]):
+    """
+    The Bayesian (weighted) bootstrap by blocks.
+
+    Each replicate draws one Dirichlet(1, …, 1) weight per block, scaled to
+    mean 1, multiplies the weight of every observation of the block by it,
+    and fits. With a loss it is the loss-likelihood bootstrap of Lyddon,
+    Holmes and Walker (2019); with one position per block, the Bayesian
+    bootstrap of Rubin (1981) and the weighted likelihood bootstrap of Newton
+    and Raftery (1994). The observed values never change.
+
+    Attributes
+    ----------
+    replicates : int
+        Number of replicates, at least 1.
+    block_length : int | "auto"
+        Positions per block.
+    starts : int
+        Starts of the fit and of each replicate (default 1): the fit, then
+        rows of a Latin hypercube over the bounds.
+    """
+
+    replicates: int = Field(ge=1, description="Number of replicates.")
+    block_length: BlockLength = Field(description="Positions per block.")
+    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+```
+
+## ResidualBootstrap
+
+Bases: `UncertaintyMethod[BootstrapResult]`
+
+The residual block bootstrap.
+
+Each replicate joins blocks of residuals of the fit, drawn with replacement across every series at once, adds them to the fitted values on `residual_scale`, and fits the synthetic data.
+
+Attributes:
+
+| Name             | Type                         | Description                                                                                                                                                                              |
+| ---------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `replicates`     | `int`                        | Number of replicates, at least 1.                                                                                                                                                        |
+| `block_length`   | \`int                        | auto\`                                                                                                                                                                                   |
+| `residual_scale` | `{additive, multiplicative}` | "additive": r = y − ŷ and ŷ + r\*. "multiplicative": r = log(y / ŷ) and ŷ · exp(r\*); it needs positive observed and fitted values and keeps synthetic values positive.                  |
+| `scheme`         | `{moving, stationary}`       | "moving": blocks of block_length consecutive positions (Künsch 1989). "stationary": blocks of geometric length with mean block_length, wrapped around the end (Politis and Romano 1994). |
+| `starts`         | `int`                        | Starts of the fit and of each replicate (default 1).                                                                                                                                     |
+
+Source code in `commol/context/inference/resampling.py`
+
+```python
+class ResidualBootstrap(UncertaintyMethod[BootstrapResult]):
+    """
+    The residual block bootstrap.
+
+    Each replicate joins blocks of residuals of the fit, drawn with
+    replacement across every series at once, adds them to the fitted values
+    on `residual_scale`, and fits the synthetic data.
+
+    Attributes
+    ----------
+    replicates : int
+        Number of replicates, at least 1.
+    block_length : int | "auto"
+        Positions per block; with ``scheme="stationary"`` the mean length.
+    residual_scale : {"additive", "multiplicative"}
+        ``"additive"``: ``r = y − ŷ`` and ``ŷ + r*``. ``"multiplicative"``:
+        ``r = log(y / ŷ)`` and ``ŷ · exp(r*)``; it needs positive observed and
+        fitted values and keeps synthetic values positive.
+    scheme : {"moving", "stationary"}
+        ``"moving"``: blocks of `block_length` consecutive positions (Künsch
+        1989). ``"stationary"``: blocks of geometric length with mean
+        `block_length`, wrapped around the end (Politis and Romano 1994).
+    starts : int
+        Starts of the fit and of each replicate (default 1).
+    """
+
+    replicates: int = Field(ge=1, description="Number of replicates.")
+    block_length: BlockLength = Field(description="Positions per block.")
+    residual_scale: Literal["additive", "multiplicative"] = Field(
+        description="The scale of the residuals."
+    )
+    scheme: Literal["moving", "stationary"] = Field(
+        description="How blocks of residuals are drawn."
+    )
+    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+```
+
+## WildBootstrap
+
+Bases: `UncertaintyMethod[BootstrapResult]`
+
+The wild block bootstrap.
+
+Each replicate multiplies the additive residuals of each block by one draw of `multipliers` and fits `ŷ + r · v`. Every residual stays at its own position, so it holds under noise whose size changes along the series.
+
+Attributes:
+
+| Name           | Type                   | Description                                                                                                                                                      |
+| -------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `replicates`   | `int`                  | Number of replicates, at least 1.                                                                                                                                |
+| `block_length` | \`int                  | auto\`                                                                                                                                                           |
+| `multipliers`  | `{rademacher, mammen}` | "rademacher": ±1 with probability 1/2. "mammen": two values with mean 0, variance 1 and third moment 1 (Mammen 1993), which keeps the skewness of the residuals. |
+| `starts`       | `int`                  | Starts of the fit and of each replicate (default 1).                                                                                                             |
+
+Source code in `commol/context/inference/resampling.py`
+
+```python
+class WildBootstrap(UncertaintyMethod[BootstrapResult]):
+    """
+    The wild block bootstrap.
+
+    Each replicate multiplies the additive residuals of each block by one
+    draw of `multipliers` and fits ``ŷ + r · v``. Every residual stays at its
+    own position, so it holds under noise whose size changes along the
+    series.
+
+    Attributes
+    ----------
+    replicates : int
+        Number of replicates, at least 1.
+    block_length : int | "auto"
+        Positions per block.
+    multipliers : {"rademacher", "mammen"}
+        ``"rademacher"``: ±1 with probability 1/2. ``"mammen"``: two values
+        with mean 0, variance 1 and third moment 1 (Mammen 1993), which keeps
+        the skewness of the residuals.
+    starts : int
+        Starts of the fit and of each replicate (default 1).
+    """
+
+    replicates: int = Field(ge=1, description="Number of replicates.")
+    block_length: BlockLength = Field(description="Positions per block.")
+    multipliers: Literal["rademacher", "mammen"] = Field(
+        description="The distribution of the multipliers."
+    )
+    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+```
+
+## BlockJackknife
+
+Bases: `UncertaintyMethod[JackknifeResult]`
+
+The block jackknife (Künsch 1989): one fit per block left out.
+
+It gives a standard error and a bias of each parameter, and the influence of each block, with as many fits as blocks. A block is left out by giving its observations weight 0.
+
+Attributes:
+
+| Name           | Type  | Description                                              |
+| -------------- | ----- | -------------------------------------------------------- |
+| `block_length` | \`int | auto\`                                                   |
+| `starts`       | `int` | Starts of the fit and of each leave-out fit (default 1). |
+
+Source code in `commol/context/inference/resampling.py`
+
+```python
+class BlockJackknife(UncertaintyMethod[JackknifeResult]):
+    """
+    The block jackknife (Künsch 1989): one fit per block left out.
+
+    It gives a standard error and a bias of each parameter, and the influence
+    of each block, with as many fits as blocks. A block is left out by giving
+    its observations weight 0.
+
+    Attributes
+    ----------
+    block_length : int | "auto"
+        Positions per block; it must leave at least two blocks.
+    starts : int
+        Starts of the fit and of each leave-out fit (default 1).
+    """
+
+    block_length: BlockLength = Field(description="Positions per block.")
+    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+```
+
+## BootstrapResult
+
+Bases: `BaseModel`
+
+The result of a bootstrap.
+
+Attributes:
+
+| Name          | Type                    | Description                                                                                         |
+| ------------- | ----------------------- | --------------------------------------------------------------------------------------------------- |
+| `fit`         | `CalibrationResult`     | The fit every replicate starts from: Calibrator.run(starts).                                        |
+| `sample`      | `ParameterSample`       | One draw per replicate that did not fail, with equal weights; the group of a draw is its replicate. |
+| `diagnostics` | `ResamplingDiagnostics` | The block length, and the replicates that failed, did not converge or made values below zero.       |
+
+Source code in `commol/context/inference/resampling.py`
+
+```python
+class BootstrapResult(BaseModel):
+    """
+    The result of a bootstrap.
+
+    Attributes
+    ----------
+    fit : CalibrationResult
+        The fit every replicate starts from: ``Calibrator.run(starts)``.
+    sample : ParameterSample
+        One draw per replicate that did not fail, with equal weights; the
+        group of a draw is its replicate.
+    diagnostics : ResamplingDiagnostics
+        The block length, and the replicates that failed, did not converge or
+        made values below zero.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    fit: CalibrationResult
+    sample: ParameterSample
+    diagnostics: ResamplingDiagnostics
+
+    def interval_error(self, confidence_level: float) -> dict[str, BoundError]:
+        """
+        The Monte Carlo error of the central interval of each parameter.
+
+        More replicates make it smaller; when it is wide against the interval,
+        run more.
+
+        Parameters
+        ----------
+        confidence_level : float
+            Strictly between 0 and 1.
+
+        Returns
+        -------
+        dict[str, BoundError]
+            The error of each bound, by parameter.
+
+        Raises
+        ------
+        ValueError
+            If the confidence level is not strictly between 0 and 1.
+        """
+        if not 0.0 < confidence_level < 1.0:
+            raise ValueError(
+                f"A confidence level is strictly between 0 and 1, got "
+                f"{confidence_level}."
+            )
+        low, high = (1.0 - confidence_level) / 2.0, (1.0 + confidence_level) / 2.0
+        errors: dict[str, BoundError] = {}
+        for index, name in enumerate(self.sample.names):
+            column = [row[index] for row in self.sample.values]
+            errors[name] = BoundError(
+                lower=commol_rs.inference.quantile_error(column, low),
+                upper=commol_rs.inference.quantile_error(column, high),
+            )
+        return errors
+```
+
+### Methods:
+
+#### interval_error
+
+```python
+interval_error(confidence_level: float) -> dict[str, BoundError]
+```
+
+The Monte Carlo error of the central interval of each parameter.
+
+More replicates make it smaller; when it is wide against the interval, run more.
+
+Parameters:
+
+| Name               | Type    | Description               | Default    |
+| ------------------ | ------- | ------------------------- | ---------- |
+| `confidence_level` | `float` | Strictly between 0 and 1. | *required* |
+
+Returns:
+
+| Type                    | Description                            |
+| ----------------------- | -------------------------------------- |
+| `dict[str, BoundError]` | The error of each bound, by parameter. |
+
+Raises:
+
+| Type         | Description                                              |
+| ------------ | -------------------------------------------------------- |
+| `ValueError` | If the confidence level is not strictly between 0 and 1. |
+
+Source code in `commol/context/inference/resampling.py`
+
+```python
+def interval_error(self, confidence_level: float) -> dict[str, BoundError]:
+    """
+    The Monte Carlo error of the central interval of each parameter.
+
+    More replicates make it smaller; when it is wide against the interval,
+    run more.
+
+    Parameters
+    ----------
+    confidence_level : float
+        Strictly between 0 and 1.
+
+    Returns
+    -------
+    dict[str, BoundError]
+        The error of each bound, by parameter.
+
+    Raises
+    ------
+    ValueError
+        If the confidence level is not strictly between 0 and 1.
+    """
+    if not 0.0 < confidence_level < 1.0:
+        raise ValueError(
+            f"A confidence level is strictly between 0 and 1, got "
+            f"{confidence_level}."
+        )
+    low, high = (1.0 - confidence_level) / 2.0, (1.0 + confidence_level) / 2.0
+    errors: dict[str, BoundError] = {}
+    for index, name in enumerate(self.sample.names):
+        column = [row[index] for row in self.sample.values]
+        errors[name] = BoundError(
+            lower=commol_rs.inference.quantile_error(column, low),
+            upper=commol_rs.inference.quantile_error(column, high),
+        )
+    return errors
+```
+
+## JackknifeResult
+
+Bases: `BaseModel`
+
+The result of a block jackknife.
+
+With `B` fits `θ̂₍₋ᵦ₎` that leave one block out, around the fit `θ̂`, and their mean `θ̄`: the bias is `(B − 1)(θ̄ − θ̂)`, the standard error `√((B − 1)/B · Σ (θ̂₍₋ᵦ₎ − θ̄)²)`, and the pseudo-value of block `b` is `B θ̂ − (B − 1) θ̂₍₋ᵦ₎`. The pseudo-values are not draws: their percentiles are not an interval.
+
+Attributes:
+
+| Name             | Type                        | Description                                                                                                                                           |
+| ---------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`            | `CalibrationResult`         | The fit with every observation.                                                                                                                       |
+| `estimate`       | `dict[str, float]`          | The bias-corrected estimate of each parameter.                                                                                                        |
+| `bias`           | `dict[str, float]`          | The jackknife bias of each parameter.                                                                                                                 |
+| `standard_error` | `dict[str, float]`          | The jackknife standard error of each parameter.                                                                                                       |
+| `blocks`         | `list[tuple[float, float]]` | The first and last position of each block that was left out and fitted, in order.                                                                     |
+| `pseudo_values`  | `dict[str, list[float]]`    | The pseudo-values of each parameter, one per block.                                                                                                   |
+| `influence`      | `dict[str, list[float]]`    | How far leaving each block out moves each parameter, in standard errors: (θ̂₍₋ᵦ₎ − θ̂) / se, one per block. NaN or infinite when a standard error is 0. |
+| `diagnostics`    | `ResamplingDiagnostics`     | The block length and the fits that failed or did not converge.                                                                                        |
+
+Source code in `commol/context/inference/resampling.py`
+
+```python
+class JackknifeResult(BaseModel):
+    """
+    The result of a block jackknife.
+
+    With ``B`` fits ``θ̂₍₋ᵦ₎`` that leave one block out, around the fit
+    ``θ̂``, and their mean ``θ̄``: the bias is ``(B − 1)(θ̄ − θ̂)``, the
+    standard error ``√((B − 1)/B · Σ (θ̂₍₋ᵦ₎ − θ̄)²)``, and the pseudo-value of
+    block ``b`` is ``B θ̂ − (B − 1) θ̂₍₋ᵦ₎``. The pseudo-values are not draws:
+    their percentiles are not an interval.
+
+    Attributes
+    ----------
+    fit : CalibrationResult
+        The fit with every observation.
+    estimate : dict[str, float]
+        The bias-corrected estimate of each parameter.
+    bias : dict[str, float]
+        The jackknife bias of each parameter.
+    standard_error : dict[str, float]
+        The jackknife standard error of each parameter.
+    blocks : list[tuple[float, float]]
+        The first and last position of each block that was left out and
+        fitted, in order.
+    pseudo_values : dict[str, list[float]]
+        The pseudo-values of each parameter, one per block.
+    influence : dict[str, list[float]]
+        How far leaving each block out moves each parameter, in standard
+        errors: ``(θ̂₍₋ᵦ₎ − θ̂) / se``, one per block. NaN or infinite when a
+        standard error is 0.
+    diagnostics : ResamplingDiagnostics
+        The block length and the fits that failed or did not converge.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+
+    fit: CalibrationResult
+    estimate: dict[str, float]
+    bias: dict[str, float]
+    standard_error: dict[str, float]
+    blocks: list[tuple[float, float]]
+    pseudo_values: dict[str, list[float]]
+    influence: dict[str, list[float]]
+    diagnostics: ResamplingDiagnostics
+```
+
+## ResamplingDiagnostics
+
+Bases: `BaseModel`
+
+What happened to the replicates of a resampling method.
+
+Attributes:
+
+| Name                     | Type               | Description                                                                                                                       |
+| ------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `block_length`           | `int`              | The block length the method ran with.                                                                                             |
+| `block_length_estimates` | \`dict[str, float] | None\`                                                                                                                            |
+| `failed`                 | `list[str]`        | Each replicate that failed, with its reason. A failed replicate is not in the sample.                                             |
+| `not_converged`          | `int`              | Replicates kept although their optimizer did not converge.                                                                        |
+| `negative_values`        | `int`              | Synthetic observed values below zero, over every replicate. They are kept; many of them point to residual_scale="multiplicative". |
+
+Source code in `commol/context/inference/resampling.py`
+
+```python
+class ResamplingDiagnostics(BaseModel):
+    """
+    What happened to the replicates of a resampling method.
+
+    Attributes
+    ----------
+    block_length : int
+        The block length the method ran with.
+    block_length_estimates : dict[str, float] | None
+        With ``block_length="auto"``, the estimate of each series, by label;
+        otherwise None.
+    failed : list[str]
+        Each replicate that failed, with its reason. A failed replicate is not
+        in the sample.
+    not_converged : int
+        Replicates kept although their optimizer did not converge.
+    negative_values : int
+        Synthetic observed values below zero, over every replicate. They are
+        kept; many of them point to ``residual_scale="multiplicative"``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    block_length: int = Field(description="The block length used.")
+    block_length_estimates: dict[str, float] | None = Field(
+        description="The estimate of each series with the automatic length."
+    )
+    failed: list[str] = Field(description="Each replicate that failed.")
+    not_converged: int = Field(description="Replicates that did not converge.")
+    negative_values: int = Field(description="Synthetic values below zero.")
+```
+
+## BoundError
+
+Bases: `BaseModel`
+
+The Monte Carlo error of the bounds of an interval: for each bound, an order-statistic interval that holds the bound of infinitely many replicates with about 95 % probability.
+
+Attributes:
+
+| Name    | Type                  | Description                            |
+| ------- | --------------------- | -------------------------------------- |
+| `lower` | `tuple[float, float]` | The error interval of the lower bound. |
+| `upper` | `tuple[float, float]` | The error interval of the upper bound. |
+
+Source code in `commol/context/inference/resampling.py`
+
+```python
+class BoundError(BaseModel):
+    """
+    The Monte Carlo error of the bounds of an interval: for each bound, an
+    order-statistic interval that holds the bound of infinitely many
+    replicates with about 95 % probability.
+
+    Attributes
+    ----------
+    lower : tuple[float, float]
+        The error interval of the lower bound.
+    upper : tuple[float, float]
+        The error interval of the upper bound.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    lower: tuple[float, float]
+    upper: tuple[float, float]
+```
+
+## Scores and intervals
+
 ## scores
 
 Scores of a predictive against observations.
 
-Every score is computed in Rust from each draw's value of the observations (`Predictive.at_observations`), per observation and per series. Which observations to score, for example the ones held out of the calibration, is an argument with no default.
+Every score is computed in Rust from each draw's value of the observations (`Predictive.at_observations`), per observation and per series. Which observations to score, for example the ones held out of the calibration, and the observation noise are arguments with no default: a band of the model (`NoNoise`) compared with data covers less than its level.
 
 ### Classes
 
@@ -1883,18 +2503,19 @@ class Score(BaseModel):
 #### coverage
 
 ```python
-coverage(predictive: Predictive, observations: Sequence[ObservedDataPoint], confidence_level: float) -> Score
+coverage(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise, confidence_level: float) -> Score
 ```
 
 The empirical coverage of the central interval of `confidence_level`.
 
 Parameters:
 
-| Name               | Type                          | Description                | Default    |
-| ------------------ | ----------------------------- | -------------------------- | ---------- |
-| `predictive`       | `Predictive`                  | The predictive.            | *required* |
-| `observations`     | `Sequence[ObservedDataPoint]` | The observations to score. | *required* |
-| `confidence_level` | `float`                       | Strictly between 0 and 1.  | *required* |
+| Name               | Type                          | Description                | Default                                                          |
+| ------------------ | ----------------------------- | -------------------------- | ---------------------------------------------------------------- |
+| `predictive`       | `Predictive`                  | The predictive.            | *required*                                                       |
+| `observations`     | `Sequence[ObservedDataPoint]` | The observations to score. | *required*                                                       |
+| `noise`            | \`NoNoise                     | ResidualNoise\`            | The observation noise of the draws (Predictive.at_observations). |
+| `confidence_level` | `float`                       | Strictly between 0 and 1.  | *required*                                                       |
 
 Returns:
 
@@ -1908,6 +2529,7 @@ Source code in `commol/api/inference/scores.py`
 def coverage(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
+    noise: ObservationNoise,
     confidence_level: float,
 ) -> Score:
     """
@@ -1919,6 +2541,8 @@ def coverage(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
+    noise : NoNoise | ResidualNoise
+        The observation noise of the draws (`Predictive.at_observations`).
     confidence_level : float
         Strictly between 0 and 1.
 
@@ -1928,25 +2552,26 @@ def coverage(
         1 for each observation inside its interval, 0 outside; the means are
         the coverage. A calibrated interval covers about `confidence_level`.
     """
-    draws = predictive.at_observations(observations)
+    draws = predictive.at_observations(observations, noise)
     return _score(draws, draws.rust_draws.coverage(draws.observed, confidence_level))
 ```
 
 #### interval_score
 
 ```python
-interval_score(predictive: Predictive, observations: Sequence[ObservedDataPoint], confidence_level: float) -> Score
+interval_score(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise, confidence_level: float) -> Score
 ```
 
 The interval score: `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`.
 
 Parameters:
 
-| Name               | Type                          | Description                                     | Default    |
-| ------------------ | ----------------------------- | ----------------------------------------------- | ---------- |
-| `predictive`       | `Predictive`                  | The predictive.                                 | *required* |
-| `observations`     | `Sequence[ObservedDataPoint]` | The observations to score.                      | *required* |
-| `confidence_level` | `float`                       | The level c of the central interval; α = 1 − c. | *required* |
+| Name               | Type                          | Description                                     | Default                                                          |
+| ------------------ | ----------------------------- | ----------------------------------------------- | ---------------------------------------------------------------- |
+| `predictive`       | `Predictive`                  | The predictive.                                 | *required*                                                       |
+| `observations`     | `Sequence[ObservedDataPoint]` | The observations to score.                      | *required*                                                       |
+| `noise`            | \`NoNoise                     | ResidualNoise\`                                 | The observation noise of the draws (Predictive.at_observations). |
+| `confidence_level` | `float`                       | The level c of the central interval; α = 1 − c. | *required*                                                       |
 
 Returns:
 
@@ -1960,6 +2585,7 @@ Source code in `commol/api/inference/scores.py`
 def interval_score(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
+    noise: ObservationNoise,
     confidence_level: float,
 ) -> Score:
     """
@@ -1971,6 +2597,8 @@ def interval_score(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
+    noise : NoNoise | ResidualNoise
+        The observation noise of the draws (`Predictive.at_observations`).
     confidence_level : float
         The level ``c`` of the central interval; ``α = 1 − c``.
 
@@ -1979,7 +2607,7 @@ def interval_score(
     Score
         Lower is better.
     """
-    draws = predictive.at_observations(observations)
+    draws = predictive.at_observations(observations, noise)
     return _score(
         draws, draws.rust_draws.interval_score(draws.observed, confidence_level)
     )
@@ -1988,7 +2616,7 @@ def interval_score(
 #### weighted_interval_score
 
 ```python
-weighted_interval_score(predictive: Predictive, observations: Sequence[ObservedDataPoint], confidence_levels: Sequence[float]) -> Score
+weighted_interval_score(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise, confidence_levels: Sequence[float]) -> Score
 ```
 
 The weighted interval score of Bracher et al. (2021).
@@ -1997,11 +2625,12 @@ The weighted interval score of Bracher et al. (2021).
 
 Parameters:
 
-| Name                | Type                          | Description                          | Default    |
-| ------------------- | ----------------------------- | ------------------------------------ | ---------- |
-| `predictive`        | `Predictive`                  | The predictive.                      | *required* |
-| `observations`      | `Sequence[ObservedDataPoint]` | The observations to score.           | *required* |
-| `confidence_levels` | `Sequence[float]`             | The levels of the central intervals. | *required* |
+| Name                | Type                          | Description                          | Default                                                          |
+| ------------------- | ----------------------------- | ------------------------------------ | ---------------------------------------------------------------- |
+| `predictive`        | `Predictive`                  | The predictive.                      | *required*                                                       |
+| `observations`      | `Sequence[ObservedDataPoint]` | The observations to score.           | *required*                                                       |
+| `noise`             | \`NoNoise                     | ResidualNoise\`                      | The observation noise of the draws (Predictive.at_observations). |
+| `confidence_levels` | `Sequence[float]`             | The levels of the central intervals. | *required*                                                       |
 
 Returns:
 
@@ -2019,6 +2648,7 @@ Source code in `commol/api/inference/scores.py`
 def weighted_interval_score(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
+    noise: ObservationNoise,
     confidence_levels: Sequence[float],
 ) -> Score:
     """
@@ -2033,6 +2663,8 @@ def weighted_interval_score(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
+    noise : NoNoise | ResidualNoise
+        The observation noise of the draws (`Predictive.at_observations`).
     confidence_levels : Sequence[float]
         The levels of the central intervals.
 
@@ -2047,7 +2679,7 @@ def weighted_interval_score(
     epidemic forecasts in an interval format. PLOS Computational Biology,
     17(2), e1008618. https://doi.org/10.1371/journal.pcbi.1008618
     """
-    draws = predictive.at_observations(observations)
+    draws = predictive.at_observations(observations, noise)
     return _score(
         draws,
         draws.rust_draws.weighted_interval_score(
@@ -2059,7 +2691,7 @@ def weighted_interval_score(
 #### crps
 
 ```python
-crps(predictive: Predictive, observations: Sequence[ObservedDataPoint]) -> Score
+crps(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise) -> Score
 ```
 
 The continuous ranked probability score of the weighted draws.
@@ -2068,10 +2700,11 @@ The continuous ranked probability score of the weighted draws.
 
 Parameters:
 
-| Name           | Type                          | Description                | Default    |
-| -------------- | ----------------------------- | -------------------------- | ---------- |
-| `predictive`   | `Predictive`                  | The predictive.            | *required* |
-| `observations` | `Sequence[ObservedDataPoint]` | The observations to score. | *required* |
+| Name           | Type                          | Description                | Default                                                          |
+| -------------- | ----------------------------- | -------------------------- | ---------------------------------------------------------------- |
+| `predictive`   | `Predictive`                  | The predictive.            | *required*                                                       |
+| `observations` | `Sequence[ObservedDataPoint]` | The observations to score. | *required*                                                       |
+| `noise`        | \`NoNoise                     | ResidualNoise\`            | The observation noise of the draws (Predictive.at_observations). |
 
 Returns:
 
@@ -2085,6 +2718,7 @@ Source code in `commol/api/inference/scores.py`
 def crps(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
+    noise: ObservationNoise,
 ) -> Score:
     """
     The continuous ranked probability score of the weighted draws.
@@ -2098,20 +2732,22 @@ def crps(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
+    noise : NoNoise | ResidualNoise
+        The observation noise of the draws (`Predictive.at_observations`).
 
     Returns
     -------
     Score
         Lower is better; in the unit of the observations.
     """
-    draws = predictive.at_observations(observations)
+    draws = predictive.at_observations(observations, noise)
     return _score(draws, draws.rust_draws.crps(draws.observed))
 ```
 
 #### pit
 
 ```python
-pit(predictive: Predictive, observations: Sequence[ObservedDataPoint], seed: int) -> Score
+pit(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise, seed: int) -> Score
 ```
 
 The probability integral transform of each observation.
@@ -2120,11 +2756,12 @@ The probability integral transform of each observation.
 
 Parameters:
 
-| Name           | Type                          | Description                        | Default    |
-| -------------- | ----------------------------- | ---------------------------------- | ---------- |
-| `predictive`   | `Predictive`                  | The predictive.                    | *required* |
-| `observations` | `Sequence[ObservedDataPoint]` | The observations to score.         | *required* |
-| `seed`         | `int`                         | Seed of the randomization of ties. | *required* |
+| Name           | Type                          | Description                        | Default                                                          |
+| -------------- | ----------------------------- | ---------------------------------- | ---------------------------------------------------------------- |
+| `predictive`   | `Predictive`                  | The predictive.                    | *required*                                                       |
+| `observations` | `Sequence[ObservedDataPoint]` | The observations to score.         | *required*                                                       |
+| `noise`        | \`NoNoise                     | ResidualNoise\`                    | The observation noise of the draws (Predictive.at_observations). |
+| `seed`         | `int`                         | Seed of the randomization of ties. | *required*                                                       |
 
 Returns:
 
@@ -2138,6 +2775,7 @@ Source code in `commol/api/inference/scores.py`
 def pit(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
+    noise: ObservationNoise,
     seed: int,
 ) -> Score:
     """
@@ -2153,6 +2791,8 @@ def pit(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
+    noise : NoNoise | ResidualNoise
+        The observation noise of the draws (`Predictive.at_observations`).
     seed : int
         Seed of the randomization of ties.
 
@@ -2161,7 +2801,7 @@ def pit(
     Score
         Values in ``[0, 1]``; calibrated predictions give uniform values.
     """
-    draws = predictive.at_observations(observations)
+    draws = predictive.at_observations(observations, noise)
     return _score(draws, draws.rust_draws.pit(draws.observed, seed))
 ```
 

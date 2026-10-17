@@ -1258,6 +1258,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/resampling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2615,7 +2643,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/calibration_problem.rs</code></td>
-<td><code>CalibrationProblem</code>: the layers below, built once (<code>new</code>, <code>with_replicates</code>, <code>with_observation_normalization</code>, <code>with_initial_condition_remainder</code>), the one evaluation of a point (<code>evaluate</code>), and the position check that names an observation or constraint (<code>check_positions</code>). It uses only <code>SimulationEngine</code>.</td>
+<td><code>CalibrationProblem</code>: the layers below, built once (<code>new</code>, <code>with_replicates</code>, <code>with_observation_normalization</code>, <code>with_initial_condition_remainder</code>), a copy with other observed values and weights (<code>with_data</code>), the one evaluation of a point (<code>evaluate</code>), and the position check that names an observation or constraint (<code>check_positions</code>). It uses only <code>SimulationEngine</code>.</td>
 <td>Penalties; optimizer setup; anything of one model kind.</td>
 </tr>
 <tr>
@@ -2675,8 +2703,13 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/predictive.rs</code></td>
-<td><code>Predictive</code> (the run of every draw, its bands), <code>observation_draws</code> through the observation operator, the <code>ObservationNoise</code> port and <code>NoNoise</code>.</td>
+<td><code>Predictive</code> (the run of every draw, its bands), <code>observation_draws</code> through the observation operator, the <code>ObservationNoise</code> port (one draw's whole vector) and <code>NoNoise</code>.</td>
 <td>Noise models of one method.</td>
+</tr>
+<tr>
+<td><code>crates/commol-inference/src/resampling/</code></td>
+<td>Fits to reweighted or resampled data: <code>blocks.rs</code> (<code>BlockScheme</code>, the automatic block length), <code>residuals.rs</code> (<code>Residuals</code> on a scale, residuals by series and position), <code>resamplers.rs</code> (the <code>Resampler</code> port, <code>Perturbation</code>, the Bayesian, residual and wild bootstraps), <code>runner.rs</code> (<code>ReplicateRunner</code>, <code>bootstrap</code>), <code>jackknife.rs</code> (<code>block_jackknife</code>), <code>noise.rs</code> (<code>ResidualNoise</code>).</td>
+<td>Changes to the problem other than through <code>with_data</code>.</td>
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/scores.rs</code></td>
@@ -2736,13 +2769,13 @@
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
-<td><code>py-commol/src/inference.rs</code></td>
-<td><code>commol_rs.inference</code>: <code>CalibrationProblem</code> (built once from a <code>Calibrator</code>: starts, history, predictions, the predictive), <code>ParameterSample</code>, <code>Predictive</code>, <code>ObservationDraws</code>, <code>weighted_quantiles</code>, <code>weighted_mean</code>, <code>by_series</code>; the runners of methods.</td>
+<td><code>py-commol/src/identifiability.rs</code></td>
+<td><code>commol_rs.inference</code>: <code>structural_rank</code>, <code>collinearity</code>, <code>sample_identifiability</code>, <code>starts_identifiability</code> and their result classes.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
-<td><code>py-commol/src/identifiability.rs</code></td>
-<td><code>commol_rs.inference</code>: <code>structural_rank</code>, <code>collinearity</code>, <code>sample_identifiability</code>, <code>starts_identifiability</code> and their result classes.</td>
+<td><code>py-commol/src/inference.rs</code></td>
+<td><code>commol_rs.inference</code>: <code>CalibrationProblem</code> (built once from a <code>Calibrator</code>: starts, history, predictions, the predictive), <code>ParameterSample</code>, <code>Predictive</code>, <code>ObservationDraws</code>, <code>BootstrapRun</code>, <code>JackknifeRun</code>, <code>weighted_quantiles</code>, <code>weighted_mean</code>, <code>by_series</code>, <code>quantile_error</code>; the runners of methods (<code>bootstrap</code>, <code>jackknife</code>).</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
@@ -2789,7 +2822,7 @@
 </tr>
 <tr>
 <td><code>api/inference/</code></td>
-<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), the scores (<code>scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), and the runners of the identifiability methods (<code>identifiability.py</code>), which build the report.</td>
+<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), the scores (<code>scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), the runners of the identifiability methods (<code>identifiability.py</code>), which build the report, and the runners of the resampling methods (<code>resampling.py</code>).</td>
 <td>Transforms of predictions; quantile formulas.</td>
 </tr>
 <tr>
@@ -2809,7 +2842,7 @@
 </tr>
 <tr>
 <td><code>context/inference/</code></td>
-<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code> and <code>IdentifiabilityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, and the identifiability methods and <code>IdentifiabilityReport</code> (<code>identifiability.py</code>).</td>
+<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code> and <code>IdentifiabilityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>), and the settings and results of the resampling methods (<code>resampling.py</code>).</td>
 <td>Runners.</td>
 </tr>
 <tr>

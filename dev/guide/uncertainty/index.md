@@ -14,17 +14,22 @@ A calibration gives one set of parameters. This section shows how far you can tr
 
 ## A band of the model, or a prediction interval
 
-A **band of the model** is the spread of the model's output across the draws of the parameters. It says where the model curve lies, not where the next observation will fall: an observation also carries measurement noise. A **prediction interval** adds that noise to every draw before it reduces them (the `ObservationNoise` port of `commol-inference`). A method that has no noise model gives a band of the model, and this page says so wherever it shows one. Comparing a band of the model with data underestimates the spread, so its coverage of the data is below its level.
+A **band of the model** is the spread of the model's output across the draws of the parameters. It says where the model curve lies, not where the next observation will fall: an observation also carries measurement noise. A **prediction interval** adds that noise to every draw before it reduces them (the `ObservationNoise` port of `commol-inference`). Every reader of observations takes the noise as an argument with no default: `NoNoise()` gives a band of the model, and `ResidualNoise(...)` adds residuals of a fit, which gives a prediction interval with no noise model ([Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)). Comparing a band of the model with data underestimates the spread, so its coverage of the data is below its level.
 
 ## Which method answers which question
 
-| Method                                     | Question                                                                       | Needs a noise model | Page                                                                                                        |
-| ------------------------------------------ | ------------------------------------------------------------------------------ | ------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Several starts, `Calibrator.run(starts=n)` | Which parameters fit the data: distinct ends with equal losses                 | No                  | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)            |
-| `StructuralRank`                           | Which parameters any data of this design can determine, and which combinations | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#structural-rank) |
-| `Collinearity`                             | Which parameters can be fitted together                                        | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#collinearity)    |
-| `SampleIdentifiability`                    | Which parameters a sample determines: contraction, correlations, modes         | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)        |
-| `StartsIdentifiability`                    | Which parameters differ between starts of equal loss                           | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)          |
+| Method                                     | Question                                                                             | Needs a noise model | Page                                                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Several starts, `Calibrator.run(starts=n)` | Which parameters fit the data: distinct ends with equal losses                       | No                  | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)            |
+| `StructuralRank`                           | Which parameters any data of this design can determine, and which combinations       | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#structural-rank) |
+| `Collinearity`                             | Which parameters can be fitted together                                              | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#collinearity)    |
+| `SampleIdentifiability`                    | Which parameters a sample determines: contraction, correlations, modes               | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)        |
+| `StartsIdentifiability`                    | Which parameters differ between starts of equal loss                                 | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)          |
+| `BayesianBootstrap`                        | How far the parameters move when the data are reweighted by blocks                   | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#bayesian-bootstrap)        |
+| `ResidualBootstrap`                        | How far the parameters move when the residuals of the fit are resampled by blocks    | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#residual-block-bootstrap)  |
+| `WildBootstrap`                            | The same, when the size of the noise changes along the series                        | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#wild-block-bootstrap)      |
+| `BlockJackknife`                           | The standard error and bias of each parameter, and which block of data moves it most | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#block-jackknife)           |
+| `ResidualNoise`                            | Where the next observations fall: a prediction interval                              | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)      |
 
 Each uncertainty method adds its row here when it lands.
 
@@ -38,6 +43,7 @@ from commol import (
     Calibrator,
     ModelBuilder,
     NelderMeadConfig,
+    NoNoise,
     ObservedDataPoint,
     ParameterSample,
     Predictive,
@@ -99,9 +105,9 @@ predictive = Predictive(calibrator, sample, positions=list(range(61)))
 band = predictive.band(confidence_level=0.9)
 print(band.lower["B"][50] <= truth["B"][50] <= band.upper["B"][50])  # True
 
-# Scores on the held-out observations.
-print(scores.coverage(predictive, held_out, confidence_level=0.9).mean)
-print(scores.crps(predictive, held_out).per_series)
+# Scores of the band of the model on the held-out observations.
+print(scores.coverage(predictive, held_out, NoNoise(), confidence_level=0.9).mean)
+print(scores.crps(predictive, held_out, NoNoise()).per_series)
 ```
 
 ## The parameter sample
@@ -150,26 +156,26 @@ print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75
 
 `Predictive(calibrator, sample, positions)` runs every draw at `positions`, in parallel in Rust. With a stochastic engine every replicate of a draw is a draw of the predictive, with an equal share of its weight.
 
-| Member                                                     | Returns                                                                                                                                     |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `band(confidence_level)`                                   | The weighted mean, median and central interval of every output at every position (`PredictiveBand`)                                         |
-| `series_band(outputs, confidence_level, cumulative=False)` | The band of the sum of some outputs, or of its running total; each draw is reduced first                                                    |
-| `at_observations(observed_data)`                           | Every draw's value of each observation, read through the observation operator the loss uses: sums, windows and factors (`ObservationDraws`) |
-| `runs()`, `weights`                                        | The trajectory and weight of every draw                                                                                                     |
+| Member                                                     | Returns                                                                                                                                                                                                                          |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `band(confidence_level)`                                   | The weighted mean, median and central interval of every output at every position (`PredictiveBand`)                                                                                                                              |
+| `series_band(outputs, confidence_level, cumulative=False)` | The band of the sum of some outputs, or of its running total; each draw is reduced first                                                                                                                                         |
+| `at_observations(observed_data, noise)`                    | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with `noise` drawn from the calibrator's seed: `NoNoise()` or `ResidualNoise(...)` (`ObservationDraws`) |
+| `runs()`, `weights`                                        | The trajectory and weight of every draw                                                                                                                                                                                          |
 
 `SimulationPlotter.plot_series` and `plot_cumulative` draw the band of a predictive when it is the `calibration_result`, and `simulation_report` reduces its draws with their weights when it is the `ensemble_runs`. `applied_parameters_report` takes the sample itself (`sample=`, with a `confidence_level`).
 
 ## Scores
 
-The functions of `commol.scores` compare a predictive with observations, and return a `Score`: the value of each observation, the mean of each series and the overall mean. Which observations to score is an argument with no default: score data the method did not see, such as the held-out positions above.
+The functions of `commol.scores` compare a predictive with observations, and return a `Score`: the value of each observation, the mean of each series and the overall mean. Which observations to score and the observation noise are arguments with no default: score data the method did not see, such as the held-out positions above, and say whether you score a band of the model (`NoNoise()`) or a prediction interval (`ResidualNoise(...)`).
 
-| Function                                                               | Score                                                                        | Better             |
-| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------ |
-| `coverage(predictive, observations, confidence_level)`                 | 1 inside the central interval, 0 outside; the mean is the empirical coverage | Close to the level |
-| `interval_score(predictive, observations, confidence_level)`           | `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`, `α = 1 − c`                       | Lower              |
-| `weighted_interval_score(predictive, observations, confidence_levels)` | The weighted interval score of Bracher et al. (2021)                         | Lower              |
-| `crps(predictive, observations)`                                       | \`Σ wᵢ                                                                       | xᵢ − y             |
-| `pit(predictive, observations, seed)`                                  | `F(y)`, randomized where draws tie with `y`                                  | Uniform            |
+| Function                                                                      | Score                                                                        | Better             |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------ |
+| `coverage(predictive, observations, noise, confidence_level)`                 | 1 inside the central interval, 0 outside; the mean is the empirical coverage | Close to the level |
+| `interval_score(predictive, observations, noise, confidence_level)`           | `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`, `α = 1 − c`                       | Lower              |
+| `weighted_interval_score(predictive, observations, noise, confidence_levels)` | The weighted interval score of Bracher et al. (2021)                         | Lower              |
+| `crps(predictive, observations, noise)`                                       | \`Σ wᵢ                                                                       | xᵢ − y             |
+| `pit(predictive, observations, noise, seed)`                                  | `F(y)`, randomized where draws tie with `y`                                  | Uniform            |
 
 ## The entry point
 
@@ -178,7 +184,10 @@ Every method runs through `Calibrator.uncertainty(method)`. A method is a config
 The identifiability methods run through their own entry point, `Calibrator.identifiability(method)`, with a subclass of `IdentifiabilityMethod[R]`: they answer another question ([Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md)). Both kinds subclass `InferenceMethod[R]` and share one registry; each entry point refuses the other kind with a `TypeError` that names the right one.
 
 ```python
-result = calibrator.uncertainty(SomeMethod(...))
+from commol import BayesianBootstrap
+
+result = calibrator.uncertainty(BayesianBootstrap(replicates=20, block_length=1))
+print(type(result).__name__, len(result.sample))  # BootstrapResult 20
 ```
 
 ## Checklist
@@ -189,9 +198,10 @@ result = calibrator.uncertainty(SomeMethod(...))
 
 ## Next steps
 
-| To learn                            | Read                                                                                                |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Several starts of an optimizer      | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)    |
-| Which parameters the data determine | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) |
-| Reports of a sample                 | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                             |
-| Plots of a predictive               | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/#plotting)            |
+| To learn                                                               | Read                                                                                                |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Bootstraps, the jackknife and prediction intervals with no noise model | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md)           |
+| Several starts of an optimizer                                         | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)    |
+| Which parameters the data determine                                    | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) |
+| Reports of a sample                                                    | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                             |
+| Plots of a predictive                                                  | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/#plotting)            |

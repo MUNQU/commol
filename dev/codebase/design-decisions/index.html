@@ -1258,6 +1258,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/resampling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2515,6 +2543,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#a-replicate-changes-only-the-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A replicate changes only the data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#observation-noise-is-an-argument" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observation noise is an argument
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3485,6 +3535,28 @@
     <span class="md-ellipsis">
       
         Two verdicts per parameter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-replicate-changes-only-the-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A replicate changes only the data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#observation-noise-is-an-argument" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observation noise is an argument
       
     </span>
   </a>
@@ -4740,6 +4812,82 @@ modelling judgments.</p>
 </tbody>
 </table>
 <p><strong>Guards:</strong> <code>tests/uncertainty/test_identifiability.py</code> (<code>TestReport</code>).</p>
+<h3 id="a-replicate-changes-only-the-data">A replicate changes only the data<a class="headerlink" href="#a-replicate-changes-only-the-data" title="Permanent link">&para;</a></h3>
+<p>A resampling method makes each replicate with
+<code>CalibrationProblem::with_data(values, weights)</code>
+(<code>crates/commol-calibration/src/calibration_problem.rs</code>): a copy of the problem
+whose discrepancy is built as <code>new</code> builds it, so with normalization on its
+factors come from the replicate's own values, as the fit's do. The engine, the
+observation operator and the feasibility stay. A replicate starts from the fit
+and, with more starts, from a Latin hypercube, and keeps its best end
+(<code>ReplicateRunner</code>, <code>resampling/runner.rs</code>). Blocks hold every series in a
+window of positions (<code>BlockScheme</code>), and <code>block_length</code> has no default.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CalibrationProblem::new</code> per replicate</td>
+<td>The problem does not keep its constraints, replicates or normalization, so a second copy of the arguments would live elsewhere.</td>
+</tr>
+<tr>
+<td>The replicate's data in the <code>Workspace</code></td>
+<td>A per-thread buffer would become a second source of data.</td>
+</tr>
+<tr>
+<td>Keep the fit's normalization factors</td>
+<td>The replicates would apply another estimator than the fit.</td>
+</tr>
+<tr>
+<td>Blocks per series</td>
+<td>They break the dependence of series observed at the same time, so intervals of combined quantities come out too narrow.</td>
+</tr>
+<tr>
+<td>Random starts only</td>
+<td>Each replicate may land in another basin, which adds optimizer noise to the data's uncertainty.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_with_data.rs</code>,
+<code>crates/commol-inference/tests/test_resampling.rs</code>,
+<code>tests/uncertainty/test_resampling.py</code>.</p>
+<h3 id="observation-noise-is-an-argument">Observation noise is an argument<a class="headerlink" href="#observation-noise-is-an-argument" title="Permanent link">&para;</a></h3>
+<p>Every reader of observations of a sample (<code>Predictive.at_observations</code>, every
+function of <code>commol.scores</code>) takes the noise with no default: <code>NoNoise()</code> gives
+a band of the model, <code>ResidualNoise(...)</code> a prediction interval. The Rust port
+<code>ObservationNoise</code> (<code>crates/commol-inference/src/predictive.rs</code>) sees one
+draw's whole vector of observations with the draw's parameter values, so a
+noise can draw blocks of residuals across observations, and a noise model can
+read calibrated noise parameters. <code>ResidualNoise</code> serves only series the fit
+has residuals of.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NoNoise</code> by default</td>
+<td>A band of the model would be scored against data with no notice, and cover less than its level.</td>
+</tr>
+<tr>
+<td>A port per observation</td>
+<td>It cannot draw one block for several observations, and sees no position or series.</td>
+</tr>
+<tr>
+<td>Residual noise on the band at positions</td>
+<td>A series may sum outputs with a factor: a residual has no correct split among outputs, and none for an output nobody observed.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_resampling.rs::residual_noise_rejects_a_series_with_no_residuals</code>,
+<code>tests/uncertainty/test_resampling.py::TestResidualNoise</code>.</p>
 <h2 id="results">Results<a class="headerlink" href="#results" title="Permanent link">&para;</a></h2>
 <h3 id="one-confidence-interval-convention">One confidence-interval convention<a class="headerlink" href="#one-confidence-interval-convention" title="Permanent link">&para;</a></h3>
 <p>Every interval is a weighted quantile: the inverse of the weighted empirical

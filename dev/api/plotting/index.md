@@ -773,7 +773,7 @@ class SimulationPlotter:
             )
             for at in ends
         ]
-        return predictive.at_observations(points).band(self.confidence_level)
+        return predictive.at_observations(points, NoNoise()).band(self.confidence_level)
 
     def _plot_bin_series_predictive(
         self,
