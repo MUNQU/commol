@@ -122,6 +122,7 @@ markdown_extensions:
   - attr_list # HTML attributes (for styling)
   - md_in_html # Markdown in HTML blocks
   - pymdownx.snippets: # AGENTS.md owns the task table and the commands
+      base_path: !relative $config_dir # the root, from any working directory
       check_paths: true # a missing snippet fails the build
 
 nav:
