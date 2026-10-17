@@ -55,7 +55,7 @@ Run the checks before you open a pull request:
 
 ```bash
 # Python, from py-commol/ with the virtual environment active
-ruff check . && ruff format --check . && ty check commol
+ruff check . ../.github/scripts && ruff format --check . ../.github/scripts && ty check commol
 vulture commol .vulture_allowlist.py --min-confidence 80 && pytest
 
 # Rust, from the repository root
