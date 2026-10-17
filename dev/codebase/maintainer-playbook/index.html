@@ -2685,6 +2685,10 @@
 <li>Run both test suites (see <a href="https://github.com/MUNQU/commol/blob/main/AGENTS.md#commands"><code>AGENTS.md</code></a>).</li>
 <li>Update the documentation as the mandatory
    <a href="../conventions/#documentation-definition-of-done">definition of done</a> requires.</li>
+<li>Run <code>python .github/scripts/affected.py --closes &lt;number&gt;</code> and update each
+   open issue it lists whose current state, paths or assumptions the change
+   alters: its body, and a comment that says what changed
+   (<a href="../../development/workflow/#lifecycle-of-a-proposal">Planning</a>, step 4).</li>
 </ol>
 <h2 id="guardrails">Guardrails<a class="headerlink" href="#guardrails" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2887,6 +2891,7 @@ changing it (<a href="../design-decisions/#methods-plug-into-one-entry-point">De
 <li>[ ] Every new claim in the docs names a file, function or test.</li>
 <li>[ ] The diagrams of <a href="../architecture/">Architecture</a> still describe the code.</li>
 <li>[ ] The tests that guard the touched <a href="../design-decisions/">design decisions</a> still pass.</li>
+<li>[ ] Each open issue that <code>.github/scripts/affected.py</code> lists is updated, or does not depend on what changed.</li>
 </ul>
 <h2 id="navigation">Navigation<a class="headerlink" href="#navigation" title="Permanent link">&para;</a></h2>
 <p>Previous: <a href="../conventions/">Conventions</a> | Back to: <a href="../">Codebase Guide</a></p>
