@@ -4,9 +4,33 @@
 
 What every uncertainty method takes and returns: the configuration base, the weighted parameter sample, the predictive, the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
 
-## UncertaintyMethod
+## InferenceMethod
 
 Bases: `BaseModel`, `Generic[ResultT]`
+
+The configuration of a method that reads a calibration problem, whose result is `ResultT`.
+
+A method subclasses one of its kinds, `UncertaintyMethod` or `IdentifiabilityMethod`, with its result type, and registers its runner (`commol.api.inference.registry.register`).
+
+Source code in `commol/context/inference/method.py`
+
+```python
+class InferenceMethod(BaseModel, Generic[ResultT]):
+    """
+    The configuration of a method that reads a calibration problem, whose
+    result is `ResultT`.
+
+    A method subclasses one of its kinds, `UncertaintyMethod` or
+    `IdentifiabilityMethod`, with its result type, and registers its runner
+    (`commol.api.inference.registry.register`).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+```
+
+## UncertaintyMethod
+
+Bases: `InferenceMethod[ResultT]`, `Generic[ResultT]`
 
 The configuration of an uncertainty method, whose result is `ResultT`.
 
@@ -15,7 +39,7 @@ A method subclasses it with its result type, for example `class BayesianBootstra
 Source code in `commol/context/inference/method.py`
 
 ```python
-class UncertaintyMethod(BaseModel, Generic[ResultT]):
+class UncertaintyMethod(InferenceMethod[ResultT], Generic[ResultT]):
     """
     The configuration of an uncertainty method, whose result is `ResultT`.
 
@@ -25,8 +49,6 @@ class UncertaintyMethod(BaseModel, Generic[ResultT]):
     ``Calibrator.uncertainty(method)`` returns that result type, so a static
     type checker infers it from the configuration's type.
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 ```
 
 ## ParameterSample
@@ -2400,9 +2422,9 @@ def ci_percentiles(confidence_level: float) -> tuple[float, float]:
 
 ## registry
 
-The runners of uncertainty methods, looked up by configuration type.
+The runners of inference methods, looked up by configuration type.
 
-A method registers its runner with `register`; `Calibrator.uncertainty` finds it with `run_method`. The entry point knows no method.
+A method registers its runner with `register`; `Calibrator.uncertainty` and `Calibrator.identifiability` find it with `run_method`. The entry points know no method.
 
 ### Classes
 
@@ -2414,14 +2436,14 @@ A method registers its runner with `register`; `Calibrator.uncertainty` finds it
 register(method_type: type[MethodT], runner: Callable[[Calibrator, MethodT], BaseModel]) -> None
 ```
 
-Register the runner of an uncertainty method.
+Register the runner of an inference method.
 
 Parameters:
 
-| Name          | Type                                                   | Description                                             | Default    |
-| ------------- | ------------------------------------------------------ | ------------------------------------------------------- | ---------- |
-| `method_type` | `type[UncertaintyMethod]`                              | The configuration type of the method.                   | *required* |
-| `runner`      | `Callable[[Calibrator, UncertaintyMethod], BaseModel]` | Runs the method on a calibrator and returns its result. | *required* |
+| Name          | Type                                                 | Description                                             | Default    |
+| ------------- | ---------------------------------------------------- | ------------------------------------------------------- | ---------- |
+| `method_type` | `type[InferenceMethod]`                              | The configuration type of the method.                   | *required* |
+| `runner`      | `Callable[[Calibrator, InferenceMethod], BaseModel]` | Runs the method on a calibrator and returns its result. | *required* |
 
 Raises:
 
@@ -2437,13 +2459,13 @@ def register(
     runner: Callable[["Calibrator", MethodT], BaseModel],
 ) -> None:
     """
-    Register the runner of an uncertainty method.
+    Register the runner of an inference method.
 
     Parameters
     ----------
-    method_type : type[UncertaintyMethod]
+    method_type : type[InferenceMethod]
         The configuration type of the method.
-    runner : Callable[[Calibrator, UncertaintyMethod], BaseModel]
+    runner : Callable[[Calibrator, InferenceMethod], BaseModel]
         Runs the method on a calibrator and returns its result.
 
     Raises
@@ -2488,17 +2510,18 @@ def registered() -> list[str]:
 #### run_method
 
 ```python
-run_method(calibrator: Calibrator, method: UncertaintyMethod[ResultT]) -> ResultT
+run_method(calibrator: Calibrator, method: InferenceMethod[ResultT], kind: type[InferenceMethod[BaseModel]]) -> ResultT
 ```
 
 Run `method` on `calibrator` with the runner of its type.
 
 Parameters:
 
-| Name         | Type                         | Description                      | Default    |
-| ------------ | ---------------------------- | -------------------------------- | ---------- |
-| `calibrator` | `Calibrator`                 | The calibration problem.         | *required* |
-| `method`     | `UncertaintyMethod[ResultT]` | The configuration of the method. | *required* |
+| Name         | Type                       | Description                                                                           | Default    |
+| ------------ | -------------------------- | ------------------------------------------------------------------------------------- | ---------- |
+| `calibrator` | `Calibrator`               | The calibration problem.                                                              | *required* |
+| `method`     | `InferenceMethod[ResultT]` | The configuration of the method.                                                      | *required* |
+| `kind`       | `type[InferenceMethod]`    | The kind of method the entry point takes: UncertaintyMethod or IdentifiabilityMethod. | *required* |
 
 Returns:
 
@@ -2508,14 +2531,19 @@ Returns:
 
 Raises:
 
-| Type         | Description                                              |
-| ------------ | -------------------------------------------------------- |
-| `ValueError` | If no runner is registered for the configuration's type. |
+| Type         | Description                                                  |
+| ------------ | ------------------------------------------------------------ |
+| `TypeError`  | If method is not of kind; the message names its entry point. |
+| `ValueError` | If no runner is registered for the configuration's type.     |
 
 Source code in `commol/api/inference/registry.py`
 
 ```python
-def run_method(calibrator: "Calibrator", method: UncertaintyMethod[ResultT]) -> ResultT:
+def run_method(
+    calibrator: "Calibrator",
+    method: InferenceMethod[ResultT],
+    kind: type[InferenceMethod[BaseModel]],
+) -> ResultT:
     """
     Run `method` on `calibrator` with the runner of its type.
 
@@ -2523,8 +2551,11 @@ def run_method(calibrator: "Calibrator", method: UncertaintyMethod[ResultT]) -> 
     ----------
     calibrator : Calibrator
         The calibration problem.
-    method : UncertaintyMethod[ResultT]
+    method : InferenceMethod[ResultT]
         The configuration of the method.
+    kind : type[InferenceMethod]
+        The kind of method the entry point takes: `UncertaintyMethod` or
+        `IdentifiabilityMethod`.
 
     Returns
     -------
@@ -2533,13 +2564,26 @@ def run_method(calibrator: "Calibrator", method: UncertaintyMethod[ResultT]) -> 
 
     Raises
     ------
+    TypeError
+        If `method` is not of `kind`; the message names its entry point.
     ValueError
         If no runner is registered for the configuration's type.
     """
+    if not isinstance(method, kind):
+        right = next(
+            (
+                name
+                for other, name in _ENTRY_POINTS.items()
+                if isinstance(method, other)
+            ),
+            None,
+        )
+        hint = f" Run it with {right}." if right else ""
+        raise TypeError(f"{type(method).__name__} is not a {kind.__name__}.{hint}")
     runner = _RUNNERS.get(type(method))
     if runner is None:
         raise ValueError(
-            f"No uncertainty method is registered for {type(method).__name__}. "
+            f"No method is registered for {type(method).__name__}. "
             f"Registered: {registered()}."
         )
     return cast("ResultT", runner(calibrator, method))

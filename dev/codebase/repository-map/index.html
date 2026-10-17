@@ -1230,6 +1230,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1564,6 +1592,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
   
 
     
@@ -2564,7 +2620,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/forward.rs</code></td>
-<td><code>ForwardModel</code>: the only code that clones, resets, writes values to or runs the engine (<code>run_schedule</code>, <code>run_observed</code>, <code>run_at</code>), one run per replicate of a stochastic engine; <code>Workspace</code>.</td>
+<td><code>ForwardModel</code>: the only code that clones, resets, writes values to or runs the engine (<code>run_schedule</code>, <code>run_observed</code>, <code>run_at</code>), one run per replicate of a stochastic engine; the same model on other observations (<code>with_observations</code>); <code>Workspace</code>.</td>
 <td>Loss, penalties, history.</td>
 </tr>
 <tr>
@@ -2628,6 +2684,16 @@
 <td>—</td>
 </tr>
 <tr>
+<td><code>crates/commol-inference/src/sensitivity/</code></td>
+<td><code>SensitivitySource</code>, the port of derivatives of the predicted observations; <code>FiniteDifferences</code> on the design of the observations or a dense one; the scaled sensitivities and <code>observation_scales</code>.</td>
+<td>Ranks, verdicts.</td>
+</tr>
+<tr>
+<td><code>crates/commol-inference/src/identifiability/</code></td>
+<td>The analyses: <code>structural_rank</code> (ranks, null space, combinations), <code>collinearity</code> (Brun's indices), <code>sample_identifiability</code> (contraction, correlations, modes), <code>starts_identifiability</code>.</td>
+<td>Derivatives; reports.</td>
+</tr>
+<tr>
 <td><code>crates/commol-inference/src/target.rs</code></td>
 <td><code>Target</code> (a log density, <code>−∞</code> outside the support) and <code>discrepancy_in_support</code>.</td>
 <td>Penalties.</td>
@@ -2675,6 +2741,11 @@
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
+<td><code>py-commol/src/identifiability.rs</code></td>
+<td><code>commol_rs.inference</code>: <code>structural_rank</code>, <code>collinearity</code>, <code>sample_identifiability</code>, <code>starts_identifiability</code> and their result classes.</td>
+<td>Logic beyond type conversion.</td>
+</tr>
+<tr>
 <td><code>py-commol/src/python_observer.rs</code></td>
 <td>The progress table of a verbose optimization, written to Python's <code>sys.stdout</code>.</td>
 <td>Writes to the standard error.</td>
@@ -2718,7 +2789,7 @@
 </tr>
 <tr>
 <td><code>api/inference/</code></td>
-<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), the scores (<code>scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), and the registry of method runners (<code>registry.py</code>).</td>
+<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), the scores (<code>scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), and the runners of the identifiability methods (<code>identifiability.py</code>), which build the report.</td>
 <td>Transforms of predictions; quantile formulas.</td>
 </tr>
 <tr>
@@ -2738,7 +2809,7 @@
 </tr>
 <tr>
 <td><code>context/inference/</code></td>
-<td><code>UncertaintyMethod</code> (the generic base of a method's configuration), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>.</td>
+<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code> and <code>IdentifiabilityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, and the identifiability methods and <code>IdentifiabilityReport</code> (<code>identifiability.py</code>).</td>
 <td>Runners.</td>
 </tr>
 <tr>
@@ -2953,6 +3024,11 @@
 <td>Add an uncertainty method</td>
 <td><code>crates/commol-inference/</code></td>
 <td><code>py-commol/src/inference.rs</code>, <code>context/inference/</code>, <code>api/inference/registry.py</code>, <a href="../maintainer-playbook/#uncertainty-method">checklist</a></td>
+</tr>
+<tr>
+<td>Change sensitivities or identifiability</td>
+<td><code>crates/commol-inference/src/sensitivity/</code>, <code>crates/commol-inference/src/identifiability/</code></td>
+<td><code>py-commol/src/identifiability.rs</code>, <code>context/inference/identifiability.py</code>, <code>api/inference/identifiability.py</code>, <a href="../../guide/uncertainty/identifiability/">Identifiability</a></td>
 </tr>
 <tr>
 <td>Expose an engine rule to Python</td>

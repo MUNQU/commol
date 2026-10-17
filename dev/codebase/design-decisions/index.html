@@ -1230,6 +1230,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1564,6 +1592,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
   
 
     
@@ -2431,6 +2487,28 @@
     <span class="md-ellipsis">
       
         Methods plug into one entry point
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sensitivities-come-from-one-port" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sensitivities come from one port
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-verdicts-per-parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two verdicts per parameter
       
     </span>
   </a>
@@ -3385,6 +3463,28 @@
     <span class="md-ellipsis">
       
         Methods plug into one entry point
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sensitivities-come-from-one-port" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sensitivities come from one port
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-verdicts-per-parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two verdicts per parameter
       
     </span>
   </a>
@@ -4529,7 +4629,12 @@ weights give the unweighted statistic.</p>
 <p><strong>Guards:</strong> <code>crates/commol-inference/src/sample.rs</code> tests,
 <code>tests/uncertainty/test_sample.py</code>.</p>
 <h3 id="methods-plug-into-one-entry-point">Methods plug into one entry point<a class="headerlink" href="#methods-plug-into-one-entry-point" title="Permanent link">&para;</a></h3>
-<p><code>Calibrator.uncertainty(method: UncertaintyMethod[R]) -&gt; R</code> runs every method.
+<p><code>Calibrator.uncertainty(method: UncertaintyMethod[R]) -&gt; R</code> runs every
+uncertainty method, and <code>Calibrator.identifiability(method:
+IdentifiabilityMethod[R]) -&gt; R</code> every identifiability method. Both kinds
+subclass <code>InferenceMethod[R]</code> (<code>context/inference/method.py</code>) and share one
+registry; each entry point refuses the other kind with a <code>TypeError</code> that
+names the right one.
 A method is three parts: a configuration that subclasses <code>UncertaintyMethod</code>
 with its result type (<code>context/inference/</code>), a runner in Rust bound in
 <code>py-commol/src/inference.rs</code>, and a result (<code>context/inference/</code>). It registers
@@ -4565,6 +4670,76 @@ intervals cover the truth at their level; they run weekly
 (<code>.github/workflows/coverage.yaml</code>).</p>
 <p><strong>Guards:</strong> <code>tests/uncertainty/test_entry_point.py</code>,
 <code>tests/uncertainty/test_coverage.py</code>.</p>
+<h3 id="sensitivities-come-from-one-port">Sensitivities come from one port<a class="headerlink" href="#sensitivities-come-from-one-port" title="Permanent link">&para;</a></h3>
+<p>Every reader of derivatives of the predicted observations asks
+<code>SensitivitySource</code> (<code>crates/commol-inference/src/sensitivity/</code>); only a source
+knows how its derivatives are made. <code>FiniteDifferences</code> is the first: central
+differences, one-sided of second order at a bound, with the step
+<code>h = η^{1/3} · max(|θ|, w)</code> (at most <code>w / 8</code>), where <code>η</code> is the output
+accuracy of the engine (<code>SimulationEngine::output_accuracy</code>: machine epsilon,
+or the <code>rtol</code> of the ODE engine) and <code>w</code> the width of the bounds. Each entry
+carries an estimated error, from the steps <code>h</code> and <code>2h</code> and the accuracy of
+the runs; the structural rank counts a singular value only above the norm of
+that error (Weyl's inequality). The scaled sensitivities
+<code>S_ij = J_ij · |θ_j| / s_i</code> do not depend on units. A stochastic engine is
+refused: its runs change in jumps with the parameters.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Each method differentiates on its own</td>
+<td>The step, the error and the scaling would differ between methods.</td>
+</tr>
+<tr>
+<td>Exact derivatives first</td>
+<td>Symbolic differentiation of expressions and sensitivity equations in two engines; a later source behind the same port.</td>
+</tr>
+<tr>
+<td>Machine epsilon as the accuracy of every engine</td>
+<td>With <code>rtol = 1e-6</code> the solver's error over the step is a fifth of the derivative, and the rank reads noise.</td>
+</tr>
+<tr>
+<td>A fixed rank threshold such as <code>1e-10</code></td>
+<td>Below the error of finite differences, so every model looks identifiable.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_sensitivity.rs</code>,
+<code>crates/commol-inference/tests/test_identifiability.rs</code>,
+<code>tests/uncertainty/test_identifiability.py</code>.</p>
+<h3 id="two-verdicts-per-parameter">Two verdicts per parameter<a class="headerlink" href="#two-verdicts-per-parameter" title="Permanent link">&para;</a></h3>
+<p>An <code>IdentifiabilityReport</code> gives each parameter a structural verdict (what
+any data of the design of the observations can determine) and a practical
+verdict (what these data determine). Only <code>StructuralRank</code> on the design of
+the observations gives the structural verdict; a dense design keeps its
+verdicts in its section. Merging reports keeps a verdict the reports agree
+on, and makes one they disagree on <code>conflicting</code>, with every reason.
+Thresholds and tolerances of the methods are required arguments: they are
+modelling judgments.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One verdict</td>
+<td>A parameter structurally identifiable and poorly determined by the data, the usual case, would look like a conflict.</td>
+</tr>
+<tr>
+<td>Defaults for the thresholds</td>
+<td>A judgment hidden in the library.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>tests/uncertainty/test_identifiability.py</code> (<code>TestReport</code>).</p>
 <h2 id="results">Results<a class="headerlink" href="#results" title="Permanent link">&para;</a></h2>
 <h3 id="one-confidence-interval-convention">One confidence-interval convention<a class="headerlink" href="#one-confidence-interval-convention" title="Permanent link">&para;</a></h3>
 <p>Every interval is a weighted quantile: the inverse of the weighted empirical

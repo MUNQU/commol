@@ -1225,6 +1225,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#identifiability_report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        identifiability_report
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#checklist" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1333,6 +1344,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
   
 
     
@@ -1680,6 +1719,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
   
 
     
@@ -2358,6 +2425,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#identifiability_report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        identifiability_report
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#checklist" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2405,7 +2483,9 @@
 for JSON: <code>applied_parameters_report</code> (what the model holds and what calibration
 set) and <code>simulation_report</code> (what a run produced, next to the observations).
 Both work for a single calibration and for a sample of the parameters, with
-the same layout.</p>
+the same layout. A third, <code>identifiability_report</code>, gives the verdicts of an
+<code>IdentifiabilityReport</code> as plain data
+(<a href="../uncertainty/identifiability/#the-report">Identifiability</a>).</p>
 <h2 id="quick-path">Quick path<a class="headerlink" href="#quick-path" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -2634,6 +2714,12 @@ a run label or summary figures in your domain's terms:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">document</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;calibration&quot;</span><span class="p">,</span> <span class="s2">&quot;at&quot;</span><span class="p">:</span> <span class="n">ends</span><span class="p">,</span> <span class="o">**</span><span class="n">run_report</span><span class="p">}</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">document</span><span class="p">)[:</span><span class="mi">30</span><span class="p">])</span>
 </span></code></pre></div>
+<h2 id="identifiability_report"><code>identifiability_report</code><a class="headerlink" href="#identifiability_report" title="Permanent link">&para;</a></h2>
+<p><code>identifiability_report(report)</code> takes the result of
+<code>Calibrator.identifiability</code>, or of <code>IdentifiabilityReport.merge</code>, and returns
+<code>parameters</code> (each parameter, in problem order, with its <code>structural</code> and
+<code>practical</code> verdicts, their reasons and combinations, or <code>None</code>) and
+<code>sections</code> (the evidence of each method that ran, by section name).</p>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
 <li>[ ] The model passed to <code>applied_parameters_report</code> already has the calibrated values.</li>

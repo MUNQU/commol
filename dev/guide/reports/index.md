@@ -2,7 +2,7 @@
 
 [Back to Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)
 
-Two functions turn a calibrated model and a run into plain dictionaries, ready for JSON: `applied_parameters_report` (what the model holds and what calibration set) and `simulation_report` (what a run produced, next to the observations). Both work for a single calibration and for a sample of the parameters, with the same layout.
+Two functions turn a calibrated model and a run into plain dictionaries, ready for JSON: `applied_parameters_report` (what the model holds and what calibration set) and `simulation_report` (what a run produced, next to the observations). Both work for a single calibration and for a sample of the parameters, with the same layout. A third, `identifiability_report`, gives the verdicts of an `IdentifiabilityReport` as plain data ([Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#the-report)).
 
 ## Quick path
 
@@ -143,6 +143,10 @@ The report holds only these blocks. Add your own envelope around them, such as a
 document = {"kind": "calibration", "at": ends, **run_report}
 print(json.dumps(document)[:30])
 ```
+
+## `identifiability_report`
+
+`identifiability_report(report)` takes the result of `Calibrator.identifiability`, or of `IdentifiabilityReport.merge`, and returns `parameters` (each parameter, in problem order, with its `structural` and `practical` verdicts, their reasons and combinations, or `None`) and `sections` (the evidence of each method that ran, by section name).
 
 ## Checklist
 

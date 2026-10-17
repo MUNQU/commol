@@ -1230,6 +1230,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1564,6 +1592,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
   
 
     
@@ -2458,7 +2514,7 @@ top to bottom. The dashed box is the base that every box uses.</p>
     E3["Stochastic&lt;br/&gt;random events"]
     O[/one series per output/]
     C["Calibration&lt;br/&gt;the problem in layers, optimizers"]
-    I["Inference&lt;br/&gt;parameter sample, predictive, scores"]
+    I["Inference&lt;br/&gt;parameter sample, predictive, scores,&lt;br/&gt;sensitivities, identifiability"]
     F["Base: commol-core, commol-random&lt;br/&gt;used by every box"]
     J --&gt; M
     M --&gt; E1 &amp; E2 &amp; E3
@@ -2505,7 +2561,7 @@ top to bottom. The dashed box is the base that every box uses.</p>
 <tr>
 <td>Inference</td>
 <td><code>commol-inference</code></td>
-<td>What every uncertainty method returns or reads: the weighted parameter sample, the one quantile, the predictive of a sample and its scores. It depends on calibration, never the reverse.</td>
+<td>What every uncertainty method returns or reads: the weighted parameter sample, the one quantile, the predictive of a sample and its scores; the port of sensitivities and the identifiability analyses. It depends on calibration, never the reverse.</td>
 </tr>
 </tbody>
 </table>

@@ -1230,6 +1230,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1564,6 +1592,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
   
 
     
@@ -2778,6 +2834,10 @@ changing it (<a href="../design-decisions/#methods-plug-into-one-entry-point">De
 <li>[ ] A guide page under <code>docs/guide/uncertainty/</code>, a row in the table
       "Which method answers which question" of its index, and an API entry.</li>
 </ul>
+<p>An identifiability method follows the same steps with
+<code>IdentifiabilityMethod[IdentifiabilityReport]</code> and <code>Calibrator.identifiability</code>;
+it reads derivatives only through <code>SensitivitySource</code>, adds its section to
+<code>IdentifiabilityReport</code>, and needs no coverage study.</p>
 <h3 id="model-type-engine">Model type (engine)<a class="headerlink" href="#model-type-engine" title="Permanent link">&para;</a></h3>
 <p>To add an engine to the list:</p>
 <ul>

@@ -1401,6 +1401,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1735,6 +1763,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
   
 
     
@@ -2818,8 +2874,9 @@ swarm draws its own population; its start <code>i &gt; 0</code> takes its own se
 </table>
 <p>The result is the start of least loss; if every start fails, <code>run</code> raises a
 <code>RuntimeError</code> with every reason. Starts that end at distinct points with equal
-losses are a sign that the data do not identify the parameters (see
-<a href="../uncertainty/">Uncertainty</a>).</p>
+losses are a sign that the data do not identify the parameters;
+<code>StartsIdentifiability</code> names the parameters that differ (see
+<a href="../uncertainty/identifiability/#starts">Identifiability</a>).</p>
 <h2 id="reproducibility">Reproducibility<a class="headerlink" href="#reproducibility" title="Permanent link">&para;</a></h2>
 <p>Set <code>CalibrationProblem(seed=...)</code>: the starts, a particle swarm and the
 replicates of a stochastic engine then make the same random choices on every

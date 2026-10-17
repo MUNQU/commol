@@ -1226,6 +1226,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1560,6 +1588,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
   
 
     
@@ -2975,6 +3031,19 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><code>Calibrator.uncertainty(method)</code>: one entry point for every uncertainty
   method. A method's configuration subclasses <code>UncertaintyMethod[R]</code> and
   registers its runner; the result type follows the configuration's type.</li>
+<li><code>Calibrator.identifiability(method)</code>: which parameters the model and the
+  data determine, and which combinations they determine in their place.
+  <code>StructuralRank</code> (the rank of the sensitivities at random points, on the
+  design of the observations or a dense one), <code>Collinearity</code> (Brun's indices
+  at a fit or over a sample), <code>SampleIdentifiability</code> (contraction,
+  correlations and modes of a sample) and <code>StartsIdentifiability</code> (starts of
+  equal loss that end apart). Each returns an <code>IdentifiabilityReport</code> with a
+  structural and a practical verdict per parameter; <code>merge</code> joins reports and
+  <code>identifiability_report</code> gives one as plain data. See
+  <a href="../../guide/uncertainty/identifiability/">Identifiability</a>.</li>
+<li><code>InferenceMethod[R]</code>, the common base of <code>UncertaintyMethod[R]</code> and
+  <code>IdentifiabilityMethod[R]</code>; each entry point refuses the other kind with a
+  <code>TypeError</code>.</li>
 <li><code>weighted_quantiles</code>, and a <code>weights</code> argument for <code>member_statistics</code>.</li>
 <li><code>CalibrationHistory</code> and <code>CalibrationEvaluation</code>, returned by
   <code>Calibrator.run_with_history()</code>.</li>

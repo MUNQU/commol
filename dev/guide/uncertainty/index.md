@@ -6,11 +6,11 @@ A calibration gives one set of parameters. This section shows how far you can tr
 
 ## The three questions
 
-| Question                            | What answers it                                                                                                                                         |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Which parameters fit the data?      | A sample of the parameters, or a profile of the loss; several starts that end apart with equal losses show that the data do not identify the parameters |
-| How do the inputs move the outputs? | The predictive of a sample: the run of every draw, and its band                                                                                         |
-| Are the intervals calibrated?       | Scores of the predictive against observations the method did not see, and coverage studies                                                              |
+| Question                            | What answers it                                                                                                                                                                                                                                                          |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Which parameters fit the data?      | The [identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) methods; a sample of the parameters, or a profile of the loss; several starts that end apart with equal losses show that the data do not identify the parameters |
+| How do the inputs move the outputs? | The predictive of a sample: the run of every draw, and its band                                                                                                                                                                                                          |
+| Are the intervals calibrated?       | Scores of the predictive against observations the method did not see, and coverage studies                                                                                                                                                                               |
 
 ## A band of the model, or a prediction interval
 
@@ -18,9 +18,13 @@ A **band of the model** is the spread of the model's output across the draws of 
 
 ## Which method answers which question
 
-| Method                                     | Question                                                       | Needs a noise model | Page                                                                                             |
-| ------------------------------------------ | -------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------ |
-| Several starts, `Calibrator.run(starts=n)` | Which parameters fit the data: distinct ends with equal losses | No                  | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts) |
+| Method                                     | Question                                                                       | Needs a noise model | Page                                                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------ | ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Several starts, `Calibrator.run(starts=n)` | Which parameters fit the data: distinct ends with equal losses                 | No                  | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)            |
+| `StructuralRank`                           | Which parameters any data of this design can determine, and which combinations | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#structural-rank) |
+| `Collinearity`                             | Which parameters can be fitted together                                        | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#collinearity)    |
+| `SampleIdentifiability`                    | Which parameters a sample determines: contraction, correlations, modes         | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)        |
+| `StartsIdentifiability`                    | Which parameters differ between starts of equal loss                           | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)          |
 
 Each uncertainty method adds its row here when it lands.
 
@@ -171,6 +175,8 @@ The functions of `commol.scores` compare a predictive with observations, and ret
 
 Every method runs through `Calibrator.uncertainty(method)`. A method is a configuration, a subclass of `UncertaintyMethod[R]` whose type parameter `R` is its result; the call returns an `R`, which a static type checker infers from the configuration's type. A configuration with no registered runner raises a `ValueError` that names the registered ones.
 
+The identifiability methods run through their own entry point, `Calibrator.identifiability(method)`, with a subclass of `IdentifiabilityMethod[R]`: they answer another question ([Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md)). Both kinds subclass `InferenceMethod[R]` and share one registry; each entry point refuses the other kind with a `TypeError` that names the right one.
+
 ```python
 result = calibrator.uncertainty(SomeMethod(...))
 ```
@@ -183,8 +189,9 @@ result = calibrator.uncertainty(SomeMethod(...))
 
 ## Next steps
 
-| To learn                       | Read                                                                                             |
-| ------------------------------ | ------------------------------------------------------------------------------------------------ |
-| Several starts of an optimizer | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts) |
-| Reports of a sample            | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                          |
-| Plots of a predictive          | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/#plotting)         |
+| To learn                            | Read                                                                                                |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Several starts of an optimizer      | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)    |
+| Which parameters the data determine | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) |
+| Reports of a sample                 | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                             |
+| Plots of a predictive               | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/#plotting)            |

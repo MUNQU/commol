@@ -256,13 +256,49 @@ class Calibrator:
 
         Raises
         ------
+        TypeError
+            If `method` is an identifiability method; the message names
+            ``Calibrator.identifiability``.
         ValueError
             If no runner is registered for the configuration's type; the
             message names the registered ones.
         """
         from commol.api.inference.registry import run_method
 
-        return run_method(self, method)
+        return run_method(self, method, UncertaintyMethod)
+
+    def identifiability(self, method: IdentifiabilityMethod[ResultT]) -> ResultT:
+        """
+        Run an identifiability method on this calibration problem.
+
+        Each method answers which parameters the model and the data
+        determine, from another kind of evidence: `StructuralRank`,
+        `Collinearity`, `SampleIdentifiability` or `StartsIdentifiability`.
+        Each returns an `IdentifiabilityReport`; `IdentifiabilityReport.merge`
+        joins them.
+
+        Parameters
+        ----------
+        method : IdentifiabilityMethod[ResultT]
+            The configuration of the method.
+
+        Returns
+        -------
+        ResultT
+            The result of the method.
+
+        Raises
+        ------
+        TypeError
+            If `method` is an uncertainty method; the message names
+            ``Calibrator.uncertainty``.
+        ValueError
+            If no runner is registered for the configuration's type, or the
+            method fails (see the method).
+        """
+        from commol.api.inference.registry import run_method
+
+        return run_method(self, method, IdentifiabilityMethod)
 
     def _to_rust_parameter_type(
         self, param_type: str
@@ -835,6 +871,7 @@ Raises:
 
 | Type         | Description                                                                                     |
 | ------------ | ----------------------------------------------------------------------------------------------- |
+| `TypeError`  | If method is an identifiability method; the message names Calibrator.identifiability.           |
 | `ValueError` | If no runner is registered for the configuration's type; the message names the registered ones. |
 
 Source code in `commol/api/calibrator.py`
@@ -861,13 +898,82 @@ def uncertainty(self, method: UncertaintyMethod[ResultT]) -> ResultT:
 
     Raises
     ------
+    TypeError
+        If `method` is an identifiability method; the message names
+        ``Calibrator.identifiability``.
     ValueError
         If no runner is registered for the configuration's type; the
         message names the registered ones.
     """
     from commol.api.inference.registry import run_method
 
-    return run_method(self, method)
+    return run_method(self, method, UncertaintyMethod)
+```
+
+#### identifiability
+
+```python
+identifiability(method: IdentifiabilityMethod[ResultT]) -> ResultT
+```
+
+Run an identifiability method on this calibration problem.
+
+Each method answers which parameters the model and the data determine, from another kind of evidence: `StructuralRank`, `Collinearity`, `SampleIdentifiability` or `StartsIdentifiability`. Each returns an `IdentifiabilityReport`; `IdentifiabilityReport.merge` joins them.
+
+Parameters:
+
+| Name     | Type                             | Description                      | Default    |
+| -------- | -------------------------------- | -------------------------------- | ---------- |
+| `method` | `IdentifiabilityMethod[ResultT]` | The configuration of the method. | *required* |
+
+Returns:
+
+| Type      | Description               |
+| --------- | ------------------------- |
+| `ResultT` | The result of the method. |
+
+Raises:
+
+| Type         | Description                                                                                    |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| `TypeError`  | If method is an uncertainty method; the message names Calibrator.uncertainty.                  |
+| `ValueError` | If no runner is registered for the configuration's type, or the method fails (see the method). |
+
+Source code in `commol/api/calibrator.py`
+
+```python
+def identifiability(self, method: IdentifiabilityMethod[ResultT]) -> ResultT:
+    """
+    Run an identifiability method on this calibration problem.
+
+    Each method answers which parameters the model and the data
+    determine, from another kind of evidence: `StructuralRank`,
+    `Collinearity`, `SampleIdentifiability` or `StartsIdentifiability`.
+    Each returns an `IdentifiabilityReport`; `IdentifiabilityReport.merge`
+    joins them.
+
+    Parameters
+    ----------
+    method : IdentifiabilityMethod[ResultT]
+        The configuration of the method.
+
+    Returns
+    -------
+    ResultT
+        The result of the method.
+
+    Raises
+    ------
+    TypeError
+        If `method` is an uncertainty method; the message names
+        ``Calibrator.uncertainty``.
+    ValueError
+        If no runner is registered for the configuration's type, or the
+        method fails (see the method).
+    """
+    from commol.api.inference.registry import run_method
+
+    return run_method(self, method, IdentifiabilityMethod)
 ```
 
 ## CalibrationProblem

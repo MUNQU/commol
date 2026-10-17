@@ -3540,12 +3540,12 @@ scaled_result = Calibrator(Simulation(model(0.4)), problem).run()
 print(round(scaled_result.best_parameters["share_seen"], 3))  # 0.3
 ```
 
-| Fact                  | Detail                                                                                                              |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Several factors       | Each observation names its own `factor_id`, so outputs can have different shares.                                   |
-| Not part of the model | `apply_calibration_parameters` skips `factor` values.                                                               |
-| Plots                 | Pass `calibration_result=` to `SimulationPlotter.plot_series`; it applies the calibrated factors to the comparison. |
-| Identifiability       | A rate and a share can explain the same data. Fit them together only when the data can tell them apart.             |
+| Fact                  | Detail                                                                                                                                                                                                                 |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Several factors       | Each observation names its own `factor_id`, so outputs can have different shares.                                                                                                                                      |
+| Not part of the model | `apply_calibration_parameters` skips `factor` values.                                                                                                                                                                  |
+| Plots                 | Pass `calibration_result=` to `SimulationPlotter.plot_series`; it applies the calibrated factors to the comparison.                                                                                                    |
+| Identifiability       | A rate and a share can explain the same data. Fit them together only when the data can tell them apart: [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) checks it. |
 
 ## Counts per period: windows
 
@@ -3796,7 +3796,7 @@ print({name: round(value, 2) for name, value in result.best_parameters.items()})
 | `starts`                  | One `StartSummary` per start that finished, in order: `start`, `end`, `loss`, `converged`                                     |
 | `failed_runs`             | Why each start that failed did, with its number; each is also logged as a warning (`logging`, logger `commol.api.calibrator`) |
 
-The result is the start of least loss; if every start fails, `run` raises a `RuntimeError` with every reason. Starts that end at distinct points with equal losses are a sign that the data do not identify the parameters (see [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)).
+The result is the start of least loss; if every start fails, `run` raises a `RuntimeError` with every reason. Starts that end at distinct points with equal losses are a sign that the data do not identify the parameters; `StartsIdentifiability` names the parameters that differ (see [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)).
 
 ## Reproducibility
 
@@ -3964,11 +3964,11 @@ A calibration gives one set of parameters. This section shows how far you can tr
 
 ## The three questions
 
-| Question                            | What answers it                                                                                                                                         |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Which parameters fit the data?      | A sample of the parameters, or a profile of the loss; several starts that end apart with equal losses show that the data do not identify the parameters |
-| How do the inputs move the outputs? | The predictive of a sample: the run of every draw, and its band                                                                                         |
-| Are the intervals calibrated?       | Scores of the predictive against observations the method did not see, and coverage studies                                                              |
+| Question                            | What answers it                                                                                                                                                                                                                                                          |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Which parameters fit the data?      | The [identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) methods; a sample of the parameters, or a profile of the loss; several starts that end apart with equal losses show that the data do not identify the parameters |
+| How do the inputs move the outputs? | The predictive of a sample: the run of every draw, and its band                                                                                                                                                                                                          |
+| Are the intervals calibrated?       | Scores of the predictive against observations the method did not see, and coverage studies                                                                                                                                                                               |
 
 ## A band of the model, or a prediction interval
 
@@ -3976,9 +3976,13 @@ A **band of the model** is the spread of the model's output across the draws of 
 
 ## Which method answers which question
 
-| Method                                     | Question                                                       | Needs a noise model | Page                                                                                             |
-| ------------------------------------------ | -------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------ |
-| Several starts, `Calibrator.run(starts=n)` | Which parameters fit the data: distinct ends with equal losses | No                  | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts) |
+| Method                                     | Question                                                                       | Needs a noise model | Page                                                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------ | ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Several starts, `Calibrator.run(starts=n)` | Which parameters fit the data: distinct ends with equal losses                 | No                  | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)            |
+| `StructuralRank`                           | Which parameters any data of this design can determine, and which combinations | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#structural-rank) |
+| `Collinearity`                             | Which parameters can be fitted together                                        | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#collinearity)    |
+| `SampleIdentifiability`                    | Which parameters a sample determines: contraction, correlations, modes         | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)        |
+| `StartsIdentifiability`                    | Which parameters differ between starts of equal loss                           | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)          |
 
 Each uncertainty method adds its row here when it lands.
 
@@ -4129,6 +4133,8 @@ The functions of `commol.scores` compare a predictive with observations, and ret
 
 Every method runs through `Calibrator.uncertainty(method)`. A method is a configuration, a subclass of `UncertaintyMethod[R]` whose type parameter `R` is its result; the call returns an `R`, which a static type checker infers from the configuration's type. A configuration with no registered runner raises a `ValueError` that names the registered ones.
 
+The identifiability methods run through their own entry point, `Calibrator.identifiability(method)`, with a subclass of `IdentifiabilityMethod[R]`: they answer another question ([Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md)). Both kinds subclass `InferenceMethod[R]` and share one registry; each entry point refuses the other kind with a `TypeError` that names the right one.
+
 ```python
 result = calibrator.uncertainty(SomeMethod(...))
 ```
@@ -4141,17 +4147,235 @@ result = calibrator.uncertainty(SomeMethod(...))
 
 ## Next steps
 
-| To learn                       | Read                                                                                             |
-| ------------------------------ | ------------------------------------------------------------------------------------------------ |
-| Several starts of an optimizer | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts) |
-| Reports of a sample            | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                          |
-| Plots of a predictive          | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/#plotting)         |
+| To learn                            | Read                                                                                                |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Several starts of an optimizer      | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)    |
+| Which parameters the data determine | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) |
+| Reports of a sample                 | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                             |
+| Plots of a predictive               | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/#plotting)            |
+
+# Identifiability
+
+[Back to Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)
+
+A parameter the data cannot determine shows up as a wide interval, or as starts that end apart with equal losses. This page shows how to find out why: which parameters the model and the data determine, which they do not, and which combination of parameters the data determine in their place. It is for anyone who fits more than one parameter.
+
+## Structural against practical
+
+| Kind           | Question                                               | Depends on                                                                | Methods                                                          |
+| -------------- | ------------------------------------------------------ | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| **Structural** | Can any data from this design determine the parameter? | The model and the positions and outputs observed, not the observed values | `StructuralRank`                                                 |
+| **Practical**  | Do these data determine it?                            | The observed values, their noise and the fit                              | `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability` |
+
+A parameter that is not structurally identifiable is never practically identifiable: no amount of data of the same design fixes it. A parameter that is structurally identifiable can still be poorly determined by the data at hand.
+
+## Quick path
+
+`k1` and `alpha` enter the model only as their product `k1 * alpha`, so the data determine the product and not each one.
+
+```python
+from commol import (
+    Aggregate,
+    CalibrationParameter,
+    CalibrationProblem,
+    Calibrator,
+    Collinearity,
+    ModelBuilder,
+    NelderMeadConfig,
+    ObservedDataPoint,
+    ParameterSample,
+    SampleIdentifiability,
+    SampleMethod,
+    Simulation,
+    StartsIdentifiability,
+    StructuralRank,
+    identifiability_report,
+)
+
+
+def basic_model(k1: float | None, alpha: float | None, k2: float | None):
+    return (
+        ModelBuilder(name="Basic Model")
+        .add_bin(id="A", name="State A")
+        .add_bin(id="B", name="State B")
+        .add_bin(id="C", name="State C")
+        .add_parameter(id="k1", value=k1)
+        .add_parameter(id="alpha", value=alpha)
+        .add_parameter(id="k2", value=k2)
+        .add_transition(
+            id="t_ab", source=["A"], target=["B"], rate="k1 * alpha * A * B / total"
+        )
+        .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
+        .build(
+            Aggregate(total=1000, bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0}),
+            engine="DifferenceEquations",
+        )
+    )
+
+
+truth = Simulation(basic_model(0.4, 1.0, 0.1)).run(num_steps=60)
+problem = CalibrationProblem(
+    observed_data=[
+        # B with a measurement error of ±5 %.
+        ObservedDataPoint(at=step, output="B", value=truth["B"][step] * (1 + 0.05 * (-1) ** step))
+        for step in range(5, 61, 5)
+    ],
+    parameters=[
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.1, max_bound=1.0),
+        CalibrationParameter(id="alpha", parameter_type="parameter", min_bound=0.5, max_bound=2.0),
+        CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.01, max_bound=0.5),
+    ],
+    loss_function="sse",
+    optimization_config=NelderMeadConfig(max_iterations=2000),
+    seed=42,
+)
+calibrator = Calibrator(Simulation(basic_model(None, None, None)), problem)
+
+# Before a fit: the structure of the model and the design.
+structural = calibrator.identifiability(StructuralRank(points=5, design="observations"))
+for name, verdicts in structural.verdicts.items():
+    print(name, verdicts.structural.verdict, verdicts.structural.combinations)
+# k1 in_combination ['k1 · alpha']
+# alpha in_combination ['k1 · alpha']
+# k2 identifiable []
+
+# After a fit: the starts and the collinearity at the best point.
+result = calibrator.run(starts=6)
+starts = calibrator.identifiability(
+    StartsIdentifiability(result=result, parameter_tolerance=0.05, loss_tolerance=0.01)
+)
+print(starts.starts[0].flagged)  # ['k1', 'alpha']
+collinearity = calibrator.identifiability(
+    Collinearity(at=result, max_subset_size=3, threshold=10)
+)
+print([subset.parameters for subset in collinearity.collinearity[0].admissible])
+# [['k1', 'k2'], ['alpha', 'k2']]
+
+# One report with every piece of evidence.
+report = structural.merge(starts, collinearity)
+for name, verdicts in report.verdicts.items():
+    print(name, verdicts.structural.verdict, verdicts.practical.verdict)
+# k1 in_combination poorly_determined
+# alpha in_combination poorly_determined
+# k2 identifiable determined
+```
+
+Fix `alpha` (or `k1`) at a value, or calibrate their product as one parameter: the data determine `k1 · alpha`, and the fit says nothing about how it splits.
+
+## The methods
+
+Every method runs through `Calibrator.identifiability(method)` and returns an `IdentifiabilityReport`. A threshold or a tolerance has no default: it is a modelling judgment, and the table gives the range the literature uses.
+
+| Method                                                               | Needs                                                                    | Answers                                                                                                                                               | Engine        |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| `StructuralRank(points, design, seed=None)`                          | The problem only                                                         | The rank of the sensitivities, the non-identifiable parameters and the identifiable combinations                                                      | Deterministic |
+| `Collinearity(at, max_subset_size, threshold)`                       | A fit (`CalibrationResult`) or a sample                                  | Which subsets of parameters can be fitted together; `threshold` from 5 to 20                                                                          | Deterministic |
+| `SampleIdentifiability(sample, reference, correlation_threshold)`    | Any `ParameterSample`                                                    | How much the sample contracts each parameter, which pairs move together, which marginals have several modes; `correlation_threshold` from 0.8 to 0.95 | Any           |
+| `StartsIdentifiability(result, parameter_tolerance, loss_tolerance)` | A result of `Calibrator.run(starts=n)` with two or more converged starts | Which parameters differ between starts of equal loss                                                                                                  | Any           |
+
+### Structural rank
+
+`StructuralRank` evaluates the sensitivities of the predicted observations at `points` rows of a Latin hypercube over the bounds, drawn from `seed` (the problem's seed by default). The sensitivity of observation `i` to parameter `j` is scaled to a relative change of both, `S_ij = (∂y_i/∂θ_j) · θ_j / s_i`, where `s_i` is the root mean square of the series of observation `i`, so the answer does not depend on units.
+
+| `design`         | Positions and outputs                                                                                             | Question                                           |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `"observations"` | Those of the problem's observations; their values are ignored                                                     | Can this design determine the parameters?          |
+| `"dense"`        | Every observed series, with its outputs, factor and window, at every unit position from 0 to the last observation | Can denser data of the same series determine them? |
+
+At each point the rank counts the singular values of `S` above the norm of the estimated error of `S`. The **generic rank** is the rank at most points; each point's singular values are in `report.structural[0].points`. A parameter is:
+
+| Verdict            | Meaning                                                      |
+| ------------------ | ------------------------------------------------------------ |
+| `identifiable`     | No combination of the other parameters undoes a change of it |
+| `in_combination`   | Only the combinations in `combinations` are identifiable     |
+| `non_identifiable` | No observation changes with it                               |
+
+Only the design of the observations gives the structural verdict of a parameter; a dense design keeps its verdicts in its section.
+
+```python
+dense = calibrator.identifiability(StructuralRank(points=5, design="dense"))
+print(dense.structural[0].generic_rank, dense.structural[0].verdicts["k1"])
+# 2 in_combination
+```
+
+Denser data of `B` do not split the product either: the deficit is in the model, not in the design.
+
+### How to read a combination
+
+A combination is a product of powers of the parameters that the data determine: `k1 · alpha` means that every pair `(k1, alpha)` with the same product fits the data equally well. `k1 / k2^2` means that `k1` and `k2²` can grow together. A parameter whose bounds allow negative values reads as its absolute value, `|k1|`. The exponents are rounded to the nearest half.
+
+### Collinearity
+
+`Collinearity` computes, after Brun et al. (2001), the sensitivity measure of each parameter and the collinearity index `γ` of each subset: 1 when the sensitivities of the subset are orthogonal, infinite when one is a combination of the others. A subset with `γ` below `threshold` can be fitted together; `admissible` lists the largest such subsets. With a sample, the index is computed at every draw and summarized by its weighted median, and `share_below` gives the share of the draws below the threshold.
+
+A parameter is `poorly_determined` when a pair that holds it has an index at or above the threshold, or no observation is sensitive to it.
+
+### A sample
+
+`SampleIdentifiability` reads any sample, such as the draws of an uncertainty method. Here the sample is the ends of the starts.
+
+```python
+names = calibrator.parameter_names
+sample = ParameterSample.equally_weighted(
+    names,
+    [(p.min_bound, p.max_bound) for p in problem.parameters],
+    [[start.end[name] for name in names] for start in result.starts],
+    SampleMethod(name="starts"),
+)
+from_sample = calibrator.identifiability(
+    SampleIdentifiability(sample=sample, reference="bounds", correlation_threshold=0.9)
+)
+pair = from_sample.sample[0].correlated_pairs[0]
+print(pair.first, pair.second, round(pair.correlation, 1))  # k1 alpha -1.0
+```
+
+| Field              | Meaning                                                                                                              |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `contraction`      | `1 − Var(sample) / Var(reference)`: near 0 when the sample spreads over the bounds, near 1 when it sits on one value |
+| `correlated_pairs` | The pairs whose absolute correlation is above `correlation_threshold`                                                |
+| `modes`            | The modes of each marginal: the maxima of a kernel density above a tenth of the highest                              |
+
+A parameter is `poorly_determined` when it is in a correlated pair or its marginal has two or more modes.
+
+### Starts
+
+`StartsIdentifiability` compares the converged starts whose loss exceeds the best by at most `loss_tolerance` of the best loss, and flags a parameter whose ends among them differ by more than `parameter_tolerance` of its bound width. A loss near zero, as with data made by the model itself, leaves no start within a relative tolerance but the best; use data with noise.
+
+## The report
+
+An `IdentifiabilityReport` holds, for each parameter, a **structural** and a **practical** verdict, and the sections of the methods that ran (`structural`, `collinearity`, `sample`, `starts`). `merge` joins reports: a verdict the reports agree on stays, with every reason; one they disagree on is `conflicting`, with both reasons. `identifiability_report` gives it as plain data.
+
+```python
+data = identifiability_report(report)
+print(data["parameters"]["k2"]["practical"]["verdict"])  # determined
+```
+
+## Limits
+
+- **Local.** The sensitivities are derivatives at points: a parameter can be identifiable near every point and still have two distant values that fit equally well. Symbolic methods give a global answer for differential equations; they are outside commol.
+- **Numerical.** The derivatives are finite differences; a singular value counts only when it is above their estimated error. The error grows with the tolerance of an ODE solver (`rtol`).
+- **Generic points.** A point where the rank is lower or higher than at most points is special; the generic rank is the rank at most points.
+- **Deterministic engines.** The runs of a stochastic engine change in jumps with the parameters, so `StructuralRank` and `Collinearity` refuse one; `SampleIdentifiability` and `StartsIdentifiability` accept it.
+
+## Checklist
+
+- [ ] You checked the structural rank of the design before you fitted.
+- [ ] Each parameter `in_combination` is fixed, or replaced by its combination.
+- [ ] The thresholds you chose are in the report you share.
+
+## Next steps
+
+| To learn                                    | Read                                                                                             |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Several starts of an optimizer              | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts) |
+| Scale factors, which often pair with a rate | [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)    |
+| What a sample is                            | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/#the-parameter-sample)     |
 
 # Reports
 
 [Back to Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)
 
-Two functions turn a calibrated model and a run into plain dictionaries, ready for JSON: `applied_parameters_report` (what the model holds and what calibration set) and `simulation_report` (what a run produced, next to the observations). Both work for a single calibration and for a sample of the parameters, with the same layout.
+Two functions turn a calibrated model and a run into plain dictionaries, ready for JSON: `applied_parameters_report` (what the model holds and what calibration set) and `simulation_report` (what a run produced, next to the observations). Both work for a single calibration and for a sample of the parameters, with the same layout. A third, `identifiability_report`, gives the verdicts of an `IdentifiabilityReport` as plain data ([Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#the-report)).
 
 ## Quick path
 
@@ -4292,6 +4516,10 @@ The report holds only these blocks. Add your own envelope around them, such as a
 document = {"kind": "calibration", "at": ends, **run_report}
 print(json.dumps(document)[:30])
 ```
+
+## `identifiability_report`
+
+`identifiability_report(report)` takes the result of `Calibrator.identifiability`, or of `IdentifiabilityReport.merge`, and returns `parameters` (each parameter, in problem order, with its `structural` and `practical` verdicts, their reasons and combinations, or `None`) and `sections` (the evidence of each method that ran, by section name).
 
 ## Checklist
 
@@ -4876,17 +5104,18 @@ results = Simulation(model).run(num_steps=60)
 
 Every public name of `commol`, generated from the docstrings. The guide pages explain how to use them; these pages list every argument, attribute and error.
 
-| Page                                                                             | Names                                                                                                                                                                                                                                                                                        |
-| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md) | `ModelBuilder`                                                                                                                                                                                                                                                                               |
-| [Model](https://munqu.github.io/commol/latest/api/model/index.md)                | `Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete`, `Groups`, `ModelDescription`, `InitialCompartment`, `UnitConsistencyError`                                                                                                                                                    |
-| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)      | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `OdeSolver`, `StochasticEventsSettings`, `StochasticStepsSettings`, `InfeasibleStateError`, `window_start`, `window_end`, `window_index`, `window_ends`, `windowed_totals`                                       |
-| [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)          | `SimulationPlotter`, `PlotConfig`                                                                                                                                                                                                                                                            |
-| [AxisPattern](https://munqu.github.io/commol/latest/api/axis-patterns/index.md)  | `AxisPattern`                                                                                                                                                                                                                                                                                |
-| [AxisUnits](https://munqu.github.io/commol/latest/api/axis-units/index.md)       | `AxisUnits`                                                                                                                                                                                                                                                                                  |
-| [Calibration](https://munqu.github.io/commol/latest/api/calibrator/index.md)     | `Calibrator`, `CalibrationProblem`, `Quantile`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `NelderMeadConfig`, `ParticleSwarmConfig`, `CalibrationResult`, `StartSummary`, `CalibrationHistory`, `CalibrationEvaluation`, `LossFunction`, `OptimizationAlgorithm` |
-| [Uncertainty](https://munqu.github.io/commol/latest/api/uncertainty/index.md)    | `UncertaintyMethod`, `ParameterSample`, `SampleMethod`, `ParameterSummary`, `Predictive`, `PredictiveBand`, `SeriesBand`, `ObservationDraws`, `commol.scores`, `weighted_quantiles`, `member_statistics`, `ci_percentiles`                                                                   |
-| [Reports](https://munqu.github.io/commol/latest/api/reports/index.md)            | `applied_parameters_report`, `simulation_report`                                                                                                                                                                                                                                             |
+| Page                                                                                  | Names                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md)      | `ModelBuilder`                                                                                                                                                                                                                                                                               |
+| [Model](https://munqu.github.io/commol/latest/api/model/index.md)                     | `Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete`, `Groups`, `ModelDescription`, `InitialCompartment`, `UnitConsistencyError`                                                                                                                                                    |
+| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)           | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `OdeSolver`, `StochasticEventsSettings`, `StochasticStepsSettings`, `InfeasibleStateError`, `window_start`, `window_end`, `window_index`, `window_ends`, `windowed_totals`                                       |
+| [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)               | `SimulationPlotter`, `PlotConfig`                                                                                                                                                                                                                                                            |
+| [AxisPattern](https://munqu.github.io/commol/latest/api/axis-patterns/index.md)       | `AxisPattern`                                                                                                                                                                                                                                                                                |
+| [AxisUnits](https://munqu.github.io/commol/latest/api/axis-units/index.md)            | `AxisUnits`                                                                                                                                                                                                                                                                                  |
+| [Calibration](https://munqu.github.io/commol/latest/api/calibrator/index.md)          | `Calibrator`, `CalibrationProblem`, `Quantile`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `NelderMeadConfig`, `ParticleSwarmConfig`, `CalibrationResult`, `StartSummary`, `CalibrationHistory`, `CalibrationEvaluation`, `LossFunction`, `OptimizationAlgorithm` |
+| [Uncertainty](https://munqu.github.io/commol/latest/api/uncertainty/index.md)         | `InferenceMethod`, `UncertaintyMethod`, `ParameterSample`, `SampleMethod`, `ParameterSummary`, `Predictive`, `PredictiveBand`, `SeriesBand`, `ObservationDraws`, `commol.scores`, `weighted_quantiles`, `member_statistics`, `ci_percentiles`                                                |
+| [Identifiability](https://munqu.github.io/commol/latest/api/identifiability/index.md) | `IdentifiabilityMethod`, `StructuralRank`, `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, `IdentifiabilityReport`                                                                                                                                                         |
+| [Reports](https://munqu.github.io/commol/latest/api/reports/index.md)                 | `applied_parameters_report`, `simulation_report`, `identifiability_report`                                                                                                                                                                                                                   |
 
 Import every name from the package root, as in `from commol import Simulation`. `UnitConsistencyError` is in `commol.utils.equations`; the scores are the module `commol.scores` (`from commol import scores`).
 
@@ -6346,13 +6575,49 @@ class Calibrator:
 
         Raises
         ------
+        TypeError
+            If `method` is an identifiability method; the message names
+            ``Calibrator.identifiability``.
         ValueError
             If no runner is registered for the configuration's type; the
             message names the registered ones.
         """
         from commol.api.inference.registry import run_method
 
-        return run_method(self, method)
+        return run_method(self, method, UncertaintyMethod)
+
+    def identifiability(self, method: IdentifiabilityMethod[ResultT]) -> ResultT:
+        """
+        Run an identifiability method on this calibration problem.
+
+        Each method answers which parameters the model and the data
+        determine, from another kind of evidence: `StructuralRank`,
+        `Collinearity`, `SampleIdentifiability` or `StartsIdentifiability`.
+        Each returns an `IdentifiabilityReport`; `IdentifiabilityReport.merge`
+        joins them.
+
+        Parameters
+        ----------
+        method : IdentifiabilityMethod[ResultT]
+            The configuration of the method.
+
+        Returns
+        -------
+        ResultT
+            The result of the method.
+
+        Raises
+        ------
+        TypeError
+            If `method` is an uncertainty method; the message names
+            ``Calibrator.uncertainty``.
+        ValueError
+            If no runner is registered for the configuration's type, or the
+            method fails (see the method).
+        """
+        from commol.api.inference.registry import run_method
+
+        return run_method(self, method, IdentifiabilityMethod)
 
     def _to_rust_parameter_type(
         self, param_type: str
@@ -6925,6 +7190,7 @@ Raises:
 
 | Type         | Description                                                                                     |
 | ------------ | ----------------------------------------------------------------------------------------------- |
+| `TypeError`  | If method is an identifiability method; the message names Calibrator.identifiability.           |
 | `ValueError` | If no runner is registered for the configuration's type; the message names the registered ones. |
 
 Source code in `commol/api/calibrator.py`
@@ -6951,13 +7217,82 @@ def uncertainty(self, method: UncertaintyMethod[ResultT]) -> ResultT:
 
     Raises
     ------
+    TypeError
+        If `method` is an identifiability method; the message names
+        ``Calibrator.identifiability``.
     ValueError
         If no runner is registered for the configuration's type; the
         message names the registered ones.
     """
     from commol.api.inference.registry import run_method
 
-    return run_method(self, method)
+    return run_method(self, method, UncertaintyMethod)
+```
+
+#### identifiability
+
+```python
+identifiability(method: IdentifiabilityMethod[ResultT]) -> ResultT
+```
+
+Run an identifiability method on this calibration problem.
+
+Each method answers which parameters the model and the data determine, from another kind of evidence: `StructuralRank`, `Collinearity`, `SampleIdentifiability` or `StartsIdentifiability`. Each returns an `IdentifiabilityReport`; `IdentifiabilityReport.merge` joins them.
+
+Parameters:
+
+| Name     | Type                             | Description                      | Default    |
+| -------- | -------------------------------- | -------------------------------- | ---------- |
+| `method` | `IdentifiabilityMethod[ResultT]` | The configuration of the method. | *required* |
+
+Returns:
+
+| Type      | Description               |
+| --------- | ------------------------- |
+| `ResultT` | The result of the method. |
+
+Raises:
+
+| Type         | Description                                                                                    |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| `TypeError`  | If method is an uncertainty method; the message names Calibrator.uncertainty.                  |
+| `ValueError` | If no runner is registered for the configuration's type, or the method fails (see the method). |
+
+Source code in `commol/api/calibrator.py`
+
+```python
+def identifiability(self, method: IdentifiabilityMethod[ResultT]) -> ResultT:
+    """
+    Run an identifiability method on this calibration problem.
+
+    Each method answers which parameters the model and the data
+    determine, from another kind of evidence: `StructuralRank`,
+    `Collinearity`, `SampleIdentifiability` or `StartsIdentifiability`.
+    Each returns an `IdentifiabilityReport`; `IdentifiabilityReport.merge`
+    joins them.
+
+    Parameters
+    ----------
+    method : IdentifiabilityMethod[ResultT]
+        The configuration of the method.
+
+    Returns
+    -------
+    ResultT
+        The result of the method.
+
+    Raises
+    ------
+    TypeError
+        If `method` is an uncertainty method; the message names
+        ``Calibrator.uncertainty``.
+    ValueError
+        If no runner is registered for the configuration's type, or the
+        method fails (see the method).
+    """
+    from commol.api.inference.registry import run_method
+
+    return run_method(self, method, IdentifiabilityMethod)
 ```
 
 ## CalibrationProblem
@@ -8812,6 +9147,886 @@ class OptimizationAlgorithm(StrEnum):
 
     NELDER_MEAD = "nelder_mead"
     PARTICLE_SWARM = "particle_swarm"
+```
+
+# Identifiability API
+
+[Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
+
+The identifiability methods, the report they return, and its parts. Guide: [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md).
+
+## IdentifiabilityMethod
+
+Bases: `InferenceMethod[ResultT]`, `Generic[ResultT]`
+
+The configuration of an identifiability method, whose result is `ResultT`.
+
+`Calibrator.identifiability(method)` runs it, and returns its result type. The methods of commol return an `IdentifiabilityReport`.
+
+Source code in `commol/context/inference/method.py`
+
+```python
+class IdentifiabilityMethod(InferenceMethod[ResultT], Generic[ResultT]):
+    """
+    The configuration of an identifiability method, whose result is
+    `ResultT`.
+
+    ``Calibrator.identifiability(method)`` runs it, and returns its result
+    type. The methods of commol return an `IdentifiabilityReport`.
+    """
+```
+
+## StructuralRank
+
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+
+Structural identifiability, local and numerical: the rank of the scaled sensitivities at random points inside the bounds.
+
+The sensitivities come from finite differences, with a step and an error set by the accuracy of the engine; a singular value counts when it is above the norm of that error. The engine must be deterministic.
+
+Attributes:
+
+| Name     | Type  | Description                                                                                                                                                                                                                                           |
+| -------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `points` | `int` | How many rows of a Latin hypercube over the bounds, at least 1.                                                                                                                                                                                       |
+| `design` | `str` | "observations": the positions and outputs of the observations, their values ignored (can this design determine the parameters?). "dense": every observed series at every unit position up to the last observation (can denser data of these series?). |
+| `seed`   | \`int | None\`                                                                                                                                                                                                                                                |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport]):
+    """
+    Structural identifiability, local and numerical: the rank of the scaled
+    sensitivities at random points inside the bounds.
+
+    The sensitivities come from finite differences, with a step and an error
+    set by the accuracy of the engine; a singular value counts when it is
+    above the norm of that error. The engine must be deterministic.
+
+    Attributes
+    ----------
+    points : int
+        How many rows of a Latin hypercube over the bounds, at least 1.
+    design : str
+        ``"observations"``: the positions and outputs of the observations,
+        their values ignored (can this design determine the parameters?).
+        ``"dense"``: every observed series at every unit position up to the
+        last observation (can denser data of these series?).
+    seed : int | None
+        The seed of the points; None takes the seed of the problem.
+    """
+
+    points: int = Field(ge=1)
+    design: Literal["observations", "dense"]
+    seed: int | None = Field(default=None, ge=0)
+```
+
+## Collinearity
+
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+
+Collinearity analysis after Brun et al. (2001): the sensitivity measure of each parameter and the collinearity index of each subset.
+
+The index of a subset is 1 when its sensitivities are orthogonal and grows without bound as they approach linear dependence. The literature puts the threshold between 5 and 20. The engine must be deterministic.
+
+Attributes:
+
+| Name              | Type                | Description                                                                                                                                               |
+| ----------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `at`              | \`CalibrationResult | ParameterSample\`                                                                                                                                         |
+| `max_subset_size` | `int`               | The largest subset, at least 2 and at most the number of parameters. Every subset up to 6 parameters is evaluated; a greedy search adds parameters above. |
+| `threshold`       | `float`             | The index below which a subset can be fitted together. No default: it is a modelling judgment.                                                            |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class Collinearity(IdentifiabilityMethod[IdentifiabilityReport]):
+    """
+    Collinearity analysis after Brun et al. (2001): the sensitivity measure
+    of each parameter and the collinearity index of each subset.
+
+    The index of a subset is 1 when its sensitivities are orthogonal and grows
+    without bound as they approach linear dependence. The literature puts the
+    threshold between 5 and 20. The engine must be deterministic.
+
+    Attributes
+    ----------
+    at : CalibrationResult | ParameterSample
+        Where to evaluate: the best point of a fit, or each draw of a sample,
+        summarized by the weighted median.
+    max_subset_size : int
+        The largest subset, at least 2 and at most the number of parameters.
+        Every subset up to 6 parameters is evaluated; a greedy search adds
+        parameters above.
+    threshold : float
+        The index below which a subset can be fitted together. No default:
+        it is a modelling judgment.
+    """
+
+    at: CalibrationResult | ParameterSample
+    max_subset_size: int = Field(ge=2)
+    threshold: float = Field(gt=1.0)
+```
+
+## SampleIdentifiability
+
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+
+Practical identifiability from any parameter sample: how much it contracts each parameter, which parameters move together, and which marginals have several modes.
+
+Attributes:
+
+| Name                    | Type              | Description                                                                                                                                                       |
+| ----------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sample`                | `ParameterSample` | The sample, such as the draws of an uncertainty method.                                                                                                           |
+| `reference`             | `str`             | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds.                                                                 |
+| `correlation_threshold` | `float`           | The absolute correlation above which a pair is listed and its parameters are poorly determined, strictly between 0 and 1. No default: it is a modelling judgment. |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
+    """
+    Practical identifiability from any parameter sample: how much it contracts
+    each parameter, which parameters move together, and which marginals have
+    several modes.
+
+    Attributes
+    ----------
+    sample : ParameterSample
+        The sample, such as the draws of an uncertainty method.
+    reference : str
+        The distribution the contraction compares with: ``"bounds"``, the
+        uniform distribution on the bounds.
+    correlation_threshold : float
+        The absolute correlation above which a pair is listed and its
+        parameters are poorly determined, strictly between 0 and 1. No
+        default: it is a modelling judgment.
+    """
+
+    sample: ParameterSample
+    reference: Literal["bounds"]
+    correlation_threshold: float = Field(gt=0.0, lt=1.0)
+```
+
+## StartsIdentifiability
+
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+
+Practical identifiability from the starts of a calibration (`Calibrator.run(starts=n)`): converged starts of equal loss that end apart flag the parameters that differ.
+
+Attributes:
+
+| Name                  | Type                | Description                                                   |
+| --------------------- | ------------------- | ------------------------------------------------------------- |
+| `result`              | `CalibrationResult` | The result, with at least two converged starts.               |
+| `parameter_tolerance` | `float`             | The share of its bound width above which a parameter differs. |
+| `loss_tolerance`      | `float`             | The share of the best loss within which two losses are equal. |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
+    """
+    Practical identifiability from the starts of a calibration
+    (``Calibrator.run(starts=n)``): converged starts of equal loss that end
+    apart flag the parameters that differ.
+
+    Attributes
+    ----------
+    result : CalibrationResult
+        The result, with at least two converged starts.
+    parameter_tolerance : float
+        The share of its bound width above which a parameter differs.
+    loss_tolerance : float
+        The share of the best loss within which two losses are equal.
+    """
+
+    result: CalibrationResult
+    parameter_tolerance: float = Field(ge=0.0)
+    loss_tolerance: float = Field(ge=0.0)
+```
+
+## IdentifiabilityReport
+
+Bases: `_Frozen`
+
+Which parameters the model and the data determine: one structural and one practical verdict per parameter, and the evidence of each method.
+
+The structural verdict comes from `StructuralRank` on the design of the observations; a dense design answers what denser data would determine, so its verdicts stay in its section. The practical verdict comes from `Collinearity`, `SampleIdentifiability` and `StartsIdentifiability`.
+
+Attributes:
+
+| Name                                       | Type                           | Description                                        |
+| ------------------------------------------ | ------------------------------ | -------------------------------------------------- |
+| `parameters`                               | `list[str]`                    | The parameters, in problem order.                  |
+| `verdicts`                                 | `dict[str, ParameterVerdicts]` | The verdicts of each parameter.                    |
+| `structural, collinearity, sample, starts` | `list`                         | The sections of the methods that ran, one per run. |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class IdentifiabilityReport(_Frozen):
+    """
+    Which parameters the model and the data determine: one structural and one
+    practical verdict per parameter, and the evidence of each method.
+
+    The structural verdict comes from `StructuralRank` on the design of the
+    observations; a dense design answers what denser data would determine,
+    so its verdicts stay in its section. The practical verdict comes from
+    `Collinearity`, `SampleIdentifiability` and `StartsIdentifiability`.
+
+    Attributes
+    ----------
+    parameters : list[str]
+        The parameters, in problem order.
+    verdicts : dict[str, ParameterVerdicts]
+        The verdicts of each parameter.
+    structural, collinearity, sample, starts : list
+        The sections of the methods that ran, one per run.
+    """
+
+    parameters: list[str]
+    verdicts: dict[str, ParameterVerdicts]
+    structural: list[StructuralSection] = Field(default_factory=list)
+    collinearity: list[CollinearitySection] = Field(default_factory=list)
+    sample: list[SampleSection] = Field(default_factory=list)
+    starts: list[StartsSection] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def check_parameters(self) -> Self:
+        """Check that the verdicts hold the parameters, in order."""
+        if list(self.verdicts) != self.parameters:
+            raise ValueError(
+                f"The verdicts must hold the parameters {self.parameters} in "
+                f"order, got {list(self.verdicts)}."
+            )
+        return self
+
+    def merge(self, *others: "IdentifiabilityReport") -> "IdentifiabilityReport":
+        """
+        Join this report with others of the same parameters.
+
+        The sections are kept side by side. A verdict that the reports agree
+        on stays, with the reasons of each; one they disagree on is
+        ``conflicting``, with every reason.
+
+        Parameters
+        ----------
+        *others : IdentifiabilityReport
+            The reports to join.
+
+        Returns
+        -------
+        IdentifiabilityReport
+            The joined report.
+
+        Raises
+        ------
+        ValueError
+            If a report has other parameters.
+        """
+        reports = [self, *others]
+        for other in others:
+            if other.parameters != self.parameters:
+                raise ValueError(
+                    f"Reports of different parameters cannot merge: "
+                    f"{self.parameters} and {other.parameters}."
+                )
+        verdicts = {
+            name: ParameterVerdicts(
+                structural=_merge_structural(
+                    [
+                        v
+                        for r in reports
+                        if (v := r.verdicts[name].structural) is not None
+                    ]
+                ),
+                practical=_merge_practical(
+                    [
+                        v
+                        for r in reports
+                        if (v := r.verdicts[name].practical) is not None
+                    ]
+                ),
+            )
+            for name in self.parameters
+        }
+        return IdentifiabilityReport(
+            parameters=self.parameters,
+            verdicts=verdicts,
+            structural=[s for r in reports for s in r.structural],
+            collinearity=[s for r in reports for s in r.collinearity],
+            sample=[s for r in reports for s in r.sample],
+            starts=[s for r in reports for s in r.starts],
+        )
+```
+
+### Methods:
+
+#### check_parameters
+
+```python
+check_parameters() -> Self
+```
+
+Check that the verdicts hold the parameters, in order.
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+@model_validator(mode="after")
+def check_parameters(self) -> Self:
+    """Check that the verdicts hold the parameters, in order."""
+    if list(self.verdicts) != self.parameters:
+        raise ValueError(
+            f"The verdicts must hold the parameters {self.parameters} in "
+            f"order, got {list(self.verdicts)}."
+        )
+    return self
+```
+
+#### merge
+
+```python
+merge(*others: IdentifiabilityReport) -> IdentifiabilityReport
+```
+
+Join this report with others of the same parameters.
+
+The sections are kept side by side. A verdict that the reports agree on stays, with the reasons of each; one they disagree on is `conflicting`, with every reason.
+
+Parameters:
+
+| Name      | Type                    | Description          | Default |
+| --------- | ----------------------- | -------------------- | ------- |
+| `*others` | `IdentifiabilityReport` | The reports to join. | `()`    |
+
+Returns:
+
+| Type                    | Description        |
+| ----------------------- | ------------------ |
+| `IdentifiabilityReport` | The joined report. |
+
+Raises:
+
+| Type         | Description                       |
+| ------------ | --------------------------------- |
+| `ValueError` | If a report has other parameters. |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+def merge(self, *others: "IdentifiabilityReport") -> "IdentifiabilityReport":
+    """
+    Join this report with others of the same parameters.
+
+    The sections are kept side by side. A verdict that the reports agree
+    on stays, with the reasons of each; one they disagree on is
+    ``conflicting``, with every reason.
+
+    Parameters
+    ----------
+    *others : IdentifiabilityReport
+        The reports to join.
+
+    Returns
+    -------
+    IdentifiabilityReport
+        The joined report.
+
+    Raises
+    ------
+    ValueError
+        If a report has other parameters.
+    """
+    reports = [self, *others]
+    for other in others:
+        if other.parameters != self.parameters:
+            raise ValueError(
+                f"Reports of different parameters cannot merge: "
+                f"{self.parameters} and {other.parameters}."
+            )
+    verdicts = {
+        name: ParameterVerdicts(
+            structural=_merge_structural(
+                [
+                    v
+                    for r in reports
+                    if (v := r.verdicts[name].structural) is not None
+                ]
+            ),
+            practical=_merge_practical(
+                [
+                    v
+                    for r in reports
+                    if (v := r.verdicts[name].practical) is not None
+                ]
+            ),
+        )
+        for name in self.parameters
+    }
+    return IdentifiabilityReport(
+        parameters=self.parameters,
+        verdicts=verdicts,
+        structural=[s for r in reports for s in r.structural],
+        collinearity=[s for r in reports for s in r.collinearity],
+        sample=[s for r in reports for s in r.sample],
+        starts=[s for r in reports for s in r.starts],
+    )
+```
+
+## ParameterVerdicts
+
+Bases: `_Frozen`
+
+The two verdicts of one parameter; `None` when no evidence gives one.
+
+Attributes:
+
+| Name         | Type                | Description |
+| ------------ | ------------------- | ----------- |
+| `structural` | \`StructuralVerdict | None\`      |
+| `practical`  | \`PracticalVerdict  | None\`      |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class ParameterVerdicts(_Frozen):
+    """
+    The two verdicts of one parameter; ``None`` when no evidence gives one.
+
+    Attributes
+    ----------
+    structural : StructuralVerdict | None
+        From the structural rank on the design of the observations.
+    practical : PracticalVerdict | None
+        From collinearity, a sample or the starts.
+    """
+
+    structural: StructuralVerdict | None = None
+    practical: PracticalVerdict | None = None
+```
+
+## StructuralVerdict
+
+Bases: `_Frozen`
+
+The structural verdict of one parameter.
+
+Attributes:
+
+| Name           | Type                    | Description                                                                                                                                                                                                          |
+| -------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verdict`      | `StructuralVerdictName` | identifiable: the null space of the sensitivities has no component on it. in_combination: only the combinations in combinations are. non_identifiable: it lies in the null space. conflicting: two reports disagree. |
+| `reasons`      | `list[str]`             | Why, one per piece of evidence.                                                                                                                                                                                      |
+| `combinations` | `list[str]`             | The identifiable combinations that hold the parameter, such as "k1 · s".                                                                                                                                             |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class StructuralVerdict(_Frozen):
+    """
+    The structural verdict of one parameter.
+
+    Attributes
+    ----------
+    verdict : StructuralVerdictName
+        ``identifiable``: the null space of the sensitivities has no
+        component on it. ``in_combination``: only the combinations in
+        `combinations` are. ``non_identifiable``: it lies in the null space.
+        ``conflicting``: two reports disagree.
+    reasons : list[str]
+        Why, one per piece of evidence.
+    combinations : list[str]
+        The identifiable combinations that hold the parameter, such as
+        ``"k1 · s"``.
+    """
+
+    verdict: StructuralVerdictName
+    reasons: list[str] = Field(default_factory=list)
+    combinations: list[str] = Field(default_factory=list)
+```
+
+## PracticalVerdict
+
+Bases: `_Frozen`
+
+The practical verdict of one parameter.
+
+Attributes:
+
+| Name      | Type                   | Description                                                                              |
+| --------- | ---------------------- | ---------------------------------------------------------------------------------------- |
+| `verdict` | `PracticalVerdictName` | determined or poorly_determined by these data, or conflicting when two reports disagree. |
+| `reasons` | `list[str]`            | Why, one per piece of evidence.                                                          |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class PracticalVerdict(_Frozen):
+    """
+    The practical verdict of one parameter.
+
+    Attributes
+    ----------
+    verdict : PracticalVerdictName
+        ``determined`` or ``poorly_determined`` by these data, or
+        ``conflicting`` when two reports disagree.
+    reasons : list[str]
+        Why, one per piece of evidence.
+    """
+
+    verdict: PracticalVerdictName
+    reasons: list[str] = Field(default_factory=list)
+```
+
+## StructuralSection
+
+Bases: `_Frozen`
+
+The evidence of `StructuralRank`.
+
+Attributes:
+
+| Name           | Type                               | Description                                                                                               |
+| -------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `design`       | `str`                              | The design the sensitivities were evaluated on: "observations" or "dense".                                |
+| `points`       | `list[PointRank]`                  | Each feasible point.                                                                                      |
+| `skipped`      | `list[str]`                        | Why each infeasible point was skipped.                                                                    |
+| `generic_rank` | `int`                              | The rank at most points.                                                                                  |
+| `projections`  | `dict[str, float]`                 | The norm of the projection of each parameter on the null space, averaged over the points of generic rank. |
+| `verdicts`     | `dict[str, StructuralVerdictName]` | The verdict of each parameter on this design.                                                             |
+| `combinations` | `list[Combination]`                | The identifiable combinations.                                                                            |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class StructuralSection(_Frozen):
+    """
+    The evidence of `StructuralRank`.
+
+    Attributes
+    ----------
+    design : str
+        The design the sensitivities were evaluated on: ``"observations"`` or
+        ``"dense"``.
+    points : list[PointRank]
+        Each feasible point.
+    skipped : list[str]
+        Why each infeasible point was skipped.
+    generic_rank : int
+        The rank at most points.
+    projections : dict[str, float]
+        The norm of the projection of each parameter on the null space,
+        averaged over the points of generic rank.
+    verdicts : dict[str, StructuralVerdictName]
+        The verdict of each parameter on this design.
+    combinations : list[Combination]
+        The identifiable combinations.
+    """
+
+    design: Literal["observations", "dense"]
+    points: list[PointRank]
+    skipped: list[str]
+    generic_rank: int
+    projections: dict[str, float]
+    verdicts: dict[str, StructuralVerdictName]
+    combinations: list[Combination]
+```
+
+## PointRank
+
+Bases: `_Frozen`
+
+The rank of the scaled sensitivities at one point.
+
+Attributes:
+
+| Name              | Type               | Description                                                                                       |
+| ----------------- | ------------------ | ------------------------------------------------------------------------------------------------- |
+| `values`          | `dict[str, float]` | The point.                                                                                        |
+| `singular_values` | `list[float]`      | The singular values, largest first.                                                               |
+| `threshold`       | `float`            | The norm of the estimated errors of the sensitivities, which a singular value must pass to count. |
+| `rank`            | `int`              | How many pass it.                                                                                 |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class PointRank(_Frozen):
+    """
+    The rank of the scaled sensitivities at one point.
+
+    Attributes
+    ----------
+    values : dict[str, float]
+        The point.
+    singular_values : list[float]
+        The singular values, largest first.
+    threshold : float
+        The norm of the estimated errors of the sensitivities, which a
+        singular value must pass to count.
+    rank : int
+        How many pass it.
+    """
+
+    values: dict[str, float]
+    singular_values: list[float]
+    threshold: float
+    rank: int
+```
+
+## Combination
+
+Bases: `_Frozen`
+
+A combination of parameters the data determine: the product of each parameter raised to its exponent.
+
+Attributes:
+
+| Name        | Type               | Description                                                                                                              |
+| ----------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `exponents` | `dict[str, float]` | The exponent of each parameter, in problem order.                                                                        |
+| `text`      | `str`              | The product, such as "k1 · s" or "k1 / s^2"; a parameter whose bounds allow negative values reads as its absolute value. |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class Combination(_Frozen):
+    """
+    A combination of parameters the data determine: the product of each
+    parameter raised to its exponent.
+
+    Attributes
+    ----------
+    exponents : dict[str, float]
+        The exponent of each parameter, in problem order.
+    text : str
+        The product, such as ``"k1 · s"`` or ``"k1 / s^2"``; a parameter whose
+        bounds allow negative values reads as its absolute value.
+    """
+
+    exponents: dict[str, float]
+    text: str
+```
+
+## CollinearitySection
+
+Bases: `_Frozen`
+
+The evidence of `Collinearity`.
+
+Attributes:
+
+| Name           | Type                          | Description                                                                  |
+| -------------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| `threshold`    | `float`                       | The index below which a subset can be fitted together.                       |
+| `points`       | `int`                         | How many points were used: one for a fit, one per feasible draw of a sample. |
+| `skipped`      | `list[str]`                   | Why each infeasible point was skipped.                                       |
+| `sensitivity`  | `dict[str, float]`            | The weighted median of Brun's sensitivity measure of each parameter.         |
+| `pair_gamma`   | `dict[str, dict[str, float]]` | The weighted median of the index of each pair.                               |
+| `best_by_size` | `list[SubsetIndex]`           | The subset of lowest index of each size.                                     |
+| `admissible`   | `list[SubsetIndex]`           | The largest subsets whose index is below the threshold.                      |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class CollinearitySection(_Frozen):
+    """
+    The evidence of `Collinearity`.
+
+    Attributes
+    ----------
+    threshold : float
+        The index below which a subset can be fitted together.
+    points : int
+        How many points were used: one for a fit, one per feasible draw of a
+        sample.
+    skipped : list[str]
+        Why each infeasible point was skipped.
+    sensitivity : dict[str, float]
+        The weighted median of Brun's sensitivity measure of each parameter.
+    pair_gamma : dict[str, dict[str, float]]
+        The weighted median of the index of each pair.
+    best_by_size : list[SubsetIndex]
+        The subset of lowest index of each size.
+    admissible : list[SubsetIndex]
+        The largest subsets whose index is below the threshold.
+    """
+
+    threshold: float
+    points: int
+    skipped: list[str]
+    sensitivity: dict[str, float]
+    pair_gamma: dict[str, dict[str, float]]
+    best_by_size: list[SubsetIndex]
+    admissible: list[SubsetIndex]
+```
+
+## SubsetIndex
+
+Bases: `_Frozen`
+
+A subset of parameters and its collinearity index.
+
+Attributes:
+
+| Name          | Type        | Description                                                                   |
+| ------------- | ----------- | ----------------------------------------------------------------------------- |
+| `parameters`  | `list[str]` | The parameters, in problem order.                                             |
+| `gamma`       | `float`     | The weighted median of the index over the points.                             |
+| `share_below` | `float`     | The share of the weight of the points where the index is below the threshold. |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class SubsetIndex(_Frozen):
+    """
+    A subset of parameters and its collinearity index.
+
+    Attributes
+    ----------
+    parameters : list[str]
+        The parameters, in problem order.
+    gamma : float
+        The weighted median of the index over the points.
+    share_below : float
+        The share of the weight of the points where the index is below the
+        threshold.
+    """
+
+    parameters: list[str]
+    gamma: float
+    share_below: float
+```
+
+## SampleSection
+
+Bases: `_Frozen`
+
+The evidence of `SampleIdentifiability`.
+
+Attributes:
+
+| Name                    | Type                          | Description                                                                                                                          |
+| ----------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `reference`             | `str`                         | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds.                                    |
+| `correlation_threshold` | `float`                       | The absolute correlation above which a pair is listed.                                                                               |
+| `contraction`           | `dict[str, float]`            | 1 − Var(sample) / Var(reference) of each parameter: near 0 when the sample spreads as the reference, near 1 when it sits on a value. |
+| `correlation`           | `dict[str, dict[str, float]]` | The weighted correlation matrix.                                                                                                     |
+| `correlated_pairs`      | `list[CorrelatedPair]`        | The pairs above the threshold.                                                                                                       |
+| `modes`                 | `dict[str, list[float]]`      | The modes of the marginal of each parameter.                                                                                         |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class SampleSection(_Frozen):
+    """
+    The evidence of `SampleIdentifiability`.
+
+    Attributes
+    ----------
+    reference : str
+        The distribution the contraction compares with: ``"bounds"``, the
+        uniform distribution on the bounds.
+    correlation_threshold : float
+        The absolute correlation above which a pair is listed.
+    contraction : dict[str, float]
+        ``1 − Var(sample) / Var(reference)`` of each parameter: near 0 when
+        the sample spreads as the reference, near 1 when it sits on a value.
+    correlation : dict[str, dict[str, float]]
+        The weighted correlation matrix.
+    correlated_pairs : list[CorrelatedPair]
+        The pairs above the threshold.
+    modes : dict[str, list[float]]
+        The modes of the marginal of each parameter.
+    """
+
+    reference: Literal["bounds"]
+    correlation_threshold: float
+    contraction: dict[str, float]
+    correlation: dict[str, dict[str, float]]
+    correlated_pairs: list[CorrelatedPair]
+    modes: dict[str, list[float]]
+```
+
+## CorrelatedPair
+
+Bases: `_Frozen`
+
+Two parameters whose absolute correlation is above the threshold.
+
+Attributes:
+
+| Name            | Type    | Description                       |
+| --------------- | ------- | --------------------------------- |
+| `first, second` | `str`   | The parameters, in problem order. |
+| `correlation`   | `float` | Their weighted correlation.       |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class CorrelatedPair(_Frozen):
+    """
+    Two parameters whose absolute correlation is above the threshold.
+
+    Attributes
+    ----------
+    first, second : str
+        The parameters, in problem order.
+    correlation : float
+        Their weighted correlation.
+    """
+
+    first: str
+    second: str
+    correlation: float
+```
+
+## StartsSection
+
+Bases: `_Frozen`
+
+The evidence of `StartsIdentifiability`.
+
+Attributes:
+
+| Name                  | Type               | Description                                                                           |
+| --------------------- | ------------------ | ------------------------------------------------------------------------------------- |
+| `parameter_tolerance` | `float`            | The share of its bound width above which a parameter differs.                         |
+| `loss_tolerance`      | `float`            | The share of the best loss within which two losses are equal.                         |
+| `near_best`           | `list[int]`        | The converged starts within the loss tolerance of the best.                           |
+| `spread`              | `dict[str, float]` | The largest difference of each parameter between them, as a share of its bound width. |
+| `flagged`             | `list[str]`        | The parameters whose spread is above the tolerance.                                   |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class StartsSection(_Frozen):
+    """
+    The evidence of `StartsIdentifiability`.
+
+    Attributes
+    ----------
+    parameter_tolerance : float
+        The share of its bound width above which a parameter differs.
+    loss_tolerance : float
+        The share of the best loss within which two losses are equal.
+    near_best : list[int]
+        The converged starts within the loss tolerance of the best.
+    spread : dict[str, float]
+        The largest difference of each parameter between them, as a share of
+        its bound width.
+    flagged : list[str]
+        The parameters whose spread is above the tolerance.
+    """
+
+    parameter_tolerance: float
+    loss_tolerance: float
+    near_best: list[int]
+    spread: dict[str, float]
+    flagged: list[str]
 ```
 
 # ModelBuilder API
@@ -16708,6 +17923,72 @@ def simulation_report(
     }
 ```
 
+## identifiability_report
+
+```python
+identifiability_report(report: IdentifiabilityReport) -> IdentifiabilityReportData
+```
+
+Report the identifiability of each parameter as plain data.
+
+Parameters:
+
+| Name     | Type                    | Description                                                                  | Default    |
+| -------- | ----------------------- | ---------------------------------------------------------------------------- | ---------- |
+| `report` | `IdentifiabilityReport` | The result of Calibrator.identifiability, or of IdentifiabilityReport.merge. | *required* |
+
+Returns:
+
+| Type                        | Description                                                                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `IdentifiabilityReportData` | parameters: each parameter, in problem order, with its structural and practical verdicts; sections: the evidence of each method that ran. |
+
+Source code in `commol/api/reporting.py`
+
+```python
+def identifiability_report(report: IdentifiabilityReport) -> IdentifiabilityReportData:
+    """
+    Report the identifiability of each parameter as plain data.
+
+    Parameters
+    ----------
+    report : IdentifiabilityReport
+        The result of ``Calibrator.identifiability``, or of
+        `IdentifiabilityReport.merge`.
+
+    Returns
+    -------
+    IdentifiabilityReportData
+        ``parameters``: each parameter, in problem order, with its structural
+        and practical verdicts; ``sections``: the evidence of each method that
+        ran.
+    """
+    parameters: dict[str, VerdictsEntry] = {}
+    for name in report.parameters:
+        verdicts = report.verdicts[name]
+        structural = verdicts.structural
+        practical = verdicts.practical
+        parameters[name] = {
+            "structural": None
+            if structural is None
+            else {
+                "verdict": structural.verdict,
+                "reasons": list(structural.reasons),
+                "combinations": list(structural.combinations),
+            },
+            "practical": None
+            if practical is None
+            else {"verdict": practical.verdict, "reasons": list(practical.reasons)},
+        }
+    sections: dict[str, list[dict[str, object]]] = {
+        "structural": [section.model_dump() for section in report.structural],
+        "collinearity": [section.model_dump() for section in report.collinearity],
+        "sample": [section.model_dump() for section in report.sample],
+        "starts": [section.model_dump() for section in report.starts],
+    }
+    return {"parameters": parameters, "sections": sections}
+```
+
 # Simulation API
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
@@ -19186,9 +20467,33 @@ def windowed_totals(
 
 What every uncertainty method takes and returns: the configuration base, the weighted parameter sample, the predictive, the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
 
-## UncertaintyMethod
+## InferenceMethod
 
 Bases: `BaseModel`, `Generic[ResultT]`
+
+The configuration of a method that reads a calibration problem, whose result is `ResultT`.
+
+A method subclasses one of its kinds, `UncertaintyMethod` or `IdentifiabilityMethod`, with its result type, and registers its runner (`commol.api.inference.registry.register`).
+
+Source code in `commol/context/inference/method.py`
+
+```python
+class InferenceMethod(BaseModel, Generic[ResultT]):
+    """
+    The configuration of a method that reads a calibration problem, whose
+    result is `ResultT`.
+
+    A method subclasses one of its kinds, `UncertaintyMethod` or
+    `IdentifiabilityMethod`, with its result type, and registers its runner
+    (`commol.api.inference.registry.register`).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+```
+
+## UncertaintyMethod
+
+Bases: `InferenceMethod[ResultT]`, `Generic[ResultT]`
 
 The configuration of an uncertainty method, whose result is `ResultT`.
 
@@ -19197,7 +20502,7 @@ A method subclasses it with its result type, for example `class BayesianBootstra
 Source code in `commol/context/inference/method.py`
 
 ```python
-class UncertaintyMethod(BaseModel, Generic[ResultT]):
+class UncertaintyMethod(InferenceMethod[ResultT], Generic[ResultT]):
     """
     The configuration of an uncertainty method, whose result is `ResultT`.
 
@@ -19207,8 +20512,6 @@ class UncertaintyMethod(BaseModel, Generic[ResultT]):
     ``Calibrator.uncertainty(method)`` returns that result type, so a static
     type checker infers it from the configuration's type.
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 ```
 
 ## ParameterSample
@@ -21582,9 +22885,9 @@ def ci_percentiles(confidence_level: float) -> tuple[float, float]:
 
 ## registry
 
-The runners of uncertainty methods, looked up by configuration type.
+The runners of inference methods, looked up by configuration type.
 
-A method registers its runner with `register`; `Calibrator.uncertainty` finds it with `run_method`. The entry point knows no method.
+A method registers its runner with `register`; `Calibrator.uncertainty` and `Calibrator.identifiability` find it with `run_method`. The entry points know no method.
 
 ### Classes
 
@@ -21596,14 +22899,14 @@ A method registers its runner with `register`; `Calibrator.uncertainty` finds it
 register(method_type: type[MethodT], runner: Callable[[Calibrator, MethodT], BaseModel]) -> None
 ```
 
-Register the runner of an uncertainty method.
+Register the runner of an inference method.
 
 Parameters:
 
-| Name          | Type                                                   | Description                                             | Default    |
-| ------------- | ------------------------------------------------------ | ------------------------------------------------------- | ---------- |
-| `method_type` | `type[UncertaintyMethod]`                              | The configuration type of the method.                   | *required* |
-| `runner`      | `Callable[[Calibrator, UncertaintyMethod], BaseModel]` | Runs the method on a calibrator and returns its result. | *required* |
+| Name          | Type                                                 | Description                                             | Default    |
+| ------------- | ---------------------------------------------------- | ------------------------------------------------------- | ---------- |
+| `method_type` | `type[InferenceMethod]`                              | The configuration type of the method.                   | *required* |
+| `runner`      | `Callable[[Calibrator, InferenceMethod], BaseModel]` | Runs the method on a calibrator and returns its result. | *required* |
 
 Raises:
 
@@ -21619,13 +22922,13 @@ def register(
     runner: Callable[["Calibrator", MethodT], BaseModel],
 ) -> None:
     """
-    Register the runner of an uncertainty method.
+    Register the runner of an inference method.
 
     Parameters
     ----------
-    method_type : type[UncertaintyMethod]
+    method_type : type[InferenceMethod]
         The configuration type of the method.
-    runner : Callable[[Calibrator, UncertaintyMethod], BaseModel]
+    runner : Callable[[Calibrator, InferenceMethod], BaseModel]
         Runs the method on a calibrator and returns its result.
 
     Raises
@@ -21670,17 +22973,18 @@ def registered() -> list[str]:
 #### run_method
 
 ```python
-run_method(calibrator: Calibrator, method: UncertaintyMethod[ResultT]) -> ResultT
+run_method(calibrator: Calibrator, method: InferenceMethod[ResultT], kind: type[InferenceMethod[BaseModel]]) -> ResultT
 ```
 
 Run `method` on `calibrator` with the runner of its type.
 
 Parameters:
 
-| Name         | Type                         | Description                      | Default    |
-| ------------ | ---------------------------- | -------------------------------- | ---------- |
-| `calibrator` | `Calibrator`                 | The calibration problem.         | *required* |
-| `method`     | `UncertaintyMethod[ResultT]` | The configuration of the method. | *required* |
+| Name         | Type                       | Description                                                                           | Default    |
+| ------------ | -------------------------- | ------------------------------------------------------------------------------------- | ---------- |
+| `calibrator` | `Calibrator`               | The calibration problem.                                                              | *required* |
+| `method`     | `InferenceMethod[ResultT]` | The configuration of the method.                                                      | *required* |
+| `kind`       | `type[InferenceMethod]`    | The kind of method the entry point takes: UncertaintyMethod or IdentifiabilityMethod. | *required* |
 
 Returns:
 
@@ -21690,14 +22994,19 @@ Returns:
 
 Raises:
 
-| Type         | Description                                              |
-| ------------ | -------------------------------------------------------- |
-| `ValueError` | If no runner is registered for the configuration's type. |
+| Type         | Description                                                  |
+| ------------ | ------------------------------------------------------------ |
+| `TypeError`  | If method is not of kind; the message names its entry point. |
+| `ValueError` | If no runner is registered for the configuration's type.     |
 
 Source code in `commol/api/inference/registry.py`
 
 ```python
-def run_method(calibrator: "Calibrator", method: UncertaintyMethod[ResultT]) -> ResultT:
+def run_method(
+    calibrator: "Calibrator",
+    method: InferenceMethod[ResultT],
+    kind: type[InferenceMethod[BaseModel]],
+) -> ResultT:
     """
     Run `method` on `calibrator` with the runner of its type.
 
@@ -21705,8 +23014,11 @@ def run_method(calibrator: "Calibrator", method: UncertaintyMethod[ResultT]) -> 
     ----------
     calibrator : Calibrator
         The calibration problem.
-    method : UncertaintyMethod[ResultT]
+    method : InferenceMethod[ResultT]
         The configuration of the method.
+    kind : type[InferenceMethod]
+        The kind of method the entry point takes: `UncertaintyMethod` or
+        `IdentifiabilityMethod`.
 
     Returns
     -------
@@ -21715,13 +23027,26 @@ def run_method(calibrator: "Calibrator", method: UncertaintyMethod[ResultT]) -> 
 
     Raises
     ------
+    TypeError
+        If `method` is not of `kind`; the message names its entry point.
     ValueError
         If no runner is registered for the configuration's type.
     """
+    if not isinstance(method, kind):
+        right = next(
+            (
+                name
+                for other, name in _ENTRY_POINTS.items()
+                if isinstance(method, other)
+            ),
+            None,
+        )
+        hint = f" Run it with {right}." if right else ""
+        raise TypeError(f"{type(method).__name__} is not a {kind.__name__}.{hint}")
     runner = _RUNNERS.get(type(method))
     if runner is None:
         raise ValueError(
-            f"No uncertainty method is registered for {type(method).__name__}. "
+            f"No method is registered for {type(method).__name__}. "
             f"Registered: {registered()}."
         )
     return cast("ResultT", runner(calibrator, method))
@@ -23761,6 +25086,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `Predictive(calibrator, sample, positions)`: the run of every draw, in parallel, its band (`band`, `series_band`) and every draw's value of a set of observations through the observation operator of the loss (`at_observations`). `SimulationPlotter` and `simulation_report` take a predictive.
 - `commol.scores`: empirical coverage, interval score, weighted interval score, the CRPS of a weighted sample and PIT values of a predictive, per observation and per series.
 - `Calibrator.uncertainty(method)`: one entry point for every uncertainty method. A method's configuration subclasses `UncertaintyMethod[R]` and registers its runner; the result type follows the configuration's type.
+- `Calibrator.identifiability(method)`: which parameters the model and the data determine, and which combinations they determine in their place. `StructuralRank` (the rank of the sensitivities at random points, on the design of the observations or a dense one), `Collinearity` (Brun's indices at a fit or over a sample), `SampleIdentifiability` (contraction, correlations and modes of a sample) and `StartsIdentifiability` (starts of equal loss that end apart). Each returns an `IdentifiabilityReport` with a structural and a practical verdict per parameter; `merge` joins reports and `identifiability_report` gives one as plain data. See [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md).
+- `InferenceMethod[R]`, the common base of `UncertaintyMethod[R]` and `IdentifiabilityMethod[R]`; each entry point refuses the other kind with a `TypeError`.
 - `weighted_quantiles`, and a `weights` argument for `member_statistics`.
 - `CalibrationHistory` and `CalibrationEvaluation`, returned by `Calibrator.run_with_history()`.
 - The crate `commol-inference`: the parameter sample, the one quantile, the predictive and the scores. See [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).

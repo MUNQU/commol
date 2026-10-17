@@ -28,6 +28,7 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 - [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md): Nelder-Mead and particle swarm settings, reproducibility, troubleshooting
 - [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md): Constraints on unknowns and outputs, and how violations count
 - [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md): The three questions, bands and prediction intervals, which method answers which question, the parameter sample, the predictive, scores and the entry point
+- [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md): Structural against practical identifiability, the structural rank, collinearity, a sample, starts, combinations and the report
 - [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md): applied_parameters_report and simulation_report
 - [Examples](https://munqu.github.io/commol/latest/guide/examples/index.md): Complete models
 
@@ -37,6 +38,7 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 - [AxisPattern](https://munqu.github.io/commol/latest/api/axis-patterns/index.md)
 - [AxisUnits](https://munqu.github.io/commol/latest/api/axis-units/index.md)
 - [Calibration](https://munqu.github.io/commol/latest/api/calibrator/index.md)
+- [Identifiability](https://munqu.github.io/commol/latest/api/identifiability/index.md)
 - [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md)
 - [Model](https://munqu.github.io/commol/latest/api/model/index.md)
 - [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)

@@ -18,7 +18,7 @@
         <link rel="prev" href="../reports/">
       
       
-        <link rel="next" href="../examples/">
+        <link rel="next" href="identifiability/">
       
       
         
@@ -1418,6 +1418,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1752,6 +1780,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
   
 
     
@@ -2562,7 +2618,7 @@ Each method has its own page, listed in the table below.</p>
 <tbody>
 <tr>
 <td>Which parameters fit the data?</td>
-<td>A sample of the parameters, or a profile of the loss; several starts that end apart with equal losses show that the data do not identify the parameters</td>
+<td>The <a href="identifiability/">identifiability</a> methods; a sample of the parameters, or a profile of the loss; several starts that end apart with equal losses show that the data do not identify the parameters</td>
 </tr>
 <tr>
 <td>How do the inputs move the outputs?</td>
@@ -2599,6 +2655,30 @@ coverage of the data is below its level.</p>
 <td>Which parameters fit the data: distinct ends with equal losses</td>
 <td>No</td>
 <td><a href="../calibration-optimizers/#several-starts">Optimizers</a></td>
+</tr>
+<tr>
+<td><code>StructuralRank</code></td>
+<td>Which parameters any data of this design can determine, and which combinations</td>
+<td>No</td>
+<td><a href="identifiability/#structural-rank">Identifiability</a></td>
+</tr>
+<tr>
+<td><code>Collinearity</code></td>
+<td>Which parameters can be fitted together</td>
+<td>No</td>
+<td><a href="identifiability/#collinearity">Identifiability</a></td>
+</tr>
+<tr>
+<td><code>SampleIdentifiability</code></td>
+<td>Which parameters a sample determines: contraction, correlations, modes</td>
+<td>No</td>
+<td><a href="identifiability/#a-sample">Identifiability</a></td>
+</tr>
+<tr>
+<td><code>StartsIdentifiability</code></td>
+<td>Which parameters differ between starts of equal loss</td>
+<td>No</td>
+<td><a href="identifiability/#starts">Identifiability</a></td>
 </tr>
 </tbody>
 </table>
@@ -2853,6 +2933,12 @@ configuration, a subclass of <code>UncertaintyMethod[R]</code> whose type parame
 its result; the call returns an <code>R</code>, which a static type checker infers from
 the configuration's type. A configuration with no registered runner raises a
 <code>ValueError</code> that names the registered ones.</p>
+<p>The identifiability methods run through their own entry point,
+<code>Calibrator.identifiability(method)</code>, with a subclass of
+<code>IdentifiabilityMethod[R]</code>: they answer another question
+(<a href="identifiability/">Identifiability</a>). Both kinds subclass
+<code>InferenceMethod[R]</code> and share one registry; each entry point refuses the
+other kind with a <code>TypeError</code> that names the right one.</p>
 <!-- doc-test: skip: no method ships yet; shows the call -->
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span><span class="n">SomeMethod</span><span class="p">(</span><span class="o">...</span><span class="p">))</span>
 </span></code></pre></div>
@@ -2874,6 +2960,10 @@ the configuration's type. A configuration with no registered runner raises a
 <tr>
 <td>Several starts of an optimizer</td>
 <td><a href="../calibration-optimizers/#several-starts">Optimizers</a></td>
+</tr>
+<tr>
+<td>Which parameters the data determine</td>
+<td><a href="identifiability/">Identifiability</a></td>
 </tr>
 <tr>
 <td>Reports of a sample</td>

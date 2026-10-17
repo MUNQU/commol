@@ -165,7 +165,7 @@ print({name: round(value, 2) for name, value in result.best_parameters.items()})
 | `starts`                  | One `StartSummary` per start that finished, in order: `start`, `end`, `loss`, `converged`                                     |
 | `failed_runs`             | Why each start that failed did, with its number; each is also logged as a warning (`logging`, logger `commol.api.calibrator`) |
 
-The result is the start of least loss; if every start fails, `run` raises a `RuntimeError` with every reason. Starts that end at distinct points with equal losses are a sign that the data do not identify the parameters (see [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)).
+The result is the start of least loss; if every start fails, `run` raises a `RuntimeError` with every reason. Starts that end at distinct points with equal losses are a sign that the data do not identify the parameters; `StartsIdentifiability` names the parameters that differ (see [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)).
 
 ## Reproducibility
 

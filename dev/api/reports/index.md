@@ -257,3 +257,69 @@ def simulation_report(
         ),
     }
 ```
+
+## identifiability_report
+
+```python
+identifiability_report(report: IdentifiabilityReport) -> IdentifiabilityReportData
+```
+
+Report the identifiability of each parameter as plain data.
+
+Parameters:
+
+| Name     | Type                    | Description                                                                  | Default    |
+| -------- | ----------------------- | ---------------------------------------------------------------------------- | ---------- |
+| `report` | `IdentifiabilityReport` | The result of Calibrator.identifiability, or of IdentifiabilityReport.merge. | *required* |
+
+Returns:
+
+| Type                        | Description                                                                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `IdentifiabilityReportData` | parameters: each parameter, in problem order, with its structural and practical verdicts; sections: the evidence of each method that ran. |
+
+Source code in `commol/api/reporting.py`
+
+```python
+def identifiability_report(report: IdentifiabilityReport) -> IdentifiabilityReportData:
+    """
+    Report the identifiability of each parameter as plain data.
+
+    Parameters
+    ----------
+    report : IdentifiabilityReport
+        The result of ``Calibrator.identifiability``, or of
+        `IdentifiabilityReport.merge`.
+
+    Returns
+    -------
+    IdentifiabilityReportData
+        ``parameters``: each parameter, in problem order, with its structural
+        and practical verdicts; ``sections``: the evidence of each method that
+        ran.
+    """
+    parameters: dict[str, VerdictsEntry] = {}
+    for name in report.parameters:
+        verdicts = report.verdicts[name]
+        structural = verdicts.structural
+        practical = verdicts.practical
+        parameters[name] = {
+            "structural": None
+            if structural is None
+            else {
+                "verdict": structural.verdict,
+                "reasons": list(structural.reasons),
+                "combinations": list(structural.combinations),
+            },
+            "practical": None
+            if practical is None
+            else {"verdict": practical.verdict, "reasons": list(practical.reasons)},
+        }
+    sections: dict[str, list[dict[str, object]]] = {
+        "structural": [section.model_dump() for section in report.structural],
+        "collinearity": [section.model_dump() for section in report.collinearity],
+        "sample": [section.model_dump() for section in report.sample],
+        "starts": [section.model_dump() for section in report.starts],
+    }
+    return {"parameters": parameters, "sections": sections}
+```
