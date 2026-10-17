@@ -397,7 +397,7 @@ builder = (
 )
 ```
 
-The engine decides the kind when the model is built, and [`model.describe()`](https://munqu.github.io/commol/latest/guide/describing-models/index.md) shows the result: the proportional rate above shows as `k2 * B`. See [Design decisions](https://munqu.github.io/commol/latest/codebase/design-decisions/#absolute-and-proportional-rates) for the exact rule.
+The engine decides the kind when the model is built, and [`model.describe()`](https://munqu.github.io/commol/latest/guide/describing-models/index.md) shows the result: the proportional rate above shows as `k2 * B`. See [Design decisions](https://munqu.github.io/commol/latest/codebase/decisions/transitions-and-rates/#absolute-and-proportional-rates) for the exact rule.
 
 ## Accumulators
 
@@ -2446,13 +2446,13 @@ except ValueError as error:
 
 Replicate `i` takes the seed derived from `seed` and `i`, the SplitMix64 of `seed + i` (`replicate_seed` in `crates/commol-random/src/generator.rs`), so a replicate gives the same run however many replicates run, and `simulation.run(…, seed=replicates[i].seed)` repeats it. `SimulationReplicates` (`py-commol/commol/api/results.py`) is a list of `SimulationResults`:
 
-| Member                                        | Returns                                                                                                                                                                                                                                            |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `replicates[i]`, `len(replicates)`            | One run, with its `seed`; the number of runs                                                                                                                                                                                                       |
-| `seed`, `seeds`, `positions`                  | The seed the replicate seeds derive from, the seed of each replicate, the positions                                                                                                                                                                |
-| `mean()`                                      | `SimulationResults` of the mean of every output at each position                                                                                                                                                                                   |
-| `quantiles(levels)`                           | `{level: SimulationResults}`, at each position, by [the one quantile](https://munqu.github.io/commol/latest/codebase/design-decisions/#one-confidence-interval-convention) (NumPy's `method="hazen"`)                                              |
-| `member_statistics(output, confidence_level)` | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate with [the one quantile](https://munqu.github.io/commol/latest/codebase/design-decisions/#one-confidence-interval-convention) |
+| Member                                        | Returns                                                                                                                                                                                                                                             |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `replicates[i]`, `len(replicates)`            | One run, with its `seed`; the number of runs                                                                                                                                                                                                        |
+| `seed`, `seeds`, `positions`                  | The seed the replicate seeds derive from, the seed of each replicate, the positions                                                                                                                                                                 |
+| `mean()`                                      | `SimulationResults` of the mean of every output at each position                                                                                                                                                                                    |
+| `quantiles(levels)`                           | `{level: SimulationResults}`, at each position, by [the one quantile](https://munqu.github.io/commol/latest/codebase/decisions/results/#one-confidence-interval-convention) (NumPy's `method="hazen"`)                                              |
+| `member_statistics(output, confidence_level)` | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate with [the one quantile](https://munqu.github.io/commol/latest/codebase/decisions/results/#one-confidence-interval-convention) |
 
 ```python
 from commol.api.plotter import SimulationPlotter
@@ -24009,7 +24009,7 @@ In JSON the structure is an object with its `kind`, its `variant` and the fields
 }
 ```
 
-`Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete` and `Groups` are documented in [Model API](https://munqu.github.io/commol/latest/api/model/index.md). The engine must run the kind of the structure: a model whose engine runs another kind is rejected when it is made, with an error that names the engine, both kinds and the engines of the kind of the model. A variant keeps the kind, the fields and the engines of its structure, and loads back as its own class ([Design decisions](https://munqu.github.io/commol/latest/codebase/design-decisions/#a-model-is-a-header-a-process-a-structure-and-an-engine)).
+`Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete` and `Groups` are documented in [Model API](https://munqu.github.io/commol/latest/api/model/index.md). The engine must run the kind of the structure: a model whose engine runs another kind is rejected when it is made, with an error that names the engine, both kinds and the engines of the kind of the model. A variant keeps the kind, the fields and the engines of its structure, and loads back as its own class ([Design decisions](https://munqu.github.io/commol/latest/codebase/decisions/model-kinds/#a-model-is-a-header-a-process-a-structure-and-an-engine)).
 
 ## Bins and accumulators
 

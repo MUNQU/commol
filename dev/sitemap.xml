@@ -89,6 +89,50 @@
          <lastmod>2026-10-17</lastmod>
     </url>
     <url>
+         <loc>https://munqu.github.io/commol/dev/codebase/tests/</loc>
+         <lastmod>2026-10-17</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/codebase/decisions/calibration/</loc>
+         <lastmod>2026-10-17</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/codebase/decisions/engines/</loc>
+         <lastmod>2026-10-17</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/codebase/decisions/initial-conditions/</loc>
+         <lastmod>2026-10-17</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/codebase/decisions/model-kinds/</loc>
+         <lastmod>2026-10-17</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/codebase/decisions/model-structure/</loc>
+         <lastmod>2026-10-17</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/codebase/decisions/results/</loc>
+         <lastmod>2026-10-17</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/codebase/decisions/security/</loc>
+         <lastmod>2026-10-17</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/codebase/decisions/time/</loc>
+         <lastmod>2026-10-17</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/codebase/decisions/transitions-and-rates/</loc>
+         <lastmod>2026-10-17</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/codebase/decisions/uncertainty/</loc>
+         <lastmod>2026-10-17</lastmod>
+    </url>
+    <url>
          <loc>https://munqu.github.io/commol/dev/development/contributing/</loc>
          <lastmod>2026-10-17</lastmod>
     </url>
