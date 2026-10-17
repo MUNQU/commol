@@ -16,11 +16,9 @@ maturin develop --release --features test-kind
 pre-commit install
 ```
 
-Run `maturin develop --release --features test-kind` again after every Rust
-change, before you run `pytest`. The `test-kind` feature adds the model kind of
-the tests (`py-commol/src/test_kind.rs`); the tests of `tests/model_kinds/`
-need it, and a release build never has it. `cargo build --workspace` does not link the PyO3 crate outside
-maturin; use `cargo clippy` and the per-crate tests instead (see
+The `test-kind` feature adds the model kind of the tests
+(`py-commol/src/test_kind.rs`); the tests of `tests/model_kinds/` need it, and
+a release build never has it. Rebuild after every Rust change (see
 [Quick commands](#quick-commands)).
 
 ## Branching Strategy
@@ -198,15 +196,7 @@ cargo clippy --all-targets --fix      # Fix Rust linting issues
 
 ### 3. Testing Your Changes
 
-```bash
-# Run Python tests (with virtual environment activated)
-cd py-commol
-pytest -v
-
-# Run Rust tests
-cd ..
-cargo test --workspace
-```
+Run the Python and the Rust tests of [Quick commands](#quick-commands).
 
 ### 4. Committing Changes
 
@@ -295,7 +285,7 @@ Process](release.md)).
 | Code Quality (`code-quality.yaml`) | Pull requests, the merge queue and on demand | Python: Ruff (lint, format, docstrings `D1`/`D417`) of `py-commol/` and `.github/scripts/`, Ty, Pytest with the documentation checks (`pytest -m docs`) and its coverage. Rust: rustfmt, Clippy (`-D warnings`, so `missing_docs` too), rustdoc without broken links, cargo test with its coverage (`cargo llvm-cov`). Both upload their coverage to Codecov (flags `python` and `rust`) with the OIDC token of the run, so no secret is needed; `.github/codecov.yml` makes its checks informational. | `Python Code Quality`, `Rust Code Quality` |
 | Build (`build.yaml`) | Pull requests, the merge queue, every Monday on `main` and on demand | Tests, except the documentation checks and the coverage studies. A pull request runs one job, Ubuntu with Python 3.12, for a fast answer; the merge queue, the weekly and the manual runs test Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14. A failure that only one operating system shows appears in the queue, which then removes the pull request. A change of only documentation or planning files (`docs/`, Markdown at the root, `mkdocs.yaml`, `.github/ISSUE_TEMPLATE/`, `.github/scripts/`) skips the tests. The wheels of every architecture are built by the release (`release.yaml`). | `Build Passed` |
 | Documentation (`docs.yaml`) | Pull requests, the merge queue, pushes to `main` and release tags | `mkdocs build --strict`: no broken internal link or anchor. Deploys the site with mike: a release tag as `latest`, a push to `main` as `dev`. | `Build Documentation` |
-| Coverage Studies (`coverage.yaml`) | Every Monday; on demand | `pytest -m coverage_study`: the intervals of each uncertainty method cover the truth at their level ([Design decisions](../codebase/design-decisions.md#methods-plug-into-one-entry-point)). | None: each study runs many fits |
+| Coverage Studies (`coverage.yaml`) | Every Monday; on demand | `pytest -m coverage_study`: the intervals of each uncertainty method cover the truth at their level ([Design decisions](../codebase/decisions/uncertainty.md#methods-plug-into-one-entry-point)). | None: each study runs many fits |
 | Links (`links.yaml`) | Pull requests that change `docs/`, `README.md` or `AGENTS.md`; every Monday; on demand | External links, with lychee. | None: a site that is down for a while must not block a pull request |
 | Merge queue (`merge_group` in Code Quality, Build and Documentation) | A pull request queued for `main` | The same required checks, on the pull request merged on top of the ones queued before it, at most 2 groups at a time and up to 5 pull requests per group. The tree that reaches `main` is the tree the queue tested, so a push to `main` runs no tests again. | The same |
 | Release (`release.yaml`) | A published GitHub release | Builds wheels and the sdist, and publishes them to PyPI. See [Release Process](release.md). | — |
@@ -304,28 +294,7 @@ Process](release.md)).
 
 ### Quick Commands
 
-```bash
-# Python, from py-commol/ with the virtual environment active
-ruff check . ../.github/scripts && ruff format --check . ../.github/scripts && ty check commol
-vulture commol .vulture_allowlist.py --min-confidence 80 && pytest
-
-# Rust, from the repository root
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-stochastic -p commol
-cargo test -p commol --features test-kind   # the engine of the test model kind
-
-# Coverage studies (slow), from py-commol/
-pytest -m coverage_study
-
-# Test coverage, as CI measures it (Rust needs `cargo install cargo-llvm-cov` and
-# `rustup component add llvm-tools-preview`)
-pytest --cov=commol                           # from py-commol/
-cargo llvm-cov --all-features --workspace     # from the repository root
-
-# Documentation, from the repository root
-mkdocs build --strict
-```
+--8<-- "AGENTS.md:commands"
 
 ### Pre-commit Hooks
 

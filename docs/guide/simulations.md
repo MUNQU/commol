@@ -141,8 +141,8 @@ replicate gives the same run however many replicates run, and
 | `replicates[i]`, `len(replicates)` | One run, with its `seed`; the number of runs |
 | `seed`, `seeds`, `positions` | The seed the replicate seeds derive from, the seed of each replicate, the positions |
 | `mean()` | `SimulationResults` of the mean of every output at each position |
-| `quantiles(levels)` | `{level: SimulationResults}`, at each position, by [the one quantile](../codebase/design-decisions.md#one-confidence-interval-convention) (NumPy's `method="hazen"`) |
-| `member_statistics(output, confidence_level)` | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate with [the one quantile](../codebase/design-decisions.md#one-confidence-interval-convention) |
+| `quantiles(levels)` | `{level: SimulationResults}`, at each position, by [the one quantile](../codebase/decisions/results.md#one-confidence-interval-convention) (NumPy's `method="hazen"`) |
+| `member_statistics(output, confidence_level)` | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate with [the one quantile](../codebase/decisions/results.md#one-confidence-interval-convention) |
 
 ```python
 from commol.api.plotter import SimulationPlotter

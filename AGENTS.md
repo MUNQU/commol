@@ -10,26 +10,24 @@ predictive and scores (`commol-inference`), joined by PyO3 bindings
 (`py-commol/src/`). This file is an index. The details live in `docs/`, and
 the code is the final authority.
 
-**Golden rule: the Rust engine is the single source of truth.** Python
-validates input and presents results. It never re-implements how the engine
-expands, initializes, plans or simulates a model. It asks the engine.
+**Golden rule: the Rust engine is the single source of truth**
+([Mental model](docs/codebase/mental-model.md#the-golden-rule)).
 
-**Documentation is mandatory.** Every change to this repository, including
-yours, ships with the documentation it needs, in the agreed format and at the
-agreed quality. Before you call a change done, follow the
-[documentation definition of done](docs/codebase/conventions.md#documentation-definition-of-done).
+**Documentation is mandatory.** A change, yours too, is done only when it meets
+the [documentation definition of done](docs/codebase/conventions.md#documentation-definition-of-done).
 
 ## Before you change code
 
 1. Read [Mental model](docs/codebase/mental-model.md) (5 minutes) and look at
    the diagrams of [Architecture](docs/codebase/architecture.md).
 2. Find the owner of the behavior in [Repository map](docs/codebase/repository-map.md).
-3. Read the [Design decisions](docs/codebase/design-decisions.md) that touch it.
+3. Read only the page of your area in [Design decisions](docs/codebase/design-decisions.md).
 4. Follow the checklist for your change in the [Maintainer playbook](docs/codebase/maintainer-playbook.md).
 5. Update the documentation as the [definition of done](docs/codebase/conventions.md#documentation-definition-of-done) requires.
 
 ## Commands
 
+<!-- --8<-- [start:commands] -->
 Run them from `py-commol/` with the virtual environment `py-commol/.venv`.
 
 | Task | Command |
@@ -49,6 +47,7 @@ Run them from `py-commol/` with the virtual environment `py-commol/.venv`.
 Rebuild the extension after every Rust change, before you run `pytest`.
 `cargo build --workspace` does not link the PyO3 crate outside `maturin`; use
 `clippy` and the per-crate tests instead.
+<!-- --8<-- [end:commands] -->
 
 ## Rules
 
@@ -58,7 +57,7 @@ Rebuild the extension after every Rust change, before you run `pytest`.
 | Local files | Never stage or commit `CLAUDE.md` or `AGENT.md`; they are local context files. |
 | Branches | One branch, `main` (trunk-based). Work on a short branch from `main`; a PR to `main` goes through the merge queue and is squash-merged. A release is a tag on `main`; a branch `release/X.Y` is cut from its tag only to fix an old version. See [Development workflow](docs/development/workflow.md). |
 | Rust toolchain | `rust-toolchain.toml` pins the one Rust version of local builds, hooks and CI. Never use a floating `stable` in a workflow; Dependabot proposes each newer stable release in its own PR: [The Rust toolchain](docs/development/workflow.md#the-rust-toolchain). |
-| Tests | Run the Rust and the Python suites before you call a change done. Put a Python test in the package of its guide page, build models with `tests/support/`, and check a result: [Tests](docs/codebase/conventions.md#tests). |
+| Tests | Run the Rust and the Python suites before you call a change done. Put a Python test in the package of its guide page, build models with `tests/support/`, and check a result: [Tests](docs/codebase/tests.md). |
 | Comments | Describe the code as it is, never how it came to be. See [Conventions](docs/codebase/conventions.md). |
 | Docs | **Mandatory.** Every change ships with its documentation, in the agreed format and quality: the [documentation definition of done](docs/codebase/conventions.md#documentation-definition-of-done). |
 | Planning | Work is a GitHub issue written from `.github/ISSUE_TEMPLATE/`: a proposal (label `proposal`) holds the requirements with their tests, the decisions and the tasks; its blockers and milestone set the order and the release, and the [project](https://github.com/orgs/MUNQU/projects/1) shows its status. Two proposals run in parallel when no link joins them and neither changes what the other touches (`.github/scripts/parallel.py`). The next one is `.github/scripts/next.sh`; start it with `.github/scripts/start.sh <number> <type>/<name>`, never by hand. A change updates every open issue it affects (body and a comment; `python .github/scripts/affected.py --closes <number>` lists them), and work it leaves undone goes to an open issue, never only to a comment of the closed one. A pull request says `Closes #N`. See [Planning](docs/development/workflow.md#planning). |
@@ -66,14 +65,15 @@ Rebuild the extension after every Rust change, before you run `pytest`.
 
 ## If you need to…
 
+<!-- --8<-- [start:tasks] -->
 | Task | Start with | Then check |
 |---|---|---|
 | Change how a model expands into compartments | `crates/commol-model/src/builder.rs` (`expand`) | `layout.rs`, `py-commol/commol/context/_model/engine_state.py` |
 | Change how transitions become flows | `crates/commol-model/src/flows.rs` | `helpers.rs`, `system.rs` (`flow_rates`, `flow_changes`, `derivatives`), `context/_model/equations.py` (`DynamicsDescription`) |
 | Change the difference step | `crates/commol-difference/src/simulation.rs` | `crates/commol-core/src/simulation_engine.rs` |
-| Change the ODE engine or its solver settings | `crates/commol-differential/src/solve.rs` | `lib.rs`, `crates/commol-core/src/types/engine.rs` (`OdeSolver`), `py-commol/commol/context/engine.py` |
-| Add a model type (engine) | `crates/commol-core/src/types/engine.rs` (`EngineType`) | `py-commol/src/engine.rs` (`Engine`), `py-commol/commol/context/engine.py`, the [checklist](docs/codebase/maintainer-playbook.md#model-type-engine) |
-| Add a model kind | `py-commol/commol/context/structure.py` (`ModelStructure`) | `crates/commol-core/src/types/structure.rs`, `engine.rs` (`ModelKind`), `py-commol/src/engine.rs`, the [checklist](docs/codebase/maintainer-playbook.md#model-kind) |
+| Change the ODE engine or its solver settings | `crates/commol-differential/src/solve.rs` | `crates/commol-differential/src/lib.rs`, `crates/commol-core/src/types/engine.rs` (`OdeSolver`), `py-commol/commol/context/engine.py` |
+| Add a model type (engine) | `crates/commol-core/src/types/engine.rs` (`EngineType`) | `py-commol/src/engine.rs` (`Engine`), `py-commol/commol/context/engine.py`, the checklist "Model type (engine)" in `docs/codebase/maintainer-playbook.md` |
+| Add a model kind | `py-commol/commol/context/structure.py` (`ModelStructure`) | `crates/commol-core/src/types/structure.rs`, `crates/commol-core/src/types/engine.rs` (`ModelKind`), `py-commol/src/engine.rs`, the checklist "Model kind" in `docs/codebase/maintainer-playbook.md` |
 | Change how a rate reads the neighbors of a unit | `crates/commol-model/src/flows.rs` (`resolve_neighbors`) | `crates/commol-core/src/types/aggregate.rs` (`Neighbors`), `builder.rs` (`check_model`), `py-commol/commol/context/neighbors.py` |
 | Change impulses | `crates/commol-model/src/system.rs` (`apply_impulses`) | both engines, `py-commol/commol/context/transition.py` |
 | Change which positions a model type accepts | `crates/commol-core/src/simulation_engine.rs` (`check_position`) | each engine's `check_position`, `crates/commol-calibration/src/calibration_problem.rs` (`check_positions`) |
@@ -81,16 +81,17 @@ Rebuild the extension after every Rust change, before you run `pytest`.
 | Add a function or variable to rate expressions | `crates/commol-core/src/math_expression/` | `py-commol/commol/utils/security.py`, `docs/guide/mathematical-expressions.md` |
 | Change initial conditions | `py-commol/commol/context/initial_conditions.py` | `crates/commol-model/src/builder.rs` (`initial_state`), `py-commol/commol/context/aggregate.py`, `docs/guide/building-models.md` |
 | Change a stochastic engine of the aggregate kind (events, chain binomial, whole units) | `crates/commol-stochastic/src/` (`events.rs`, `steps.rs`, `units.rs`) | `crates/commol-core/src/types/engine.rs` (`StochasticEventsSettings`, `Rounding`), `crates/commol-model/src/system.rs` (`flow_changes`, `breakpoints`), `py-commol/commol/context/engine.py`, `docs/guide/stochastic.md` |
-| Add or change a stochastic engine, seeds or samplers | `crates/commol-random/` | `crates/commol-core/src/simulation_engine.rs` (`set_seed`, `run_replicates`), `engine.rs` (`is_stochastic`), `py-commol/commol/api/simulation.py` (`replicates`) |
-| Change calibration | `crates/commol-calibration/src/calibration_problem.rs` and its layers (`forward.rs`, `observation.rs`, `feasibility.rs`, `discrepancy.rs`, `objective.rs`, `starts.rs`) | `values.rs`, `crates/commol-model/src/initial_conditions.rs`, `py-commol/commol/api/calibrator.py`, `py-commol/src/inference.rs` (`CalibrationProblem`) |
-| Add an uncertainty method | `crates/commol-inference/` | `py-commol/src/inference.rs`, `py-commol/commol/context/inference/`, `api/inference/registry.py`, the [checklist](docs/codebase/maintainer-playbook.md#uncertainty-method) |
+| Add or change a stochastic engine, seeds or samplers | `crates/commol-random/` | `crates/commol-core/src/simulation_engine.rs` (`set_seed`, `run_replicates`), `crates/commol-core/src/types/engine.rs` (`is_stochastic`), `py-commol/commol/api/simulation.py` (`replicates`) |
+| Change calibration | `crates/commol-calibration/src/calibration_problem.rs` and its layers (`forward.rs`, `observation.rs`, `feasibility.rs`, `discrepancy.rs`, `objective.rs`); `crates/commol-calibration/src/starts.rs` | `values.rs`, `crates/commol-model/src/initial_conditions.rs`, `py-commol/commol/api/calibrator.py`, `py-commol/src/inference.rs` (`CalibrationProblem`) |
+| Add an uncertainty method | `crates/commol-inference/` | `py-commol/src/inference.rs`, `py-commol/commol/context/inference/`, `api/inference/registry.py`, the checklist "Uncertainty method" in `docs/codebase/maintainer-playbook.md` |
 | Change sensitivities or identifiability | `crates/commol-inference/src/sensitivity/`, `crates/commol-inference/src/identifiability/` | `crates/commol-core/src/simulation_engine.rs` (`output_accuracy`), `py-commol/src/identifiability.rs`, `py-commol/commol/context/inference/identifiability.py`, `api/inference/identifiability.py`, `docs/guide/uncertainty/identifiability.md` |
 | Change a bootstrap, the jackknife, blocks or residual noise | `crates/commol-inference/src/resampling/` | `crates/commol-calibration/src/calibration_problem.rs` (`with_data`), `py-commol/src/inference.rs` (`bootstrap`, `jackknife`), `py-commol/commol/context/inference/resampling.py`, `api/inference/resampling.py`, `docs/guide/uncertainty/resampling.md` |
-| Change the parameter sample, the predictive, the scores or the quantile | `crates/commol-inference/src/` (`sample.rs`, `predictive.rs`, `scores.rs`, `statistics.rs`) | `py-commol/commol/context/inference/sample.py`, `api/inference/`, `docs/guide/uncertainty/index.md` |
+| Change the parameter sample, the predictive, the scores or the quantile | `crates/commol-inference/src/sample.rs`, `predictive.rs`, `scores.rs`, `statistics.rs` | `py-commol/commol/context/inference/sample.py`, `api/inference/`, `docs/guide/uncertainty/index.md` |
 | Change the Python API | `py-commol/commol/api/` | `docs/api/`, the guide page of that feature |
-| Expose a Rust function to Python | `py-commol/src/` (`engine.rs` for a function that takes an engine) | `py-commol/commol/commol_rs/_commol_rs.pyi` |
+| Expose a Rust function to Python | `py-commol/src/`; `py-commol/src/engine.rs` for a function that takes an engine | `py-commol/commol/commol_rs/_commol_rs.pyi`, `py-commol/commol/context/_model/engine_state.py` (the only Python caller of the engine queries) |
 | Change how a model is described | `py-commol/commol/context/description.py` (blocks), `context/_model/describe.py` (layouts) | `ModelStructure.describe`, `context/_model/aggregate_description.py`, `api/description.py` (renderers), `docs/guide/describing-models.md` |
-| Change reports | `py-commol/commol/api/reporting.py` | `ModelStructure.report_sections`, `context/_model/report.py`, [Design decisions](docs/codebase/design-decisions.md#reports) |
+| Change reports | `py-commol/commol/api/reporting.py` | `ModelStructure.report_sections`, `context/_model/report.py`, `docs/codebase/decisions/results.md` (Reports) |
+<!-- --8<-- [end:tasks] -->
 
 ## Documentation map
 

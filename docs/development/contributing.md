@@ -47,22 +47,12 @@ The rules for code, comments, documentation and commits are in one place:
 |---|---|
 | Python | Ruff (line length 88), type hints on every signature and never `Any`, NumPy docstrings on every public item |
 | Rust | `cargo fmt`, no Clippy warnings, rustdoc on every public item |
-| Tests | pytest for Python, laid out as in [Tests](../codebase/conventions.md#tests); `#[cfg(test)]` modules and `tests/` for Rust; test both success and error cases |
+| Tests | pytest for Python, laid out as in [Tests](../codebase/tests.md); `#[cfg(test)]` modules and `tests/` for Rust; test both success and error cases |
 | Documentation | Mandatory with every change: the [definition of done](../codebase/conventions.md#documentation-definition-of-done) |
 | Commits | `type(scope): description`, one short phrase, no body; see [Commits](../codebase/conventions.md#commits) |
 
-Run the checks before you open a pull request:
-
-```bash
-# Python, from py-commol/ with the virtual environment active
-ruff check . ../.github/scripts && ruff format --check . ../.github/scripts && ty check commol
-vulture commol .vulture_allowlist.py --min-confidence 80 && pytest
-
-# Rust, from the repository root
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-random -p commol-stochastic -p commol
-```
+Run the checks of [Quick commands](workflow.md#quick-commands) before you
+open a pull request.
 
 The pre-commit hooks run most of them on every commit; see
 [Pre-commit Hooks](workflow.md#pre-commit-hooks).

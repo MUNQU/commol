@@ -75,7 +75,7 @@ builder = (
 
 The engine decides the kind when the model is built, and
 [`model.describe()`](describing-models.md) shows the result: the proportional
-rate above shows as `k2 * B`. See [Design decisions](../codebase/design-decisions.md#absolute-and-proportional-rates)
+rate above shows as `k2 * B`. See [Design decisions](../codebase/decisions/transitions-and-rates.md#absolute-and-proportional-rates)
 for the exact rule.
 
 ## Accumulators

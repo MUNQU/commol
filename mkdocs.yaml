@@ -121,6 +121,8 @@ markdown_extensions:
       alternate_style: true
   - attr_list # HTML attributes (for styling)
   - md_in_html # Markdown in HTML blocks
+  - pymdownx.snippets: # AGENTS.md owns the task table and the commands
+      check_paths: true # a missing snippet fails the build
 
 nav:
   - Home: index.md
@@ -169,8 +171,20 @@ nav:
           - Mental Model: codebase/mental-model.md
           - Architecture: codebase/architecture.md
           - Repository Map: codebase/repository-map.md
-          - Design Decisions: codebase/design-decisions.md
+          - Design Decisions:
+              - Design Decisions: codebase/design-decisions.md
+              - Model Kinds: codebase/decisions/model-kinds.md
+              - Model Structure: codebase/decisions/model-structure.md
+              - Transitions and Rates: codebase/decisions/transitions-and-rates.md
+              - Initial Conditions: codebase/decisions/initial-conditions.md
+              - Time: codebase/decisions/time.md
+              - Engines: codebase/decisions/engines.md
+              - Calibration: codebase/decisions/calibration.md
+              - Uncertainty: codebase/decisions/uncertainty.md
+              - Results: codebase/decisions/results.md
+              - Security: codebase/decisions/security.md
           - Conventions: codebase/conventions.md
+          - Tests: codebase/tests.md
           - Maintainer Playbook: codebase/maintainer-playbook.md
       - Development Workflow: development/workflow.md
       - Contributing: development/contributing.md

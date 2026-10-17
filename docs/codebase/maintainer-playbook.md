@@ -12,7 +12,7 @@ Use this page before you make or review a change. It turns the
 2. Find the owner in the [Repository map](repository-map.md).
 3. Read the tests next to that code before you change it.
 4. Make the change in the narrowest owner.
-5. Run both test suites (see [`AGENTS.md`](https://github.com/MUNQU/commol/blob/main/AGENTS.md#commands)).
+5. Run both test suites ([Quick commands](../development/workflow.md#quick-commands)).
 6. Update the documentation as the mandatory
    [definition of done](conventions.md#documentation-definition-of-done) requires.
 7. Run `python .github/scripts/affected.py --closes <number>` and update each
@@ -25,7 +25,7 @@ Use this page before you make or review a change. It turns the
 - **Do not duplicate an engine rule in Python.** Add a binding instead, and
   call it from `context/_model/engine_state.py`.
 - **Do not identify compartments by name.** Use labels (see
-  [Compartments are labels](design-decisions.md#compartments-are-labels-with-a-name)).
+  [Compartments are labels](decisions/model-structure.md#compartments-are-labels-with-a-name)).
 - **Do not drop invalid input silently.** Reject it with a message that names
   the transition, compartment or parameter.
 - **Do not change saved formats by accident.** Model JSON and report key order
@@ -51,8 +51,8 @@ Use this page before you make or review a change. It turns the
 
 ### Transitions and rates
 
-- [ ] Plan the flows in `flows.rs`; reject what cannot be simulated.
-- [ ] Check the [rate semantics](design-decisions.md#absolute-and-proportional-rates).
+- [ ] Plan the flows in `commol-model/src/flows.rs`; reject what cannot be simulated.
+- [ ] Check the [rate semantics](decisions/transitions-and-rates.md#absolute-and-proportional-rates).
 - [ ] Add a case to `tests/transitions/test_flows.py`, and check the `dynamics`
       section of `Model.describe` (`tests/description/`).
 - [ ] Update [Building models](../guide/building-models.md).
@@ -69,8 +69,8 @@ Use this page before you make or review a change. It turns the
 - [ ] Change the Pydantic validation in `context/initial_conditions.py` and the
       engine rule in `builder.rs` (`initial_state`).
 - [ ] Check that `Aggregate.initial_state(process)` reports the new state.
-- [ ] If calibration can set it, update `initial_conditions.rs` in
-      `commol-model` (`InitialConditionPlan`) and the write-back
+- [ ] If calibration can set it, update
+      `commol-model/src/initial_conditions.rs` (`InitialConditionPlan`) and the write-back
       (`context/_model/calibration_write_back.py`).
 - [ ] Check that `test_applied_model_reproduces_the_loss_the_optimizer_scored`
       still passes.
@@ -91,7 +91,7 @@ Use this page before you make or review a change. It turns the
 ### Uncertainty method
 
 A method is three parts, and plugs into `Calibrator.uncertainty` without
-changing it ([Design decisions](design-decisions.md#methods-plug-into-one-entry-point)):
+changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-entry-point)):
 
 - [ ] The algorithm in `crates/commol-inference/`. It runs the engine only
       through `ForwardModel`, reads observations only through
@@ -124,8 +124,8 @@ To add an engine to the list:
       file: its name, the model kinds it runs (`kinds`), whether it is
       stochastic (`is_stochastic`), its settings (`EngineSettings`, parsed
       and validated with `deny_unknown_fields`), the form of its dynamics
-      (`dynamics_form`: the schedule a description shows and the left-hand
-      side of its equations) and the meaning of a rate.
+      (`dynamics_form`) and the meaning of a rate (see
+      [One list of engines](decisions/engines.md#one-list-of-engines)).
 - [ ] Write the engine in its own crate and implement `SimulationEngine`
       (for an engine of the aggregate kind, also `CompartmentalEngine` from
       `commol-model`); `try_from_model` rejects a model of another engine. A
@@ -151,7 +151,7 @@ To add an engine to the list:
 ### Model kind
 
 To add a kind of model, such as an agent network (see
-[One interface for every model kind](design-decisions.md#one-interface-for-every-model-kind)):
+[One interface for every model kind](decisions/model-kinds.md#one-interface-for-every-model-kind)):
 
 - [ ] Add the kind to `ModelKind` in `crates/commol-core/src/types/engine.rs`
       and to its `ALL`: its name and the types of value calibration may set
@@ -197,8 +197,9 @@ To add a kind of model, such as an agent network (see
 
 - [ ] Keep logic out of `py-commol/src/`: convert types and call the crate.
 - [ ] Update `_commol_rs.pyi`.
-- [ ] Rebuild with `maturin develop --release --features test-kind` before you
-      run `pytest`: the tests need the test model kind.
+- [ ] Rebuild the extension with the test model kind
+      ([Quick commands](../development/workflow.md#quick-commands)) before you run
+      `pytest`.
 
 ### Reports
 
@@ -234,4 +235,4 @@ To add a kind of model, such as an agent network (see
 
 ## Navigation
 
-Previous: [Conventions](conventions.md) | Back to: [Codebase Guide](index.md)
+Previous: [Tests](tests.md) | Back to: [Codebase Guide](index.md)
