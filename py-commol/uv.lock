@@ -241,7 +241,7 @@ wheels = [
 
 [[package]]
 name = "commol"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "cffi" },
     { name = "numpy" },

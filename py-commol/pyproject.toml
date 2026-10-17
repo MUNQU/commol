@@ -143,3 +143,9 @@ skip-magic-trailing-comma = false
 
 [tool.ty.src]
 exclude = [".vulture_allowlist.py"]
+
+# uv installs the tools and never builds commol: `maturin develop` builds it,
+# with the features a task needs. A `uv sync` then removes that install; run
+# `maturin develop` again.
+[tool.uv]
+package = false
