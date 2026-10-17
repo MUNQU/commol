@@ -180,7 +180,7 @@ zero, and the report divides by it (`initial_state` in
 | "mass" | A unit, not a quantity of any unit. |
 | "stock" | An economic term, new to the code. |
 | "content" | Ambiguous in software. |
-| "size" | Reads as a count, and clashes with the NSGA-II `population_size`. |
+| "size" | Reads as a count. |
 | A function `total(g1, t1)` | No reserved names, but the expression language has no text arguments (`jit/ast.rs`), so the parser, the JIT and the security check would change. |
 
 **Guards:** `builder.rs` tests
@@ -487,7 +487,7 @@ checks whether a model type accepts a position.
 **Guards:** `crates/commol-calibration/tests/test_positions.rs`,
 `crates/commol-difference/src/simulation.rs::integer_positions_are_accepted_and_others_rejected`,
 `crates/commol-differential/src/tests.rs::a_difference_engine_names_a_series_point_between_steps`,
-`tests/calibration/test_observations.py::TestPositionsAndTypology`.
+`tests/calibration/test_observations.py::TestPositionsAndEngines`.
 
 ### Results carry their positions
 
