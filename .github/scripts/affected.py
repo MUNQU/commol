@@ -37,7 +37,7 @@ INDEXES = {
     "CLAUDE.md",
     "Cargo.lock",
     "docs/about/changelog.md",
-    "mkdocs.yml",
+    "mkdocs.yaml",
     "py-commol/uv.lock",
     "uv.lock",
 }
