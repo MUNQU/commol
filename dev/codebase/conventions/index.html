@@ -3035,6 +3035,11 @@ every match.</p>
 <td>CI (Code Quality)</td>
 </tr>
 <tr>
+<td>Every test or definition a page names as <code>&lt;file&gt;::&lt;name&gt;</code> exists in that file (the dated design records <code>development/design-*.md</code> keep the names of their date)</td>
+<td><code>pytest -m docs</code> (<code>tests/docs/test_reference.py</code>)</td>
+<td>CI (Code Quality)</td>
+</tr>
+<tr>
 <td>Public Python modules, classes, functions and arguments have docstrings</td>
 <td><code>ruff check .</code> (rules <code>D1</code>, <code>D417</code>, NumPy convention)</td>
 <td>pre-commit, CI</td>
