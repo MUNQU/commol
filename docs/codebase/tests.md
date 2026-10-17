@@ -188,10 +188,13 @@ The coverage studies (`coverage_study`) are the one exception. A study counts
 how often an interval covers the truth over hundreds of synthetic data sets;
 fewer data sets widen its tolerance until it checks nothing, so it cannot
 shrink to the budget. They do not run less often than the code they check:
-Build runs them for every pull request that changes the uncertainty methods,
+Build runs them for every pull request that changes what they run,
 and the release runs them before it publishes ([CI pipelines](../development/workflow.md#continuous-integration-pipelines)).
 `test_every_coverage_study_runs_in_a_group_of_the_workflow` checks that
-`coverage.yaml` runs each of them.
+`coverage.yaml` runs each of them, and
+`test_the_studies_run_for_a_change_of_any_crate_they_use` that a change of
+`commol-inference`, of a crate it depends on or of the difference engine runs
+them.
 
 The check reads the wall time of the run, so a machine that runs other work
 at the same time can exceed the budget. `pytest --durations=20` shows the

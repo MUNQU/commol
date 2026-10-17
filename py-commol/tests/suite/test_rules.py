@@ -5,6 +5,7 @@ The rules are in ``docs/codebase/tests.md``."""
 
 import ast
 import re
+import tomllib
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -388,4 +389,45 @@ def test_every_coverage_study_runs_in_a_group_of_the_workflow() -> None:
     assert not missing, (
         f"Add these coverage studies to a group of {relative(COVERAGE_WORKFLOW)}:\n"
         + "\n".join(missing)
+    )
+
+
+BUILD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "build.yaml"
+STUDY_ENGINE = {"commol-model", "commol-difference"}
+"""The engine of the models of the studies: ``flow_calibrator`` builds a
+difference model."""
+
+
+def workspace_dependencies(crate: str) -> set[str]:
+    """``crate`` and the crates of the workspace it depends on, transitively."""
+    found, pending = set(), [crate]
+    while pending:
+        name = pending.pop()
+        if name not in found:
+            found.add(name)
+            manifest = tomllib.loads(
+                (REPO_ROOT / "crates" / name / "Cargo.toml").read_text(encoding="utf-8")
+            )
+            pending += [
+                d for d in manifest.get("dependencies", {}) if d.startswith("commol-")
+            ]
+    return found
+
+
+def test_the_studies_run_for_a_change_of_any_crate_they_use() -> None:
+    """Build runs the coverage studies for a change of the uncertainty methods,
+    of every crate they depend on, and of the engine of their models."""
+    pattern = re.search(
+        r"studies='(?P<pattern>[^']+)'", BUILD_WORKFLOW.read_text(encoding="utf-8")
+    )
+    assert pattern, f"{relative(BUILD_WORKFLOW)} has no pattern 'studies'"
+    used = workspace_dependencies("commol-inference") | STUDY_ENGINE
+    missing = sorted(
+        crate
+        for crate in used
+        if not re.search(pattern["pattern"], f"crates/{crate}/src/lib.rs")
+    )
+    assert not missing, (
+        f"Add these crates to the pattern 'studies' of {relative(BUILD_WORKFLOW)}: "
+        f"{missing}"
     )

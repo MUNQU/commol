@@ -2,10 +2,10 @@ name: Coverage Studies
 
 # Coverage studies check that the intervals of each uncertainty method cover
 # the truth at their nominal rate (tests marked `coverage_study`,
-# py-commol/tests/support/coverage.py). Each runs many fits, so no pull request
-# runs them unless it changes the uncertainty methods: Build calls this
-# workflow for such a pull request, the release calls it before it publishes,
-# and anyone can run it by hand.
+# py-commol/tests/support/coverage.py). Each runs many fits, so a pull request
+# runs them only when it changes what they run: Build calls this workflow for
+# such a pull request, the release calls it before it publishes, and anyone
+# can run it by hand.
 
 on:
   workflow_call:

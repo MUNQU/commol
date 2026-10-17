@@ -9,7 +9,7 @@ errors of `c`, `z·√(c(1 − c)/K)`.
 Tests that run a study carry the marker ``coverage_study``: ``pytest``
 excludes them, ``pytest -m coverage_study`` runs them, and
 ``.github/workflows/coverage.yaml`` runs them for a pull request that changes
-the uncertainty methods and before a release.
+what they run and before a release.
 """
 
 import math

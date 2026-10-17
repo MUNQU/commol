@@ -24,13 +24,14 @@ env:
 jobs:
     # Whether the change touches more than the documentation and the planning
     # files, which compile nothing (a scheduled or manual run tests
-    # everything), and whether a pull request changes the uncertainty methods.
+    # everything), and whether a pull request changes what the coverage
+    # studies run.
     changes:
         name: Changed files
         runs-on: ubuntu-latest
         outputs:
             code: ${{ steps.diff.outputs.code }}
-            inference: ${{ steps.diff.outputs.inference }}
+            studies: ${{ steps.diff.outputs.studies }}
         steps:
             - uses: actions/checkout@v7
               with:
@@ -56,11 +57,16 @@ jobs:
                   else
                       echo "code=false" >> "$GITHUB_OUTPUT"
                   fi
-                  inference='^(crates/commol-inference/|py-commol/src/inference\.rs$|py-commol/commol/(api|context)/inference/|py-commol/tests/support/coverage\.py$|py-commol/tests/uncertainty/test_[a-z_]*coverage\.py$|\.github/workflows/coverage\.yaml$)'
-                  if [ "$EVENT" = "pull_request" ] && printf '%s\n' "$files" | grep -q -E "$inference"; then
-                      echo "inference=true" >> "$GITHUB_OUTPUT"
+                  # What the coverage studies run: the uncertainty methods and the
+                  # crates they depend on, the difference engine of their models,
+                  # the bindings, the Python package, the support code of the
+                  # tests, and the locks and toolchain that build them
+                  # (tests/suite/test_rules.py checks the crates).
+                  studies='^(crates/commol-(core|model|difference|calibration|random|inference)/|py-commol/(src|commol)/|py-commol/tests/(support/|conftest\.py$|uncertainty/test_[a-z_]*coverage\.py$)|py-commol/(Cargo\.toml|pyproject\.toml|uv\.lock)$|Cargo\.(toml|lock)$|rust-toolchain\.toml$|\.github/workflows/coverage\.yaml$)'
+                  if [ "$EVENT" = "pull_request" ] && printf '%s\n' "$files" | grep -q -E "$studies"; then
+                      echo "studies=true" >> "$GITHUB_OUTPUT"
                   else
-                      echo "inference=false" >> "$GITHUB_OUTPUT"
+                      echo "studies=false" >> "$GITHUB_OUTPUT"
                   fi
 
     # Tests run on the runner's own architecture, so the target architecture
@@ -112,19 +118,18 @@ jobs:
               working-directory: ./py-commol
               run: uv run pytest -m "not docs and not coverage_study"
 
-    # The coverage studies, for a pull request that changes the uncertainty
-    # methods. The merge queue does not run them again: they check the methods,
-    # which the pull request already ran.
+    # The coverage studies, for a pull request that changes what they run. The
+    # merge queue does not run them again: the pull request already ran them.
     coverage-studies:
         name: Coverage studies
         needs: changes
-        if: needs.changes.outputs.inference == 'true'
+        if: needs.changes.outputs.studies == 'true'
         uses: ./.github/workflows/coverage.yaml
 
     # Single required status check for the whole workflow, so the ruleset does
     # not have to list every job. When only the documentation or the planning
     # files change, the tests are skipped and count as passed; the coverage
-    # studies pass, or are skipped when the uncertainty methods do not change.
+    # studies pass, or are skipped when nothing they run changes.
     build-passed:
         name: Build Passed
         if: always()
@@ -136,17 +141,17 @@ jobs:
                   CHANGES: ${{ needs.changes.result }}
                   CODE: ${{ needs.changes.outputs.code }}
                   TESTS: ${{ needs.test.result }}
-                  INFERENCE: ${{ needs.changes.outputs.inference }}
+                  STUDIES_CHANGED: ${{ needs.changes.outputs.studies }}
                   STUDIES: ${{ needs.coverage-studies.result }}
               run: |
-                  echo "changes: $CHANGES, code: $CODE, test: $TESTS, inference: $INFERENCE, studies: $STUDIES"
+                  echo "changes: $CHANGES, code: $CODE, test: $TESTS, studies changed: $STUDIES_CHANGED, studies: $STUDIES"
                   test "$CHANGES" = "success"
                   if [ "$CODE" = "true" ]; then
                       test "$TESTS" = "success"
                   else
                       test "$TESTS" = "skipped"
                   fi
-                  if [ "$INFERENCE" = "true" ]; then
+                  if [ "$STUDIES_CHANGED" = "true" ]; then
                       test "$STUDIES" = "success"
                   else
                       test "$STUDIES" = "skipped"
