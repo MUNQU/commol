@@ -1,7 +1,8 @@
 """Check that the documentation names what exists: every public name has an
-API entry, and every site link, crate and named test exists."""
+API entry, and every site link, crate, named test and cited path exists."""
 
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -107,4 +108,83 @@ def test_crate_is_on_the_architecture_page(crate: str) -> None:
     assert f"`{crate}`" in text, (
         f"{crate} is not named in docs/codebase/architecture.md: add it to "
         "the diagrams and tables of that page"
+    )
+
+
+CODE_BLOCK = re.compile(r"^ *(```|~~~).*?^ *\1", re.MULTILINE | re.DOTALL)
+CODE_SPAN = re.compile(r"`(?P<text>[^`\s]+)`")
+CITED_PATH = re.compile(
+    r"[\w.\-/]*(?:/|\.(?:py|pyi|rs|md|toml|yaml|yml|json|lock|sh|txt|html))"
+)
+LOCAL_FILES = {"CLAUDE.md", "AGENT.md"}
+CODEBASE_DIR = REPO_ROOT / "docs" / "codebase"
+
+
+def git_paths() -> tuple[set[str], set[str]]:
+    """The files git tracks or does not ignore, and the directories that hold them."""
+    listing = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    files = set(listing.stdout.splitlines())
+    directories = {
+        parent.as_posix() for file in files for parent in Path(file).parents
+    } - {"."}
+    return files, directories
+
+
+def cited_paths() -> list[tuple[str, str]]:
+    """Each path in code format outside a code block, with its page.
+
+    The pages are ``AGENTS.md`` and ``docs/codebase/``. A path ends in ``/`` or
+    in the extension of a file; ``::name`` after it is left out.
+    """
+    pages = [REPO_ROOT / "AGENTS.md", *sorted(CODEBASE_DIR.rglob("*.md"))]
+    return [
+        (page.relative_to(REPO_ROOT).as_posix(), path)
+        for page in pages
+        for match in CODE_SPAN.finditer(
+            CODE_BLOCK.sub("", page.read_text(encoding="utf-8"))
+        )
+        if CITED_PATH.fullmatch(path := match.group("text").split("::")[0])
+        and path not in LOCAL_FILES
+    ]
+
+
+def matches(path: str, tracked: set[str]) -> list[str]:
+    """The paths of ``tracked`` that end with every part of ``path``."""
+    name = path.removeprefix("../").rstrip("/")
+    return sorted(
+        candidate
+        for candidate in tracked
+        if candidate == name or candidate.endswith(f"/{name}")
+    )
+
+
+@pytest.mark.docs
+def test_cited_paths_exist() -> None:
+    """Every path a page cites names a file or a directory of the repository."""
+    files, directories = git_paths()
+    missing = [
+        f"{page}: {path}"
+        for page, path in cited_paths()
+        if not matches(path, files if not path.endswith("/") else directories)
+    ]
+    assert not missing, f"These pages name paths that do not exist: {missing}"
+
+
+@pytest.mark.docs
+def test_cited_file_names_are_unique() -> None:
+    """A bare file name a page cites matches one tracked file only."""
+    files, _ = git_paths()
+    ambiguous = [
+        f"{page}: {path} matches {found}"
+        for page, path in cited_paths()
+        if "/" not in path and len(found := matches(path, files)) > 1
+    ]
+    assert not ambiguous, (
+        f"Write enough of the directory to make each name unique: {ambiguous}"
     )

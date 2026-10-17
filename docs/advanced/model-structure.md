@@ -66,7 +66,7 @@ structure: a model whose engine runs another kind is rejected when it is made,
 with an error that names the engine, both kinds and the engines of the kind of
 the model. A variant keeps the kind, the fields and the engines of its
 structure, and loads back as its own class
-([Design decisions](../codebase/design-decisions.md#a-model-is-a-header-a-process-a-structure-and-an-engine)).
+([Design decisions](../codebase/decisions/model-kinds.md#a-model-is-a-header-a-process-a-structure-and-an-engine)).
 
 ## Bins and accumulators
 
