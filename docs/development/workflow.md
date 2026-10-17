@@ -187,9 +187,9 @@ git checkout -b feature/your-feature-name
 
 # Run quality checks before committing (with virtual environment activated)
 cd py-commol
-ruff check . --fix         # Auto-fix Python linting issues
-ruff format .              # Format Python code
-ty check commol            # Type checking
+ruff check . ../.github/scripts --fix   # Auto-fix Python linting issues
+ruff format . ../.github/scripts        # Format Python code
+ty check commol                        # Type checking
 
 cd ..
 cargo fmt --all                       # Format Rust code
@@ -292,7 +292,7 @@ Process](release.md)).
 
 | Workflow | Runs on | Checks | Required check |
 |---|---|---|---|
-| Code Quality (`code-quality.yaml`) | Pull requests, the merge queue and on demand | Python: Ruff (lint, format, docstrings `D1`/`D417`), Ty, Pytest with the documentation checks (`pytest -m docs`) and its coverage. Rust: rustfmt, Clippy (`-D warnings`, so `missing_docs` too), rustdoc without broken links, cargo test with its coverage (`cargo llvm-cov`). Both upload their coverage to Codecov (flags `python` and `rust`) with the OIDC token of the run, so no secret is needed; `.github/codecov.yml` makes its checks informational. | `Python Code Quality`, `Rust Code Quality` |
+| Code Quality (`code-quality.yaml`) | Pull requests, the merge queue and on demand | Python: Ruff (lint, format, docstrings `D1`/`D417`) of `py-commol/` and `.github/scripts/`, Ty, Pytest with the documentation checks (`pytest -m docs`) and its coverage. Rust: rustfmt, Clippy (`-D warnings`, so `missing_docs` too), rustdoc without broken links, cargo test with its coverage (`cargo llvm-cov`). Both upload their coverage to Codecov (flags `python` and `rust`) with the OIDC token of the run, so no secret is needed; `.github/codecov.yml` makes its checks informational. | `Python Code Quality`, `Rust Code Quality` |
 | Build (`build.yaml`) | Pull requests, the merge queue, every Monday on `main` and on demand | Tests, except the documentation checks and the coverage studies. A pull request runs one job, Ubuntu with Python 3.12, for a fast answer; the merge queue, the weekly and the manual runs test Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14. A failure that only one operating system shows appears in the queue, which then removes the pull request. A change of only documentation or planning files (`docs/`, Markdown at the root, `mkdocs.yaml`, `.github/ISSUE_TEMPLATE/`, `.github/scripts/`) skips the tests. The wheels of every architecture are built by the release (`release.yaml`). | `Build Passed` |
 | Documentation (`docs.yaml`) | Pull requests, the merge queue, pushes to `main` and release tags | `mkdocs build --strict`: no broken internal link or anchor. Deploys the site with mike: a release tag as `latest`, a push to `main` as `dev`. | `Build Documentation` |
 | Coverage Studies (`coverage.yaml`) | Every Monday; on demand | `pytest -m coverage_study`: the intervals of each uncertainty method cover the truth at their level ([Design decisions](../codebase/design-decisions.md#methods-plug-into-one-entry-point)). | None: each study runs many fits |
@@ -306,7 +306,7 @@ Process](release.md)).
 
 ```bash
 # Python, from py-commol/ with the virtual environment active
-ruff check . && ruff format --check . && ty check commol
+ruff check . ../.github/scripts && ruff format --check . ../.github/scripts && ty check commol
 vulture commol .vulture_allowlist.py --min-confidence 80 && pytest
 
 # Rust, from the repository root
