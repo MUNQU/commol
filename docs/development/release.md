@@ -129,7 +129,17 @@ The **Release to PyPI** workflow:
 1. Builds the wheels for Linux and macOS (x86_64 and aarch64) and Windows
    (x86_64), for Python 3.12, 3.13 and 3.14
 2. Builds the source distribution (sdist)
-3. Publishes all of them to PyPI with trusted publishing
+3. Runs the coverage studies (`coverage.yaml`), about 10 min
+4. Publishes all of them to PyPI with trusted publishing, only when every
+   step before passed
+
+If a coverage study fails, nothing reaches PyPI: delete the GitHub release
+and the tag, fix the method on `main`, and tag again. To learn the answer
+before you tag, run the studies on `main` by hand:
+
+```bash
+gh workflow run "Coverage Studies" --ref main
+```
 
 Watch it in the [Actions tab](https://github.com/MUNQU/commol/actions) or with:
 

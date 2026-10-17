@@ -79,7 +79,7 @@ addopts = "--log-cli-level=WARN -m 'not coverage_study'"
 filterwarnings = ["error::pytest.PytestRemovedIn10Warning"]
 markers = [
     "docs: checks the documentation, its examples and its API coverage (tests/docs/)",
-    "coverage_study: checks that the intervals of a method cover at their nominal rate; excluded by default, run with -m coverage_study (weekly in CI)",
+    "coverage_study: checks that the intervals of a method cover at their nominal rate; excluded by default, run with -m coverage_study (in CI when the uncertainty methods change and before a release)",
 ]
 log_cli_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"

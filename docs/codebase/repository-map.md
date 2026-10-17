@@ -107,7 +107,7 @@ Use this page when you know what to change but not where it belongs.
 | `.github/scripts/parallel.py` | The proposals that can run in parallel, from the Touches and the links of the open issues. |
 | `.github/scripts/affected.py` | The open issues that the changes of a branch affect: those whose body names a changed path. |
 | `.github/scripts/release_notes.py` | The notes of a GitHub release, from its section of the changelog. |
-| `.github/workflows/` | CI: code quality, build, docs, release, and the weekly coverage studies (`coverage.yaml`). |
+| `.github/workflows/` | CI: code quality, build, docs, release, and the coverage studies (`coverage.yaml`), which Build and the release call. |
 
 ## If you need to…
 

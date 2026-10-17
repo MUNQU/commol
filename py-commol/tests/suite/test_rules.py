@@ -354,3 +354,38 @@ def test_slow_tests_are_listed() -> None:
         f"These tests take over {BUDGET} s: make their inputs smaller, or give "
         f"the reason in the time budget of {relative(CONVENTIONS)}:\n" + "\n".join(slow)
     )
+
+
+# Coverage studies
+
+COVERAGE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "coverage.yaml"
+NODE_ID = re.compile(r"\btests/[\w/]+\.py(?:::\w+)*")
+
+
+def coverage_studies() -> Iterator[str]:
+    """The node id of every class and function marked ``coverage_study``."""
+    for path in sorted(TESTS_DIR.rglob("test_*.py")):
+        for node in ast.parse(path.read_text(encoding="utf-8")).body:
+            if isinstance(node, ast.ClassDef | ast.FunctionDef) and any(
+                ast.unparse(decorator) == "pytest.mark.coverage_study"
+                for decorator in node.decorator_list
+            ):
+                yield f"{path.relative_to(TESTS_DIR.parent).as_posix()}::{node.name}"
+
+
+def test_every_coverage_study_runs_in_a_group_of_the_workflow() -> None:
+    """Each study is in one group of the matrix of ``coverage.yaml``, so the
+    workflow runs it."""
+    groups = set(NODE_ID.findall(COVERAGE_WORKFLOW.read_text(encoding="utf-8")))
+    studies = list(coverage_studies())
+    assert studies, "No test is marked coverage_study"
+    missing = [
+        study
+        for study in studies
+        if not any(study == group or study.startswith(f"{group}::") for group in groups)
+        and study.split("::")[0] not in groups
+    ]
+    assert not missing, (
+        f"Add these coverage studies to a group of {relative(COVERAGE_WORKFLOW)}:\n"
+        + "\n".join(missing)
+    )

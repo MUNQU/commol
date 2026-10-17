@@ -182,8 +182,16 @@ of CI. A test over 0.5 s stays only if it checks what no faster test checks,
 with the smallest inputs that still check it: a shorter horizon, fewer steps,
 fewer replicates. `tests/suite/durations.py` records the time of each test,
 and `test_slow_tests_are_listed` runs last and fails on a test over the budget
-that the table below does not list. The coverage studies (`coverage_study`)
-are outside the budget: they run weekly.
+that the table below does not list.
+
+The coverage studies (`coverage_study`) are the one exception. A study counts
+how often an interval covers the truth over hundreds of synthetic data sets;
+fewer data sets widen its tolerance until it checks nothing, so it cannot
+shrink to the budget. They do not run less often than the code they check:
+Build runs them for every pull request that changes the uncertainty methods,
+and the release runs them before it publishes ([CI pipelines](../development/workflow.md#continuous-integration-pipelines)).
+`test_every_coverage_study_runs_in_a_group_of_the_workflow` checks that
+`coverage.yaml` runs each of them.
 
 The check reads the wall time of the run, so a machine that runs other work
 at the same time can exceed the budget. `pytest --durations=20` shows the
