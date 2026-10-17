@@ -12,6 +12,7 @@
 //! | [`scores`] | Coverage, interval scores, CRPS and PIT of a predictive |
 //! | [`identifiability`] | Structural rank, collinearity, and the identifiability of a sample and of starts |
 //! | [`sensitivity`] | The port of derivatives, [`sensitivity::SensitivitySource`], and finite differences |
+//! | [`resampling`] | Bootstraps and the jackknife: fits to reweighted or resampled data, and residual noise |
 //!
 //! Rules: this crate depends on `commol-calibration`, never the reverse; a
 //! method touches an engine only through the problem's
@@ -23,6 +24,7 @@
 
 pub mod identifiability;
 pub mod predictive;
+pub mod resampling;
 pub mod sample;
 pub mod scores;
 pub mod sensitivity;

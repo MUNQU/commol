@@ -19,12 +19,34 @@ use rayon::prelude::*;
 use crate::sample::ParameterSample;
 use crate::statistics;
 
-/// What an observation shows for a predicted value: the port through which
-/// a method adds observation noise to the draws of a predictive.
+/// What observations show for the values a draw predicts: the port through
+/// which a method adds observation noise to the draws of a predictive.
+///
+/// The port sees one draw's whole vector of observations at once, so a
+/// method can draw noise that is shared or dependent across observations,
+/// such as blocks of residuals.
 pub trait ObservationNoise: Sync {
-    /// The value observation `observation` shows when the model predicts
-    /// `predicted`, drawn with `generator`.
-    fn observe(&self, observation: usize, predicted: f64, generator: &mut Generator) -> f64;
+    /// Reject observations this noise cannot serve. Called once, before
+    /// any draw.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the first observation it cannot serve.
+    fn check(&self, _observations: &[ObservedDataPoint]) -> Result<(), String> {
+        Ok(())
+    }
+
+    /// Write into `out` what `observations` show when a draw with parameter
+    /// `values` predicts `predicted`, one value per observation, drawn with
+    /// `generator`.
+    fn observe(
+        &self,
+        observations: &[ObservedDataPoint],
+        values: &[f64],
+        predicted: &[f64],
+        generator: &mut Generator,
+        out: &mut [f64],
+    );
 }
 
 /// No observation noise: an observation shows the predicted value.
@@ -32,8 +54,15 @@ pub trait ObservationNoise: Sync {
 pub struct NoNoise;
 
 impl ObservationNoise for NoNoise {
-    fn observe(&self, _observation: usize, predicted: f64, _generator: &mut Generator) -> f64 {
-        predicted
+    fn observe(
+        &self,
+        _observations: &[ObservedDataPoint],
+        _values: &[f64],
+        predicted: &[f64],
+        _generator: &mut Generator,
+        out: &mut [f64],
+    ) {
+        out.copy_from_slice(predicted);
     }
 }
 
@@ -315,7 +344,8 @@ impl ObservationDraws {
 /// # Errors
 ///
 /// Returns an error when the sample's parameters are not the problem's, an
-/// observation names an unknown output or factor, or a draw has no run.
+/// observation names an unknown output or factor or is one `noise` cannot
+/// serve, or a draw has no run.
 pub fn observation_draws<E>(
     problem: &CalibrationProblem<E>,
     sample: &ParameterSample,
@@ -341,6 +371,9 @@ where
         &schedule,
     )
     .map_err(PredictiveError::Mismatch)?;
+    noise
+        .check(observations)
+        .map_err(PredictiveError::Mismatch)?;
     let runs = sample
         .values()
         .par_iter()
@@ -364,16 +397,14 @@ where
         values: Vec::new(),
         weights: Vec::new(),
     };
-    for (replicates, &weight) in runs.into_iter().zip(sample.weights()) {
+    for ((replicates, &weight), values) in
+        runs.into_iter().zip(sample.weights()).zip(sample.values())
+    {
         let share = weight / replicates.len() as f64;
         for predicted in replicates {
-            draws.values.push(
-                predicted
-                    .iter()
-                    .enumerate()
-                    .map(|(i, &value)| noise.observe(i, value, &mut generator))
-                    .collect(),
-            );
+            let mut shown = vec![0.0; predicted.len()];
+            noise.observe(observations, values, &predicted, &mut generator, &mut shown);
+            draws.values.push(shown);
             draws.weights.push(share);
         }
     }

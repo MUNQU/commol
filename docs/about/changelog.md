@@ -27,12 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   back equal.
 - `Predictive(calibrator, sample, positions)`: the run of every draw, in
   parallel, its band (`band`, `series_band`) and every draw's value of a set
-  of observations through the observation operator of the loss
-  (`at_observations`). `SimulationPlotter` and `simulation_report` take a
+  of observations through the observation operator of the loss, with an
+  observation noise that has no default (`at_observations(observed_data,
+  noise)`: `NoNoise()` for a band of the model, `ResidualNoise(...)` for a
+  prediction interval). `SimulationPlotter` and `simulation_report` take a
   predictive.
 - `commol.scores`: empirical coverage, interval score, weighted interval score,
   the CRPS of a weighted sample and PIT values of a predictive, per
-  observation and per series.
+  observation and per series. Each takes the observation noise, so a band of
+  the model is never scored as a prediction interval by accident.
 - `Calibrator.uncertainty(method)`: one entry point for every uncertainty
   method. A method's configuration subclasses `UncertaintyMethod[R]` and
   registers its runner; the result type follows the configuration's type.
@@ -54,6 +57,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Calibrator.run_with_history()`.
 - The crate `commol-inference`: the parameter sample, the one quantile, the
   predictive and the scores. See [Uncertainty](../guide/uncertainty/index.md).
+- Resampling methods with no noise model, through `Calibrator.uncertainty`:
+  `BayesianBootstrap`, `ResidualBootstrap` and `WildBootstrap` return a
+  `BootstrapResult` (the fit, one draw per replicate, diagnostics, and the
+  Monte Carlo error of each interval bound, `interval_error`);
+  `BlockJackknife` returns a `JackknifeResult` (estimate, bias, standard
+  error, pseudo-values and the influence of each block). Blocks of consecutive
+  positions span every series; `block_length` is an integer or `"auto"`
+  (Politis and White). See [Resampling](../guide/uncertainty/resampling.md).
+- `ResidualNoise`: observation noise made of blocks of residuals of a fit,
+  which gives a prediction interval with no noise model; `NoNoise` gives a
+  band of the model.
+- `CalibrationProblem::with_data` (Rust): a copy of a problem with other
+  observed values and weights.
 
 ### Changed
 
@@ -99,7 +115,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their settings classes. Its intervals had no statistical meaning: its members
   were points the optimizer visited, and the selection maximized the coverage
   of the data it was fitted to. The closest replacement with no noise model is
-  `Calibrator.uncertainty(BayesianBootstrap(...))`, in the next release.
+  `Calibrator.uncertainty(BayesianBootstrap(replicates=..., block_length=...))`:
+  the same parallel fits, each on randomly weighted data, with a stated
+  meaning.
 - The dependency on `scikit-learn`.
 
 ## [0.4.0] - 2026-10-16

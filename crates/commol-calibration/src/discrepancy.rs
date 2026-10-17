@@ -16,6 +16,7 @@ pub struct Discrepancy {
     observed: Vec<f64>,
     weights: Vec<f64>,
     labels: Vec<String>,
+    normalized: bool,
     normalization: Vec<f64>,
     summary: Option<ReplicateSummary>,
 }
@@ -29,14 +30,26 @@ impl Discrepancy {
             observed: observed_data.iter().map(|obs| obs.value).collect(),
             weights: observed_data.iter().map(|obs| obs.weight).collect(),
             labels: observed_data.iter().map(|obs| obs.label.clone()).collect(),
+            normalized: false,
             normalization: vec![1.0; observed_data.len()],
             summary: None,
         }
     }
 
+    /// The discrepancy of other observed values and weights, built as this
+    /// one was built: the same loss, normalization setting and summary. The
+    /// normalization factors come from the new values.
+    pub(crate) fn with_data(&self, observed_data: &[ObservedDataPoint]) -> Self {
+        let mut discrepancy = Self::new(self.loss, observed_data);
+        discrepancy.set_normalization(self.normalized);
+        discrepancy.summary = self.summary;
+        discrepancy
+    }
+
     /// Enable or disable per-series normalization
     /// ([`observation_normalization`]).
     pub(crate) fn set_normalization(&mut self, enabled: bool) {
+        self.normalized = enabled;
         self.normalization = if enabled {
             observation_normalization(&self.labels, &self.observed)
         } else {
@@ -149,6 +162,20 @@ mod tests {
         discrepancy.set_normalization(true);
         let rms = (12.5_f64).sqrt();
         assert_eq!(discrepancy.normalization(), [1.0 / rms, 1.0 / rms, 1.0]);
+    }
+
+    #[test]
+    fn other_data_get_the_normalization_of_their_own_values() {
+        let mut discrepancy = Discrepancy::new(LossConfig::SumSquaredError, &observed());
+        discrepancy.set_normalization(true);
+        let mut other = observed();
+        other[0].value = 6.0;
+        other[1].value = 8.0;
+        let rms = (50.0_f64).sqrt();
+        assert_eq!(
+            discrepancy.with_data(&other).normalization(),
+            [1.0 / rms, 1.0 / rms, 1.0]
+        );
     }
 
     #[test]

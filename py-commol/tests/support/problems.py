@@ -1,13 +1,17 @@
 """Calibration problems that many tests share."""
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 from commol import (
     CalibrationParameter,
     CalibrationProblem,
+    Calibrator,
     NelderMeadConfig,
     ObservedDataPoint,
+    Simulation,
 )
+
+from .models import a_to_b_builder, build
 
 
 def initial_condition_problem(
@@ -72,3 +76,49 @@ def observed(
         )
         for step in at
     ]
+
+
+def flow_observations(
+    values: Sequence[float], *, windowed: bool, start: int = 1
+) -> list[ObservedDataPoint]:
+    """
+    Observations of B at positions ``start``, ``start + 1``, …: with
+    `windowed`, of the flow of one step each; otherwise of the amount of B.
+    """
+    return [
+        ObservedDataPoint(
+            at=start + index,
+            output="B",
+            value=float(value),
+            window=1 if windowed else None,
+        )
+        for index, value in enumerate(values)
+    ]
+
+
+def flow_calibrator(
+    values: Sequence[float],
+    *,
+    windowed: bool,
+    seed: int = 1,
+    bounds: tuple[float, float] = (0.0, 50.0),
+) -> Calibrator:
+    """
+    Fit a constant flow ``c`` from A to B (``a_to_b_builder`` with the rate
+    ``c * A / A``, absolute because it names A, and a total of 10⁶) to
+    `values` at positions 1, 2, ….
+
+    A model linear in its parameter: with `windowed`, each observation is the
+    flow of one step and its prediction is ``c``, so the fit is the mean of
+    the values; otherwise each observation is the amount of B at ``t`` and
+    its prediction is ``c·t``, a regression through the origin.
+    """
+    model = build(a_to_b_builder(parameters={"c": None}, rate="c * A / A", total=1e6))
+    problem = CalibrationProblem(
+        observed_data=flow_observations(values, windowed=windowed),
+        parameters=[bounded("c", *bounds, initial_guess=sum(bounds) / 2)],
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-14),
+        seed=seed,
+    )
+    return Calibrator(Simulation(model), problem)

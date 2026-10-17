@@ -901,6 +901,49 @@ modelling judgments.
 | Defaults for the thresholds | A judgment hidden in the library. |
 
 **Guards:** `tests/uncertainty/test_identifiability.py` (`TestReport`).
+### A replicate changes only the data
+
+A resampling method makes each replicate with
+`CalibrationProblem::with_data(values, weights)`
+(`crates/commol-calibration/src/calibration_problem.rs`): a copy of the problem
+whose discrepancy is built as `new` builds it, so with normalization on its
+factors come from the replicate's own values, as the fit's do. The engine, the
+observation operator and the feasibility stay. A replicate starts from the fit
+and, with more starts, from a Latin hypercube, and keeps its best end
+(`ReplicateRunner`, `resampling/runner.rs`). Blocks hold every series in a
+window of positions (`BlockScheme`), and `block_length` has no default.
+
+| Alternative | Why not |
+|---|---|
+| `CalibrationProblem::new` per replicate | The problem does not keep its constraints, replicates or normalization, so a second copy of the arguments would live elsewhere. |
+| The replicate's data in the `Workspace` | A per-thread buffer would become a second source of data. |
+| Keep the fit's normalization factors | The replicates would apply another estimator than the fit. |
+| Blocks per series | They break the dependence of series observed at the same time, so intervals of combined quantities come out too narrow. |
+| Random starts only | Each replicate may land in another basin, which adds optimizer noise to the data's uncertainty. |
+
+**Guards:** `crates/commol-calibration/tests/test_with_data.rs`,
+`crates/commol-inference/tests/test_resampling.rs`,
+`tests/uncertainty/test_resampling.py`.
+
+### Observation noise is an argument
+
+Every reader of observations of a sample (`Predictive.at_observations`, every
+function of `commol.scores`) takes the noise with no default: `NoNoise()` gives
+a band of the model, `ResidualNoise(...)` a prediction interval. The Rust port
+`ObservationNoise` (`crates/commol-inference/src/predictive.rs`) sees one
+draw's whole vector of observations with the draw's parameter values, so a
+noise can draw blocks of residuals across observations, and a noise model can
+read calibrated noise parameters. `ResidualNoise` serves only series the fit
+has residuals of.
+
+| Alternative | Why not |
+|---|---|
+| `NoNoise` by default | A band of the model would be scored against data with no notice, and cover less than its level. |
+| A port per observation | It cannot draw one block for several observations, and sees no position or series. |
+| Residual noise on the band at positions | A series may sum outputs with a factor: a residual has no correct split among outputs, and none for an output nobody observed. |
+
+**Guards:** `crates/commol-inference/tests/test_resampling.rs::residual_noise_rejects_a_series_with_no_residuals`,
+`tests/uncertainty/test_resampling.py::TestResidualNoise`.
 
 ## Results
 

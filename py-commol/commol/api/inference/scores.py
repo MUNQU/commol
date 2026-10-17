@@ -2,8 +2,9 @@
 
 Every score is computed in Rust from each draw's value of the observations
 (`Predictive.at_observations`), per observation and per series. Which
-observations to score, for example the ones held out of the calibration, is
-an argument with no default.
+observations to score, for example the ones held out of the calibration, and
+the observation noise are arguments with no default: a band of the model
+(`NoNoise`) compared with data covers less than its level.
 """
 
 from collections.abc import Sequence
@@ -13,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from commol.api.inference.predictive import ObservationDraws, Predictive
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import ObservedDataPoint
+from commol.context.inference.noise import ObservationNoise
 
 
 class Score(BaseModel):
@@ -51,6 +53,7 @@ def _score(draws: ObservationDraws, values: list[float]) -> Score:
 def coverage(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
+    noise: ObservationNoise,
     confidence_level: float,
 ) -> Score:
     """
@@ -62,6 +65,8 @@ def coverage(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
+    noise : NoNoise | ResidualNoise
+        The observation noise of the draws (`Predictive.at_observations`).
     confidence_level : float
         Strictly between 0 and 1.
 
@@ -71,13 +76,14 @@ def coverage(
         1 for each observation inside its interval, 0 outside; the means are
         the coverage. A calibrated interval covers about `confidence_level`.
     """
-    draws = predictive.at_observations(observations)
+    draws = predictive.at_observations(observations, noise)
     return _score(draws, draws.rust_draws.coverage(draws.observed, confidence_level))
 
 
 def interval_score(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
+    noise: ObservationNoise,
     confidence_level: float,
 ) -> Score:
     """
@@ -89,6 +95,8 @@ def interval_score(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
+    noise : NoNoise | ResidualNoise
+        The observation noise of the draws (`Predictive.at_observations`).
     confidence_level : float
         The level ``c`` of the central interval; ``α = 1 − c``.
 
@@ -97,7 +105,7 @@ def interval_score(
     Score
         Lower is better.
     """
-    draws = predictive.at_observations(observations)
+    draws = predictive.at_observations(observations, noise)
     return _score(
         draws, draws.rust_draws.interval_score(draws.observed, confidence_level)
     )
@@ -106,6 +114,7 @@ def interval_score(
 def weighted_interval_score(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
+    noise: ObservationNoise,
     confidence_levels: Sequence[float],
 ) -> Score:
     """
@@ -120,6 +129,8 @@ def weighted_interval_score(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
+    noise : NoNoise | ResidualNoise
+        The observation noise of the draws (`Predictive.at_observations`).
     confidence_levels : Sequence[float]
         The levels of the central intervals.
 
@@ -134,7 +145,7 @@ def weighted_interval_score(
     epidemic forecasts in an interval format. PLOS Computational Biology,
     17(2), e1008618. https://doi.org/10.1371/journal.pcbi.1008618
     """
-    draws = predictive.at_observations(observations)
+    draws = predictive.at_observations(observations, noise)
     return _score(
         draws,
         draws.rust_draws.weighted_interval_score(
@@ -146,6 +157,7 @@ def weighted_interval_score(
 def crps(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
+    noise: ObservationNoise,
 ) -> Score:
     """
     The continuous ranked probability score of the weighted draws.
@@ -159,19 +171,22 @@ def crps(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
+    noise : NoNoise | ResidualNoise
+        The observation noise of the draws (`Predictive.at_observations`).
 
     Returns
     -------
     Score
         Lower is better; in the unit of the observations.
     """
-    draws = predictive.at_observations(observations)
+    draws = predictive.at_observations(observations, noise)
     return _score(draws, draws.rust_draws.crps(draws.observed))
 
 
 def pit(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
+    noise: ObservationNoise,
     seed: int,
 ) -> Score:
     """
@@ -187,6 +202,8 @@ def pit(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
+    noise : NoNoise | ResidualNoise
+        The observation noise of the draws (`Predictive.at_observations`).
     seed : int
         Seed of the randomization of ties.
 
@@ -195,5 +212,5 @@ def pit(
     Score
         Values in ``[0, 1]``; calibrated predictions give uniform values.
     """
-    draws = predictive.at_observations(observations)
+    draws = predictive.at_observations(observations, noise)
     return _score(draws, draws.rust_draws.pit(draws.observed, seed))

@@ -19,6 +19,7 @@ from commol.api.results import SimulationReplicates, SimulationResults, same_pos
 from commol.api.simulation import Simulation
 from commol.api.windows import window_ends, windowed_totals
 from commol.context.calibration import CalibrationResult, ObservedDataPoint
+from commol.context.inference.noise import NoNoise
 from commol.context.visualization import PlotConfig
 
 logger = logging.getLogger(__name__)
@@ -775,7 +776,7 @@ class SimulationPlotter:
             )
             for at in ends
         ]
-        return predictive.at_observations(points).band(self.confidence_level)
+        return predictive.at_observations(points, NoNoise()).band(self.confidence_level)
 
     def _plot_bin_series_predictive(
         self,

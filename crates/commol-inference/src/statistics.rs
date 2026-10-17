@@ -131,12 +131,46 @@ pub fn effective_size(weights: &[f64]) -> f64 {
     total * total / squares
 }
 
+/// The Monte Carlo error of the quantile at `level` of equally weighted
+/// draws: an order-statistic interval `[x₍ₗ₎, x₍ᵤ₎]` that holds the quantile
+/// of the distribution the draws come from with about 95 % probability.
+///
+/// The ranks are `n p ∓ 1.96 √(n p (1 − p))`, rounded outward and kept
+/// between 1 and `n`, by the normal approximation of the binomial count of
+/// draws below the quantile.
+///
+/// # Panics
+///
+/// Panics when `values` is empty or `level` is not in `[0, 1]`.
+pub fn quantile_error(values: &[f64], level: f64) -> (f64, f64) {
+    assert!(!values.is_empty(), "a quantile needs a value");
+    assert!((0.0..=1.0).contains(&level), "a level is in [0, 1]");
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let n = sorted.len() as f64;
+    let centre = n * level;
+    let half = 1.959_963_984_540_054 * (n * level * (1.0 - level)).sqrt();
+    let rank = |r: f64| (r.clamp(1.0, n) as usize) - 1;
+    (
+        sorted[rank((centre - half).floor())],
+        sorted[rank((centre + half).ceil())],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn close(a: f64, b: f64) -> bool {
         (a - b).abs() < 1e-12
+    }
+
+    #[test]
+    fn the_error_of_a_median_brackets_it_by_its_order_statistics() {
+        let values: Vec<f64> = (1..=100).map(f64::from).collect();
+        // 50 ∓ 1.96 · 5 = 40.2 and 59.8, rounded outward.
+        assert_eq!(quantile_error(&values, 0.5), (40.0, 60.0));
+        assert_eq!(quantile_error(&values, 0.0), (1.0, 1.0));
     }
 
     #[test]
