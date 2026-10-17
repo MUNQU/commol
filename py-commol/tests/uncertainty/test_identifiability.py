@@ -1,8 +1,6 @@
 """Identifiability: the structural rank, collinearity, a sample, the starts
 and the report that joins them."""
 
-from typing import assert_type
-
 import pytest
 from pydantic import ValidationError
 
@@ -328,14 +326,6 @@ class TestReport:
 
 
 class TestEntryPoint:
-    def test_the_entry_point_infers_the_result_type(self, product: Calibrator) -> None:
-        report = product.identifiability(
-            StructuralRank(points=2, design="observations")
-        )
-
-        assert_type(report, IdentifiabilityReport)
-        assert isinstance(report, IdentifiabilityReport)
-
     def test_derivative_methods_refuse_a_stochastic_engine(self) -> None:
         model = build_stochastic(
             abc_builder(parameters={"k1": None, "k2": 0.1}), "StochasticSteps"

@@ -1,7 +1,9 @@
 """Assertions on simulation results that state their tolerance."""
 
 import math
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
+
+import pytest
 
 Series = Mapping[str, Sequence[float]]
 Values = Mapping[str, float]
@@ -116,3 +118,16 @@ def assert_total_conserved(
         assert math.isclose(held, total, rel_tol=rel), (
             f"step {step}: the outputs hold {held!r}, expected {total!r}"
         )
+
+
+def assert_accepted(
+    check: Callable[..., object], *args: object, **kwargs: object
+) -> None:
+    """``check`` accepts its arguments: it raises nothing. A rejection fails the
+    test with the message of ``check``, for a test whose subject is that a
+    validator accepts a valid input."""
+    try:
+        check(*args, **kwargs)
+    except Exception as error:
+        name = getattr(check, "__qualname__", check)
+        pytest.fail(f"{name} rejected {args or ''}{kwargs or ''}: {error}")

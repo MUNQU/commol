@@ -3,6 +3,7 @@
 from .assertions import (
     ENGINE_REL,
     ODE_REL,
+    assert_accepted,
     assert_close,
     assert_total_conserved,
 )
@@ -51,6 +52,7 @@ __all__ = [
     "ODE_REL",
     "ABC_START",
     "a_to_b_builder",
+    "assert_accepted",
     "assert_close",
     "assert_total_conserved",
     "assert_threshold",

@@ -10,23 +10,10 @@ from commol.utils.security import (
     validate_expression_security,
 )
 from tests.axis_patterns.conditions import condition, rate_string
+from tests.support import assert_accepted
 
 
 class TestPulse:
-    def test_formula_contains_step_and_amount(self):
-        p = AxisPattern.pulse(at=5, value=1.0)
-        assert "step == 5" in str(p)
-        assert "1.0" in str(p)
-
-    def test_formula_is_parenthesized(self):
-        p = AxisPattern.pulse(at=5, value=1.0)
-        formula = str(p)
-        assert formula.startswith("(") and formula.endswith(")")
-
-    def test_boundary_at_zero(self):
-        p = AxisPattern.pulse(at=0, value=1.0)
-        assert "step == 0" in str(p)
-
     def test_zero_amount_is_legal(self):
         p = AxisPattern.pulse(at=0, value=0.0)
         assert str(p) == "(if(step == 0, 0.0, 0))"
@@ -112,10 +99,6 @@ class TestSeriesParameterValue:
 
 
 class TestPeriodic:
-    def test_formula_contains_period(self):
-        p = AxisPattern.periodic(period=7, value=0.1)
-        assert "7" in str(p)
-
     def test_period_zero_raises(self):
         with pytest.raises(ValidationError):
             AxisPattern.periodic(period=0, value=0.1)
@@ -159,16 +142,8 @@ class TestInterval:
         with pytest.raises(ValidationError):
             AxisPattern.interval(start=10, end=5, value=0.3)
 
-    def test_formula_is_parenthesized(self):
-        formula = str(AxisPattern.interval(start=0, end=1, value=1.0))
-        assert formula.startswith("(") and formula.endswith(")")
-
 
 class TestSinusoid:
-    def test_formula_contains_sin(self):
-        formula = str(AxisPattern.sinusoid(amplitude=1.0, period=4))
-        assert "sin" in formula
-
     def test_period_zero_raises(self):
         with pytest.raises(ValidationError):
             AxisPattern.sinusoid(amplitude=1.0, period=0)
@@ -181,21 +156,14 @@ class TestSinusoid:
         p = AxisPattern.sinusoid(amplitude=1.0, period="period_param")
         assert "period_param" in str(p)
 
-    def test_formula_contains_all_params(self):
+    def test_formula_places_every_parameter(self):
         formula = str(
             AxisPattern.sinusoid(amplitude=2.0, period=12.0, phase=3.0, baseline=1.0)
         )
-        assert "2.0" in formula
-        assert "12.0" in formula
-        assert "3.0" in formula
-        assert "1.0" in formula
+        assert formula == "(1.0 + 2.0 * sin(2 * pi * (t - 3.0) / 12.0))"
 
 
 class TestGaussianPulse:
-    def test_formula_contains_exp(self):
-        formula = str(AxisPattern.gaussian_pulse(center=10.0, width=2.0, peak=1.0))
-        assert "exp" in formula
-
     def test_width_zero_raises(self):
         with pytest.raises(ValidationError):
             AxisPattern.gaussian_pulse(center=0.0, width=0.0, peak=1.0)
@@ -224,18 +192,6 @@ class TestLinearRamp:
 
 
 class TestCombine:
-    def test_sum_contains_plus(self):
-        a = AxisPattern.pulse(at=1, value=0.1)
-        b = AxisPattern.pulse(at=2, value=0.2)
-        result = str(AxisPattern.combine(a, b, mode=AxisPattern.SUM))
-        assert "+" in result
-
-    def test_max_contains_max(self):
-        a = AxisPattern.pulse(at=1, value=0.1)
-        b = AxisPattern.pulse(at=2, value=0.2)
-        result = str(AxisPattern.combine(a, b, mode=AxisPattern.MAX))
-        assert "max" in result
-
     def test_min_contains_min(self):
         a = AxisPattern.pulse(at=1, value=0.1)
         b = AxisPattern.pulse(at=2, value=0.2)
@@ -250,12 +206,6 @@ class TestCombine:
     def test_zero_patterns_raises(self):
         with pytest.raises(ValueError):
             AxisPattern.combine()
-
-    def test_result_is_parenthesized(self):
-        a = AxisPattern.pulse(at=1, value=0.1)
-        b = AxisPattern.pulse(at=2, value=0.2)
-        result = str(AxisPattern.combine(a, b))
-        assert result.startswith("(") and result.endswith(")")
 
     def test_three_patterns_sum(self):
         a = AxisPattern.pulse(at=1, value=0.1)
@@ -309,22 +259,9 @@ class TestCombine:
 
 
 class TestFromFormula:
-    def test_passthrough(self):
-        p = AxisPattern.from_formula("k1 * t")
-        assert "k1 * t" in str(p)
-
     def test_wraps_in_parens(self):
         """from_formula always wraps in parens for safe composition."""
-        p = AxisPattern.from_formula("k1 * t")
-        formula = str(p)
-        assert formula.startswith("(") and formula.endswith(")")
-
-    def test_outer_multiplication_is_safe(self):
-        """f-string multiplication binds to the whole expr, not the last term."""
-        p = AxisPattern.from_formula("a + b")
-        composed = f"2 * {p}"
-        # The result is "2 * (a + b)" rather than "2 * a + b".
-        assert composed == "2 * (a + b)"
+        assert str(AxisPattern.from_formula("k1 * t")) == "(k1 * t)"
 
     def test_already_parenthesized_expression(self):
         p = AxisPattern.from_formula("(x + y)")
@@ -387,12 +324,6 @@ class TestToStratifiedRate:
 
 
 class TestCompositionSafety:
-    def test_outer_multiplication_respects_parens(self):
-        formula = str(AxisPattern.pulse(at=5, value=1.0))
-        outer = f"2 * {formula}"
-        # The whole pulse expression is multiplied, not just the last token
-        assert outer.startswith("2 * (")
-
     def test_nested_combine_is_parenthesized(self):
         a = AxisPattern.pulse(at=1, value=0.1)
         b = AxisPattern.pulse(at=2, value=0.2)
@@ -425,4 +356,4 @@ class TestSecurityValidation:
     )
     def test_pattern_survives_security_validator(self, pattern: AxisPattern):
         """Each pattern's formula passes the full security validator."""
-        validate_expression_security(str(pattern))
+        assert_accepted(validate_expression_security, str(pattern))

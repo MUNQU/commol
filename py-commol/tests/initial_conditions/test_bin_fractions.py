@@ -20,12 +20,6 @@ class TestBinFractionUpdates:
         with pytest.raises(ValueError, match="must sum to 1.0"):
             conditions.update_bin_fractions({"A": 0.9, "B": 0.9})
 
-    def test_partial_update_must_keep_the_sum(self) -> None:
-        conditions = _conditions()
-
-        with pytest.raises(ValueError, match="must sum to 1.0"):
-            conditions.update_bin_fractions({"A": 0.4})
-
     def test_rejected_update_leaves_the_bins_unchanged(self) -> None:
         conditions = _conditions()
 

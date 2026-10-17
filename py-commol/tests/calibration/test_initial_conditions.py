@@ -11,7 +11,14 @@ from commol import (
     Simulation,
 )
 from commol.context.model import Model
-from tests.support import a_to_b_builder, bounded, build, observed, abc_builder
+from tests.support import (
+    a_to_b_builder,
+    assert_accepted,
+    bounded,
+    build,
+    observed,
+    abc_builder,
+)
 
 SEED = 42
 
@@ -51,7 +58,7 @@ class TestIds:
 
     @pytest.mark.parametrize("parameter_id", ["B", "B_g1", "B_g1_y", "g1", "group:g1"])
     def test_every_documented_id_kind_is_accepted(self, parameter_id: str) -> None:
-        Calibrator(Simulation(_model()), _problem(parameter_id))
+        assert_accepted(Calibrator, Simulation(_model()), _problem(parameter_id))
 
     def test_an_unknown_id_is_rejected(self) -> None:
         with pytest.raises(

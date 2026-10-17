@@ -68,16 +68,6 @@ class TestUpdateStratificationFractions:
         assert _fractions_of(model, "group") == {"group1": 0.25, "group2": 0.75}
         assert _fractions_of(model, "tier") == {"low": 0.1, "mid": 0.4, "high": 0.5}
 
-    def test_fractions_still_sum_to_one(self) -> None:
-        model = _stratified_model()
-
-        model.structure.update_stratification_fractions(
-            {"group1": 0.123, "low": 0.077, "mid": 0.401}
-        )
-
-        assert sum(_fractions_of(model, "group").values()) == pytest.approx(1.0)
-        assert sum(_fractions_of(model, "tier").values()) == pytest.approx(1.0)
-
     def test_two_omitted_categories_are_rejected(self) -> None:
         model = _stratified_model()
 

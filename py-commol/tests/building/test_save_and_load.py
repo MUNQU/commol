@@ -123,14 +123,6 @@ class TestToJson:
         assert restored == model
         assert restored.structure.uncalibrated_values() == ["A"]
 
-    def test_accepts_a_string_path(self, tmp_path: Path) -> None:
-        model = _model()
-        path = tmp_path / "model.json"
-
-        model.to_json(str(path))
-
-        assert Model.from_json(path) == model
-
     def test_long_numeric_arrays_are_written_on_one_line(self, tmp_path: Path) -> None:
         model = _model()
         model.parameters[0].value = SeriesValue(

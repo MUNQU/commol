@@ -7,6 +7,7 @@ from commol.utils.equations import UnitConsistencyError
 from tests.support import (
     FactoryBuilder,
     a_to_b_builder,
+    assert_accepted,
     build,
     build_ode,
     abcd_builder,
@@ -77,15 +78,15 @@ def _with_v(rate: str, threshold_unit: str = "item") -> Model:
 
 class TestConsistentModels:
     def test_abc(self) -> None:
-        _abc().check_unit_consistency()
+        assert_accepted(_abc().check_unit_consistency)
 
     def test_rates_divided_by_subgroup_totals(self) -> None:
-        _per_group_ab(
-            "k1 * A * B / total_g1", "k1 * A * B / total_g2"
-        ).check_unit_consistency()
+        model = _per_group_ab("k1 * A * B / total_g1", "k1 * A * B / total_g2")
+
+        assert_accepted(model.check_unit_consistency)
 
     def test_a_proportional_rate_is_checked_as_its_flow(self) -> None:
-        _abc(bc="k2").check_unit_consistency()
+        assert_accepted(_abc(bc="k2").check_unit_consistency)
 
     def test_a_proportional_rate_in_the_unit_of_a_flow_fails(self) -> None:
         model = _abc(bc="k2", units={"k1": "1/day", "k2": "item/day"})
@@ -104,17 +105,19 @@ class TestConsistentModels:
             update={"neighbors": Complete()}
         )
 
-        build(builder).check_unit_consistency()
+        assert_accepted(build(builder).check_unit_consistency)
 
     def test_a_dimensionless_parameter(self) -> None:
-        _abc(
+        model = _abc(
             parameters={"factor": 0.5, "k1": 0.5, "k2": 0.1},
             units={**DAILY, "factor": "dimensionless"},
             ab="k1 * factor * A * B / total",
-        ).check_unit_consistency()
+        )
+
+        assert_accepted(model.check_unit_consistency)
 
     def test_a_unit_pint_does_not_define_is_its_own_dimension(self) -> None:
-        build(
+        model = build(
             abc_builder(
                 bin_unit="widget",
                 parameters={"k1": 0.1},
@@ -122,20 +125,26 @@ class TestConsistentModels:
                 step_unit="generation",
                 bc=None,
             )
-        ).check_unit_consistency()
+        )
+
+        assert_accepted(model.check_unit_consistency)
 
     def test_a_with_v_rate(self) -> None:
-        _with_v("k_v * A", threshold_unit="dimensionless").check_unit_consistency()
+        model = _with_v("k_v * A", threshold_unit="dimensionless")
+
+        assert_accepted(model.check_unit_consistency)
 
     def test_exponential_decay_of_a_rate(self) -> None:
-        _abc(
+        model = _abc(
             parameters={"k1_0": 0.5, "decay_rate": 0.01, "k2": 0.1},
             units={"k1_0": "1/day", "decay_rate": "dimensionless", "k2": "1/day"},
             ab="k1_0 * exp(-decay_rate * step) * A * B / total",
-        ).check_unit_consistency()
+        )
+
+        assert_accepted(model.check_unit_consistency)
 
     def test_sin_of_step_forcing(self) -> None:
-        _abc(
+        model = _abc(
             parameters={"k1_avg": 0.5, "amplitude": 0.1, "k2": 0.1},
             units={
                 "k1_avg": "1/day",
@@ -143,10 +152,12 @@ class TestConsistentModels:
                 "k2": "1/day",
             },
             ab=("k1_avg * (1 + amplitude * sin(2 * pi * step / 365)) * A * B / total"),
-        ).check_unit_consistency()
+        )
+
+        assert_accepted(model.check_unit_consistency)
 
     def test_the_unit_of_a_formula_parameter_is_inferred(self) -> None:
-        _abc(
+        model = _abc(
             parameters={
                 "k1_base": 0.3,
                 "multiplier": 2.0,
@@ -158,20 +169,24 @@ class TestConsistentModels:
                 "multiplier": "dimensionless",
                 "k2": "1/day",
             },
-        ).check_unit_consistency()
+        )
+
+        assert_accepted(model.check_unit_consistency)
 
     def test_a_formula_of_subgroup_totals_is_dimensionless(self) -> None:
-        _abc(
+        model = _abc(
             parameters={
                 "g1_fraction": "total_g1 / total",
                 "k1": 0.3,
                 "k2": 0.1,
             },
             stratifications={"group": {"g1": 0.3, "g2": 0.7}},
-        ).check_unit_consistency()
+        )
+
+        assert_accepted(model.check_unit_consistency)
 
     def test_chained_formula_parameters(self) -> None:
-        _abc(
+        model = _abc(
             parameters={
                 "base_rate": 0.1,
                 "adjusted_rate": "base_rate * 2",
@@ -180,14 +195,12 @@ class TestConsistentModels:
             },
             units={"base_rate": "1/day", "k2": "1/day"},
             ab="final_rate * A * B / total",
-        ).check_unit_consistency()
+        )
+
+        assert_accepted(model.check_unit_consistency)
 
 
 class TestMissingUnits:
-    def test_parameters_without_units_are_named(self) -> None:
-        with pytest.raises(UnitConsistencyError, match="missing units"):
-            _abc(units={}).check_unit_consistency()
-
     def test_one_parameter_without_a_unit_is_named(self) -> None:
         with pytest.raises(UnitConsistencyError, match="missing units") as error:
             _abc(units={"k1": "1/day"}).check_unit_consistency()
@@ -411,13 +424,17 @@ class TestStepUnit:
 
     @pytest.mark.parametrize("unit", ["day", "week", "d"])
     def test_a_model_in_its_step_unit_passes(self, unit: str) -> None:
-        _two_rates(f"1/{unit}", f"1/{unit}", step_unit=unit).check_unit_consistency()
+        model = _two_rates(f"1/{unit}", f"1/{unit}", step_unit=unit)
+
+        assert_accepted(model.check_unit_consistency)
 
     def test_a_model_in_steps_needs_no_step_unit(self) -> None:
-        _two_rates("1/step", "1/step").check_unit_consistency()
+        assert_accepted(_two_rates("1/step", "1/step").check_unit_consistency)
 
     def test_aliases_of_one_unit_are_one_unit(self) -> None:
-        _two_rates("1/day", "1/d", step_unit="day").check_unit_consistency()
+        model = _two_rates("1/day", "1/d", step_unit="day")
+
+        assert_accepted(model.check_unit_consistency)
 
     def test_rates_per_day_without_a_step_unit_say_to_declare_it(self) -> None:
         with pytest.raises(UnitConsistencyError, match="Declare step_unit"):
@@ -457,7 +474,9 @@ class TestAxisUnit:
     """A declared step unit of any single dimension: time is one case."""
 
     def test_a_model_in_one_per_meter_passes_with_its_step_unit(self) -> None:
-        _two_rates("1/meter", "1/meter", step_unit="meter").check_unit_consistency()
+        model = _two_rates("1/meter", "1/meter", step_unit="meter")
+
+        assert_accepted(model.check_unit_consistency)
 
     def test_without_a_declared_unit_a_length_is_not_the_step(self) -> None:
         with pytest.raises(UnitConsistencyError, match="item/step"):
@@ -477,12 +496,14 @@ class TestAxisUnit:
             _two_rates("1/day", "1/day", step_unit=unit).check_unit_consistency()
 
     def test_a_step_unit_pint_does_not_define_is_its_own_dimension(self) -> None:
-        _two_rates(
-            "1/generation", "1/generation", step_unit="generation"
-        ).check_unit_consistency()
+        model = _two_rates("1/generation", "1/generation", step_unit="generation")
+
+        assert_accepted(model.check_unit_consistency)
 
     def test_a_differential_model_in_one_per_day_passes(self) -> None:
-        _two_rates("1/day", "1/day", step_unit="day", ode=True).check_unit_consistency()
+        model = _two_rates("1/day", "1/day", step_unit="day", ode=True)
+
+        assert_accepted(model.check_unit_consistency)
 
     def test_an_impulse_moves_an_amount_of_the_bin_unit(self) -> None:
         def impulse(unit: str) -> Model:
@@ -519,7 +540,7 @@ class TestPositionOnTheAxis:
         )
 
     def test_a_rate_proportional_to_t_needs_k_per_step_unit_squared(self) -> None:
-        self._proportional_to_t("1/day**2").check_unit_consistency()
+        assert_accepted(self._proportional_to_t("1/day**2").check_unit_consistency)
 
     def test_a_rate_proportional_to_t_with_k_per_day_fails(self) -> None:
         with pytest.raises(UnitConsistencyError, match="k \\* t"):
@@ -539,10 +560,10 @@ class TestPositionOnTheAxis:
     def test_a_number_compared_with_t_is_read_in_the_step_unit(self) -> None:
         model = self._windowed("if(t >= 10, if(t < 20.5, k, 0), 0) * A")
 
-        model.check_unit_consistency()
+        assert_accepted(model.check_unit_consistency)
 
     def test_a_number_added_to_t_is_read_in_the_step_unit(self) -> None:
-        self._windowed("k * (t - 3) * k * A").check_unit_consistency()
+        assert_accepted(self._windowed("k * (t - 3) * k * A").check_unit_consistency)
 
     def test_the_branches_of_if_share_a_unit(self) -> None:
         with pytest.raises(UnitConsistencyError, match=FAILED):

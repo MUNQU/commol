@@ -67,8 +67,16 @@ jobs:
       - name: Run ty type checking
         run: uv run ty check commol
 
+      # The test that compiles the LaTeX description needs latexmk, which the
+      # runner does not have; this job is the one that runs it.
+      - name: Install LaTeX
+        run: >-
+          sudo apt-get update &&
+          sudo apt-get install --no-install-recommends -y latexmk
+          texlive-latex-base texlive-latex-recommended texlive-fonts-recommended
+
       - name: Run pytest (including the documentation examples)
-        run: uv run pytest --cov=commol --cov-report=xml --cov-report=term
+        run: uv run pytest --cov=commol --cov-report=xml --cov-report=term --durations=20
 
       # Codecov authenticates the upload with the OIDC token of the run, so the
       # repository keeps no Codecov secret. A pull request from a fork has no

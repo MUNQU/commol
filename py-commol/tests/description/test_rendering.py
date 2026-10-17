@@ -132,6 +132,8 @@ class TestDot:
     @pytest.mark.skipif(
         importlib.util.find_spec("pydot") is None, reason="pydot is not installed"
     )
+    # pydot 4 calls pyparsing names that pyparsing 3.3 deprecates.
+    @pytest.mark.filterwarnings("ignore::DeprecationWarning:pydot.dot_parser")
     def test_the_dot_file_parses(self) -> None:
         import pydot
 

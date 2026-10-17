@@ -117,7 +117,7 @@ def test_staged_treatment_ends_with_the_control_final_size_relation() -> None:
 @pytest.mark.xfail(
     strict=True,
     raises=ValidationError,
-    reason="F2: an id with a digit before letters is read as a number in a rate",
+    reason="#197: an id with a digit before letters is read as a number in a rate",
 )
 @pytest.mark.parametrize(
     "names", [("e1", "e2", "dlt1", "dlt2"), ("eps1", "eps2", "d1T", "d2T")]

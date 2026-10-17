@@ -4,7 +4,7 @@ import pytest
 
 from commol.context.model import Model
 from tests.support.description import equation_forms
-from tests.support import build, build_ode, abcd_builder, abc_builder
+from tests.support import build, build_ode, abc_builder
 
 
 def _without_ab_rate() -> Model:
@@ -40,36 +40,6 @@ class TestText:
             "[A(t+Dt) - A(t)] / Dt = - (k1 * A * B / total)\n"
             "[B(t+Dt) - B(t)] / Dt = (k1 * A * B / total) - (k2 * B)\n"
             "[C(t+Dt) - C(t)] / Dt = (k2 * B)"
-        )
-        assert output == expected
-
-    def test_the_forms_of_four_bins(self) -> None:
-        output = equation_forms(build(abcd_builder(name="ABCD Model")))
-
-        expected = (
-            "========================================\n"
-            "COMPACT FORM\n"
-            "========================================\n"
-            "\n"
-            "Bin Transitions:\n"
-            "ab (A -> B):\n"
-            "  A -> B: k1 * A * C / total\n"
-            "\n"
-            "bc (B -> C):\n"
-            "  B -> C: k3 * B\n"
-            "\n"
-            "cd (C -> D):\n"
-            "  C -> D: k2 * C\n"
-            "\n"
-            "Total System: 4 coupled equations (4 bins)\n"
-            "\n"
-            "========================================\n"
-            "EXPANDED FORM\n"
-            "========================================\n"
-            "[A(t+Dt) - A(t)] / Dt = - (k1 * A * C / total)\n"
-            "[B(t+Dt) - B(t)] / Dt = (k1 * A * C / total) - (k3 * B)\n"
-            "[C(t+Dt) - C(t)] / Dt = (k3 * B) - (k2 * C)\n"
-            "[D(t+Dt) - D(t)] / Dt = (k2 * C)"
         )
         assert output == expected
 

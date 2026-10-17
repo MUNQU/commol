@@ -2,8 +2,9 @@
 
 [Back to Codebase Guide](index.md)
 
-Where a Python test goes, how it builds its model, and what it must check.
-The tests live in `py-commol/tests/`.
+Where a Python test goes, how it builds its model, what it must check, and
+how long it may take. The Python tests live in `py-commol/tests/`; the Rust
+tests are `#[cfg(test)]` modules and the `tests/` folder of each crate.
 
 ## Layout: one package per guide page
 
@@ -33,6 +34,7 @@ kind that is not aggregate through every generic layer.
 | `docs/` | The documentation examples and the API coverage (marker `docs`) | — |
 | `reference_models/` | Published models against their stated results, one module per model family | — (across features) |
 | `model_kinds/` | The test model kind (`support/kinds.py`) through a simulation, a calibration, a report and a plot; the check that an engine runs its kind; the variants of a structure (`UnstratifiedVariant`). It needs the extension built with `--features test-kind`. | — (across features; [Design decisions](decisions/model-kinds.md#one-interface-for-every-model-kind)) |
+| `suite/` | The rules of this page that a program can check (`test_rules.py`), and the plugin that records how long each test takes (`durations.py`) | — |
 | `support/` | No tests: the code the tests share | — |
 
 Keep a test module under about 600 lines. When it grows past that, split it by
@@ -77,7 +79,41 @@ A test compares a result with an oracle:
 
 "It runs" is not a result. A test whose only check is that no exception
 occurs is allowed only when the exception is its subject, such as a validator
-that accepts a valid input.
+that accepts a valid input; it calls `assert_accepted(check, *args)`
+(`tests/support/assertions.py`), which fails with the message of the
+rejection.
+
+A test checks the behavior of commol. It does not check:
+
+- the behavior of Python, pydantic, NumPy or another library, such as a
+  `str` path that `pathlib` accepts, or an unknown keyword that Python rejects;
+- a default of a pydantic model or of a binding;
+- an attribute read back as the test set it;
+- the absence of an API that was removed: that is history, not behavior.
+
+`tests/suite/test_rules.py` checks the part of this that a program can read:
+every Python test has an `assert`, a `pytest.raises`, `pytest.warns` or
+`pytest.fail`, a call of `np.testing.assert_*`, or a call of a helper of
+`tests/` that has one; every Rust test has an `assert*!`, `panic!` or
+`unreachable!`, calls a function of its crate that has one, is
+`#[should_panic]`, or returns a `Result`. Review checks the rest.
+
+## Duplicates
+
+Two tests do not check the same behavior with the same inputs. Candidates
+come from the coverage of each test:
+
+```bash
+COVERAGE_CORE=ctrace pytest --cov=commol --cov-context=test --cov-report=
+```
+
+The `sysmon` core, the default of coverage on Python 3.14, records a line only
+for the first test that runs it, so it gives most tests no context. Two tests of one module whose covered lines are equal,
+or one inside the other, are a candidate. Coverage does not decide: two tests
+can run the same lines and check different results. Read both, and keep one
+only when the other checks nothing that it does not: the same output for the
+same input, or a weaker check of the same output (`"+" in formula` against
+the exact formula).
 
 ## Tolerances
 
@@ -118,12 +154,62 @@ result (`test_the_fixed_point_starts_the_periodic_orbit`).
   differential one; an asymptotic result is read with `settled`, and the test
   states its horizon.
 - **Gaps.** A model that commol cannot state, or computes wrong, gets a test
-  marked `xfail(strict=True, reason="F<n>: …")` that names a finding of the
-  task that added it, so a fix makes the test pass and forces the marker out.
+  marked as [Skips, expected failures and ignored tests](#skips-expected-failures-and-ignored-tests)
+  says, with the open issue of the finding.
 
 To add a test, write the model with `Flow` and `flow_model` (`tests/support/flows.py`)
 from the initial value of each bin, compute the stated result in the test,
 and cite the papers.
+
+## Skips, expected failures and ignored tests
+
+- An `xfail` is `strict=True` and its reason starts with the open issue that
+  fixes it (`reason="#196: …"`): the fix makes the test pass, and the strict
+  marker then fails the run until the fix removes it.
+- A test that skips when an optional dependency is missing runs in at least
+  one CI job: Code Quality installs `pydot` (the `dev` extra) and `latexmk`.
+- A Rust `#[ignore]` gives a reason with the `cargo test` command that runs it,
+  such as the benchmarks of `crates/commol-differential/src/tests.rs`. A
+  benchmark also asserts that the methods it times give the same result.
+
+`tests/suite/test_rules.py` checks the `xfail` markers and the reasons of
+`#[ignore]`.
+
+## Time budget
+
+A test takes at most 1 s, setup and teardown included, on the Ubuntu runner
+of CI. A test over 0.5 s stays only if it checks what no faster test checks,
+with the smallest inputs that still check it: a shorter horizon, fewer steps,
+fewer replicates. `tests/suite/durations.py` records the time of each test,
+and `test_slow_tests_are_listed` runs last and fails on a test over the budget
+that the table below does not list. The coverage studies (`coverage_study`)
+are outside the budget: they run weekly.
+
+The check reads the wall time of the run, so a machine that runs other work
+at the same time can exceed the budget. `pytest --durations=20` shows the
+slowest tests; Code Quality prints them.
+
+| Test | Why it takes longer |
+|---|---|
+
+## Mutation testing
+
+Coverage says that a line ran, not that a test notices when it changes.
+Mutation testing changes the code, one small change at a time, and reports
+the changes that no test fails on. It runs on demand, not in CI, because a
+full run takes hours:
+
+```bash
+cargo install --locked cargo-mutants
+cargo mutants -j 4 -p commol-model --test-package commol-model \
+  --test-package commol-difference --test-package commol-differential \
+  --test-package commol-stochastic
+```
+
+For Python, `mutmut` (`uv pip install mutmut`) with `[tool.mutmut]`
+`paths_to_mutate = ["commol/context/", "commol/api/"]` in a copy of
+`py-commol/`. A missed mutant gets a test that fails on it, or a reason: an
+equivalent mutant changes no behavior.
 
 ## Navigation
 

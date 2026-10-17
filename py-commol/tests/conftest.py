@@ -6,6 +6,8 @@ from commol import Simulation
 from commol.context.model import Model
 from tests.support import abc_builder, build
 
+pytest_plugins = ["tests.suite.durations"]
+
 
 @pytest.fixture
 def abc_model() -> Model:

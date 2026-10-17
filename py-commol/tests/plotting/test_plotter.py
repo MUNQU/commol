@@ -58,16 +58,6 @@ def _observed_b(results: dict[str, list[float]]) -> list[ObservedDataPoint]:
 
 
 class TestSimulationPlotter:
-    def test_plotter_initialization(self, abc_simulation: Simulation) -> None:
-        results = abc_simulation.run(100)
-
-        plotter = SimulationPlotter(abc_simulation, results)
-
-        assert plotter.simulation == abc_simulation
-        assert plotter.results == results
-        assert len(plotter.bins) == 3
-        assert plotter.results.positions == [float(step) for step in range(101)]
-
     def test_plot_series_draws_every_bin(self, plotter: SimulationPlotter) -> None:
         fig = plotter.plot_series()
 
@@ -145,13 +135,6 @@ class TestSimulationPlotter:
 
         assert len(fig.axes) == 3
         assert fig.dpi == 150
-        _assert_draws(fig, {name: plotter.results[name] for name in BINS})
-
-    def test_plot_series_with_seaborn_config(self, plotter: SimulationPlotter) -> None:
-        config = PlotConfig(style="dark", palette="husl", context="talk")
-
-        fig = plotter.plot_series(config=config)
-
         _assert_draws(fig, {name: plotter.results[name] for name in BINS})
 
     def test_plot_cumulative_draws_the_running_sums(

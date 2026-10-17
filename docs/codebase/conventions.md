@@ -18,7 +18,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 | Comments | Describe the code as it is | Review |
 | Documentation | Mandatory with every change: [definition of done](#documentation-definition-of-done) | CI and review |
 | Doc examples | Abstract names; every block runs | `pytest -m docs` (CI) and review |
-| Tests | One package per guide page; shared factories; every test checks a result: [Tests](tests.md) | Review; pytest 10 deprecations fail the run (`filterwarnings`) |
+| Tests | One package per guide page; shared factories; every test checks a result, once, within its time budget: [Tests](tests.md) | `tests/suite/` (CI) and review; pytest 10 deprecations fail the run (`filterwarnings`) |
 | Commits | `type(scope): description` | Review |
 
 ## Python

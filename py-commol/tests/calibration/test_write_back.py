@@ -487,17 +487,6 @@ class TestApplyCalibrationParameters:
         with pytest.raises(ValueError, match="no declared parameter type"):
             model.apply_calibration_parameters({"mystery": 0.15}, _split_problem())
 
-    def test_per_compartment_initial_condition_is_written_back(self) -> None:
-        model = _binary_split()
-        problem = initial_condition_problem("A_group1", "A_group2")
-
-        model.apply_calibration_parameters({"A_group1": 0.3, "A_group2": 0.7}, problem)
-
-        assert _overrides(model) == {
-            "A_group1": pytest.approx(0.3),
-            "A_group2": pytest.approx(0.7),
-        }
-
     def test_per_compartment_initial_condition_is_upserted(self) -> None:
         model = _binary_split()
         problem = initial_condition_problem("A_group1", "A_group2")
