@@ -167,3 +167,30 @@ pub fn observation_scales(observed_data: &[ObservedDataPoint]) -> Vec<f64> {
     let values: Vec<f64> = observed_data.iter().map(|obs| obs.value).collect();
     series_rms(&labels, &values)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scaling_multiplies_by_the_magnitude_and_divides_by_the_scale() {
+        let jacobian = Matrix::from_row_slice(2, 2, &[1.0, 2.0, 3.0, 4.0]);
+        let sensitivities = Sensitivities {
+            predictions: vec![0.0, 0.0],
+            errors: jacobian.clone() * 0.5,
+            jacobian,
+            labels: vec!["A".to_string(), "B".to_string()],
+        };
+        let parameters = [
+            CalibrationParameter::new("k1".to_string(), 0.0, 10.0),
+            CalibrationParameter::new("k2".to_string(), 1.0, 4.0),
+        ];
+
+        // θ̃ = (|2|, the width 3 of [1, 4] for k2 = 0) and s = (2, 4).
+        let scaled = sensitivities.scaled(&[2.0, 0.0], &parameters, &[2.0, 4.0]);
+
+        let expected = Matrix::from_row_slice(2, 2, &[1.0, 3.0, 1.5, 3.0]);
+        assert_eq!(scaled.jacobian, expected);
+        assert_eq!(scaled.errors, expected * 0.5);
+    }
+}

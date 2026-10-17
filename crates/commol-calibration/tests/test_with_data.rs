@@ -137,6 +137,8 @@ fn with_data_checks_its_values_and_weights() {
     let problem = problem();
     let error = problem.with_data(&[1.0, 2.0], &[1.0, 1.0]).unwrap_err();
     assert!(error.contains("4 observations, 2 values"), "{error}");
+    let error = problem.with_data(&[1.0; 4], &[1.0, 1.0]).unwrap_err();
+    assert!(error.contains("4 values, 2 weights"), "{error}");
 
     let error = problem
         .with_data(&[1.0, f64::NAN, 2.0, 3.0], &[1.0; 4])

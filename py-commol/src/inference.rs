@@ -706,12 +706,6 @@ pub struct PyPredictive {
 
 #[pymethods]
 impl PyPredictive {
-    /// The positions of the trajectories
-    #[getter]
-    fn positions(&self) -> Vec<f64> {
-        self.inner.positions().to_vec()
-    }
-
     /// The trajectory of every draw, `[draw][position][output]`
     #[getter]
     fn trajectories(&self) -> Vec<Vec<Vec<f64>>> {

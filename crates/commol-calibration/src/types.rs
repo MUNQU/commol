@@ -71,32 +71,9 @@ impl ObservedDataPoint {
         }
     }
 
-    /// Create an observation of one output with a custom weight
-    pub fn with_weight(at: f64, output: String, value: f64, weight: f64) -> Self {
-        Self {
-            weight,
-            ..Self::new(at, output, value)
-        }
-    }
-
     /// Create an observation of one output with a factor parameter
     pub fn with_factor(at: f64, output: String, value: f64, factor_id: String) -> Self {
         Self {
-            factor_id: Some(factor_id),
-            ..Self::new(at, output, value)
-        }
-    }
-
-    /// Create an observation of one output with both weight and factor
-    pub fn with_weight_and_factor(
-        at: f64,
-        output: String,
-        value: f64,
-        weight: f64,
-        factor_id: String,
-    ) -> Self {
-        Self {
-            weight,
             factor_id: Some(factor_id),
             ..Self::new(at, output, value)
         }

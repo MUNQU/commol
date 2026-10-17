@@ -6,7 +6,11 @@ import numpy as np
 import pytest
 
 from commol import (
+    CalibrationProblem,
+    NelderMeadConfig,
     NoNoise,
+    ObservedDataPoint,
+    Simulation,
     Calibrator,
     ParameterSample,
     Predictive,
@@ -15,6 +19,7 @@ from commol import (
     member_statistics,
     simulation_report,
 )
+from tests.support import a_to_b_builder, bounded, build_stochastic
 
 POSITIONS = list(range(51))
 
@@ -90,6 +95,34 @@ class TestBands:
 
 
 class TestObservations:
+    def test_the_replicates_of_a_draw_share_its_weight(self) -> None:
+        problem = CalibrationProblem(
+            observed_data=[ObservedDataPoint(at=5, output="A", value=600.0)],
+            parameters=[bounded("k", 0.01, 0.5)],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=1),
+            replicates=4,
+            replicate_summary="mean",
+            seed=7,
+        )
+        model = build_stochastic(
+            a_to_b_builder(parameters={"k": None}), "StochasticSteps"
+        )
+        calibrator = Calibrator(Simulation(model), problem)
+        sample = ParameterSample(
+            names=["k"],
+            bounds=[(0.01, 0.5)],
+            values=[[0.1], [0.2]],
+            log_weights=[math.log(0.25), math.log(0.75)],
+            method=SampleMethod(name="test"),
+        )
+
+        draws = Predictive(calibrator, sample, [5.0]).at_observations(
+            problem.observed_data, NoNoise()
+        )
+
+        assert draws.weights == pytest.approx([0.0625] * 4 + [0.1875] * 4)
+
     def test_draws_read_observations_as_the_loss_does(
         self, calibrator: Calibrator
     ) -> None:

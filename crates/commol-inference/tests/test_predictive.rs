@@ -74,3 +74,21 @@ fn observation_draws_are_the_predictions_the_loss_compares() {
     // B over the window from 1 to 3 at k = 0.2: 1000 (0.8 − 0.512).
     assert!((draws.values[0][1] - 288.0).abs() < 1e-9);
 }
+
+#[test]
+fn a_sample_of_other_parameters_is_named_in_the_error() {
+    let other = ParameterSample::new(
+        vec!["r".to_string()],
+        vec![(0.0, 1.0)],
+        vec![vec![0.2]],
+        &[0.0],
+        None,
+    )
+    .unwrap();
+
+    let error = Predictive::new(&problem(), &other, &[1.0])
+        .expect_err("the sample does not match the problem")
+        .to_string();
+
+    assert!(error.contains(r#"["r"]; the problem has ["k"]"#), "{error}");
+}

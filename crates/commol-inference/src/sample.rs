@@ -287,8 +287,12 @@ mod tests {
     #[test]
     fn resampling_never_picks_a_draw_of_zero_weight() {
         let sample = sample(&[0.0, f64::NEG_INFINITY, 0.0]);
+        assert!(!sample.is_empty());
         let picks = sample.resample(1000, 3);
         assert!(picks.iter().all(|&i| i != 1));
+        // Draws 0 and 2 share the weight: each is picked about 500 times.
+        let first = picks.iter().filter(|&&i| i == 0).count();
+        assert!((400..600).contains(&first), "{first}");
         assert_eq!(picks, sample.resample(1000, 3));
     }
 }

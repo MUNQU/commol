@@ -213,9 +213,25 @@ mod tests {
     }
 
     #[test]
+    fn the_covariance_does_not_depend_on_the_scale_of_the_weights() {
+        let x = [1.0, 2.0, 4.0];
+        let y = [2.0, 1.0, 0.0];
+        assert!(close(covariance(&x, &y, &[3.0; 3]), -1.5));
+    }
+
+    #[test]
     fn kish_size_counts_equal_weights_and_shrinks_with_unequal_ones() {
         assert!(close(effective_size(&[0.25; 4]), 4.0));
+        assert!(close(effective_size(&[2.0; 4]), 4.0));
         assert!(close(effective_size(&[0.5, 0.25, 0.25]), 1.0 / 0.375));
+    }
+
+    #[test]
+    fn an_interval_level_is_strictly_between_zero_and_one() {
+        assert_eq!(interval_levels(0.5), Ok([0.25, 0.75]));
+        for level in [0.0, 1.0] {
+            assert!(interval_levels(level).is_err(), "{level} is accepted");
+        }
     }
 
     #[test]
