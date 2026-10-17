@@ -139,6 +139,7 @@ every match.
 | The documentation examples run | `pytest -m docs` (from `py-commol/`) | CI (Code Quality) |
 | Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Code Quality) |
 | Every crate under `crates/` is named in [Architecture](architecture.md) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Code Quality) |
+| Every test or definition a page names as `<file>::<name>` exists in that file (the dated design records `development/design-*.md` keep the names of their date) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Code Quality) |
 | Public Python modules, classes, functions and arguments have docstrings | `ruff check .` (rules `D1`, `D417`, NumPy convention) | pre-commit, CI |
 | Public Rust items have docs, without broken links | `#![warn(missing_docs)]` in every crate (denied by `clippy -D warnings`); `RUSTDOCFLAGS="-D warnings" cargo doc` | pre-commit (clippy), CI |
 | The table in step 1 is complete for this change | — | Pull request checklist and review |

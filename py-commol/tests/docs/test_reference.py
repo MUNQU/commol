@@ -1,4 +1,5 @@
-"""Check that the API reference documents every public name of the package."""
+"""Check that the documentation names what exists: every public name has an
+API entry, and every site link, crate and named test exists."""
 
 import re
 from pathlib import Path
@@ -54,6 +55,42 @@ def test_site_links_point_to_existing_pages(source: str) -> None:
         if not any(candidate.is_file() for candidate in candidates):
             missing.append(match.group(0))
     assert not missing, f"{source} links to pages that do not exist: {missing}"
+
+
+NAMED_TEST = re.compile(
+    r"`(?P<file>(?:py-commol/)?(?:tests|crates)/[\w/.\-]+\.(?:py|rs))::(?P<name>\w+)"
+)
+
+
+def named_tests() -> list[tuple[str, str, str]]:
+    """Each ``<file>::<name>`` reference under ``docs/``, with its page.
+
+    The dated design records (``development/design-*.md``) keep the names of
+    their date, so they are left out.
+    """
+    docs_dir = REPO_ROOT / "docs"
+    return [
+        (str(page.relative_to(docs_dir)), match.group("file"), match.group("name"))
+        for page in sorted(docs_dir.rglob("*.md"))
+        if not page.match("development/design-*.md")
+        for match in NAMED_TEST.finditer(page.read_text(encoding="utf-8"))
+    ]
+
+
+@pytest.mark.docs
+@pytest.mark.parametrize(("page", "file", "name"), named_tests())
+def test_named_tests_exist(page: str, file: str, name: str) -> None:
+    """Every ``<file>::<name>`` in the documentation names a definition in that file."""
+    path = REPO_ROOT / file
+    if not path.is_file():
+        path = REPO_ROOT / "py-commol" / file
+    assert path.is_file(), f"{page} names {file}, which does not exist"
+    definition = re.compile(
+        rf"^\s*(?:pub(?:\(\w+\))? )?(?:def|fn|class) {name}\b", re.MULTILINE
+    )
+    assert definition.search(path.read_text(encoding="utf-8")), (
+        f"{page} names {file}::{name}, which {file} does not define"
+    )
 
 
 ARCHITECTURE_PAGE = REPO_ROOT / "docs" / "codebase" / "architecture.md"
