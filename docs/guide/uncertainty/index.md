@@ -13,7 +13,7 @@ Each method has its own page, listed in the table below.
 
 | Question | What answers it |
 |---|---|
-| Which parameters fit the data? | A sample of the parameters, or a profile of the loss; several starts that end apart with equal losses show that the data do not identify the parameters |
+| Which parameters fit the data? | The [identifiability](identifiability.md) methods; a sample of the parameters, or a profile of the loss; several starts that end apart with equal losses show that the data do not identify the parameters |
 | How do the inputs move the outputs? | The predictive of a sample: the run of every draw, and its band |
 | Are the intervals calibrated? | Scores of the predictive against observations the method did not see, and coverage studies |
 
@@ -33,6 +33,10 @@ coverage of the data is below its level.
 | Method | Question | Needs a noise model | Page |
 |---|---|---|---|
 | Several starts, `Calibrator.run(starts=n)` | Which parameters fit the data: distinct ends with equal losses | No | [Optimizers](../calibration-optimizers.md#several-starts) |
+| `StructuralRank` | Which parameters any data of this design can determine, and which combinations | No | [Identifiability](identifiability.md#structural-rank) |
+| `Collinearity` | Which parameters can be fitted together | No | [Identifiability](identifiability.md#collinearity) |
+| `SampleIdentifiability` | Which parameters a sample determines: contraction, correlations, modes | No | [Identifiability](identifiability.md#a-sample) |
+| `StartsIdentifiability` | Which parameters differ between starts of equal loss | No | [Identifiability](identifiability.md#starts) |
 
 Each uncertainty method adds its row here when it lands.
 
@@ -206,6 +210,13 @@ its result; the call returns an `R`, which a static type checker infers from
 the configuration's type. A configuration with no registered runner raises a
 `ValueError` that names the registered ones.
 
+The identifiability methods run through their own entry point,
+`Calibrator.identifiability(method)`, with a subclass of
+`IdentifiabilityMethod[R]`: they answer another question
+([Identifiability](identifiability.md)). Both kinds subclass
+`InferenceMethod[R]` and share one registry; each entry point refuses the
+other kind with a `TypeError` that names the right one.
+
 <!-- doc-test: skip: no method ships yet; shows the call -->
 ```python
 result = calibrator.uncertainty(SomeMethod(...))
@@ -222,5 +233,6 @@ result = calibrator.uncertainty(SomeMethod(...))
 | To learn | Read |
 |---|---|
 | Several starts of an optimizer | [Optimizers](../calibration-optimizers.md#several-starts) |
+| Which parameters the data determine | [Identifiability](identifiability.md) |
 | Reports of a sample | [Reports](../reports.md) |
 | Plots of a predictive | [Running Simulations](../simulations.md#plotting) |

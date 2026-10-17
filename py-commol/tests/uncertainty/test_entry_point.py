@@ -5,7 +5,7 @@ from typing import assert_type
 
 import pytest
 
-from commol import Calibrator, UncertaintyMethod
+from commol import Calibrator, StructuralRank, UncertaintyMethod
 from commol.api.inference.registry import register, registered
 from tests.support.methods import StartsResult, StartsSample, run_starts_sample
 
@@ -38,3 +38,13 @@ class TestEntryPoint:
 
     def test_the_registry_lists_its_types(self) -> None:
         assert "StartsSample" in registered()
+
+    def test_each_entry_point_refuses_the_other_kind(
+        self, calibrator: Calibrator
+    ) -> None:
+        with pytest.raises(TypeError, match=r"Calibrator\.uncertainty"):
+            calibrator.identifiability(StartsSample(starts=2))  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError, match=r"Calibrator\.identifiability"):
+            calibrator.uncertainty(
+                StructuralRank(points=2, design="observations")  # ty: ignore[invalid-argument-type]
+            )

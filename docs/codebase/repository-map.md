@@ -30,7 +30,7 @@ Use this page when you know what to change but not where it belongs.
 | `crates/commol-stochastic/src/steps.rs` | `StochasticSteps`: the chain binomial (one multinomial per source, capped Poisson draws for absolute flows) and the check of its per-step probabilities. | Samplers; flows. |
 | `crates/commol-stochastic/src/units.rs` | What both stochastic engines share: the generator, the whole start of a run (`largest_remainder`, `random_rounding`) and impulses that move whole units. | Anything of one engine. |
 | `crates/commol-calibration/src/calibration_problem.rs` | `CalibrationProblem`: the layers below, built once (`new`, `with_replicates`, `with_observation_normalization`, `with_initial_condition_remainder`), the one evaluation of a point (`evaluate`), and the position check that names an observation or constraint (`check_positions`). It uses only `SimulationEngine`. | Penalties; optimizer setup; anything of one model kind. |
-| `crates/commol-calibration/src/forward.rs` | `ForwardModel`: the only code that clones, resets, writes values to or runs the engine (`run_schedule`, `run_observed`, `run_at`), one run per replicate of a stochastic engine; `Workspace`. | Loss, penalties, history. |
+| `crates/commol-calibration/src/forward.rs` | `ForwardModel`: the only code that clones, resets, writes values to or runs the engine (`run_schedule`, `run_observed`, `run_at`), one run per replicate of a stochastic engine; the same model on other observations (`with_observations`); `Workspace`. | Loss, penalties, history. |
 | `crates/commol-calibration/src/observation.rs` | `ObservationOperator`: one prediction per observation from the rows of a run (rows, sums of outputs, windows, factors). | Comparison with data. |
 | `crates/commol-calibration/src/feasibility.rs` | `Feasibility` (bounds, constraints), `Violation` and `EvaluationError`. | Penalties. |
 | `crates/commol-calibration/src/discrepancy.rs` | `Discrepancy`: the loss of predictions against the data, with weights, per-series normalization and the summary of the replicates. | Running engines. |
@@ -43,6 +43,8 @@ Use this page when you know what to change but not where it belongs.
 | `crates/commol-inference/src/sample.rs` | `ParameterSample`: weighted draws, their invariants and statistics, resampling. | What a method does. |
 | `crates/commol-inference/src/predictive.rs` | `Predictive` (the run of every draw, its bands), `observation_draws` through the observation operator, the `ObservationNoise` port and `NoNoise`. | Noise models of one method. |
 | `crates/commol-inference/src/scores.rs` | Coverage, interval score, weighted interval score, sample CRPS, PIT, and their means per series. | — |
+| `crates/commol-inference/src/sensitivity/` | `SensitivitySource`, the port of derivatives of the predicted observations; `FiniteDifferences` on the design of the observations or a dense one; the scaled sensitivities and `observation_scales`. | Ranks, verdicts. |
+| `crates/commol-inference/src/identifiability/` | The analyses: `structural_rank` (ranks, null space, combinations), `collinearity` (Brun's indices), `sample_identifiability` (contraction, correlations, modes), `starts_identifiability`. | Derivatives; reports. |
 | `crates/commol-inference/src/target.rs` | `Target` (a log density, `−∞` outside the support) and `discrepancy_in_support`. | Penalties. |
 
 ## PyO3 bindings
@@ -55,6 +57,7 @@ Use this page when you know what to change but not where it belongs.
 | `py-commol/src/test_kind.rs` | `TestEngine` and `TestStochasticEngine`, the engines of the test model kind; only with the `test-kind` feature. | Anything a release needs. |
 | `py-commol/src/calibration.rs` | The calibration types (observations, parameters, constraints, loss, optimizers, results) and the checks that take an `Engine`. | Logic beyond type conversion. |
 | `py-commol/src/inference.rs` | `commol_rs.inference`: `CalibrationProblem` (built once from a `Calibrator`: starts, history, predictions, the predictive), `ParameterSample`, `Predictive`, `ObservationDraws`, `weighted_quantiles`, `weighted_mean`, `by_series`; the runners of methods. | Logic beyond type conversion. |
+| `py-commol/src/identifiability.rs` | `commol_rs.inference`: `structural_rank`, `collinearity`, `sample_identifiability`, `starts_identifiability` and their result classes. | Logic beyond type conversion. |
 | `py-commol/src/python_observer.rs` | The progress table of a verbose optimization, written to Python's `sys.stdout`. | Writes to the standard error. |
 | `py-commol/commol/commol_rs/_commol_rs.pyi` | The type stub of the extension. Update it with every binding change. | — |
 
@@ -66,11 +69,11 @@ Use this page when you know what to change but not where it belongs.
 | `api/simulation.py` | `Simulation`: runs (`run`, `run_at`, with the seed of a stochastic engine), replicates (`replicates`, `ReplicateRuns`), output grouping through `ModelStructure.outputs_by_source`. | Expansion rules; which positions a model type accepts; anything of one model kind. |
 | `api/results.py` | `SimulationResults` (values with their positions and seed), `SimulationReplicates` (runs with one seed each, and their statistics), `index_at`, `sample`. | Engine rules. |
 | `api/calibrator.py` | `Calibrator`: the one conversion of a problem to Rust types, `run(starts=n)`, `run_with_history`, and the entry point `uncertainty`. | Loss or optimizer logic. |
-| `api/inference/` | What reads a sample: `Predictive` (`predictive.py`), the scores (`scores.py`, exposed as `commol.scores`), the one interval convention (`intervals.py`: `weighted_quantiles`, `member_statistics`, `ci_percentiles`), and the registry of method runners (`registry.py`). | Transforms of predictions; quantile formulas. |
+| `api/inference/` | What reads a sample: `Predictive` (`predictive.py`), the scores (`scores.py`, exposed as `commol.scores`), the one interval convention (`intervals.py`: `weighted_quantiles`, `member_statistics`, `ci_percentiles`), the registry of method runners (`registry.py`), and the runners of the identifiability methods (`identifiability.py`), which build the report. | Transforms of predictions; quantile formulas. |
 | `api/reporting.py` | `simulation_report` and `applied_parameters_report`, with the sections the structure adds (`ModelStructure.report_sections`). | Domain vocabulary; sections of one model kind. |
 | `api/patterns.py`, `api/windows.py` | Rates that change along the axis (`AxisPattern`), the window grid and windowed totals. | Physical units inside the model. |
 | `api/plotter.py` | Plots of results and of the bands of a `Predictive`. | Computation of results. |
-| `context/inference/` | `UncertaintyMethod` (the generic base of a method's configuration), `ParameterSample`, `SampleMethod`, `ParameterSummary`. | Runners. |
+| `context/inference/` | `InferenceMethod` and its kinds `UncertaintyMethod` and `IdentifiabilityMethod` (`method.py`), `ParameterSample`, `SampleMethod`, `ParameterSummary`, and the identifiability methods and `IdentifiabilityReport` (`identifiability.py`). | Runners. |
 | `api/description.py` | The renderers of a `ModelDescription`: text, Markdown (Mermaid), LaTeX, JSON and Graphviz DOT, and `save`. | Anything of one model kind: a renderer reads only blocks. |
 | `context/` | The Pydantic model: fields, validation, JSON I/O, update methods. | Engine rules. |
 | `context/model.py` | `Model`: the header, the engine, the process and the structure of any kind, generic in its structure class (`Model[Aggregate]`). | Anything of one model kind. |
@@ -121,6 +124,7 @@ Use this page when you know what to change but not where it belongs.
 | Change initial conditions | `context/initial_conditions.py` | `builder.rs` (`initial_state`), `tests/initial_conditions/` |
 | Change calibration | `calibration_problem.rs` and its layers (`forward.rs`, `observation.rs`, `feasibility.rs`, `discrepancy.rs`, `objective.rs`) | `values.rs`, `commol-model/src/initial_conditions.rs`, `api/calibrator.py`, `tests/calibration/` |
 | Add an uncertainty method | `crates/commol-inference/` | `py-commol/src/inference.rs`, `context/inference/`, `api/inference/registry.py`, [checklist](maintainer-playbook.md#uncertainty-method) |
+| Change sensitivities or identifiability | `crates/commol-inference/src/sensitivity/`, `crates/commol-inference/src/identifiability/` | `py-commol/src/identifiability.rs`, `context/inference/identifiability.py`, `api/inference/identifiability.py`, [Identifiability](../guide/uncertainty/identifiability.md) |
 | Expose an engine rule to Python | `py-commol/src/` | `_commol_rs.pyi`, `engine_state.py` |
 | Change a report | `api/reporting.py` | [Design decisions](design-decisions.md#reports), `tests/reporting/` |
 

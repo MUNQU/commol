@@ -10,6 +10,8 @@
 //! | [`target`] | [`Target`]: a log density, `−∞` outside the support |
 //! | [`predictive`] | [`Predictive`]: the run of every draw, its bands, and every draw's value of observations |
 //! | [`scores`] | Coverage, interval scores, CRPS and PIT of a predictive |
+//! | [`identifiability`] | Structural rank, collinearity, and the identifiability of a sample and of starts |
+//! | [`sensitivity`] | The port of derivatives, [`sensitivity::SensitivitySource`], and finite differences |
 //!
 //! Rules: this crate depends on `commol-calibration`, never the reverse; a
 //! method touches an engine only through the problem's
@@ -19,9 +21,11 @@
 
 #![warn(missing_docs)]
 
+pub mod identifiability;
 pub mod predictive;
 pub mod sample;
 pub mod scores;
+pub mod sensitivity;
 pub mod statistics;
 pub mod target;
 

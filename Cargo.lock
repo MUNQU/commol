@@ -235,7 +235,9 @@ dependencies = [
  "commol-calibration",
  "commol-core",
  "commol-difference",
+ "commol-differential",
  "commol-random",
+ "nalgebra",
  "rayon",
  "serde_json",
 ]

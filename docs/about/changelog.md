@@ -36,6 +36,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Calibrator.uncertainty(method)`: one entry point for every uncertainty
   method. A method's configuration subclasses `UncertaintyMethod[R]` and
   registers its runner; the result type follows the configuration's type.
+- `Calibrator.identifiability(method)`: which parameters the model and the
+  data determine, and which combinations they determine in their place.
+  `StructuralRank` (the rank of the sensitivities at random points, on the
+  design of the observations or a dense one), `Collinearity` (Brun's indices
+  at a fit or over a sample), `SampleIdentifiability` (contraction,
+  correlations and modes of a sample) and `StartsIdentifiability` (starts of
+  equal loss that end apart). Each returns an `IdentifiabilityReport` with a
+  structural and a practical verdict per parameter; `merge` joins reports and
+  `identifiability_report` gives one as plain data. See
+  [Identifiability](../guide/uncertainty/identifiability.md).
+- `InferenceMethod[R]`, the common base of `UncertaintyMethod[R]` and
+  `IdentifiabilityMethod[R]`; each entry point refuses the other kind with a
+  `TypeError`.
 - `weighted_quantiles`, and a `weights` argument for `member_statistics`.
 - `CalibrationHistory` and `CalibrationEvaluation`, returned by
   `Calibrator.run_with_history()`.

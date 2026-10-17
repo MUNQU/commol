@@ -26,7 +26,7 @@ use crate::engine::{Engine, InfeasibleStateError, PyEngine};
 /// A calibration problem, built once
 #[pyclass(name = "CalibrationProblem", frozen)]
 pub struct PyCalibrationProblem {
-    inner: CalibrationProblem<Engine>,
+    pub(crate) inner: CalibrationProblem<Engine>,
 }
 
 /// The Python error of a parameter set that has no prediction:
@@ -307,7 +307,7 @@ fn predictive_error(error: PredictiveError) -> PyErr {
 ///         weight is NaN or +inf, or the shapes differ
 #[pyclass(name = "ParameterSample", frozen)]
 pub struct PyParameterSample {
-    inner: ParameterSample,
+    pub(crate) inner: ParameterSample,
 }
 
 #[pymethods]
@@ -563,5 +563,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(weighted_quantiles, m)?)?;
     m.add_function(wrap_pyfunction!(by_series, m)?)?;
     m.add_function(wrap_pyfunction!(weighted_mean, m)?)?;
+    crate::identifiability::register(m)?;
     Ok(())
 }

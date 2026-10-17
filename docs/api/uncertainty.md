@@ -6,6 +6,8 @@ What every uncertainty method takes and returns: the configuration base, the
 weighted parameter sample, the predictive, the scores and the one quantile.
 Guide: [Uncertainty](../guide/uncertainty/index.md).
 
+::: commol.context.inference.method.InferenceMethod
+
 ::: commol.context.inference.method.UncertaintyMethod
 
 ::: commol.context.inference.sample.ParameterSample

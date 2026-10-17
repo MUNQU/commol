@@ -1,4 +1,4 @@
-from typing import ClassVar, Protocol
+from typing import ClassVar, Literal, Protocol
 
 class BinProtocol(Protocol):
     id: str
@@ -508,6 +508,66 @@ class ObservationDrawsProtocol(Protocol):
     def crps(self, observed: list[float]) -> list[float]: ...
     def pit(self, observed: list[float], seed: int) -> list[float]: ...
 
+class PointRankProtocol(Protocol):
+    @property
+    def values(self) -> list[float]: ...
+    @property
+    def singular_values(self) -> list[float]: ...
+    @property
+    def threshold(self) -> float: ...
+    @property
+    def rank(self) -> int: ...
+
+class StructuralAnalysisProtocol(Protocol):
+    @property
+    def points(self) -> list[PointRankProtocol]: ...
+    @property
+    def skipped(self) -> list[str]: ...
+    @property
+    def generic_rank(self) -> int: ...
+    @property
+    def projections(self) -> list[float]: ...
+    @property
+    def verdicts(
+        self,
+    ) -> list[Literal["identifiable", "in_combination", "non_identifiable"]]: ...
+    @property
+    def combinations(self) -> list[list[tuple[int, float]]]: ...
+
+class CollinearityAnalysisProtocol(Protocol):
+    @property
+    def sensitivity(self) -> list[float]: ...
+    @property
+    def pair_gamma(self) -> list[list[float]]: ...
+    @property
+    def best_by_size(self) -> list[tuple[list[int], float, float]]: ...
+    @property
+    def admissible(self) -> list[tuple[list[int], float, float]]: ...
+    @property
+    def points(self) -> int: ...
+    @property
+    def skipped(self) -> list[str]: ...
+
+class SampleAnalysisProtocol(Protocol):
+    @property
+    def contraction(self) -> list[float]: ...
+    @property
+    def correlation(self) -> list[list[float]]: ...
+    @property
+    def correlated_pairs(self) -> list[tuple[int, int, float]]: ...
+    @property
+    def multimodal(self) -> list[bool]: ...
+    @property
+    def modes(self) -> list[list[float]]: ...
+
+class StartsAnalysisProtocol(Protocol):
+    @property
+    def near_best(self) -> list[int]: ...
+    @property
+    def spread(self) -> list[float]: ...
+    @property
+    def flagged(self) -> list[bool]: ...
+
 class InferenceModule(Protocol):
     CalibrationProblem: type[CalibrationProblemProtocol]
     ParameterSample: type[ParameterSampleProtocol]
@@ -520,6 +580,33 @@ class InferenceModule(Protocol):
     def by_series(
         self, labels: list[str], values: list[float]
     ) -> list[tuple[str, float]]: ...
+    def structural_rank(
+        self,
+        problem: CalibrationProblemProtocol,
+        points: int,
+        dense: bool,
+        seed: int,
+    ) -> StructuralAnalysisProtocol: ...
+    def collinearity(
+        self,
+        problem: CalibrationProblemProtocol,
+        points: list[list[float]],
+        weights: list[float],
+        max_subset_size: int,
+        threshold: float,
+    ) -> CollinearityAnalysisProtocol: ...
+    def sample_identifiability(
+        self, sample: ParameterSampleProtocol, correlation_threshold: float
+    ) -> SampleAnalysisProtocol: ...
+    def starts_identifiability(
+        self,
+        ends: list[list[float]],
+        losses: list[float],
+        converged: list[bool],
+        bounds: list[tuple[float, float]],
+        parameter_tolerance: float,
+        loss_tolerance: float,
+    ) -> StartsAnalysisProtocol: ...
 
 class MathExpressionProtocol(Protocol):
     def __init__(self, expression: str) -> None: ...

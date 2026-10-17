@@ -102,8 +102,17 @@ impl Discrepancy {
 /// values of its series (its label), or 1 for a series whose values are all
 /// (near) zero.
 pub fn observation_normalization(labels: &[String], observed: &[f64]) -> Vec<f64> {
+    series_rms(labels, observed)
+        .into_iter()
+        .map(|rms| 1.0 / rms)
+        .collect()
+}
+
+/// The scale of each value: the root mean square of the values of its series
+/// (its label), or 1 for a series whose values are all (near) zero.
+pub fn series_rms(labels: &[String], values: &[f64]) -> Vec<f64> {
     let mut sums: HashMap<&str, (f64, usize)> = HashMap::new();
-    for (label, value) in labels.iter().zip(observed) {
+    for (label, value) in labels.iter().zip(values) {
         let entry = sums.entry(label.as_str()).or_insert((0.0, 0));
         entry.0 += value * value;
         entry.1 += 1;
@@ -114,7 +123,7 @@ pub fn observation_normalization(labels: &[String], observed: &[f64]) -> Vec<f64
             let (sum_squares, count) = sums[label.as_str()];
             let rms = (sum_squares / count as f64).sqrt();
             if rms > f64::EPSILON {
-                1.0 / rms
+                rms
             } else {
                 1.0
             }

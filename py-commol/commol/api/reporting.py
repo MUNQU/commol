@@ -19,6 +19,7 @@ from commol.context.calibration import (
 from commol.context._model.report import InitialConditionEntry
 from commol.context.constants import CalibrationParameterType
 from commol.context.model import Model
+from commol.context.inference.identifiability import IdentifiabilityReport
 from commol.context.inference.sample import ParameterSample, ParameterSummary
 from commol.context.report_entry import Interval, entry_interval
 
@@ -528,3 +529,80 @@ def simulation_report(
             confidence_level,
         ),
     }
+
+
+class StructuralVerdictEntry(TypedDict):
+    """The structural verdict of a parameter, its reasons and combinations."""
+
+    verdict: str
+    reasons: list[str]
+    combinations: list[str]
+
+
+class PracticalVerdictEntry(TypedDict):
+    """The practical verdict of a parameter and its reasons."""
+
+    verdict: str
+    reasons: list[str]
+
+
+class VerdictsEntry(TypedDict):
+    """The two verdicts of a parameter; None when no evidence gives one."""
+
+    structural: StructuralVerdictEntry | None
+    practical: PracticalVerdictEntry | None
+
+
+class IdentifiabilityReportData(TypedDict):
+    """
+    The identifiability of each parameter, and the evidence of each method.
+
+    ``sections`` maps ``structural``, ``collinearity``, ``sample`` and
+    ``starts`` to the list of their sections, as plain data.
+    """
+
+    parameters: dict[str, VerdictsEntry]
+    sections: dict[str, list[dict[str, object]]]
+
+
+def identifiability_report(report: IdentifiabilityReport) -> IdentifiabilityReportData:
+    """
+    Report the identifiability of each parameter as plain data.
+
+    Parameters
+    ----------
+    report : IdentifiabilityReport
+        The result of ``Calibrator.identifiability``, or of
+        `IdentifiabilityReport.merge`.
+
+    Returns
+    -------
+    IdentifiabilityReportData
+        ``parameters``: each parameter, in problem order, with its structural
+        and practical verdicts; ``sections``: the evidence of each method that
+        ran.
+    """
+    parameters: dict[str, VerdictsEntry] = {}
+    for name in report.parameters:
+        verdicts = report.verdicts[name]
+        structural = verdicts.structural
+        practical = verdicts.practical
+        parameters[name] = {
+            "structural": None
+            if structural is None
+            else {
+                "verdict": structural.verdict,
+                "reasons": list(structural.reasons),
+                "combinations": list(structural.combinations),
+            },
+            "practical": None
+            if practical is None
+            else {"verdict": practical.verdict, "reasons": list(practical.reasons)},
+        }
+    sections: dict[str, list[dict[str, object]]] = {
+        "structural": [section.model_dump() for section in report.structural],
+        "collinearity": [section.model_dump() for section in report.collinearity],
+        "sample": [section.model_dump() for section in report.sample],
+        "starts": [section.model_dump() for section in report.starts],
+    }
+    return {"parameters": parameters, "sections": sections}

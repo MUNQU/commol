@@ -216,6 +216,15 @@ pub trait SimulationEngine: Clone {
         Vec::new()
     }
 
+    /// The relative accuracy of the outputs of a run: the size of the
+    /// relative error a run may carry. Finite differences set their step
+    /// from it. Machine epsilon by default, for an engine whose outputs are
+    /// exact up to rounding; an engine that integrates with a tolerance
+    /// returns that tolerance.
+    fn output_accuracy(&self) -> f64 {
+        f64::EPSILON
+    }
+
     /// Reset the simulation to its initial state.
     ///
     /// After calling this method:

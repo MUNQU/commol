@@ -64,7 +64,12 @@ pub fn quantiles(values: &[f64], weights: &[f64], levels: &[f64]) -> Vec<f64> {
             } else {
                 let (p0, p1) = (midpoints[after - 1], midpoints[after]);
                 let (v0, v1) = (members[after - 1].0, members[after].0);
-                v0 + (level - p0) / (p1 - p0) * (v1 - v0)
+                if v0 == v1 {
+                    // Also when both are infinite, where the difference is NaN.
+                    v0
+                } else {
+                    v0 + (level - p0) / (p1 - p0) * (v1 - v0)
+                }
             }
         })
         .collect()

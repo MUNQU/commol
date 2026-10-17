@@ -16,8 +16,10 @@ crate-type = ["rlib"]
 commol-calibration = { path = "../commol-calibration" }
 commol-core = { path = "../commol-core" }
 commol-random = { path = "../commol-random" }
+nalgebra = { version = "0.35.0", default-features = false, features = ["std"] }
 rayon = "1.11"
 
 [dev-dependencies]
 commol-difference = { path = "../commol-difference" }
+commol-differential = { path = "../commol-differential" }
 serde_json = "1.0"

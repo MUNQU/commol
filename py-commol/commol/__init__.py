@@ -14,6 +14,7 @@ from commol.api import (
     AxisPattern,
     applied_parameters_report,
     ci_percentiles,
+    identifiability_report,
     simulation_report,
     member_statistics,
     weighted_quantiles,
@@ -59,9 +60,16 @@ from commol.context.calibration import (
     StartSummary,
 )
 from commol.context.inference import (
+    Collinearity,
+    IdentifiabilityMethod,
+    IdentifiabilityReport,
+    InferenceMethod,
     ParameterSample,
     ParameterSummary,
+    SampleIdentifiability,
     SampleMethod,
+    StartsIdentifiability,
+    StructuralRank,
     UncertaintyMethod,
 )
 from commol.context.visualization import PlotConfig
@@ -87,6 +95,14 @@ def add_stderr_logger(level: int = logging.INFO) -> logging.StreamHandler[TextIO
 
 
 __all__ = [
+    "Collinearity",
+    "IdentifiabilityMethod",
+    "IdentifiabilityReport",
+    "InferenceMethod",
+    "SampleIdentifiability",
+    "StartsIdentifiability",
+    "StructuralRank",
+    "identifiability_report",
     "CalibrationConstraint",
     "CalibrationEvaluation",
     "CalibrationHistory",
