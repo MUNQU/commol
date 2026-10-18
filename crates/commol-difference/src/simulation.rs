@@ -174,11 +174,6 @@ impl DifferenceEquations {
         }
     }
 
-    /// The compiled model the engine steps.
-    pub fn model(&self) -> &CompiledModel {
-        &self.model
-    }
-
     /// Current amount of each compartment, without the accumulators.
     pub fn state(&self) -> Vec<f64> {
         self.state[..self.model.num_compartments()].to_vec()
@@ -198,11 +193,8 @@ impl DifferenceEquations {
         self.state.len()
     }
 
-    fn copy_output_row(&self, row: &mut Vec<f64>) {
-        let output_len = self.output_len();
-        if row.len() != output_len {
-            row.resize(output_len, 0.0);
-        }
+    /// Copy the state into a row that `record_steps` sized to the outputs.
+    fn copy_output_row(&self, row: &mut [f64]) {
         row.copy_from_slice(&self.state);
     }
 

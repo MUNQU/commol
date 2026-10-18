@@ -89,11 +89,6 @@ impl DifferentialEquations {
         })
     }
 
-    /// The compiled model the engine integrates.
-    pub fn model(&self) -> &CompiledModel {
-        &self.model
-    }
-
     /// The solver settings.
     pub fn settings(&self) -> &OdeSolver {
         &self.settings
