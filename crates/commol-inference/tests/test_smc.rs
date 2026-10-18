@@ -4,11 +4,16 @@
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use commol_calibration::Workspace;
-use commol_inference::smc::{
-    RandomWalk, SmcRun, SmcSampler, TemperedTarget, abc_rejection, next_level,
+use commol_calibration::{
+    CalibrationParameter, CalibrationProblem, LossConfig, ObservedDataPoint, Workspace,
 };
-use commol_inference::{Distribution, Family};
+use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
+use commol_inference::resampling::BlockScheme;
+use commol_inference::smc::{
+    AbcTarget, Distance, GibbsTarget, RandomWalk, SmcRun, SmcSampler, TemperedTarget,
+    abc_rejection, bootstrap_coverage_eta, information_matching_eta, next_level,
+};
+use commol_inference::{Distribution, Family, Priors};
 use commol_random::Generator;
 
 /// A prior of independent distributions and a kernel `exp(−level · v)`,
@@ -322,6 +327,17 @@ fn abc_rejection_keeps_the_closest_draws() {
 }
 
 #[test]
+fn abc_rejection_needs_two_draws() {
+    let target = Abc {
+        prior: vec![unit_uniform()],
+        bounds: vec![(0.0, 1.0)],
+        distance: |values| values[0],
+    };
+    let error = abc_rejection(&target, 1, 0.5, 1).unwrap_err();
+    assert_eq!(error, "draws must be at least 2, got 1");
+}
+
+#[test]
 fn abc_next_tolerance_is_the_weighted_quantile_of_the_distances() {
     let target = Abc {
         prior: vec![unit_uniform()],
@@ -382,4 +398,327 @@ fn abc_smc_stops_when_the_moves_stop_accepting() {
             assert!(kept.unwrap() <= last);
         }
     }
+}
+
+/// A target whose evaluation is `rule(values, call)`, where `call` counts the
+/// evaluations before this one; its kernel is `exp(−level · v)`.
+struct Scripted {
+    prior: Vec<Distribution>,
+    bounds: Vec<(f64, f64)>,
+    rule: fn(&[f64], usize) -> Result<Option<f64>, String>,
+    calls: AtomicUsize,
+}
+
+impl Scripted {
+    fn new(prior: Distribution, rule: fn(&[f64], usize) -> Result<Option<f64>, String>) -> Self {
+        Self {
+            bounds: vec![prior.bounds()],
+            prior: vec![prior],
+            rule,
+            calls: AtomicUsize::new(0),
+        }
+    }
+}
+
+impl TemperedTarget for Scripted {
+    fn bounds(&self) -> &[(f64, f64)] {
+        &self.bounds
+    }
+
+    fn log_prior(&self, values: &[f64]) -> f64 {
+        self.prior[0].log_density(values[0])
+    }
+
+    fn sample_prior(&self, stream: &mut Generator) -> Vec<f64> {
+        vec![self.prior[0].sample(stream)]
+    }
+
+    fn evaluate(
+        &self,
+        values: &[f64],
+        _stream: &mut Generator,
+        _workspace: &mut Workspace,
+    ) -> Result<Option<f64>, String> {
+        (self.rule)(values, self.calls.fetch_add(1, Ordering::Relaxed))
+    }
+
+    fn log_kernel(&self, value: f64, level: f64) -> f64 {
+        -level * value
+    }
+
+    fn first_level(&self, _kept: &[f64]) -> f64 {
+        0.0
+    }
+
+    fn last_level(&self) -> f64 {
+        1.0
+    }
+}
+
+const PARTICLES: usize = 200;
+
+#[test]
+fn a_prior_entirely_outside_the_support_is_an_error() {
+    let target = Scripted::new(unit_uniform(), |_, _| Ok(None));
+    let error = sampler(PARTICLES, 0.1).run(&target, 1).unwrap_err();
+    assert!(
+        error.contains("Every draw of the prior is outside the support"),
+        "{error}"
+    );
+}
+
+#[test]
+fn moves_that_accept_nothing_are_an_error() {
+    // The draws of the prior run; every proposed move is outside the support.
+    let target = Scripted::new(unit_uniform(), |values, call| {
+        Ok((call < PARTICLES).then(|| 50.0 * values[0]))
+    });
+    let error = sampler(PARTICLES, 0.1).run(&target, 2).unwrap_err();
+    assert!(error.contains("accept no proposal"), "{error}");
+}
+
+#[test]
+fn a_failure_of_the_model_in_a_move_stops_the_run() {
+    let target = Scripted::new(unit_uniform(), |values, call| {
+        if call < PARTICLES {
+            Ok(Some(50.0 * values[0]))
+        } else {
+            Err("the engine failed".to_string())
+        }
+    });
+    let error = sampler(PARTICLES, 0.1).run(&target, 3).unwrap_err();
+    assert_eq!(error, "the engine failed");
+
+    // The first move of the step runs; a later one fails.
+    let later = Scripted::new(unit_uniform(), |values, call| {
+        if call < 2 * PARTICLES {
+            Ok(Some(50.0 * values[0]))
+        } else {
+            Err("the engine failed".to_string())
+        }
+    });
+    let error = sampler(PARTICLES, 0.01).run(&later, 3).unwrap_err();
+    assert_eq!(error, "the engine failed");
+}
+
+#[test]
+fn particles_outside_the_support_keep_no_weight_and_do_not_move() {
+    // Draws above 0.5 are outside the support from the start.
+    let target = Scripted::new(unit_uniform(), |values, _| {
+        Ok((values[0] <= 0.5).then(|| 50.0 * values[0]))
+    });
+    // A threshold this low never resamples, so the particles of weight 0
+    // stay and are not moved.
+    let run = SmcSampler::new(PARTICLES, RandomWalk::new(), 0.01, 0.5, 0.1)
+        .unwrap()
+        .run(&target, 4)
+        .unwrap();
+    assert!(run.steps.iter().all(|step| !step.resampled));
+    assert!(run.weights().contains(&0.0));
+    for ((values, kept), weight) in run.values.iter().zip(&run.kept).zip(run.weights()) {
+        if weight > 0.0 {
+            assert!(values[0] <= 0.5 && kept.is_some());
+        }
+    }
+    assert!(run.steps.iter().all(|step| step.level > 0.0));
+}
+
+#[test]
+fn a_proposal_the_prior_rules_out_runs_no_model() {
+    // A log-normal on [−1, ∞) has no density at or below 0, which the walk
+    // on log(θ + 1) can propose: such a proposal is rejected unrun.
+    let prior = Distribution::new(
+        Family::LogNormal {
+            mu: -2.0,
+            sigma: 1.0,
+        },
+        -1.0,
+        f64::INFINITY,
+    )
+    .unwrap();
+    let target = Scripted::new(prior, |values, _| Ok(Some(values[0])));
+    let run = sampler(PARTICLES, 0.1).run(&target, 5).unwrap();
+    let moved: usize = run.steps.iter().map(|step| step.moves * PARTICLES).sum();
+    assert!(run.evaluations < PARTICLES + moved, "{}", run.evaluations);
+    assert!(run.values.iter().all(|values| values[0] > 0.0));
+}
+
+/// One output `x = 10 k` at every position, `NaN` for `0.5 < k ≤ 0.7`, and
+/// a failed run above; with `flat`, `x = 1` for every `k`.
+#[derive(Clone, Debug)]
+struct Brittle {
+    k: f64,
+    flat: bool,
+}
+
+#[derive(Clone, Debug)]
+struct NoPlan;
+
+impl ValuePlan for NoPlan {
+    fn infeasibility(&self, excess: f64) -> String {
+        format!("{excess}")
+    }
+}
+
+impl SimulationEngine for Brittle {
+    type ValuePlan = NoPlan;
+
+    fn check_position(&self, _position: f64) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn run_at_positions_into_buffer(
+        &mut self,
+        positions: &[f64],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), SimulationError> {
+        let x = if self.flat {
+            1.0
+        } else if self.k > 0.7 {
+            return Err(SimulationError::Failed("the run failed".to_string()));
+        } else if self.k > 0.5 {
+            f64::NAN
+        } else {
+            10.0 * self.k
+        };
+        buffer.clear();
+        buffer.extend(positions.iter().map(|_| vec![x]));
+        Ok(())
+    }
+
+    fn step(&mut self) -> Result<(), SimulationError> {
+        Ok(())
+    }
+
+    fn output_names(&self) -> Vec<String> {
+        vec!["x".to_string()]
+    }
+
+    fn state_outputs(&self) -> usize {
+        1
+    }
+
+    fn reset(&mut self) {}
+
+    fn set_parameter(&mut self, _parameter_id: &str, value: f64) -> Result<(), String> {
+        self.k = value;
+        Ok(())
+    }
+
+    fn current_position(&self) -> f64 {
+        0.0
+    }
+
+    fn plan_values(&self, _: &[ModelValue], _: Option<&str>) -> Result<NoPlan, String> {
+        Ok(NoPlan)
+    }
+
+    fn apply_values(&mut self, _: &NoPlan, _: &[f64]) -> Result<f64, String> {
+        Ok(0.0)
+    }
+}
+
+/// `k` in `[0, 1]` of `Brittle`, observed as 2 at positions 0 to 3.
+fn brittle_problem(flat: bool) -> (CalibrationProblem<Brittle>, Priors) {
+    let problem = CalibrationProblem::new(
+        Brittle { k: 0.2, flat },
+        (0..4)
+            .map(|t| ObservedDataPoint::new(f64::from(t), "x".to_string(), 2.0))
+            .collect(),
+        vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .unwrap();
+    let priors =
+        Priors::uniform_on_bounds(&problem.parameter_names(), &problem.parameter_bounds()).unwrap();
+    (problem, priors)
+}
+
+#[test]
+fn a_gibbs_target_needs_a_finite_eta_above_zero() {
+    let (problem, priors) = brittle_problem(false);
+    for eta in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+        let error = GibbsTarget::new(&problem, &priors, eta).err().unwrap();
+        assert!(error.contains("finite number above 0"), "{error}");
+    }
+}
+
+#[test]
+fn abc_keeps_no_distance_outside_the_support_and_stops_on_a_failure() {
+    let (problem, priors) = brittle_problem(false);
+    let target = AbcTarget::new(&problem, &priors, Distance::Loss);
+    let mut stream = Generator::from_seed(1);
+    let mut workspace = Workspace::default();
+    let mut evaluate = |k: f64| target.evaluate(&[k], &mut stream, &mut workspace);
+
+    // (2 − 10 k)² at four positions.
+    assert_eq!(evaluate(0.1), Ok(Some(4.0)));
+    // Outside the bounds, and a run that is not a number.
+    assert_eq!(evaluate(1.5), Ok(None));
+    assert_eq!(evaluate(0.6), Ok(None));
+    assert_eq!(
+        evaluate(0.8),
+        Err("Simulation failed: the run failed".to_string())
+    );
+}
+
+#[test]
+fn bootstrap_coverage_fails_when_every_replicate_fails() {
+    // The prior draws runs above 0.7 that fail, so every replicate fails.
+    let (problem, priors) = brittle_problem(false);
+    let blocks = BlockScheme::new(problem.observed_data(), 1).unwrap();
+    let error = bootstrap_coverage_eta(
+        &problem,
+        &priors,
+        &[0.21],
+        &mut sampler(PARTICLES, 0.1),
+        &blocks,
+        3,
+        0.8,
+        7,
+    )
+    .unwrap_err();
+    assert!(error.starts_with("Every replicate failed (3)"), "{error}");
+}
+
+#[test]
+fn bootstrap_coverage_fails_when_no_eta_narrows_the_intervals() {
+    // No output reads k: every posterior is the prior, whose interval holds
+    // the fit at every eta.
+    let (problem, priors) = brittle_problem(true);
+    let blocks = BlockScheme::new(problem.observed_data(), 1).unwrap();
+    let error = bootstrap_coverage_eta(
+        &problem,
+        &priors,
+        &[0.5],
+        &mut sampler(PARTICLES, 0.1),
+        &blocks,
+        5,
+        0.8,
+        8,
+    )
+    .unwrap_err();
+    assert!(error.contains("still cover the fit"), "{error}");
+}
+
+#[test]
+fn a_calibration_of_eta_needs_a_fit_inside_the_support() {
+    let (problem, priors) = brittle_problem(false);
+    let blocks = BlockScheme::new(problem.observed_data(), 1).unwrap();
+    // The run at 0.6 is not a number.
+    let error = bootstrap_coverage_eta(
+        &problem,
+        &priors,
+        &[0.6],
+        &mut sampler(PARTICLES, 0.1),
+        &blocks,
+        5,
+        0.8,
+        8,
+    )
+    .unwrap_err();
+    assert_eq!(error, "The fit is outside the support of the problem");
+    let error = information_matching_eta(&problem, &[0.6]).unwrap_err();
+    assert!(error.contains("infeasible"), "{error}");
 }

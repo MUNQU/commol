@@ -74,6 +74,20 @@ pub struct AbcTarget<'a, E: SimulationEngine> {
     scale: Vec<f64>,
 }
 
+impl Distance {
+    /// The distance of a series metric, or the loss without one.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that lists the metrics when `metric` is none of
+    /// them.
+    pub fn from_metric(metric: Option<&str>) -> Result<Self, String> {
+        metric.map_or(Ok(Self::Loss), |name| {
+            SeriesMetric::from_name(name).map(Self::Series)
+        })
+    }
+}
+
 impl<'a, E: SimulationEngine> AbcTarget<'a, E> {
     /// ABC on `problem` with `priors` and `distance`.
     pub fn new(problem: &'a CalibrationProblem<E>, priors: &'a Priors, distance: Distance) -> Self {
@@ -182,5 +196,23 @@ impl<E: SimulationEngine + Sync> TemperedTarget for AbcTarget<'_, E> {
 
     fn last_level(&self) -> f64 {
         0.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_distance_is_the_loss_or_a_metric_of_the_series() {
+        assert_eq!(Distance::from_metric(None), Ok(Distance::Loss));
+        assert_eq!(
+            Distance::from_metric(Some("mae")),
+            Ok(Distance::Series(SeriesMetric::Mae))
+        );
+        assert_eq!(
+            Distance::from_metric(Some("max")),
+            Err("metric is 'max'; it must be \"rmse\" or \"mae\"".to_string())
+        );
     }
 }

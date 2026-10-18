@@ -9,7 +9,7 @@
 //!
 //! A draw inverts the distribution function of one uniform number of the
 //! [`Generator`], so a seed gives the same draws on every platform: the
-//! special functions come from [`crate::special`], on `libm`.
+//! special functions come from the private module `special`, on `libm`.
 
 use std::fmt;
 
@@ -250,11 +250,6 @@ impl Distribution {
         Ok(distribution)
     }
 
-    /// The family.
-    pub fn family(&self) -> Family {
-        self.family
-    }
-
     /// The bounds `(lower, upper)` the family is truncated to.
     pub fn bounds(&self) -> (f64, f64) {
         (self.lower, self.upper)
@@ -280,17 +275,12 @@ impl Distribution {
         }
     }
 
-    /// The untruncated survival function `1 − F(x)`.
+    /// The untruncated survival function `1 − F(x)`, inside the support
+    /// (`x ≥ 0` for the log-normal, whose `log 0 = −∞` gives 1).
     fn base_sf(&self, x: f64) -> f64 {
         match self.family {
             Family::Normal { mean, sd } => normal_sf((x - mean) / sd),
-            Family::LogNormal { mu, sigma } => {
-                if x <= 0.0 {
-                    1.0
-                } else {
-                    normal_sf((libm::log(x) - mu) / sigma)
-                }
-            }
+            Family::LogNormal { mu, sigma } => normal_sf((libm::log(x) - mu) / sigma),
             Family::Gamma { shape, rate } => gamma_q(shape, rate * x),
             _ => 1.0 - self.base_cdf(x),
         }
@@ -394,11 +384,9 @@ impl Distribution {
         let mut low = self.low;
         let mut high = self.upper;
         if high.is_infinite() {
-            let scale = match self.family {
-                Family::Gamma { shape, rate } => (shape / rate).max(1.0 / rate),
-                _ => 1.0,
-            };
-            high = low.max(0.0) + scale;
+            // The mean and the spread above the lower end set the first step.
+            let scale = self.mean() - low + self.variance().sqrt();
+            high = low + scale;
             while self.cdf(high) < p {
                 low = high;
                 high = 2.0 * high + scale;
@@ -563,13 +551,107 @@ mod tests {
         // 30 standard deviations up, the truncated normal is nearly an
         // exponential of rate 30 above its lower bound.
         let d = Distribution::new(Family::Normal { mean: 0.0, sd: 1.0 }, 30.0, 31.0).unwrap();
-        assert!(
-            (d.mean() - (30.0 + 1.0 / 30.0)).abs() < 1e-3,
-            "{}",
-            d.mean()
-        );
+        assert!((d.mean() - (30.0 + 1.0 / 30.0)).abs() < 1e-3);
         assert!((d.quantile(0.5) - (30.0 + 2f64.ln() / 30.0)).abs() < 1e-3);
         assert!((d.cdf(d.quantile(0.3)) - 0.3).abs() < 1e-12);
+    }
+
+    #[test]
+    fn bounds_in_the_upper_tail_read_the_survival_function() {
+        // A log-normal and a gamma far above their medians: each truncated
+        // distribution is still a distribution, with its mean inside.
+        let cases = [
+            (
+                Family::LogNormal {
+                    mu: 0.0,
+                    sigma: 0.5,
+                },
+                5.0,
+                8.0,
+            ),
+            (
+                Family::Gamma {
+                    shape: 2.0,
+                    rate: 1.0,
+                },
+                15.0,
+                f64::INFINITY,
+            ),
+        ];
+        for (family, lower, upper) in cases {
+            let d = Distribution::new(family, lower, upper).unwrap();
+            assert!(d.upper_tail, "{family:?}");
+            let median = d.quantile(0.5);
+            assert!((d.cdf(median) - 0.5).abs() < 1e-10, "{family:?}");
+            assert!(d.mean() > lower && d.mean() < median + 2.0, "{family:?}");
+            assert!(d.variance() > 0.0, "{family:?}");
+        }
+    }
+
+    #[test]
+    fn the_survival_function_complements_the_distribution_function() {
+        let uniform = Distribution::new(Family::Uniform, 0.0, 4.0).unwrap();
+        assert_eq!(uniform.base_sf(1.0), 0.75);
+        let log_normal = Distribution::new(
+            Family::LogNormal {
+                mu: 0.0,
+                sigma: 1.0,
+            },
+            0.0,
+            2.0,
+        )
+        .unwrap();
+        assert_eq!(log_normal.base_sf(0.0), 1.0);
+    }
+
+    #[test]
+    fn a_support_above_zero_has_no_density_at_or_below_zero() {
+        let log_normal = Distribution::new(
+            Family::LogNormal {
+                mu: 0.0,
+                sigma: 1.0,
+            },
+            -1.0,
+            2.0,
+        )
+        .unwrap();
+        assert_eq!(log_normal.base_log_density(0.0), f64::NEG_INFINITY);
+        assert_eq!(log_normal.log_density(-0.5), f64::NEG_INFINITY);
+        let gamma = Distribution::new(
+            Family::Gamma {
+                shape: 2.0,
+                rate: 1.0,
+            },
+            0.0,
+            2.0,
+        )
+        .unwrap();
+        assert_eq!(gamma.log_density(0.0), f64::NEG_INFINITY);
+        assert_eq!(
+            Family::Gamma {
+                shape: 2.0,
+                rate: 1.0
+            }
+            .to_string(),
+            "Gamma(shape=2, rate=1)"
+        );
+    }
+
+    #[test]
+    fn a_distribution_needs_ordered_bounds_and_finite_parameters() {
+        let equal = Distribution::new(Family::Uniform, 1.0, 1.0).unwrap_err();
+        assert!(equal.contains("lower < upper"), "{equal}");
+        assert!(Distribution::new(Family::Uniform, f64::NAN, 1.0).is_err());
+        let error = Distribution::new(
+            Family::Normal {
+                mean: f64::INFINITY,
+                sd: 1.0,
+            },
+            0.0,
+            1.0,
+        )
+        .unwrap_err();
+        assert!(error.contains("finite mean"), "{error}");
     }
 
     #[test]

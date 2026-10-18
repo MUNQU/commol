@@ -69,10 +69,9 @@ def _diagnostics(run: "SmcRunProtocol", notes: list[str]) -> SmcDiagnostics:
     )
 
 
-def _distance(distance: AbcDistance) -> tuple[str, str | None]:
-    if isinstance(distance, LossDistance):
-        return ("loss", None)
-    return ("series", distance.metric)
+def _metric(distance: AbcDistance) -> str | None:
+    """The metric of the series, or None for the problem's loss."""
+    return None if isinstance(distance, LossDistance) else distance.metric
 
 
 def run_gibbs_posterior(
@@ -162,12 +161,10 @@ def run_abc_smc(calibrator: "Calibrator", method: AbcSmc) -> SmcResult:
     SmcResult
         The sample, the tolerances, the log evidence and the diagnostics.
     """
-    kind, metric = _distance(method.distance)
     run, stochastic = rust.abc_smc(
         calibrator.rust_problem,
         method.priors.rust_priors(),
-        kind,
-        metric,
+        _metric(method.distance),
         method.particles,
         method.target_cess,
         method.min_acceptance,
@@ -203,12 +200,10 @@ def run_abc_rejection(calibrator: "Calibrator", method: AbcRejection) -> SmcResu
     SmcResult
         The kept draws, the tolerance, the log evidence and the diagnostics.
     """
-    kind, metric = _distance(method.distance)
     run, stochastic = rust.abc_rejection(
         calibrator.rust_problem,
         method.priors.rust_priors(),
-        kind,
-        metric,
+        _metric(method.distance),
         method.draws,
         method.quantile,
         calibrator.seed,

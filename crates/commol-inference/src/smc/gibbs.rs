@@ -15,7 +15,7 @@ use super::TemperedTarget;
 use super::kernel::Kernel;
 use super::sampler::{SmcRun, SmcSampler, SmcState, Stop};
 use crate::priors::Priors;
-use crate::resampling::{BayesianBootstrap, BlockScheme, Perturbation, Resampler};
+use crate::resampling::{BayesianBootstrap, BlockScheme};
 use crate::sensitivity::{Design, FiniteDifferences, SensitivitySource};
 use crate::statistics::{interval_levels, normalized_weights, quantiles};
 use crate::target::discrepancy_in_support;
@@ -121,18 +121,21 @@ where
     K: Kernel,
 {
     let target = GibbsTarget::new(problem, priors, eta)?;
-    let run = sampler.run(&target, seed)?;
-    if let Some(Stop::NoNextLevel { level }) = run.stopped_at {
-        return Err(no_next_level(level));
-    }
+    let run = reached_the_posterior(sampler.run(&target, seed)?)?;
     Ok(GibbsRun { run, eta })
 }
 
-fn no_next_level(level: f64) -> String {
-    format!(
-        "The Gibbs posterior stopped at the temperature {level}: no higher one keeps the \
-         effective sample size; use more particles"
-    )
+/// `run`, when it reached the temperature 1.
+fn reached_the_posterior(run: SmcRun) -> Result<SmcRun, String> {
+    match run.stopped_at {
+        Some(Stop::NoNextLevel { level }) | Some(Stop::LowAcceptance { level, .. }) => {
+            Err(format!(
+                "The Gibbs posterior stopped at the temperature {level}: no higher one keeps \
+                 the effective sample size; use more particles"
+            ))
+        }
+        None => Ok(run),
+    }
 }
 
 /// `η` by information matching (Holmes and Walker 2017; Lyddon, Holmes and
@@ -174,8 +177,8 @@ where
                 .to_string(),
         );
     }
-    let source =
-        FiniteDifferences::new(problem, Design::Observations).map_err(|error| error.to_string())?;
+    let source = FiniteDifferences::new(problem, Design::Observations)
+        .expect("finite differences refuse only a stochastic engine, refused above");
     let sensitivities = source.jacobian(fit).map_err(|error| error.to_string())?;
     let jacobian = &sensitivities.jacobian;
     let d = fit.len();
@@ -196,14 +199,9 @@ where
          more observations than parameters and residuals that are not all 0"
             .to_string()
     })?;
-    let eta = (&curvature * inverse * &curvature).trace() / curvature.trace();
-    if eta.is_finite() && eta > 0.0 {
-        Ok(eta)
-    } else {
-        Err(format!(
-            "Information matching gives eta = {eta}; the loss has no curvature at the fit"
-        ))
-    }
+    // With `I` positive definite, some gradient is not 0, so `tr(J) > 0`
+    // and `η > 0`.
+    Ok((&curvature * inverse * &curvature).trace() / curvature.trace())
 }
 
 /// The outcome of [`bootstrap_coverage_eta`].
@@ -343,12 +341,13 @@ fn interpolated_eta(thresholds: &mut [f64], confidence_level: f64) -> Result<f64
 /// seed `replicate_seed(seed, b)`, and runs one tempered sampler to a large
 /// `η`; the posterior at any smaller `η` reweights the particles of the step
 /// below it, so no search below runs a model. The largest `η` starts at
-/// `n / loss(θ̂)` and grows four times while its intervals still cover too
-/// often. Each replicate and parameter has a threshold, the `η` at which its
+/// `1 / loss(θ̂)`, where the kernel of the fit is `e⁻¹`, and grows four times,
+/// each sampler going on from its particles, while its intervals still cover
+/// too often. Each replicate and parameter has a threshold, the `η` at which its
 /// interval stops holding the fit (bisection on `log η`), and `η` is the
-/// interpolated quantile of the thresholds of [`interpolated_eta`], whose
-/// expected coverage is the level: the largest `η` that covers at the level
-/// would be an order statistic, biased to cover less.
+/// interpolated quantile of the thresholds, whose expected coverage is the
+/// level: the largest `η` that covers at the level would be an order
+/// statistic, biased to cover less.
 ///
 /// # Errors
 ///
@@ -384,20 +383,18 @@ where
     let observed = problem.observed_data();
     let values: Vec<f64> = observed.iter().map(|obs| obs.value).collect();
     let resampler = BayesianBootstrap::new(observed, blocks);
-    let mut eta_max = observed.len() as f64 / loss;
+    let mut eta_max = 1.0 / loss;
 
-    let mut problems = Vec::new();
+    let problems = (0..replicates)
+        .map(|b| {
+            let mut generator = Generator::from_seed(replicate_seed(seed, b as u64));
+            let weights = resampler.draw_weights(&mut generator);
+            problem
+                .with_data(&values, &weights)
+                .map(|replicate| (b, replicate))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let mut failed = Vec::new();
-    for b in 0..replicates {
-        let mut generator = Generator::from_seed(replicate_seed(seed, b as u64));
-        let Perturbation::Weights(weights) = resampler.replicate(&mut generator) else {
-            unreachable!("the Bayesian bootstrap reweights");
-        };
-        match problem.with_data(&values, &weights) {
-            Ok(replicate) => problems.push((b, replicate)),
-            Err(reason) => failed.push((b, reason)),
-        }
-    }
 
     // One run per replicate, with a snapshot of the particles at each step.
     let mut runs: Vec<(usize, SmcState, Vec<Snapshot>)> = Vec::new();
@@ -505,8 +502,59 @@ mod tests {
         );
     }
 
+    fn run(stopped_at: Option<Stop>) -> SmcRun {
+        SmcRun {
+            values: vec![vec![0.5]],
+            log_weights: vec![0.0],
+            kept: vec![Some(1.0)],
+            steps: Vec::new(),
+            log_evidence: 0.0,
+            evaluations: 1,
+            stopped_at,
+        }
+    }
+
     #[test]
     fn a_stop_below_the_posterior_says_why() {
-        assert!(no_next_level(0.3).contains("temperature 0.3"));
+        let error = reached_the_posterior(run(Some(Stop::NoNextLevel { level: 0.3 }))).unwrap_err();
+        assert!(error.contains("temperature 0.3"), "{error}");
+        assert!(reached_the_posterior(run(None)).is_ok());
+    }
+
+    fn snapshot(values: &[f64], kept: &[Option<f64>]) -> Snapshot {
+        Snapshot {
+            eta: 0.0,
+            values: values.iter().map(|&v| vec![v]).collect(),
+            log_weights: vec![0.0; values.len()],
+            kept: kept.to_vec(),
+        }
+    }
+
+    #[test]
+    fn a_particle_outside_the_support_has_no_weight_in_an_interval() {
+        // The particle at 9 is outside the support: the interval of the
+        // others, [0, 1], does not hold 5.
+        let snapshots = [snapshot(&[0.0, 1.0, 9.0], &[Some(0.0), Some(0.0), None])];
+        let levels = [0.0, 1.0];
+        assert_eq!(covers_at(&snapshots, 1.0, &[5.0], &levels), vec![false]);
+        assert_eq!(covers_at(&snapshots, 1.0, &[0.5], &levels), vec![true]);
+    }
+
+    #[test]
+    fn a_threshold_is_zero_or_infinite_outside_its_bracket() {
+        let levels = [0.0, 1.0];
+        // The fit at 5 is outside every interval: no η covers it.
+        let never = [snapshot(&[0.0, 1.0], &[Some(1.0), Some(1.0)])];
+        assert_eq!(threshold(&never, 0, &[5.0], &levels, (1e-3, 1e3)), 0.0);
+        // Equal losses: every η gives the same interval, which holds 0.5.
+        assert_eq!(
+            threshold(&never, 0, &[0.5], &levels, (1e-3, 1e3)),
+            f64::INFINITY
+        );
+        // The particle at 1 keeps a loss of 1, so a large η leaves the one
+        // at 0, and the interval stops holding 1 between the two ends.
+        let narrowing = [snapshot(&[0.0, 1.0], &[Some(0.0), Some(1.0)])];
+        let eta = threshold(&narrowing, 0, &[1.0], &levels, (1e-3, 1e3));
+        assert!(eta > 1e-3 && eta < 1e3, "{eta}");
     }
 }

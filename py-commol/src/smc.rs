@@ -9,9 +9,7 @@
 use commol_inference::resampling::{
     BlockDrawing, BlockScheme, ResidualScale, Residuals, automatic_block_length,
 };
-use commol_inference::smc::{
-    self, AbcTarget, Distance, RandomWalk, SeriesMetric, SmcRun, SmcSampler, Stop,
-};
+use commol_inference::smc::{self, AbcTarget, Distance, RandomWalk, SmcRun, SmcSampler, Stop};
 use commol_inference::{Distribution, Family, Priors};
 use commol_random::{Generator, replicate_seed};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -96,16 +94,6 @@ impl PyDistribution {
             )));
         }
         Ok(self.inner.quantile(p))
-    }
-
-    /// The mean
-    fn mean(&self) -> f64 {
-        self.inner.mean()
-    }
-
-    /// The variance
-    fn variance(&self) -> f64 {
-        self.inner.variance()
     }
 
     /// `count` draws from the generator seeded with `seed`
@@ -343,25 +331,13 @@ fn bootstrap_coverage_eta(
     })
 }
 
-fn distance(kind: &str, metric: Option<&str>) -> PyResult<Distance> {
-    match (kind, metric) {
-        ("loss", None) => Ok(Distance::Loss),
-        ("series", Some(metric)) => SeriesMetric::from_name(metric)
-            .map(Distance::Series)
-            .map_err(value_error),
-        _ => Err(value_error(format!(
-            "Unknown distance '{kind}' with metric {metric:?}"
-        ))),
-    }
-}
-
 /// Sample ABC by sequential Monte Carlo
 ///
 /// Args:
 ///     problem: The calibration problem
 ///     priors: The priors, or None for uniform on the bounds
-///     distance: "loss" or "series"
-///     metric: The metric of "series", "rmse" or "mae"; None for "loss"
+///     metric: The metric of each series, "rmse" or "mae"; None for the
+///         problem's loss
 ///     particles: Number of particles
 ///     target_cess: The weighted share of particles each tolerance keeps
 ///     min_acceptance: Stop when the first move of a step accepts less
@@ -377,13 +353,12 @@ fn distance(kind: &str, metric: Option<&str>) -> PyResult<Distance> {
 ///     ValueError: If a prior or a setting is not valid
 ///     RuntimeError: If the run fails
 #[pyfunction]
-#[pyo3(signature = (problem, priors, distance_kind, metric, particles, target_cess, min_acceptance, stay_probability, seed))]
+#[pyo3(signature = (problem, priors, metric, particles, target_cess, min_acceptance, stay_probability, seed))]
 #[allow(clippy::too_many_arguments)]
 fn abc_smc(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     priors: Option<Vec<PriorArgs>>,
-    distance_kind: &str,
     metric: Option<&str>,
     particles: usize,
     target_cess: f64,
@@ -392,7 +367,7 @@ fn abc_smc(
     seed: u64,
 ) -> PyResult<(PySmcRun, bool)> {
     let priors = problem_priors(problem, priors)?;
-    let distance = distance(distance_kind, metric)?;
+    let distance = Distance::from_metric(metric).map_err(value_error)?;
     // With weights of 0 or 1, a particle of weight 0 cannot move: every
     // step resamples.
     let mut sampler = sampler(particles, 1.0, target_cess, stay_probability)?
@@ -410,8 +385,8 @@ fn abc_smc(
 /// Args:
 ///     problem: The calibration problem
 ///     priors: The priors, or None for uniform on the bounds
-///     distance: "loss" or "series"
-///     metric: The metric of "series", "rmse" or "mae"; None for "loss"
+///     metric: The metric of each series, "rmse" or "mae"; None for the
+///         problem's loss
 ///     draws: Number of draws
 ///     quantile: The share of draws kept
 ///     seed: Seed of every random number
@@ -424,20 +399,18 @@ fn abc_smc(
 ///     ValueError: If a prior or a setting is not valid
 ///     RuntimeError: If the run fails
 #[pyfunction]
-#[pyo3(signature = (problem, priors, distance_kind, metric, draws, quantile, seed))]
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (problem, priors, metric, draws, quantile, seed))]
 fn abc_rejection(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     priors: Option<Vec<PriorArgs>>,
-    distance_kind: &str,
     metric: Option<&str>,
     draws: usize,
     quantile: f64,
     seed: u64,
 ) -> PyResult<(PySmcRun, bool)> {
     let priors = problem_priors(problem, priors)?;
-    let distance = distance(distance_kind, metric)?;
+    let distance = Distance::from_metric(metric).map_err(value_error)?;
     let target = AbcTarget::new(&problem.inner, &priors, distance);
     let run = py
         .detach(|| smc::abc_rejection(&target, draws, quantile, seed))

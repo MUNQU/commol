@@ -7,7 +7,9 @@ squares and ``η = 1/(2σ²)`` the Gibbs posterior is the normal posterior of a
 mean, ``N(ȳ, σ²/n)``.
 """
 
+import logging
 import math
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -17,11 +19,13 @@ from commol import (
     AbcRejection,
     AbcSmc,
     Beta,
+    CalibrationConstraint,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
     EtaCalibration,
     GibbsPosterior,
+    LogNormal,
     LogUniform,
     LossDistance,
     NelderMeadConfig,
@@ -33,6 +37,8 @@ from commol import (
     SmcResult,
     Uniform,
 )
+from commol.api.inference import smc
+from commol.commol_rs import _commol_rs as commol_rs
 from tests.support import (
     a_to_b_builder,
     bounded,
@@ -143,6 +149,16 @@ class TestPriors:
         assert all(0.0 <= draw <= 50.0 for draw in draws)
         assert draws == Beta(a=2.0, b=5.0).sample(500, bounds, seed=3)
         assert np.mean(draws) == pytest.approx(50.0 * 2 / 7, rel=0.05)
+
+    def test_every_distribution_reaches_rust(self) -> None:
+        log_normal = LogNormal(mu=0.0, sigma=1.0)
+        assert log_normal.cdf(1.0, (0.0, math.inf)) == pytest.approx(0.5)
+        with pytest.raises(ValueError, match="between 0 and 1, got 1.5"):
+            log_normal.quantile(1.5, (0.0, math.inf))
+        with pytest.raises(ValueError, match="Unknown distribution 'cauchy'"):
+            commol_rs.inference.Distribution("cauchy", [], 0.0, 1.0)
+        with pytest.raises(ValidationError):
+            GibbsPosterior.model_validate("not a configuration")
 
     def test_a_distribution_checks_its_parameters(self) -> None:
         with pytest.raises(ValidationError, match="sd"):
@@ -276,6 +292,48 @@ class TestGibbsPosterior:
         ):
             _binomial(300, loss_function="sse").uncertainty(method)
 
+    def test_information_matching_needs_a_parameter_the_data_read(self) -> None:
+        # No output reads d: its loss terms have no variance.
+        model = build(
+            a_to_b_builder(
+                parameters={"c": None, "d": None}, rate="c * A / A", total=1e6
+            )
+        )
+        problem = CalibrationProblem(
+            observed_data=flow_observations(_flow_data(10, 3), windowed=True),
+            parameters=[
+                bounded("c", 0.0, 50.0, initial_guess=25.0),
+                bounded("d", 0.0, 1.0, initial_guess=0.5),
+            ],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=200),
+            seed=1,
+        )
+        with pytest.raises(RuntimeError, match="singular"):
+            Calibrator(Simulation(model), problem).uncertainty(
+                _gibbs(eta=EtaCalibration.information_matching())
+            )
+
+    def test_bootstrap_coverage_needs_a_loss_above_zero_at_the_fit(self) -> None:
+        # With no flow and no flow observed, every c fits exactly.
+        model = build(
+            a_to_b_builder(parameters={"c": None}, rate="0 * c * A / A", total=1e6)
+        )
+        problem = CalibrationProblem(
+            observed_data=flow_observations([0.0] * 5, windowed=True),
+            parameters=[bounded("c", 0.0, 50.0, initial_guess=25.0)],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=10),
+            seed=1,
+        )
+        method = _gibbs(
+            eta=EtaCalibration.bootstrap_coverage(
+                replicates=10, block_length="auto", confidence_level=0.8
+            )
+        )
+        with pytest.raises(RuntimeError, match="loss at the fit is 0"):
+            Calibrator(Simulation(model), problem).uncertainty(method)
+
     def test_bootstrap_coverage_finds_an_eta_whose_intervals_cover(self) -> None:
         result = _flow(_flow_data(20, 7)).uncertainty(
             _gibbs(
@@ -294,6 +352,35 @@ class TestGibbsPosterior:
         # The bootstrap spread of a mean is that of its posterior: η is near
         # 1/(2σ²).
         assert 0.25 < result.eta * 2 * NOISE**2 < 4.0
+
+    def test_a_failed_bootstrap_replicate_is_noted_and_logged(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        found = SimpleNamespace(
+            eta=0.1, coverage=0.8, failed=[(2, "Simulation failed: x")]
+        )
+        monkeypatch.setattr(
+            smc,
+            "rust",
+            SimpleNamespace(
+                bootstrap_coverage_eta=lambda *_: found,
+                gibbs_posterior=commol_rs.inference.gibbs_posterior,
+            ),
+        )
+
+        with caplog.at_level(logging.WARNING, logger="commol.api.inference"):
+            result = _flow(_flow_data(10, 3)).uncertainty(
+                _gibbs(
+                    eta=EtaCalibration.bootstrap_coverage(
+                        replicates=3, block_length="auto", confidence_level=0.5
+                    )
+                )
+            )
+
+        note = "Bootstrap replicate 2 failed: Simulation failed: x"
+        assert result.diagnostics.notes == [note]
+        assert [r.getMessage() for r in caplog.records] == [note]
+        assert result.eta == 0.1
 
 
 class TestAbc:
@@ -386,6 +473,33 @@ class TestAbc:
         )
         # The raw loss grows with the unit of the scaled series.
         assert distance(1000.0, LossDistance()) > 1e5 * distance(1.0, LossDistance())
+
+    def test_a_run_that_breaks_a_constraint_is_outside_the_support(self) -> None:
+        model = build(
+            a_to_b_builder(parameters={"c": None}, rate="c * A / A", total=1e6)
+        )
+        problem = CalibrationProblem(
+            observed_data=flow_observations(_flow_data(5, 9), windowed=True),
+            parameters=[bounded("c", 0.0, 50.0, initial_guess=25.0)],
+            constraints=[CalibrationConstraint(id="low", expression="100 - B", at=[5])],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=10),
+            seed=1,
+        )
+        result = Calibrator(Simulation(model), problem).uncertainty(
+            AbcRejection(
+                priors=Priors.uniform_on_bounds(),
+                distance=SeriesDistance(metric="mae"),
+                draws=200,
+                quantile=0.2,
+            )
+        )
+
+        # B at 5 is 5c: a draw above c = 20 breaks the constraint.
+        outside = [draw["c"] > 20.0 for draw in result.sample.draws()]
+        assert any(outside)
+        for is_outside, kept in zip(outside, result.kept, strict=True):
+            assert (kept is None) == is_outside
 
     def test_abc_rejection_keeps_the_closest_draws(self) -> None:
         result = _binomial(300).uncertainty(

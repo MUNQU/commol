@@ -548,8 +548,6 @@ class DistributionProtocol(Protocol):
     def log_density(self, x: float) -> float: ...
     def cdf(self, x: float) -> float: ...
     def quantile(self, p: float) -> float: ...
-    def mean(self) -> float: ...
-    def variance(self) -> float: ...
     def sample(self, count: int, seed: int) -> list[float]: ...
 
 class SmcRunProtocol(Protocol):
@@ -659,7 +657,6 @@ class InferenceModule(Protocol):
         self,
         problem: CalibrationProblemProtocol,
         priors: _Priors,
-        distance_kind: str,
         metric: str | None,
         particles: int,
         target_cess: float,
@@ -671,7 +668,6 @@ class InferenceModule(Protocol):
         self,
         problem: CalibrationProblemProtocol,
         priors: _Priors,
-        distance_kind: str,
         metric: str | None,
         draws: int,
         quantile: float,

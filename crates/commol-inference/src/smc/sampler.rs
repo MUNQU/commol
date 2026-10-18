@@ -95,11 +95,6 @@ impl SmcRun {
     pub fn weights(&self) -> Vec<f64> {
         normalized_weights(&self.log_weights)
     }
-
-    /// The level of the particles: that of the last step, or the first.
-    pub fn level(&self) -> Option<f64> {
-        self.steps.last().map(|step| step.level)
-    }
 }
 
 /// The state of a run between steps.

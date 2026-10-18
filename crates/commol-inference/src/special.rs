@@ -14,6 +14,12 @@ const MAX_TERMS: usize = 10_000;
 /// The smallest denominator of the modified Lentz method.
 const TINY: f64 = 1e-300;
 
+/// `x`, or `TINY` when `x` is nearer 0: the guard of a denominator of the
+/// modified Lentz method.
+fn away_from_zero(x: f64) -> f64 {
+    if x.abs() < TINY { TINY } else { x }
+}
+
 /// `ln Γ(x)` for `x > 0`.
 pub(crate) fn ln_gamma(x: f64) -> f64 {
     libm::lgamma(x)
@@ -168,13 +174,9 @@ fn gamma_continued_fraction(a: f64, x: f64) -> f64 {
         let an = -(i as f64) * (i as f64 - a);
         b += 2.0;
         d = an * d + b;
-        if d.abs() < TINY {
-            d = TINY;
-        }
+        d = away_from_zero(d);
         c = b + an / c;
-        if c.abs() < TINY {
-            c = TINY;
-        }
+        c = away_from_zero(c);
         d = 1.0 / d;
         let delta = d * c;
         h *= delta;
@@ -208,9 +210,7 @@ fn beta_continued_fraction(a: f64, b: f64, x: f64) -> f64 {
     let qam = a - 1.0;
     let mut c = 1.0;
     let mut d = 1.0 - qab * x / qap;
-    if d.abs() < TINY {
-        d = TINY;
-    }
+    d = away_from_zero(d);
     d = 1.0 / d;
     let mut h = d;
     for m in 1..MAX_TERMS {
@@ -218,24 +218,16 @@ fn beta_continued_fraction(a: f64, b: f64, x: f64) -> f64 {
         let m2 = 2.0 * m;
         let even = m * (b - m) * x / ((qam + m2) * (a + m2));
         d = 1.0 + even * d;
-        if d.abs() < TINY {
-            d = TINY;
-        }
+        d = away_from_zero(d);
         c = 1.0 + even / c;
-        if c.abs() < TINY {
-            c = TINY;
-        }
+        c = away_from_zero(c);
         d = 1.0 / d;
         h *= d * c;
         let odd = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
         d = 1.0 + odd * d;
-        if d.abs() < TINY {
-            d = TINY;
-        }
+        d = away_from_zero(d);
         c = 1.0 + odd / c;
-        if c.abs() < TINY {
-            c = TINY;
-        }
+        c = away_from_zero(c);
         d = 1.0 / d;
         let delta = d * c;
         h *= delta;
@@ -267,6 +259,19 @@ mod tests {
         }
         assert!(close(normal_sf(normal_quantile_sf(1e-200)), 1e-200, 1e-12));
         assert_eq!(normal_quantile(0.5), 0.0);
+    }
+
+    #[test]
+    fn the_functions_reach_their_limits_at_the_ends() {
+        assert_eq!(normal_density(f64::INFINITY), 0.0);
+        assert_eq!(normal_quantile(0.0), f64::NEG_INFINITY);
+        assert_eq!(normal_quantile(1.0), f64::INFINITY);
+        assert_eq!((gamma_p(2.0, 0.0), gamma_q(2.0, 0.0)), (0.0, 1.0));
+        assert_eq!(
+            (gamma_p(2.0, f64::INFINITY), gamma_q(2.0, f64::INFINITY)),
+            (1.0, 0.0)
+        );
+        assert_eq!((beta_i(2.0, 3.0, 0.0), beta_i(2.0, 3.0, 1.0)), (0.0, 1.0));
     }
 
     #[test]

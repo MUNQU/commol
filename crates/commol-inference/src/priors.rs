@@ -156,6 +156,24 @@ mod tests {
     }
 
     #[test]
+    fn a_prior_with_no_mass_on_its_bounds_names_its_parameter() {
+        let error = Priors::new(
+            &names()[..1],
+            &[(0.0, 1.0)],
+            &[(
+                "a".to_string(),
+                Family::Normal {
+                    mean: 100.0,
+                    sd: 1.0,
+                },
+            )],
+        )
+        .unwrap_err();
+        assert!(error.starts_with("The prior of 'a': "), "{error}");
+        assert!(error.contains("no mass"), "{error}");
+    }
+
+    #[test]
     fn a_family_that_does_not_fit_the_bounds_names_those_that_do() {
         let error =
             Priors::uniform_on_bounds(&names(), &[(0.0, 1.0), (0.0, f64::INFINITY)]).unwrap_err();
