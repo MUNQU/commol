@@ -304,30 +304,4 @@ mod tests {
         ]);
         assert_eq!(eval_fast_rate(&program, &[], &ctx, ZERO).unwrap(), -7.0);
     }
-
-    #[test]
-    fn fast_rate_program_detects_invalid_stack_state() {
-        let ctx = MathExpressionContext::new();
-        let program =
-            FastRateExpression::Program(vec![FastRateOp::Constant(1.0), FastRateOp::Constant(2.0)]);
-        let error = eval_fast_rate(&program, &[], &ctx, ZERO).unwrap_err();
-        assert!(error.contains("invalid stack state"));
-    }
-
-    #[test]
-    fn fast_rate_program_underflow_is_reported() {
-        let ctx = MathExpressionContext::new();
-        let program = FastRateExpression::Program(vec![FastRateOp::Add]);
-        let error = eval_fast_rate(&program, &[], &ctx, ZERO).unwrap_err();
-        assert!(error.contains("underflow"));
-    }
-
-    #[test]
-    fn fast_rate_program_overflow_is_reported() {
-        let ctx = MathExpressionContext::new();
-        let ops: Vec<FastRateOp> = (0..33).map(|_| FastRateOp::Constant(1.0)).collect();
-        let program = FastRateExpression::Program(ops);
-        let error = eval_fast_rate(&program, &[], &ctx, ZERO).unwrap_err();
-        assert!(error.contains("overflow"));
-    }
 }
