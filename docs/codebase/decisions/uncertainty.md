@@ -140,3 +140,28 @@ has residuals of.
 
 **Guards:** `crates/commol-inference/tests/test_resampling.rs::residual_noise_rejects_a_series_with_no_residuals`,
 `tests/uncertainty/test_resampling.py::TestResidualNoise`.
+
+## Conformal variants share one score and one quantile
+
+A conformal variant only chooses which predictions and which held-out values
+feed a `NonconformityScore`; the score, its scale and the quantile
+`⌈(n + 1)(1 − α)⌉` live once (`crates/commol-inference/src/conformal/score.rs`,
+`quantile.rs`). `score`, `by` and `level` are required in every variant, and
+`check_conformal_settings` rejects in Rust `"normalized"` per series. A horizon
+of `RollingConformal` is a count of observations after the origin. `EnbPI`
+draws its own block counts through `ReplicateRunner::fit_one`, and
+`AdaptiveConformal` keeps its state in Rust (`AdaptiveLevel`) and returns the
+same `ConformalResult` as every variant.
+
+| Alternative | Why not |
+|---|---|
+| A default score or pooling | The choice sets the pattern of the widths, a modelling choice. |
+| `"normalized"` per series | Its factor is one constant per series, so its intervals equal those of `"absolute"`. |
+| A horizon as a distance on the axis | Positions are `f64` and can be irregular, so each point would have its own horizon and an unbounded interval. |
+| A `CVPlus` class | Blocks of consecutive positions make the folds of CV+, so it is jackknife+ with a longer `block_length`. |
+| EnbPI on a `BootstrapResult` | No bootstrap leaves a block out, so no replicate gives a leave-one-out prediction. |
+| A mutable Python `AdaptiveConformal` | Configurations are frozen, and every variant returns one result type. |
+
+**Guards:** `crates/commol-inference/tests/test_conformal.rs`,
+`tests/uncertainty/test_conformal.py`, the studies of
+`tests/uncertainty/test_coverage.py`.

@@ -29,7 +29,8 @@ a band of the model, and `ResidualNoise(...)` adds residuals of a fit, which
 gives a prediction interval with no noise model
 ([Resampling](resampling.md#prediction-intervals)). Comparing a band of the
 model with data underestimates the spread, so its coverage of the data is below
-its level.
+its level. A [conformal](conformal.md) interval is a prediction interval with a
+coverage guarantee, from the scores of observations the fit did not use.
 
 ## Which method answers which question
 
@@ -45,6 +46,11 @@ its level.
 | `WildBootstrap` | The same, when the size of the noise changes along the series | No | [Resampling](resampling.md#wild-block-bootstrap) |
 | `BlockJackknife` | The standard error and bias of each parameter, and which block of data moves it most | No | [Resampling](resampling.md#block-jackknife) |
 | `ResidualNoise` | Where the next observations fall: a prediction interval | No | [Resampling](resampling.md#prediction-intervals) |
+| `SplitConformal` | Where new observations fall, with a guaranteed coverage, from held-out observations | No | [Conformal](conformal.md#split-conformal) |
+| `RollingConformal` | Where the next observations fall at each horizon ahead of the data | No | [Conformal](conformal.md#rolling-origins) |
+| `JackknifePlus` | Where new observations fall, with a guaranteed coverage and no held-out data | No | [Conformal](conformal.md#jackknife) |
+| `EnbPI` | Where the next observations of a series with dependent errors fall | No | [Conformal](conformal.md#enbpi) |
+| `AdaptiveConformal` | Intervals for observations as they arrive, whose share of misses tends to its level | No | [Conformal](conformal.md#adaptive-conformal-inference) |
 
 Each uncertainty method adds its row here when it lands.
 ## Quick path
@@ -245,6 +251,7 @@ print(type(result).__name__, len(result.sample))  # BootstrapResult 20
 | To learn | Read |
 |---|---|
 | Bootstraps, the jackknife and prediction intervals with no noise model | [Resampling](resampling.md) |
+| Prediction intervals with a coverage guarantee | [Conformal Prediction Intervals](conformal.md) |
 | Several starts of an optimizer | [Optimizers](../calibration-optimizers.md#several-starts) |
 | Which parameters the data determine | [Identifiability](identifiability.md) |
 | Reports of a sample | [Reports](../reports.md) |

@@ -199,9 +199,10 @@ def run_jackknife_plus(
         run,
         method.level,
         f"Each interval covers a new observation with probability at least "
-        f"{run.bound:.4g} when the blocks are exchangeable: 1 − 2α with one "
-        f"observation per block, and the CV+ bound of Barber et al. (2021) with "
-        f"K = {run.blocks} blocks of {run.block_length} positions otherwise.",
+        f"{run.bound:.4g} when the blocks are exchangeable: the CV+ bound of "
+        f"Barber et al. (2021) with K = {run.blocks} blocks of "
+        f"{run.block_length} positions, which is 1 − 2α with one observation "
+        f"per block.",
     )
 
 
