@@ -186,6 +186,7 @@ nav:
               - Security: codebase/decisions/security.md
           - Conventions: codebase/conventions.md
           - Tests: codebase/tests.md
+          - Coverage and Mutation Testing: codebase/coverage.md
           - Maintainer Playbook: codebase/maintainer-playbook.md
       - Development Workflow: development/workflow.md
       - Contributing: development/contributing.md

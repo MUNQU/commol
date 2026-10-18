@@ -84,7 +84,7 @@ markers = [
 log_cli_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 
-# Test coverage: the policy and its exclusions are in docs/codebase/tests.md
+# Test coverage: the policy and its exclusions are in docs/codebase/coverage.md
 [tool.coverage.report]
 exclude_also = [
     # Imports for the type checker only; Python never runs them.

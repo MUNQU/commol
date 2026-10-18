@@ -1,6 +1,8 @@
 # Codecov reports the coverage of Python (flag `python`) and of Rust (flag
 # `rust`) for the badges of the README. Its checks inform and never fail a
-# pull request, and it writes no comment on it.
+# pull request, and it writes no comment on it: the thresholds that fail a
+# pull request are in the Code Quality workflow (docs/codebase/coverage.md),
+# so a merge does not depend on this service.
 coverage:
   status:
     project:
