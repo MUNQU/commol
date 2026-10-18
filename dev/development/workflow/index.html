@@ -3617,14 +3617,15 @@ the same zones (<code>gh issue list --label area:inference -s open</code>).</p>
 <ul>
 <li><strong>Code Quality Pipeline</strong>: Linting, formatting, type checking for both Python and Rust</li>
 <li><strong>Build Pipeline</strong>: Builds on Ubuntu, Windows, and macOS with Python versions</li>
-<li><strong>Test Coverage</strong>: The Code Quality jobs measure the coverage of Python
-  (<code>pytest --cov</code>) and of Rust (<code>cargo llvm-cov</code>) and upload it to Codecov,
-  which feeds the coverage badges of the README</li>
+<li><strong>Test Coverage</strong>: Python Coverage (<code>pytest --cov</code>) and Rust Code Quality
+  (<code>cargo llvm-cov</code>) measure the coverage and upload it to Codecov, which feeds
+  the coverage badges of the README</li>
 </ul>
 <p><strong>PR Requirements</strong>:</p>
 <ul>
-<li>The required checks must pass: <code>Python Code Quality</code>, <code>Rust Code Quality</code>,
-  <code>Build Documentation</code> and <code>Build Passed</code> (the whole test matrix)</li>
+<li>The required checks must pass: <code>Python Code Quality</code>, <code>Python Coverage</code>,
+  <code>Rust Code Quality</code>, <code>Build Documentation</code> and <code>Build Passed</code> (the whole test
+  matrix)</li>
 <li>No merge conflicts with target branch</li>
 <li>The merge queue: it merges each pull request on top of the ones queued
   before it, after the required checks pass on that result</li>
@@ -3657,13 +3658,13 @@ Updating the file there also triggers a version-update check right away.</p>
 <tr>
 <td>Code Quality (<code>code-quality.yaml</code>)</td>
 <td>Pull requests, the merge queue and on demand</td>
-<td>Python: Ruff (lint, format, docstrings <code>D1</code>/<code>D417</code>) of <code>py-commol/</code> and <code>.github/scripts/</code>, Ty, Pytest with the documentation checks (<code>pytest -m docs</code>) and its coverage. Rust: rustfmt, Clippy (<code>-D warnings</code>, so <code>missing_docs</code> too), rustdoc without broken links, cargo test with its coverage (<code>cargo llvm-cov</code>). Both upload their coverage to Codecov (flags <code>python</code> and <code>rust</code>) with the OIDC token of the run, so no secret is needed; <code>.github/codecov.yml</code> makes its checks informational.</td>
-<td><code>Python Code Quality</code>, <code>Rust Code Quality</code></td>
+<td>Python Code Quality: Ruff (lint, format, docstrings <code>D1</code>/<code>D417</code>) of <code>py-commol/</code> and <code>.github/scripts/</code>, Ty and Vulture, on the source and the stubs, so it builds nothing. Python Coverage: every test, the documentation checks (<code>pytest -m docs</code>) too, under coverage, for every change, the documentation included. Rust: rustfmt, Clippy (<code>-D warnings</code>, so <code>missing_docs</code> too), rustdoc without broken links, cargo test with its coverage (<code>cargo llvm-cov</code>). Both upload their coverage to Codecov (flags <code>python</code> and <code>rust</code>) with the OIDC token of the run, so no secret is needed; <code>.github/codecov.yml</code> makes its checks informational.</td>
+<td><code>Python Code Quality</code>, <code>Python Coverage</code>, <code>Rust Code Quality</code></td>
 </tr>
 <tr>
 <td>Build (<code>build.yaml</code>)</td>
 <td>Pull requests, the merge queue, every Monday on <code>main</code> and on demand</td>
-<td>Tests, except the documentation checks and the coverage studies. A pull request runs one job, Ubuntu with Python 3.12, for a fast answer; the merge queue, the weekly and the manual runs test Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14. A failure that only one operating system shows appears in the queue, which then removes the pull request. A change of only documentation or planning files (<code>docs/</code>, Markdown at the root, <code>mkdocs.yaml</code>, <code>.github/ISSUE_TEMPLATE/</code>, <code>.github/scripts/</code>) skips the tests. The wheels of every architecture are built by the release (<code>release.yaml</code>).</td>
+<td>Tests, the documentation checks included, without coverage: the job on Ubuntu installs LaTeX and times every test against its budget (<a href="../../codebase/tests/#time-budget">Time budget</a>). A pull request that changes what the coverage studies run also runs them (<code>coverage.yaml</code>): the crates <code>commol-core</code>, <code>commol-model</code>, <code>commol-difference</code>, <code>commol-calibration</code>, <code>commol-random</code> and <code>commol-inference</code>, the bindings (<code>py-commol/src/</code>), the Python package, <code>tests/support/</code>, the studies, the locks, the manifests and the toolchain. The merge queue does not run them again. A pull request runs one job, Ubuntu with Python 3.12, for a fast answer; the merge queue, the weekly and the manual runs test Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14. A failure that only one operating system shows appears in the queue, which then removes the pull request. A change of only documentation or planning files (<code>docs/</code>, Markdown at the root, <code>mkdocs.yaml</code>, <code>.github/ISSUE_TEMPLATE/</code>, <code>.github/scripts/</code>) skips the tests. The wheels of every architecture are built by the release (<code>release.yaml</code>).</td>
 <td><code>Build Passed</code></td>
 </tr>
 <tr>
@@ -3674,9 +3675,9 @@ Updating the file there also triggers a version-update check right away.</p>
 </tr>
 <tr>
 <td>Coverage Studies (<code>coverage.yaml</code>)</td>
-<td>Every Monday; on demand</td>
-<td><code>pytest -m coverage_study</code>: the intervals of each uncertainty method cover the truth at their level (<a href="../../codebase/decisions/uncertainty/#methods-plug-into-one-entry-point">Design decisions</a>).</td>
-<td>None: each study runs many fits</td>
+<td>Called by Build for a pull request that changes what the studies run and by the release before it publishes; on demand</td>
+<td><code>pytest -m coverage_study</code>: the intervals of each uncertainty method cover the truth at their level (<a href="../../codebase/decisions/uncertainty/#methods-plug-into-one-entry-point">Design decisions</a>). One job per group of studies, so the slowest study, about 10 min, sets the wait.</td>
+<td><code>Build Passed</code>, through Build</td>
 </tr>
 <tr>
 <td>Links (<code>links.yaml</code>)</td>
@@ -3693,7 +3694,7 @@ Updating the file there also triggers a version-update check right away.</p>
 <tr>
 <td>Release (<code>release.yaml</code>)</td>
 <td>A published GitHub release</td>
-<td>Builds wheels and the sdist, and publishes them to PyPI. See <a href="../release/">Release Process</a>.</td>
+<td>Builds wheels and the sdist, runs the coverage studies, and publishes to PyPI only when all of them pass. See <a href="../release/">Release Process</a>.</td>
 <td>—</td>
 </tr>
 </tbody>
@@ -3726,7 +3727,7 @@ Updating the file there also triggers a version-update check right away.</p>
 <td><code>pytest -m docs</code></td>
 </tr>
 <tr>
-<td>Coverage studies of the uncertainty methods (slow; weekly in CI)</td>
+<td>Coverage studies of the uncertainty methods (slow; CI runs them when what they run changes, and before a release)</td>
 <td><code>pytest -m coverage_study</code></td>
 </tr>
 <tr>
@@ -3755,7 +3756,8 @@ Updating the file there also triggers a version-update check right away.</p>
 </tr>
 </tbody>
 </table>
-<p>Rebuild the extension after every Rust change, before you run <code>pytest</code>.
+<p>Rebuild the extension after every Rust change and every <code>uv sync</code>, before you
+run <code>pytest</code>; uv never builds it (<code>package = false</code>).
 <code>cargo build --workspace</code> does not link the PyO3 crate outside <code>maturin</code>; use
 <code>clippy</code> and the per-crate tests instead.</p>
 <h3 id="pre-commit-hooks">Pre-commit Hooks<a class="headerlink" href="#pre-commit-hooks" title="Permanent link">&para;</a></h3>

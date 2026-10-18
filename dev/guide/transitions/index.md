@@ -314,6 +314,8 @@ print(redirect.describe().render("text"))
 # A_g1 -> A_g2_s1: k * A_g1   and   B_g1 -> B_g2_s1: k * B_g1
 ```
 
+A transition without a source starts from the compartments it enters, so its `category` conditions choose them and `build` rejects a `to`.
+
 ## Limiting when a transition runs
 
 A transition runs at every step. To limit a flow, write the condition in the rate with `if`, as in `"if(step > 30, k, 0)"`, or use a [`AxisPattern`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md), a [series parameter](https://munqu.github.io/commol/latest/guide/building-models/#series-parameters) or a [stratified rate](#stratified-rates). A comparison alone is a boolean, so `"k * (step > 30)"` is rejected.
@@ -398,16 +400,17 @@ A calibration gives a run that stops this way a penalty and goes on; see [Calibr
 
 `build` plans every flow in the engine and rejects a transition it cannot simulate as written:
 
-| Rejected                                                                                     | Message names                                            |
-| -------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| A source or target that is neither a bin nor a category of one stratification                | The transition                                           |
-| A category transition without exactly one source and one target                              | The transition                                           |
-| A rate variable that is not a parameter, bin, compartment or special variable                | The variable and the available names                     |
-| Several sources with a proportional rate                                                     | The transition; use an absolute rate or `$compartment`   |
-| A stratified rate whose `category` conditions match no source compartment                    | The categories; use `to` to reach another stratification |
-| A flow that ends in categories no compartment has                                            | The transition; add a `to` condition                     |
-| `impulse_at` and `impulse_every` together, a negative step, or a period that is not positive | The transition                                           |
-| A non-integer impulse step in a `DifferenceEquations` model                                  | The transition and the step                              |
+| Rejected                                                                                     | Message names                                                      |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| A source or target that is neither a bin nor a category of one stratification                | The transition                                                     |
+| A category transition without exactly one source and one target                              | The transition                                                     |
+| A rate variable that is not a parameter, bin, compartment or special variable                | The variable and the available names                               |
+| Several sources with a proportional rate                                                     | The transition; use an absolute rate or `$compartment`             |
+| A stratified rate whose `category` conditions match no source compartment                    | The transition; use `to` to reach another stratification           |
+| A `to` condition on a transition without a source                                            | The transition; use `category` to choose the compartment it enters |
+| A flow that ends in categories no compartment has                                            | The transition; add a `to` condition                               |
+| `impulse_at` and `impulse_every` together, a negative step, or a period that is not positive | The transition                                                     |
+| A non-integer impulse step in a `DifferenceEquations` model                                  | The transition and the step                                        |
 
 ## Next steps
 

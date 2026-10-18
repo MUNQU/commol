@@ -3618,6 +3618,8 @@ it can send the flow into a stratification that the source does not have:</p>
 </span><span id="__span-7-30"><a id="__codelineno-7-30" name="__codelineno-7-30" href="#__codelineno-7-30"></a><span class="nb">print</span><span class="p">(</span><span class="n">redirect</span><span class="o">.</span><span class="n">describe</span><span class="p">()</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="s2">&quot;text&quot;</span><span class="p">))</span>
 </span><span id="__span-7-31"><a id="__codelineno-7-31" name="__codelineno-7-31" href="#__codelineno-7-31"></a><span class="c1"># A_g1 -&gt; A_g2_s1: k * A_g1   and   B_g1 -&gt; B_g2_s1: k * B_g1</span>
 </span></code></pre></div>
+<p>A transition without a source starts from the compartments it enters, so its
+<code>category</code> conditions choose them and <code>build</code> rejects a <code>to</code>.</p>
 <h2 id="limiting-when-a-transition-runs">Limiting when a transition runs<a class="headerlink" href="#limiting-when-a-transition-runs" title="Permanent link">&para;</a></h2>
 <p>A transition runs at every step. To limit a flow, write the condition in the
 rate with <code>if</code>, as in <code>"if(step &gt; 30, k, 0)"</code>, or use a
@@ -3778,7 +3780,11 @@ simulate as written:</p>
 </tr>
 <tr>
 <td>A stratified rate whose <code>category</code> conditions match no source compartment</td>
-<td>The categories; use <code>to</code> to reach another stratification</td>
+<td>The transition; use <code>to</code> to reach another stratification</td>
+</tr>
+<tr>
+<td>A <code>to</code> condition on a transition without a source</td>
+<td>The transition; use <code>category</code> to choose the compartment it enters</td>
 </tr>
 <tr>
 <td>A flow that ends in categories no compartment has</td>

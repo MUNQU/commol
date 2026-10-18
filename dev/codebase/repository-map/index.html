@@ -3316,7 +3316,7 @@
 <tbody>
 <tr>
 <td><code>py-commol/tests/</code></td>
-<td>Python tests: one package per page of the user guide (<code>building/</code>, <code>transitions/</code>, <code>rates/</code>, <code>axis_patterns/</code>, <code>initial_conditions/</code>, <code>simulation/</code>, <code>stochastic/</code>, <code>units/</code>, <code>calibration/</code>, <code>uncertainty/</code>, <code>reporting/</code>, <code>plotting/</code>, <code>docs/</code>); <code>reference_models/</code>, published models checked against their stated results; <code>model_kinds/</code>, the test model kind through every generic layer; and <code>support/</code> with the shared model factories, the test kind (<code>kinds.py</code>), the test uncertainty method (<code>methods.py</code>), the coverage harness (<code>coverage.py</code>), the flow models, the reference solver, the oracles and the assertions. See <a href="../tests/">Tests</a>.</td>
+<td>Python tests: one package per page of the user guide (<code>building/</code>, <code>transitions/</code>, <code>rates/</code>, <code>axis_patterns/</code>, <code>initial_conditions/</code>, <code>simulation/</code>, <code>stochastic/</code>, <code>units/</code>, <code>calibration/</code>, <code>uncertainty/</code>, <code>reporting/</code>, <code>plotting/</code>, <code>docs/</code>); <code>reference_models/</code>, published models checked against their stated results; <code>model_kinds/</code>, the test model kind through every generic layer; <code>suite/</code>, the checks of the rules of the tests; and <code>support/</code> with the shared model factories, the test kind (<code>kinds.py</code>), the test uncertainty method (<code>methods.py</code>), the coverage harness (<code>coverage.py</code>), the flow models, the reference solver, the oracles and the assertions. See <a href="../tests/">Tests</a>.</td>
 </tr>
 <tr>
 <td><code>crates/*/tests/</code>, <code>#[cfg(test)]</code> modules</td>
@@ -3352,7 +3352,7 @@
 </tr>
 <tr>
 <td><code>.github/workflows/</code></td>
-<td>CI: code quality, build, docs, release, and the weekly coverage studies (<code>coverage.yaml</code>).</td>
+<td>CI: code quality, build, docs, release, and the coverage studies (<code>coverage.yaml</code>), which Build and the release call.</td>
 </tr>
 </tbody>
 </table>

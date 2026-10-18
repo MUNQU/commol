@@ -3052,8 +3052,8 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
 </tr>
 <tr>
 <td>Tests</td>
-<td>One package per guide page; shared factories; every test checks a result: <a href="../tests/">Tests</a></td>
-<td>Review; pytest 10 deprecations fail the run (<code>filterwarnings</code>)</td>
+<td>One package per guide page; shared factories; every test checks a result, once, within its time budget: <a href="../tests/">Tests</a></td>
+<td><code>tests/suite/</code> (CI) and review; pytest 10 deprecations fail the run (<code>filterwarnings</code>)</td>
 </tr>
 <tr>
 <td>Commits</td>
@@ -3246,22 +3246,22 @@ every match.</p>
 <tr>
 <td>The documentation examples run</td>
 <td><code>pytest -m docs</code> (from <code>py-commol/</code>)</td>
-<td>CI (Code Quality)</td>
+<td>CI (Python Coverage, and Test of Build)</td>
 </tr>
 <tr>
 <td>Every name in <code>commol.__all__</code> has an API entry (<code>…</code> under <code>docs/api/</code>)</td>
 <td><code>pytest -m docs</code> (<code>tests/docs/test_reference.py</code>)</td>
-<td>CI (Code Quality)</td>
+<td>CI (Python Coverage, and Test of Build)</td>
 </tr>
 <tr>
 <td>Every crate under <code>crates/</code> is named in <a href="../architecture/">Architecture</a></td>
 <td><code>pytest -m docs</code> (<code>tests/docs/test_reference.py</code>)</td>
-<td>CI (Code Quality)</td>
+<td>CI (Python Coverage, and Test of Build)</td>
 </tr>
 <tr>
 <td>Every test or definition a page names as <code>&lt;file&gt;::&lt;name&gt;</code> exists in that file (the dated design records <code>development/design-*.md</code> keep the names of their date)</td>
 <td><code>pytest -m docs</code> (<code>tests/docs/test_reference.py</code>)</td>
-<td>CI (Code Quality)</td>
+<td>CI (Python Coverage, and Test of Build)</td>
 </tr>
 <tr>
 <td>Public Python modules, classes, functions and arguments have docstrings</td>
@@ -3271,22 +3271,22 @@ every match.</p>
 <tr>
 <td>Every path a page of <code>AGENTS.md</code> or <code>docs/codebase/</code> names in code format exists, and a bare file name matches one file</td>
 <td><code>pytest -m docs</code> (<code>tests/docs/test_reference.py</code>)</td>
-<td>CI (Code Quality)</td>
+<td>CI (Python Coverage, and Test of Build)</td>
 </tr>
 <tr>
 <td>Every area page of decisions has a row on the index, and no link points to a decision on the index</td>
 <td><code>pytest -m docs</code> (<code>tests/docs/test_layout.py</code>)</td>
-<td>CI (Code Quality)</td>
+<td>CI (Python Coverage, and Test of Build)</td>
 </tr>
 <tr>
 <td>No run of 12 words is in two pages of <code>AGENTS.md</code>, <code>docs/codebase/</code> or <code>docs/development/</code>; the repository map and the workflow include the task table and the commands of <code>AGENTS.md</code></td>
 <td><code>pytest -m docs</code> (<code>tests/docs/test_layout.py</code>)</td>
-<td>CI (Code Quality)</td>
+<td>CI (Python Coverage, and Test of Build)</td>
 </tr>
 <tr>
 <td><code>AGENTS.md</code> stays within 110 lines, a page of <code>docs/codebase/</code> within 300 and a page of <code>docs/codebase/decisions/</code> within 250</td>
 <td><code>pytest -m docs</code> (<code>tests/docs/test_layout.py</code>)</td>
-<td>CI (Code Quality)</td>
+<td>CI (Python Coverage, and Test of Build)</td>
 </tr>
 <tr>
 <td>Public Rust items have docs, without broken links</td>

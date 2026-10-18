@@ -2875,7 +2875,7 @@ needs a Rust toolchain.</p>
 <tbody>
 <tr>
 <td><code>uv sync --extra dev --extra docs</code></td>
-<td>Creates <code>.venv</code> with the test, lint and documentation tools.</td>
+<td>Creates <code>.venv</code> with the test, lint and documentation tools. It does not build Commol (<code>package = false</code> in <code>pyproject.toml</code>), and a later <code>uv sync</code> removes the install of Commol.</td>
 </tr>
 <tr>
 <td><code>source .venv/bin/activate</code></td>
@@ -2883,7 +2883,7 @@ needs a Rust toolchain.</p>
 </tr>
 <tr>
 <td><code>maturin develop --release</code></td>
-<td>Compiles the Rust extension and installs Commol in editable mode. Run it again after every Rust change.</td>
+<td>Compiles the Rust extension and installs Commol in editable mode. Run it again after every Rust change and every <code>uv sync</code>.</td>
 </tr>
 </tbody>
 </table>

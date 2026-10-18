@@ -279,6 +279,11 @@ class ParameterSample(BaseModel):
         -------
         dict[str, list[float]]
             One quantile per level for each name.
+
+        Raises
+        ------
+        ValueError
+            If a level is not between 0 and 1.
         """
         rows = self._rust.quantiles([float(level) for level in levels])
         return {
@@ -701,6 +706,12 @@ Returns:
 | ------------------------ | ------------------------------------- |
 | `dict[str, list[float]]` | One quantile per level for each name. |
 
+Raises:
+
+| Type         | Description                        |
+| ------------ | ---------------------------------- |
+| `ValueError` | If a level is not between 0 and 1. |
+
 Source code in `commol/context/inference/sample.py`
 
 ```python
@@ -721,6 +732,11 @@ def quantiles(self, levels: list[float]) -> dict[str, list[float]]:
     -------
     dict[str, list[float]]
         One quantile per level for each name.
+
+    Raises
+    ------
+    ValueError
+        If a level is not between 0 and 1.
     """
     rows = self._rust.quantiles([float(level) for level in levels])
     return {
@@ -2831,9 +2847,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                     |
-| ------------ | ----------------------------------------------- |
-| `ValueError` | If the lengths differ or no weight is positive. |
+| Type         | Description                                                               |
+| ------------ | ------------------------------------------------------------------------- |
+| `ValueError` | If the lengths differ, no weight is positive or a level is not in [0, 1]. |
 
 Source code in `commol/api/inference/intervals.py`
 
@@ -2869,7 +2885,8 @@ def weighted_quantiles(
     Raises
     ------
     ValueError
-        If the lengths differ or no weight is positive.
+        If the lengths differ, no weight is positive or a level is not in
+        ``[0, 1]``.
     """
     values = [float(value) for value in values]
     if weights is None:

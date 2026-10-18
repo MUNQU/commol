@@ -44,11 +44,11 @@ maturin develop --release
 pytest
 ```
 
-| Step                               | Why                                                                                                     |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `uv sync --extra dev --extra docs` | Creates `.venv` with the test, lint and documentation tools.                                            |
-| `source .venv/bin/activate`        | `maturin develop` installs into the active environment.                                                 |
-| `maturin develop --release`        | Compiles the Rust extension and installs Commol in editable mode. Run it again after every Rust change. |
+| Step                               | Why                                                                                                                                                                                 |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `uv sync --extra dev --extra docs` | Creates `.venv` with the test, lint and documentation tools. It does not build Commol (`package = false` in `pyproject.toml`), and a later `uv sync` removes the install of Commol. |
+| `source .venv/bin/activate`        | `maturin develop` installs into the active environment.                                                                                                                             |
+| `maturin develop --release`        | Compiles the Rust extension and installs Commol in editable mode. Run it again after every Rust change and every `uv sync`.                                                         |
 
 Paths with spaces
 

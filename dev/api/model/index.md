@@ -107,8 +107,8 @@ class Model(BaseModel, Generic[StructureT]):
         """
         Loads a model from a JSON file.
 
-        The method reads the specified JSON file, parses its content, and validates
-        it against the Model schema.
+        The method reads the specified JSON file as UTF-8, the encoding of
+        JSON, parses its content, and validates it against the Model schema.
 
         Parameters
         ----------
@@ -127,10 +127,7 @@ class Model(BaseModel, Generic[StructureT]):
         pydantic.ValidationError
             If the JSON content does not conform to the Model schema.
         """
-        with open(file_path, "r") as f:
-            json_data = f.read()
-
-        return cls.model_validate_json(json_data)
+        return cls.model_validate_json(Path(file_path).read_text(encoding="utf-8"))
 
     def to_json(self, file_path: str | Path, indent: int = 2) -> None:
         """
@@ -415,7 +412,7 @@ from_json(file_path: str | Path) -> Self
 
 Loads a model from a JSON file.
 
-The method reads the specified JSON file, parses its content, and validates it against the Model schema.
+The method reads the specified JSON file as UTF-8, the encoding of JSON, parses its content, and validates it against the Model schema.
 
 Parameters:
 
@@ -444,8 +441,8 @@ def from_json(cls, file_path: str | Path) -> Self:
     """
     Loads a model from a JSON file.
 
-    The method reads the specified JSON file, parses its content, and validates
-    it against the Model schema.
+    The method reads the specified JSON file as UTF-8, the encoding of
+    JSON, parses its content, and validates it against the Model schema.
 
     Parameters
     ----------
@@ -464,10 +461,7 @@ def from_json(cls, file_path: str | Path) -> Self:
     pydantic.ValidationError
         If the JSON content does not conform to the Model schema.
     """
-    with open(file_path, "r") as f:
-        json_data = f.read()
-
-    return cls.model_validate_json(json_data)
+    return cls.model_validate_json(Path(file_path).read_text(encoding="utf-8"))
 ```
 
 #### to_json
@@ -4002,6 +3996,42 @@ class Table(BaseModel):
     heading: str | None = None
     columns: list[str]
     rows: list[list[Cell]]
+
+    @model_validator(mode="after")
+    def check_row_lengths(self) -> Self:
+        """Each row has one cell per column."""
+        for index, row in enumerate(self.rows):
+            if len(row) != len(self.columns):
+                raise ValueError(
+                    f"Row {index} of the table has {len(row)} cells; the table "
+                    f"has {len(self.columns)} columns: {self.columns}"
+                )
+        return self
+```
+
+### Methods:
+
+#### check_row_lengths
+
+```python
+check_row_lengths() -> Self
+```
+
+Each row has one cell per column.
+
+Source code in `commol/context/description.py`
+
+```python
+@model_validator(mode="after")
+def check_row_lengths(self) -> Self:
+    """Each row has one cell per column."""
+    for index, row in enumerate(self.rows):
+        if len(row) != len(self.columns):
+            raise ValueError(
+                f"Row {index} of the table has {len(row)} cells; the table "
+                f"has {len(self.columns)} columns: {self.columns}"
+            )
+    return self
 ```
 
 ## Equations
@@ -4301,6 +4331,42 @@ class Matrix(BaseModel):
     row_labels: list[str]
     column_labels: list[str]
     values: list[list[float]]
+
+    @model_validator(mode="after")
+    def check_shape(self) -> Self:
+        """One row of values per row label, one value per column label."""
+        shape = [len(row) for row in self.values]
+        if shape != [len(self.column_labels)] * len(self.row_labels):
+            raise ValueError(
+                f"A matrix of {len(self.row_labels)} rows and "
+                f"{len(self.column_labels)} columns has rows of {shape} values"
+            )
+        return self
+```
+
+### Methods:
+
+#### check_shape
+
+```python
+check_shape() -> Self
+```
+
+One row of values per row label, one value per column label.
+
+Source code in `commol/context/description.py`
+
+```python
+@model_validator(mode="after")
+def check_shape(self) -> Self:
+    """One row of values per row label, one value per column label."""
+    shape = [len(row) for row in self.values]
+    if shape != [len(self.column_labels)] * len(self.row_labels):
+        raise ValueError(
+            f"A matrix of {len(self.row_labels)} rows and "
+            f"{len(self.column_labels)} columns has rows of {shape} values"
+        )
+    return self
 ```
 
 ## UnitConsistencyError

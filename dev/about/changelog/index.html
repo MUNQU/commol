@@ -3496,9 +3496,35 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>An error of the model at a vertex of the initial Nelder-Mead simplex made
   the optimizer panic; it now stops the calibration with its message (the
   argmin fork returns the error).</li>
+<li>A <code>to</code> condition on a transition without a source was ignored by its flow
+  but applied by its accumulators; <code>build</code> now rejects it, and a <code>category</code>
+  condition chooses the compartment the flow enters.</li>
+<li><code>Model.from_json</code> read a file in the encoding of the system; it now reads
+  UTF-8, the encoding of JSON.</li>
+<li><code>Model.check_unit_consistency</code> checked every flow of a category transition
+  in the unit of the first bin of the model; each flow is now checked in the
+  unit of its own bin. In a model of bins of different units, a rate that
+  reads <code>total</code>, a subgroup total, a category or <code>neighbors</code> fails the check:
+  these add amounts of different units.</li>
+<li>The LaTeX description wrote a part of a rate in parentheses, such as
+  <code>(I / N)</code> or the argument of <code>sin(t / T)</code>, as upright text, and wrote a
+  unit inside the name of another variable (<code>A_{g1(\text{item})}</code>); only units
+  are text now, each after its variable. The expanded form merges <code>k * p</code> and <code>k * (1 - p)</code> also when a
+  third term shares another factor, and a merged term keeps the place of its
+  first term.</li>
+<li><code>ModelBuilder</code> and <code>Simulation</code> logged to the root logger of the
+  application; they log to the <code>commol</code> logger, as the rest of the library
+  does, so <code>add_stderr_logger</code> shows their messages.</li>
+<li><code>AxisPattern.combine(mode="max")</code> raised "Unknown combine mode": a mode may
+  be given by its value.</li>
+<li>A quantile level outside <code>[0, 1]</code>, or NaN, gave the smallest or the largest
+  value; <code>ParameterSample.quantiles</code> and <code>weighted_quantiles</code> now raise
+  <code>ValueError</code>.</li>
 </ul>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>commol.api.model_loader.ModelLoader</code>: a copy of <code>Model.from_json</code> that no
+  page documented and nothing called.</li>
 <li><strong>Breaking:</strong> the ensemble calibration: <code>Calibrator.run_probabilistic</code>,
   <code>ProbabilisticCalibrator</code>, <code>CalibrationProblem.probabilistic_config</code>,
   <code>ProbabilisticCalibrationConfig</code>, <code>ProbabilisticCalibrationResult</code>,

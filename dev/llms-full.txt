@@ -135,11 +135,11 @@ maturin develop --release
 pytest
 ```
 
-| Step                               | Why                                                                                                     |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `uv sync --extra dev --extra docs` | Creates `.venv` with the test, lint and documentation tools.                                            |
-| `source .venv/bin/activate`        | `maturin develop` installs into the active environment.                                                 |
-| `maturin develop --release`        | Compiles the Rust extension and installs Commol in editable mode. Run it again after every Rust change. |
+| Step                               | Why                                                                                                                                                                                 |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `uv sync --extra dev --extra docs` | Creates `.venv` with the test, lint and documentation tools. It does not build Commol (`package = false` in `pyproject.toml`), and a later `uv sync` removes the install of Commol. |
+| `source .venv/bin/activate`        | `maturin develop` installs into the active environment.                                                                                                                             |
+| `maturin develop --release`        | Compiles the Rust extension and installs Commol in editable mode. Run it again after every Rust change and every `uv sync`.                                                         |
 
 Paths with spaces
 
@@ -1441,6 +1441,8 @@ print(redirect.describe().render("text"))
 # A_g1 -> A_g2_s1: k * A_g1   and   B_g1 -> B_g2_s1: k * B_g1
 ```
 
+A transition without a source starts from the compartments it enters, so its `category` conditions choose them and `build` rejects a `to`.
+
 ## Limiting when a transition runs
 
 A transition runs at every step. To limit a flow, write the condition in the rate with `if`, as in `"if(step > 30, k, 0)"`, or use a [`AxisPattern`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md), a [series parameter](https://munqu.github.io/commol/latest/guide/building-models/#series-parameters) or a [stratified rate](#stratified-rates). A comparison alone is a boolean, so `"k * (step > 30)"` is rejected.
@@ -1525,16 +1527,17 @@ A calibration gives a run that stops this way a penalty and goes on; see [Calibr
 
 `build` plans every flow in the engine and rejects a transition it cannot simulate as written:
 
-| Rejected                                                                                     | Message names                                            |
-| -------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| A source or target that is neither a bin nor a category of one stratification                | The transition                                           |
-| A category transition without exactly one source and one target                              | The transition                                           |
-| A rate variable that is not a parameter, bin, compartment or special variable                | The variable and the available names                     |
-| Several sources with a proportional rate                                                     | The transition; use an absolute rate or `$compartment`   |
-| A stratified rate whose `category` conditions match no source compartment                    | The categories; use `to` to reach another stratification |
-| A flow that ends in categories no compartment has                                            | The transition; add a `to` condition                     |
-| `impulse_at` and `impulse_every` together, a negative step, or a period that is not positive | The transition                                           |
-| A non-integer impulse step in a `DifferenceEquations` model                                  | The transition and the step                              |
+| Rejected                                                                                     | Message names                                                      |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| A source or target that is neither a bin nor a category of one stratification                | The transition                                                     |
+| A category transition without exactly one source and one target                              | The transition                                                     |
+| A rate variable that is not a parameter, bin, compartment or special variable                | The variable and the available names                               |
+| Several sources with a proportional rate                                                     | The transition; use an absolute rate or `$compartment`             |
+| A stratified rate whose `category` conditions match no source compartment                    | The transition; use `to` to reach another stratification           |
+| A `to` condition on a transition without a source                                            | The transition; use `category` to choose the compartment it enters |
+| A flow that ends in categories no compartment has                                            | The transition; add a `to` condition                               |
+| `impulse_at` and `impulse_every` together, a negative step, or a period that is not positive | The transition                                                     |
+| A non-integer impulse step in a `DifferenceEquations` model                                  | The transition and the step                                        |
 
 ## Next steps
 
@@ -2056,7 +2059,7 @@ model.check_unit_consistency(verbose=True)  # Unit consistency check passed succ
 
 ## Unit checking
 
-`Model.check_unit_consistency(verbose=False)` checks that every flow has the unit `<bin unit>/<step unit>`, every [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses) the unit `<bin unit>`, and that every function receives a plain number. It checks `DifferenceEquations` and `DifferentialEquations` models alike: in both, a rate is per unit of the axis, and only what its value means differs (see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means)). It reads the flows the engine plans (`transition_flows`), so a proportional rate is checked as its flow, the rate times its source: `k2` in `1/day` from a bin in `item` gives `item/day`. A rate that reads the [neighbors of a unit](https://munqu.github.io/commol/latest/guide/building-models/#neighbors) is checked as the sums they are. It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every transition that fails.
+`Model.check_unit_consistency(verbose=False)` checks that every flow has the unit `<bin unit>/<step unit>`, every [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses) the unit `<bin unit>`, and that every function receives a plain number. It checks `DifferenceEquations` and `DifferentialEquations` models alike: in both, a rate is per unit of the axis, and only what its value means differs (see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means)). It reads the flows the engine plans (`transition_flows`), so a proportional rate is checked as its flow, the rate times its source: `k2` in `1/day` from a bin in `item` gives `item/day`. The bin unit of a flow is the unit of the bin it leaves, or of the bin it enters when it has no source; so a category transition in a model of bins in `item` and `kg` moves `item/day` in one bin and `kg/day` in the other. In such a model `total`, a subgroup total `total_<categories>`, a category and `neighbors` add amounts of different units, so they have none, and a rate that reads one fails the check; read the bins or the compartments instead. A rate that reads the [neighbors of a unit](https://munqu.github.io/commol/latest/guide/building-models/#neighbors) is checked as the sums they are. It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every transition that fails.
 
 ### What needs a unit
 
@@ -5645,9 +5648,11 @@ class AxisPattern(BaseModel):
         - ``combine(p)`` is the identity (returns ``p`` unchanged).
         - All input patterns must share the same ``conditions`` and
           ``source_compartment`` (or have none); the result preserves them.
-        - Raises ``ValueError`` if no patterns are supplied, the inputs have
-          inconsistent group bindings, or the combined formula exceeds the
-          security length cap.
+        - ``mode`` is a `CombineMode` or its value (``"sum"``, ``"max"``,
+          ``"min"``).
+        - Raises ``ValueError`` if no patterns are supplied, ``mode`` is not a
+          mode, the inputs have inconsistent group bindings, or the combined
+          formula exceeds the security length cap.
         """
         if len(patterns) == 0:
             raise ValueError("combine() requires at least one pattern")
@@ -5655,7 +5660,7 @@ class AxisPattern(BaseModel):
             return patterns[0]
 
         shared_conditions, shared_source = _require_consistent_group(patterns)
-        result = _compose_formulas([p.formula for p in patterns], mode)
+        result = _compose_formulas([p.formula for p in patterns], CombineMode(mode))
         _enforce_length_cap(result, config)
 
         return _ComputedAxisPattern(
@@ -5998,7 +6003,8 @@ Combine patterns into a single composed pattern.
 
 - `combine(p)` is the identity (returns `p` unchanged).
 - All input patterns must share the same `conditions` and `source_compartment` (or have none); the result preserves them.
-- Raises `ValueError` if no patterns are supplied, the inputs have inconsistent group bindings, or the combined formula exceeds the security length cap.
+- `mode` is a `CombineMode` or its value (`"sum"`, `"max"`, `"min"`).
+- Raises `ValueError` if no patterns are supplied, `mode` is not a mode, the inputs have inconsistent group bindings, or the combined formula exceeds the security length cap.
 
 Source code in `commol/api/patterns.py`
 
@@ -6016,9 +6022,11 @@ def combine(
     - ``combine(p)`` is the identity (returns ``p`` unchanged).
     - All input patterns must share the same ``conditions`` and
       ``source_compartment`` (or have none); the result preserves them.
-    - Raises ``ValueError`` if no patterns are supplied, the inputs have
-      inconsistent group bindings, or the combined formula exceeds the
-      security length cap.
+    - ``mode`` is a `CombineMode` or its value (``"sum"``, ``"max"``,
+      ``"min"``).
+    - Raises ``ValueError`` if no patterns are supplied, ``mode`` is not a
+      mode, the inputs have inconsistent group bindings, or the combined
+      formula exceeds the security length cap.
     """
     if len(patterns) == 0:
         raise ValueError("combine() requires at least one pattern")
@@ -6026,7 +6034,7 @@ def combine(
         return patterns[0]
 
     shared_conditions, shared_source = _require_consistent_group(patterns)
-    result = _compose_formulas([p.formula for p in patterns], mode)
+    result = _compose_formulas([p.formula for p in patterns], CombineMode(mode))
     _enforce_length_cap(result, config)
 
     return _ComputedAxisPattern(
@@ -8582,13 +8590,9 @@ class ParticleSwarmConfig(BaseModel):
             )
         if type == PSOInertiaType.CONSTANT:
             self._inertia = PSOConstantInertia(factor=kwargs.get("factor", 0.721))
-        elif type == PSOInertiaType.CHAOTIC:
+        else:
             self._inertia = PSOChaoticInertia(
                 w_min=kwargs["w_min"], w_max=kwargs["w_max"]
-            )
-        else:
-            raise ValueError(
-                f"Unknown inertia type: {type}. Use 'constant' or 'chaotic'"
             )
         return self
 
@@ -8659,16 +8663,12 @@ class ParticleSwarmConfig(BaseModel):
                 cognitive=kwargs.get("cognitive", 1.193),
                 social=kwargs.get("social", 1.193),
             )
-        elif type == PSOAccelerationType.TIME_VARYING:
+        else:
             self._acceleration = PSOTimeVaryingAcceleration(
                 c1_initial=kwargs["c1_initial"],
                 c1_final=kwargs["c1_final"],
                 c2_initial=kwargs["c2_initial"],
                 c2_final=kwargs["c2_final"],
-            )
-        else:
-            raise ValueError(
-                f"Unknown acceleration type: {type}. Use 'constant' or 'time_varying'"
             )
         return self
 
@@ -8880,13 +8880,9 @@ def inertia(self, type: str, **kwargs: float) -> Self:
         )
     if type == PSOInertiaType.CONSTANT:
         self._inertia = PSOConstantInertia(factor=kwargs.get("factor", 0.721))
-    elif type == PSOInertiaType.CHAOTIC:
+    else:
         self._inertia = PSOChaoticInertia(
             w_min=kwargs["w_min"], w_max=kwargs["w_max"]
-        )
-    else:
-        raise ValueError(
-            f"Unknown inertia type: {type}. Use 'constant' or 'chaotic'"
         )
     return self
 ```
@@ -8981,16 +8977,12 @@ def acceleration(self, type: str, **kwargs: float) -> Self:
             cognitive=kwargs.get("cognitive", 1.193),
             social=kwargs.get("social", 1.193),
         )
-    elif type == PSOAccelerationType.TIME_VARYING:
+    else:
         self._acceleration = PSOTimeVaryingAcceleration(
             c1_initial=kwargs["c1_initial"],
             c1_final=kwargs["c1_final"],
             c2_initial=kwargs["c2_initial"],
             c2_final=kwargs["c2_final"],
-        )
-    else:
-        raise ValueError(
-            f"Unknown acceleration type: {type}. Use 'constant' or 'time_varying'"
         )
     return self
 ```
@@ -10390,7 +10382,7 @@ class ModelBuilder:
         self._parameters: list[Parameter] = []
         self._series_counter: int = 0
 
-        logging.info(
+        logger.info(
             (
                 f"Initialized ModelBuilder: name='{self._name}', "
                 f"version='{self._version or 'N/A'}'"
@@ -10418,13 +10410,13 @@ class ModelBuilder:
         # Use bin-specific unit, or fall back to model-level bin_unit
         final_unit = unit if unit is not None else self._bin_unit
         self._bins.append(Bin(id=id, name=name, unit=final_unit))
-        logging.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
+        logger.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
         return self
 
     def add_accumulator(self, id: str, name: str) -> Self:
         """Add a cumulative event counter to the model outputs."""
         self._accumulators.append(Accumulator(id=id, name=name))
-        logging.info(f"Added accumulator: id='{id}', name='{name}'")
+        logger.info(f"Added accumulator: id='{id}', name='{name}'")
         return self
 
     def add_stratification(
@@ -10494,7 +10486,7 @@ class ModelBuilder:
                 conditions=condition_objects,
             )
         )
-        logging.info(f"Added stratification: id='{id}', categories={categories}")
+        logger.info(f"Added stratification: id='{id}', categories={categories}")
         return self
 
     def add_parameter(
@@ -10566,7 +10558,7 @@ class ModelBuilder:
         self._parameters.append(
             Parameter(id=id, value=param_value, description=description, unit=unit)
         )
-        logging.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
+        logger.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
         return self
 
     def _ensure_parameter_id_available(self, id: str) -> None:
@@ -10577,9 +10569,9 @@ class ModelBuilder:
         self,
         pattern: AxisPattern,
         *,
-        transition_id: str = "",
-        source_bin: str = "",
-        target_bin: str = "",
+        transition_id: str,
+        source_bin: str,
+        target_bin: str,
     ) -> AxisPattern:
         """Auto-register a series parameter for pulse-type patterns.
 
@@ -10817,7 +10809,7 @@ class ModelBuilder:
                 impulse_every=impulse_every,
             )
         )
-        logging.info(
+        logger.info(
             (
                 f"Added transition: id='{id}', source={source}, target={target}, "
                 f"rate='{rate}', stratified_rates={
@@ -10913,7 +10905,6 @@ class ModelBuilder:
         """
         # Determine if we're expanding over sources or targets
         has_multiple_sources = len(source) > 1
-        has_multiple_targets = len(target) > 1
 
         if has_multiple_sources:
             compartments = source
@@ -10922,7 +10913,7 @@ class ModelBuilder:
             compartments = target
             expand_type = "target"
 
-        logging.info(
+        logger.info(
             (
                 f"Expanding transition '{id}' with $compartment placeholder: "
                 f"{len(compartments)} {expand_type} compartments will create "
@@ -10964,17 +10955,13 @@ class ModelBuilder:
             # Generate unique ID for this expanded transition
             expanded_id = f"{id}__{compartment}"
 
-            # Create the expanded transition with appropriate source/target
+            # add_transition accepts several sources or several targets.
             if has_multiple_sources:
                 expanded_source = [compartment]
                 expanded_target = target
-            elif has_multiple_targets:
+            else:
                 expanded_source = source
                 expanded_target = [compartment]
-            else:
-                raise ValueError(
-                    "The transition must have multiple sources or targets."
-                )
 
             self._transitions.append(
                 Transition(
@@ -10993,7 +10980,7 @@ class ModelBuilder:
                 if expanded_stratified_rates
                 else ""
             )
-            logging.info(
+            logger.info(
                 (
                     f"  Created expanded transition: id='{expanded_id}', "
                     f"source=['{compartment}'], target={target}, "
@@ -11001,8 +10988,9 @@ class ModelBuilder:
                 )
             )
 
-        logging.info(
-            f"Successfully expanded transition '{id}' into {len(source)} transitions"
+        logger.info(
+            f"Successfully expanded transition '{id}' into {len(compartments)} "
+            "transitions"
         )
 
     def get_summary(self) -> dict[str, str | int | list[str] | None]:
@@ -11137,9 +11125,7 @@ class ModelBuilder:
             step_unit=self._step_unit,
         )
 
-        logging.info(
-            f"Model '{self._name}' successfully built for the {engine} engine."
-        )
+        logger.info(f"Model '{self._name}' successfully built for the {engine} engine.")
 
         return model
 ```
@@ -11210,7 +11196,7 @@ def __init__(
     self._parameters: list[Parameter] = []
     self._series_counter: int = 0
 
-    logging.info(
+    logger.info(
         (
             f"Initialized ModelBuilder: name='{self._name}', "
             f"version='{self._version or 'N/A'}'"
@@ -11264,7 +11250,7 @@ def add_bin(self, id: str, name: str, unit: str | None = None) -> Self:
     # Use bin-specific unit, or fall back to model-level bin_unit
     final_unit = unit if unit is not None else self._bin_unit
     self._bins.append(Bin(id=id, name=name, unit=final_unit))
-    logging.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
+    logger.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
     return self
 ```
 
@@ -11282,7 +11268,7 @@ Source code in `commol/api/model_builder.py`
 def add_accumulator(self, id: str, name: str) -> Self:
     """Add a cumulative event counter to the model outputs."""
     self._accumulators.append(Accumulator(id=id, name=name))
-    logging.info(f"Added accumulator: id='{id}', name='{name}'")
+    logger.info(f"Added accumulator: id='{id}', name='{name}'")
     return self
 ```
 
@@ -11385,7 +11371,7 @@ def add_stratification(
             conditions=condition_objects,
         )
     )
-    logging.info(f"Added stratification: id='{id}', categories={categories}")
+    logger.info(f"Added stratification: id='{id}', categories={categories}")
     return self
 ```
 
@@ -11491,7 +11477,7 @@ def add_parameter(
     self._parameters.append(
         Parameter(id=id, value=param_value, description=description, unit=unit)
     )
-    logging.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
+    logger.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
     return self
 ```
 
@@ -11752,7 +11738,7 @@ def add_transition(
             impulse_every=impulse_every,
         )
     )
-    logging.info(
+    logger.info(
         (
             f"Added transition: id='{id}', source={source}, target={target}, "
             f"rate='{rate}', stratified_rates={
@@ -12010,9 +11996,7 @@ def build(
         step_unit=self._step_unit,
     )
 
-    logging.info(
-        f"Model '{self._name}' successfully built for the {engine} engine."
-    )
+    logger.info(f"Model '{self._name}' successfully built for the {engine} engine.")
 
     return model
 ```
@@ -12126,8 +12110,8 @@ class Model(BaseModel, Generic[StructureT]):
         """
         Loads a model from a JSON file.
 
-        The method reads the specified JSON file, parses its content, and validates
-        it against the Model schema.
+        The method reads the specified JSON file as UTF-8, the encoding of
+        JSON, parses its content, and validates it against the Model schema.
 
         Parameters
         ----------
@@ -12146,10 +12130,7 @@ class Model(BaseModel, Generic[StructureT]):
         pydantic.ValidationError
             If the JSON content does not conform to the Model schema.
         """
-        with open(file_path, "r") as f:
-            json_data = f.read()
-
-        return cls.model_validate_json(json_data)
+        return cls.model_validate_json(Path(file_path).read_text(encoding="utf-8"))
 
     def to_json(self, file_path: str | Path, indent: int = 2) -> None:
         """
@@ -12434,7 +12415,7 @@ from_json(file_path: str | Path) -> Self
 
 Loads a model from a JSON file.
 
-The method reads the specified JSON file, parses its content, and validates it against the Model schema.
+The method reads the specified JSON file as UTF-8, the encoding of JSON, parses its content, and validates it against the Model schema.
 
 Parameters:
 
@@ -12463,8 +12444,8 @@ def from_json(cls, file_path: str | Path) -> Self:
     """
     Loads a model from a JSON file.
 
-    The method reads the specified JSON file, parses its content, and validates
-    it against the Model schema.
+    The method reads the specified JSON file as UTF-8, the encoding of
+    JSON, parses its content, and validates it against the Model schema.
 
     Parameters
     ----------
@@ -12483,10 +12464,7 @@ def from_json(cls, file_path: str | Path) -> Self:
     pydantic.ValidationError
         If the JSON content does not conform to the Model schema.
     """
-    with open(file_path, "r") as f:
-        json_data = f.read()
-
-    return cls.model_validate_json(json_data)
+    return cls.model_validate_json(Path(file_path).read_text(encoding="utf-8"))
 ```
 
 #### to_json
@@ -16021,6 +15999,42 @@ class Table(BaseModel):
     heading: str | None = None
     columns: list[str]
     rows: list[list[Cell]]
+
+    @model_validator(mode="after")
+    def check_row_lengths(self) -> Self:
+        """Each row has one cell per column."""
+        for index, row in enumerate(self.rows):
+            if len(row) != len(self.columns):
+                raise ValueError(
+                    f"Row {index} of the table has {len(row)} cells; the table "
+                    f"has {len(self.columns)} columns: {self.columns}"
+                )
+        return self
+```
+
+### Methods:
+
+#### check_row_lengths
+
+```python
+check_row_lengths() -> Self
+```
+
+Each row has one cell per column.
+
+Source code in `commol/context/description.py`
+
+```python
+@model_validator(mode="after")
+def check_row_lengths(self) -> Self:
+    """Each row has one cell per column."""
+    for index, row in enumerate(self.rows):
+        if len(row) != len(self.columns):
+            raise ValueError(
+                f"Row {index} of the table has {len(row)} cells; the table "
+                f"has {len(self.columns)} columns: {self.columns}"
+            )
+    return self
 ```
 
 ## Equations
@@ -16320,6 +16334,42 @@ class Matrix(BaseModel):
     row_labels: list[str]
     column_labels: list[str]
     values: list[list[float]]
+
+    @model_validator(mode="after")
+    def check_shape(self) -> Self:
+        """One row of values per row label, one value per column label."""
+        shape = [len(row) for row in self.values]
+        if shape != [len(self.column_labels)] * len(self.row_labels):
+            raise ValueError(
+                f"A matrix of {len(self.row_labels)} rows and "
+                f"{len(self.column_labels)} columns has rows of {shape} values"
+            )
+        return self
+```
+
+### Methods:
+
+#### check_shape
+
+```python
+check_shape() -> Self
+```
+
+One row of values per row label, one value per column label.
+
+Source code in `commol/context/description.py`
+
+```python
+@model_validator(mode="after")
+def check_shape(self) -> Self:
+    """One row of values per row label, one value per column label."""
+    shape = [len(row) for row in self.values]
+    if shape != [len(self.column_labels)] * len(self.row_labels):
+        raise ValueError(
+            f"A matrix of {len(self.row_labels)} rows and "
+            f"{len(self.column_labels)} columns has rows of {shape} values"
+        )
+    return self
 ```
 
 ## UnitConsistencyError
@@ -16515,7 +16565,7 @@ class SimulationPlotter:
             tick_every,
             x_label,
         )
-        self._finalize_series_plot(axes, bins_to_plot, output_file, config)
+        self._finalize_plot(axes, bins_to_plot, output_file, config, "Series")
 
         return fig
 
@@ -16587,7 +16637,7 @@ class SimulationPlotter:
         self._plot_all_cumulative_bins(
             axes, bins_to_plot, cumulative_observed, calibration_result, kwargs
         )
-        self._finalize_cumulative_plot(axes, bins_to_plot, output_file, config)
+        self._finalize_plot(axes, bins_to_plot, output_file, config, "Cumulative")
 
         return fig
 
@@ -16815,20 +16865,20 @@ class SimulationPlotter:
         self, config: PlotConfig, bins_to_plot: list[str]
     ) -> tuple["Figure", list["Axes"]]:
         """
-        Create figure and axes array for series plotting.
+        A figure of the layout, sized by its subplots, and its axes in order.
         """
-        layout = config.layout or self._calculate_layout(len(bins_to_plot))
-        rows, cols = layout
-        figsize = (cols * 4.5, rows * 3.5 + 1.0)
-        fig, axes = plt.subplots(rows, cols, figsize=figsize, dpi=config.dpi)
+        rows, cols = config.layout or self._calculate_layout(len(bins_to_plot))
+        return self._create_figure(
+            rows, cols, (cols * 4.5, rows * 3.5 + 1.0), config.dpi
+        )
 
-        # Ensure axes is always a flat array
-        if layout[0] == 1 and layout[1] == 1:
-            axes = [axes]
-        else:
-            axes = axes.flatten() if hasattr(axes, "flatten") else [axes]
-
-        return fig, axes
+    @staticmethod
+    def _create_figure(
+        rows: int, cols: int, figsize: tuple[float, float], dpi: int
+    ) -> tuple["Figure", list["Axes"]]:
+        """A figure of `rows` by `cols` subplots, and its axes row by row."""
+        fig, axes = plt.subplots(rows, cols, figsize=figsize, dpi=dpi, squeeze=False)
+        return fig, list(axes.flat)
 
     def _plot_all_series_bins(
         self,
@@ -16846,12 +16896,7 @@ class SimulationPlotter:
         """
         Plot series data for all bins across subplots.
         """
-        for idx, bin_id in enumerate(bins_to_plot):
-            if idx >= len(axes):
-                break
-
-            ax = axes[idx]
-
+        for ax, bin_id in zip(axes, bins_to_plot, strict=False):
             if isinstance(calibration_result, Predictive):
                 self._plot_bin_series_predictive(
                     ax,
@@ -16877,43 +16922,33 @@ class SimulationPlotter:
                     x_label,
                 )
 
-    def _finalize_series_plot(
-        self,
+    @staticmethod
+    def _finalize_plot(
         axes: list["Axes"],
         bins_to_plot: list[str],
         output_file: str | None,
         config: PlotConfig,
+        name: str,
     ) -> None:
         """
-        Finalize series plot by hiding unused subplots and saving.
+        Hide the subplots no series fills, and save the figure to
+        `output_file` when there is one.
         """
-        for idx in range(len(bins_to_plot), len(axes)):
-            axes[idx].set_visible(False)
+        for ax in axes[len(bins_to_plot) :]:
+            ax.set_visible(False)
 
         plt.tight_layout()
 
         if output_file:
             plt.savefig(output_file, dpi=config.dpi, bbox_inches="tight")
-            logger.info(f"Series plot saved to {output_file}")
+            logger.info(f"{name} plot saved to {output_file}")
 
     def _create_cumulative_figure(
         self, config: PlotConfig, bins_to_plot: list[str]
     ) -> tuple["Figure", list["Axes"]]:
-        """
-        Create figure and axes array for cumulative plotting.
-        """
-        layout = config.layout or self._calculate_layout(len(bins_to_plot))
-        fig, axes = plt.subplots(
-            layout[0], layout[1], figsize=config.figsize, dpi=config.dpi
-        )
-
-        # Ensure axes is always a flat array
-        if layout[0] == 1 and layout[1] == 1:
-            axes = [axes]
-        else:
-            axes = axes.flatten() if hasattr(axes, "flatten") else [axes]
-
-        return fig, axes
+        """A figure of the layout, of the size of the configuration."""
+        rows, cols = config.layout or self._calculate_layout(len(bins_to_plot))
+        return self._create_figure(rows, cols, config.figsize, config.dpi)
 
     def _plot_all_cumulative_bins(
         self,
@@ -16926,12 +16961,9 @@ class SimulationPlotter:
         """
         Plot cumulative data for all bins across subplots.
         """
-        for idx, bin_id in enumerate(bins_to_plot):
-            if idx >= len(axes):
-                break
-
-            ax = axes[idx]
-
+        if not isinstance(calibration_result, Predictive):
+            cumulative_results = self._calculate_cumulative(bins_to_plot)
+        for ax, bin_id in zip(axes, bins_to_plot, strict=False):
             if isinstance(calibration_result, Predictive):
                 self._plot_bin_cumulative_predictive(
                     ax,
@@ -16941,7 +16973,6 @@ class SimulationPlotter:
                     dict(kwargs),
                 )
             else:
-                cumulative_results = self._calculate_cumulative(bins_to_plot)
                 self._plot_bin_cumulative(
                     ax,
                     bin_id,
@@ -16949,25 +16980,6 @@ class SimulationPlotter:
                     cumulative_observed.get(bin_id, []),
                     dict(kwargs),
                 )
-
-    def _finalize_cumulative_plot(
-        self,
-        axes: list["Axes"],
-        bins_to_plot: list[str],
-        output_file: str | None,
-        config: PlotConfig,
-    ) -> None:
-        """
-        Finalize cumulative plot by hiding unused subplots and saving.
-        """
-        for idx in range(len(bins_to_plot), len(axes)):
-            axes[idx].set_visible(False)
-
-        plt.tight_layout()
-
-        if output_file:
-            plt.savefig(output_file, dpi=config.dpi, bbox_inches="tight")
-            logger.info(f"Cumulative plot saved to {output_file}")
 
     def _plot_bin_series(
         self,
@@ -17211,31 +17223,7 @@ class SimulationPlotter:
             label=f"{self.confidence_level:.0%} of the draws",
         )
 
-        # Overlay cumulative observed data if available
-        if cumulative_observed:
-            obs_positions = [at for at, _ in cumulative_observed]
-            obs_values = [value for _, value in cumulative_observed]
-            sns.scatterplot(
-                x=obs_positions,
-                y=obs_values,
-                ax=ax,
-                label="Observed (Cumulative)",
-                color="red",
-                s=30,
-                alpha=0.7,
-                zorder=5,
-            )
-
-        model = self.simulation.model_definition
-        label = model.structure.series_label(model, bin_id)
-        unit_str = label.unit or ""
-        bin_name = label.name
-
-        ax.set_xlabel("Step")
-        ax.set_ylabel(f"{unit_str}")
-        ax.set_title(f"{bin_name}")
-        ax.legend()
-        ax.grid(True, alpha=0.3)
+        self._finish_cumulative_axes(ax, bin_id, cumulative_observed)
 
     def _calculate_cumulative(self, bins_to_plot: list[str]) -> dict[str, list[float]]:
         """
@@ -17310,13 +17298,19 @@ class SimulationPlotter:
         # Plot cumulative simulation results
         sns.lineplot(**params)
 
-        # Overlay cumulative observed data if available
+        self._finish_cumulative_axes(ax, bin_id, cumulative_observed)
+
+    def _finish_cumulative_axes(
+        self,
+        ax: "Axes",
+        bin_id: str,
+        cumulative_observed: list[tuple[int | float, float]],
+    ) -> None:
+        """Overlay the running total of the observations, and label the axes."""
         if cumulative_observed:
-            obs_positions = [at for at, _ in cumulative_observed]
-            obs_values = [value for _, value in cumulative_observed]
             sns.scatterplot(
-                x=obs_positions,
-                y=obs_values,
+                x=[at for at, _ in cumulative_observed],
+                y=[value for _, value in cumulative_observed],
                 ax=ax,
                 label="Observed (Cumulative)",
                 color="red",
@@ -17327,12 +17321,9 @@ class SimulationPlotter:
 
         model = self.simulation.model_definition
         label = model.structure.series_label(model, bin_id)
-        unit_str = label.unit or ""
-        bin_name = label.name
-
         ax.set_xlabel("Step")
-        ax.set_ylabel(f"{unit_str}")
-        ax.set_title(f"{bin_name}")
+        ax.set_ylabel(label.unit or "")
+        ax.set_title(label.name)
         ax.legend()
         ax.grid(True, alpha=0.3)
 ```
@@ -17533,7 +17524,7 @@ def plot_series(
         tick_every,
         x_label,
     )
-    self._finalize_series_plot(axes, bins_to_plot, output_file, config)
+    self._finalize_plot(axes, bins_to_plot, output_file, config, "Series")
 
     return fig
 ```
@@ -17642,7 +17633,7 @@ def plot_cumulative(
     self._plot_all_cumulative_bins(
         axes, bins_to_plot, cumulative_observed, calibration_result, kwargs
     )
-    self._finalize_cumulative_plot(axes, bins_to_plot, output_file, config)
+    self._finalize_plot(axes, bins_to_plot, output_file, config, "Cumulative")
 
     return fig
 ```
@@ -18299,7 +18290,7 @@ class Simulation:
                 f"{type(model.structure).__name__}, not a ModelStructure. A model "
                 "holds the structure of its kind, such as an Aggregate."
             )
-        logging.info(f"Initializing Simulation with model: '{model.name}'")
+        logger.info(f"Initializing Simulation with model: '{model.name}'")
         self.model_definition: Model = model
         self._build_engine(model.model_dump_json())
 
@@ -18308,7 +18299,7 @@ class Simulation:
         self._model_json: str = model_json
         self._engine: "EngineProtocol" = build_engine(model_json)
         self._simulation_outputs: list[str] = self._engine.output_names
-        logging.info(
+        logger.info(
             f"Simulation engine ready. Outputs: {len(self._simulation_outputs)}"
         )
 
@@ -18316,7 +18307,7 @@ class Simulation:
         """Rebuild the engine when the model changed since it was built."""
         model_json = self.model_definition.model_dump_json()
         if model_json != self._model_json:
-            logging.info("Model changed since the engine was built; rebuilding it.")
+            logger.info("Model changed since the engine was built; rebuilding it.")
             self._build_engine(model_json)
 
     def _validate_all_parameters_calibrated(self, model: Model) -> None:
@@ -18408,10 +18399,10 @@ class Simulation:
         self._sync_engine()
         used_seed = self._seed_run(seed)
         self._engine.reset()
-        logging.info(f"Running simulation for {num_steps} steps.")
+        logger.info(f"Running simulation for {num_steps} steps.")
         start = time.time()
         positions, rows = self._engine.run(num_steps)
-        logging.info(f"Simulation complete. It took {time.time() - start} seconds.")
+        logger.info(f"Simulation complete. It took {time.time() - start} seconds.")
         return SimulationResults.from_rows(
             positions, self._simulation_outputs, rows, seed=used_seed
         )
@@ -18725,7 +18716,7 @@ def __init__(self, model: Model):
             f"{type(model.structure).__name__}, not a ModelStructure. A model "
             "holds the structure of its kind, such as an Aggregate."
         )
-    logging.info(f"Initializing Simulation with model: '{model.name}'")
+    logger.info(f"Initializing Simulation with model: '{model.name}'")
     self.model_definition: Model = model
     self._build_engine(model.model_dump_json())
 ```
@@ -18801,10 +18792,10 @@ def run(self, num_steps: int, *, seed: int | None = None) -> SimulationResults:
     self._sync_engine()
     used_seed = self._seed_run(seed)
     self._engine.reset()
-    logging.info(f"Running simulation for {num_steps} steps.")
+    logger.info(f"Running simulation for {num_steps} steps.")
     start = time.time()
     positions, rows = self._engine.run(num_steps)
-    logging.info(f"Simulation complete. It took {time.time() - start} seconds.")
+    logger.info(f"Simulation complete. It took {time.time() - start} seconds.")
     return SimulationResults.from_rows(
         positions, self._simulation_outputs, rows, seed=used_seed
     )
@@ -20628,7 +20619,8 @@ def window_ends(window: float, end: float) -> list[float]:
         If `window` is not positive.
     """
     _check_window(window)
-    count = math.floor(_windows_in(end, window)) if end > 0 else 0
+    # A non-positive end has no window: range() of a count below 1 is empty.
+    count = math.floor(_windows_in(end, window))
     return [window_end(index, window) for index in range(count)]
 ```
 
@@ -21006,6 +20998,11 @@ class ParameterSample(BaseModel):
         -------
         dict[str, list[float]]
             One quantile per level for each name.
+
+        Raises
+        ------
+        ValueError
+            If a level is not between 0 and 1.
         """
         rows = self._rust.quantiles([float(level) for level in levels])
         return {
@@ -21428,6 +21425,12 @@ Returns:
 | ------------------------ | ------------------------------------- |
 | `dict[str, list[float]]` | One quantile per level for each name. |
 
+Raises:
+
+| Type         | Description                        |
+| ------------ | ---------------------------------- |
+| `ValueError` | If a level is not between 0 and 1. |
+
 Source code in `commol/context/inference/sample.py`
 
 ```python
@@ -21448,6 +21451,11 @@ def quantiles(self, levels: list[float]) -> dict[str, list[float]]:
     -------
     dict[str, list[float]]
         One quantile per level for each name.
+
+    Raises
+    ------
+    ValueError
+        If a level is not between 0 and 1.
     """
     rows = self._rust.quantiles([float(level) for level in levels])
     return {
@@ -23558,9 +23566,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                     |
-| ------------ | ----------------------------------------------- |
-| `ValueError` | If the lengths differ or no weight is positive. |
+| Type         | Description                                                               |
+| ------------ | ------------------------------------------------------------------------- |
+| `ValueError` | If the lengths differ, no weight is positive or a level is not in [0, 1]. |
 
 Source code in `commol/api/inference/intervals.py`
 
@@ -23596,7 +23604,8 @@ def weighted_quantiles(
     Raises
     ------
     ValueError
-        If the lengths differ or no weight is positive.
+        If the lengths differ, no weight is positive or a level is not in
+        ``[0, 1]``.
     """
     values = [float(value) for value in values]
     if weights is None:
@@ -26015,9 +26024,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - A parameter value could land on another parameter when results were read by name from an unordered mapping.
 - A failed run of a multi-start optimization was written to the standard error and dropped; it is now part of the result.
 - An error of the model at a vertex of the initial Nelder-Mead simplex made the optimizer panic; it now stops the calibration with its message (the argmin fork returns the error).
+- A `to` condition on a transition without a source was ignored by its flow but applied by its accumulators; `build` now rejects it, and a `category` condition chooses the compartment the flow enters.
+- `Model.from_json` read a file in the encoding of the system; it now reads UTF-8, the encoding of JSON.
+- `Model.check_unit_consistency` checked every flow of a category transition in the unit of the first bin of the model; each flow is now checked in the unit of its own bin. In a model of bins of different units, a rate that reads `total`, a subgroup total, a category or `neighbors` fails the check: these add amounts of different units.
+- The LaTeX description wrote a part of a rate in parentheses, such as `(I / N)` or the argument of `sin(t / T)`, as upright text, and wrote a unit inside the name of another variable (`A_{g1(\text{item})}`); only units are text now, each after its variable. The expanded form merges `k * p` and `k * (1 - p)` also when a third term shares another factor, and a merged term keeps the place of its first term.
+- `ModelBuilder` and `Simulation` logged to the root logger of the application; they log to the `commol` logger, as the rest of the library does, so `add_stderr_logger` shows their messages.
+- `AxisPattern.combine(mode="max")` raised "Unknown combine mode": a mode may be given by its value.
+- A quantile level outside `[0, 1]`, or NaN, gave the smallest or the largest value; `ParameterSample.quantiles` and `weighted_quantiles` now raise `ValueError`.
 
 ### Removed
 
+- `commol.api.model_loader.ModelLoader`: a copy of `Model.from_json` that no page documented and nothing called.
 - **Breaking:** the ensemble calibration: `Calibrator.run_probabilistic`, `ProbabilisticCalibrator`, `CalibrationProblem.probabilistic_config`, `ProbabilisticCalibrationConfig`, `ProbabilisticCalibrationResult`, `EnsembleSolution`, `EnsembleSelectionSummary`, `ParameterSetStatistics` and their settings classes. Its intervals had no statistical meaning: its members were points the optimizer visited, and the selection maximized the coverage of the data it was fitted to. The closest replacement with no noise model is `Calibrator.uncertainty(BayesianBootstrap(replicates=..., block_length=...))`: the same parallel fits, each on randomly weighted data, with a stated meaning.
 - The dependency on `scikit-learn`.
 
