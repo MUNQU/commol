@@ -22,8 +22,9 @@ input reaches is removed, not tested.
 The bindings have no Rust tests: `pytest` runs them. So the script builds the
 Rust tests and the extension with the instrumentation of `cargo llvm-cov`,
 runs both, and writes one report. It builds in the debug profile, so
-`debug_assert!` runs and each line keeps its own count, and it puts the
-release extension back when it ends. It needs `cargo-llvm-cov`
+`debug_assert!` runs and each line keeps its own count; the time budget
+(`test_slow_tests_are_listed`) stays out, as the job Test of Build times the
+release extension. It puts the release extension back when it ends. It needs `cargo-llvm-cov`
 (`cargo install --locked cargo-llvm-cov`) and the component
 `llvm-tools-preview` (`rustup component add llvm-tools-preview`). Options
 after the script go to `cargo llvm-cov report`, such as `--summary-only` or
