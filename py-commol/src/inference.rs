@@ -581,7 +581,7 @@ fn value_error(message: String) -> PyErr {
     PyErr::new::<pyo3::exceptions::PyValueError, _>(message)
 }
 
-fn predictive_error(error: PredictiveError) -> PyErr {
+pub(crate) fn predictive_error(error: PredictiveError) -> PyErr {
     match error {
         PredictiveError::Mismatch(message) => value_error(message),
         PredictiveError::Draw { draw, error } => prediction_error(draw, error),
@@ -853,5 +853,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(by_series, m)?)?;
     m.add_function(wrap_pyfunction!(weighted_mean, m)?)?;
     crate::identifiability::register(m)?;
+    crate::conformal::register(m)?;
     Ok(())
 }

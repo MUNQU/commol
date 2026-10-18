@@ -13,6 +13,7 @@
 //! | [`identifiability`] | Structural rank, collinearity, and the identifiability of a sample and of starts |
 //! | [`sensitivity`] | The port of derivatives, [`sensitivity::SensitivitySource`], and finite differences |
 //! | [`resampling`] | Bootstraps and the jackknife: fits to reweighted or resampled data, and residual noise |
+//! | [`conformal`] | Conformal prediction intervals: split, rolling, jackknife+, EnbPI and adaptive |
 //!
 //! Rules: this crate depends on `commol-calibration`, never the reverse; a
 //! method touches an engine only through the problem's
@@ -22,6 +23,7 @@
 
 #![warn(missing_docs)]
 
+pub mod conformal;
 pub mod identifiability;
 pub mod predictive;
 pub mod resampling;

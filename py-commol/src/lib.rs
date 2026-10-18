@@ -35,6 +35,7 @@ use pyo3::prelude::*;
 
 // Module declarations
 mod calibration;
+mod conformal;
 mod core;
 mod engine;
 mod identifiability;
