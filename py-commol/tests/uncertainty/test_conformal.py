@@ -5,7 +5,9 @@ The model is linear in its one parameter (``flow_calibrator``): each
 observation of B is ``c·t``, or ``c`` with a window of one step.
 """
 
+import logging
 import math
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -24,6 +26,7 @@ from commol import (
     Simulation,
     SplitConformal,
 )
+from commol.api.inference import conformal as conformal_runners
 from tests.support import (
     a_to_b_builder,
     bounded,
@@ -160,6 +163,19 @@ class TestScores:
         assert 'by="all"' in message and 'score="absolute"' in message
         assert variant(**settings, score="normalized", by="all").by == "all"
 
+    @pytest.mark.parametrize("variant", [SplitConformal, AdaptiveConformal])
+    def test_the_spread_score_needs_a_sample(self, variant: type) -> None:
+        settings = _variant_settings()[variant]
+
+        with pytest.raises(ValueError, match="give a sample"):
+            variant(**settings, score="spread", by="series")
+
+    def test_rolling_origins_have_no_spread(self) -> None:
+        settings = _variant_settings()[RollingConformal]
+
+        with pytest.raises(ValueError, match='once per origin.*"absolute"'):
+            RollingConformal(**settings, score="spread", by="series")
+
     def test_a_series_with_few_points_gets_an_unbounded_interval(self) -> None:
         calibrator = flow_calibrator(_amounts(range(1, 21), 1), windowed=False)
         # At level 0.9 a series needs 1/0.1 − 1 = 9 held-out points.
@@ -229,6 +245,41 @@ class TestRollingConformal:
             (hi - lo) / 2 for lo, hi in zip(series.lower, series.upper, strict=True)
         ]
         assert half_widths == pytest.approx([1.0, 2.0, 3.0])
+
+    def test_a_failed_refit_is_logged(
+        self, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calibrator = flow_calibrator(_amounts(range(1, 21), 3), windowed=False)
+        run = SimpleNamespace(
+            labels=["B"],
+            positions=[21.0],
+            prediction=[210.0],
+            lower=[209.0],
+            upper=[211.0],
+            scores=[("B", 1.0)],
+            failed=[(0, "Simulation failed: x")],
+        )
+        monkeypatch.setattr(
+            conformal_runners,
+            "commol_rs",
+            SimpleNamespace(
+                inference=SimpleNamespace(rolling_conformal=lambda *_: run)
+            ),
+        )
+
+        with caplog.at_level(logging.WARNING, logger="commol.api.inference"):
+            result = calibrator.uncertainty(
+                RollingConformal(
+                    origins=[10.0],
+                    score="absolute",
+                    by="series",
+                    level=0.5,
+                    positions=[21.0],
+                )
+            )
+
+        assert "Refit 0 failed: Simulation failed: x" in caplog.text
+        assert result.scores == {"B": [1.0]}
 
 
 class TestEnbPI:
