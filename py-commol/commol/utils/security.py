@@ -6,6 +6,20 @@ import re
 import string
 import unicodedata
 
+# An identifier starts where no letter, digit or underscore precedes it, so the
+# exponent of ``1e5`` belongs to the number and ``e1`` is a name.
+_IDENTIFIER_REGEX: re.Pattern[str] = re.compile(
+    r"(?<![A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*"
+)
+
+
+def _without_identifier_digits(expression: str) -> str:
+    """`expression` with the digits of each identifier removed, so that the
+    numeric checks read only numbers: ``c1star * 1e5`` becomes ``cstar * 1e5``."""
+    return _IDENTIFIER_REGEX.sub(
+        lambda match: re.sub(r"\d", "", match.group()), expression
+    )
+
 
 @dataclass
 class SecurityConfig:
@@ -600,6 +614,7 @@ class ExpressionSecurityValidator:
 
     def _check_malformed_numbers(self, expression: str) -> None:
         """Check for malformed numeric values."""
+        expression = _without_identifier_digits(expression)
         # First check if this contains valid hex/binary/octal numbers - if so,
         # skip the check
         has_valid_special_format = re.search(r"0[xXbBoO][0-9a-fA-F]+", expression)
@@ -624,12 +639,6 @@ class ExpressionSecurityValidator:
         if re.search(r"\d+e(?![+-]?\d)", expression, re.IGNORECASE):
             raise SecurityError(
                 "Invalid numeric format: incomplete scientific notation"
-            )
-
-        # Pattern for scientific notation starting with 'e' (e.g., e10)
-        if re.search(r"(?<!\w)e\d+", expression, re.IGNORECASE):
-            raise SecurityError(
-                "Invalid numeric format: scientific notation without base"
             )
 
         # Pattern for multiple 'e' in scientific notation (e.g., 1e1e1)
@@ -722,6 +731,7 @@ class ExpressionSecurityValidator:
 
     def _check_mathematical_injection(self, expression: str) -> None:
         """Check for attempts to inject code through mathematical constructs."""
+        expression = _without_identifier_digits(expression)
         # Look for suspicious mathematical patterns that could be code
         suspicious_math_patterns = [
             r"\d+\s*[eE]\s*[a-zA-Z]",  # Numbers followed by 'e' and letters
@@ -792,17 +802,13 @@ def get_expression_variables(expression: str) -> list[str]:
     list[str]
         A list of unique variable names found in the expression.
     """
-    # Regex to find identifiers (variables)
-    identifier_regex = r"[a-zA-Z_][a-zA-Z0-9_]*"
-
-    # Find all potential identifiers
-    all_identifiers: list[str] = re.findall(identifier_regex, expression)
+    all_identifiers: list[str] = _IDENTIFIER_REGEX.findall(expression)
 
     # Filter out known safe functions and constants
     safe_tokens = ExpressionSecurityValidator.SAFE_FUNCTIONS | {"pi", "e"}
     variables: list[str] = []
     for var in all_identifiers:
-        if var.lower() not in safe_tokens and not var.isdigit():
+        if var.lower() not in safe_tokens:
             variables.append(var)
 
     return list(set(variables))

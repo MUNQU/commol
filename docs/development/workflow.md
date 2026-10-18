@@ -150,6 +150,26 @@ gh project item-edit --project-id PVT_kwDODcfAw84BnXyo --id "$item" \
 5. Open the pull request with `Closes #N` and the evidence. The merge closes
    the issue.
 
+### Milestones
+
+Every issue that ships in a release has the milestone of that release, so the
+release checklist asks for it:
+
+- **A new bug** gets, when it is opened, the milestone of the nearest release
+  it fits: the next one, unless its fix is breaking and that release must not
+  break. A bug with no milestone is in no checklist, and `next.sh` lists it
+  after every issue that has one. To find the bugs that break this rule:
+
+  ```bash
+  gh issue list --state open --label change --search "no:milestone"
+  ```
+
+- **At the close of a release**, every issue still open in its milestone moves
+  to another milestone, with a comment that says why it did not ship. The
+  milestone closes with no open issue.
+
+An experiment, such as a benchmark, is not a bug and may have no milestone.
+
 ### Parallel work
 
 Two proposals can run at the same time when no chain of "blocked by" links

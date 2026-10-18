@@ -63,8 +63,10 @@ milestone of the release lists the issues it ships.
 
 ### Step 1: Choose the Version
 
-When every issue of the milestone is closed, list the changes since the last
-release:
+An issue of the milestone that will not ship in this release moves to another
+milestone, with a comment that says why
+([Milestones](workflow.md#milestones)). When every issue left in the milestone
+is closed, list the changes since the last release:
 
 ```bash
 git fetch --tags origin
@@ -223,7 +225,7 @@ publisher on PyPI first, or the upload fails.
 
 The release issue repeats this list.
 
-- [ ] Every issue of the milestone closed
+- [ ] Every issue of the milestone closed, or moved to another milestone with a comment that says why
 - [ ] Version chosen
 - [ ] Changelog dated on `main`, with its opening paragraph
 - [ ] Annotated tag `vX.Y.Z` created on `main` and pushed
