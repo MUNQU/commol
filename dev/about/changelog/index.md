@@ -54,6 +54,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - A quantile level outside `[0, 1]`, or NaN, gave the smallest or the largest value; `ParameterSample.quantiles` and `weighted_quantiles` now raise `ValueError`.
 - `AxisPattern.from_formula` and `AxisPattern.combine` with a `config` that allows formulas longer than the default rejected them anyway; the configuration now applies.
 - A rate of `StochasticSteps` that is not a number raised `InfeasibleStateError` and said that a rate cannot be negative; it now raises `RuntimeError`, as `StochasticEvents` does, and says that the rate is not a number.
+- A rate that read an id with digits, such as `e1`, `E2` or `c1star`, was rejected as a malformed number; and the exponent of a number such as `1e1` was read as the undefined variable `e1`. An identifier now starts only after a character that is not a letter, a digit or `_`, so the digits of an id belong to its name and an exponent belongs to its number.
 
 ### Removed
 

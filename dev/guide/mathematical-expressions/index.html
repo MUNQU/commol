@@ -3083,6 +3083,9 @@ accept <code>&amp;&amp;</code> or <code>||</code>; nest <code>if</code> calls in
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">outside</span> <span class="o">=</span> <span class="s2">&quot;if(step &lt; 10, 0.05, if(step &gt; 20, 0.05, 0))&quot;</span>    <span class="c1"># 0.05 outside that window</span>
 </span></code></pre></div>
 <h2 id="variables">Variables<a class="headerlink" href="#variables" title="Permanent link">&para;</a></h2>
+<p>An id starts with a letter or <code>_</code> and can hold digits after it, such as <code>e1</code>
+or <code>c1star</code>. A number such as <code>1e5</code> or <code>2.5E-3</code> is a number: its exponent is
+never a variable.</p>
 <table>
 <thead>
 <tr>

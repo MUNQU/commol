@@ -61,6 +61,8 @@ outside = "if(step < 10, 0.05, if(step > 20, 0.05, 0))"    # 0.05 outside that w
 
 ## Variables
 
+An id starts with a letter or `_` and can hold digits after it, such as `e1` or `c1star`. A number such as `1e5` or `2.5E-3` is a number: its exponent is never a variable.
+
 | Variable                           | Value                                                                                                                                                                                                                                                                              |
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A parameter id                     | The parameter's value at this step                                                                                                                                                                                                                                                 |
