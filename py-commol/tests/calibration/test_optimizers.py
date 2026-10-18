@@ -227,6 +227,15 @@ class TestParticleSwarmSettings:
         assert capfd.readouterr().out != ""
 
 
+class TestVerbose:
+    def test_a_verbose_nelder_mead_prints_its_header(self, capfd) -> None:
+        _calibrate(_k_problem(NelderMeadConfig(max_iterations=3, verbose=True)))
+
+        assert (
+            "=== Nelder-Mead Optimization (Verbose Mode) ===" in capfd.readouterr().out
+        )
+
+
 class TestNelderMeadInsideBounds:
     def test_the_optimum_is_found_from_the_midpoint(self) -> None:
         result = _calibrate(_k_problem(NelderMeadConfig(max_iterations=2000)))

@@ -63,3 +63,23 @@ class TestCalibration:
 
         assert first.best_parameters == second.best_parameters
         assert first.final_loss == second.final_loss
+
+
+@pytest.mark.parametrize("verbose", [False, True])
+def test_a_start_whose_run_fails_is_named_in_the_error(verbose: bool) -> None:
+    builder = a_to_b_builder(parameters={"k": None}, rate="k * sqrt(0.5 - k)")
+    problem = CalibrationProblem(
+        observed_data=[ObservedDataPoint(at=1, output="A", value=900.0)],
+        parameters=[bounded("k", 0.6, 0.9)],
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=3, verbose=verbose),
+        replicates=2,
+        replicate_summary="mean",
+        seed=1,
+    )
+    calibrator = Calibrator(
+        Simulation(build_stochastic(builder, "StochasticEvents")), problem
+    )
+
+    with pytest.raises(RuntimeError, match="Start 0 failed: .*is not a number"):
+        calibrator.run()

@@ -105,6 +105,21 @@ class TestStructuralRank:
         assert report.verdicts["k2"].structural.verdict == "identifiable"
         assert report.structural[0].generic_rank == 2
 
+    def test_a_parameter_no_observation_reads_is_non_identifiable(
+        self, truth: dict[str, list[float]]
+    ) -> None:
+        calibrator = _calibrator(
+            observed(truth, "B", range(5, 51, 5)), {"k1": (0.1, 0.6), "s": (0.5, 2.0)}
+        )
+
+        report = calibrator.identifiability(
+            StructuralRank(points=3, design="observations")
+        )
+
+        structural = report.verdicts["s"].structural
+        assert structural is not None
+        assert structural.verdict == "non_identifiable"
+
     def test_sir_observed_in_every_compartment_is_identifiable(
         self, truth: dict[str, list[float]]
     ) -> None:
