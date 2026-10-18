@@ -111,13 +111,7 @@ pub(crate) fn target_categories(
             .map(|to_cat| to_cat.to_string())
             .or_else(|| source.get(&strat.id).cloned());
 
-        let applies = match &strat.conditions {
-            None => true,
-            Some(conds) => conds.iter().all(|c| match &c.category {
-                Some(cat) => target_applied.get(&c.stratification) == Some(cat),
-                None => true,
-            }),
-        };
+        let applies = stratification_conditions_met(&strat.conditions, &target_applied);
 
         if applies && let Some(cat) = effective_cat {
             target_applied.insert(strat.id.clone(), cat.clone());
@@ -126,6 +120,21 @@ pub(crate) fn target_categories(
     }
 
     categories
+}
+
+/// Check whether a stratification's conditions are all satisfied by the
+/// already-applied categories of the current compartment being built.
+pub(crate) fn stratification_conditions_met(
+    conditions: &Option<Vec<commol_core::StratificationCondition>>,
+    applied: &HashMap<String, String>,
+) -> bool {
+    match conditions {
+        None => true,
+        Some(conds) => conds.iter().all(|c| match &c.category {
+            Some(cat) => applied.get(&c.stratification) == Some(cat),
+            None => true,
+        }),
+    }
 }
 
 /// `to` overrides of a set of conditions, keyed by stratification id.

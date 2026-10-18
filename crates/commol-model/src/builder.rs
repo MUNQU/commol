@@ -1,6 +1,7 @@
 //! Expansion of a model and its compilation into a [`CompiledModel`].
 
 use crate::flows::{PlannedFlow, plan_transition_flows};
+use crate::helpers::stratification_conditions_met;
 use crate::labels::OutputLabels;
 use crate::layout::CompartmentLayout;
 use crate::types::{
@@ -415,21 +416,6 @@ fn impulse_schedules(process: &Process) -> Result<HashMap<String, ImpulseSchedul
         schedules.insert(transition.id.clone(), schedule);
     }
     Ok(schedules)
-}
-
-/// Check whether a stratification's conditions are all satisfied by the
-/// already-applied categories of the current compartment being built.
-fn stratification_conditions_met(
-    conditions: &Option<Vec<commol_core::StratificationCondition>>,
-    applied: &HashMap<String, String>,
-) -> bool {
-    match conditions {
-        None => true,
-        Some(conds) => conds.iter().all(|c| match &c.category {
-            Some(cat) => applied.get(&c.stratification) == Some(cat),
-            None => true,
-        }),
-    }
 }
 
 /// A bin or accumulator expanded over the stratifications.
@@ -1213,9 +1199,8 @@ fn collect_used_context_variables<'a>(
 /// Resolve the input variables of a JIT-compiled rate expression to direct
 /// storage slots (compartment index, parameter name, or step alias) so the
 /// per-step inner loop can fill the JIT input buffer without HashMap probes
-/// for compartments. Returns `None` for non-JIT rates (constants, single
-/// parameter references, or evalexpr fallbacks) — those have a fast path
-/// of their own.
+/// for compartments. Returns `None` for constants and single parameter
+/// references, which have a fast path of their own.
 fn resolve_jit_slots(
     rate_expression: &RateMathExpression,
     compartment_map: &HashMap<String, usize>,

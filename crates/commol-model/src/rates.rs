@@ -106,29 +106,25 @@ fn eval_fast_rate(
     ctx: &MathExpressionContext,
     clock: Clock,
 ) -> Result<f64, String> {
-    match expr {
-        FastRateExpression::Constant(value) => return Ok(*value),
-        FastRateExpression::Slot(slot) => {
-            return resolve_slot(slot, amounts, ctx, clock);
-        }
+    Ok(match expr {
+        FastRateExpression::Constant(value) => *value,
+        FastRateExpression::Slot(slot) => resolve_slot(slot, amounts, ctx, clock)?,
         FastRateExpression::Mul2(a, b) => {
-            return Ok(
-                resolve_slot(a, amounts, ctx, clock)? * resolve_slot(b, amounts, ctx, clock)?
-            );
+            resolve_slot(a, amounts, ctx, clock)? * resolve_slot(b, amounts, ctx, clock)?
         }
         FastRateExpression::Mul3(a, b, c) => {
-            return Ok(resolve_slot(a, amounts, ctx, clock)?
+            resolve_slot(a, amounts, ctx, clock)?
                 * resolve_slot(b, amounts, ctx, clock)?
-                * resolve_slot(c, amounts, ctx, clock)?);
+                * resolve_slot(c, amounts, ctx, clock)?
         }
         FastRateExpression::OneMinusMul3 {
             subtract,
             factor,
             value,
         } => {
-            return Ok((1.0 - resolve_slot(subtract, amounts, ctx, clock)?)
+            (1.0 - resolve_slot(subtract, amounts, ctx, clock)?)
                 * resolve_slot(factor, amounts, ctx, clock)?
-                * resolve_slot(value, amounts, ctx, clock)?);
+                * resolve_slot(value, amounts, ctx, clock)?
         }
         FastRateExpression::MulAddDiv {
             first,
@@ -137,18 +133,24 @@ fn eval_fast_rate(
             add_right,
             denominator,
         } => {
-            return Ok(resolve_slot(first, amounts, ctx, clock)?
+            resolve_slot(first, amounts, ctx, clock)?
                 * resolve_slot(second, amounts, ctx, clock)?
                 * (resolve_slot(add_left, amounts, ctx, clock)?
                     + resolve_slot(add_right, amounts, ctx, clock)?)
-                / resolve_slot(denominator, amounts, ctx, clock)?);
+                / resolve_slot(denominator, amounts, ctx, clock)?
         }
-        FastRateExpression::Program(_) => {}
-    }
+        FastRateExpression::Program(ops) => eval_program(ops, amounts, ctx, clock)?,
+    })
+}
 
-    let FastRateExpression::Program(ops) = expr else {
-        unreachable!("specialized fast rate variants return above");
-    };
+/// Run a stack program of a rate.
+#[inline]
+fn eval_program(
+    ops: &[FastRateOp],
+    amounts: &[f64],
+    ctx: &MathExpressionContext,
+    clock: Clock,
+) -> Result<f64, String> {
     let mut stack = [0.0_f64; 32];
     let mut sp = 0usize;
 
