@@ -149,6 +149,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `InfeasibleStateError` and said that a rate cannot be negative; it now raises
   `RuntimeError`, as `StochasticEvents` does, and says that the rate is not a
   number.
+- A rate that read an id with digits, such as `e1`, `E2` or `c1star`, was
+  rejected as a malformed number; and the exponent of a number such as `1e1`
+  was read as the undefined variable `e1`. An identifier now starts only after
+  a character that is not a letter, a digit or `_`, so the digits of an id
+  belong to its name and an exponent belongs to its number.
 
 ### Removed
 

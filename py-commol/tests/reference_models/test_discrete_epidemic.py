@@ -22,7 +22,6 @@ References
 import math
 
 import pytest
-from pydantic import ValidationError
 
 from commol import Simulation
 from commol.context.model import Model
@@ -114,11 +113,6 @@ def test_staged_treatment_ends_with_the_control_final_size_relation() -> None:
     assert_close(results["S"][-1], expected, rel=ENGINE_REL)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=ValidationError,
-    reason="#197: an id with a digit before letters is read as a number in a rate",
-)
 @pytest.mark.parametrize(
     "names", [("e1", "e2", "dlt1", "dlt2"), ("eps1", "eps2", "d1T", "d2T")]
 )

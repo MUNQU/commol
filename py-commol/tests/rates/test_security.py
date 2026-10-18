@@ -49,6 +49,12 @@ class TestBasicValidation:
         for expr in valid_expressions:
             assert_accepted(validate_expression_security, expr)
 
+    @pytest.mark.parametrize(
+        "expression", ["e1 * A", "E2 * A", "c1star * A", "d1T * A", "k2e3 * x1ea"]
+    )
+    def test_an_identifier_with_digits_is_not_a_number(self, expression):
+        assert_accepted(validate_expression_security, expression)
+
     def test_numeric_formats(self):
         """Test various numeric format validations."""
         valid_numbers = [
@@ -457,7 +463,6 @@ class TestExpressionLimitsAndComplexity:
         invalid_numbers = [
             "3..14",  # Double decimal point
             "1e",  # Incomplete scientific notation
-            "e10",  # Missing base in scientific notation
             "1e1e1",  # Multiple 'e' characters
             "123abc",  # Mixed alphanumeric
             "1ea",  # An exponent of letters

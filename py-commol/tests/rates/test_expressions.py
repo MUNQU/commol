@@ -34,6 +34,18 @@ class TestConstants:
         assert result["B"][1] == pytest.approx(constant * 0.1 * 1000)
 
 
+class TestNumbers:
+    @pytest.mark.parametrize(
+        ("rate", "factor"), [("1e1 * k * A", 10), ("k * 2E-1 * A", 0.2)]
+    )
+    def test_the_exponent_of_a_number_is_not_a_variable(
+        self, rate: str, factor: float
+    ) -> None:
+        result = run(_ab_model(rate), 1)
+
+        assert result["B"][1] == pytest.approx(factor * 0.1 * 1000)
+
+
 class TestSubgroupTotals:
     def test_categories_out_of_declaration_order_are_rejected(self) -> None:
         with pytest.raises(ValueError, match="total_t1_g1") as error:
