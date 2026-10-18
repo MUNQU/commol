@@ -85,30 +85,36 @@ def test_no_text_is_repeated_across_pages() -> None:
     """No run of twelve words, outside code blocks, is in two pages."""
     runs: defaultdict[str, set[str]] = defaultdict(set)
     words_of: dict[str, list[str]] = {}
+    keys_of: dict[str, list[str]] = {}
     for page in shared_pages():
+        name = relative(page)
         words = CODE_BLOCK.sub("", page.read_text(encoding="utf-8")).split()
-        words_of[relative(page)] = words
-        for start in range(len(words) - REPEAT_WORDS + 1):
-            runs[" ".join(words[start : start + REPEAT_WORDS])].add(relative(page))
+        # The run of twelve words that starts at each word, joined once.
+        keys = [
+            " ".join(words[start : start + REPEAT_WORDS])
+            for start in range(len(words) - REPEAT_WORDS + 1)
+        ]
+        words_of[name], keys_of[name] = words, keys
+        for key in keys:
+            runs[key].add(name)
     repeated = []
-    for name, words in words_of.items():
+    for name, keys in keys_of.items():
         start = 0
-        while start <= len(words) - REPEAT_WORDS:
-            others = runs[" ".join(words[start : start + REPEAT_WORDS])] - {name}
-            if not others:
+        while start < len(keys):
+            if len(runs[keys[start]]) == 1:
                 start += 1
                 continue
-            end = start + REPEAT_WORDS
-            while (
-                end < len(words)
-                and others & runs[" ".join(words[end - REPEAT_WORDS + 1 : end + 1])]
-            ):
+            others = runs[keys[start]] - {name}
+            end = start + 1
+            while end < len(keys) and others & runs[keys[end]]:
                 end += 1
+            last_word = end - 1 + REPEAT_WORDS
             if name < min(others):
                 repeated.append(
-                    f"{name} and {sorted(others)}: {' '.join(words[start:end])}"
+                    f"{name} and {sorted(others)}: "
+                    f"{' '.join(words_of[name][start:last_word])}"
                 )
-            start = end
+            start = last_word
     assert not repeated, (
         "Keep each text in one page and link to it from the others: "
         + "\n".join(repeated)

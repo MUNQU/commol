@@ -205,10 +205,13 @@ them.
 
 The check reads the wall time of the run, so a machine that runs other work
 at the same time can exceed the budget. `pytest --durations=20` shows the
-slowest tests; Python Coverage prints them, slowed by coverage.
+slowest tests; Python Coverage prints them, slowed by coverage. A row names
+a test, or one case of a parametrized test with its parameter in brackets.
 
 | Test | Why it takes longer |
 |---|---|
+| `tests/description/test_rendering.py::TestLatex::test_the_latex_document_compiles` | It compiles the LaTeX description with `latexmk`; the first TeX run of the job loads its formats. No other test checks that the document compiles. |
+| `tests/docs/test_examples.py::test_page_examples_run[docs/guide/simulations.md]` | It runs every example of the page, which draws and saves four figures with matplotlib, one label per plotted position; the figures are what the page documents. |
 
 ## Mutation testing
 

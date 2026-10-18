@@ -357,7 +357,7 @@ def test_slow_tests_are_listed() -> None:
     slow = [
         f"{nodeid}: {seconds:.2f} s"
         for nodeid, seconds in sorted(DURATIONS.items())
-        if seconds > BUDGET and nodeid.split("[")[0] not in listed
+        if seconds > BUDGET and not {nodeid, nodeid.split("[")[0]} & listed
     ]
     assert not slow, (
         f"These tests take over {BUDGET} s: make their inputs smaller, or give "

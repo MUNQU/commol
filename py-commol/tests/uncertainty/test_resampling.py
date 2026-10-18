@@ -78,7 +78,7 @@ class TestBayesianBootstrap:
         rng = np.random.default_rng(7)
         y = 3.0 * t + rng.normal(0.0, 2.0, t.size)
         calibrator = flow_calibrator(y.tolist(), windowed=False, seed=11)
-        replicates = 600
+        replicates = 300
 
         result = calibrator.uncertainty(
             BayesianBootstrap(replicates=replicates, block_length=1)
