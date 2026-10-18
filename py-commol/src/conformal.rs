@@ -77,6 +77,19 @@ impl From<ConformalRun> for PyConformalRun {
     }
 }
 
+/// The predictor of a method that does not refit: the sample when there is
+/// one, otherwise the fit
+fn predictor<'a>(
+    fit: Option<&'a [f64]>,
+    sample: Option<&'a PyParameterSample>,
+) -> PyResult<Predictor<'a>> {
+    match (fit, sample) {
+        (_, Some(sample)) => Ok(Predictor::Sample(&sample.inner)),
+        (Some(fit), None) => Ok(Predictor::Fit(fit)),
+        (None, None) => Err(PyValueError::new_err("A predictor needs a fit or a sample")),
+    }
+}
+
 /// Check the score and the pooling of a conformal method
 ///
 /// Raises:
@@ -122,15 +135,7 @@ fn split_conformal(
 ) -> PyResult<PyConformalRun> {
     let settings = settings(score, by, level)?;
     let calibration: Vec<_> = calibration.into_iter().map(|o| o.inner).collect();
-    let predictor = match (&fit, sample) {
-        (_, Some(sample)) => Predictor::Sample(&sample.inner),
-        (Some(fit), None) => Predictor::Fit(fit),
-        (None, None) => {
-            return Err(PyValueError::new_err(
-                "split conformal needs a fit or a sample",
-            ));
-        }
-    };
+    let predictor = predictor(fit.as_deref(), sample)?;
     py.detach(|| {
         conformal::split_conformal(
             &problem.inner,
@@ -301,6 +306,44 @@ fn enbpi(
     })
 }
 
+/// Adaptive conformal intervals at each point of `stream`, in order of
+/// position
+///
+/// Args:
+///     problem: The calibration problem
+///     fit: The fitted values, in problem order, or None with a sample
+///     sample: The sample whose predictive is the predictor, or None
+///     stream: The observations that arrive
+///     step: The step of the working level
+///     score: "absolute", "normalized" or "spread"
+///     by: "series" or "all"
+///     level: The target level of the intervals
+///
+/// Raises:
+///     ValueError: If a setting is not valid, the score has no scale, or a
+///         point names an unknown output
+///     InfeasibleStateError: If a run leaves the values its model allows
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn adaptive_conformal(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    fit: Option<Vec<f64>>,
+    sample: Option<&PyParameterSample>,
+    stream: Vec<PyObservedDataPoint>,
+    step: f64,
+    score: &str,
+    by: &str,
+    level: f64,
+) -> PyResult<PyConformalRun> {
+    let settings = settings(score, by, level)?;
+    let stream: Vec<_> = stream.into_iter().map(|o| o.inner).collect();
+    let predictor = predictor(fit.as_deref(), sample)?;
+    py.detach(|| conformal::adaptive_conformal(&problem.inner, predictor, &stream, step, settings))
+        .map(PyConformalRun::from)
+        .map_err(conformal_error)
+}
+
 /// Register the conformal functions with the inference module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyConformalRun>()?;
@@ -309,5 +352,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rolling_conformal, m)?)?;
     m.add_function(wrap_pyfunction!(jackknife_plus, m)?)?;
     m.add_function(wrap_pyfunction!(enbpi, m)?)?;
+    m.add_function(wrap_pyfunction!(adaptive_conformal, m)?)?;
     Ok(())
 }

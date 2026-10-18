@@ -248,3 +248,40 @@ class TestEnbPI:
                     positions=[41.0],
                 )
             )
+
+
+class TestAdaptiveConformal:
+    def test_adaptive_conformal_recovers_after_a_change_of_regime(self) -> None:
+        rng = np.random.default_rng(8)
+        calibrator = flow_calibrator(
+            (C + rng.normal(0.0, 1.0, 30)).tolist(), windowed=True
+        )
+        # The noise of the flows grows from 1 to 3 after 100 points.
+        noise = np.concatenate([rng.normal(0.0, 1.0, 100), rng.normal(0.0, 3.0, 500)])
+        stream = flow_observations((C + noise).tolist(), windowed=True, start=31)
+        settings = {"score": "absolute", "by": "series", "level": 0.9}
+
+        adaptive = calibrator.uncertainty(
+            AdaptiveConformal(**settings, step=0.02, stream=stream)
+        )
+        split = calibrator.uncertainty(
+            SplitConformal(
+                **settings,
+                calibration_data=stream[:100],
+                positions=[point.at for point in stream[100:]],
+            )
+        )
+
+        def late_miss_rate(series: object, observed: list[ObservedDataPoint]) -> float:
+            lower, upper = series.lower[-300:], series.upper[-300:]  # type: ignore[attr-defined]
+            values = [point.value for point in observed[-300:]]
+            misses = [
+                not lo <= y <= hi
+                for lo, hi, y in zip(lower, upper, values, strict=True)
+            ]
+            return sum(misses) / len(misses)
+
+        assert late_miss_rate(adaptive.intervals.series["B"], stream) == pytest.approx(
+            0.1, abs=0.04
+        )
+        assert late_miss_rate(split.intervals.series["B"], stream) > 0.4

@@ -662,6 +662,17 @@ class InferenceModule(Protocol):
         starts: int,
         seed: int,
     ) -> ConformalRunProtocol: ...
+    def adaptive_conformal(
+        self,
+        problem: CalibrationProblemProtocol,
+        fit: list[float] | None,
+        sample: ParameterSampleProtocol | None,
+        stream: list[ObservedDataPointProtocol],
+        step: float,
+        score: str,
+        by: str,
+        level: float,
+    ) -> ConformalRunProtocol: ...
 
 class MathExpressionProtocol(Protocol):
     def __init__(self, expression: str) -> None: ...
