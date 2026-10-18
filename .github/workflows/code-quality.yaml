@@ -174,8 +174,26 @@ jobs:
       - name: Check Rust documentation
         run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-random -p commol-stochastic -p commol-inference
 
-      - name: Run tests with coverage
-        run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+      # The bindings (py-commol/src/) run only under pytest, so the coverage
+      # of Rust joins the Rust tests and pytest on an instrumented extension.
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: py-commol/uv.lock
+
+      - name: Install dependencies
+        working-directory: ./py-commol
+        run: uv sync --locked --extra dev
+
+      # The script fails when the line coverage falls under its threshold.
+      - name: Run the Rust and the Python tests with the coverage of Rust
+        run: uv run --project py-commol .github/scripts/rust_coverage.sh --lcov --output-path lcov.info
 
       # cargo llvm-cov does not run the doctests on a stable toolchain.
       - name: Run doctests

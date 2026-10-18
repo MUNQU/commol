@@ -439,3 +439,49 @@ def test_the_studies_run_for_a_change_of_any_crate_they_use() -> None:
         f"Add these crates to the pattern 'studies' of {relative(BUILD_WORKFLOW)}: "
         f"{missing}"
     )
+
+
+# Test coverage
+
+PACKAGE_DIR = REPO_ROOT / "py-commol" / "commol"
+PYPROJECT = REPO_ROOT / "py-commol" / "pyproject.toml"
+PRAGMA = re.compile(r"#\s*pragma:\s*no\s*cover\b(?P<reason>.*)", re.IGNORECASE)
+
+
+def exclusion_patterns() -> Iterator[tuple[int, str, bool]]:
+    """Each line of ``exclude_also`` in ``pyproject.toml``: its line number,
+    the pattern and whether a comment above it gives the reason."""
+    lines = PYPROJECT.read_text(encoding="utf-8").splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith("exclude_also"))
+    for number in range(start + 1, len(lines)):
+        line = lines[number].strip()
+        if line == "]":
+            return
+        if line.startswith(("'", '"')):
+            above = lines[number - 1].strip()
+            yield number + 1, line, above.startswith(("#", "'", '"'))
+
+
+def test_every_coverage_exclusion_has_a_reason() -> None:
+    """Every ``# pragma: no cover`` of the package says why on its line, and
+    every pattern of ``exclude_also`` has a comment above its group."""
+    unexplained = [
+        f"{relative(path)}:{number}"
+        for path in sorted(PACKAGE_DIR.rglob("*.py"))
+        for number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        )
+        if (match := PRAGMA.search(line))
+        and not re.search(r"[a-z]", match["reason"], re.IGNORECASE)
+    ]
+    unexplained += [
+        f"{relative(PYPROJECT)}:{number} {pattern}"
+        for number, pattern, explained in exclusion_patterns()
+        if not explained
+    ]
+    configured = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
+    assert configured["tool"]["coverage"]["report"]["exclude_also"]
+    assert not unexplained, (
+        "Give each coverage exclusion its reason (`# pragma: no cover: <why>`, "
+        "or a comment above the pattern):\n" + "\n".join(unexplained)
+    )
