@@ -21,6 +21,7 @@ from tests.support import (
     assert_close,
     assert_total_conserved,
     build,
+    build_ode,
     build_stochastic,
     reference_run,
     abc_builder,
@@ -199,3 +200,17 @@ class TestModelChanges:
         result = Calibrator(simulation, problem).run()
 
         assert result.best_parameters["k"] == pytest.approx(0.2, abs=1e-3)
+
+
+@pytest.mark.parametrize("ode", [False, True], ids=["difference", "differential"])
+def test_a_step_of_the_engine_continues_the_run(ode: bool) -> None:
+    model = build_ode(abc_builder()) if ode else build(abc_builder())
+    simulation = Simulation(model)
+    two_steps = simulation.run(2)
+    simulation.run(1)
+
+    simulation.engine.step()
+
+    assert simulation.engine.state == pytest.approx(
+        [two_steps[name][2] for name in ("A", "B", "C")], rel=1e-6
+    )

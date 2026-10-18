@@ -5,9 +5,9 @@ use crate::helpers::stratification_conditions_met;
 use crate::labels::OutputLabels;
 use crate::layout::CompartmentLayout;
 use crate::types::{
-    AccumulatorOutputRef, CompiledModel, FastRateExpression, FastRateOp, FlowChange,
-    GeneratedAccumulatorOutput, ImpulseFlow, ImpulseSchedule, SeriesParameter, SubgroupTotalLayout,
-    SubgroupTotalMapping, TransitionFlow, VarSlot,
+    AccumulatorOutputRef, CompiledModel, FAST_STACK_DEPTH, FastRateExpression, FastRateOp,
+    FlowChange, GeneratedAccumulatorOutput, ImpulseFlow, ImpulseSchedule, SeriesParameter,
+    SubgroupTotalLayout, SubgroupTotalMapping, TransitionFlow, VarSlot,
 };
 use commol_core::math_expression::jit::ast::{BinaryOperator, Expr, UnaryOperator};
 use commol_core::math_expression::jit::parser::parse_expression;
@@ -1244,7 +1244,21 @@ fn build_fast_rate_expression(
             push_fast_ops_from_ast(&ast, compartment_map, expression_context, &mut ops)?;
         }
     }
-    Some(FastRateExpression::Program(ops))
+    (stack_depth(&ops) <= FAST_STACK_DEPTH).then_some(FastRateExpression::Program(ops))
+}
+
+/// The deepest stack a program of a fast rate reaches.
+fn stack_depth(ops: &[FastRateOp]) -> usize {
+    let (mut depth, mut deepest) = (0usize, 0usize);
+    for op in ops {
+        match op {
+            FastRateOp::Constant(_) | FastRateOp::Slot(_) => depth += 1,
+            FastRateOp::Add | FastRateOp::Sub | FastRateOp::Mul | FastRateOp::Div => depth -= 1,
+            FastRateOp::Neg => {}
+        }
+        deepest = deepest.max(depth);
+    }
+    deepest
 }
 
 fn specialized_fast_expr(

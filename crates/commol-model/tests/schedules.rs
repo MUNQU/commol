@@ -251,6 +251,9 @@ fn only_the_impulses_of_a_position_act_and_an_absolute_one_moves_its_rate() {
     let mut model = compiled(&serde_json::from_str(json).expect("valid model JSON"));
     let mut state = model.initial_state().to_vec();
 
+    let mut rates = Vec::new();
+    model.impulse_rates(1.0, &state, &mut rates).unwrap();
+    assert_eq!(rates, [(0, 0.5)]);
     assert!(model.apply_impulses(1.0, &mut state).unwrap());
     assert_eq!(state, [400.0, 600.0, 0.0]);
     assert!(model.apply_impulses(2.0, &mut state).unwrap());

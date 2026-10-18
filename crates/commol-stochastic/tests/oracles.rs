@@ -783,7 +783,7 @@ fn an_adaptive_leap_counts_a_compartment_once_per_flow_and_skips_the_accumulator
 
 #[test]
 fn a_rate_that_reads_t_is_integrated_through_its_zeros_and_its_breakpoints() {
-    for rate in ["0.1 * t", "max(t - 1.5, 0)"] {
+    for rate in ["0.1 * t", "max(t - 1.5, 0)", "0.001", "0.001 * t"] {
         let mut engine = events(&model(
             "StochasticEvents",
             "null",

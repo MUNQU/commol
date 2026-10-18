@@ -1,7 +1,5 @@
 //! The right-hand side of a compiled model, and its accessors.
 
-use std::collections::HashMap;
-
 use commol_core::{MathExpressionContext, SPECIAL_VAR_TOTAL};
 
 use crate::labels::OutputLabels;
@@ -95,12 +93,6 @@ impl CompiledModel {
     pub fn set_parameter(&mut self, parameter_id: &str, value: f64) {
         self.expression_context
             .set_parameter(parameter_id.to_string(), value);
-    }
-
-    /// Current values of the parameters, including the variables the last
-    /// evaluation set (`total`, `t`, subgroup totals).
-    pub fn parameters(&self) -> &HashMap<String, f64> {
-        self.expression_context.get_parameters()
     }
 
     /// The right-hand side of the model: the net flow into each component of

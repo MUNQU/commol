@@ -151,3 +151,17 @@ fn a_series_without_points_is_zero() {
 
     assert_eq!(rates, [0.0]);
 }
+
+#[test]
+fn a_rate_deeper_than_the_stack_of_a_program_takes_the_jit() {
+    let mut rate = "A".to_string();
+    for _ in 0..40 {
+        rate = format!("B + ({rate})");
+    }
+    let rate = format!("k1 * ({rate}) / total");
+
+    let value = rate_of(&rate, 0, 0.0);
+
+    assert!((value - expected(&rate, 0, 0.0)).abs() < 1e-9, "{value}");
+    assert!((value - 0.3 * (700.0 + 40.0 * 200.0) / 1000.0).abs() < 1e-9);
+}

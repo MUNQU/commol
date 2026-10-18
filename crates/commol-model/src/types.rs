@@ -48,6 +48,10 @@ pub(crate) enum FastRateExpression {
     Program(Vec<FastRateOp>),
 }
 
+/// The depth of the stack a program of a fast rate runs on; a rate whose
+/// program needs more takes the JIT.
+pub(crate) const FAST_STACK_DEPTH: usize = 32;
+
 #[derive(Clone)]
 pub(crate) enum FastRateOp {
     Constant(f64),

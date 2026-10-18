@@ -807,18 +807,14 @@ fn weighted_quantiles(values: Vec<f64>, weights: Vec<f64>, levels: Vec<f64>) -> 
     Ok(statistics::quantiles(&values, &weights, &levels))
 }
 
-/// The weighted mean of `values`
-///
-/// Raises:
-///     ValueError: If the lengths differ or no weight is positive
+/// The weighted mean of `values`, one weight per value and some positive
 #[pyfunction]
-fn weighted_mean(values: Vec<f64>, weights: Vec<f64>) -> PyResult<f64> {
-    if values.len() != weights.len() || !weights.iter().any(|w| *w > 0.0) {
-        return Err(value_error(
-            "A weighted mean needs one weight per value and a positive weight".to_string(),
-        ));
-    }
-    Ok(statistics::mean(&values, &weights))
+fn weighted_mean(values: Vec<f64>, weights: Vec<f64>) -> f64 {
+    debug_assert!(
+        values.len() == weights.len() && weights.iter().any(|w| *w > 0.0),
+        "member_statistics checks the weights with weighted_quantiles first"
+    );
+    statistics::mean(&values, &weights)
 }
 
 /// The Monte Carlo error of the quantile at `level` of equally weighted
