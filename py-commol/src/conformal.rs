@@ -78,15 +78,11 @@ impl From<ConformalRun> for PyConformalRun {
 }
 
 /// The predictor of a method that does not refit: the sample when there is
-/// one, otherwise the fit
-fn predictor<'a>(
-    fit: Option<&'a [f64]>,
-    sample: Option<&'a PyParameterSample>,
-) -> PyResult<Predictor<'a>> {
-    match (fit, sample) {
-        (_, Some(sample)) => Ok(Predictor::Sample(&sample.inner)),
-        (Some(fit), None) => Ok(Predictor::Fit(fit)),
-        (None, None) => Err(PyValueError::new_err("A predictor needs a fit or a sample")),
+/// one, otherwise the fit (the runner passes one of them)
+fn predictor<'a>(fit: Option<&'a [f64]>, sample: Option<&'a PyParameterSample>) -> Predictor<'a> {
+    match sample {
+        Some(sample) => Predictor::Sample(&sample.inner),
+        None => Predictor::Fit(fit.unwrap_or_default()),
     }
 }
 
@@ -135,7 +131,7 @@ fn split_conformal(
 ) -> PyResult<PyConformalRun> {
     let settings = settings(score, by, level)?;
     let calibration: Vec<_> = calibration.into_iter().map(|o| o.inner).collect();
-    let predictor = predictor(fit.as_deref(), sample)?;
+    let predictor = predictor(fit.as_deref(), sample);
     py.detach(|| {
         conformal::split_conformal(
             &problem.inner,
@@ -338,7 +334,7 @@ fn adaptive_conformal(
 ) -> PyResult<PyConformalRun> {
     let settings = settings(score, by, level)?;
     let stream: Vec<_> = stream.into_iter().map(|o| o.inner).collect();
-    let predictor = predictor(fit.as_deref(), sample)?;
+    let predictor = predictor(fit.as_deref(), sample);
     py.detach(|| conformal::adaptive_conformal(&problem.inner, predictor, &stream, step, settings))
         .map(PyConformalRun::from)
         .map_err(conformal_error)

@@ -1,7 +1,137 @@
-//! The conformal quantile, the scores and the working level of adaptive
-//! conformal inference.
+//! The conformal quantile, the scores, the working level of adaptive
+//! conformal inference, and what each variant rejects, on an engine whose
+//! output is a parameter: `x = c` at every position.
 
-use commol_inference::conformal::{AdaptiveLevel, conformal_quantile};
+use std::collections::HashMap;
+
+use commol_calibration::{
+    CalibrationParameter, CalibrationProblem, LossConfig, NelderMeadConfig, ObservedDataPoint,
+    OptimizationConfig,
+};
+use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
+use commol_inference::PredictiveError;
+use commol_inference::conformal::{
+    AdaptiveLevel, ConformalError, ConformalSettings, NonconformityScore, Pooling, Predictor,
+    adaptive_conformal, conformal_quantile, enbpi, jackknife_plus, rolling_conformal, scales,
+    split_conformal,
+};
+use commol_inference::resampling::{BlockScheme, ReplicateRunner};
+
+/// One output `x = c` at every position.
+#[derive(Clone, Debug)]
+struct Constant {
+    parameters: HashMap<String, f64>,
+}
+
+#[derive(Clone, Debug)]
+struct NoPlan;
+
+impl ValuePlan for NoPlan {
+    fn infeasibility(&self, excess: f64) -> String {
+        format!("{excess}")
+    }
+}
+
+impl SimulationEngine for Constant {
+    type ValuePlan = NoPlan;
+
+    fn check_position(&self, _position: f64) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn run_at_positions_into_buffer(
+        &mut self,
+        positions: &[f64],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), SimulationError> {
+        buffer.clear();
+        buffer.extend(positions.iter().map(|_| vec![self.parameters["c"]]));
+        Ok(())
+    }
+
+    fn step(&mut self) -> Result<(), SimulationError> {
+        Ok(())
+    }
+
+    fn output_names(&self) -> Vec<String> {
+        vec!["x".to_string()]
+    }
+
+    fn state_outputs(&self) -> usize {
+        1
+    }
+
+    fn reset(&mut self) {}
+
+    fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
+        self.parameters.insert(parameter_id.to_string(), value);
+        Ok(())
+    }
+
+    fn current_position(&self) -> f64 {
+        0.0
+    }
+
+    fn plan_values(&self, _: &[ModelValue], _: Option<&str>) -> Result<NoPlan, String> {
+        Ok(NoPlan)
+    }
+
+    fn apply_values(&mut self, _: &NoPlan, _: &[f64]) -> Result<f64, String> {
+        Ok(0.0)
+    }
+}
+
+/// Observations of `x` at positions 1, 2, …, with weight 0 at the
+/// positions of `unweighted`.
+fn observations(values: &[f64], unweighted: &[f64]) -> Vec<ObservedDataPoint> {
+    values
+        .iter()
+        .enumerate()
+        .map(|(i, &value)| {
+            let at = (i + 1) as f64;
+            let mut point = ObservedDataPoint::new(at, "x".to_string(), value);
+            if unweighted.contains(&at) {
+                point.weight = 0.0;
+            }
+            point
+        })
+        .collect()
+}
+
+fn problem(observed: Vec<ObservedDataPoint>) -> CalibrationProblem<Constant> {
+    CalibrationProblem::new(
+        Constant {
+            parameters: HashMap::from([("c".to_string(), 0.0)]),
+        },
+        observed,
+        vec![CalibrationParameter::new("c".to_string(), -50.0, 50.0)],
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .unwrap()
+}
+
+fn config() -> OptimizationConfig {
+    OptimizationConfig::NelderMead(NelderMeadConfig {
+        sd_tolerance: 1e-12,
+        max_iterations: 500,
+        ..NelderMeadConfig::default()
+    })
+}
+
+/// Ten values around 10.
+const VALUES: [f64; 10] = [9.0, 11.0, 10.5, 9.5, 10.0, 8.5, 11.5, 10.2, 9.8, 10.1];
+
+fn settings(score: NonconformityScore) -> ConformalSettings {
+    ConformalSettings::new(score, Pooling::Series, 0.5).unwrap()
+}
+
+fn invalid(result: Result<impl std::fmt::Debug, ConformalError>) -> String {
+    match result {
+        Err(ConformalError::Invalid(message)) => message,
+        other => panic!("not rejected as invalid: {other:?}"),
+    }
+}
 
 #[test]
 fn conformal_quantile_is_the_ceiling_order_statistic() {
@@ -23,4 +153,186 @@ fn adaptive_level_follows_the_update_rule() {
     level.update(true);
     assert!((level.alpha() - (0.1 + 0.05 * (0.1 - 1.0) + 0.05 * 0.1)).abs() < 1e-12);
     assert!((level.level() - (1.0 - level.alpha())).abs() < 1e-12);
+}
+
+#[test]
+fn an_adaptive_level_or_step_out_of_range_is_rejected() {
+    for (level, step) in [(1.0, 0.05), (0.9, 0.0), (0.9, f64::INFINITY)] {
+        assert!(AdaptiveLevel::new(level, step).is_err(), "{level} {step}");
+    }
+    let problem = problem(observations(&VALUES, &[]));
+    let stream = observations(&VALUES, &[]);
+    let message = invalid(adaptive_conformal(
+        &problem,
+        Predictor::Fit(&[10.0]),
+        &stream,
+        -1.0,
+        settings(NonconformityScore::Absolute),
+    ));
+    assert!(message.contains("step"), "{message}");
+}
+
+#[test]
+fn scores_and_poolings_name_their_valid_values() {
+    for name in [None, Some("other")] {
+        let score = NonconformityScore::from_name(name).unwrap_err();
+        assert!(
+            score.contains("\"absolute\", \"normalized\" or \"spread\""),
+            "{score}"
+        );
+        let by = Pooling::from_name(name).unwrap_err();
+        assert!(by.contains("\"series\" or \"all\""), "{by}");
+    }
+    let pair = ConformalSettings::new(NonconformityScore::Normalized, Pooling::Series, 0.9);
+    assert!(pair.unwrap_err().contains("by=\"all\""));
+    let level = ConformalSettings::new(NonconformityScore::Absolute, Pooling::All, 1.0);
+    assert!(level.unwrap_err().contains("strictly between 0 and 1"));
+}
+
+#[test]
+fn a_score_without_its_scale_is_rejected() {
+    let observed = observations(&VALUES, &[]);
+    let mut other = observed[0].clone();
+    other.label = "y".to_string();
+
+    let normalized = scales(NonconformityScore::Normalized, &observed, &[other], None);
+    assert!(normalized.unwrap_err().contains("none of 'y'"));
+    let spread = scales(NonconformityScore::Spread, &observed, &observed, None);
+    assert!(spread.unwrap_err().contains("give a sample"));
+    let flat = scales(
+        NonconformityScore::Spread,
+        &observed[..1],
+        &observed[..1],
+        Some(&[0.0]),
+    );
+    assert!(flat.unwrap_err().contains("positive spread"));
+}
+
+#[test]
+fn a_conformal_error_says_why() {
+    let error = ConformalError::from(PredictiveError::Mismatch("names differ".to_string()));
+    assert_eq!(error.to_string(), "names differ");
+    assert_eq!(
+        ConformalError::Failed("no fit".to_string()).to_string(),
+        "no fit"
+    );
+}
+
+#[test]
+fn split_conformal_needs_held_out_observations() {
+    let problem = problem(observations(&VALUES, &[]));
+
+    let message = invalid(split_conformal(
+        &problem,
+        Predictor::Fit(&[10.0]),
+        &[],
+        &[11.0],
+        settings(NonconformityScore::Absolute),
+    ));
+
+    assert!(message.contains("calibration_data is empty"), "{message}");
+}
+
+#[test]
+fn rolling_conformal_rejects_what_it_cannot_score() {
+    let problem = problem(observations(&VALUES, &[]));
+    let config = config();
+    let runner = ReplicateRunner::new(&problem, &config, &[10.0], 1, 1).unwrap();
+    let absolute = settings(NonconformityScore::Absolute);
+
+    let spread = invalid(rolling_conformal(
+        &runner,
+        &[5.0],
+        &[11.0],
+        settings(NonconformityScore::Spread),
+    ));
+    assert!(spread.contains("once per origin"), "{spread}");
+    let inside = invalid(rolling_conformal(&runner, &[5.0], &[10.0], absolute));
+    assert!(inside.contains("ahead of the data"), "{inside}");
+    let last = invalid(rolling_conformal(&runner, &[10.0], &[11.0], absolute));
+    assert!(last.contains("origin 10"), "{last}");
+}
+
+#[test]
+fn a_rolling_origin_with_no_weight_is_a_failed_refit() {
+    // The origin at 2 has only observations of weight 0 to fit.
+    let problem = problem(observations(&VALUES, &[1.0, 2.0]));
+    let config = config();
+    let runner = ReplicateRunner::new(&problem, &config, &[10.0], 1, 1).unwrap();
+
+    let run = rolling_conformal(
+        &runner,
+        &[2.0, 5.0],
+        &[11.0],
+        settings(NonconformityScore::Absolute),
+    )
+    .unwrap();
+
+    assert_eq!(run.failed.len(), 1);
+    assert_eq!(run.failed[0].0, 0);
+    // Only the origin at 5 scores: the 5 observations after it.
+    assert_eq!(run.scores.len(), 5);
+}
+
+#[test]
+fn jackknife_plus_needs_two_blocks_and_two_refits() {
+    let config = config();
+    let all = problem(observations(&VALUES, &[]));
+    let runner = ReplicateRunner::new(&all, &config, &[10.0], 1, 1).unwrap();
+    let one_block = BlockScheme::new(all.observed_data(), 10).unwrap();
+    let absolute = settings(NonconformityScore::Absolute);
+    let message = invalid(jackknife_plus(&runner, &one_block, &[11.0], absolute));
+    assert!(message.contains("at least two"), "{message}");
+
+    // The first block has weight 0, so leaving out the second leaves nothing.
+    let half = problem(observations(&VALUES, &[1.0, 2.0, 3.0, 4.0, 5.0]));
+    let runner = ReplicateRunner::new(&half, &config, &[10.0], 1, 1).unwrap();
+    let two_blocks = BlockScheme::new(half.observed_data(), 5).unwrap();
+    match jackknife_plus(&runner, &two_blocks, &[11.0], absolute) {
+        Err(ConformalError::Failed(message)) => assert!(message.contains("two refits")),
+        other => panic!("not a failure: {other:?}"),
+    }
+}
+
+#[test]
+fn jackknife_plus_with_the_spread_score_reads_the_spread_of_its_refits() {
+    let problem = problem(observations(&VALUES, &[]));
+    let config = config();
+    let runner = ReplicateRunner::new(&problem, &config, &[10.0], 1, 1).unwrap();
+    let scheme = BlockScheme::new(problem.observed_data(), 1).unwrap();
+
+    let run = jackknife_plus(
+        &runner,
+        &scheme,
+        &[11.0],
+        settings(NonconformityScore::Spread),
+    )
+    .unwrap();
+
+    let intervals = run.run.intervals;
+    assert!(intervals.lower[0] < intervals.prediction[0]);
+    assert!(intervals.prediction[0] < intervals.upper[0]);
+    assert!((run.bound - (1.0 - 2.0 * 0.5)).abs() < 1e-12);
+}
+
+#[test]
+fn an_enbpi_replicate_with_no_weight_is_a_failed_refit() {
+    // Three blocks, the first of weight 0: a replicate that draws only it
+    // has nothing to fit, with probability 1/27.
+    let problem = problem(observations(&VALUES[..9], &[1.0, 2.0, 3.0]));
+    let config = config();
+    let runner = ReplicateRunner::new(&problem, &config, &[10.0], 1, 3).unwrap();
+    let scheme = BlockScheme::new(problem.observed_data(), 3).unwrap();
+
+    let run = enbpi(
+        &runner,
+        &scheme,
+        200,
+        &[10.0],
+        settings(NonconformityScore::Spread),
+    )
+    .unwrap();
+
+    assert!(!run.failed.is_empty());
+    assert_eq!(run.scores.len(), 9);
 }

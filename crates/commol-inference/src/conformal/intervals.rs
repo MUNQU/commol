@@ -52,13 +52,6 @@ impl PredictionIntervals {
             upper,
         }
     }
-
-    /// The indices of the targets whose interval is unbounded on a side.
-    pub fn unbounded(&self) -> Vec<usize> {
-        (0..self.targets.len())
-            .filter(|&i| !(self.lower[i].is_finite() && self.upper[i].is_finite()))
-            .collect()
-    }
 }
 
 /// The quantile of each target's group, from the quantiles of

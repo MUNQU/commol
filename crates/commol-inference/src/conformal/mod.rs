@@ -36,7 +36,7 @@ pub use jackknife_plus::{JackknifePlusRun, cv_plus_bound, jackknife_plus};
 pub use predict::{Predictions, Predictor, predict, set_predictions, targets};
 pub use quantile::{conformal_quantile, group_quantiles, lower_quantile, upper_quantile};
 pub use rolling::rolling_conformal;
-pub use score::{ConformalSettings, NonconformityScore, Pooling};
+pub use score::{ConformalSettings, NonconformityScore, Pooling, scales};
 pub use split::split_conformal;
 
 use crate::predictive::PredictiveError;
