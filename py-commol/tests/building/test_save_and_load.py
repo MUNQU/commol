@@ -194,3 +194,38 @@ class TestToJson:
         assert len(wide.read_text()) > len(narrow.read_text())
         assert default.read_text() == narrow.read_text()
         assert Model.from_json(wide) == Model.from_json(narrow)
+
+
+class TestFromJson:
+    @staticmethod
+    def _load(tmp_path: Path, change) -> Model:
+        path = tmp_path / "model.json"
+        _model().to_json(path)
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        change(payload)
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        return Model.from_json(path)
+
+    @pytest.mark.parametrize(
+        ("change", "message"),
+        [
+            (
+                lambda p: p["structure"].pop("kind"),
+                r"needs a 'kind'. Known kinds: \['aggregate'",
+            ),
+            (
+                lambda p: p["structure"].update(variant=3),
+                "The variant of a structure is a name, got 3",
+            ),
+            (
+                lambda p: p["parameters"].append(dict(p["parameters"][0])),
+                r"Duplicate parameter IDs found: \['k'\]",
+            ),
+        ],
+        ids=["no kind", "variant", "parameter"],
+    )
+    def test_a_file_is_checked_as_it_loads(
+        self, tmp_path: Path, change, message: str
+    ) -> None:
+        with pytest.raises(ValidationError, match=message):
+            self._load(tmp_path, change)

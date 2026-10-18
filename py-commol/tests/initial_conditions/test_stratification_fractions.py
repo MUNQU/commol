@@ -1,7 +1,9 @@
 """Stratification fractions: updating them, and reading categories by id."""
 
 import pytest
+from pydantic import ValidationError
 
+from commol import Aggregate
 from commol.context.model import Model
 from tests.support import (
     a_to_b_builder,
@@ -214,3 +216,32 @@ class TestQualifiedCategoryReads:
         assert model.structure.subgroup_total(
             model.process, ("level:c1",)
         ) == pytest.approx(500.0)
+
+
+class TestNames:
+    @pytest.mark.parametrize(
+        ("fractions", "message"),
+        [
+            ({}, r"stratification ids. Missing ids: \['g'\], Extra ids: \[\]"),
+            (
+                {"g": {"g1": 1.0, "g3": 0.0}},
+                r"Missing categories: \['g2'\], Extra categories: \['g3'\]",
+            ),
+            ({"g": {"g1": 0.5, "g2": 0.4}}, "'g' must sum to 1.0, but got 0.9"),
+        ],
+        ids=["stratification", "category", "sum"],
+    )
+    def test_the_fractions_of_a_stratification_name_its_categories_and_sum_to_1(
+        self, fractions: dict[str, dict[str, float]], message: str
+    ) -> None:
+        builder = a_to_b_builder(stratifications={"g": ["g1", "g2"]})
+        builder.set_structure(
+            Aggregate(
+                total=10,
+                bin_fractions={"A": 1.0, "B": 0.0},
+                stratification_fractions=fractions,
+            )
+        )
+
+        with pytest.raises(ValidationError, match=message):
+            build(builder)

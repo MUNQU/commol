@@ -62,3 +62,18 @@ class TestTotal:
         model = build(a_to_b_builder(total=2.5))
 
         assert sum(initial_state(model).values()) == pytest.approx(2.5)
+
+
+class TestNames:
+    def test_calibrated_fractions_leave_room_for_the_others(self) -> None:
+        with pytest.raises(ValidationError, match="must be LESS than 1.0"):
+            Aggregate(total=10, bin_fractions={"A": 1.0, "B": None})
+
+    def test_the_bin_fractions_name_every_bin(self) -> None:
+        builder = a_to_b_builder()
+        builder.set_structure(Aggregate(total=10, bin_fractions={"A": 1.0, "C": 0.0}))
+
+        with pytest.raises(
+            ValidationError, match=r"Missing ids: \['B'\], Extra ids: \['C'\]"
+        ):
+            build(builder)

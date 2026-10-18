@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import Field
 
-from commol.constants import RESERVED_VARIABLE_NAMES, SUBGROUP_TOTAL_PREFIX
+from commol.constants import RESERVED_VARIABLE_NAMES
 from commol.context._model import engine_state
 from commol.context._model.engine_state import InitialCompartment
 from commol.context.initial_conditions import InitialConditions
@@ -440,8 +440,8 @@ class Aggregate(ModelStructure, InitialConditions):
         if actual_bins != expected_bins:
             raise ValueError(
                 f"Initial bin fractions keys must exactly match bin ids. "
-                f"Missing ids: {expected_bins - actual_bins}, "
-                f"Extra ids: {actual_bins - expected_bins}."
+                f"Missing ids: {sorted(expected_bins - actual_bins)}, "
+                f"Extra ids: {sorted(actual_bins - expected_bins)}."
             )
 
     def _check_stratification_fractions(self, process: Process) -> None:
@@ -452,8 +452,9 @@ class Aggregate(ModelStructure, InitialConditions):
         if actual_strat != expected_strat:
             raise ValueError(
                 f"Initial stratification fractions keys must exactly match "
-                f"stratification ids. Missing ids: {expected_strat - actual_strat}, "
-                f"Extra ids: {actual_strat - expected_strat}."
+                f"stratification ids. "
+                f"Missing ids: {sorted(expected_strat - actual_strat)}, "
+                f"Extra ids: {sorted(actual_strat - expected_strat)}."
             )
 
         for strat_id, fractions in self.stratification_fractions.items():
@@ -465,8 +466,8 @@ class Aggregate(ModelStructure, InitialConditions):
                 raise ValueError(
                     f"Categories for stratification '{strat_id}' must exactly "
                     f"match defined categories in instance '{strat_instance.id}'. "
-                    f"Missing categories: {expected - actual}, "
-                    f"Extra categories: {actual - expected}."
+                    f"Missing categories: {sorted(expected - actual)}, "
+                    f"Extra categories: {sorted(actual - expected)}."
                 )
 
             total = sum(fractions.values())
@@ -572,15 +573,4 @@ class Aggregate(ModelStructure, InitialConditions):
             f"Available bins: "
             f"{', '.join(sorted(bin_ids)) if bin_ids else 'none'}."
         )
-        if any(var.startswith(SUBGROUP_TOTAL_PREFIX) for var in undefined_vars):
-            names = sorted(
-                name
-                for name in engine_state.subgroup_total_names(process)
-                if name.startswith(SUBGROUP_TOTAL_PREFIX)
-            )
-            message += (
-                " Subgroup total names follow the declaration order of the "
-                "stratifications. Available subgroup totals: "
-                f"{', '.join(names) if names else 'none'}."
-            )
         raise ValueError(message)

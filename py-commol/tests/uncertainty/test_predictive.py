@@ -35,6 +35,14 @@ def _sample(values: list[list[float]], weights: list[float] | None = None):
 
 
 class TestBands:
+    def test_a_band_of_an_unknown_output_names_the_outputs(
+        self, calibrator: Calibrator
+    ) -> None:
+        predictive = Predictive(calibrator, _sample([[0.1, 0.05]]), POSITIONS)
+
+        with pytest.raises(ValueError, match=r"Unknown outputs \['Z'\]. Outputs: "):
+            predictive.series_band(["Z"], 0.9)
+
     def test_the_band_of_one_draw_is_that_draw(
         self, calibrator: Calibrator, truth_run: dict[str, list[float]]
     ) -> None:

@@ -30,6 +30,10 @@ def common_units() -> None:
 
 
 CONSISTENT = [
+    pytest.param("A + -5", {"A": "item"}, "item", id="negative-number-in-a-sum"),
+    pytest.param("max(1, 2) * k", {"k": "1/day"}, "1/day", id="numbers-alone-in-a-max"),
+    pytest.param("k * A", {"k": "1", "A": "item"}, "item", id="unit-written-as-1"),
+    pytest.param("2", {}, "dimensionless", id="number-alone"),
     pytest.param(
         "k1 * A * B / total",
         {"k1": "1/day", "A": "item", "B": "item", "total": "item"},
@@ -149,6 +153,23 @@ CONSISTENT = [
 ]
 
 INCONSISTENT = [
+    pytest.param(
+        "k * True", {"k": "1/day"}, "1/day", "unsupported operand", id="boolean"
+    ),
+    pytest.param(
+        "k, A",
+        {"k": "1/day", "A": "item"},
+        "item",
+        "Unexpected result type <class 'tuple'>",
+        id="tuple",
+    ),
+    pytest.param(
+        "k",
+        {"k": "1/day"},
+        "blorp",
+        "Unit error in equation 'k': 'blorp' is not defined",
+        id="unknown-expected-unit",
+    ),
     pytest.param(
         "k1 * A",
         {"k1": "1/day", "A": "item"},

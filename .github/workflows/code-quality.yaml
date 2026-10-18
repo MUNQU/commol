@@ -105,8 +105,10 @@ jobs:
           sudo apt-get install --no-install-recommends -y latexmk
           texlive-latex-base texlive-latex-recommended texlive-fonts-recommended
 
+      # Every statement of the package runs, except the exclusions of
+      # [tool.coverage.report] in pyproject.toml (docs/codebase/tests.md).
       - name: Run pytest (including the documentation examples)
-        run: uv run pytest --cov=commol --cov-report=xml --cov-report=term --durations=20
+        run: uv run pytest --cov=commol --cov-fail-under=100 --cov-report=xml --cov-report=term --durations=20
 
       # Codecov authenticates the upload with the OIDC token of the run, so the
       # repository keeps no Codecov secret. A pull request from a fork has no

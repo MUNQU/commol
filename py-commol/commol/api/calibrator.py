@@ -7,8 +7,6 @@ from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import (
-        CalibrationParameterProtocol,
-        CalibrationParameterTypeProtocol,
         CalibrationProblemProtocol,
         CalibrationResultProtocol,
         EngineProtocol,
@@ -97,7 +95,7 @@ class Calibrator:
             commol_rs.inference.CalibrationProblem(
                 self._engine,
                 engine_state.rust_observed_data(problem.observed_data),
-                self._rust_parameters(),
+                engine_state.rust_parameters(problem.parameters),
                 engine_state.rust_constraints(problem.constraints),
                 loss_config,
                 initial_condition_remainder=problem.initial_condition_remainder,
@@ -344,17 +342,6 @@ class Calibrator:
 
         return run_method(self, method, IdentifiabilityMethod)
 
-    def _to_rust_parameter_type(
-        self, param_type: str
-    ) -> "CalibrationParameterTypeProtocol":
-        """Convert Python CalibrationParameterType to Rust type."""
-        rust_types = rust_calibration.CalibrationParameterType
-        return {
-            CalibrationParameterType.PARAMETER: rust_types.Parameter,
-            CalibrationParameterType.INITIAL_CONDITION: rust_types.InitialCondition,
-            CalibrationParameterType.FACTOR: rust_types.Factor,
-        }[CalibrationParameterType(param_type)]
-
     def _build_loss_config(self) -> "LossConfigProtocol":
         """The Rust loss, with the replicates of a stochastic engine."""
         return engine_state.rust_loss_config(
@@ -465,19 +452,6 @@ class Calibrator:
     def parameter_names(self) -> list[str]:
         """Names of parameters being calibrated."""
         return [param.id for param in self.problem.parameters]
-
-    def _rust_parameters(self) -> list["CalibrationParameterProtocol"]:
-        """Calibration parameters as engine types, in problem order."""
-        return [
-            rust_calibration.CalibrationParameter(
-                id=param.id,
-                parameter_type=self._to_rust_parameter_type(param.parameter_type),
-                min_bound=param.min_bound,
-                max_bound=param.max_bound,
-                initial_guess=param.initial_guess,
-            )
-            for param in self.problem.parameters
-        ]
 
     def _validate_calibration_parameters(self) -> None:
         """

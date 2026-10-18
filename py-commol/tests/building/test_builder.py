@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from commol.context.bin import Bin
 from commol.context.model import Model
-from tests.support import a_to_b_builder, build, abc_builder
+from tests.support import FactoryBuilder, a_to_b_builder, build, abc_builder
 from commol import Aggregate
 
 
@@ -121,3 +121,20 @@ class TestProcessChecks:
         bins = {Bin(id="A", name="first"), Bin(id="A", name="second")}
 
         assert bins == {Bin(id="A", name="any")}
+
+    @pytest.mark.parametrize(
+        ("bins", "message"),
+        [([], "At least one bin"), (["A"], "At least one transition")],
+    )
+    def test_a_process_has_a_bin_and_a_transition(
+        self, bins: list[str], message: str
+    ) -> None:
+        builder = FactoryBuilder(name="m")
+        for bin_id in bins:
+            builder.add_bin(bin_id, bin_id)
+        builder.set_structure(
+            Aggregate(total=10, bin_fractions=dict.fromkeys(bins, 1.0))
+        )
+
+        with pytest.raises(ValidationError, match=message):
+            build(builder)

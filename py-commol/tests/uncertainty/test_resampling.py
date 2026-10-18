@@ -6,7 +6,9 @@ observation is either ``c`` (windowed), so the fit is the mean of the values,
 or ``c·t``, a regression through the origin.
 """
 
+import logging
 import math
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -246,3 +248,33 @@ class TestResidualNoise:
             assert prediction.upper[i] - prediction.lower[i] > 2 * (
                 model.upper[i] - model.lower[i]
             )
+
+
+class TestFailedReplicates:
+    def test_a_failed_replicate_is_in_the_diagnostics_and_in_the_log(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        calibrator = flow_calibrator(_noisy(12, 4), windowed=False, bounds=(0.0, 5.0))
+        engine = calibrator._rust_problem
+        run = SimpleNamespace(
+            values=[[1.0]],
+            groups=None,
+            block_length=1,
+            block_length_estimates=None,
+            failed=[(1, "Simulation failed: x")],
+            not_converged=0,
+            negative_values=0,
+        )
+        calibrator._rust_problem = SimpleNamespace(  # type: ignore[assignment]
+            optimize=engine.optimize, bootstrap=lambda *_, **__: run
+        )
+
+        with caplog.at_level(logging.WARNING, logger="commol.api.inference"):
+            result = calibrator.uncertainty(
+                BayesianBootstrap(replicates=2, block_length=1)
+            )
+
+        assert result.diagnostics.failed == ["Replicate 1 failed: Simulation failed: x"]
+        assert [r.getMessage() for r in caplog.records if r.levelname == "WARNING"] == [
+            "Replicate 1 failed: Simulation failed: x"
+        ]

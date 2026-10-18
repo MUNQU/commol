@@ -4,7 +4,9 @@ import math
 
 import pytest
 
-from commol import Simulation
+from pydantic import ValidationError
+
+from commol import ModelBuilder, Simulation
 from commol.context.parameter import Parameter
 from tests.support import (
     ENGINE_REL,
@@ -137,3 +139,27 @@ class TestSeriesParameters:
 
         with pytest.raises(RuntimeError, match="'k' is a pulse at 1.5"):
             Simulation(build_ode(builder))
+
+
+class TestValues:
+    def test_a_formula_is_not_blank(self) -> None:
+        with pytest.raises(ValidationError, match="Formula cannot be empty"):
+            ModelBuilder("M").add_parameter("x", "   ")
+
+    def test_a_series_has_a_mode_and_only_a_series_has_one(self) -> None:
+        with pytest.raises(ValueError, match="'x': 'mode' is required"):
+            ModelBuilder("M").add_parameter("x", [(0, 1.0)])
+        with pytest.raises(ValueError, match="'x': 'mode' is only valid"):
+            ModelBuilder("M").add_parameter("x", 1.0, mode="pulse")
+
+    def test_a_series_value_is_finite(self) -> None:
+        with pytest.raises(ValidationError, match="Series values must be finite"):
+            ModelBuilder("M").add_parameter("x", [(0, math.inf)], mode="pulse")
+
+    def test_a_run_names_the_initial_conditions_left_to_calibrate(self) -> None:
+        model = build(a_to_b_builder(fractions={"A": 0.5, "B": None}))
+
+        with pytest.raises(
+            ValueError, match="Initial conditions requiring calibration: B"
+        ):
+            Simulation(model).run(2)

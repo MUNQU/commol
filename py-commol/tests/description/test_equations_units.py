@@ -88,6 +88,16 @@ class TestUnits:
         )
         assert output == expected
 
+    def test_a_rate_whose_units_do_not_add_shows_no_unit(self) -> None:
+        model = build(
+            abc_builder(bin_unit="item", units=DAILY, ab="k1 * A + B", bc="k2 * B")
+        )
+
+        output = equation_forms(model)
+
+        assert "  A -> B: k1(1/day) * A(item) + B(item)\n" in output
+        assert "  B -> C: k2(1/day) * B(item) [item / day]\n" in output
+
     def test_compact_without_units(self) -> None:
         output = equation_forms(_ab_into_b())
 

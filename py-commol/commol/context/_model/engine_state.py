@@ -252,18 +252,17 @@ def transition_flows(
 
 def _rust_parameter_type(parameter_type: str) -> "CalibrationParameterTypeProtocol":
     rust_types = commol_rs.calibration.CalibrationParameterType
-    if parameter_type == CalibrationParameterType.PARAMETER:
-        return rust_types.Parameter
-    if parameter_type == CalibrationParameterType.INITIAL_CONDITION:
-        return rust_types.InitialCondition
-    if parameter_type == CalibrationParameterType.FACTOR:
-        return rust_types.Factor
-    raise ValueError(f"Unknown parameter type: {parameter_type}")
+    return {
+        CalibrationParameterType.PARAMETER: rust_types.Parameter,
+        CalibrationParameterType.INITIAL_CONDITION: rust_types.InitialCondition,
+        CalibrationParameterType.FACTOR: rust_types.Factor,
+    }[CalibrationParameterType(parameter_type)]
 
 
-def _rust_parameters(
+def rust_parameters(
     parameters: Sequence["CalibrationParameter"],
 ) -> list["CalibrationParameterProtocol"]:
+    """The parameters of a calibration problem, as the engine takes them."""
     return [
         commol_rs.calibration.CalibrationParameter(
             id=param.id,
@@ -387,7 +386,7 @@ def check_model_values(
     try:
         commol_rs.calibration.check_model_values(
             engine,
-            _rust_parameters(parameters),
+            rust_parameters(parameters),
             initial_condition_remainder=remainder,
         )
     except ValueError as error:
@@ -453,7 +452,7 @@ def calibrated_initial_state[S: "Aggregate"](
     engine = build_engine(model)
     applied, state, covered = commol_rs.calibration.calibrated_initial_state(
         engine,
-        _rust_parameters(parameters),
+        rust_parameters(parameters),
         list(values),
         initial_condition_remainder=remainder,
     )
@@ -536,9 +535,8 @@ def rust_loss_config(
     Raises
     ------
     ValueError
-        If the loss function is unknown, or the engine is stochastic and the
-        problem has no ``replicates``, no ``replicate_summary`` (the message
-        lists the options) or no ``seed``.
+        If the engine is stochastic and the problem has no ``replicates``, no
+        ``replicate_summary`` (the message lists the options) or no ``seed``.
     """
     from commol.context.calibration import Quantile
     from commol.context.constants import LossFunction
@@ -548,9 +546,7 @@ def rust_loss_config(
         LossFunction.RMSE: commol_rs.calibration.LossConfig.rmse,
         LossFunction.MAE: commol_rs.calibration.LossConfig.mae,
     }
-    builder = builders.get(LossFunction(problem.loss_function))
-    if builder is None:
-        raise ValueError(f"Unsupported loss function: {problem.loss_function}.")
+    builder = builders[LossFunction(problem.loss_function)]
     # Per-series normalization is orthogonal to the chosen metric.
     loss_config = builder().normalized(problem.normalize_observations)
     if not commol_rs.engine.EngineType(engine_type).is_stochastic:
