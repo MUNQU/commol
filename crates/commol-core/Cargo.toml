@@ -23,6 +23,8 @@ indexmap = { version = "2.12", features = ["serde"] }
 rayon = "1.11"
 thiserror = "2.0"
 evalexpr = "13.1"
+# The math functions of the JIT that the standard library does not have
+libm = "0.2.15"
 
 # Cranelift JIT compiler
 cranelift = "0.126"

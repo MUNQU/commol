@@ -411,3 +411,29 @@ fn a_greedy_search_extends_the_best_subset_past_the_exhaustive_sizes() {
         at_one.admissible
     );
 }
+
+#[test]
+fn a_structural_rank_needs_a_point_and_collinearity_a_feasible_one() {
+    let jacobian = Matrix::from_row_slice(2, 2, &[1.0, 0.0, 0.0, 1.0]);
+    let source = Fixed::new(vec![jacobian]);
+
+    let no_points = structural_rank(&source, 0, 7).unwrap_err();
+    let infeasible = collinearity(
+        &source,
+        &[vec![-1.0, 0.0], vec![-1.0, 0.0]],
+        &[1.0, 1.0],
+        2,
+        20.0,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        no_points,
+        IdentifiabilityError::Invalid("A structural rank needs at least one point".to_string())
+    );
+    assert!(
+        matches!(&infeasible, IdentifiabilityError::NoFeasiblePoint { points: 2, reasons }
+            if reasons.len() == 2),
+        "{infeasible:?}"
+    );
+}

@@ -753,6 +753,37 @@ mod tests {
     }
 
     #[test]
+    fn group_neighbors_of_weight_zero_are_zero() {
+        let process = model(
+            &["A", "B"],
+            AB_GROUPS,
+            r#"{"id":"ab","source":["A"],"target":["B"],"rate":"k1 * neighbors_B"}"#,
+        );
+        let weights = r#"{"g1":{"g1":0.0,"g2":0.0},"g2":{"g1":0.0,"g2":1.0}}"#;
+
+        let rates: Vec<String> = flows_with(&process, Some(&groups(Some(weights))))
+            .into_iter()
+            .map(|(_, _, rate, _)| rate)
+            .collect();
+        assert_eq!(rates, ["k1 * (0)", "k1 * (B_g2)"]);
+    }
+
+    #[test]
+    fn a_transition_with_no_source_and_no_target_moves_nothing() {
+        let process = model(
+            &["A", "B"],
+            "",
+            r#"{"id":"none","source":[],"target":[],"rate":"k1"},
+            {"id":"ab","source":["A"],"target":["B"],"rate":"k1"}"#,
+        );
+
+        assert_eq!(
+            flows(&process),
+            vec![(some("A"), some("B"), "k1".to_string(), false)]
+        );
+    }
+
+    #[test]
     fn group_neighbors_without_weights_see_their_own_category() {
         let process = model(
             &["A", "B"],

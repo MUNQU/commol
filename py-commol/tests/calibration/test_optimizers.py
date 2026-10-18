@@ -227,6 +227,15 @@ class TestParticleSwarmSettings:
         assert capfd.readouterr().out != ""
 
 
+class TestVerbose:
+    def test_a_verbose_nelder_mead_prints_its_header(self, capfd) -> None:
+        _calibrate(_k_problem(NelderMeadConfig(max_iterations=3, verbose=True)))
+
+        assert (
+            "=== Nelder-Mead Optimization (Verbose Mode) ===" in capfd.readouterr().out
+        )
+
+
 class TestNelderMeadInsideBounds:
     def test_the_optimum_is_found_from_the_midpoint(self) -> None:
         result = _calibrate(_k_problem(NelderMeadConfig(max_iterations=2000)))
@@ -268,6 +277,14 @@ class TestParticleSwarmConfig:
         config = ParticleSwarmConfig().inertia("chaotic", w_min=0.4, w_max=0.9)
 
         assert config.inertia_config == PSOChaoticInertia(w_min=0.4, w_max=0.9)
+
+    def test_a_chaotic_inertia_needs_a_range(self) -> None:
+        with pytest.raises(ValueError, match=r"w_max \(0.4\) must be greater"):
+            ParticleSwarmConfig().inertia("chaotic", w_min=0.9, w_max=0.4)
+
+    def test_an_initialization_is_one_of_the_known_ones(self) -> None:
+        with pytest.raises(ValueError, match="Invalid initialization: sobol"):
+            ParticleSwarmConfig(initialization="sobol")
 
     def test_a_constant_acceleration_has_the_canonical_coefficients_by_default(
         self,

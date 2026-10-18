@@ -12,7 +12,6 @@ use pyo3::prelude::*;
 
 // Constants for table formatting
 const HEADER_SEPARATOR_WIDTH: usize = 76;
-const DEFAULT_HEADER_INTERVAL: u64 = 100;
 
 /// Write a message to Python's stdout
 ///
@@ -44,14 +43,6 @@ pub struct PythonObserver {
 }
 
 impl PythonObserver {
-    /// Create a new Python observer with default header interval
-    pub fn new() -> Self {
-        Self {
-            header_interval: DEFAULT_HEADER_INTERVAL,
-            last_header_iter: 0,
-        }
-    }
-
     /// Create a new Python observer with custom header interval
     pub fn with_header_interval(header_interval: u64) -> Self {
         Self {
@@ -69,12 +60,6 @@ impl PythonObserver {
             "Iteration", "Time (s)", "Obj. Evaluations", "Best Objective"
         ));
         write_to_python_stdout(&separator);
-    }
-}
-
-impl Default for PythonObserver {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -154,9 +139,6 @@ pub fn optimize_with_python_observer<E: SimulationEngine>(
                 ps_config.num_particles,
                 ps_config.max_iterations
             );
-            if let Some(target) = ps_config.target_cost {
-                header.push_str(&format!("Target cost: {}\n", target));
-            }
             header.push_str("===================================================\n");
             header
         }

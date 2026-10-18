@@ -216,6 +216,43 @@ impl Aggregate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::process::Stratification;
+
+    fn grouped_process() -> Process {
+        Process {
+            stratifications: vec![Stratification {
+                id: "group".to_string(),
+                categories: vec!["g1".to_string(), "g2".to_string()],
+                conditions: None,
+            }],
+            ..Process::default()
+        }
+    }
+
+    #[test]
+    fn every_unit_weighs_one_for_every_other_under_complete_neighbors() {
+        assert_eq!(Neighbors::Complete.weight("g1", "g2"), 1.0);
+        assert_eq!(Neighbors::Complete.weight("g1", "g1"), 1.0);
+    }
+
+    #[test]
+    fn the_weights_of_the_neighbors_have_one_row_per_category() {
+        let neighbors = Neighbors::Groups {
+            stratification: "group".to_string(),
+            weights: Some(BTreeMap::from([(
+                "g1".to_string(),
+                BTreeMap::from([("g1".to_string(), 1.0), ("g2".to_string(), 0.5)]),
+            )])),
+        };
+
+        let error = neighbors.check(&grouped_process()).unwrap_err();
+
+        assert_eq!(
+            error,
+            "The weights of the neighbors need one row per category of 'group' \
+             ([\"g1\", \"g2\"]); they have [\"g1\"]"
+        );
+    }
 
     #[test]
     fn initial_conditions_without_compartment_fractions_deserialize() {

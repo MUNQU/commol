@@ -11,7 +11,13 @@ import math
 
 import pytest
 
-from commol import InfeasibleStateError, Simulation, simulation_report
+from commol import (
+    InfeasibleStateError,
+    Simulation,
+    SimulationReplicates,
+    SimulationResults,
+    simulation_report,
+)
 from commol.api.plotter import SimulationPlotter
 from commol.context.engine import EngineName
 from tests.support import (
@@ -118,3 +124,69 @@ class TestProbabilities:
 
         assert "step 0" in str(error.value)
         assert "'A'" in str(error.value)
+
+
+class TestReplicates:
+    @staticmethod
+    def _replicates() -> SimulationReplicates:
+        simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
+        return simulation.replicates(3, seed=7).run_at(POSITIONS)
+
+    def test_replicates_share_their_positions(self) -> None:
+        runs = [
+            SimulationResults([1.0], {"A": [1.0]}),
+            SimulationResults([2.0], {"A": [1.0]}),
+        ]
+
+        with pytest.raises(ValueError, match="Replicate 1 is at other positions"):
+            SimulationReplicates(runs, seed=1, positions=[1.0])
+
+    @pytest.mark.parametrize(
+        "statistic",
+        [SimulationReplicates.mean, lambda r: r.quantiles([0.5])],
+        ids=["mean", "quantiles"],
+    )
+    def test_a_statistic_of_no_replicates_is_an_error(self, statistic) -> None:
+        with pytest.raises(ValueError, match="There are no replicates"):
+            statistic(SimulationReplicates([], seed=1, positions=[1.0]))
+
+    def test_a_quantile_level_is_a_probability(self) -> None:
+        with pytest.raises(ValueError, match="between 0 and 1, got 1.5"):
+            self._replicates().quantiles([0.5, 1.5])
+
+    def test_the_statistics_of_an_unknown_output_name_the_outputs(self) -> None:
+        with pytest.raises(KeyError, match=r"'D' is not an output.*\['A', 'B'\]"):
+            self._replicates().member_statistics("D", confidence_level=0.9)
+
+    def test_replicates_print_their_count_their_seed_and_their_positions(
+        self,
+    ) -> None:
+        assert repr(self._replicates()) == (
+            "SimulationReplicates(3 replicates, seed=7, positions=[1.0, 5.0, 10.0])"
+        )
+
+
+@pytest.mark.parametrize("engine", STOCHASTIC_ENGINES)
+class TestTheEngine:
+    def test_a_step_continues_the_run_where_it_stopped(
+        self, engine: EngineName
+    ) -> None:
+        simulation = Simulation(build_stochastic(a_to_b_builder(), engine))
+        two_steps = simulation.run(2, seed=8)
+        simulation.run(1, seed=8)
+
+        simulation.engine.step()
+
+        assert simulation.engine.state == [two_steps["A"][2], two_steps["B"][2]]
+
+    def test_a_rate_that_is_not_a_number_stops_the_run(
+        self, engine: EngineName
+    ) -> None:
+        simulation = Simulation(
+            build_stochastic(a_to_b_builder(rate="k * sqrt(-1)"), engine)
+        )
+
+        with pytest.raises(
+            RuntimeError, match="The rate of flow 't_ab' at .* is not a"
+        ):
+            simulation.run(2, seed=1)

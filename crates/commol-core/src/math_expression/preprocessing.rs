@@ -72,15 +72,10 @@ pub fn preprocess_formula(formula: &str) -> String {
             let prefix = &remaining[prefix_start..pos];
 
             // Check if this is a valid function boundary (not part of another identifier)
-            let is_valid_boundary = if pos == 0 {
-                true // Start of string
-            } else {
-                let prev_char = remaining.chars().nth(pos - 1);
-                match prev_char {
-                    Some(c) => !c.is_alphanumeric() && c != '_',
-                    None => true,
-                }
-            };
+            let is_valid_boundary = remaining[..pos]
+                .chars()
+                .next_back()
+                .is_none_or(|c| !c.is_alphanumeric() && c != '_');
 
             if is_valid_boundary && !prefix.ends_with("math::") {
                 new_result.push_str(&remaining[..pos]);
@@ -106,19 +101,6 @@ pub fn get_variables_from_node(node: &Node, variables: &mut HashSet<String>) {
             variables.insert(ident.to_string());
         }
     }
-}
-
-/// Checks if an AST node is a single variable identifier.
-pub fn is_single_identifier(node: &Node) -> bool {
-    let mut var_count = 0;
-    for _ in node.iter_variable_identifiers() {
-        var_count += 1;
-        if var_count > 1 {
-            return false;
-        }
-    }
-
-    var_count == 1 && node.children().is_empty()
 }
 
 /// Get all variable identifiers used in an expression.
@@ -152,6 +134,17 @@ mod tests {
         assert_eq!(preprocess_formula("log(x)"), "math::ln(x)");
         assert_eq!(preprocess_formula("log10(x)"), "math::log10(x)");
         assert_eq!(preprocess_formula("max(a, b)"), "max(a, b)"); // No prefix needed
+    }
+
+    #[test]
+    fn a_function_name_inside_an_identifier_gets_no_prefix() {
+        assert_eq!(
+            preprocess_formula("cosin(x) + sin(x)"),
+            "cosin(x) + math::sin(x)"
+        );
+        assert_eq!(preprocess_formula("my_exp(x)"), "my_exp(x)");
+        assert_eq!(preprocess_formula("é + sin(x)"), "é + math::sin(x)");
+        assert_eq!(preprocess_formula("math::sin(x)"), "math::sin(x)");
     }
 
     #[test]

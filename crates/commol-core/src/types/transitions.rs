@@ -2,8 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::math_expression::RateMathExpression;
-
 /// Condition that specifies a stratification category for rate matching.
 ///
 /// When `to` is set, the matched category in the source compartment is replaced
@@ -52,7 +50,7 @@ pub struct Transition {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub accumulators: Vec<String>,
     /// The rate, or the fallback rate when `stratified_rates` is set.
-    pub rate: Option<RateMathExpression>,
+    pub rate: Option<String>,
     /// Rates for compartments with some categories.
     pub stratified_rates: Option<Vec<StratifiedRate>>,
     /// When true, base compartment names in the rate expression are replaced
@@ -67,11 +65,4 @@ pub struct Transition {
     /// `offset + period`, `offset + 2 * period`, …
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub impulse_every: Option<(f64, f64)>,
-}
-
-impl Transition {
-    /// Whether the transition is an impulse rather than a continuous flow.
-    pub fn is_impulse(&self) -> bool {
-        self.impulse_at.is_some() || self.impulse_every.is_some()
-    }
 }

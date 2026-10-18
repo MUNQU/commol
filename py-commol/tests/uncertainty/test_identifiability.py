@@ -105,6 +105,21 @@ class TestStructuralRank:
         assert report.verdicts["k2"].structural.verdict == "identifiable"
         assert report.structural[0].generic_rank == 2
 
+    def test_a_parameter_no_observation_reads_is_non_identifiable(
+        self, truth: dict[str, list[float]]
+    ) -> None:
+        calibrator = _calibrator(
+            observed(truth, "B", range(5, 51, 5)), {"k1": (0.1, 0.6), "s": (0.5, 2.0)}
+        )
+
+        report = calibrator.identifiability(
+            StructuralRank(points=3, design="observations")
+        )
+
+        structural = report.verdicts["s"].structural
+        assert structural is not None
+        assert structural.verdict == "non_identifiable"
+
     def test_sir_observed_in_every_compartment_is_identifiable(
         self, truth: dict[str, list[float]]
     ) -> None:
@@ -193,6 +208,59 @@ class TestCollinearity:
         section = report.collinearity[0]
         assert section.points == 3
         assert section.pair_gamma["k1"]["s"] == float("inf")
+
+    def test_a_parameter_no_observation_reads_is_poorly_determined(
+        self, truth: dict[str, list[float]]
+    ) -> None:
+        calibrator = _calibrator(
+            observed(truth, "B", range(5, 51, 5)), {"k1": (0.1, 0.6), "s": (0.5, 2.0)}
+        )
+        at = CalibrationResult(
+            best_parameters={"k1": 0.3, "s": 1.0},
+            final_loss=0.0,
+            iterations=0,
+            converged=True,
+            termination_reason="given",
+        )
+
+        report = calibrator.identifiability(
+            Collinearity(at=at, max_subset_size=2, threshold=20)
+        )
+
+        practical = report.verdicts["s"].practical
+        assert practical is not None
+        assert (practical.verdict, practical.reasons) == (
+            "poorly_determined",
+            ["Collinearity: no observation is sensitive to it."],
+        )
+
+    def test_a_result_holds_every_parameter_of_the_problem(
+        self, product: Calibrator
+    ) -> None:
+        at = CalibrationResult(
+            best_parameters={"k1": 0.3, "k2": 0.1},
+            final_loss=0.0,
+            iterations=0,
+            converged=True,
+            termination_reason="given",
+        )
+
+        with pytest.raises(ValueError, match=r"The result has no value of \['s'\]"):
+            product.identifiability(
+                Collinearity(at=at, max_subset_size=2, threshold=20)
+            )
+
+    def test_a_sample_holds_the_parameters_of_the_problem(
+        self, product: Calibrator
+    ) -> None:
+        sample = ParameterSample.equally_weighted(
+            ["k1", "s"], [(0.1, 0.6), (0.5, 2.0)], [[0.3, 1.0]], SampleMethod(name="g")
+        )
+
+        with pytest.raises(ValueError, match=r"parameters \['k1', 's'\] are not"):
+            product.identifiability(
+                Collinearity(at=sample, max_subset_size=2, threshold=20)
+            )
 
     def test_collinearity_rejects_invalid_settings(self, product: Calibrator) -> None:
         at = CalibrationResult(
@@ -401,6 +469,13 @@ def _report(
 
 
 class TestReport:
+    def test_the_verdicts_hold_the_parameters_in_order(self) -> None:
+        with pytest.raises(ValidationError, match=r"parameters \['k', 'j'\] in order"):
+            IdentifiabilityReport(
+                parameters=["k", "j"],
+                verdicts={"j": ParameterVerdicts(), "k": ParameterVerdicts()},
+            )
+
     def test_merge_keeps_structural_and_practical_verdicts_apart(self) -> None:
         merged = _report(structural="in_combination").merge(
             _report(practical="poorly_determined")

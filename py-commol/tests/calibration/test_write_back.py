@@ -114,6 +114,7 @@ WRITE_BACK_CASES = [
     pytest.param(_two_bins, {"A": 0.6}, "B", id="bin-with-remainder"),
     pytest.param(_two_bins, {"A": 0.4, "B": 0.6}, None, id="complete-bins"),
     pytest.param(_flat_category, {"g1": 0.3}, None, id="flat-category"),
+    pytest.param(_flat_category, {"g1": 0.3, "g2": 0.3}, None, id="both-categories"),
     pytest.param(shared_category_builder, {"level:c1": 0.6}, None, id="qualified"),
     pytest.param(
         _shared_category_override,

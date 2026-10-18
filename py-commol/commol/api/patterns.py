@@ -12,6 +12,7 @@ the class and chaining further ``add_group`` / ``set_default`` calls on the
 returned instance. The user never instantiates or names any other class.
 """
 
+from abc import abstractmethod
 from collections.abc import Iterable
 from enum import StrEnum
 from typing import Annotated, ClassVar, NotRequired, Protocol, Self, TypedDict
@@ -154,11 +155,9 @@ def _copy_condition(c: ConditionDict) -> ConditionDict:
 
 
 def _condition_key(
-    conditions: list[ConditionDict] | None,
+    conditions: list[ConditionDict],
 ) -> frozenset[tuple[str, str, str]]:
     """Return a hashable key for a conditions list, used for duplicate detection."""
-    if not conditions:
-        return frozenset()
     keys: list[tuple[str, str, str]] = []
     for c in conditions:
         if "stratification" not in c:
@@ -296,9 +295,9 @@ class AxisPattern(BaseModel):
     add_group: ClassVar[_AddGroupDescriptor] = _AddGroupDescriptor()
 
     @property
+    @abstractmethod
     def formula(self) -> str:
         """The mathematical expression for this pattern (always parenthesised)."""
-        raise NotImplementedError("Subclasses must implement formula")
 
     def _as_series_data(self) -> list[tuple[int, float]] | None:
         """Return pulse data as (step, value) points if representable as a series.
@@ -710,18 +709,10 @@ class _LinearRampAxisPattern(AxisPattern):
 
 
 class _ComputedAxisPattern(AxisPattern):
-    computed_formula: Annotated[str, Field(min_length=1)]
+    """A formula that ``combine`` or ``from_formula`` checked with its
+    configuration."""
 
-    @field_validator("computed_formula")
-    @classmethod
-    def validate_formula_length(cls, v: str) -> str:
-        config = SecurityConfig()
-        if len(v) > config.max_expression_length:
-            raise ValueError(
-                f"Formula length {len(v)} exceeds maximum "
-                f"{config.max_expression_length} characters"
-            )
-        return v
+    computed_formula: Annotated[str, Field(min_length=1)]
 
     @property
     def formula(self) -> str:
@@ -788,7 +779,7 @@ class _ScheduleAxisPattern(AxisPattern):
         key = _condition_key(conditions)
         pattern = schedule.for_group(conditions, source_compartment=source_compartment)
         for existing in self.patterns:
-            if _condition_key(existing.pattern.conditions) == key:
+            if _condition_key(existing.pattern.conditions or []) == key:
                 raise ValueError(
                     f"A group with conditions {pattern.conditions!r} has "
                     "already been registered."

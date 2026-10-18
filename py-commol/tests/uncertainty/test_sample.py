@@ -54,6 +54,16 @@ class TestInvariants:
                 ["k1", "k1"], [(0, 1), (0, 1)], [[0.5, 0.5]], METHOD
             )
 
+    def test_a_sample_is_read_from_a_mapping(self) -> None:
+        with pytest.raises(ValidationError, match="a valid dictionary"):
+            ParameterSample.model_validate([1.0, 2.0])
+
+    def test_a_sample_equals_only_a_sample(self) -> None:
+        sample = _sample([0.0, 0.0, 1.0])
+
+        assert sample != sample.values
+        assert sample == _sample([0.0, 0.0, 1.0])
+
     def test_a_sample_saved_to_json_loads_back_equal(self) -> None:
         sample = _sample([0.0, float("-inf"), 1.0])
 

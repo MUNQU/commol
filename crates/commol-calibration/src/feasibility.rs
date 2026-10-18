@@ -8,7 +8,7 @@
 
 use std::collections::HashSet;
 
-use commol_core::{MathExpression, MathExpressionContext, ENGINE_VARIABLES};
+use commol_core::{MathExpression, MathExpressionContext};
 
 use crate::types::{CalibrationConstraint, CalibrationParameter};
 
@@ -98,7 +98,6 @@ pub struct Feasibility {
 
 #[derive(Debug, Clone)]
 struct CompiledConstraint {
-    id: String,
     weight: f64,
     expression: MathExpression,
     /// `(position, row)` pairs of a constraint at positions.
@@ -145,16 +144,14 @@ impl Feasibility {
         let mut position_constraints = Vec::new();
         for constraint in constraints {
             let expression = MathExpression::new(constraint.expression.clone());
-            if let Err(e) = expression.validate() {
+            if let Err(e) = expression.validate().and_then(|()| expression.compiles()) {
                 return Err(format!(
                     "Constraint '{}' has invalid expression: {:?}",
                     constraint.id, e
                 ));
             }
+            // The engine variables (`total`, `t`, ...) are not among them.
             for variable in expression.get_variables() {
-                if ENGINE_VARIABLES.contains(&variable.as_str()) {
-                    continue;
-                }
                 let is_parameter = parameter_ids.contains(variable.as_str());
                 let is_output = outputs.contains(variable.as_str());
                 if !is_parameter && !is_output {
@@ -172,7 +169,6 @@ impl Feasibility {
                 }
             }
             let compiled = CompiledConstraint {
-                id: constraint.id.clone(),
                 weight: constraint.weight,
                 expression,
                 rows: constraint
@@ -248,12 +244,10 @@ impl Feasibility {
         let mut context = self.context(values);
         let mut amount = 0.0;
         for constraint in &self.parameter_constraints {
-            let value = constraint.expression.evaluate(&mut context).map_err(|e| {
-                EvaluationError::Failed(format!(
-                    "Parameter constraint '{}' evaluation failed: {:?}",
-                    constraint.id, e
-                ))
-            })?;
+            let value = constraint
+                .expression
+                .evaluate(&mut context)
+                .expect("Feasibility::new checks that a constraint compiles and reads parameters");
             if value < 0.0 {
                 amount += constraint.weight * -value;
             }
@@ -261,26 +255,9 @@ impl Feasibility {
         violation(amount)
     }
 
-    /// Check the constraints at positions on the rows of one run.
-    ///
-    /// # Errors
-    ///
-    /// A [`Violation::Constraint`] when one evaluates below zero at one of
-    /// its positions, or a failure when one cannot be evaluated.
-    pub fn check_rows(&self, values: &[f64], rows: &[Vec<f64>]) -> Result<(), EvaluationError> {
-        violation(self.row_violation(values, rows)?)
-    }
-
     /// The constraint amount of the rows of one run: 0 when every
     /// constraint at positions holds.
-    pub(crate) fn row_violation(
-        &self,
-        values: &[f64],
-        rows: &[Vec<f64>],
-    ) -> Result<f64, EvaluationError> {
-        if self.position_constraints.is_empty() {
-            return Ok(0.0);
-        }
+    pub(crate) fn row_violation(&self, values: &[f64], rows: &[Vec<f64>]) -> f64 {
         let mut context = self.context(values);
         // Only the state outputs are registered, so `total` stays the sum of
         // the state. Outputs after it are injected by name, with the sums.
@@ -288,12 +265,9 @@ impl Feasibility {
         let mut amount = 0.0;
         for constraint in &self.position_constraints {
             for &(position, row) in &constraint.rows {
-                let Some(values) = rows.get(row) else {
-                    return Err(EvaluationError::Failed(format!(
-                        "Position {} not found in simulation results for constraint '{}'",
-                        position, constraint.id
-                    )));
-                };
+                // The rows are those of the schedule, which holds every
+                // constraint position.
+                let values = &rows[row];
                 context.set_compartments_by_index(values);
                 for (name, index) in &self.non_state_outputs {
                     context.set_parameter_str(name, values[*index]);
@@ -303,18 +277,15 @@ impl Feasibility {
                     context.set_parameter_str(name, total);
                 }
                 context.set_step(position);
-                let value = constraint.expression.evaluate(&mut context).map_err(|e| {
-                    EvaluationError::Failed(format!(
-                        "Constraint '{}' evaluation failed at position {}: {:?}",
-                        constraint.id, position, e
-                    ))
-                })?;
+                let value = constraint.expression.evaluate(&mut context).expect(
+                    "Feasibility::new checks that a constraint compiles and reads parameters and outputs",
+                );
                 if value < 0.0 {
                     amount += constraint.weight * -value;
                 }
             }
         }
-        Ok(amount)
+        amount
     }
 }
 
@@ -364,10 +335,7 @@ mod tests {
             Err(Violation::Constraint { amount: 0.5 }.into())
         );
         let rows = vec![vec![0.0, 9.0], vec![1.0, 4.0]];
-        assert_eq!(
-            feasibility.check_rows(&[0.25, 0.5], &rows),
-            Err(Violation::Constraint { amount: 1.0 }.into())
-        );
+        assert_eq!(feasibility.row_violation(&[0.25, 0.5], &rows), 1.0);
     }
 
     #[test]

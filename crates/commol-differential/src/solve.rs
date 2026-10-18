@@ -131,9 +131,9 @@ pub(crate) fn integrate_with(
     positions: &[f64],
     rows: &mut [Vec<f64>],
 ) -> Result<(), String> {
-    let Some(&end) = positions.last() else {
-        return Ok(());
-    };
+    let end = *positions
+        .last()
+        .expect("the engine integrates to at least one position");
     let breakpoints = model.breakpoints(t0, end)?;
     let len = state.len();
     let rhs = RightHandSide {

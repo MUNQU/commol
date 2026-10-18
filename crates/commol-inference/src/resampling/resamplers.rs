@@ -40,7 +40,7 @@ impl BayesianBootstrap {
         Self {
             weights: observations.iter().map(|obs| obs.weight).collect(),
             block_of: blocks.block_of(),
-            blocks: blocks.len(),
+            blocks: blocks.count(),
         }
     }
 }
@@ -126,6 +126,21 @@ pub enum Multipliers {
 }
 
 impl Multipliers {
+    /// The multipliers of a name: `"rademacher"` or `"mammen"`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that lists the names when `name` is none of them.
+    pub fn from_name(name: &str) -> Result<Self, String> {
+        match name {
+            "rademacher" => Ok(Self::Rademacher),
+            "mammen" => Ok(Self::Mammen),
+            _ => Err(format!(
+                "multipliers is '{name}'; it must be \"rademacher\" or \"mammen\""
+            )),
+        }
+    }
+
     /// One multiplier.
     pub fn draw(self, generator: &mut Generator) -> f64 {
         let u = generator.uniform();
@@ -166,7 +181,7 @@ impl WildBootstrap {
         Self {
             residuals,
             block_of: scheme.block_of(),
-            blocks: scheme.len(),
+            blocks: scheme.count(),
             multipliers,
         }
     }

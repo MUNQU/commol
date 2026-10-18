@@ -3,15 +3,10 @@
 //! This module provides the context for evaluating mathematical expressions,
 //! including parameters, compartments, and special variables.
 
-use evalexpr::{ContextWithMutableVariables, HashMapContext, Value};
 use std::collections::HashMap;
 
-use super::preprocessing::{
-    SPECIAL_VAR_E, SPECIAL_VAR_PI, SPECIAL_VAR_STEP, SPECIAL_VAR_T, SPECIAL_VAR_TOTAL,
-};
-
 /// Context for evaluating mathematical expressions
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MathExpressionContext {
     pub(crate) parameters: HashMap<String, f64>,
     parameter_indices: HashMap<String, usize>,
@@ -24,27 +19,12 @@ pub struct MathExpressionContext {
     pub(crate) time: f64,
     /// Cached compartment names for index-based updates
     compartment_names: Vec<String>,
-    /// Cached evalexpr context to avoid rebuilding
-    cached_evalexpr_context: Option<HashMapContext>,
-    /// Flag to indicate if cache is dirty
-    cache_dirty: bool,
 }
 
 impl MathExpressionContext {
     /// Create a new expression context
     pub fn new() -> Self {
-        Self {
-            parameters: HashMap::new(),
-            parameter_indices: HashMap::new(),
-            parameter_names: Vec::new(),
-            parameter_values: Vec::new(),
-            compartments: HashMap::new(),
-            step: 0.0,
-            time: 0.0,
-            compartment_names: Vec::new(),
-            cached_evalexpr_context: None,
-            cache_dirty: true,
-        }
+        Self::default()
     }
 
     /// Initialize compartment names for index-based updates
@@ -67,31 +47,11 @@ impl MathExpressionContext {
                 }
             }
         }
-
-        // Update cached context directly if it exists (more efficient than rebuilding)
-        if let Some(ref mut ctx) = self.cached_evalexpr_context {
-            for (i, value) in values.iter().enumerate() {
-                if i < self.compartment_names.len() {
-                    ctx.set_value(self.compartment_names[i].clone(), Value::Float(*value))
-                        .ok();
-                }
-            }
-            // Update the total. Callers may pass a wider row than the
-            // registered compartments (simulation outputs append accumulators after
-            // the state), so only the registered compartments count towards the
-            // total — matching the assignment loop above.
-            let total: f64 = values.iter().take(self.compartment_names.len()).sum();
-            ctx.set_value(SPECIAL_VAR_TOTAL.to_string(), Value::Float(total))
-                .ok();
-        } else {
-            self.cache_dirty = true;
-        }
     }
 
     /// Set a parameter value
     pub fn set_parameter(&mut self, name: String, value: f64) {
         self.set_parameter_indexed(name, value);
-        self.cache_dirty = true;
     }
 
     /// Set a parameter value by string reference (avoids allocation in the
@@ -107,13 +67,6 @@ impl MathExpressionContext {
         } else {
             self.set_parameter_indexed(name.to_string(), value);
         }
-
-        // Update cached context directly if it exists
-        if let Some(ref mut ctx) = self.cached_evalexpr_context {
-            ctx.set_value(name.to_string(), Value::Float(value)).ok();
-        } else {
-            self.cache_dirty = true;
-        }
     }
 
     /// Pre-allocate parameter slots so subsequent `set_parameter_str` calls hit
@@ -122,7 +75,6 @@ impl MathExpressionContext {
         for name in names {
             self.reserve_parameter_index(name);
         }
-        self.cache_dirty = true;
     }
 
     /// Set multiple parameters
@@ -130,29 +82,17 @@ impl MathExpressionContext {
         for (name, value) in parameters {
             self.set_parameter_indexed(name, value);
         }
-        self.cache_dirty = true;
     }
 
     /// Set the amount of a compartment
     pub fn set_compartment(&mut self, name: String, value: f64) {
         self.compartments.insert(name, value);
-        self.cache_dirty = true;
     }
 
     /// Set the current step, and the time `t` to the same value.
     pub fn set_step(&mut self, step: f64) {
         self.step = step;
         self.time = step;
-
-        // Update cached context directly if it exists
-        if let Some(ref mut ctx) = self.cached_evalexpr_context {
-            ctx.set_value(SPECIAL_VAR_STEP.to_string(), Value::Float(step))
-                .ok();
-            ctx.set_value(SPECIAL_VAR_T.to_string(), Value::Float(step))
-                .ok();
-        } else {
-            self.cache_dirty = true;
-        }
     }
 
     /// Set the time `t` and leave `step` as it is.
@@ -161,13 +101,6 @@ impl MathExpressionContext {
     /// the step that holds `t`.
     pub fn set_time(&mut self, time: f64) {
         self.time = time;
-
-        if let Some(ref mut ctx) = self.cached_evalexpr_context {
-            ctx.set_value(SPECIAL_VAR_T.to_string(), Value::Float(time))
-                .ok();
-        } else {
-            self.cache_dirty = true;
-        }
     }
 
     /// Get a single parameter value by name
@@ -188,11 +121,8 @@ impl MathExpressionContext {
     }
 
     /// Set a parameter slot by a previously resolved index. Updates both the
-    /// indexed value storage and the name-keyed HashMap so that
-    /// `get_parameters()` and evalexpr fallback evaluation stay consistent.
-    /// Skips the per-call evalexpr context patch performed by
-    /// `set_parameter_str`; the next fallback evaluation will rebuild the
-    /// cache from the up-to-date HashMap.
+    /// indexed value storage and the name-keyed HashMap, so `get_parameters()`
+    /// and the compiled expressions read the same value.
     pub fn set_parameter_by_index(&mut self, index: usize, value: f64) -> Result<(), String> {
         let Some(slot) = self.parameter_values.get_mut(index) else {
             return Err(format!("Parameter index '{}' not found", index));
@@ -204,7 +134,6 @@ impl MathExpressionContext {
         } else {
             self.parameters.insert(name.clone(), value);
         }
-        self.cache_dirty = true;
         Ok(())
     }
 
@@ -240,59 +169,5 @@ impl MathExpressionContext {
         self.parameter_indices.insert(name.clone(), idx);
         self.parameter_names.push(name);
         self.parameter_values.push(None);
-    }
-
-    /// Get or rebuild the evalexpr context (uses cache when possible)
-    pub(crate) fn get_evalexpr_context(&mut self) -> &HashMapContext {
-        if self.cache_dirty || self.cached_evalexpr_context.is_none() {
-            let mut context = HashMapContext::new();
-
-            // Add user-defined parameters
-            for (name, value) in &self.parameters {
-                context.set_value(name.clone(), Value::Float(*value)).ok();
-            }
-
-            // Add compartment values
-            for (name, value) in &self.compartments {
-                context.set_value(name.clone(), Value::Float(*value)).ok();
-            }
-
-            // Add special variables
-            // Sum compartment values in sorted order for deterministic floating-point results.
-            // HashMap iteration order is non-deterministic, and floating-point addition
-            // is not associative, so summing in different orders produces different results.
-            let mut sorted_values: Vec<f64> = self.compartments.values().copied().collect();
-            sorted_values.sort_by(|a, b| a.total_cmp(b));
-            let total: f64 = sorted_values.iter().sum();
-            context
-                .set_value(SPECIAL_VAR_TOTAL.to_string(), Value::Float(total))
-                .ok();
-            context
-                .set_value(SPECIAL_VAR_STEP.to_string(), Value::Float(self.step))
-                .ok();
-            context
-                .set_value(SPECIAL_VAR_T.to_string(), Value::Float(self.time))
-                .ok();
-            context
-                .set_value(
-                    SPECIAL_VAR_PI.to_string(),
-                    Value::Float(std::f64::consts::PI),
-                )
-                .ok();
-            context
-                .set_value(SPECIAL_VAR_E.to_string(), Value::Float(std::f64::consts::E))
-                .ok();
-
-            self.cached_evalexpr_context = Some(context);
-            self.cache_dirty = false;
-        }
-
-        self.cached_evalexpr_context.as_ref().unwrap()
-    }
-}
-
-impl Default for MathExpressionContext {
-    fn default() -> Self {
-        Self::new()
     }
 }

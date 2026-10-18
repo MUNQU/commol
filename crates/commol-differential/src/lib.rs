@@ -33,8 +33,6 @@ mod solve;
 
 pub use solve::SPARSE_THRESHOLD;
 
-use std::collections::HashMap;
-
 use commol_core::{EngineSettings, ModelValue, OdeSolver, SimulationError};
 use commol_model::{
     CompartmentalEngine, CompiledModel, InitialConditionPlan, OutputLabels, output_sums,
@@ -89,11 +87,6 @@ impl DifferentialEquations {
             current_time: 0.0,
             settled: false,
         })
-    }
-
-    /// The compiled model the engine integrates.
-    pub fn model(&self) -> &CompiledModel {
-        &self.model
     }
 
     /// The solver settings.
@@ -228,10 +221,6 @@ impl commol_core::SimulationEngine for DifferentialEquations {
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
         self.model.set_parameter(parameter_id, value);
         Ok(())
-    }
-
-    fn get_parameters(&self) -> &HashMap<String, f64> {
-        self.model.parameters()
     }
 
     fn current_position(&self) -> f64 {

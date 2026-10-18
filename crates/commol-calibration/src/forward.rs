@@ -204,7 +204,7 @@ impl<E: SimulationEngine> ForwardModel<E> {
     /// Write the predicted observations of the rows in `workspace` into
     /// `workspace.predictions`, replicate after replicate.
     pub fn observe(&self, values: &[f64], workspace: &mut Workspace) {
-        let n = self.observation.len();
+        let n = self.observation.count();
         workspace.predictions.resize(n * workspace.rows.len(), 0.0);
         for (rows, out) in workspace
             .rows

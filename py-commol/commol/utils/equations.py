@@ -240,11 +240,7 @@ def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Q
     namespace: dict[str, object] = {}
 
     for var, unit_str in variable_units.items():
-        unit_obj = ureg(unit_str)
-        if isinstance(unit_obj, pint.Quantity):
-            namespace[var] = unit_obj
-        else:
-            namespace[var] = 1.0 * unit_obj
+        namespace[var] = ureg(unit_str)
 
     namespace.update(
         {

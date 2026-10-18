@@ -51,6 +51,18 @@ fn only_a_fixed_value_compared_with_t_is_a_breakpoint() {
 }
 
 #[test]
+fn a_threshold_of_fixed_values_through_functions_is_a_breakpoint() {
+    for (rate, point) in [
+        ("if(t > max(k, 2), k, 0)", 2.0),
+        ("if(t > -k + 3, k, 0)", 2.7),
+        ("if(t > if(k > 0, 3, 4), k, 0)", 3.0),
+    ] {
+        let mut model = compiled(&model(rate, "k", "step_function", ""));
+        assert_eq!(model.breakpoints(1.5, 4.5), Ok(vec![point, 4.5]), "{rate}");
+    }
+}
+
+#[test]
 fn a_rate_of_step_stops_at_every_integer_after_the_start() {
     let mut model = compiled(&model("k * step", "k", "step_function", ""));
     assert_eq!(model.breakpoints(2.5, 5.0).unwrap(), [3.0, 4.0, 5.0]);
@@ -97,6 +109,19 @@ fn an_impulse_position_is_finite_and_not_negative() {
             assert!(error.contains("finite and not negative"), "{error}");
         }
     }
+}
+
+#[test]
+fn an_impulse_has_positions_or_a_period_not_both() {
+    let mut model = model("k", "k", "step_function", r#","impulse_at":[1]"#);
+    model.process.transitions[0].impulse_every = Some((2.0, 0.0));
+
+    let error = CompiledModel::try_from_model(&model).err().unwrap();
+
+    assert_eq!(
+        error,
+        "Transition 'ab' sets both impulse_at and impulse_every; set one"
+    );
 }
 
 #[test]
@@ -153,4 +178,92 @@ fn overrides_may_not_take_the_amounts_above_the_total() {
     fractions.insert("C".to_string(), 0.0005);
     let error = amounts(&model).err().unwrap();
     assert!(error.contains("exceed the total"), "{error}");
+}
+
+/// `model` with `k` left without a value, as before calibration.
+fn without_k(ab: &str, extra: &str) -> CompiledModel {
+    let mut model = model(ab, "z", "step_function", extra);
+    model.parameters[0].value = None;
+    compiled(&model)
+}
+
+#[test]
+fn a_value_that_reads_a_parameter_without_a_value_fails_where_it_is_read() {
+    let state = vec![800.0, 200.0, 0.0];
+    let mut rates = vec![0.0; 2];
+
+    let program = without_k("k * A + 1", "")
+        .transition_rates(0.0, 0.0, &state, &mut rates)
+        .unwrap_err();
+    let threshold = without_k("if(t > k, 1, 0)", "")
+        .breakpoints(0.0, 2.0)
+        .unwrap_err();
+    let mut impulse = without_k("k", r#","impulse_at":[1]"#);
+    let rate = impulse
+        .impulse_rates(1.0, &state, &mut Vec::new())
+        .unwrap_err();
+    let applied = impulse.apply_impulses(1.0, &mut state.clone()).unwrap_err();
+
+    for error in [&program, &rate] {
+        assert!(
+            error.contains("Parameter index '") && error.ends_with("' not found"),
+            "{error}"
+        );
+    }
+    assert!(
+        threshold.starts_with("Failed to evaluate the time threshold 'k'"),
+        "{threshold}"
+    );
+    assert_eq!(applied, rate);
+}
+
+#[test]
+fn a_formula_parameter_that_reads_a_parameter_without_a_value_fails() {
+    let mut model = model("f", "z", "step_function", "");
+    model.parameters[0].value = None;
+    model
+        .parameters
+        .push(serde_json::from_str(r#"{"id":"f","value":"k * 2"}"#).expect("valid parameter"));
+    let mut compiled = compiled(&model);
+    let state = compiled.initial_state().to_vec();
+
+    let error = compiled
+        .transition_rates(0.0, 0.0, &state, &mut [0.0; 2])
+        .unwrap_err();
+
+    assert!(
+        error.starts_with("Failed to evaluate formula parameter 'f': "),
+        "{error}"
+    );
+}
+
+#[test]
+fn only_the_impulses_of_a_position_act_and_an_absolute_one_moves_its_rate() {
+    let json = r#"{"name":"m","parameters":[{"id":"k","value":0.5}],
+        "engine":{"type":"DifferentialEquations"},
+        "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"},
+        {"id":"C","name":"C"}],"accumulators":[],"stratifications":[],
+        "transitions":[
+        {"id":"ab","source":["A"],"target":["B"],"rate":"k","impulse_at":[1]},
+        {"id":"ac","source":["A"],"target":["C"],"rate":"k * A / 4","impulse_at":[2]}]},
+        "structure":{"kind":"aggregate","total":1000,
+        "bin_fractions":{"A":0.8,"B":0.2,"C":0.0}}}"#;
+    let mut model = compiled(&serde_json::from_str(json).expect("valid model JSON"));
+    let mut state = model.initial_state().to_vec();
+
+    let mut rates = Vec::new();
+    model.impulse_rates(1.0, &state, &mut rates).unwrap();
+    assert_eq!(rates, [(0, 0.5)]);
+    assert!(model.apply_impulses(1.0, &mut state).unwrap());
+    assert_eq!(state, [400.0, 600.0, 0.0]);
+    assert!(model.apply_impulses(2.0, &mut state).unwrap());
+    assert_eq!(state, [350.0, 600.0, 50.0]);
+}
+
+#[test]
+fn a_flow_that_does_not_take_from_a_compartment_does_not_drain_it() {
+    let mut model = compiled(&model("k", "z", "step_function", ""));
+    let state = model.initial_state().to_vec();
+
+    assert_eq!(model.outflows(0.0, 0.0, &state, 1).unwrap(), []);
 }

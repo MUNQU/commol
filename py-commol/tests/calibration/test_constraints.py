@@ -198,3 +198,19 @@ class TestExpressionSecurity:
         self, expression: str, at: list[int] | None
     ) -> None:
         assert_accepted(CalibrationConstraint, id="safe", expression=expression, at=at)
+
+
+class TestPositions:
+    @pytest.mark.parametrize(
+        ("at", "message"),
+        [
+            ([], "must not be empty if specified"),
+            ([10, -1], "must all be finite and non-negative"),
+            ([float("inf")], "must all be finite and non-negative"),
+        ],
+    )
+    def test_a_constraint_is_checked_at_positions_of_the_axis(
+        self, at: list[float], message: str
+    ) -> None:
+        with pytest.raises(ValidationError, match=f"'cap' {message}"):
+            CalibrationConstraint(id="cap", expression="500.0 - B", at=at)

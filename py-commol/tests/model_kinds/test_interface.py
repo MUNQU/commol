@@ -181,6 +181,19 @@ class TestStructureInterface:
 
         assert structure.series_label(decay_model(), "x") == SeriesLabel("x", None)
 
+    def test_a_kind_adds_no_sections_unless_it_has_some(self, monkeypatch) -> None:
+        monkeypatch.setattr(ModelStructure, "_kinds", dict(ModelStructure._kinds))
+
+        class Plain(DecayStructure):
+            kind: Literal["plain"] = "plain"  # ty: ignore[invalid-assignment]
+            report_sections = ModelStructure.report_sections
+            describe = ModelStructure.describe
+
+        structure = Plain(outputs=[])
+
+        assert structure.report_sections(decay_model(), set(), None) == {}
+        assert structure.describe(decay_model()) == []
+
     def test_a_kind_describes_itself_through_the_interface(self) -> None:
         description = decay_model().describe()
 

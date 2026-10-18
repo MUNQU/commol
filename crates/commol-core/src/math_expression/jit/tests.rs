@@ -238,6 +238,67 @@ mod jit_tests {
         );
     }
 
+    fn evaluate(formula: &str, ctx: &MathExpressionContext) -> f64 {
+        let compiler = JITCompiler::new().unwrap();
+        let jit_fn = compiler.compile(&preprocess_formula(formula)).unwrap();
+        jit_fn.call(ctx).unwrap()
+    }
+
+    #[test]
+    fn at_most_and_unequal_compare_two_values() {
+        let ctx = create_test_context();
+
+        assert_eq!(evaluate("k1 <= 0.5", &ctx), 1.0);
+        assert_eq!(evaluate("k1 <= 0.4", &ctx), 0.0);
+        assert_eq!(evaluate("k1 != 0.5", &ctx), 0.0);
+        assert_eq!(evaluate("k1 != k2", &ctx), 1.0);
+    }
+
+    #[test]
+    fn a_function_of_three_arguments_needs_three() {
+        let compiler = JITCompiler::new().unwrap();
+
+        let error = compiler
+            .compile(&preprocess_formula("fma(k1, k2)"))
+            .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "Invalid expression: Function fma requires exactly 3 arguments, got 2"
+        );
+    }
+
+    #[test]
+    fn a_function_reads_the_time_apart_from_the_step() {
+        let mut ctx = create_test_context();
+        ctx.set_time(5.25);
+
+        assert_eq!(evaluate("t - step", &ctx), 0.25);
+    }
+
+    #[test]
+    fn a_function_of_many_variables_reads_every_one() {
+        let mut ctx = MathExpressionContext::new();
+        let names: Vec<String> = (0..20).map(|i| format!("v{i}")).collect();
+        for (i, name) in names.iter().enumerate() {
+            ctx.set_parameter(name.clone(), i as f64);
+        }
+
+        assert_eq!(evaluate(&names.join(" + "), &ctx), 190.0);
+    }
+
+    #[test]
+    fn a_buffer_has_one_value_per_variable() {
+        let compiler = JITCompiler::new().unwrap();
+        let jit_fn = compiler.compile(&preprocess_formula("k1 * A")).unwrap();
+
+        assert_eq!(jit_fn.call_with_buffer(&[0.5, 4.0]).unwrap(), 2.0);
+        assert_eq!(
+            jit_fn.call_with_buffer(&[0.5]).unwrap_err().to_string(),
+            "Invalid expression: JIT buffer length mismatch: expected 2, got 1"
+        );
+    }
+
     #[test]
     fn test_jit_comparison_lt() {
         let compiler = JITCompiler::new().unwrap();

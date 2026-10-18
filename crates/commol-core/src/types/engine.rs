@@ -171,8 +171,6 @@ pub enum DynamicsForm {
     /// An event table: each event, its change of the state and its
     /// propensity.
     StochasticEvents,
-    /// Rules that each unit applies.
-    Rules,
 }
 
 impl DynamicsForm {
@@ -181,7 +179,6 @@ impl DynamicsForm {
         Self::DifferenceEquation,
         Self::DifferentialEquation,
         Self::StochasticEvents,
-        Self::Rules,
     ];
 
     /// Name of the form, as Python shows it.
@@ -190,7 +187,6 @@ impl DynamicsForm {
             Self::DifferenceEquation => "difference_equation",
             Self::DifferentialEquation => "differential_equation",
             Self::StochasticEvents => "stochastic_events",
-            Self::Rules => "rules",
         }
     }
 
@@ -213,10 +209,6 @@ impl DynamicsForm {
                  state by its change, with a probability per unit of the axis given by its \
                  propensity."
             }
-            Self::Rules => {
-                "Each step, every unit applies the rules of the model to its own state and \
-                 to its neighbors."
-            }
         }
     }
 
@@ -232,7 +224,7 @@ impl DynamicsForm {
             }
             (Self::DifferentialEquation, false) => format!("d{variable}/dt"),
             (Self::DifferentialEquation, true) => format!("\\frac{{d{variable}}}{{dt}}"),
-            (Self::StochasticEvents | Self::Rules, _) => return None,
+            (Self::StochasticEvents, _) => return None,
         })
     }
 }
@@ -965,15 +957,29 @@ mod tests {
             "settings": {"method": "tau_leaping", "tau": 0.5, "rounding": "random"}
         }))
         .unwrap();
-        let EngineSettings::StochasticEvents(settings) = engine.settings() else {
-            panic!("expected stochastic event settings");
-        };
-        assert_eq!(settings.method, EventMethod::TauLeaping);
-        assert_eq!(settings.tau, Some(0.5));
+        assert!(matches!(
+            engine.settings(),
+            EngineSettings::StochasticEvents(settings)
+                if settings.method == EventMethod::TauLeaping && settings.tau == Some(0.5)
+        ));
         assert_eq!(engine.settings().rounding(), Some(Rounding::Random));
         let again: ModelEngine =
             serde_json::from_value(serde_json::to_value(engine).unwrap()).unwrap();
         assert_eq!(again, engine);
+        let steps_engine: ModelEngine = serde_json::from_value(json!({
+            "type": "StochasticSteps",
+            "settings": {"rounding": "random"}
+        }))
+        .unwrap();
+        let steps_again: ModelEngine =
+            serde_json::from_value(serde_json::to_value(steps_engine).unwrap()).unwrap();
+        assert_eq!(steps_again, steps_engine);
+        assert_eq!(
+            ModelEngine::new(EngineType::DifferenceEquations)
+                .settings()
+                .rounding(),
+            None
+        );
 
         let steps = EngineType::StochasticSteps
             .settings(Some(&json!({"rounding": "largest_remainder"})))
@@ -1009,10 +1015,7 @@ mod tests {
             for latex in [false, true] {
                 match form.equation_lhs("A", latex) {
                     Some(lhs) => assert!(lhs.contains('A'), "{lhs}"),
-                    None => assert!(matches!(
-                        form,
-                        DynamicsForm::StochasticEvents | DynamicsForm::Rules
-                    )),
+                    None => assert_eq!(form, DynamicsForm::StochasticEvents),
                 }
             }
         }
@@ -1105,11 +1108,11 @@ mod tests {
             "settings": {"method": "bdf", "rtol": 1e-8}
         }))
         .unwrap();
-        let EngineSettings::DifferentialEquations(solver) = engine.settings() else {
-            panic!("expected differential settings");
-        };
-        assert_eq!(solver.method, OdeMethod::Bdf);
-        assert_eq!(solver.atol, OdeSolver::DEFAULT_ATOL);
+        assert!(matches!(
+            engine.settings(),
+            EngineSettings::DifferentialEquations(solver)
+                if solver.method == OdeMethod::Bdf && solver.atol == OdeSolver::DEFAULT_ATOL
+        ));
         let again: ModelEngine =
             serde_json::from_value(serde_json::to_value(engine).unwrap()).unwrap();
         assert_eq!(again, engine);
@@ -1118,6 +1121,17 @@ mod tests {
         assert_eq!(
             serde_json::to_value(difference).unwrap(),
             json!({"type": "DifferenceEquations", "settings": null})
+        );
+    }
+
+    #[cfg(feature = "test-kind")]
+    #[test]
+    fn a_test_engine_has_no_settings() {
+        let engine = ModelEngine::new(EngineType::TestEngine);
+
+        assert_eq!(
+            serde_json::to_value(engine).unwrap(),
+            json!({"type": "TestEngine", "settings": null})
         );
     }
 

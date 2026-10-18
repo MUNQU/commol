@@ -20,6 +20,21 @@ pub enum ResidualScale {
 }
 
 impl ResidualScale {
+    /// The scale of a name: `"additive"` or `"multiplicative"`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that lists the names when `name` is none of them.
+    pub fn from_name(name: &str) -> Result<Self, String> {
+        match name {
+            "additive" => Ok(Self::Additive),
+            "multiplicative" => Ok(Self::Multiplicative),
+            _ => Err(format!(
+                "residual_scale is '{name}'; it must be \"additive\" or \"multiplicative\""
+            )),
+        }
+    }
+
     /// The value an observation shows when the model gives `fitted` and the
     /// residual is `residual`.
     pub fn apply(self, fitted: f64, residual: f64) -> f64 {
@@ -198,6 +213,23 @@ pub enum ResidualBlocks {
     /// Blocks with a uniform start and a geometric length of mean `length`,
     /// wrapped around the end (Politis and Romano 1994).
     Stationary,
+}
+
+impl ResidualBlocks {
+    /// The blocks of a name: `"moving"` or `"stationary"`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that lists the names when `name` is none of them.
+    pub fn from_name(name: &str) -> Result<Self, String> {
+        match name {
+            "moving" => Ok(Self::Moving),
+            "stationary" => Ok(Self::Stationary),
+            _ => Err(format!(
+                "scheme is '{name}'; it must be \"moving\" or \"stationary\""
+            )),
+        }
+    }
 }
 
 /// The source position of each of `count` synthetic positions, drawn from

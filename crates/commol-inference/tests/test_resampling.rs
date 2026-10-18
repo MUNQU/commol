@@ -74,10 +74,6 @@ impl SimulationEngine for ClosedForm {
         Ok(())
     }
 
-    fn get_parameters(&self) -> &HashMap<String, f64> {
-        &self.parameters
-    }
-
     fn current_position(&self) -> f64 {
         0.0
     }
@@ -180,7 +176,7 @@ fn blocks_cover_every_observation_once_across_series() {
         .collect();
     let scheme = BlockScheme::new(&observations, 3).unwrap();
 
-    assert_eq!(scheme.len(), 4);
+    assert_eq!(scheme.count(), 4);
     let mut seen: Vec<usize> = scheme.blocks().iter().flatten().copied().collect();
     seen.sort_unstable();
     assert_eq!(seen, (0..20).collect::<Vec<_>>());
@@ -734,5 +730,83 @@ fn residuals_of_a_stochastic_free_fit_are_observed_minus_fitted() {
     assert_eq!(
         copy.evaluate(&[1.0, 1.0], &mut workspace).unwrap(),
         problem.evaluate(&[1.0, 1.0], &mut workspace).unwrap()
+    );
+}
+
+#[test]
+fn a_runner_takes_a_start_and_one_fit_value_per_parameter() {
+    let problem = line_problem(&[1.0, 2.0, 3.0]);
+    let config = config();
+
+    let starts = ReplicateRunner::new(&problem, &config, &[1.0, 1.0], 0, 0).err();
+    let fit = ReplicateRunner::new(&problem, &config, &[1.0], 1, 0).err();
+
+    assert_eq!(
+        starts.as_deref(),
+        Some("A replicate needs at least one start")
+    );
+    assert_eq!(
+        fit.as_deref(),
+        Some("The fit has 1 values for 2 parameters")
+    );
+}
+
+#[test]
+fn a_jackknife_reports_the_blocks_it_could_not_fit() {
+    let values = [1.0, 2.0, 3.0, 4.0];
+    let problem = line_problem(&values);
+    let scheme = BlockScheme::new(problem.observed_data(), 2).unwrap();
+    let broken = OptimizationConfig::NelderMead(NelderMeadConfig {
+        initial_simplex_size: 0.0,
+        ..NelderMeadConfig::default()
+    });
+    // Without the observations of the first block, no weight is left when
+    // the second one is left out.
+    let half = problem.with_data(&values, &[0.0, 0.0, 1.0, 1.0]).unwrap();
+    let config = config();
+
+    let none = block_jackknife(
+        &ReplicateRunner::new(&problem, &broken, &[1.0, 1.0], 2, 0).unwrap(),
+        &scheme,
+    )
+    .unwrap_err();
+    let one = block_jackknife(
+        &ReplicateRunner::new(&half, &config, &[1.0, 1.0], 1, 0).unwrap(),
+        &scheme,
+    )
+    .unwrap_err();
+
+    assert!(none.starts_with("Every replicate failed (2)"), "{none}");
+    assert!(
+        one.starts_with("Only one block left out could be fitted; a jackknife needs two."),
+        "{one}"
+    );
+}
+
+#[test]
+fn a_name_gives_its_setting_and_an_unknown_name_lists_the_names() {
+    assert!(matches!(
+        ResidualScale::from_name("multiplicative"),
+        Ok(ResidualScale::Multiplicative)
+    ));
+    assert!(matches!(
+        ResidualBlocks::from_name("stationary"),
+        Ok(ResidualBlocks::Stationary)
+    ));
+    assert!(matches!(
+        Multipliers::from_name("mammen"),
+        Ok(Multipliers::Mammen)
+    ));
+    assert_eq!(
+        ResidualScale::from_name("log").err().as_deref(),
+        Some("residual_scale is 'log'; it must be \"additive\" or \"multiplicative\"")
+    );
+    assert_eq!(
+        ResidualBlocks::from_name("circular").err().as_deref(),
+        Some("scheme is 'circular'; it must be \"moving\" or \"stationary\"")
+    );
+    assert_eq!(
+        Multipliers::from_name("gauss").err().as_deref(),
+        Some("multipliers is 'gauss'; it must be \"rademacher\" or \"mammen\"")
     );
 }

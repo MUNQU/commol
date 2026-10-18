@@ -170,6 +170,26 @@ class TestRunReport:
         assert leaf["ci_lower"] == pytest.approx(leaf["ci_upper"])
         assert leaf["median"] == pytest.approx([results["A"][s] for s in STEPS])
 
+    def test_an_empty_ensemble_reports_the_run(self) -> None:
+        simulation = _accumulator_model()
+        results = simulation.run(max(STEPS))
+
+        plain = simulation_report(
+            simulation, results, STEPS, WINDOW, WINDOWS, accumulators=["events"]
+        )
+        empty = simulation_report(
+            simulation,
+            results,
+            STEPS,
+            WINDOW,
+            WINDOWS,
+            accumulators=["events"],
+            ensemble_runs=[],
+            confidence_level=0.95,
+        )
+
+        assert empty == plain
+
     def test_layout_is_the_same_with_and_without_an_ensemble(self) -> None:
         simulation = _accumulator_model()
         results = simulation.run(max(STEPS))

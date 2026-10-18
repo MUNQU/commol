@@ -13,10 +13,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-try:
-    from commol.commol_rs import _commol_rs as commol_rs
-except ImportError as e:
-    raise ImportError(f"Error importing Rust extension: {e}") from e
+from commol.commol_rs import _commol_rs as commol_rs
 
 
 NEIGHBORS_VARIABLE: str = commol_rs.model.NEIGHBORS

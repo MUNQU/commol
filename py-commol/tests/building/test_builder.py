@@ -1,7 +1,11 @@
 """The builder assembles bins, parameters, transitions and initial conditions."""
 
+import pytest
+from pydantic import ValidationError
+
+from commol.context.bin import Bin
 from commol.context.model import Model
-from tests.support import a_to_b_builder, build, abc_builder
+from tests.support import FactoryBuilder, a_to_b_builder, build, abc_builder
 from commol import Aggregate
 
 
@@ -68,3 +72,69 @@ class TestCloneAndReset:
         )
 
         assert model.process.accumulators == []
+
+
+class TestProcessChecks:
+    @pytest.mark.parametrize(
+        ("add", "message"),
+        [
+            (lambda b: b.add_bin(id="A", name="A2"), r"Duplicate bin IDs.*'A'"),
+            (
+                lambda b: b.add_stratification(id="g", categories=["x"]),
+                r"Duplicate stratification IDs.*'g'",
+            ),
+            (
+                lambda b: b.add_transition(
+                    id="t_ab", source=["A"], target=["B"], rate="k"
+                ),
+                r"Duplicate transition IDs.*'t_ab'",
+            ),
+        ],
+        ids=["bin", "stratification", "transition"],
+    )
+    def test_an_id_names_one_item_of_its_kind(self, add, message: str) -> None:
+        builder = a_to_b_builder(stratifications={"g": ["g1", "g2"]})
+        add(builder)
+
+        with pytest.raises(ValidationError, match=message):
+            build(builder)
+
+    @pytest.mark.parametrize(
+        ("source", "target", "message"),
+        [
+            (["A"], ["Z"], r"'t2' contains invalid ids: \{'Z'\}"),
+            (["A"], ["g1"], "'t2' mixes id types"),
+            (["g1"], ["h1"], "categories from multiple stratifications: g, h"),
+        ],
+        ids=["unknown", "bin and category", "two stratifications"],
+    )
+    def test_a_transition_moves_between_bins_or_categories_of_one_stratification(
+        self, source: list[str], target: list[str], message: str
+    ) -> None:
+        builder = a_to_b_builder(stratifications={"g": ["g1", "g2"], "h": ["h1", "h2"]})
+        builder.add_transition(id="t2", source=source, target=target, rate="k")
+
+        with pytest.raises(ValidationError, match=message):
+            build(builder)
+
+    def test_bins_of_one_id_are_one_member_of_a_set(self) -> None:
+        bins = {Bin(id="A", name="first"), Bin(id="A", name="second")}
+
+        assert bins == {Bin(id="A", name="any")}
+
+    @pytest.mark.parametrize(
+        ("bins", "message"),
+        [([], "At least one bin"), (["A"], "At least one transition")],
+    )
+    def test_a_process_has_a_bin_and_a_transition(
+        self, bins: list[str], message: str
+    ) -> None:
+        builder = FactoryBuilder(name="m")
+        for bin_id in bins:
+            builder.add_bin(bin_id, bin_id)
+        builder.set_structure(
+            Aggregate(total=10, bin_fractions=dict.fromkeys(bins, 1.0))
+        )
+
+        with pytest.raises(ValidationError, match=message):
+            build(builder)

@@ -5,12 +5,19 @@ from typing import Self
 
 from pydantic import ConfigDict, BaseModel, Field, field_validator, model_validator
 
-try:
-    from commol.commol_rs import _commol_rs as commol_rs
-except ImportError as e:
-    raise ImportError(f"Error importing Rust extension: {e}") from e
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.stratification_condition import StratificationCondition
 from commol.utils.security import validate_expression_security
+
+
+def _checked_rate(value: str) -> str:
+    """``value`` once it passes the security and the syntax checks."""
+    try:
+        validate_expression_security(value)
+        commol_rs.core.MathExpression(value).validate()
+    except ValueError as e:
+        raise ValueError(f"Validation failed for rate '{value}': {e}")
+    return value
 
 
 class StratifiedRate(BaseModel):
@@ -72,12 +79,7 @@ class StratifiedRate(BaseModel):
     @classmethod
     def validate_rate(cls, value: str) -> str:
         """Perform security and syntax validation on the rate expression."""
-        try:
-            validate_expression_security(value)
-            commol_rs.core.MathExpression(value).validate()
-        except ValueError as e:
-            raise ValueError(f"Validation failed for rate '{value}': {e}")
-        return value
+        return _checked_rate(value)
 
 
 class Transition(BaseModel):
@@ -209,9 +211,4 @@ class Transition(BaseModel):
         """
         if value is None:
             return value
-        try:
-            validate_expression_security(value)
-            commol_rs.core.MathExpression(value).validate()
-        except ValueError as e:
-            raise ValueError(f"Validation failed for rate '{value}': {e}")
-        return value
+        return _checked_rate(value)

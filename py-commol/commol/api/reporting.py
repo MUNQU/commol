@@ -392,7 +392,7 @@ def accumulators_report(
     Returns
     -------
     dict[str, AccumulatorReport]
-        One entry per accumulator that has outputs.
+        One entry per accumulator.
 
     Raises
     ------
@@ -411,8 +411,6 @@ def accumulators_report(
     block: dict[str, AccumulatorReport] = {}
     for accumulator_id in accumulators:
         outputs = simulation.outputs_for(accumulator_id)
-        if not outputs:
-            continue
 
         def leaf(
             reduce_fn: Callable[[SimulationResults], float | list[float]],

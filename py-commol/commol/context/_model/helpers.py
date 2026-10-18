@@ -161,7 +161,10 @@ class ModelCompartmentHelper:
         return inferred_any
 
     def get_rate_unit(self, rate: str, variable_units: dict[str, str]) -> str | None:
-        """Calculate the unit for a transition rate expression."""
+        """
+        The unit of a rate expression, or None when a variable has no unit or
+        the units do not combine, such as a sum of days and items.
+        """
         try:
             self.register_custom_units()
             variables = get_expression_variables(rate)
@@ -175,23 +178,20 @@ class ModelCompartmentHelper:
 
             equation_unit = parse_equation_unit(rate, rate_variable_units)
             return str(equation_unit.units)
-        except Exception:
+        except ValueError:
             return None
 
     def annotate_rate_variables(self, rate: str, variable_units: dict[str, str]) -> str:
         """Annotate variables in a rate expression with their units."""
         from commol.context._model.equations import replace_variables
 
-        try:
-            return replace_variables(
-                rate,
-                rate,
-                lambda var: (
-                    f"{var}({variable_units[var]})" if var in variable_units else var
-                ),
-            )
-        except Exception:
-            return rate
+        return replace_variables(
+            rate,
+            rate,
+            lambda var: (
+                f"{var}({variable_units[var]})" if var in variable_units else var
+            ),
+        )
 
     def format_rate_with_unit(
         self,

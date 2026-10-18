@@ -1,9 +1,9 @@
 //! Evaluation of the compiled rate of a flow.
 //!
 //! A rate takes the fastest path it supports: the specialized fast-path
-//! interpreter, the JIT with pre-resolved slots, or the evalexpr fallback.
+//! interpreter, or the JIT with pre-resolved slots.
 
-use crate::types::{FastRateExpression, FastRateOp, TransitionFlow, VarSlot};
+use crate::types::{FAST_STACK_DEPTH, FastRateExpression, FastRateOp, TransitionFlow, VarSlot};
 use commol_core::{MathExpression, MathExpressionContext, RateMathExpression};
 
 /// The step and the time a rate is evaluated at.
@@ -16,8 +16,8 @@ pub(crate) struct Clock {
 }
 
 /// Evaluate a transition flow's rate, choosing the fastest path the rate
-/// supports: the specialized fast-path interpreter, the JIT with pre-resolved
-/// slots, or the evalexpr fallback.
+/// supports: the specialized fast-path interpreter, or the JIT with
+/// pre-resolved slots.
 #[inline]
 pub(crate) fn evaluate_rate(
     flow: &TransitionFlow,
@@ -26,16 +26,16 @@ pub(crate) fn evaluate_rate(
     clock: Clock,
     jit_buf: &mut [f64; 16],
 ) -> Result<f64, String> {
-    let rate_result = if let Some(fast_expr) = &flow.fast_rate_expression {
-        eval_fast_rate(fast_expr, amounts, ctx, clock)
-    } else if let (RateMathExpression::Formula(expr), Some(slots)) =
-        (&flow.rate_expression, &flow.resolved_slots)
-    {
-        evaluate_jit_rate(expr, slots, amounts, ctx, clock, jit_buf)
-    } else {
-        flow.rate_expression
-            .evaluate(ctx)
-            .map_err(|error| error.to_string())
+    let rate_result = match (
+        &flow.fast_rate_expression,
+        &flow.rate_expression,
+        &flow.resolved_slots,
+    ) {
+        (Some(fast_expr), _, _) => eval_fast_rate(fast_expr, amounts, ctx, clock),
+        (None, RateMathExpression::Formula(expr), Some(slots)) => {
+            evaluate_jit_rate(expr, slots, amounts, ctx, clock, jit_buf)
+        }
+        _ => unreachable!("the builder gives every rate a fast path or the slots of its JIT"),
     };
 
     rate_result.map_err(|error| {
@@ -106,29 +106,25 @@ fn eval_fast_rate(
     ctx: &MathExpressionContext,
     clock: Clock,
 ) -> Result<f64, String> {
-    match expr {
-        FastRateExpression::Constant(value) => return Ok(*value),
-        FastRateExpression::Slot(slot) => {
-            return resolve_slot(slot, amounts, ctx, clock);
-        }
+    Ok(match expr {
+        FastRateExpression::Constant(value) => *value,
+        FastRateExpression::Slot(slot) => resolve_slot(slot, amounts, ctx, clock)?,
         FastRateExpression::Mul2(a, b) => {
-            return Ok(
-                resolve_slot(a, amounts, ctx, clock)? * resolve_slot(b, amounts, ctx, clock)?
-            );
+            resolve_slot(a, amounts, ctx, clock)? * resolve_slot(b, amounts, ctx, clock)?
         }
         FastRateExpression::Mul3(a, b, c) => {
-            return Ok(resolve_slot(a, amounts, ctx, clock)?
+            resolve_slot(a, amounts, ctx, clock)?
                 * resolve_slot(b, amounts, ctx, clock)?
-                * resolve_slot(c, amounts, ctx, clock)?);
+                * resolve_slot(c, amounts, ctx, clock)?
         }
         FastRateExpression::OneMinusMul3 {
             subtract,
             factor,
             value,
         } => {
-            return Ok((1.0 - resolve_slot(subtract, amounts, ctx, clock)?)
+            (1.0 - resolve_slot(subtract, amounts, ctx, clock)?)
                 * resolve_slot(factor, amounts, ctx, clock)?
-                * resolve_slot(value, amounts, ctx, clock)?);
+                * resolve_slot(value, amounts, ctx, clock)?
         }
         FastRateExpression::MulAddDiv {
             first,
@@ -137,80 +133,53 @@ fn eval_fast_rate(
             add_right,
             denominator,
         } => {
-            return Ok(resolve_slot(first, amounts, ctx, clock)?
+            resolve_slot(first, amounts, ctx, clock)?
                 * resolve_slot(second, amounts, ctx, clock)?
                 * (resolve_slot(add_left, amounts, ctx, clock)?
                     + resolve_slot(add_right, amounts, ctx, clock)?)
-                / resolve_slot(denominator, amounts, ctx, clock)?);
+                / resolve_slot(denominator, amounts, ctx, clock)?
         }
-        FastRateExpression::Program(_) => {}
-    }
+        FastRateExpression::Program(ops) => eval_program(ops, amounts, ctx, clock)?,
+    })
+}
 
-    let FastRateExpression::Program(ops) = expr else {
-        unreachable!("specialized fast rate variants return above");
-    };
-    let mut stack = [0.0_f64; 32];
+/// Run a stack program of a rate.
+#[inline]
+fn eval_program(
+    ops: &[FastRateOp],
+    amounts: &[f64],
+    ctx: &MathExpressionContext,
+    clock: Clock,
+) -> Result<f64, String> {
+    // The builder gives a program only when it is well formed and fits the
+    // stack (`FAST_STACK_DEPTH`).
+    let mut stack = [0.0_f64; FAST_STACK_DEPTH];
     let mut sp = 0usize;
-
     for op in ops {
-        match op {
-            FastRateOp::Constant(value) => push_stack(&mut stack, &mut sp, *value)?,
-            FastRateOp::Slot(slot) => push_stack(
-                &mut stack,
-                &mut sp,
-                resolve_slot(slot, amounts, ctx, clock)?,
-            )?,
-            FastRateOp::Add => {
-                let rhs = pop_stack(&stack, &mut sp)?;
-                let lhs = pop_stack(&stack, &mut sp)?;
-                push_stack(&mut stack, &mut sp, lhs + rhs)?;
-            }
-            FastRateOp::Sub => {
-                let rhs = pop_stack(&stack, &mut sp)?;
-                let lhs = pop_stack(&stack, &mut sp)?;
-                push_stack(&mut stack, &mut sp, lhs - rhs)?;
-            }
-            FastRateOp::Mul => {
-                let rhs = pop_stack(&stack, &mut sp)?;
-                let lhs = pop_stack(&stack, &mut sp)?;
-                push_stack(&mut stack, &mut sp, lhs * rhs)?;
-            }
-            FastRateOp::Div => {
-                let rhs = pop_stack(&stack, &mut sp)?;
-                let lhs = pop_stack(&stack, &mut sp)?;
-                push_stack(&mut stack, &mut sp, lhs / rhs)?;
-            }
+        let value = match op {
+            FastRateOp::Constant(value) => *value,
+            FastRateOp::Slot(slot) => resolve_slot(slot, amounts, ctx, clock)?,
             FastRateOp::Neg => {
-                let value = pop_stack(&stack, &mut sp)?;
-                push_stack(&mut stack, &mut sp, -value)?;
+                stack[sp - 1] = -stack[sp - 1];
+                continue;
             }
-        }
+            binary => {
+                sp -= 1;
+                let (lhs, rhs) = (stack[sp - 1], stack[sp]);
+                stack[sp - 1] = match binary {
+                    FastRateOp::Add => lhs + rhs,
+                    FastRateOp::Sub => lhs - rhs,
+                    FastRateOp::Mul => lhs * rhs,
+                    _ => lhs / rhs,
+                };
+                continue;
+            }
+        };
+        stack[sp] = value;
+        sp += 1;
     }
-
-    if sp == 1 {
-        pop_stack(&stack, &mut sp)
-    } else {
-        Err("fast rate expression left an invalid stack state".to_string())
-    }
-}
-
-#[inline]
-fn push_stack(stack: &mut [f64; 32], sp: &mut usize, value: f64) -> Result<(), String> {
-    if *sp >= stack.len() {
-        return Err("fast rate expression stack overflow".to_string());
-    }
-    stack[*sp] = value;
-    *sp += 1;
-    Ok(())
-}
-
-#[inline]
-fn pop_stack(stack: &[f64; 32], sp: &mut usize) -> Result<f64, String> {
-    if *sp == 0 {
-        return Err("fast rate expression stack underflow".to_string());
-    }
-    *sp -= 1;
-    Ok(stack[*sp])
+    debug_assert_eq!(sp, 1, "a program leaves one value");
+    Ok(stack[0])
 }
 
 #[cfg(test)]
@@ -334,31 +303,5 @@ mod tests {
             FastRateOp::Neg,
         ]);
         assert_eq!(eval_fast_rate(&program, &[], &ctx, ZERO).unwrap(), -7.0);
-    }
-
-    #[test]
-    fn fast_rate_program_detects_invalid_stack_state() {
-        let ctx = MathExpressionContext::new();
-        let program =
-            FastRateExpression::Program(vec![FastRateOp::Constant(1.0), FastRateOp::Constant(2.0)]);
-        let error = eval_fast_rate(&program, &[], &ctx, ZERO).unwrap_err();
-        assert!(error.contains("invalid stack state"));
-    }
-
-    #[test]
-    fn fast_rate_program_underflow_is_reported() {
-        let ctx = MathExpressionContext::new();
-        let program = FastRateExpression::Program(vec![FastRateOp::Add]);
-        let error = eval_fast_rate(&program, &[], &ctx, ZERO).unwrap_err();
-        assert!(error.contains("underflow"));
-    }
-
-    #[test]
-    fn fast_rate_program_overflow_is_reported() {
-        let ctx = MathExpressionContext::new();
-        let ops: Vec<FastRateOp> = (0..33).map(|_| FastRateOp::Constant(1.0)).collect();
-        let program = FastRateExpression::Program(ops);
-        let error = eval_fast_rate(&program, &[], &ctx, ZERO).unwrap_err();
-        assert!(error.contains("overflow"));
     }
 }

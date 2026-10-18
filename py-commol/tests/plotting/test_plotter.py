@@ -20,7 +20,14 @@ from commol import (
 )
 from commol.api.plotter import SimulationPlotter
 from commol.context.calibration import CalibrationResult
-from tests.support import a_to_b_builder, abc_builder, bounded, build, build_ode
+from tests.support import (
+    a_to_b_builder,
+    abc_builder,
+    bounded,
+    build,
+    build_ode,
+    build_stochastic,
+)
 
 BINS = ["A", "B", "C"]
 TITLES = {"A": "State A", "B": "State B", "C": "State C"}
@@ -449,6 +456,37 @@ class TestPredictiveSeries:
         assert band.min() == pytest.approx(min(low["B"]))
         assert band.max() == pytest.approx(max(high["B"]))
 
+    def test_a_band_reads_one_factor(self) -> None:
+        predictive = self._predictive([0.05])
+        observed = [
+            ObservedDataPoint(at=at, output="B", value=1.0, factor_id=factor_id)
+            for at, factor_id in ((10, "f1"), (20, "f2"))
+        ]
+        plotter = SimulationPlotter(
+            predictive.calibrator.simulation, predictive.runs()[0]
+        )
+
+        with pytest.raises(ValueError, match=r"several factors \['f1', 'f2'\]"):
+            plotter.plot_series(
+                observed_data=observed, calibration_result=predictive, series=["B"]
+            )
+
+    def test_a_band_labels_its_positions(self) -> None:
+        predictive = self._predictive([0.05])
+        plotter = SimulationPlotter(
+            predictive.calibrator.simulation, predictive.runs()[0]
+        )
+
+        figure = plotter.plot_series(
+            calibration_result=predictive,
+            series=["B"],
+            position_label=lambda at: f"day {at:g}",
+            tick_every=20,
+        )
+
+        labels = [label.get_text() for label in figure.axes[0].get_xticklabels()]
+        assert labels == ["day 0", "day 20", "day 40"]
+
     def test_a_cumulative_band_spans_the_running_totals_of_its_draws(self) -> None:
         predictive = self._predictive([0.02, 0.1])
         low, high = predictive.runs()
@@ -474,6 +512,80 @@ class TestPredictiveSeries:
         assert ax.lines[0].get_label() == "Median of the draws (cumulative)"
         np.testing.assert_allclose(_scatter(ax), [[5.0, 1.0], [9.0, 2.0]])
         assert ax.get_title() == "B"
+
+
+class TestObservationOperator:
+    """The plotted line is the series as the observations read it."""
+
+    def test_a_sum_of_outputs_plots_their_sum(self, plotter: SimulationPlotter) -> None:
+        observed = [ObservedDataPoint(at=10, outputs=["B", "C"], label="B", value=1.0)]
+
+        fig = plotter.plot_series(observed_data=observed, series=["B"])
+
+        expected = np.add(plotter.results["B"], plotter.results["C"])
+        np.testing.assert_allclose(fig.axes[0].lines[0].get_ydata(), expected)
+
+    def test_a_sum_of_an_unknown_output_is_an_error(
+        self, plotter: SimulationPlotter
+    ) -> None:
+        observed = [ObservedDataPoint(at=10, outputs=["B", "Z"], label="B", value=1.0)]
+
+        with pytest.raises(KeyError, match=r"aggregate components: \['Z'\]"):
+            plotter.plot_series(observed_data=observed, series=["B"])
+
+    @pytest.mark.parametrize(
+        ("factor_ids", "message"),
+        [
+            (["f1", "f2"], "Multiple factor_id values"),
+            (["f3"], "Factor parameter 'f3' not found"),
+        ],
+    )
+    def test_a_factor_it_cannot_read_leaves_the_line_unscaled(
+        self,
+        plotter: SimulationPlotter,
+        caplog: pytest.LogCaptureFixture,
+        factor_ids: list[str],
+        message: str,
+    ) -> None:
+        observed = [
+            ObservedDataPoint(at=10 * i, output="B", value=1.0, factor_id=factor_id)
+            for i, factor_id in enumerate(factor_ids, start=1)
+        ]
+        result = CalibrationResult(
+            best_parameters={"f1": 0.5, "f2": 0.5},
+            final_loss=0.0,
+            iterations=1,
+            converged=True,
+            termination_reason="Test",
+        )
+
+        fig = plotter.plot_series(
+            observed_data=observed, calibration_result=result, series=["B"]
+        )
+
+        np.testing.assert_allclose(
+            fig.axes[0].lines[0].get_ydata(), plotter.results["B"]
+        )
+        assert message in caplog.text
+
+    def test_the_band_of_windowed_replicates_spans_their_window_totals(self) -> None:
+        simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
+        replicates = simulation.replicates(5, seed=2).run(20)
+        observed = [ObservedDataPoint(at=10, output="B", value=1.0, window=5)]
+
+        fig = SimulationPlotter(simulation, replicates).plot_series(
+            observed_data=observed, series=["B"]
+        )
+
+        totals = [
+            [run["B"][end] - run["B"][end - 5] for end in (5, 10, 15, 20)]
+            for run in replicates
+        ]
+        band = [c for c in fig.axes[0].collections if c.get_paths()][0]
+        vertices = band.get_paths()[0].vertices
+        assert sorted({float(x) for x, _ in vertices}) == [5.0, 10.0, 15.0, 20.0]
+        assert vertices[:, 1].min() >= np.min(totals) - 1e-9
+        assert vertices[:, 1].max() <= np.max(totals) + 1e-9
 
 
 class TestSeriesSelection:

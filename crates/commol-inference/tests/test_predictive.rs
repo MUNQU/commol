@@ -136,3 +136,16 @@ fn a_forward_model_observed_again_at_its_observations_predicts_the_same() {
     let alone = windowed.run_observed(&[0.1], &mut workspace).unwrap();
     assert_eq!(alone, &first[1..]);
 }
+
+#[test]
+fn a_band_of_an_output_the_rows_lack_is_an_error() {
+    let problem = problem();
+    let predictive = Predictive::new(&problem, &sample(vec![vec![0.2]]), &[1.0, 2.0]).unwrap();
+
+    let error = predictive.series_band(&[9], false, 0.9).err();
+
+    assert_eq!(
+        error.as_deref(),
+        Some("Output 9 is out of range; a row has 2 outputs")
+    );
+}

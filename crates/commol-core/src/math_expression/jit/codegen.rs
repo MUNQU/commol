@@ -10,7 +10,7 @@ use super::libm::{
 use crate::math_expression::error::MathExpressionError;
 use cranelift::prelude::*;
 use cranelift_codegen::ir::InstBuilder;
-use cranelift_module::Module;
+use cranelift_module::{FuncId, Module};
 use std::collections::HashMap;
 
 /// Code generator that converts AST to Cranelift IR
@@ -139,12 +139,12 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
 
             BinaryOperator::Mod => {
                 // Call libm fmod function
-                return self.call_libm_f64_f64_to_f64("fmod", left, right);
+                return self.call_two_arg_libm("fmod", left, right);
             }
 
             BinaryOperator::Pow => {
                 // Call libm pow function
-                return self.call_libm_f64_f64_to_f64("pow", left, right);
+                return self.call_two_arg_libm("pow", left, right);
             }
 
             // Comparison operations - return 1.0 or 0.0
@@ -257,7 +257,10 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
             }
 
             let arg_val = self.generate(&args[0])?;
-            return self.call_libm_f64_to_f64(libm_name, arg_val);
+            let func_id = self
+                .libm_registry
+                .import_f64_to_f64(self.module, libm_name)?;
+            return Ok(self.call_imported(func_id, &[arg_val]));
         }
 
         // Two-argument function
@@ -272,7 +275,7 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
 
             let arg1_val = self.generate(&args[0])?;
             let arg2_val = self.generate(&args[1])?;
-            return self.call_libm_f64_f64_to_f64(libm_name, arg1_val, arg2_val);
+            return self.call_two_arg_libm(libm_name, arg1_val, arg2_val);
         }
 
         // Three-argument function
@@ -288,7 +291,10 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
             let arg1_val = self.generate(&args[0])?;
             let arg2_val = self.generate(&args[1])?;
             let arg3_val = self.generate(&args[2])?;
-            return self.call_libm_f64_f64_f64_to_f64(libm_name, arg1_val, arg2_val, arg3_val);
+            let func_id = self
+                .libm_registry
+                .import_f64_f64_f64_to_f64(self.module, libm_name)?;
+            return Ok(self.call_imported(func_id, &[arg1_val, arg2_val, arg3_val]));
         }
 
         Err(MathExpressionError::InvalidExpression(format!(
@@ -297,71 +303,24 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
         )))
     }
 
-    /// Generic helper to call a libm function with any number of arguments
-    fn call_libm_function(
+    /// Call a two-argument libm function.
+    fn call_two_arg_libm(
         &mut self,
         name: &str,
-        args: &[Value],
+        left: Value,
+        right: Value,
     ) -> Result<Value, MathExpressionError> {
-        // Import the function based on argument count
-        let func_id = match args.len() {
-            1 => self.libm_registry.import_f64_to_f64(self.module, name)?,
-            2 => self
-                .libm_registry
-                .import_f64_f64_to_f64(self.module, name)?,
-            3 => self
-                .libm_registry
-                .import_f64_f64_f64_to_f64(self.module, name)?,
-            n => {
-                return Err(MathExpressionError::InvalidExpression(format!(
-                    "Unsupported argument count {} for libm function {}",
-                    n, name
-                )));
-            }
-        };
+        let func_id = self
+            .libm_registry
+            .import_f64_f64_to_f64(self.module, name)?;
+        Ok(self.call_imported(func_id, &[left, right]))
+    }
 
-        // Get function reference in current function
+    /// Call an imported function with its arguments, and return its result.
+    fn call_imported(&mut self, func_id: FuncId, args: &[Value]) -> Value {
         let func_ref = self.module.declare_func_in_func(func_id, self.builder.func);
-
-        // Generate call
         let call = self.builder.ins().call(func_ref, args);
-
-        // Get return value
-        let results = self.builder.inst_results(call);
-        Ok(results[0])
-    }
-
-    /// Call a single-argument libm function
-    #[inline]
-    fn call_libm_f64_to_f64(
-        &mut self,
-        name: &str,
-        arg: Value,
-    ) -> Result<Value, MathExpressionError> {
-        self.call_libm_function(name, &[arg])
-    }
-
-    /// Call a two-argument libm function
-    #[inline]
-    fn call_libm_f64_f64_to_f64(
-        &mut self,
-        name: &str,
-        arg1: Value,
-        arg2: Value,
-    ) -> Result<Value, MathExpressionError> {
-        self.call_libm_function(name, &[arg1, arg2])
-    }
-
-    /// Call a three-argument libm function
-    #[inline]
-    fn call_libm_f64_f64_f64_to_f64(
-        &mut self,
-        name: &str,
-        arg1: Value,
-        arg2: Value,
-        arg3: Value,
-    ) -> Result<Value, MathExpressionError> {
-        self.call_libm_function(name, &[arg1, arg2, arg3])
+        self.builder.inst_results(call)[0]
     }
 
     /// Generate min/max function (variadic)
@@ -370,18 +329,13 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
         name: &str,
         args: &[Expr],
     ) -> Result<Value, MathExpressionError> {
-        if args.is_empty() {
-            return Err(MathExpressionError::InvalidExpression(format!(
-                "Function {} requires at least 1 argument",
-                name
-            )));
-        }
-
-        // Generate first argument
-        let mut result = self.generate(&args[0])?;
+        let [first, rest @ ..] = args else {
+            unreachable!("the parser gives a call at least one argument")
+        };
+        let mut result = self.generate(first)?;
 
         // Compare with remaining arguments
-        for arg in &args[1..] {
+        for arg in rest {
             let arg_val = self.generate(arg)?;
 
             // Compare and select

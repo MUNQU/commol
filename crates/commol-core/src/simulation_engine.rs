@@ -1,8 +1,6 @@
 //! The interface every simulation engine implements, whatever the kind of its
 //! model.
 
-use std::collections::HashMap;
-
 use rayon::prelude::*;
 use std::fmt::{self, Debug, Display};
 
@@ -114,8 +112,7 @@ pub trait ValuePlan: Clone + Debug + Send + Sync {
 /// # Example Implementation
 ///
 /// ```rust,ignore
-/// use commol_core::{SimulationEngine};
-/// use std::collections::HashMap;
+/// use commol_core::SimulationEngine;
 ///
 /// #[derive(Clone)]
 /// struct MyModel {
@@ -268,18 +265,6 @@ pub trait SimulationEngine: Clone {
     /// engine.set_parameter("k2", 0.1)?;
     /// ```
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String>;
-
-    /// Get all current parameter values.
-    ///
-    /// Returns a reference to a hashmap mapping parameter IDs to their current values.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// let params = engine.get_parameters();
-    /// assert_eq!(params.get("k1"), Some(&0.3));
-    /// ```
-    fn get_parameters(&self) -> &HashMap<String, f64>;
 
     /// The current position on the axis.
     ///

@@ -134,6 +134,16 @@ class TestWeightedQuantiles:
         # Weights 1/4 and 3/4 put the values at 1/8 and 5/8.
         assert weighted_quantiles([0.0, 1.0], [0.5], [1, 3]) == pytest.approx([0.75])
 
+    def test_a_weight_per_value(self) -> None:
+        with pytest.raises(
+            ValueError, match="One weight per value: 2 values, 1 weights"
+        ):
+            weighted_quantiles([1.0, 2.0], [0.5], [1.0])
+
+    def test_member_statistics_need_a_positive_weight(self) -> None:
+        with pytest.raises(ValueError, match="a positive weight"):
+            member_statistics([[1.0], [2.0]], 0.9, weights=[0.0, 0.0])
+
     def test_no_positive_weight_is_rejected(self) -> None:
         with pytest.raises(ValueError, match="positive weight"):
             weighted_quantiles([1.0], [0.5], [0.0])

@@ -174,6 +174,11 @@ pub fn quantile_error(values: &[f64], level: f64) -> (f64, f64) {
 mod tests {
     use super::*;
 
+    #[test]
+    fn the_covariance_of_one_effective_member_is_not_a_number() {
+        assert!(covariance(&[1.0, 5.0], &[2.0, 7.0], &[1.0, 0.0]).is_nan());
+    }
+
     fn close(a: f64, b: f64) -> bool {
         (a - b).abs() < 1e-12
     }

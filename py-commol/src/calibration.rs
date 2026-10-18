@@ -65,19 +65,6 @@ impl PyObservedDataPoint {
         inner.window = window;
         Self { inner }
     }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "ObservedDataPoint(at={}, label='{}', value={})",
-            self.inner.at, self.inner.label, self.inner.value
-        )
-    }
-
-    /// Position of the observation on the axis
-    #[getter]
-    fn at(&self) -> f64 {
-        self.inner.at
-    }
 }
 
 /// Parameter to calibrate with bounds
@@ -125,13 +112,6 @@ impl PyCalibrationParameter {
             },
         }
     }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "CalibrationParameter(id='{}', type={:?}, bounds=[{}, {}])",
-            self.inner.id, self.inner.parameter_type, self.inner.min_bound, self.inner.max_bound
-        )
-    }
 }
 
 /// Calibration constraint defined as a mathematical expression
@@ -148,46 +128,20 @@ impl PyCalibrationConstraint {
     /// Args:
     ///     id: Unique identifier for this constraint
     ///     expression: Mathematical expression that must evaluate >= 0
-    ///     description: Optional human-readable description
     ///     weight: Penalty weight multiplier (default: 1.0)
     ///     at: Optional positions on the axis at which to evaluate the
     ///         constraint; it can then read output values
     #[new]
-    #[pyo3(signature = (id, expression, description=None, weight=1.0, at=None))]
-    fn new(
-        id: String,
-        expression: String,
-        description: Option<String>,
-        weight: f64,
-        at: Option<Vec<f64>>,
-    ) -> Self {
-        let mut constraint = commol_calibration::CalibrationConstraint::new(id, expression);
-
-        if let Some(desc) = description {
-            constraint = constraint.with_description(desc);
-        }
-
-        constraint = constraint.with_weight(weight);
+    #[pyo3(signature = (id, expression, weight=1.0, at=None))]
+    fn new(id: String, expression: String, weight: f64, at: Option<Vec<f64>>) -> Self {
+        let mut constraint =
+            commol_calibration::CalibrationConstraint::new(id, expression).with_weight(weight);
 
         if let Some(positions) = at {
             constraint = constraint.with_positions(positions);
         }
 
         Self { inner: constraint }
-    }
-
-    fn __repr__(&self) -> String {
-        if let Some(ref desc) = self.inner.description {
-            format!(
-                "CalibrationConstraint(id='{}', expression='{}', description='{}')",
-                self.inner.id, self.inner.expression, desc
-            )
-        } else {
-            format!(
-                "CalibrationConstraint(id='{}', expression='{}')",
-                self.inner.id, self.inner.expression
-            )
-        }
     }
 }
 
@@ -271,19 +225,8 @@ impl PyLossConfig {
         summary: &str,
         quantile: Option<f64>,
     ) -> PyResult<Self> {
-        use commol_calibration::ReplicateSummary;
-        let summary = match (summary, quantile) {
-            ("mean", None) => ReplicateSummary::Mean,
-            ("median", None) => ReplicateSummary::Median,
-            ("crps", None) => ReplicateSummary::Crps,
-            ("quantile", Some(level)) => ReplicateSummary::Quantile(level),
-            _ => {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Unknown replicate summary '{summary}' with quantile {quantile:?}; the \
-                     summaries are 'mean', 'median', 'crps' and 'quantile' with a level"
-                )));
-            }
-        };
+        let summary = commol_calibration::ReplicateSummary::from_name(summary, quantile)
+            .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
         let replicates = commol_calibration::Replicates::new(count, seed, summary)
             .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
         Ok(Self {
@@ -296,24 +239,6 @@ impl PyLossConfig {
     #[getter]
     fn normalize_observations(&self) -> bool {
         self.normalize_observations
-    }
-
-    /// Loss of residuals with their observation weights
-    ///
-    /// The residuals are used as given: scale them by their normalization
-    /// factor first when normalization applies.
-    ///
-    /// Raises:
-    ///     ValueError: If `residuals` and `weights` differ in length
-    fn aggregate(&self, residuals: Vec<f64>, weights: Vec<f64>) -> PyResult<f64> {
-        if residuals.len() != weights.len() {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "{} residuals but {} weights",
-                residuals.len(),
-                weights.len()
-            )));
-        }
-        Ok(self.inner.aggregate(residuals.into_iter().zip(weights)))
     }
 }
 
@@ -367,12 +292,6 @@ impl PyNelderMeadConfig {
             verbose,
             header_interval,
         }
-    }
-
-    /// Get the header interval
-    #[getter]
-    fn header_interval(&self) -> u64 {
-        self.header_interval
     }
 }
 
@@ -504,6 +423,24 @@ impl PyPSOVelocity {
     }
 }
 
+/// An inertia strategy of a swarm.
+#[derive(FromPyObject)]
+pub enum PyInertia<'py> {
+    /// A constant weight.
+    Constant(PyRef<'py, PyPSOInertiaConstant>),
+    /// A chaotic weight.
+    Chaotic(PyRef<'py, PyPSOInertiaChaotic>),
+}
+
+/// An acceleration strategy of a swarm.
+#[derive(FromPyObject)]
+pub enum PyAcceleration<'py> {
+    /// Constant coefficients.
+    Constant(PyRef<'py, PyPSOAccelerationConstant>),
+    /// Time-varying coefficients.
+    TimeVarying(PyRef<'py, PyPSOAccelerationTimeVarying>),
+}
+
 /// Particle Swarm Optimization configuration
 #[pyclass(name = "ParticleSwarmConfig", from_py_object)]
 #[derive(Clone)]
@@ -534,249 +471,75 @@ impl PyParticleSwarmConfig {
         num_particles: usize,
         max_iterations: u64,
         verbose: bool,
-        inertia: Option<Py<PyAny>>,
-        acceleration: Option<Py<PyAny>>,
-        mutation: Option<Py<PyPSOMutation>>,
-        velocity: Option<Py<PyPSOVelocity>>,
+        inertia: Option<PyInertia>,
+        acceleration: Option<PyAcceleration>,
+        mutation: Option<PyRef<PyPSOMutation>>,
+        velocity: Option<PyRef<PyPSOVelocity>>,
         initialization: &str,
         seed: Option<u64>,
     ) -> PyResult<Self> {
-        Python::attach(|py| {
-            // Parse initialization strategy
-            let init_strategy = match initialization {
-                "uniform" | "uniform_random" => {
-                    commol_calibration::InitializationStrategy::UniformRandom
+        let value_error = PyErr::new::<pyo3::exceptions::PyValueError, _>;
+        let (mutation_strategy, mutation_probability, mutation_application) = match mutation {
+            Some(mutation) => (
+                commol_calibration::MutationStrategy::from_name(&mutation.strategy, mutation.scale)
+                    .map_err(value_error)?,
+                mutation.probability,
+                commol_calibration::MutationApplication::from_name(&mutation.application)
+                    .map_err(value_error)?,
+            ),
+            None => (
+                commol_calibration::MutationStrategy::None,
+                0.0,
+                commol_calibration::MutationApplication::None,
+            ),
+        };
+        let config = commol_calibration::ParticleSwarmConfig {
+            num_particles,
+            max_iterations,
+            target_cost: None,
+            inertia_strategy: inertia.map(|inertia| match inertia {
+                PyInertia::Constant(constant) => {
+                    commol_calibration::InertiaWeightStrategy::Constant(constant.factor)
                 }
-                "latin_hypercube" | "lhs" => {
-                    commol_calibration::InitializationStrategy::LatinHypercube
-                }
-                "opposition_based" | "obl" => {
-                    commol_calibration::InitializationStrategy::OppositionBased
-                }
-                _ => {
-                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                        "Unknown initialization strategy: {}. Valid options: 'uniform', 'latin_hypercube', 'opposition_based'",
-                        initialization
-                    )));
-                }
-            };
-
-            let mut config = commol_calibration::ParticleSwarmConfig {
-                num_particles,
-                max_iterations,
-                target_cost: None,
-                inertia_strategy: None,
-                acceleration_strategy: None,
-                initialization_strategy: init_strategy,
-                velocity_clamp_factor: None,
-                velocity_mutation_threshold: None,
-                mutation_strategy: commol_calibration::MutationStrategy::None,
-                mutation_probability: 0.0,
-                mutation_application: commol_calibration::MutationApplication::None,
-                seed,
-            };
-
-            // Handle inertia strategy
-            if let Some(inertia_obj) = inertia {
-                if let Ok(constant) = inertia_obj.extract::<PyRef<PyPSOInertiaConstant>>(py) {
-                    config.inertia_strategy = Some(
-                        commol_calibration::InertiaWeightStrategy::Constant(constant.factor),
-                    );
-                } else if let Ok(chaotic) = inertia_obj.extract::<PyRef<PyPSOInertiaChaotic>>(py) {
-                    config.inertia_strategy =
-                        Some(commol_calibration::InertiaWeightStrategy::Chaotic {
-                            w_min: chaotic.w_min,
-                            w_max: chaotic.w_max,
-                        });
-                } else {
-                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "inertia must be PSOInertiaConstant or PSOInertiaChaotic",
-                    ));
-                }
-            }
-
-            // Handle acceleration strategy
-            if let Some(accel_obj) = acceleration {
-                if let Ok(constant) = accel_obj.extract::<PyRef<PyPSOAccelerationConstant>>(py) {
-                    config.acceleration_strategy =
-                        Some(commol_calibration::AccelerationStrategy::Constant {
-                            cognitive: constant.cognitive,
-                            social: constant.social,
-                        });
-                } else if let Ok(tvac) =
-                    accel_obj.extract::<PyRef<PyPSOAccelerationTimeVarying>>(py)
-                {
-                    config.acceleration_strategy =
-                        Some(commol_calibration::AccelerationStrategy::TimeVarying {
-                            c1_initial: tvac.c1_initial,
-                            c1_final: tvac.c1_final,
-                            c2_initial: tvac.c2_initial,
-                            c2_final: tvac.c2_final,
-                        });
-                } else {
-                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "acceleration must be PSOAccelerationConstant or PSOAccelerationTimeVarying",
-                    ));
-                }
-            }
-
-            // Handle mutation
-            if let Some(mut_ref) = mutation {
-                let mut_obj = mut_ref.borrow(py);
-                config.mutation_strategy = match mut_obj.strategy.as_str() {
-                    "gaussian" => commol_calibration::MutationStrategy::Gaussian(mut_obj.scale),
-                    "cauchy" => commol_calibration::MutationStrategy::Cauchy(mut_obj.scale),
-                    _ => {
-                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                            "Invalid mutation strategy: {}",
-                            mut_obj.strategy
-                        )));
+                PyInertia::Chaotic(chaotic) => commol_calibration::InertiaWeightStrategy::Chaotic {
+                    w_min: chaotic.w_min,
+                    w_max: chaotic.w_max,
+                },
+            }),
+            acceleration_strategy: acceleration.map(|acceleration| match acceleration {
+                PyAcceleration::Constant(constant) => {
+                    commol_calibration::AccelerationStrategy::Constant {
+                        cognitive: constant.cognitive,
+                        social: constant.social,
                     }
-                };
-                config.mutation_probability = mut_obj.probability;
-                config.mutation_application = match mut_obj.application.as_str() {
-                    "global_best" => commol_calibration::MutationApplication::GlobalBestOnly,
-                    "all_particles" => commol_calibration::MutationApplication::AllParticles,
-                    "below_average" => commol_calibration::MutationApplication::BelowAverage,
-                    _ => {
-                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                            "Invalid mutation application: {}",
-                            mut_obj.application
-                        )));
+                }
+                PyAcceleration::TimeVarying(tvac) => {
+                    commol_calibration::AccelerationStrategy::TimeVarying {
+                        c1_initial: tvac.c1_initial,
+                        c1_final: tvac.c1_final,
+                        c2_initial: tvac.c2_initial,
+                        c2_final: tvac.c2_final,
                     }
-                };
-            }
-
-            // Handle velocity
-            if let Some(vel_ref) = velocity {
-                let vel_obj = vel_ref.borrow(py);
-                config.velocity_clamp_factor = vel_obj.clamp_factor;
-                config.velocity_mutation_threshold = vel_obj.mutation_threshold;
-            }
-
-            Ok(Self {
-                inner: config,
-                verbose,
-                header_interval: 100,
-            })
+                }
+            }),
+            initialization_strategy: commol_calibration::InitializationStrategy::from_name(
+                initialization,
+            )
+            .map_err(value_error)?,
+            velocity_clamp_factor: velocity.as_ref().and_then(|velocity| velocity.clamp_factor),
+            velocity_mutation_threshold: velocity
+                .as_ref()
+                .and_then(|velocity| velocity.mutation_threshold),
+            mutation_strategy,
+            mutation_probability,
+            mutation_application,
+            seed,
+        };
+        Ok(Self {
+            inner: config,
+            verbose,
+            header_interval: 100,
         })
-    }
-
-    /// Get the header interval
-    #[getter]
-    fn header_interval(&self) -> u64 {
-        self.header_interval
-    }
-
-    /// Set chaotic inertia weight using logistic map
-    ///
-    /// Args:
-    ///     w_min: Minimum inertia weight
-    ///     w_max: Maximum inertia weight
-    fn set_chaotic_inertia(&mut self, w_min: f64, w_max: f64) {
-        self.inner.inertia_strategy =
-            Some(commol_calibration::InertiaWeightStrategy::Chaotic { w_min, w_max });
-    }
-
-    /// Enable Time-Varying Acceleration Coefficients (TVAC)
-    ///
-    /// Args:
-    ///     c1_initial: Initial cognitive factor
-    ///     c1_final: Final cognitive factor
-    ///     c2_initial: Initial social factor
-    ///     c2_final: Final social factor
-    fn set_tvac(&mut self, c1_initial: f64, c1_final: f64, c2_initial: f64, c2_final: f64) {
-        self.inner.acceleration_strategy =
-            Some(commol_calibration::AccelerationStrategy::TimeVarying {
-                c1_initial,
-                c1_final,
-                c2_initial,
-                c2_final,
-            });
-    }
-
-    /// Set initialization strategy
-    ///
-    /// Args:
-    ///     strategy: One of "uniform" (default), "latin_hypercube", or "opposition_based"
-    fn set_initialization_strategy(&mut self, strategy: &str) -> PyResult<()> {
-        self.inner.initialization_strategy = match strategy {
-            "uniform" | "uniform_random" => {
-                commol_calibration::InitializationStrategy::UniformRandom
-            }
-            "latin_hypercube" | "lhs" => commol_calibration::InitializationStrategy::LatinHypercube,
-            "opposition_based" | "obl" => {
-                commol_calibration::InitializationStrategy::OppositionBased
-            }
-            _ => {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Unknown initialization strategy: {}. Valid options: 'uniform', 'latin_hypercube', 'opposition_based'",
-                    strategy
-                )));
-            }
-        };
-        Ok(())
-    }
-
-    /// Enable velocity clamping
-    ///
-    /// Args:
-    ///     clamp_factor: Fraction of search space range (typically 0.1 to 0.2)
-    fn set_velocity_clamping(&mut self, clamp_factor: f64) {
-        self.inner.velocity_clamp_factor = Some(clamp_factor);
-    }
-
-    /// Enable velocity mutation when velocity approaches zero
-    ///
-    /// Args:
-    ///     threshold: Velocity threshold below which reinitialization occurs (typically 0.001 to 0.01)
-    fn set_velocity_mutation(&mut self, threshold: f64) {
-        self.inner.velocity_mutation_threshold = Some(threshold);
-    }
-
-    /// Enable mutation to help escape local optima
-    ///
-    /// Args:
-    ///     strategy: Either "gaussian" or "cauchy"
-    ///     scale: Standard deviation (for gaussian) or scale parameter (for cauchy)
-    ///     probability: Mutation probability per iteration (0.0 to 1.0)
-    ///     application: One of "global_best" (default), "all_particles", or "below_average"
-    #[pyo3(signature = (strategy, scale, probability, application="global_best"))]
-    fn set_mutation(
-        &mut self,
-        strategy: &str,
-        scale: f64,
-        probability: f64,
-        application: &str,
-    ) -> PyResult<()> {
-        self.inner.mutation_strategy = match strategy {
-            "gaussian" => commol_calibration::MutationStrategy::Gaussian(scale),
-            "cauchy" => commol_calibration::MutationStrategy::Cauchy(scale),
-            _ => {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Unknown mutation strategy: {}. Valid options: 'gaussian', 'cauchy'",
-                    strategy
-                )));
-            }
-        };
-
-        self.inner.mutation_probability = probability;
-
-        self.inner.mutation_application = match application {
-            "global_best" | "global_best_only" => {
-                commol_calibration::MutationApplication::GlobalBestOnly
-            }
-            "all" | "all_particles" => commol_calibration::MutationApplication::AllParticles,
-            "below_average" => commol_calibration::MutationApplication::BelowAverage,
-            _ => {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Unknown mutation application: {}. Valid options: 'global_best', 'all_particles', 'below_average'",
-                    application
-                )));
-            }
-        };
-
-        Ok(())
     }
 }
 
@@ -841,13 +604,6 @@ impl PyCalibrationEvaluation {
     fn loss(&self) -> f64 {
         self.inner.loss
     }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "CalibrationEvaluation(loss={:.6}, parameters={:?})",
-            self.inner.loss, self.inner.parameters
-        )
-    }
 }
 
 /// Calibration result
@@ -894,13 +650,6 @@ impl PyCalibrationResult {
     fn termination_reason(&self) -> String {
         self.inner.termination_reason.clone()
     }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "CalibrationResult(loss={:.6}, iterations={}, converged={})",
-            self.inner.final_loss, self.inner.iterations, self.inner.converged
-        )
-    }
 }
 
 /// Calibration result with every evaluation of a feasible point
@@ -927,14 +676,6 @@ impl PyCalibrationResultWithHistory {
             .iter()
             .map(|e| PyCalibrationEvaluation { inner: e.clone() })
             .collect()
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "CalibrationResultWithHistory(loss={:.6}, evaluations={})",
-            self.inner.result.final_loss,
-            self.inner.evaluations.len()
-        )
     }
 }
 

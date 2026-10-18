@@ -3,7 +3,7 @@
 //!
 //! This crate expands the process of a [`commol_core::Model`] into its
 //! compartments and accumulators, plans its transition flows, compiles their
-//! rates (fast path, JIT, evalexpr fallback) and exposes the result as a
+//! rates (fast path or JIT) and exposes the result as a
 //! [`CompiledModel`]. Its
 //! [`CompiledModel::derivatives`] is the right-hand side `dX/dt = Σ flows`:
 //! the difference engine (`commol-difference`) adds it once per step, the

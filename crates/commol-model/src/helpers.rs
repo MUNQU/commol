@@ -1,29 +1,7 @@
 //! Helper functions for stratification handling and rate resolution.
 
-use commol_core::{
-    RateMathExpression, Stratification, StratificationCondition, StratifiedRate, Transition,
-};
+use commol_core::{Stratification, StratificationCondition, StratifiedRate, Transition};
 use std::collections::HashMap;
-
-/// Convert a RateMathExpression to its string representation.
-///
-/// This helper extracts the string form of a rate expression, whether it's
-/// a parameter name, formula, or constant value.
-///
-/// # Arguments
-///
-/// * `rate` - The rate expression to convert
-///
-/// # Returns
-///
-/// The string representation of the rate expression.
-pub(crate) fn rate_to_string(rate: &RateMathExpression) -> String {
-    match rate {
-        RateMathExpression::Parameter(param) => param.clone(),
-        RateMathExpression::Formula(formula) => formula.formula.clone(),
-        RateMathExpression::Constant(value) => value.to_string(),
-    }
-}
 
 /// Result of matching a stratified rate for a compartment.
 ///
@@ -56,11 +34,7 @@ pub(crate) fn get_rate_string_for_compartment<'a>(
     // If no stratified rates defined, use default rate
     if transition.stratified_rates.is_none() {
         return transition.rate.as_ref().map(|r| MatchedRate {
-            rate_string: match r {
-                RateMathExpression::Parameter(p) => p.clone(),
-                RateMathExpression::Formula(f) => f.formula.clone(),
-                RateMathExpression::Constant(c) => c.to_string(),
-            },
+            rate_string: r.clone(),
             stratified_rate: None,
         });
     }
@@ -111,7 +85,7 @@ pub(crate) fn get_rate_string_for_compartment<'a>(
 
     // Fall back to default rate
     transition.rate.as_ref().map(|r| MatchedRate {
-        rate_string: rate_to_string(r),
+        rate_string: r.clone(),
         stratified_rate: None,
     })
 }
@@ -137,13 +111,7 @@ pub(crate) fn target_categories(
             .map(|to_cat| to_cat.to_string())
             .or_else(|| source.get(&strat.id).cloned());
 
-        let applies = match &strat.conditions {
-            None => true,
-            Some(conds) => conds.iter().all(|c| match &c.category {
-                Some(cat) => target_applied.get(&c.stratification) == Some(cat),
-                None => true,
-            }),
-        };
+        let applies = stratification_conditions_met(&strat.conditions, &target_applied);
 
         if applies && let Some(cat) = effective_cat {
             target_applied.insert(strat.id.clone(), cat.clone());
@@ -152,6 +120,21 @@ pub(crate) fn target_categories(
     }
 
     categories
+}
+
+/// Check whether a stratification's conditions are all satisfied by the
+/// already-applied categories of the current compartment being built.
+pub(crate) fn stratification_conditions_met(
+    conditions: &Option<Vec<commol_core::StratificationCondition>>,
+    applied: &HashMap<String, String>,
+) -> bool {
+    match conditions {
+        None => true,
+        Some(conds) => conds.iter().all(|c| match &c.category {
+            Some(cat) => applied.get(&c.stratification) == Some(cat),
+            None => true,
+        }),
+    }
 }
 
 /// `to` overrides of a set of conditions, keyed by stratification id.

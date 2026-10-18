@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from commol import Aggregate, Simulation
 from tests.support import (
     FactoryBuilder,
+    a_to_b_builder,
     ENGINE_REL,
     assert_close,
     build,
@@ -173,4 +174,43 @@ class TestStratifiedRateValidation:
         )
 
         with pytest.raises(ValidationError, match="use 'to'"):
+            build(builder)
+
+
+class TestConditions:
+    @pytest.mark.parametrize(
+        ("conditions", "message"),
+        [
+            ([], "at least one stratification condition"),
+            (
+                [
+                    {"stratification": "g", "category": "g1"},
+                    {"stratification": "g", "category": "g2"},
+                ],
+                r"Duplicate stratifications found: \['g'\]",
+            ),
+            (
+                [{"stratification": "z", "category": "g1"}],
+                r"rate 0: Stratification 'z' not found. Available: \['g'\]",
+            ),
+            (
+                [{"stratification": "g", "category": "g9"}],
+                r"Category 'g9' not found in stratification 'g'",
+            ),
+        ],
+        ids=["none", "repeated", "unknown stratification", "unknown category"],
+    )
+    def test_a_rate_names_each_stratification_once_by_a_category_it_has(
+        self, conditions: list[dict[str, str]], message: str
+    ) -> None:
+        builder = a_to_b_builder(stratifications={"g": ["g1", "g2"]})
+
+        with pytest.raises(ValidationError, match=message):
+            builder.add_transition(
+                id="t2",
+                source=["A"],
+                target=["B"],
+                rate="k",
+                stratified_rates=[{"conditions": conditions, "rate": "k"}],
+            )
             build(builder)

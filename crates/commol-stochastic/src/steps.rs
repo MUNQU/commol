@@ -1,7 +1,5 @@
 //! The discrete-time stochastic engine: the chain binomial.
 
-use std::collections::HashMap;
-
 use commol_core::{EngineSettings, EngineType, ModelValue, SimulationError};
 use commol_model::{
     CompartmentalEngine, CompiledModel, InitialConditionPlan, OutputLabels, output_sums,
@@ -99,11 +97,6 @@ impl StochasticSteps {
         })
     }
 
-    /// The compiled model the engine steps.
-    pub fn model(&self) -> &CompiledModel {
-        &self.units.model
-    }
-
     /// Current amount of each compartment, without the accumulators.
     pub fn state(&self) -> Vec<f64> {
         self.units.state[..self.units.model.num_compartments()].to_vec()
@@ -190,12 +183,13 @@ impl StochasticSteps {
             position: step,
             message,
         };
-        if let Some((flow, rate)) = self
-            .rates
-            .iter()
-            .enumerate()
-            .find(|(_, rate)| rate.is_nan() || **rate < 0.0)
-        {
+        if let Some(flow) = self.rates.iter().position(|rate| rate.is_nan()) {
+            return Err(SimulationError::Failed(format!(
+                "The rate of flow '{}' at step {step} is not a number",
+                changes[flow].transition_id()
+            )));
+        }
+        if let Some((flow, rate)) = self.rates.iter().enumerate().find(|(_, rate)| **rate < 0.0) {
             let change = &changes[flow];
             let compartment = match change.takes().first() {
                 Some(&(source, _)) => format!("out of compartment '{}'", name(source)),
@@ -333,10 +327,6 @@ impl commol_core::SimulationEngine for StochasticSteps {
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
         self.units.model.set_parameter(parameter_id, value);
         Ok(())
-    }
-
-    fn get_parameters(&self) -> &HashMap<String, f64> {
-        self.units.model.parameters()
     }
 
     fn current_position(&self) -> f64 {

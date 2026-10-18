@@ -121,13 +121,8 @@ impl ObservationOperator {
     }
 
     /// Number of observations.
-    pub fn len(&self) -> usize {
+    pub fn count(&self) -> usize {
         self.rows.len()
-    }
-
-    /// Whether the operator has no observations.
-    pub fn is_empty(&self) -> bool {
-        self.rows.is_empty()
     }
 
     /// Write the prediction of each observation into `out`: the sum of its
@@ -140,7 +135,7 @@ impl ObservationOperator {
     ///
     /// Panics when `out` does not hold one value per observation.
     pub fn apply(&self, rows: &[Vec<f64>], parameters: &[f64], out: &mut [f64]) {
-        assert_eq!(out.len(), self.len(), "one prediction per observation");
+        assert_eq!(out.len(), self.count(), "one prediction per observation");
         let sum_at = |row: usize, outputs: &[usize]| -> f64 {
             rows.get(row)
                 .map(|values| outputs.iter().filter_map(|&i| values.get(i)).sum())

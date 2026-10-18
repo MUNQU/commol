@@ -91,10 +91,6 @@ impl SimulationEngine for FrozenEngine {
         Ok(())
     }
 
-    fn get_parameters(&self) -> &HashMap<String, f64> {
-        &self.parameters
-    }
-
     fn current_position(&self) -> f64 {
         0.0
     }
@@ -343,4 +339,32 @@ fn the_plan_covers_what_its_values_and_remainder_set() {
     // A covers 0 and 1, the remainder B covers 3 and 4; a category split and
     // the fixed C cover nothing.
     assert_eq!(plan.covered_compartments(), vec![0, 1, 3, 4]);
+}
+
+#[test]
+fn a_remainder_is_a_compartment_or_a_bin() {
+    let error = written_state(FrozenEngine::two_bins(), &["A"], Some("X"), &[0.5]).unwrap_err();
+
+    assert_eq!(
+        error,
+        "Initial-condition remainder 'X' is not a compartment or a bin \
+         (available: A_cat0, A_cat1, B_cat0, B_cat1)"
+    );
+}
+
+#[test]
+fn a_plan_takes_one_value_per_initial_condition() {
+    let error = written_state(FrozenEngine::two_bins(), &["A"], None, &[0.5, 0.2]).unwrap_err();
+
+    assert_eq!(error, "Expected 1 initial-condition values, got 2");
+}
+
+#[test]
+fn a_qualified_category_that_no_compartment_has_is_rejected() {
+    let error = written_state(FrozenEngine::two_bins(), &["group:cat9"], None, &[0.5]).unwrap_err();
+
+    assert_eq!(
+        error,
+        "Initial condition category 'group:cat9' matches no compartment"
+    );
 }

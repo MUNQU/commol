@@ -231,11 +231,6 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         &self.feasibility
     }
 
-    /// The discrepancy.
-    pub fn discrepancy(&self) -> &Discrepancy {
-        &self.discrepancy
-    }
-
     /// The observations.
     pub fn observed_data(&self) -> &[ObservedDataPoint] {
         &self.observed_data
@@ -298,7 +293,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         if self.feasibility.reads_rows() {
             let mut amount = 0.0;
             for rows in &workspace.rows {
-                amount += self.feasibility.row_violation(values, rows)?;
+                amount += self.feasibility.row_violation(values, rows);
             }
             if amount > 0.0 {
                 return Err(Violation::Constraint { amount }.into());

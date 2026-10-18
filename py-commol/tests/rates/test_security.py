@@ -109,6 +109,11 @@ class TestBasicValidation:
         for func in safe_functions:
             assert_accepted(validate_expression_security, func)
 
+    @pytest.mark.parametrize("expression", ["", "   "])
+    def test_an_empty_expression_is_rejected(self, expression):
+        with pytest.raises(SecurityError, match="Empty expression"):
+            validate_expression_security(expression)
+
     def test_tokenization(self):
         """Test expression tokenization."""
         validator = ExpressionSecurityValidator()
@@ -314,6 +319,7 @@ class TestAdvancedAttackVectors:
             "\\x48\\x65\\x6c\\x6c\\x6f",
             "k1 + \\u0041",  # Unicode escape sequences
             "\\u0048\\u0065\\u006c\\u006c\\u006f",
+            "k1 + \\101",  # Octal escape sequences
             "aGVsbG8gd29ybGQgdGhpcyBpcyBhIGxvbmcgc3RyaW5n",  # Base64-like
             "VGhpcyBpcyBhIHN1c3BpY2lvdXMgcGF5bG9hZA==",
         ]
@@ -372,6 +378,11 @@ class TestAdvancedAttackVectors:
         for expr in math_injection_attacks:
             with pytest.raises(SecurityError):
                 validate_expression_security(expr)
+
+    @pytest.mark.parametrize("expression", ["2 e x", "a 1 b", "k1.real(1)"])
+    def test_code_spelled_as_arithmetic_is_rejected(self, expression):
+        with pytest.raises(SecurityError, match="Suspicious mathematical pattern"):
+            validate_expression_security(expression)
 
     def test_repetitive_patterns(self):
         """Test detection of repetitive patterns that could indicate attacks."""
@@ -449,6 +460,7 @@ class TestExpressionLimitsAndComplexity:
             "e10",  # Missing base in scientific notation
             "1e1e1",  # Multiple 'e' characters
             "123abc",  # Mixed alphanumeric
+            "1ea",  # An exponent of letters
         ]
         for num in invalid_numbers:
             with pytest.raises(SecurityError):
@@ -523,3 +535,11 @@ class TestStrictModeValidation:
         for num in large_numbers:
             with pytest.raises(SecurityError, match="Numeric value too large"):
                 validate_expression_security(num)
+
+    def test_not_a_number_is_rejected(self):
+        with pytest.raises(SecurityError, match="Invalid numeric value: nan"):
+            validate_expression_security("nan * k1")
+
+    def test_a_suspicious_keyword_between_underscores_is_rejected(self):
+        with pytest.raises(SecurityError, match="Suspicious keyword 'key'"):
+            validate_expression_security("my_key * A")

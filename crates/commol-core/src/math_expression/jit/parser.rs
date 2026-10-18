@@ -101,48 +101,19 @@ fn convert_node(node: &Node) -> Result<Expr, MathExpressionError> {
         Operator::Neg => unary_op!(node, "Neg", UnaryOperator::Neg),
         Operator::Not => unary_op!(node, "Not", UnaryOperator::Not),
 
-        // Function calls
+        // Function calls: evalexpr gives a call one child, a root that holds
+        // a tuple of the arguments or the one argument.
         Operator::FunctionIdentifier { identifier } => {
-            let children = node.children();
-
-            // Extract arguments - they might be wrapped in a Tuple
-            // evalexpr represents multi-argument functions as: FunctionIdentifier -> RootNode -> Tuple -> [args]
-            let arg_exprs: Vec<Expr> = if children.len() == 1 {
-                // Check if the child is a RootNode wrapping a Tuple
-                let child = &children[0];
-                if matches!(child.operator(), Operator::RootNode) && child.children().len() == 1 {
-                    let grandchild = &child.children()[0];
-                    if matches!(grandchild.operator(), Operator::Tuple) {
-                        // Extract tuple elements and convert each
-                        grandchild
-                            .children()
-                            .iter()
-                            .map(convert_node)
-                            .collect::<Result<Vec<_>, _>>()?
-                    } else {
-                        // Single argument, not in a tuple
-                        vec![convert_node(child)?]
-                    }
-                } else if matches!(child.operator(), Operator::Tuple) {
-                    // Direct tuple (less common, but handle it)
-                    child
-                        .children()
-                        .iter()
-                        .map(convert_node)
-                        .collect::<Result<Vec<_>, _>>()?
-                } else {
-                    // Single argument, not in a tuple
-                    vec![convert_node(child)?]
-                }
-            } else if children.is_empty() {
-                // No arguments
-                Vec::new()
-            } else {
-                // Multiple direct children - convert each one
-                children
+            let [arguments] = node.children() else {
+                unreachable!("evalexpr gives a call one child")
+            };
+            let arg_exprs: Vec<Expr> = match arguments.children() {
+                [tuple] if matches!(tuple.operator(), Operator::Tuple) => tuple
+                    .children()
                     .iter()
                     .map(convert_node)
-                    .collect::<Result<Vec<_>, _>>()?
+                    .collect::<Result<Vec<_>, _>>()?,
+                _ => vec![convert_node(arguments)?],
             };
 
             // Special case for 'if' function (conditional)
@@ -164,32 +135,12 @@ fn convert_node(node: &Node) -> Result<Expr, MathExpressionError> {
             Ok(Expr::call(identifier.clone(), arg_exprs))
         }
 
-        // Tuple (used for function arguments)
-        // Tuples should only appear within function calls, but if we encounter one
-        // at the top level, try to handle it gracefully
-        Operator::Tuple => {
-            let children = node.children();
-            if children.len() == 1 {
-                // Single-element tuple, unwrap it
-                convert_node(&children[0])
-            } else {
-                Err(MathExpressionError::InvalidExpression(format!(
-                    "Unexpected tuple with {} elements in expression",
-                    children.len()
-                )))
-            }
-        }
-
-        // Chain (sequence of expressions - take the last one)
-        Operator::Chain => {
-            let children = node.children();
-            if children.is_empty() {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Empty chain".to_string(),
-                ));
-            }
-            convert_node(&children[children.len() - 1])
-        }
+        // A tuple outside the arguments of a call: evalexpr keeps a single
+        // value in parentheses as a root, so a tuple has two values or more.
+        Operator::Tuple => Err(MathExpressionError::InvalidExpression(format!(
+            "Unexpected tuple with {} elements in expression",
+            node.children().len()
+        ))),
 
         // Unsupported operators
         _ => Err(MathExpressionError::InvalidExpression(format!(
@@ -218,11 +169,13 @@ mod tests {
     #[test]
     fn test_parse_binary_op() {
         let expr = parse_expression("k1 * k2").unwrap();
-        if let Expr::BinaryOp { op, .. } = expr {
-            assert_eq!(op, BinaryOperator::Mul);
-        } else {
-            panic!("Expected BinaryOp");
-        }
+        assert!(matches!(
+            expr,
+            Expr::BinaryOp {
+                op: BinaryOperator::Mul,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -235,11 +188,67 @@ mod tests {
     #[test]
     fn test_parse_function_call() {
         let expr = parse_expression("math::sin(x)").unwrap();
-        if let Expr::FunctionCall { name, args } = expr {
-            assert_eq!(name, "math::sin");
-            assert_eq!(args.len(), 1);
-        } else {
-            panic!("Expected FunctionCall");
+        assert!(
+            matches!(&expr, Expr::FunctionCall { name, args } if name == "math::sin" && args.len() == 1)
+        );
+    }
+
+    #[test]
+    fn a_parsed_expression_prints_as_a_formula_that_reads_back_as_itself() {
+        for formula in [
+            "x + 1",
+            "x - 1",
+            "x * 2",
+            "x / 2",
+            "x % 2",
+            "x ^ 2",
+            "x < 1",
+            "x > 1",
+            "x <= 1",
+            "x >= 1",
+            "x == 1",
+            "x != 1",
+            "x && y",
+            "x || y",
+            "-x",
+            "!x",
+            "if(x, 1, 2)",
+            "max(x, y, 2)",
+            "math::sin(x)",
+        ] {
+            let printed = parse_expression(formula).unwrap().to_string();
+            let again = parse_expression(&printed).unwrap().to_string();
+            assert_eq!(again, printed, "{formula}");
+        }
+        assert_eq!(
+            parse_expression("max(x, -y) <= 1").unwrap().to_string(),
+            "(max(x, (-y)) <= 1)"
+        );
+    }
+
+    #[test]
+    fn a_boolean_is_a_number() {
+        assert!(matches!(
+            parse_expression("if(true, 1, 2)").unwrap(),
+            Expr::Conditional { condition, .. } if *condition == Expr::Constant(1.0)
+        ));
+    }
+
+    #[test]
+    fn what_the_jit_does_not_compile_is_an_error_that_says_why() {
+        for (formula, reason) in [
+            ("\"a\"", "Unsupported constant type"),
+            ("a = 1", "Unsupported operator: Assign"),
+            ("1; 2", "Unsupported operator: Chain"),
+            ("1, 2", "Unexpected tuple with 2 elements in expression"),
+            ("if(1, 2)", "if requires exactly 3 arguments, got 2"),
+            ("f()", "RootNode should have exactly 1 child"),
+        ] {
+            assert_eq!(
+                parse_expression(formula).unwrap_err().to_string(),
+                format!("Invalid expression: {reason}"),
+                "{formula}"
+            );
         }
     }
 }

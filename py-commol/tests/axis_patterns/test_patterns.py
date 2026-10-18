@@ -107,6 +107,27 @@ class TestSeriesParameterValue:
         with pytest.raises(ValidationError, match="unique"):
             ModelBuilder("M").add_parameter("x", [(1, 1.0), (1, 2.0)], mode="pulse")
 
+    @pytest.mark.parametrize(
+        "pattern",
+        [
+            AxisPattern.pulse(at=1, value="k"),
+            AxisPattern.pulses(at=[1, 2], value="k"),
+            AxisPattern.pulses(at=[1, 2], value=[0.1, "k"]),
+        ],
+        ids=["pulse", "pulses", "one-formula-of-several"],
+    )
+    def test_a_pulse_of_a_formula_stays_a_formula(self, pattern: AxisPattern):
+        builder = (
+            ModelBuilder("M")
+            .add_bin("A", "A")
+            .add_bin("B", "B")
+            .add_parameter("k", 0.1)
+            .add_transition("t", ["A"], ["B"], rate=pattern)
+        )
+
+        assert [p.id for p in builder._parameters] == ["k"]
+        assert builder._transitions[0].rate == pattern.formula
+
     def test_duplicate_user_parameter_id_raises_immediately(self):
         with pytest.raises(ValueError, match="already exists"):
             ModelBuilder("M").add_parameter("x", 1.0).add_parameter("x", 2.0)
@@ -244,6 +265,14 @@ class TestCombine:
         assert str(error.value) == (
             f"Combined formula length {length} exceeds maximum {length - 1} characters"
         )
+
+    def test_a_formula_longer_than_the_default_cap_follows_its_configuration(self):
+        expr = " + ".join(f"k{i}" for i in range(3000))
+        config = SecurityConfig(max_expression_length=len(expr) + 2)
+
+        pattern = AxisPattern.from_formula(expr, config=config)
+
+        assert str(pattern) == f"({expr})"
 
     def test_a_formula_is_checked_with_its_configuration(self):
         with pytest.raises(SecurityError, match="6 characters \\(maximum: 4\\)"):
@@ -417,3 +446,9 @@ class TestSecurityValidation:
     def test_pattern_survives_security_validator(self, pattern: AxisPattern):
         """Each pattern's formula passes the full security validator."""
         assert_accepted(validate_expression_security, str(pattern))
+
+
+class TestAbstract:
+    def test_a_pattern_comes_from_a_factory(self):
+        with pytest.raises(TypeError, match="abstract"):
+            AxisPattern()

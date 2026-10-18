@@ -94,11 +94,6 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
         })
     }
 
-    /// The design the source differentiates.
-    pub fn design(&self) -> Design {
-        self.design
-    }
-
     /// The step `h_j` of each parameter at `values`.
     pub fn steps(&self, values: &[f64]) -> Vec<f64> {
         let factor = self.accuracy.cbrt();
@@ -233,7 +228,9 @@ fn reason(violation: &Violation) -> String {
         }
         Violation::InfeasibleRun => "the run leaves the values the model allows".to_string(),
         Violation::NonFinite => "a value of the run is not finite".to_string(),
-        other => format!("{other:?}"),
+        Violation::OutOfBounds { .. } | Violation::Constraint { .. } => {
+            unreachable!("a run of the forward model checks no bounds and no constraint")
+        }
     }
 }
 

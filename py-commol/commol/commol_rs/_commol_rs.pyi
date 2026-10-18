@@ -1,87 +1,20 @@
 from typing import ClassVar, Literal, Protocol
 
-class BinProtocol(Protocol):
-    id: str
-    name: str
-
-class StratificationProtocol(Protocol):
-    id: str
-    categories: list[str]
-
-class StratificationConditionProtocol(Protocol):
-    stratification: str
-    category: str
-
-class StratifiedRateProtocol(Protocol):
-    conditions: list[StratificationConditionProtocol]
-    rate: str
-
-class TransitionProtocol(Protocol):
-    id: str
-    source: list[str]
-    target: list[str]
-    rate: RateMathExpressionProtocol | None
-    stratified_rates: list[StratifiedRateProtocol] | None
-
-class ParameterProtocol(Protocol):
-    id: str
-    value: float
-    description: str | None
-
-class StratificationFractionProtocol(Protocol):
-    category: str
-    fraction: float
-
-class StratificationFractionsProtocol(Protocol):
-    stratification: str
-    fractions: list[StratificationFractionProtocol]
-
-class InitialConditionsProtocol(Protocol):
-    def __init__(
-        self,
-        total: float,
-        bin_fractions: list[tuple[str, float | None]],
-        stratification_fractions: dict[str, dict[str, float]] | None = None,
-        compartment_fractions: list[tuple[str, float]] | None = None,
-    ) -> None: ...
-    total: float
-    bin_fractions: list[tuple[str, float | None]]
-    stratification_fractions: list[tuple[str, list[tuple[str, float]]]]
-    compartment_fractions: list[tuple[str, float]]
-
 class RustProcessProtocol(Protocol):
     """The process of a model: bins, accumulators, stratifications and transitions."""
 
-    def __init__(
-        self,
-        bins: list[BinProtocol],
-        stratifications: list[StratificationProtocol],
-        transitions: list[TransitionProtocol] | None = None,
-        accumulators: list[object] | None = None,
-    ) -> None: ...
     @staticmethod
     def from_json(json_str: str) -> RustProcessProtocol: ...
 
 class RustAggregateProtocol(Protocol):
     """The aggregate structure: amounts per compartment."""
 
-    def __init__(self, initial_conditions: InitialConditionsProtocol) -> None: ...
     @staticmethod
     def from_json(json_str: str) -> RustAggregateProtocol: ...
 
 class RustModelProtocol(Protocol):
     """A model of any kind: its header, process, structure and engine."""
 
-    def __init__(
-        self,
-        name: str,
-        process: RustProcessProtocol,
-        structure: RustAggregateProtocol,
-        parameters: list[ParameterProtocol],
-        engine: str,
-        description: str | None = None,
-        version: str | None = None,
-    ) -> None: ...
     @staticmethod
     def from_json(json_str: str) -> RustModelProtocol: ...
 
@@ -93,21 +26,13 @@ class EngineProtocol(Protocol):
     def engine_type(self) -> str: ...
     def run(self, num_steps: int) -> tuple[list[float], list[list[float]]]: ...
     def run_at(self, positions: list[float]) -> list[list[float]]: ...
-    def check_position(self, position: float) -> None: ...
     def step(self) -> None: ...
     def reset(self) -> None: ...
     def set_seed(self, seed: int) -> None: ...
     def run_replicates(
-        self,
-        seed: int,
-        count: int,
-        num_steps: int | None = None,
-        positions: list[float] | None = None,
+        self, seed: int, count: int, grid: int | list[float]
     ) -> tuple[list[float], list[int], list[list[list[float]]]]: ...
-    def set_parameter(self, parameter_id: str, value: float) -> None: ...
-    def get_parameters(self) -> dict[str, float]: ...
     def current_position(self) -> float: ...
-    def set_initial_condition(self, compartment_index: int, value: float) -> None: ...
     @property
     def state(self) -> list[float]: ...
     @property
@@ -121,8 +46,6 @@ class EngineTypeProtocol(Protocol):
     def __init__(self, name: str) -> None: ...
     @staticmethod
     def names() -> list[str]: ...
-    @property
-    def name(self) -> str: ...
     @property
     def kinds(self) -> list[str]: ...
     @property
@@ -145,8 +68,6 @@ class ModelKindProtocol(Protocol):
     def __init__(self, name: str) -> None: ...
     @staticmethod
     def names() -> list[str]: ...
-    @property
-    def name(self) -> str: ...
     def value_types(self) -> list[str]: ...
     def engines(self) -> list[str]: ...
 
@@ -188,8 +109,6 @@ class ObservedDataPointProtocol(Protocol):
         factor_id: str | None = None,
         window: float | None = None,
     ) -> None: ...
-    @property
-    def at(self) -> float: ...
 
 class CalibrationParameterTypeProtocol(Protocol):
     Parameter: ClassVar["CalibrationParameterTypeProtocol"]
@@ -219,20 +138,9 @@ class CalibrationConstraintProtocol(Protocol):
         self,
         id: str,
         expression: str,
-        description: str | None = None,
         weight: float = 1.0,
         at: list[float] | None = None,
     ) -> None: ...
-    @property
-    def id(self) -> str: ...
-    @property
-    def expression(self) -> str: ...
-    @property
-    def description(self) -> str | None: ...
-    @property
-    def weight(self) -> float: ...
-    @property
-    def at(self) -> list[float] | None: ...
 
 class LossConfigProtocol(Protocol):
     @staticmethod
@@ -245,7 +153,6 @@ class LossConfigProtocol(Protocol):
     def with_replicates(
         self, count: int, seed: int, summary: str, quantile: float | None = None
     ) -> LossConfigProtocol: ...
-    def aggregate(self, residuals: list[float], weights: list[float]) -> float: ...
     @property
     def normalize_observations(self) -> bool: ...
 
@@ -424,12 +331,6 @@ class CalibrationProblemProtocol(Protocol):
         loss_config: LossConfigProtocol,
         initial_condition_remainder: str | None = None,
     ) -> None: ...
-    @property
-    def parameter_names(self) -> list[str]: ...
-    @property
-    def observation_count(self) -> int: ...
-    @property
-    def replicate_count(self) -> int: ...
     def optimize(
         self, config: OptimizationConfigProtocol, starts: int, seed: int
     ) -> list[StartOutcomeProtocol]: ...
@@ -439,9 +340,6 @@ class CalibrationProblemProtocol(Protocol):
     def predict_observations(
         self, parameter_sets: list[list[float]]
     ) -> list[list[list[float]]]: ...
-    def predict_positions(
-        self, parameter_sets: list[list[float]], positions: list[float]
-    ) -> list[list[list[list[float]]]]: ...
     def predictive(
         self, sample: ParameterSampleProtocol, positions: list[float]
     ) -> PredictiveProtocol: ...
@@ -452,18 +350,35 @@ class CalibrationProblemProtocol(Protocol):
         seed: int,
         residual_noise: tuple[list[float], int, str] | None = None,
     ) -> ObservationDrawsProtocol: ...
-    def bootstrap(
+    def bayesian_bootstrap(
         self,
         config: OptimizationConfigProtocol,
         fit: list[float],
-        method: str,
         replicates: int,
         block_length: int | None,
         starts: int,
         seed: int,
-        residual_scale: str | None = None,
-        scheme: str | None = None,
-        multipliers: str | None = None,
+    ) -> BootstrapRunProtocol: ...
+    def residual_bootstrap(
+        self,
+        config: OptimizationConfigProtocol,
+        fit: list[float],
+        replicates: int,
+        block_length: int | None,
+        starts: int,
+        seed: int,
+        residual_scale: str,
+        scheme: str,
+    ) -> BootstrapRunProtocol: ...
+    def wild_bootstrap(
+        self,
+        config: OptimizationConfigProtocol,
+        fit: list[float],
+        replicates: int,
+        block_length: int | None,
+        starts: int,
+        seed: int,
+        multipliers: str,
     ) -> BootstrapRunProtocol: ...
     def jackknife(
         self,
@@ -675,32 +590,11 @@ class MathExpressionProtocol(Protocol):
     def __init__(self, expression: str) -> None: ...
     def validate(self) -> None: ...
 
-class RateMathExpressionProtocol(Protocol):
-    @staticmethod
-    def from_string_py(s: str) -> RateMathExpressionProtocol: ...
-    @staticmethod
-    def parameter(name: str) -> RateMathExpressionProtocol: ...
-    @staticmethod
-    def formula(formula: str) -> RateMathExpressionProtocol: ...
-    @staticmethod
-    def constant(value: float) -> RateMathExpressionProtocol: ...
-    def py_get_variables(self) -> list[str]: ...
-
 class CoreModule(Protocol):
     Model: type[RustModelProtocol]
     Process: type[RustProcessProtocol]
     Aggregate: type[RustAggregateProtocol]
-    Bin: type[BinProtocol]
-    Stratification: type[StratificationProtocol]
-    StratificationCondition: type[StratificationConditionProtocol]
-    StratifiedRate: type[StratifiedRateProtocol]
-    Transition: type[TransitionProtocol]
-    Parameter: type[ParameterProtocol]
-    InitialConditions: type[InitialConditionsProtocol]
-    StratificationFraction: type[StratificationFractionProtocol]
-    StratificationFractions: type[StratificationFractionsProtocol]
     MathExpression: type[MathExpressionProtocol]
-    RateMathExpression: type[RateMathExpressionProtocol]
 
 class RustCommolModule(Protocol):
     core: CoreModule

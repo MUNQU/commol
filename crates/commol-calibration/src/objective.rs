@@ -58,11 +58,6 @@ impl<'a, E: SimulationEngine> OptimizationObjective<'a, E> {
         }
     }
 
-    /// The problem.
-    pub fn problem(&self) -> &'a CalibrationProblem<E> {
-        self.problem
-    }
-
     /// The penalty of a violation: `base × (1 + amount)`, where `base` scales
     /// with the largest observed value and is at least `1e10`.
     pub fn penalty(&self, violation: &Violation) -> f64 {

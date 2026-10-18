@@ -1,7 +1,5 @@
 //! The right-hand side of a compiled model, and its accessors.
 
-use std::collections::HashMap;
-
 use commol_core::{MathExpressionContext, SPECIAL_VAR_TOTAL};
 
 use crate::labels::OutputLabels;
@@ -13,9 +11,8 @@ use crate::types::{CompiledModel, FlowChange, TransitionFlow, same_position};
 const PARAM_T: &str = "t";
 
 /// Set a reserved parameter slot during an evaluation. When `keep_cache_live`
-/// is true the call routes through the name-keyed path so the cached evalexpr
-/// context (used by formula parameters and slow-path rate fallbacks) stays
-/// warm; otherwise the indexed path skips the cache patch.
+/// is true the call goes through the name-keyed path, which the formula
+/// parameters read; otherwise it writes the indexed slot only.
 #[inline]
 fn set_step_parameter(
     ctx: &mut MathExpressionContext,
@@ -23,12 +20,12 @@ fn set_step_parameter(
     index: usize,
     value: f64,
     keep_cache_live: bool,
-) -> Result<(), String> {
+) {
     if keep_cache_live {
         ctx.set_parameter_str(name, value);
-        Ok(())
     } else {
         ctx.set_parameter_by_index(index, value)
+            .expect("the builder reserves the slot of every variable it sets");
     }
 }
 
@@ -96,12 +93,6 @@ impl CompiledModel {
     pub fn set_parameter(&mut self, parameter_id: &str, value: f64) {
         self.expression_context
             .set_parameter(parameter_id.to_string(), value);
-    }
-
-    /// Current values of the parameters, including the variables the last
-    /// evaluation set (`total`, `t`, subgroup totals).
-    pub fn parameters(&self) -> &HashMap<String, f64> {
-        self.expression_context.get_parameters()
     }
 
     /// The right-hand side of the model: the net flow into each component of
@@ -504,18 +495,18 @@ impl CompiledModel {
             self.total_parameter_index,
             total,
             keep_cache_live,
-        )?;
+        );
         set_step_parameter(
             &mut self.expression_context,
             PARAM_T,
             self.t_parameter_index,
             t,
             keep_cache_live,
-        )?;
+        );
 
-        // Only evalexpr fallback/formula-parameter paths need compartment
-        // values in the expression context. JIT-resolved transition formulas
-        // and fast-path rates read compartment values directly from the state.
+        // Only the formula parameters need compartment values in the
+        // expression context. JIT-resolved transition formulas and fast-path
+        // rates read compartment values directly from the state.
         if keep_cache_live {
             self.expression_context.set_compartments_by_index(amounts);
         }
@@ -532,7 +523,7 @@ impl CompiledModel {
                 mapping.parameter_index,
                 total,
                 keep_cache_live,
-            )?;
+            );
         }
 
         // A pulse series is read at `step`, the others at `t` (O(log N) search).
@@ -544,7 +535,7 @@ impl CompiledModel {
                 ts.parameter_index,
                 value,
                 keep_cache_live,
-            )?;
+            );
         }
 
         for (param_name, rate_expr) in &self.formula_parameters {

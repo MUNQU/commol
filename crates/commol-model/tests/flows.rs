@@ -281,3 +281,38 @@ fn a_bin_in_a_rate_is_the_total_of_the_bin_without_per_compartment() {
     // A holds 700 split 280 and 420 by group; each flow reads the whole bin.
     assert_eq!(rates, [0.3 * 700.0, 0.3 * 700.0]);
 }
+
+/// Bins A and B with a stratification `g` of the given `conditions`, A → B
+/// at `rate`.
+fn conditional(conditions: &str, rate: &str) -> Model {
+    let json = format!(
+        r#"{{"name":"m","parameters":[{{"id":"k","value":0.1}}],
+        "engine":{{"type":"DifferenceEquations"}},
+        "process":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}}],
+        "accumulators":[],
+        "stratifications":[{{"id":"g","categories":["g1","g2"],"conditions":{conditions}}}],
+        "transitions":[{{"id":"ab","source":["A"],"target":["B"],"rate":"{rate}"}}]}},
+        "structure":{{"kind":"aggregate","total":1000,"bin_fractions":{{"A":1.0,"B":0.0}},
+        "stratification_fractions":{{"g":{{"g1":0.5,"g2":0.5}}}}}}}}"#
+    );
+    serde_json::from_str(&json).expect("valid model JSON")
+}
+
+#[test]
+fn a_stratification_whose_condition_no_compartment_meets_expands_nothing() {
+    let model = conditional(r#"[{"stratification":"h","category":"h1"}]"#, "k");
+
+    let compiled = CompiledModel::try_from_model(&model).unwrap();
+
+    assert_eq!(compiled.compartments(), ["A", "B"]);
+    assert!(subgroup_total_names(&model.process).is_empty());
+}
+
+#[test]
+fn a_stratification_condition_without_a_category_filters_nothing() {
+    let model = conditional(r#"[{"stratification":"h"}]"#, "k");
+
+    let compiled = CompiledModel::try_from_model(&model).unwrap();
+
+    assert_eq!(compiled.compartments(), ["A_g1", "A_g2", "B_g1", "B_g2"]);
+}

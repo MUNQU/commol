@@ -819,3 +819,66 @@ fn the_engine_writes_initial_conditions_and_its_state_excludes_accumulators() {
 
     assert_eq!(CompartmentalEngine::state(&engine), vec![400.0, 600.0]);
 }
+
+#[test]
+fn a_run_continues_where_the_last_one_stopped_and_reports_at_its_start() {
+    let mut once = engine(&decay_model(TIGHT));
+    let mut parts = engine(&decay_model(TIGHT));
+
+    let at_once = once.run_at(&[0.0, 1.0, 2.0]).unwrap();
+    let start = parts.run_at(&[0.0]).unwrap();
+    let first = parts.run_at(&[1.0]).unwrap();
+    let second = parts.run_at(&[2.0]).unwrap();
+
+    assert_eq!(start[0], [1000.0, 0.0, 0.0]);
+    assert_eq!(at_once[0], start[0]);
+    for (a, b) in at_once[2].iter().zip(&second[0]) {
+        assert_close(*a, *b, 1e-9, "continued run");
+    }
+    assert!(first[0][0] < 1000.0);
+}
+
+#[test]
+fn a_new_initial_amount_before_the_run_starts_from_it() {
+    use commol_model::CompartmentalEngine;
+    let mut differential = engine(&decay_model(TIGHT));
+    let mut difference = DifferenceEquations::try_from_model(&model(
+        "DifferenceEquations",
+        &[("A", 1000.0), ("B", 0.0)],
+        &[("k", "0.3")],
+        &[],
+        &[transition("decay", &["A"], &["B"], "k", "")],
+        "",
+    ))
+    .unwrap();
+    differential.run_at(&[0.0]).unwrap();
+    difference.run_at(&[0.0]).unwrap();
+
+    differential.set_initial_condition(0, 500.0).unwrap();
+    difference.set_initial_condition(0, 500.0).unwrap();
+
+    assert_eq!(differential.run_at(&[0.0]).unwrap()[0][0], 500.0);
+    assert_eq!(difference.run_at(&[0.0]).unwrap()[0][0], 500.0);
+}
+
+#[test]
+fn an_engine_solves_only_a_model_of_its_own_type() {
+    let error = DifferenceEquations::try_from_model(&decay_model(TIGHT))
+        .err()
+        .unwrap();
+
+    assert_eq!(
+        error,
+        "The DifferenceEquations engine cannot solve a DifferentialEquations model"
+    );
+}
+
+#[test]
+fn a_rate_that_cannot_be_evaluated_stops_the_solver() {
+    let mut without_k = decay_model(TIGHT);
+    without_k.parameters[0].value = None;
+
+    let error = engine(&without_k).run_at(&[1.0]).unwrap_err().to_string();
+
+    assert!(error.contains("not found"), "{error}");
+}

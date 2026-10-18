@@ -247,6 +247,28 @@ impl ParameterSample {
 mod tests {
     use super::*;
 
+    #[test]
+    fn a_sample_has_a_bound_per_name_a_draw_and_a_group_per_draw() {
+        let new = |bounds: Vec<(f64, f64)>, values: Vec<Vec<f64>>, groups| {
+            let log_weights = vec![0.0; values.len()];
+            ParameterSample::new(vec!["k".to_string()], bounds, values, &log_weights, groups)
+                .unwrap_err()
+        };
+
+        assert_eq!(
+            new(vec![], vec![vec![0.5]], None),
+            "A sample has one bound per name: 1 names, 0 bounds"
+        );
+        assert_eq!(
+            new(vec![(0.0, 1.0)], vec![], None),
+            "A sample needs at least one draw"
+        );
+        assert_eq!(
+            new(vec![(0.0, 1.0)], vec![vec![0.5]], Some(vec![0, 1])),
+            "A sample has one group per draw: 1 draws, 2 groups"
+        );
+    }
+
     fn sample(log_weights: &[f64]) -> ParameterSample {
         ParameterSample::new(
             vec!["k1".to_string(), "k2".to_string()],

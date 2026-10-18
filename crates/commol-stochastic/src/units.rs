@@ -248,6 +248,14 @@ mod tests {
     }
 
     #[test]
+    fn a_random_rounding_of_less_than_half_a_unit_is_zero() {
+        let mut generator = Generator::from_seed(1);
+
+        assert_eq!(random_rounding(&[0.2, 0.1], &mut generator), [0.0, 0.0]);
+        assert_eq!(random_rounding(&[0.0, 0.0], &mut generator), [0.0, 0.0]);
+    }
+
+    #[test]
     fn a_random_rounding_keeps_the_total_and_the_mean() {
         let amounts = [0.5, 1.5, 3.0, 0.0];
         let mut generator = Generator::from_seed(3);

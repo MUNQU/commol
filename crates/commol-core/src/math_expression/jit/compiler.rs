@@ -8,7 +8,7 @@ use super::libm::LibmRegistry;
 use super::parser::parse_expression;
 use crate::math_expression::MathExpressionContext;
 use crate::math_expression::error::MathExpressionError;
-use crate::math_expression::preprocessing::{SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX};
+use crate::math_expression::preprocessing::SPECIAL_VAR_TOTAL;
 use cranelift::prelude::*;
 use cranelift_codegen::ir::AbiParam;
 use cranelift_jit::{JITBuilder, JITModule};
@@ -46,16 +46,6 @@ impl std::fmt::Debug for JITFunction {
     }
 }
 
-impl Clone for JITFunction {
-    fn clone(&self) -> Self {
-        Self {
-            func_ptr: self.func_ptr,
-            _module: Arc::clone(&self._module),
-            variable_names: self.variable_names.clone(),
-        }
-    }
-}
-
 impl JITFunction {
     /// Call the JIT-compiled function with a context
     pub fn call(&self, context: &MathExpressionContext) -> Result<f64, MathExpressionError> {
@@ -77,10 +67,8 @@ impl JITFunction {
             // Preferred order: precomputed parameter (includes `total`, `total_*`, base bin
             // totals, and partial bin-strat sums that the engine updates once
             // per step), then compartment values, then the special variables `step` and `t`,
-            // and only then the expensive on-demand recomputation fallback.
-            //
-            // The recomputation paths are kept so that callers using the JIT
-            // standalone (without a DifferenceEquations engine) still work.
+            // and only then `total` summed from the compartments, for a caller
+            // that does not set it, such as the constraints of a calibration.
             let value = if let Some(v) = context.parameters.get(name).copied() {
                 v
             } else if let Some(v) = context.compartments.get(name).copied() {
@@ -95,20 +83,6 @@ impl JITFunction {
                 let mut sorted_values: Vec<f64> = context.compartments.values().copied().collect();
                 sorted_values.sort_by(|a, b| a.total_cmp(b));
                 sorted_values.iter().sum()
-            } else if let Some(categories) = name.strip_prefix(SUBGROUP_TOTAL_PREFIX) {
-                // Fallback: subgroup total in sorted order.
-                let suffix = format!("_{categories}");
-                let mut filtered_values: Vec<f64> = context
-                    .compartments
-                    .iter()
-                    .filter(|(comp_name, _)| comp_name.ends_with(&suffix))
-                    .map(|(_, val)| *val)
-                    .collect();
-                if filtered_values.is_empty() {
-                    return Err(MathExpressionError::VariableNotFound(name.clone()));
-                }
-                filtered_values.sort_by(|a, b| a.total_cmp(b));
-                filtered_values.iter().sum()
             } else {
                 return Err(MathExpressionError::VariableNotFound(name.clone()));
             };
@@ -157,9 +131,14 @@ impl JITCompiler {
     /// Compile a preprocessed expression to a JIT function
     pub fn compile(&self, preprocessed: &str) -> Result<JITFunction, MathExpressionError> {
         // Create a new JIT module for this function
-        let builder = JITBuilder::new(cranelift_module::default_libcall_names()).map_err(|e| {
-            MathExpressionError::InvalidExpression(format!("Failed to create JIT builder: {}", e))
-        })?;
+        let mut builder =
+            JITBuilder::new(cranelift_module::default_libcall_names()).map_err(|e| {
+                MathExpressionError::InvalidExpression(format!(
+                    "Failed to create JIT builder: {}",
+                    e
+                ))
+            })?;
+        builder.symbol_lookup_fn(Box::new(super::libm::address));
         let mut module = JITModule::new(builder);
         // Parse to AST
         let ast = parse_expression(preprocessed)?;

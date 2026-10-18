@@ -6,10 +6,7 @@ import time
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING
 
-try:
-    from commol.commol_rs import _commol_rs as commol_rs
-except ImportError as e:
-    raise ImportError(f"Error importing Rust extension: {e}") from e
+from commol.commol_rs import _commol_rs as commol_rs
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import EngineProtocol
@@ -479,23 +476,22 @@ class ReplicateRuns:
         self.n = n
         self.seed = seed
 
-    def _replicates(
-        self, num_steps: int | None, positions: list[float] | None
-    ) -> SimulationReplicates:
+    def _replicates(self, grid: int | list[float]) -> SimulationReplicates:
+        """The replicates on ``grid``: a number of steps or the positions."""
         simulation = self.simulation
         simulation._validate_all_parameters_calibrated(simulation.model_definition)
         engine = simulation.engine
-        grid, seeds, runs = engine.run_replicates(
-            self.seed, self.n, num_steps=num_steps, positions=positions
-        )
+        positions, seeds, runs = engine.run_replicates(self.seed, self.n, grid)
         outputs = simulation.simulation_outputs
         return SimulationReplicates(
             (
-                SimulationResults.from_rows(grid, outputs, rows, seed=replicate_seed)
+                SimulationResults.from_rows(
+                    positions, outputs, rows, seed=replicate_seed
+                )
                 for replicate_seed, rows in zip(seeds, runs, strict=True)
             ),
             seed=self.seed,
-            positions=grid,
+            positions=positions,
         )
 
     def run(self, num_steps: int) -> SimulationReplicates:
@@ -520,7 +516,7 @@ class ReplicateRuns:
         ValueError
             If a parameter or a value of the model has no value.
         """
-        return self._replicates(num_steps, None)
+        return self._replicates(num_steps)
 
     def run_at(self, at: Sequence[float]) -> SimulationReplicates:
         """
@@ -544,4 +540,4 @@ class ReplicateRuns:
             If a parameter has no value, the positions are not sorted and
             unique, or the engine does not report at one of them.
         """
-        return self._replicates(None, [float(position) for position in at])
+        return self._replicates([float(position) for position in at])

@@ -3,6 +3,7 @@
 import pytest
 
 from commol import ModelBuilder, Simulation
+from commol.context.stratification import Stratification
 from tests.support import assert_total_conserved, build, abc_builder
 
 GROUP = {"g1": 0.8, "g2": 0.2}
@@ -119,9 +120,30 @@ class TestConditionalStratification:
             .add_stratification(id="group", categories=["cat0", "cat1"])
         )
 
-        with pytest.raises(ValueError, match="must include a 'category'"):
+        with pytest.raises(ValueError, match="'group' must include a category"):
             builder.add_stratification(
                 id="subgroup",
                 categories=["sub0", "sub1"],
                 conditions=[{"stratification": "group"}],
             )
+
+
+class TestCategories:
+    @pytest.mark.parametrize(
+        ("categories", "message"),
+        [
+            ([], "'g' must have at least one category"),
+            (["g1", "g2", "g1"], r"must not be repeated. Found duplicates: \['g1'\]"),
+        ],
+    )
+    def test_a_stratification_has_distinct_categories(
+        self, categories: list[str], message: str
+    ) -> None:
+        with pytest.raises(ValueError, match=message):
+            ModelBuilder(name="m").add_stratification(id="g", categories=categories)
+
+    def test_stratifications_of_one_id_are_one_member_of_a_set(self) -> None:
+        first = Stratification(id="g", categories=["g1"])
+        second = Stratification(id="g", categories=["g1", "g2"])
+
+        assert {first, second} == {first}

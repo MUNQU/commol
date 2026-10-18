@@ -213,36 +213,6 @@ a test, or one case of a parametrized test with its parameter in brackets.
 | `tests/description/test_rendering.py::TestLatex::test_the_latex_document_compiles` | It compiles the LaTeX description with `latexmk`; the first TeX run of the job loads its formats. No other test checks that the document compiles. |
 | `tests/docs/test_examples.py::test_page_examples_run[docs/guide/simulations.md]` | It runs every example of the page, which draws and saves four figures with matplotlib, one label per plotted position; the figures are what the page documents. |
 
-## Mutation testing
-
-Coverage says that a line ran, not that a test notices when it changes.
-Mutation testing changes the code, one small change at a time, and reports
-the changes that no test fails on. It runs on demand, not in CI, because a
-full run takes hours:
-
-```bash
-cargo install --locked cargo-mutants
-cargo mutants -j 2 --timeout 120 -p commol-model --test-package commol-model \
-  --test-package commol-difference --test-package commol-differential \
-  --test-package commol-stochastic \
-  --exclude-re 'replace \+= with .* in CompiledModel::breakpoints'
-```
-
-A mutant can loop without end and fill the memory: the loop of
-`CompiledModel::breakpoints` never ends when its step does not grow, so the
-command leaves those mutants out, and `--timeout` stops the others. Run
-`cargo-mutants` and `mutmut` one at a time.
-
-For Python, `mutmut` (`uv pip install mutmut`) with `[tool.mutmut]`
-`paths_to_mutate = ["commol/context/", "commol/api/"]` in a copy of
-`py-commol/`. A missed mutant gets a test that fails on it, or a reason: an
-equivalent mutant changes no behavior. The Python suite also runs the Rust
-code, so check a Rust mutant that the Rust tests miss against `pytest`
-before you write a test for it. `mutmut` imports the package before it
-activates a mutant, so a mutant of code that runs at import, such as the
-registration of a model kind, survives every test: check it with
-`MUTANT_UNDER_TEST=<name>` set before Python starts.
-
 ## Navigation
 
-Previous: [Conventions](conventions.md) | Next: [Maintainer playbook](maintainer-playbook.md)
+Previous: [Conventions](conventions.md) | Next: [Coverage and mutation testing](coverage.md)

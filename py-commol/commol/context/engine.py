@@ -18,10 +18,7 @@ from pydantic import (
     model_validator,
 )
 
-try:
-    from commol.commol_rs import _commol_rs as commol_rs
-except ImportError as e:
-    raise ImportError(f"Error importing Rust extension: {e}") from e
+from commol.commol_rs import _commol_rs as commol_rs
 
 
 EngineName: TypeAlias = Literal[

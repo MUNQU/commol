@@ -238,10 +238,8 @@ fn lowest(subsets: Vec<Subset>) -> Option<Subset> {
 /// Every subset of `size` of `0..count`, in lexicographic order.
 fn combinations(count: usize, size: usize) -> Vec<Vec<usize>> {
     let mut all = Vec::new();
+    debug_assert!(size <= count, "the caller checks the size of a subset");
     let mut current: Vec<usize> = (0..size).collect();
-    if size > count {
-        return all;
-    }
     loop {
         all.push(current.clone());
         let Some(i) = (0..size).rev().find(|&i| current[i] < count - size + i) else {

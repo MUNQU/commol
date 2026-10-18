@@ -53,6 +53,42 @@ fn prediction_error(index: usize, error: EvaluationError) -> PyErr {
     }
 }
 
+impl PyCalibrationProblem {
+    /// Run `replicates` of the resampler that `resampler` makes from the fit,
+    /// and the block length it chose.
+    #[allow(clippy::too_many_arguments)]
+    fn run_bootstrap(
+        &self,
+        py: Python<'_>,
+        config: &PyOptimizationConfig,
+        fit: &[f64],
+        replicates: usize,
+        starts: usize,
+        seed: u64,
+        resampler: impl FnOnce(&[f64]) -> PyResult<(Box<dyn Resampler>, BlockLength)>,
+    ) -> PyResult<PyBootstrapRun> {
+        let runner = ReplicateRunner::new(&self.inner, &config.inner, fit, starts, seed)
+            .map_err(value_error)?;
+        let (resampler, chosen) = resampler(runner.fit())?;
+        let run = py
+            .detach(|| bootstrap(&runner, resampler.as_ref(), replicates))
+            .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
+        Ok(PyBootstrapRun {
+            values: run.sample.values().to_vec(),
+            groups: run
+                .sample
+                .groups()
+                .map(<[usize]>::to_vec)
+                .unwrap_or_default(),
+            failed: run.failed,
+            not_converged: run.not_converged,
+            negative_values: run.negative_values,
+            block_length: chosen.length,
+            block_length_estimates: chosen.estimates,
+        })
+    }
+}
+
 #[pymethods]
 impl PyCalibrationProblem {
     /// Build a calibration problem
@@ -97,24 +133,6 @@ impl PyCalibrationProblem {
         Ok(Self { inner: problem })
     }
 
-    /// The parameter names, in problem order
-    #[getter]
-    fn parameter_names(&self) -> Vec<String> {
-        self.inner.parameter_names()
-    }
-
-    /// The number of observations
-    #[getter]
-    fn observation_count(&self) -> usize {
-        self.inner.observation().len()
-    }
-
-    /// The number of runs per evaluation: one per replicate, or one
-    #[getter]
-    fn replicate_count(&self) -> usize {
-        self.inner.forward().replicate_count()
-    }
-
     /// Optimize from `starts` start points in parallel
     ///
     /// Start 0 is the initial guess; the others are rows of a Latin
@@ -122,15 +140,14 @@ impl PyCalibrationProblem {
     ///
     /// Args:
     ///     config: The optimizer
-    ///     starts: Number of starts, at least 1
+    ///     starts: Number of starts, at least 1 (the caller checks it)
     ///     seed: Seed of the starts
     ///
     /// Returns:
     ///     One StartOutcome per start, in order
     ///
     /// Raises:
-    ///     ValueError: If `starts` is 0, or a verbose optimizer has more than
-    ///         one start
+    ///     ValueError: If a verbose optimizer has more than one start
     fn optimize(
         &self,
         py: Python<'_>,
@@ -138,11 +155,6 @@ impl PyCalibrationProblem {
         starts: usize,
         seed: u64,
     ) -> PyResult<Vec<PyStartOutcome>> {
-        if starts == 0 {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "An optimization needs at least one start",
-            ));
-        }
         let outcomes = if config.verbose {
             if starts > 1 {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -200,7 +212,7 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         parameter_sets: Vec<Vec<f64>>,
     ) -> PyResult<Vec<Vec<Vec<f64>>>> {
-        let n = self.inner.observation().len();
+        let n = self.inner.observation().count();
         py.detach(|| {
             parameter_sets
                 .par_iter()
@@ -212,38 +224,6 @@ impl PyCalibrationProblem {
                         .map(|predictions| {
                             predictions.chunks(n.max(1)).map(<[f64]>::to_vec).collect()
                         })
-                        .map_err(|error| (index, error))
-                })
-                .collect::<Result<Vec<_>, _>>()
-        })
-        .map_err(|(index, error)| prediction_error(index, error))
-    }
-
-    /// The outputs of each parameter set at `positions`, in parallel
-    ///
-    /// Args:
-    ///     parameter_sets: Values of each set, in problem order
-    ///     positions: Positions to report at, sorted
-    ///
-    /// Returns:
-    ///     `[set][replicate][position][output]`
-    ///
-    /// Raises:
-    ///     InfeasibleStateError: If a set leaves the values its model allows
-    fn predict_positions(
-        &self,
-        py: Python<'_>,
-        parameter_sets: Vec<Vec<f64>>,
-        positions: Vec<f64>,
-    ) -> PyResult<Vec<Vec<Vec<Vec<f64>>>>> {
-        py.detach(|| {
-            parameter_sets
-                .par_iter()
-                .enumerate()
-                .map(|(index, values)| {
-                    self.inner
-                        .forward()
-                        .run_at(values, &positions)
                         .map_err(|error| (index, error))
                 })
                 .collect::<Result<Vec<_>, _>>()
@@ -295,8 +275,8 @@ impl PyCalibrationProblem {
         let noise: Box<dyn ObservationNoise> = match residual_noise {
             None => Box::new(NoNoise),
             Some((fit, length, scale)) => {
-                let residuals = Residuals::new(&self.inner, &fit, residual_scale(&scale)?)
-                    .map_err(value_error)?;
+                let scale = ResidualScale::from_name(&scale).map_err(value_error)?;
+                let residuals = Residuals::new(&self.inner, &fit, scale).map_err(value_error)?;
                 Box::new(
                     ResidualNoise::new(self.inner.observed_data(), &residuals, length)
                         .map_err(value_error)?,
@@ -316,138 +296,146 @@ impl PyCalibrationProblem {
         .map_err(predictive_error)
     }
 
-    /// Fit replicates of reweighted or resampled data, from the fit
+    /// Fit replicates of the data reweighted by blocks (Bayesian
+    /// bootstrap), from the fit
     ///
     /// Args:
     ///     config: The optimizer
     ///     fit: The fitted values, in problem order
-    ///     method: "bayesian", "residual" or "wild"
     ///     replicates: Number of replicates
     ///     block_length: Positions per block, or None for the automatic
     ///         length
     ///     starts: Starts per replicate, the fit first
     ///     seed: Seed of the replicates
-    ///     residual_scale: "additive" or "multiplicative", for "residual"
-    ///     scheme: "moving" or "stationary", for "residual"
-    ///     multipliers: "rademacher" or "mammen", for "wild"
+    ///
+    /// Raises:
+    ///     ValueError: If the block length does not fit the positions
+    ///     RuntimeError: If every replicate fails
+    #[allow(clippy::too_many_arguments)]
+    fn bayesian_bootstrap(
+        &self,
+        py: Python<'_>,
+        config: &PyOptimizationConfig,
+        fit: Vec<f64>,
+        replicates: usize,
+        block_length: Option<usize>,
+        starts: usize,
+        seed: u64,
+    ) -> PyResult<PyBootstrapRun> {
+        let observed = self.inner.observed_data();
+        self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
+            let residuals =
+                Residuals::new(&self.inner, fit, ResidualScale::Additive).map_err(value_error)?;
+            let chosen = BlockLength::resolve(
+                observed,
+                &residuals,
+                block_length,
+                BlockDrawing::NonOverlapping,
+            );
+            let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
+            Ok((Box::new(BayesianBootstrap::new(observed, &scheme)), chosen))
+        })
+    }
+
+    /// Fit replicates of the fit plus blocks of its residuals, from the fit
+    ///
+    /// Args:
+    ///     config: The optimizer
+    ///     fit: The fitted values, in problem order
+    ///     replicates: Number of replicates
+    ///     block_length: Positions per block, or None for the automatic
+    ///         length
+    ///     starts: Starts per replicate, the fit first
+    ///     seed: Seed of the replicates
+    ///     residual_scale: "additive" or "multiplicative"
+    ///     scheme: "moving" or "stationary"
     ///
     /// Raises:
     ///     ValueError: If a setting is not valid, the block length does not
     ///         fit the positions, or the residuals cannot be taken on their
     ///         scale
     ///     RuntimeError: If every replicate fails
-    #[pyo3(signature = (config, fit, method, replicates, block_length, starts, seed, residual_scale=None, scheme=None, multipliers=None))]
     #[allow(clippy::too_many_arguments)]
-    fn bootstrap(
+    fn residual_bootstrap(
         &self,
         py: Python<'_>,
         config: &PyOptimizationConfig,
         fit: Vec<f64>,
-        method: &str,
         replicates: usize,
         block_length: Option<usize>,
         starts: usize,
         seed: u64,
-        residual_scale: Option<String>,
-        scheme: Option<String>,
-        multipliers: Option<String>,
+        residual_scale: &str,
+        scheme: &str,
     ) -> PyResult<PyBootstrapRun> {
-        if replicates == 0 {
-            return Err(value_error(
-                "A bootstrap needs at least one replicate".to_string(),
-            ));
-        }
         let observed = self.inner.observed_data();
-        let runner = ReplicateRunner::new(&self.inner, &config.inner, &fit, starts, seed)
-            .map_err(value_error)?;
-        let fit = runner.fit().to_vec();
-        let (resampler, chosen): (Box<dyn Resampler>, BlockLength) = match method {
-            "bayesian" => {
-                let residuals = Residuals::new(&self.inner, &fit, ResidualScale::Additive)
-                    .map_err(value_error)?;
-                let chosen = BlockLength::resolve(
-                    observed,
-                    &residuals,
-                    block_length,
-                    BlockDrawing::NonOverlapping,
-                )?;
-                let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
-                (Box::new(BayesianBootstrap::new(observed, &scheme)), chosen)
-            }
-            "residual" => {
-                let scale = residual_scale_of(residual_scale.as_deref())?;
-                let blocks = match scheme.as_deref() {
-                    Some("moving") => ResidualBlocks::Moving,
-                    Some("stationary") => ResidualBlocks::Stationary,
-                    other => {
-                        return Err(value_error(format!(
-                            "scheme is {other:?}; it must be \"moving\" or \"stationary\""
-                        )));
-                    }
-                };
-                let drawing = match blocks {
-                    ResidualBlocks::Moving => BlockDrawing::Moving,
-                    ResidualBlocks::Stationary => BlockDrawing::Stationary,
-                };
-                let residuals = Residuals::new(&self.inner, &fit, scale).map_err(value_error)?;
-                let chosen = BlockLength::resolve(observed, &residuals, block_length, drawing)?;
-                let block_scheme =
-                    BlockScheme::new(observed, chosen.length).map_err(value_error)?;
-                (
-                    Box::new(ResidualBootstrap::new(
-                        observed,
-                        residuals,
-                        &block_scheme,
-                        blocks,
-                    )),
-                    chosen,
-                )
-            }
-            "wild" => {
-                let multipliers = match multipliers.as_deref() {
-                    Some("rademacher") => Multipliers::Rademacher,
-                    Some("mammen") => Multipliers::Mammen,
-                    other => {
-                        return Err(value_error(format!(
-                            "multipliers is {other:?}; it must be \"rademacher\" or \"mammen\""
-                        )));
-                    }
-                };
-                let residuals = Residuals::new(&self.inner, &fit, ResidualScale::Additive)
-                    .map_err(value_error)?;
-                let chosen = BlockLength::resolve(
-                    observed,
-                    &residuals,
-                    block_length,
-                    BlockDrawing::NonOverlapping,
-                )?;
-                let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
-                (
-                    Box::new(WildBootstrap::new(residuals, &scheme, multipliers)),
-                    chosen,
-                )
-            }
-            other => {
-                return Err(value_error(format!(
-                    "Unknown resampling method {other:?}; one of \"bayesian\", \"residual\", \"wild\""
-                )));
-            }
+        let scale = ResidualScale::from_name(residual_scale).map_err(value_error)?;
+        let blocks = ResidualBlocks::from_name(scheme).map_err(value_error)?;
+        let drawing = match blocks {
+            ResidualBlocks::Moving => BlockDrawing::Moving,
+            ResidualBlocks::Stationary => BlockDrawing::Stationary,
         };
-        let run = py
-            .detach(|| bootstrap(&runner, resampler.as_ref(), replicates))
-            .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
-        Ok(PyBootstrapRun {
-            values: run.sample.values().to_vec(),
-            groups: run
-                .sample
-                .groups()
-                .map(<[usize]>::to_vec)
-                .unwrap_or_default(),
-            failed: run.failed,
-            not_converged: run.not_converged,
-            negative_values: run.negative_values,
-            block_length: chosen.length,
-            block_length_estimates: chosen.estimates,
+        self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
+            let residuals = Residuals::new(&self.inner, fit, scale).map_err(value_error)?;
+            let chosen = BlockLength::resolve(observed, &residuals, block_length, drawing);
+            let block_scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
+            Ok((
+                Box::new(ResidualBootstrap::new(
+                    observed,
+                    residuals,
+                    &block_scheme,
+                    blocks,
+                )),
+                chosen,
+            ))
+        })
+    }
+
+    /// Fit replicates of the fit plus its residuals times random
+    /// multipliers shared by a block (wild bootstrap), from the fit
+    ///
+    /// Args:
+    ///     config: The optimizer
+    ///     fit: The fitted values, in problem order
+    ///     replicates: Number of replicates
+    ///     block_length: Positions per block, or None for the automatic
+    ///         length
+    ///     starts: Starts per replicate, the fit first
+    ///     seed: Seed of the replicates
+    ///     multipliers: "rademacher" or "mammen"
+    ///
+    /// Raises:
+    ///     ValueError: If a setting is not valid or the block length does
+    ///         not fit the positions
+    ///     RuntimeError: If every replicate fails
+    #[allow(clippy::too_many_arguments)]
+    fn wild_bootstrap(
+        &self,
+        py: Python<'_>,
+        config: &PyOptimizationConfig,
+        fit: Vec<f64>,
+        replicates: usize,
+        block_length: Option<usize>,
+        starts: usize,
+        seed: u64,
+        multipliers: &str,
+    ) -> PyResult<PyBootstrapRun> {
+        let observed = self.inner.observed_data();
+        let multipliers = Multipliers::from_name(multipliers).map_err(value_error)?;
+        self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
+            let residuals =
+                Residuals::new(&self.inner, fit, ResidualScale::Additive).map_err(value_error)?;
+            let chosen = BlockLength::resolve(
+                observed,
+                &residuals,
+                block_length,
+                BlockDrawing::NonOverlapping,
+            );
+            let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
+            Ok((
+                Box::new(WildBootstrap::new(residuals, &scheme, multipliers)),
+                chosen,
+            ))
         })
     }
 
@@ -484,13 +472,13 @@ impl PyCalibrationProblem {
             &residuals,
             block_length,
             BlockDrawing::NonOverlapping,
-        )?;
+        );
         let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
-        if scheme.len() < 2 {
+        if scheme.count() < 2 {
             return Err(value_error(format!(
                 "block_length {} makes {} block; a jackknife needs at least two",
                 scheme.length(),
-                scheme.len()
+                scheme.count()
             )));
         }
         let jackknife = py
@@ -528,8 +516,8 @@ impl BlockLength {
         residuals: &Residuals,
         requested: Option<usize>,
         drawing: BlockDrawing,
-    ) -> PyResult<Self> {
-        Ok(match requested {
+    ) -> Self {
+        match requested {
             Some(length) => Self {
                 length,
                 estimates: None,
@@ -541,21 +529,7 @@ impl BlockLength {
                     estimates: Some(automatic.estimates),
                 }
             }
-        })
-    }
-}
-
-fn residual_scale(name: &str) -> PyResult<ResidualScale> {
-    residual_scale_of(Some(name))
-}
-
-fn residual_scale_of(name: Option<&str>) -> PyResult<ResidualScale> {
-    match name {
-        Some("additive") => Ok(ResidualScale::Additive),
-        Some("multiplicative") => Ok(ResidualScale::Multiplicative),
-        other => Err(value_error(format!(
-            "residual_scale is {other:?}; it must be \"additive\" or \"multiplicative\""
-        ))),
+        }
     }
 }
 
@@ -833,40 +807,37 @@ fn weighted_quantiles(values: Vec<f64>, weights: Vec<f64>, levels: Vec<f64>) -> 
     Ok(statistics::quantiles(&values, &weights, &levels))
 }
 
-/// The weighted mean of `values`
-///
-/// Raises:
-///     ValueError: If the lengths differ or no weight is positive
+/// The weighted mean of `values`, one weight per value and some positive
 #[pyfunction]
-fn weighted_mean(values: Vec<f64>, weights: Vec<f64>) -> PyResult<f64> {
-    if values.len() != weights.len() || !weights.iter().any(|w| *w > 0.0) {
-        return Err(value_error(
-            "A weighted mean needs one weight per value and a positive weight".to_string(),
-        ));
-    }
-    Ok(statistics::mean(&values, &weights))
+fn weighted_mean(values: Vec<f64>, weights: Vec<f64>) -> f64 {
+    debug_assert!(
+        values.len() == weights.len() && weights.iter().any(|w| *w > 0.0),
+        "member_statistics checks the weights with weighted_quantiles first"
+    );
+    statistics::mean(&values, &weights)
 }
 
 /// The Monte Carlo error of the quantile at `level` of equally weighted
 /// `values`: an order-statistic interval of about 95 %
 #[pyfunction]
-fn quantile_error(values: Vec<f64>, level: f64) -> PyResult<(f64, f64)> {
-    if values.is_empty() || !(0.0..=1.0).contains(&level) {
-        return Err(value_error(
-            "A quantile error needs values and a level in [0, 1]".to_string(),
-        ));
-    }
-    Ok(statistics::quantile_error(&values, level))
+fn quantile_error(values: Vec<f64>, level: f64) -> (f64, f64) {
+    debug_assert!(
+        !values.is_empty() && (0.0..=1.0).contains(&level),
+        "the package passes values and a level in [0, 1]"
+    );
+    statistics::quantile_error(&values, level)
 }
 
 /// The mean of `values` per series named by `labels`, in order of first
 /// appearance
 #[pyfunction]
-fn by_series(labels: Vec<String>, values: Vec<f64>) -> PyResult<Vec<(String, f64)>> {
-    if labels.len() != values.len() {
-        return Err(value_error("One label per value".to_string()));
-    }
-    Ok(scores::by_series(&labels, &values))
+fn by_series(labels: Vec<String>, values: Vec<f64>) -> Vec<(String, f64)> {
+    debug_assert_eq!(
+        labels.len(),
+        values.len(),
+        "the package passes a label per value"
+    );
+    scores::by_series(&labels, &values)
 }
 
 /// Register the inference module with the Python module

@@ -4,7 +4,6 @@ use commol_core::{ModelValue, SimulationError};
 use commol_model::{
     CompartmentalEngine, CompiledModel, InitialConditionPlan, OutputLabels, output_sums,
 };
-use std::collections::HashMap;
 
 /// How far below zero, relative to the total at the start of a step, an
 /// amount may fall: the rounding of flows that empty a compartment exactly.
@@ -175,11 +174,6 @@ impl DifferenceEquations {
         }
     }
 
-    /// The compiled model the engine steps.
-    pub fn model(&self) -> &CompiledModel {
-        &self.model
-    }
-
     /// Current amount of each compartment, without the accumulators.
     pub fn state(&self) -> Vec<f64> {
         self.state[..self.model.num_compartments()].to_vec()
@@ -199,11 +193,8 @@ impl DifferenceEquations {
         self.state.len()
     }
 
-    fn copy_output_row(&self, row: &mut Vec<f64>) {
-        let output_len = self.output_len();
-        if row.len() != output_len {
-            row.resize(output_len, 0.0);
-        }
+    /// Copy the state into a row that `record_steps` sized to the outputs.
+    fn copy_output_row(&self, row: &mut [f64]) {
         row.copy_from_slice(&self.state);
     }
 
@@ -333,10 +324,6 @@ impl commol_core::SimulationEngine for DifferenceEquations {
         Ok(())
     }
 
-    fn get_parameters(&self) -> &HashMap<String, f64> {
-        self.model.parameters()
-    }
-
     fn current_position(&self) -> f64 {
         self.current_step
     }
@@ -401,7 +388,7 @@ mod tests {
     use super::*;
     use commol_core::{
         Aggregate, Bin, EngineType, InitialConditions, Model, ModelEngine, ModelStructure, Process,
-        RateMathExpression, SimulationEngine, Transition,
+        SimulationEngine, Transition,
     };
 
     /// One difference step is exactly `state + derivatives(n, state)`.
@@ -452,9 +439,7 @@ mod tests {
                     source: vec!["A".to_string()],
                     target: vec!["B".to_string()],
                     accumulators: vec![],
-                    rate: Some(RateMathExpression::from_string(
-                        "if(step - floor(step / 7) * 7 == 0, 0.1, 0)".to_string(),
-                    )),
+                    rate: Some("if(step - floor(step / 7) * 7 == 0, 0.1, 0)".to_string()),
                     stratified_rates: None,
                     per_compartment: None,
                     impulse_at: None,
@@ -501,7 +486,7 @@ mod tests {
                     source: vec!["A".to_string()],
                     target: vec!["B".to_string()],
                     accumulators: vec![],
-                    rate: Some(RateMathExpression::from_string("missing * A".to_string())),
+                    rate: Some("missing * A".to_string()),
                     stratified_rates: None,
                     per_compartment: None,
                     impulse_at: None,
@@ -630,9 +615,7 @@ mod tests {
                         source: vec!["A".to_string()],
                         target: vec!["B".to_string()],
                         accumulators: vec![],
-                        rate: Some(RateMathExpression::from_string(
-                            "k1 * A * B / total".to_string(),
-                        )),
+                        rate: Some("k1 * A * B / total".to_string()),
                         stratified_rates: None,
                         per_compartment: None,
                         impulse_at: None,
@@ -643,7 +626,7 @@ mod tests {
                         source: vec!["B".to_string()],
                         target: vec!["C".to_string()],
                         accumulators: vec![],
-                        rate: Some(RateMathExpression::from_string("k2".to_string())),
+                        rate: Some("k2".to_string()),
                         stratified_rates: None,
                         per_compartment: None,
                         impulse_at: None,
@@ -672,26 +655,6 @@ mod tests {
     }
 
     #[test]
-    fn get_parameters_exposes_the_total_after_step_without_compartment_context() {
-        let model = make_three_bin_model();
-        let mut engine = DifferenceEquations::from_model(&model);
-
-        engine.step().unwrap();
-
-        let params = engine.get_parameters();
-        let total = params
-            .get("total")
-            .copied()
-            .expect("total must be visible in get_parameters() after a step");
-        // The model keeps its total at 1000 across the first step.
-        assert!(
-            (total - 1000.0).abs() < 1e-6,
-            "expected total=1000, got {}",
-            total
-        );
-    }
-
-    #[test]
     fn three_bin_model_keeps_its_total_through_fast_path() {
         let model = make_three_bin_model();
         let mut engine = DifferenceEquations::from_model(&model);
@@ -715,7 +678,7 @@ mod tests {
             source: vec!["A".to_string()],
             target: vec!["B".to_string()],
             accumulators: vec![],
-            rate: Some(RateMathExpression::from_string(rate.to_string())),
+            rate: Some(rate.to_string()),
             stratified_rates: None,
             per_compartment: None,
             impulse_at: None,
@@ -738,7 +701,7 @@ mod tests {
             source: vec![source.to_string()],
             target: vec![target.to_string()],
             accumulators: vec![],
-            rate: Some(RateMathExpression::from_string(rate.to_string())),
+            rate: Some(rate.to_string()),
             stratified_rates: None,
             per_compartment: None,
             impulse_at: (!impulse_at.is_empty()).then(|| impulse_at.to_vec()),

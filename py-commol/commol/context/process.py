@@ -128,7 +128,7 @@ class Process(BaseModel):
                     raise ValueError(
                         f"Transition '{transition.id}' is a Stratification flow "
                         f"but involves categories from multiple stratifications: "
-                        f"{', '.join(parent_stratification_ids)}. A single "
+                        f"{', '.join(sorted(parent_stratification_ids))}. A single "
                         f"transition must only move between categories belonging "
                         f"to the same parent stratification."
                     )
