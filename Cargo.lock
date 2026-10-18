@@ -202,6 +202,7 @@ dependencies = [
  "cranelift-module",
  "evalexpr",
  "indexmap",
+ "libm",
  "rayon",
  "serde",
  "serde_json",
