@@ -126,7 +126,7 @@ modelling judgment, and the table gives the range the literature uses.
 |---|---|---|---|
 | `StructuralRank(points, design, seed=None)` | The problem only | The rank of the sensitivities, the non-identifiable parameters and the identifiable combinations | Deterministic |
 | `Collinearity(at, max_subset_size, threshold)` | A fit (`CalibrationResult`) or a sample | Which subsets of parameters can be fitted together; `threshold` from 5 to 20 | Deterministic |
-| `SampleIdentifiability(sample, reference, correlation_threshold)` | Any `ParameterSample` | How much the sample contracts each parameter, which pairs move together, which marginals have several modes; `correlation_threshold` from 0.8 to 0.95 | Any |
+| `SampleIdentifiability(sample, reference, correlation_threshold, priors)` | Any `ParameterSample` | How much the sample contracts each parameter against its bounds or its prior, which pairs move together, which marginals have several modes; `correlation_threshold` from 0.8 to 0.95 | Any |
 | `StartsIdentifiability(result, parameter_tolerance, loss_tolerance)` | A result of `Calibrator.run(starts=n)` with two or more converged starts | Which parameters differ between starts of equal loss | Any |
 
 ### Structural rank
@@ -211,6 +211,27 @@ print(pair.first, pair.second, round(pair.correlation, 1))  # k1 alpha -1.0
 | `contraction` | `1 − Var(sample) / Var(reference)`: near 0 when the sample spreads over the bounds, near 1 when it sits on one value |
 | `correlated_pairs` | The pairs whose absolute correlation is above `correlation_threshold` |
 | `modes` | The modes of each marginal: the maxima of a kernel density above a tenth of the highest |
+
+The `reference` of the contraction is `"bounds"`, the uniform distribution on
+the bounds, or `"prior"` with `priors`, the prior of each parameter: the
+sample of a [Gibbs posterior or ABC](smc.md) contracts its priors by how much
+the data inform each parameter, and a sample drawn from the priors themselves
+has a contraction near 0.
+
+```python
+from commol import Priors, Uniform
+
+against_priors = calibrator.identifiability(
+    SampleIdentifiability(
+        sample=sample,
+        reference="prior",
+        priors=Priors(distributions={name: Uniform() for name in names}),
+        correlation_threshold=0.9,
+    )
+)
+section = against_priors.sample[0]
+print(section.reference, section.contraction == from_sample.sample[0].contraction)  # prior True
+```
 
 A parameter is `poorly_determined` when it is in a correlated pair or its
 marginal has two or more modes.

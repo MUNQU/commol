@@ -45,6 +45,9 @@ its level.
 | `WildBootstrap` | The same, when the size of the noise changes along the series | No | [Resampling](resampling.md#wild-block-bootstrap) |
 | `BlockJackknife` | The standard error and bias of each parameter, and which block of data moves it most | No | [Resampling](resampling.md#block-jackknife) |
 | `ResidualNoise` | Where the next observations fall: a prediction interval | No | [Resampling](resampling.md#prediction-intervals) |
+| `GibbsPosterior` | A posterior of the parameters from the loss and priors, with a scale `η` of the loss | No | [Sequential Monte Carlo](smc.md#gibbs-posterior) |
+| `AbcSmc` | A posterior of the parameters whose runs come within a tolerance of the data, with priors | No | [Sequential Monte Carlo](smc.md#abc) |
+| `AbcRejection` | The same, from the closest draws of the priors | No | [Sequential Monte Carlo](smc.md#abc) |
 
 Each uncertainty method adds its row here when it lands.
 ## Quick path
@@ -245,6 +248,7 @@ print(type(result).__name__, len(result.sample))  # BootstrapResult 20
 | To learn | Read |
 |---|---|
 | Bootstraps, the jackknife and prediction intervals with no noise model | [Resampling](resampling.md) |
+| Posteriors with no noise model: the Gibbs posterior and ABC | [Sequential Monte Carlo](smc.md) |
 | Several starts of an optimizer | [Optimizers](../calibration-optimizers.md#several-starts) |
 | Which parameters the data determine | [Identifiability](identifiability.md) |
 | Reports of a sample | [Reports](../reports.md) |

@@ -49,6 +49,46 @@ Guide: [Resampling](../guide/uncertainty/resampling.md).
 
 ::: commol.context.inference.resampling.BoundError
 
+## Sequential Monte Carlo
+
+Guide: [Sequential Monte Carlo](../guide/uncertainty/smc.md).
+
+::: commol.context.inference.distributions.Priors
+
+::: commol.context.inference.distributions.Uniform
+
+::: commol.context.inference.distributions.LogUniform
+
+::: commol.context.inference.distributions.Beta
+
+::: commol.context.inference.distributions.Normal
+
+::: commol.context.inference.distributions.LogNormal
+
+::: commol.context.inference.distributions.Gamma
+
+::: commol.context.inference.smc.GibbsPosterior
+
+::: commol.context.inference.smc.EtaCalibration
+
+::: commol.context.inference.smc.InformationMatching
+
+::: commol.context.inference.smc.BootstrapCoverage
+
+::: commol.context.inference.smc.AbcSmc
+
+::: commol.context.inference.smc.AbcRejection
+
+::: commol.context.inference.smc.LossDistance
+
+::: commol.context.inference.smc.SeriesDistance
+
+::: commol.context.inference.smc.SmcResult
+
+::: commol.context.inference.smc.GibbsResult
+
+::: commol.context.inference.smc.SmcDiagnostics
+
 ## Scores and intervals
 
 ::: commol.api.inference.scores

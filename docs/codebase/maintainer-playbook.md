@@ -98,6 +98,10 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
       `ObservationOperator`, sees a `Violation` as outside the support
       (`discrepancy_in_support`), and draws every random number from a
       `commol_random::Generator` seeded from the problem's seed.
+- [ ] A method that samples a posterior is a `TemperedTarget` on
+      `SmcSampler` (`crates/commol-inference/src/smc/`), not a sampler of its
+      own, and its configuration takes required `priors` (`WithPriors`)
+      ([Design decisions](decisions/uncertainty.md#one-smc-core-many-targets)).
 - [ ] The runner, bound in `py-commol/src/inference.rs`, and its stub in
       `_commol_rs.pyi`.
 - [ ] The configuration, a subclass of `UncertaintyMethod[YourResult]`, and

@@ -84,6 +84,7 @@ plugins:
           - guide/uncertainty/index.md: The three questions, bands and prediction intervals, which method answers which question, the parameter sample, the predictive, scores and the entry point
           - guide/uncertainty/identifiability.md: Structural against practical identifiability, the structural rank, collinearity, a sample, starts, combinations and the report
           - guide/uncertainty/resampling.md: The Bayesian, residual and wild block bootstraps, the block jackknife, block lengths and prediction intervals from residuals
+          - guide/uncertainty/smc.md: Priors, the sequential Monte Carlo sampler, the Gibbs posterior and its scale eta, ABC and its distances, and the diagnostics
           - guide/reports.md: applied_parameters_report and simulation_report
           - guide/examples.md: Complete models
         API reference:
@@ -152,6 +153,7 @@ nav:
           - Uncertainty: guide/uncertainty/index.md
           - Identifiability: guide/uncertainty/identifiability.md
           - Resampling: guide/uncertainty/resampling.md
+          - Sequential Monte Carlo: guide/uncertainty/smc.md
       - Examples: guide/examples.md
   - API Reference:
       - API Overview: api/index.md
