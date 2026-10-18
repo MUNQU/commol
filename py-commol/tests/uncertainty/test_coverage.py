@@ -16,7 +16,7 @@ import math
 import numpy as np
 import pytest
 
-from commol import JackknifePlus, SplitConformal, weighted_quantiles
+from commol import EnbPI, JackknifePlus, SplitConformal, weighted_quantiles
 from tests.support import flow_calibrator, flow_observations
 from tests.support.coverage import CoverageStudy, Interval, StudyMethod, coverage_study
 
@@ -143,3 +143,39 @@ class TestJackknifePlus:
             1 - 2 * alpha - min(2 * (1 - 1 / k) / (n / k + 1), (1 - k / n) / (k + 1))
         )
         assert study.coverage("observation") >= bound - study.tolerance, study
+
+
+def _ar1(rng: np.random.Generator, phi: float, count: int) -> np.ndarray:
+    noise = rng.normal(0.0, 1.0, count + 50)
+    series = np.zeros_like(noise)
+    for i in range(1, noise.size):
+        series[i] = phi * series[i - 1] + noise[i]
+    return series[50:]
+
+
+@pytest.mark.coverage_study
+class TestEnbPI:
+    def test_enbpi_holds_under_autocorrelation(self) -> None:
+        level = 0.9
+
+        def make(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+            # Flows of one step around c = 10 with AR(1) noise: 60 fitted, 1 new.
+            values = 10.0 + _ar1(rng, 0.5, 61)
+            fitted = values[:60].tolist()
+            calibrator = flow_calibrator(fitted, windowed=True, seed=index)
+            result = calibrator.uncertainty(
+                EnbPI(
+                    replicates=40,
+                    block_length=5,
+                    score="absolute",
+                    by="series",
+                    level=level,
+                    positions=[61.0],
+                )
+            )
+            series = result.intervals.series["B"]
+            return _held(series.lower[0], series.upper[0], float(values[60]))
+
+        study = _conformal_study(make, level)
+
+        assert study.calibrated(), study

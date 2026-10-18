@@ -15,6 +15,7 @@ from commol.commol_rs import _commol_rs as commol_rs
 from commol.context._model import engine_state
 from commol.context.inference.conformal import (
     ConformalResult,
+    EnbPI,
     JackknifePlus,
     PredictionIntervals,
     RollingConformal,
@@ -193,6 +194,49 @@ def run_jackknife_plus(
     )
 
 
+def run_enbpi(calibrator: "Calibrator", method: EnbPI) -> ConformalResult:
+    """
+    Run ensemble batch prediction intervals.
+
+    Parameters
+    ----------
+    calibrator : Calibrator
+        The calibration problem.
+    method : EnbPI
+        The settings.
+
+    Returns
+    -------
+    ConformalResult
+        The intervals at the positions, the leave-one-out scores and the
+        guarantee.
+    """
+    fit = calibrator.run(starts=method.starts)
+    run = commol_rs.inference.enbpi(
+        calibrator.rust_problem,
+        calibrator.rust_optimizer,
+        fit_values(calibrator, fit),
+        method.replicates,
+        rust_block_length(method.block_length),
+        method.positions,
+        method.score,
+        method.by,
+        method.level,
+        method.starts,
+        calibrator.seed,
+    )
+    _log_failed(run)
+    return _result(
+        run,
+        method.level,
+        f"Each interval covers a new observation with probability near "
+        f"{method.level}, approximately, when the errors are stationary and "
+        f"strongly mixing (Xu and Xie 2021); blocks of {run.block_length} "
+        f"positions.",
+    )
+
+
 register(SplitConformal, run_split_conformal)
 register(RollingConformal, run_rolling_conformal)
 register(JackknifePlus, run_jackknife_plus)
+register(EnbPI, run_enbpi)

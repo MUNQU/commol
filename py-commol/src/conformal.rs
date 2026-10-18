@@ -251,6 +251,56 @@ fn jackknife_plus(
     })
 }
 
+/// EnbPI intervals at `positions`, for each series of the problem
+///
+/// Args:
+///     problem: The calibration problem
+///     config: The optimizer
+///     fit: The fit every replicate starts from, in problem order
+///     replicates: Number of replicates
+///     block_length: Positions per block, or None for the automatic length
+///     positions: Where the intervals are
+///     score: "absolute", "normalized" or "spread"
+///     by: "series" or "all"
+///     level: The level of the intervals
+///     starts: Starts per replicate, the fit first
+///     seed: Seed of the replicates
+///
+/// Raises:
+///     ValueError: If a setting is not valid or a block is left out by no
+///         replicate
+///     RuntimeError: If every replicate fails
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn enbpi(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    config: &PyOptimizationConfig,
+    fit: Vec<f64>,
+    replicates: usize,
+    block_length: Option<usize>,
+    positions: Vec<f64>,
+    score: &str,
+    by: &str,
+    level: f64,
+    starts: usize,
+    seed: u64,
+) -> PyResult<PyConformalRun> {
+    let settings = settings(score, by, level)?;
+    let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
+        .map_err(PyValueError::new_err)?;
+    let (scheme, chosen) = blocks(&runner, block_length, BlockDrawing::NonOverlapping)?;
+    let run = py
+        .detach(|| conformal::enbpi(&runner, &scheme, replicates, &positions, settings))
+        .map_err(conformal_error)?;
+    Ok(PyConformalRun {
+        blocks: Some(scheme.count()),
+        block_length: Some(chosen.length),
+        block_length_estimates: chosen.estimates,
+        ..PyConformalRun::from(run)
+    })
+}
+
 /// Register the conformal functions with the inference module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyConformalRun>()?;
@@ -258,5 +308,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(split_conformal, m)?)?;
     m.add_function(wrap_pyfunction!(rolling_conformal, m)?)?;
     m.add_function(wrap_pyfunction!(jackknife_plus, m)?)?;
+    m.add_function(wrap_pyfunction!(enbpi, m)?)?;
     Ok(())
 }

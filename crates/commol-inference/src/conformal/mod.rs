@@ -11,12 +11,14 @@
 //! |---|---|
 //! | [`score`] | [`NonconformityScore`], [`Pooling`], [`ConformalSettings`] and the scale of a score |
 //! | [`quantile`] | The conformal quantile and the order statistics of jackknife+ |
+//! | [`enbpi`] | [`enbpi()`]: replicates of blocks drawn with replacement, and their leave-one-out aggregate |
 //! | [`intervals`] | [`PredictionIntervals`] and [`ConformalRun`], the result of every variant |
 //! | [`predict`] | Point predictions and their spread at any observations, and the target points |
 //! | [`split`] | [`split_conformal`]: held-out observations scored against one predictor |
 //! | [`jackknife_plus`] | [`jackknife_plus()`]: one refit per block left out, and the CV+ bound |
 //! | [`rolling`] | [`rolling_conformal`]: one fit per origin, one quantile per horizon |
 
+pub mod enbpi;
 pub mod intervals;
 pub mod jackknife_plus;
 pub mod predict;
@@ -25,6 +27,7 @@ pub mod rolling;
 pub mod score;
 pub mod split;
 
+pub use enbpi::{BlockMultinomial, enbpi};
 pub use intervals::{ConformalRun, PredictionIntervals};
 pub use jackknife_plus::{JackknifePlusRun, cv_plus_bound, jackknife_plus};
 pub use predict::{Predictions, Predictor, predict, set_predictions, targets};

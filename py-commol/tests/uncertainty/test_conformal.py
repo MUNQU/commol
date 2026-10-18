@@ -229,3 +229,22 @@ class TestRollingConformal:
             (hi - lo) / 2 for lo, hi in zip(series.lower, series.upper, strict=True)
         ]
         assert half_widths == pytest.approx([1.0, 2.0, 3.0])
+
+
+class TestEnbPI:
+    def test_enbpi_needs_each_block_left_out(self) -> None:
+        calibrator = flow_calibrator(_amounts(range(1, 41), 1), windowed=False)
+
+        # Two replicates of 40 blocks: a block is left out by neither with
+        # probability (1 − 1/e)² ≈ 0.4.
+        with pytest.raises(ValueError, match=r"[Bb]lock \[.*replicates"):
+            calibrator.uncertainty(
+                EnbPI(
+                    replicates=2,
+                    block_length=1,
+                    score="absolute",
+                    by="series",
+                    level=0.9,
+                    positions=[41.0],
+                )
+            )

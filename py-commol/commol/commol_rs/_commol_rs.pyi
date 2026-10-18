@@ -648,6 +648,20 @@ class InferenceModule(Protocol):
         starts: int,
         seed: int,
     ) -> ConformalRunProtocol: ...
+    def enbpi(
+        self,
+        problem: CalibrationProblemProtocol,
+        config: OptimizationConfigProtocol,
+        fit: list[float],
+        replicates: int,
+        block_length: int | None,
+        positions: list[float],
+        score: str,
+        by: str,
+        level: float,
+        starts: int,
+        seed: int,
+    ) -> ConformalRunProtocol: ...
 
 class MathExpressionProtocol(Protocol):
     def __init__(self, expression: str) -> None: ...
