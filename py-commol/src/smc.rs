@@ -6,10 +6,18 @@
 //! built once by a `Calibrator` and returns the run as plain values; Python
 //! builds the result.
 
+use commol_inference::resampling::{
+    BlockDrawing, BlockScheme, ResidualScale, Residuals, automatic_block_length,
+};
+use commol_inference::smc::{
+    self, AbcTarget, Distance, RandomWalk, SeriesMetric, SmcRun, SmcSampler, Stop,
+};
 use commol_inference::{Distribution, Family, Priors};
 use commol_random::{Generator, replicate_seed};
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
+
+use crate::inference::PyCalibrationProblem;
 
 /// A prior as Python passes it: the parameter, the kind and its parameters.
 pub(crate) type PriorArgs = (String, String, Vec<f64>);
@@ -109,8 +117,343 @@ impl PyDistribution {
     }
 }
 
+/// A run of the sequential Monte Carlo sampler, as the runners return it
+#[pyclass(name = "SmcRun", frozen, get_all, skip_from_py_object)]
+#[derive(Clone)]
+pub struct PySmcRun {
+    /// One row per particle, in problem order
+    values: Vec<Vec<f64>>,
+    /// The normalized log weight of each particle
+    log_weights: Vec<f64>,
+    /// The loss or distance each particle keeps, or None outside the support
+    kept: Vec<Option<f64>>,
+    /// The level of each step
+    levels: Vec<f64>,
+    /// Kish's effective size after the reweighting of each step
+    effective_sizes: Vec<f64>,
+    /// Whether each step resampled
+    resampled: Vec<bool>,
+    /// The share of the first move's proposals accepted, per step
+    acceptance_rates: Vec<f64>,
+    /// How many times each particle moved, per step
+    move_counts: Vec<usize>,
+    /// The log of the product of the mean incremental weights
+    log_evidence: f64,
+    /// The number of model runs
+    evaluations: usize,
+    /// Why the run stopped before its last level, or None
+    stop_reason: Option<String>,
+}
+
+impl PySmcRun {
+    fn of(run: SmcRun) -> Self {
+        let stop_reason = run.stopped_at.as_ref().map(|stop| match stop {
+            Stop::LowAcceptance {
+                level,
+                acceptance_rate,
+            } => format!(
+                "The first move at the tolerance {level} accepted {acceptance_rate:.3} of its \
+                 proposals, below min_acceptance; the sample is that of the tolerance before"
+            ),
+            Stop::NoNextLevel { level } => format!(
+                "No tolerance below {level} keeps target_cess of the particles: too few of \
+                 their distances lie below it"
+            ),
+        });
+        Self {
+            levels: run.steps.iter().map(|s| s.level).collect(),
+            effective_sizes: run.steps.iter().map(|s| s.effective_size).collect(),
+            resampled: run.steps.iter().map(|s| s.resampled).collect(),
+            acceptance_rates: run.steps.iter().map(|s| s.acceptance_rate).collect(),
+            move_counts: run.steps.iter().map(|s| s.moves).collect(),
+            values: run.values,
+            log_weights: run.log_weights,
+            kept: run.kept,
+            log_evidence: run.log_evidence,
+            evaluations: run.evaluations,
+            stop_reason,
+        }
+    }
+}
+
+/// The `η` of bootstrap coverage
+#[pyclass(name = "EtaCoverage", frozen, get_all)]
+pub struct PyEtaCoverage {
+    /// The calibrated `η`
+    eta: f64,
+    /// The coverage of the fit by the intervals at `η`
+    coverage: f64,
+    /// The index and reason of each replicate that failed
+    failed: Vec<(usize, String)>,
+}
+
+/// The sampler of the settings of a method
+fn sampler(
+    particles: usize,
+    resample_threshold: f64,
+    target_cess: f64,
+    stay_probability: f64,
+) -> PyResult<SmcSampler<RandomWalk>> {
+    SmcSampler::new(
+        particles,
+        RandomWalk::new(),
+        resample_threshold,
+        target_cess,
+        stay_probability,
+    )
+    .map_err(value_error)
+}
+
+fn problem_priors(
+    problem: &PyCalibrationProblem,
+    given: Option<Vec<PriorArgs>>,
+) -> PyResult<Priors> {
+    priors(
+        &problem.inner.parameter_names(),
+        &problem.inner.parameter_bounds(),
+        given,
+    )
+}
+
+/// Sample the Gibbs posterior with a given `η`
+///
+/// Args:
+///     problem: The calibration problem
+///     priors: The priors, or None for uniform on the bounds
+///     eta: The scale of the loss, above 0
+///     particles: Number of particles
+///     resample_threshold: Resample below this share of effective size
+///     target_cess: The conditional effective sample size of each step
+///     stay_probability: The probability that a particle never moves in a
+///         step
+///     seed: Seed of every random number
+///
+/// Raises:
+///     ValueError: If a prior or a setting is not valid
+///     RuntimeError: If the run fails
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn gibbs_posterior(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    priors: Option<Vec<PriorArgs>>,
+    eta: f64,
+    particles: usize,
+    resample_threshold: f64,
+    target_cess: f64,
+    stay_probability: f64,
+    seed: u64,
+) -> PyResult<PySmcRun> {
+    let priors = problem_priors(problem, priors)?;
+    let mut sampler = sampler(particles, resample_threshold, target_cess, stay_probability)?;
+    let run = py
+        .detach(|| smc::gibbs_posterior(&problem.inner, &priors, eta, &mut sampler, seed))
+        .map_err(PyRuntimeError::new_err)?;
+    Ok(PySmcRun::of(run.run))
+}
+
+/// The `η` of information matching at the fit
+///
+/// Raises:
+///     ValueError: If the loss is not the sum of squares or the engine is
+///         stochastic
+///     RuntimeError: If the derivatives fail at the fit
+#[pyfunction]
+fn information_matching_eta(problem: &PyCalibrationProblem, fit: Vec<f64>) -> PyResult<f64> {
+    smc::information_matching_eta(&problem.inner, &fit).map_err(|message| {
+        if message.starts_with("EtaCalibration") {
+            value_error(message)
+        } else {
+            PyRuntimeError::new_err(message)
+        }
+    })
+}
+
+/// The `η` of bootstrap coverage
+///
+/// Args:
+///     problem: The calibration problem
+///     priors: The priors, or None for uniform on the bounds
+///     fit: The fitted values, in problem order
+///     replicates: Number of Bayesian-bootstrap data sets
+///     block_length: Positions per block, or None for the automatic length
+///     confidence_level: The level of the intervals
+///     particles: Number of particles of each replicate
+///     resample_threshold: Resample below this share of effective size
+///     target_cess: The conditional effective sample size of each step
+///     stay_probability: The probability that a particle never moves in a
+///         step
+///     seed: Seed of every random number
+///
+/// Raises:
+///     ValueError: If a prior or a setting is not valid
+///     RuntimeError: If every replicate fails or the coverage does not
+///         cross the level
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn bootstrap_coverage_eta(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    priors: Option<Vec<PriorArgs>>,
+    fit: Vec<f64>,
+    replicates: usize,
+    block_length: Option<usize>,
+    confidence_level: f64,
+    particles: usize,
+    resample_threshold: f64,
+    target_cess: f64,
+    stay_probability: f64,
+    seed: u64,
+) -> PyResult<PyEtaCoverage> {
+    let priors = problem_priors(problem, priors)?;
+    let mut sampler = sampler(particles, resample_threshold, target_cess, stay_probability)?;
+    let observed = problem.inner.observed_data();
+    let length = match block_length {
+        Some(length) => length,
+        None => {
+            let residuals = Residuals::new(&problem.inner, &fit, ResidualScale::Additive)
+                .map_err(value_error)?;
+            automatic_block_length(
+                observed,
+                residuals.residuals(),
+                BlockDrawing::NonOverlapping,
+            )
+            .length
+        }
+    };
+    let blocks = BlockScheme::new(observed, length).map_err(value_error)?;
+    let calibration = py
+        .detach(|| {
+            smc::bootstrap_coverage_eta(
+                &problem.inner,
+                &priors,
+                &fit,
+                &mut sampler,
+                &blocks,
+                replicates,
+                confidence_level,
+                seed,
+            )
+        })
+        .map_err(PyRuntimeError::new_err)?;
+    Ok(PyEtaCoverage {
+        eta: calibration.eta,
+        coverage: calibration.coverage,
+        failed: calibration.failed,
+    })
+}
+
+fn distance(kind: &str, metric: Option<&str>) -> PyResult<Distance> {
+    match (kind, metric) {
+        ("loss", None) => Ok(Distance::Loss),
+        ("series", Some(metric)) => SeriesMetric::from_name(metric)
+            .map(Distance::Series)
+            .map_err(value_error),
+        _ => Err(value_error(format!(
+            "Unknown distance '{kind}' with metric {metric:?}"
+        ))),
+    }
+}
+
+/// Sample ABC by sequential Monte Carlo
+///
+/// Args:
+///     problem: The calibration problem
+///     priors: The priors, or None for uniform on the bounds
+///     distance: "loss" or "series"
+///     metric: The metric of "series", "rmse" or "mae"; None for "loss"
+///     particles: Number of particles
+///     target_cess: The weighted share of particles each tolerance keeps
+///     min_acceptance: Stop when the first move of a step accepts less
+///     stay_probability: The probability that a particle never moves in a
+///         step
+///     seed: Seed of every random number
+///
+/// Returns:
+///     The run and whether each distance read one fresh replicate of a
+///     stochastic engine
+///
+/// Raises:
+///     ValueError: If a prior or a setting is not valid
+///     RuntimeError: If the run fails
+#[pyfunction]
+#[pyo3(signature = (problem, priors, distance_kind, metric, particles, target_cess, min_acceptance, stay_probability, seed))]
+#[allow(clippy::too_many_arguments)]
+fn abc_smc(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    priors: Option<Vec<PriorArgs>>,
+    distance_kind: &str,
+    metric: Option<&str>,
+    particles: usize,
+    target_cess: f64,
+    min_acceptance: f64,
+    stay_probability: f64,
+    seed: u64,
+) -> PyResult<(PySmcRun, bool)> {
+    let priors = problem_priors(problem, priors)?;
+    let distance = distance(distance_kind, metric)?;
+    // With weights of 0 or 1, a particle of weight 0 cannot move: every
+    // step resamples.
+    let mut sampler = sampler(particles, 1.0, target_cess, stay_probability)?
+        .with_min_acceptance(min_acceptance)
+        .map_err(value_error)?;
+    let target = AbcTarget::new(&problem.inner, &priors, distance);
+    let run = py
+        .detach(|| sampler.run(&target, seed))
+        .map_err(PyRuntimeError::new_err)?;
+    Ok((PySmcRun::of(run), target.stochastic()))
+}
+
+/// ABC rejection: keep the closest share of draws of the prior
+///
+/// Args:
+///     problem: The calibration problem
+///     priors: The priors, or None for uniform on the bounds
+///     distance: "loss" or "series"
+///     metric: The metric of "series", "rmse" or "mae"; None for "loss"
+///     draws: Number of draws
+///     quantile: The share of draws kept
+///     seed: Seed of every random number
+///
+/// Returns:
+///     The run and whether each distance read one fresh replicate of a
+///     stochastic engine
+///
+/// Raises:
+///     ValueError: If a prior or a setting is not valid
+///     RuntimeError: If the run fails
+#[pyfunction]
+#[pyo3(signature = (problem, priors, distance_kind, metric, draws, quantile, seed))]
+#[allow(clippy::too_many_arguments)]
+fn abc_rejection(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    priors: Option<Vec<PriorArgs>>,
+    distance_kind: &str,
+    metric: Option<&str>,
+    draws: usize,
+    quantile: f64,
+    seed: u64,
+) -> PyResult<(PySmcRun, bool)> {
+    let priors = problem_priors(problem, priors)?;
+    let distance = distance(distance_kind, metric)?;
+    let target = AbcTarget::new(&problem.inner, &priors, distance);
+    let run = py
+        .detach(|| smc::abc_rejection(&target, draws, quantile, seed))
+        .map_err(PyRuntimeError::new_err)?;
+    Ok((PySmcRun::of(run), target.stochastic()))
+}
+
 /// Register the classes and functions of this module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDistribution>()?;
+    m.add_class::<PySmcRun>()?;
+    m.add_class::<PyEtaCoverage>()?;
+    m.add_function(wrap_pyfunction!(gibbs_posterior, m)?)?;
+    m.add_function(wrap_pyfunction!(information_matching_eta, m)?)?;
+    m.add_function(wrap_pyfunction!(bootstrap_coverage_eta, m)?)?;
+    m.add_function(wrap_pyfunction!(abc_smc, m)?)?;
+    m.add_function(wrap_pyfunction!(abc_rejection, m)?)?;
     Ok(())
 }

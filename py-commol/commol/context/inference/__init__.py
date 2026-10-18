@@ -1,8 +1,17 @@
 """What every inference method takes and returns: the configuration bases,
-the weighted parameter sample, the observation noise, the identifiability
-methods and report, and the settings and results of the resampling
-methods."""
+the weighted parameter sample, the observation noise, the distributions and
+priors, the identifiability methods and report, and the settings and results
+of the resampling and sequential Monte Carlo methods."""
 
+from commol.context.inference.distributions import (
+    Beta,
+    Gamma,
+    LogNormal,
+    LogUniform,
+    Normal,
+    Priors,
+    Uniform,
+)
 from commol.context.inference.identifiability import (
     Collinearity,
     IdentifiabilityReport,
@@ -32,29 +41,60 @@ from commol.context.inference.sample import (
     ParameterSummary,
     SampleMethod,
 )
+from commol.context.inference.smc import (
+    AbcRejection,
+    AbcSmc,
+    BootstrapCoverage,
+    EtaCalibration,
+    GibbsPosterior,
+    GibbsResult,
+    InformationMatching,
+    LossDistance,
+    SeriesDistance,
+    SmcDiagnostics,
+    SmcResult,
+)
 
 __all__ = [
+    "AbcRejection",
+    "AbcSmc",
     "BayesianBootstrap",
+    "Beta",
     "BlockJackknife",
     "BlockLength",
+    "BootstrapCoverage",
     "BootstrapResult",
     "BoundError",
     "Collinearity",
+    "EtaCalibration",
+    "Gamma",
+    "GibbsPosterior",
+    "GibbsResult",
     "IdentifiabilityMethod",
     "IdentifiabilityReport",
     "InferenceMethod",
+    "InformationMatching",
     "JackknifeResult",
+    "LogNormal",
+    "LogUniform",
+    "LossDistance",
     "NoNoise",
+    "Normal",
     "ObservationNoise",
     "ParameterSample",
     "ParameterSummary",
+    "Priors",
     "ResamplingDiagnostics",
     "ResidualBootstrap",
     "ResidualNoise",
     "SampleIdentifiability",
     "SampleMethod",
+    "SeriesDistance",
+    "SmcDiagnostics",
+    "SmcResult",
     "StartsIdentifiability",
     "StructuralRank",
     "UncertaintyMethod",
+    "Uniform",
     "WildBootstrap",
 ]

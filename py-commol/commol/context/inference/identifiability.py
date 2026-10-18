@@ -16,11 +16,13 @@ verdict per parameter, and the evidence of its section.
 `IdentifiabilityReport.merge` joins the reports of several methods.
 """
 
+from collections.abc import Mapping
 from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from commol.context.calibration import CalibrationResult
+from commol.context.inference.distributions import Priors, coerce_priors
 from commol.context.inference.method import IdentifiabilityMethod
 from commol.context.inference.sample import ParameterSample
 
@@ -242,9 +244,10 @@ class SampleSection(_Frozen):
 
     Attributes
     ----------
-    reference : str
+    reference : {"bounds", "prior"}
         The distribution the contraction compares with: ``"bounds"``, the
-        uniform distribution on the bounds.
+        uniform distribution on the bounds, or ``"prior"``, the prior of each
+        parameter.
     correlation_threshold : float
         The absolute correlation above which a pair is listed.
     contraction : dict[str, float]
@@ -258,7 +261,7 @@ class SampleSection(_Frozen):
         The modes of the marginal of each parameter.
     """
 
-    reference: Literal["bounds"]
+    reference: Literal["bounds", "prior"]
     correlation_threshold: float
     contraction: dict[str, float]
     correlation: dict[str, dict[str, float]]
@@ -480,18 +483,44 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
     ----------
     sample : ParameterSample
         The sample, such as the draws of an uncertainty method.
-    reference : str
+    reference : {"bounds", "prior"}
         The distribution the contraction compares with: ``"bounds"``, the
-        uniform distribution on the bounds.
+        uniform distribution on the bounds, or ``"prior"``, the prior of each
+        parameter in `priors`, such as the priors the sample was drawn with.
     correlation_threshold : float
         The absolute correlation above which a pair is listed and its
         parameters are poorly determined, strictly between 0 and 1. No
         default: it is a modelling judgment.
+    priors : Priors | dict[str, Distribution] | None
+        The prior of each parameter, with ``reference="prior"`` only.
     """
 
     sample: ParameterSample
-    reference: Literal["bounds"]
+    reference: Literal["bounds", "prior"]
     correlation_threshold: float = Field(gt=0.0, lt=1.0)
+    priors: Priors | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def read_priors(cls, data: object) -> object:
+        """Read a mapping of parameter to distribution as `Priors`."""
+        if isinstance(data, Mapping) and data.get("priors") is not None:
+            return {**data, "priors": coerce_priors(data["priors"])}
+        return data
+
+    @model_validator(mode="after")
+    def check_priors(self) -> Self:
+        """The priors go with ``reference="prior"``, and only with it."""
+        if self.reference == "prior" and self.priors is None:
+            raise ValueError(
+                "reference='prior' needs priors: the prior of each parameter."
+            )
+        if self.reference == "bounds" and self.priors is not None:
+            raise ValueError(
+                "priors are read only with reference='prior'; with "
+                "reference='bounds' leave them out."
+            )
+        return self
 
 
 class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):

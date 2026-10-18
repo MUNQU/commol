@@ -5,14 +5,18 @@ import pytest
 from pydantic import ValidationError
 
 from commol import (
+    Beta,
     CalibrationProblem,
     CalibrationResult,
     Calibrator,
     Collinearity,
     IdentifiabilityReport,
+    Gamma,
     NelderMeadConfig,
+    Normal,
     ObservedDataPoint,
     ParameterSample,
+    Priors,
     SampleIdentifiability,
     SampleMethod,
     Simulation,
@@ -364,6 +368,64 @@ class TestPractical:
             "determined",
             ["Sample: contraction 1.00, no strong pair."],
         )
+
+    def test_contraction_against_the_prior_of_a_prior_sample_is_zero(
+        self, product: Calibrator
+    ) -> None:
+        bounds = [(0.1, 0.6), (0.5, 2.0), (0.02, 0.3)]
+        priors = Priors(
+            distributions={
+                "k1": Beta(a=2.0, b=5.0),
+                "s": Normal(mean=1.0, sd=0.2),
+                "k2": Gamma(shape=4.0, rate=40.0),
+            }
+        )
+        columns = [
+            priors.distributions[name].sample(4000, bound, seed=index)
+            for index, (name, bound) in enumerate(zip(["k1", "s", "k2"], bounds))
+        ]
+        sample = ParameterSample.equally_weighted(
+            ["k1", "s", "k2"],
+            bounds,
+            [list(row) for row in zip(*columns, strict=True)],
+            SampleMethod(name="prior"),
+        )
+
+        against_prior = product.identifiability(
+            SampleIdentifiability(
+                sample=sample,
+                reference="prior",
+                priors=priors,
+                correlation_threshold=0.9,
+            )
+        ).sample[0]
+        against_bounds = product.identifiability(
+            SampleIdentifiability(
+                sample=sample, reference="bounds", correlation_threshold=0.9
+            )
+        ).sample[0]
+
+        assert against_prior.reference == "prior"
+        for name in ["k1", "s", "k2"]:
+            assert against_prior.contraction[name] == pytest.approx(0.0, abs=0.1)
+            # The priors are narrower than their bounds.
+            assert against_bounds.contraction[name] > 0.3
+
+    def test_a_reference_of_priors_needs_the_priors(self) -> None:
+        sample = ParameterSample.equally_weighted(
+            ["k1"], [(0.0, 1.0)], [[0.5]], SampleMethod(name="g")
+        )
+        with pytest.raises(ValidationError, match="reference='prior' needs priors"):
+            SampleIdentifiability(
+                sample=sample, reference="prior", correlation_threshold=0.9
+            )
+        with pytest.raises(ValidationError, match="priors are read only with"):
+            SampleIdentifiability(
+                sample=sample,
+                reference="bounds",
+                priors=Priors.uniform_on_bounds(),
+                correlation_threshold=0.9,
+            )
 
     def test_a_sample_of_other_parameters_is_rejected(
         self, product: Calibrator

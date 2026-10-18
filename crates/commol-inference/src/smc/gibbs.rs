@@ -156,10 +156,14 @@ where
 {
     let discrepancy = problem.discrepancy();
     if discrepancy.loss() != LossConfig::SumSquaredError {
+        let name = match discrepancy.loss() {
+            LossConfig::RootMeanSquaredError => "rmse",
+            _ => "mae",
+        };
         return Err(format!(
             "EtaCalibration.information_matching() needs loss_function=\"sse\", a sum of smooth \
-             terms; the loss is {:?}. Use EtaCalibration.bootstrap_coverage(...) or a number",
-            discrepancy.loss()
+             terms; the loss is \"{name}\". Use EtaCalibration.bootstrap_coverage(...) or a \
+             number"
         ));
     }
     if problem.forward().replicates().is_some() {
@@ -234,9 +238,8 @@ impl Snapshot {
     }
 
     /// Whether the central interval of `levels` of each parameter at `eta`
-    /// (at least this snapshot's) holds the fit: the count of parameters it
-    /// holds.
-    fn covered(&self, eta: f64, fit: &[f64], levels: &[f64; 2]) -> usize {
+    /// (at least this snapshot's) holds the fit.
+    fn covers(&self, eta: f64, fit: &[f64], levels: &[f64; 2]) -> Vec<bool> {
         let log_weights: Vec<f64> = self
             .log_weights
             .iter()
@@ -248,13 +251,87 @@ impl Snapshot {
             .collect();
         let weights = normalized_weights(&log_weights);
         (0..fit.len())
-            .filter(|&j| {
+            .map(|j| {
                 let column: Vec<f64> = self.values.iter().map(|v| v[j]).collect();
                 let interval = quantiles(&column, &weights, levels);
                 interval[0] <= fit[j] && fit[j] <= interval[1]
             })
-            .count()
+            .collect()
     }
+}
+
+/// The posteriors of one replicate at every `η` up to the largest: each
+/// reweights the snapshot of the step below it.
+fn covers_at(snapshots: &[Snapshot], eta: f64, fit: &[f64], levels: &[f64; 2]) -> Vec<bool> {
+    snapshots
+        .iter()
+        .rev()
+        .find(|snapshot| snapshot.eta <= eta)
+        .unwrap_or(&snapshots[0])
+        .covers(eta, fit, levels)
+}
+
+/// The `η` at which the interval of parameter `j` stops holding the fit,
+/// by bisection on `log η` in `[low, high]`: 0 when it does not hold it at
+/// `low`, `∞` when it still does at `high`.
+fn threshold(
+    snapshots: &[Snapshot],
+    j: usize,
+    fit: &[f64],
+    levels: &[f64; 2],
+    (mut low, mut high): (f64, f64),
+) -> f64 {
+    let covers = |eta: f64| covers_at(snapshots, eta, fit, levels)[j];
+    if !covers(low) {
+        return 0.0;
+    }
+    if covers(high) {
+        return f64::INFINITY;
+    }
+    for _ in 0..BISECTION_STEPS {
+        let middle = (low * high).sqrt();
+        if middle <= low || middle >= high {
+            break;
+        }
+        if covers(middle) {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    low
+}
+
+/// The `η` whose share of thresholds above it is `confidence_level`: the
+/// order statistics of the thresholds `t₁ ≤ … ≤ t_M` sit at the positions
+/// `i / (M + 1)`, which their distribution function has in expectation, and
+/// `log η` interpolates between the two around `1 − confidence_level`.
+fn interpolated_eta(thresholds: &mut [f64], confidence_level: f64) -> Result<f64, String> {
+    thresholds.sort_by(f64::total_cmp);
+    let m = thresholds.len();
+    let position = (1.0 - confidence_level) * (m + 1) as f64;
+    if position < 1.0 {
+        let needed = (m..)
+            .find(|&count| (1.0 - confidence_level) * (count + 1) as f64 >= 1.0)
+            .unwrap_or(m);
+        return Err(format!(
+            "Bootstrap coverage at confidence_level = {confidence_level} needs at least \
+             {needed} replicates times parameters, got {m}; use more replicates"
+        ));
+    }
+    let below = position.floor() as usize;
+    let lower = thresholds[below - 1];
+    if lower <= 0.0 {
+        return Err(format!(
+            "Even the prior intervals cover the fit less often than confidence_level = \
+             {confidence_level}; widen the priors"
+        ));
+    }
+    let Some(&upper) = thresholds.get(below).filter(|upper| upper.is_finite()) else {
+        return Ok(lower);
+    };
+    let fraction = position - below as f64;
+    Ok((lower.ln() + fraction * (upper.ln() - lower.ln())).exp())
 }
 
 /// `η` by bootstrap coverage (Syring and Martin 2019): the `η` at which the
@@ -265,9 +342,13 @@ impl Snapshot {
 /// Replicate `b` reweights the observations by blocks of `blocks`, from the
 /// seed `replicate_seed(seed, b)`, and runs one tempered sampler to a large
 /// `η`; the posterior at any smaller `η` reweights the particles of the step
-/// below it, so the bisection on `log η` runs no model. The largest `η`
-/// starts at `n / loss(θ̂)` and grows four times while its intervals still
-/// cover too often.
+/// below it, so no search below runs a model. The largest `η` starts at
+/// `n / loss(θ̂)` and grows four times while its intervals still cover too
+/// often. Each replicate and parameter has a threshold, the `η` at which its
+/// interval stops holding the fit (bisection on `log η`), and `η` is the
+/// interpolated quantile of the thresholds of [`interpolated_eta`], whose
+/// expected coverage is the level: the largest `η` that covers at the level
+/// would be an order statistic, biased to cover less.
 ///
 /// # Errors
 ///
@@ -343,12 +424,10 @@ where
         let covered: usize = runs
             .iter()
             .map(|(_, _, snapshots)| {
-                let below = snapshots
-                    .iter()
-                    .rev()
-                    .find(|snapshot| snapshot.eta <= eta)
-                    .unwrap_or(&snapshots[0]);
-                below.covered(eta, fit, &levels)
+                covers_at(snapshots, eta, fit, &levels)
+                    .into_iter()
+                    .filter(|&c| c)
+                    .count()
             })
             .sum();
         covered as f64 / (runs.len() * fit.len()) as f64
@@ -377,29 +456,17 @@ where
         eta_max = grown;
     }
 
-    // Bisection on log η between a scale far below and the largest.
-    let mut high = eta_max;
-    let mut low = eta_max * f64::EPSILON;
-    if coverage(&runs, low) < confidence_level {
-        return Err(format!(
-            "Even the prior intervals cover the fit less often than confidence_level = \
-             {confidence_level}; widen the priors"
-        ));
-    }
-    for _ in 0..BISECTION_STEPS {
-        let middle = (low * high).sqrt();
-        if middle <= low || middle >= high {
-            break;
-        }
-        if coverage(&runs, middle) >= confidence_level {
-            low = middle;
-        } else {
-            high = middle;
-        }
-    }
+    let bracket = (eta_max * f64::EPSILON, eta_max);
+    let mut thresholds: Vec<f64> = runs
+        .iter()
+        .flat_map(|(_, _, snapshots)| {
+            (0..fit.len()).map(|j| threshold(snapshots, j, fit, &levels, bracket))
+        })
+        .collect();
+    let eta = interpolated_eta(&mut thresholds, confidence_level)?;
     Ok(CoverageCalibration {
-        eta: low,
-        coverage: coverage(&runs, low),
+        eta,
+        coverage: coverage(&runs, eta),
         failed,
     })
 }
@@ -407,6 +474,36 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn eta_interpolates_the_thresholds_at_their_expected_positions() {
+        // Nine thresholds sit at 0.1, …, 0.9: the level 0.8 is the second.
+        let mut thresholds: Vec<f64> = (1..=9).rev().map(f64::from).collect();
+        let eta = interpolated_eta(&mut thresholds, 0.8).unwrap();
+        assert!((eta - 2.0).abs() < 1e-12, "{eta}");
+        // Between the first two, on the scale of log η.
+        let mut thresholds = vec![1.0, 4.0, f64::INFINITY];
+        let eta = interpolated_eta(&mut thresholds, 0.625).unwrap();
+        assert!((eta - 2.0).abs() < 1e-12, "{eta}");
+        let mut thresholds = vec![1.0, f64::INFINITY];
+        assert_eq!(interpolated_eta(&mut thresholds, 0.5), Ok(1.0));
+    }
+
+    #[test]
+    fn too_few_thresholds_or_none_above_zero_have_no_eta() {
+        let mut few = vec![1.0, 2.0];
+        let error = interpolated_eta(&mut few, 0.9).unwrap_err();
+        assert!(
+            error.contains("needs at least") && error.contains("got 2"),
+            "{error}"
+        );
+        let mut zeros = vec![0.0; 9];
+        assert!(
+            interpolated_eta(&mut zeros, 0.8)
+                .unwrap_err()
+                .contains("widen the priors")
+        );
+    }
 
     #[test]
     fn a_stop_below_the_posterior_says_why() {

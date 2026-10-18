@@ -401,9 +401,9 @@ def test_every_coverage_study_runs_in_a_group_of_the_workflow() -> None:
 
 
 BUILD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "build.yaml"
-STUDY_ENGINE = {"commol-model", "commol-difference"}
-"""The engine of the models of the studies: ``flow_calibrator`` builds a
-difference model."""
+STUDY_ENGINE = {"commol-model", "commol-difference", "commol-stochastic"}
+"""The engines of the models of the studies: ``flow_calibrator`` builds a
+difference model, and the study of ABC a chain binomial."""
 
 
 def workspace_dependencies(crate: str) -> set[str]:
