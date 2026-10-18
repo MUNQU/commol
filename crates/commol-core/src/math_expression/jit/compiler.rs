@@ -131,9 +131,14 @@ impl JITCompiler {
     /// Compile a preprocessed expression to a JIT function
     pub fn compile(&self, preprocessed: &str) -> Result<JITFunction, MathExpressionError> {
         // Create a new JIT module for this function
-        let builder = JITBuilder::new(cranelift_module::default_libcall_names()).map_err(|e| {
-            MathExpressionError::InvalidExpression(format!("Failed to create JIT builder: {}", e))
-        })?;
+        let mut builder =
+            JITBuilder::new(cranelift_module::default_libcall_names()).map_err(|e| {
+                MathExpressionError::InvalidExpression(format!(
+                    "Failed to create JIT builder: {}",
+                    e
+                ))
+            })?;
+        builder.symbol_lookup_fn(Box::new(super::libm::address));
         let mut module = JITModule::new(builder);
         // Parse to AST
         let ast = parse_expression(preprocessed)?;

@@ -97,6 +97,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cannot compile, such as `typeof(k)`, is rejected when the model or the
   calibration problem is built, with the reason; it no longer fails when it is
   evaluated.
+- The functions `erf`, `erfc`, `tgamma`, `lgamma`, `j0`, `j1`, `y0`, `y1`,
+  `fdim` and `remainder` of a rate come from the `libm` crate, so they give the
+  same values on every platform; the other functions still come from the
+  system's math library.
 - `AxisPattern` is abstract: `AxisPattern()` raises `TypeError`. Build a
   pattern with one of its class methods.
 - Error messages that list ids (the stratifications of a transition, the
