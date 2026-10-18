@@ -51,12 +51,8 @@ impl BlockScheme {
         self.length
     }
 
-    /// The distinct positions of the observations, ascending.
-    pub fn positions(&self) -> &[f64] {
-        &self.positions
-    }
-
-    /// The index in [`Self::positions`] of each observation's position.
+    /// The index of each observation's position among the distinct positions
+    /// of the observations, ascending.
     pub fn position_of(&self) -> &[usize] {
         &self.position_of
     }

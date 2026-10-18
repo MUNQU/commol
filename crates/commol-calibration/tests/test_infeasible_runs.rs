@@ -4,7 +4,7 @@
 use argmin::core::CostFunction;
 use commol_calibration::{
     optimize, CalibrationParameter, CalibrationParameterType, CalibrationProblem, LossConfig,
-    NelderMeadConfig, ObservedDataPoint, OptimizationConfig, OptimizationObjective,
+    NelderMeadConfig, ObservedDataPoint, OptimizationConfig, OptimizationObjective, Violation,
 };
 use commol_core::Model;
 use commol_difference::DifferenceEquations;
@@ -56,17 +56,22 @@ fn an_infeasible_run_gets_the_base_penalty_and_is_not_feasible() {
 
     let infeasible = objective.cost(&vec![2.0]).unwrap();
 
-    assert!(infeasible > 1e9, "{infeasible}");
+    // The base, 800² × 5 observations × 1000, is below its floor of 1e10.
+    assert_eq!(infeasible, 1e10);
     assert!(!objective.score(&[2.0]).unwrap().feasible);
+    assert_eq!(
+        objective.penalty(&Violation::Constraint { amount: 2.0 }),
+        3e10
+    );
 }
 
 #[test]
 fn a_calibration_whose_bounds_include_infeasible_rates_finds_the_rate_of_the_data() {
-    let config = OptimizationConfig::NelderMead(
-        NelderMeadConfig::new()
-            .with_initial_simplex_size(0.5)
-            .with_sd_tolerance(1e-12),
-    );
+    let config = OptimizationConfig::NelderMead(NelderMeadConfig {
+        initial_simplex_size: 0.5,
+        sd_tolerance: 1e-12,
+        ..NelderMeadConfig::default()
+    });
 
     let result = optimize(&problem("k", 0.5), &config).unwrap();
 

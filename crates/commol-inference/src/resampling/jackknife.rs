@@ -181,4 +181,21 @@ mod tests {
             assert!((pseudo[0] - value).abs() < 1e-12);
         }
     }
+
+    #[test]
+    fn a_biased_fit_moves_the_estimate_by_its_bias() {
+        // Three blocks, mean 4: bias 2 × (4 − 1), standard error √(2/3 × 8).
+        let statistics = jackknife_statistics(&[1.0], &[vec![2.0], vec![4.0], vec![6.0]]);
+        let se = (16.0f64 / 3.0).sqrt();
+        assert_eq!(statistics.bias, vec![6.0]);
+        assert_eq!(statistics.estimate, vec![-5.0]);
+        assert!((statistics.standard_error[0] - se).abs() < 1e-12);
+        assert_eq!(
+            statistics.pseudo_values,
+            vec![vec![-1.0], vec![-5.0], vec![-9.0]]
+        );
+        for (influence, moved) in statistics.influence.iter().zip([1.0, 3.0, 5.0]) {
+            assert!((influence[0] - moved / se).abs() < 1e-12);
+        }
+    }
 }

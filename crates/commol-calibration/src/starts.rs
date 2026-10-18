@@ -118,6 +118,28 @@ mod tests {
     }
 
     #[test]
+    fn every_order_of_the_strata_is_about_as_likely() {
+        // Two starts after the first: each parameter puts them in its strata
+        // in one of two orders.
+        let in_order = (0..400)
+            .filter(|&seed| start_points(&parameters(), 3, seed)[1][0] < 0.5)
+            .count();
+        assert!((150..250).contains(&in_order), "{in_order}");
+    }
+
+    #[test]
+    fn each_parameter_orders_its_strata_on_its_own() {
+        let points = start_points(&parameters(), 9, 7);
+        let strata = |index: usize, (min, max): (f64, f64)| {
+            points[1..]
+                .iter()
+                .map(|point| (((point[index] - min) / (max - min)) * 8.0) as usize)
+                .collect::<Vec<_>>()
+        };
+        assert_ne!(strata(0, (0.0, 1.0)), strata(1, (-2.0, 2.0)));
+    }
+
+    #[test]
     fn one_seed_gives_one_set_of_starts() {
         assert_eq!(
             start_points(&parameters(), 6, 1),

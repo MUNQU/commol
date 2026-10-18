@@ -14,10 +14,12 @@ use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 
 /// An engine with two outputs: `x = start * k`, its state, and `y = 2`,
 /// which is not. Its kind has one value, `start`, which is feasible up to 1.
+/// It keeps the remainder of the last plan it applied.
 #[derive(Clone)]
 struct StartEngine {
     start: f64,
     parameters: HashMap<String, f64>,
+    remainder: Option<String>,
 }
 
 impl StartEngine {
@@ -25,6 +27,7 @@ impl StartEngine {
         Self {
             start: 0.5,
             parameters: HashMap::from([("k".to_string(), 1.0)]),
+            remainder: None,
         }
     }
 }
@@ -107,6 +110,7 @@ impl SimulationEngine for StartEngine {
 
     fn apply_values(&mut self, plan: &StartPlan, values: &[f64]) -> Result<f64, String> {
         assert_eq!(values.len(), plan.ids.len());
+        self.remainder.clone_from(&plan.remainder);
         if let Some(&start) = values.first() {
             self.start = start;
         }
@@ -172,8 +176,10 @@ fn the_remainder_reaches_the_engine() {
     assert_eq!(plan.remainder.as_deref(), Some("rest"));
     let problem = problem(vec![])
         .unwrap()
-        .with_initial_condition_remainder("rest");
-    assert!(problem.is_ok());
+        .with_initial_condition_remainder("rest")
+        .unwrap();
+    let engine = problem.forward().configure(&[1.0, 0.5, 1.0]).unwrap();
+    assert_eq!(engine.remainder.as_deref(), Some("rest"));
 }
 
 #[test]

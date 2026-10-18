@@ -82,8 +82,10 @@ pub fn sample_identifiability(
     })
 }
 
-/// The modes of the weighted Gaussian kernel density of `values`.
-fn density_modes(values: &[f64], weights: &[f64], deviation: f64) -> Vec<f64> {
+/// Silverman's bandwidth of the weighted `values` with the standard
+/// deviation `deviation`: `0.9 · min(σ, IQR / 1.34) · n_eff^{−1/5}`, or `σ`
+/// in place of the minimum when the IQR is 0.
+fn bandwidth(values: &[f64], weights: &[f64], deviation: f64) -> f64 {
     let quartiles = quantiles(values, weights, &[0.25, 0.75]);
     let spread = (quartiles[1] - quartiles[0]) / 1.34;
     let scale = if spread > 0.0 {
@@ -91,7 +93,12 @@ fn density_modes(values: &[f64], weights: &[f64], deviation: f64) -> Vec<f64> {
     } else {
         deviation
     };
-    let bandwidth = 0.9 * scale * effective_size(weights).powf(-0.2);
+    0.9 * scale * effective_size(weights).powf(-0.2)
+}
+
+/// The modes of the weighted Gaussian kernel density of `values`.
+fn density_modes(values: &[f64], weights: &[f64], deviation: f64) -> Vec<f64> {
+    let bandwidth = bandwidth(values, weights, deviation);
     if bandwidth.is_nan() || bandwidth <= 0.0 {
         return vec![values[0]];
     }
@@ -119,4 +126,67 @@ fn density_modes(values: &[f64], weights: &[f64], deviation: f64) -> Vec<f64> {
         })
         .map(|g| grid[g])
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn close(a: f64, b: f64) -> bool {
+        (a - b).abs() <= 1e-12 * b.abs().max(1.0)
+    }
+
+    #[test]
+    fn the_bandwidth_takes_the_smaller_of_the_deviation_and_the_spread() {
+        // Hazen quartiles of 0, 1, 2, 3, 10: 0.75 and 4.75.
+        let values = [0.0, 1.0, 2.0, 3.0, 10.0];
+        let weights = [0.2; 5];
+        let factor = 0.9 * 5f64.powf(-0.2);
+        assert!(close(
+            bandwidth(&values, &weights, 5.0),
+            factor * 4.0 / 1.34
+        ));
+        assert!(close(bandwidth(&values, &weights, 1.0), factor));
+    }
+
+    #[test]
+    fn without_a_spread_the_bandwidth_takes_the_deviation() {
+        // Both quartiles of five ones and a nine are 1.
+        let values = [1.0, 1.0, 1.0, 1.0, 1.0, 9.0];
+        let weights = [1.0 / 6.0; 6];
+        let expected = 0.9 * 2.0 * 6f64.powf(-0.2);
+        assert!(close(bandwidth(&values, &weights, 2.0), expected));
+    }
+
+    #[test]
+    fn a_sample_without_a_bandwidth_has_its_one_value_as_mode() {
+        // One draw has no deviation; equal draws have a deviation of 0.
+        assert_eq!(density_modes(&[0.3], &[1.0], f64::NAN), vec![0.3]);
+        assert_eq!(density_modes(&[0.3, 0.3], &[0.5, 0.5], 0.0), vec![0.3]);
+    }
+
+    #[test]
+    fn a_mode_holds_a_tenth_of_the_highest_density() {
+        let modes = |weight: f64| density_modes(&[0.0, 1.0], &[1.0 - weight, weight], 0.1);
+        assert_eq!(modes(0.1).len(), 2);
+        assert_eq!(modes(0.05).len(), 1);
+    }
+
+    #[test]
+    fn the_modes_follow_a_change_of_units() {
+        // Two clusters, about −0.6 and 0.4, with uneven weights.
+        let values: Vec<f64> = (0..40)
+            .map(|i| if i < 25 { -0.6 } else { 0.4 } + 0.01 * f64::from(i % 5))
+            .collect();
+        let weights = vec![1.0 / 40.0; 40];
+        let modes = density_modes(&values, &weights, 0.3);
+        assert_eq!(modes.len(), 2, "{modes:?}");
+
+        let scaled: Vec<f64> = values.iter().map(|v| 1e-3 * v - 5.0).collect();
+        let scaled_modes = density_modes(&scaled, &weights, 0.3e-3);
+        assert_eq!(scaled_modes.len(), 2, "{scaled_modes:?}");
+        for (mode, scaled) in modes.iter().zip(&scaled_modes) {
+            assert!((1e-3 * mode - 5.0 - scaled).abs() < 1e-9, "{mode} {scaled}");
+        }
+    }
 }

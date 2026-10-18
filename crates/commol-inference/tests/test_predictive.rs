@@ -2,11 +2,12 @@
 //! observations through the observation operator of the problem.
 
 use commol_calibration::{
-    CalibrationParameter, CalibrationProblem, LossConfig, ObservedDataPoint, Workspace,
+    CalibrationParameter, CalibrationProblem, EvaluationError, LossConfig, ObservedDataPoint,
+    Violation, Workspace,
 };
 use commol_core::Model;
 use commol_difference::DifferenceEquations;
-use commol_inference::{NoNoise, ParameterSample, Predictive, observation_draws};
+use commol_inference::{NoNoise, ParameterSample, Predictive, PredictiveError, observation_draws};
 
 /// A → B at the proportional rate `k`, in discrete steps from A = 1000.
 fn problem() -> CalibrationProblem<DifferenceEquations> {
@@ -91,4 +92,47 @@ fn a_sample_of_other_parameters_is_named_in_the_error() {
         .to_string();
 
     assert!(error.contains(r#"["r"]; the problem has ["k"]"#), "{error}");
+}
+
+#[test]
+fn a_draw_without_a_run_is_named_with_its_reason() {
+    let failed = PredictiveError::Draw {
+        draw: 1,
+        error: EvaluationError::Failed("the engine stopped".to_string()),
+    };
+    assert_eq!(failed.to_string(), "Draw 1: the engine stopped");
+    let infeasible = PredictiveError::Draw {
+        draw: 2,
+        error: EvaluationError::Violation(Violation::NonFinite),
+    };
+    assert_eq!(
+        infeasible.to_string(),
+        "Draw 2: Infeasible point: NonFinite"
+    );
+}
+
+#[test]
+fn a_forward_model_observed_again_at_its_observations_predicts_the_same() {
+    // The second observation counts B over the window (1, 3].
+    let problem = problem();
+    let again = problem
+        .forward()
+        .with_observations(problem.observed_data())
+        .unwrap();
+    let mut workspace = Workspace::default();
+
+    let first = problem
+        .forward()
+        .run_observed(&[0.1], &mut workspace)
+        .unwrap()
+        .to_vec();
+    let second = again.run_observed(&[0.1], &mut workspace).unwrap();
+    assert_eq!(first, second);
+
+    let windowed = problem
+        .forward()
+        .with_observations(&problem.observed_data()[1..])
+        .unwrap();
+    let alone = windowed.run_observed(&[0.1], &mut workspace).unwrap();
+    assert_eq!(alone, &first[1..]);
 }

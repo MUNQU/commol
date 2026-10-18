@@ -288,3 +288,43 @@ fn rounded(direction: &[f64]) -> Option<Vec<(usize, f64)>> {
         .collect();
     (!exponents.is_empty()).then_some(exponents)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_generic_rank_is_the_most_frequent_and_the_lowest_on_a_tie() {
+        assert_eq!(mode([1, 2, 2].into_iter()), 2);
+        assert_eq!(mode([3, 1, 3, 1].into_iter()), 1);
+    }
+
+    #[test]
+    fn the_reduced_row_echelon_form_has_one_pivot_per_independent_row() {
+        let mut matrix = Matrix::from_row_slice(2, 3, &[2.0, 4.0, 2.0, 1.0, 3.0, 2.0]);
+        let pivots = row_echelon(&mut matrix);
+        assert_eq!(pivots, vec![0, 1]);
+        let expected = Matrix::from_row_slice(2, 3, &[1.0, 0.0, -1.0, 0.0, 1.0, 1.0]);
+        assert!((matrix - expected).amax() < 1e-12);
+    }
+
+    #[test]
+    fn an_entry_below_the_tolerance_of_the_largest_is_no_pivot() {
+        // 1e-6 is below 1e-8 × 1e4.
+        let mut matrix = Matrix::from_row_slice(2, 2, &[1e4, 0.0, 0.0, 1e-6]);
+        assert_eq!(row_echelon(&mut matrix), vec![0]);
+    }
+
+    #[test]
+    fn a_direction_is_rounded_to_halves_of_its_smallest_entry() {
+        // The sign makes the first entry positive.
+        assert_eq!(rounded(&[-0.5, 1.0]), Some(vec![(0, 1.0), (1, -2.0)]));
+        assert_eq!(rounded(&[0.3, 0.45]), Some(vec![(0, 1.0), (1, 1.5)]));
+    }
+
+    #[test]
+    fn entries_below_a_twentieth_of_the_largest_are_dropped() {
+        assert_eq!(rounded(&[2.0, 1.0, 0.05]), Some(vec![(0, 2.0), (1, 1.0)]));
+        assert_eq!(rounded(&[0.0, 0.0]), None);
+    }
+}

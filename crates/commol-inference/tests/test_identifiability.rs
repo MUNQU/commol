@@ -189,6 +189,17 @@ fn a_ridge_gives_a_correlated_pair() {
 }
 
 #[test]
+fn a_correlation_equal_to_the_threshold_is_not_above_it() {
+    // Centered columns with Σxy = 1 and Σx² = Σy² = 2: r = 1/2.
+    let x = vec![0.75, 0.25, 0.5, 0.5];
+    let y = vec![0.75, 0.5, 0.25, 0.5];
+    let result = sample_identifiability(&sample(&[x, y]), 0.5).unwrap();
+
+    assert_eq!(result.correlation[0][1], 0.5);
+    assert!(result.correlated_pairs.is_empty());
+}
+
+#[test]
 fn a_bimodal_marginal_is_flagged() {
     let z = normals(400, 4);
     let bimodal: Vec<f64> = z
@@ -249,6 +260,36 @@ impl SensitivitySource for Fixed {
     fn scaled_jacobian(&self, values: &[f64]) -> Result<Sensitivities, SensitivityError> {
         self.jacobian(values)
     }
+}
+
+#[test]
+fn a_singular_value_at_the_error_of_the_sensitivities_is_not_counted() {
+    // Exact sensitivities: the zero singular value equals the zero error.
+    let jacobian = Matrix::from_row_slice(2, 2, &[1.0, 0.0, 0.0, 0.0]);
+    let analysis = structural_rank(&Fixed::new(vec![jacobian]), 3, 7).unwrap();
+
+    assert_eq!(analysis.generic_rank, 1);
+    assert_eq!(
+        analysis.verdicts,
+        [
+            StructuralVerdict::Identifiable,
+            StructuralVerdict::NonIdentifiable
+        ]
+    );
+}
+
+#[test]
+fn a_failure_of_the_sensitivities_stops_the_structural_rank() {
+    let source = Fixed {
+        parameters: vec![CalibrationParameter::new("k0".to_string(), -2.0, -2.0)],
+        jacobians: vec![],
+    };
+    let error = structural_rank(&source, 3, 7).unwrap_err();
+
+    assert!(
+        matches!(&error, IdentifiabilityError::Sensitivity(SensitivityError::Failed(m)) if m == "broken"),
+        "{error:?}"
+    );
 }
 
 /// Columns at 60° (k0, k1) and a third orthogonal to both (k2): the pair
@@ -362,4 +403,11 @@ fn a_greedy_search_extends_the_best_subset_past_the_exhaustive_sizes() {
         .collect();
     assert_eq!(sizes, [2, 3, 4, 5, 6, 7]);
     assert_eq!(result.admissible[0].parameters, [0, 1, 2, 3, 4, 5, 6]);
+    // At a threshold of 1, an index of 1 is not below it at any size.
+    let at_one = collinearity(&source, &[vec![0.0; 7]], &[1.0], 7, 1.0).unwrap();
+    assert!(
+        at_one.admissible.iter().all(|s| s.parameters.len() == 1),
+        "{:?}",
+        at_one.admissible
+    );
 }

@@ -133,11 +133,11 @@ fn line_problem(values: &[f64]) -> CalibrationProblem<ClosedForm> {
 }
 
 fn config() -> OptimizationConfig {
-    OptimizationConfig::NelderMead(
-        NelderMeadConfig::new()
-            .with_sd_tolerance(1e-12)
-            .with_max_iterations(2000),
-    )
+    OptimizationConfig::NelderMead(NelderMeadConfig {
+        sd_tolerance: 1e-12,
+        max_iterations: 2000,
+        ..NelderMeadConfig::default()
+    })
 }
 
 /// `count` standard normal draws (Box–Muller).
@@ -212,6 +212,55 @@ fn automatic_length_matches_the_reference_implementation() {
         "{stationary}"
     );
     assert!((moving - 3.319_171_430_134_372_4).abs() < 1e-9, "{moving}");
+}
+
+#[test]
+fn automatic_length_of_a_strong_autocorrelation_matches_the_reference_implementation() {
+    // `arch` 8.0.0, `optimal_block_length` of this series: stationary
+    // 19.37076455883211, circular 22.173990079642422.
+    let series = ar1(0.95, 300, 11);
+    let stationary = automatic_length(&series, BlockDrawing::Stationary);
+    let moving = automatic_length(&series, BlockDrawing::Moving);
+    let non_overlapping = automatic_length(&series, BlockDrawing::NonOverlapping);
+    assert!(
+        (stationary - 19.370_764_558_832_11).abs() < 1e-9,
+        "{stationary}"
+    );
+    assert!((moving - 22.173_990_079_642_422).abs() < 1e-9, "{moving}");
+    assert_eq!(non_overlapping, stationary);
+}
+
+#[test]
+fn automatic_length_of_a_short_series_matches_the_reference_implementation() {
+    // `arch` 8.0.0, `optimal_block_length` of 20 values: stationary
+    // 1.6740553467716044, circular 1.9163149982720122.
+    let series = ar1(0.5, 20, 0);
+    let stationary = automatic_length(&series, BlockDrawing::Stationary);
+    let moving = automatic_length(&series, BlockDrawing::Moving);
+    assert!(
+        (stationary - 1.674_055_346_771_604_4).abs() < 1e-9,
+        "{stationary}"
+    );
+    assert!((moving - 1.916_314_998_272_012_2).abs() < 1e-9, "{moving}");
+    // Here the estimate passes a third of the size; `arch` rounds that cap up,
+    // to 7.
+    let capped = automatic_length(&ar1(0.3, 20, 1), BlockDrawing::Stationary);
+    assert!((capped - 20.0 / 3.0).abs() < 1e-12, "{capped}");
+}
+
+#[test]
+fn automatic_length_is_at_most_three_times_the_root_of_the_size() {
+    // `arch` rounds the cap up, to 43.
+    let series = ar1(0.8, 200, 5);
+    let length = automatic_length(&series, BlockDrawing::Stationary);
+    assert!((length - 3.0 * 200f64.sqrt()).abs() < 1e-12, "{length}");
+    // Below 81 values a third of the size is the smaller cap; four values
+    // are enough for an estimate.
+    assert_eq!(automatic_length(&ar1(0.5, 6, 5), BlockDrawing::Moving), 2.0);
+    assert_eq!(
+        automatic_length(&ar1(0.5, 4, 3), BlockDrawing::Moving),
+        4.0 / 3.0
+    );
 }
 
 #[test]
@@ -357,6 +406,13 @@ fn residual_blocks_are_runs_of_consecutive_residuals() {
 }
 
 #[test]
+fn a_residual_is_added_or_multiplies_by_its_exponential() {
+    assert_eq!(ResidualScale::Additive.apply(2.0, 3.0), 5.0);
+    let value = ResidualScale::Multiplicative.apply(2.0, 3f64.ln());
+    assert!((value - 6.0).abs() < 1e-12, "{value}");
+}
+
+#[test]
 fn the_multiplicative_scale_needs_positive_values() {
     let problem = line_problem(&[1.0, 0.0, 2.0]);
     let error = Residuals::new(&problem, &[1.0, 0.0], ResidualScale::Multiplicative).unwrap_err();
@@ -390,6 +446,42 @@ fn wild_multipliers_keep_each_residual_at_its_position() {
 }
 
 #[test]
+fn mammen_multipliers_multiply_the_residuals() {
+    let values = [1.0, 4.0, 2.0, 7.0];
+    let problem = line_problem(&values);
+    let residuals = Residuals::new(&problem, &[0.0, 0.0], ResidualScale::Additive).unwrap();
+    let scheme = BlockScheme::new(problem.observed_data(), 1).unwrap();
+    let resampler = WildBootstrap::new(residuals, &scheme, Multipliers::Mammen);
+    let root5 = 5f64.sqrt();
+    let (low, high) = (-(root5 - 1.0) / 2.0, (root5 + 1.0) / 2.0);
+
+    for seed in 0..5 {
+        let Perturbation::Values(synthetic) = resampler.replicate(&mut Generator::from_seed(seed))
+        else {
+            panic!("a wild bootstrap draws values");
+        };
+        for (s, v) in synthetic.iter().zip(values) {
+            let factor = s / v;
+            assert!(
+                (factor - low).abs() < 1e-12 || (factor - high).abs() < 1e-12,
+                "{factor}"
+            );
+        }
+    }
+}
+
+#[test]
+fn rademacher_multipliers_are_minus_one_or_one_as_often() {
+    let mut generator = Generator::from_seed(12);
+    let draws: Vec<f64> = (0..10_000)
+        .map(|_| Multipliers::Rademacher.draw(&mut generator))
+        .collect();
+    assert!(draws.iter().all(|d| d.abs() == 1.0));
+    let mean = draws.iter().sum::<f64>() / draws.len() as f64;
+    assert!(mean.abs() < 0.05, "{mean}");
+}
+
+#[test]
 fn mammen_multipliers_have_their_moments() {
     let mut generator = Generator::from_seed(11);
     let draws: Vec<f64> = (0..200_000)
@@ -415,6 +507,34 @@ impl Resampler for HalfBroken {
         }
         Perturbation::Values(values)
     }
+}
+
+/// A resampler that draws the same values every time.
+struct Same(Vec<f64>);
+
+impl Resampler for Same {
+    fn replicate(&self, _: &mut Generator) -> Perturbation {
+        Perturbation::Values(self.0.clone())
+    }
+}
+
+#[test]
+fn a_bootstrap_counts_values_below_zero_and_fits_that_did_not_converge() {
+    let problem = line_problem(&[1.0, 2.0, 3.0, 4.0]);
+    let same = Same(vec![-1.0, -2.0, 0.0, 3.0]);
+    let run = |config: &OptimizationConfig| {
+        let runner = ReplicateRunner::new(&problem, config, &[1.0, 1.0], 1, 3).unwrap();
+        bootstrap(&runner, &same, 4).unwrap()
+    };
+    let one_iteration = OptimizationConfig::NelderMead(NelderMeadConfig {
+        max_iterations: 1,
+        ..NelderMeadConfig::default()
+    });
+
+    let converged = run(&config());
+    assert_eq!(converged.negative_values, 8);
+    assert_eq!(converged.not_converged, 0);
+    assert_eq!(run(&one_iteration).not_converged, 4);
 }
 
 #[test]
@@ -534,6 +654,23 @@ fn a_jackknife_needs_two_blocks() {
     let scheme = BlockScheme::new(problem.observed_data(), 3).unwrap();
     let error = block_jackknife(&runner, &scheme).unwrap_err();
     assert!(error.contains("block_length 3 makes 1 block"), "{error}");
+}
+
+#[test]
+fn two_blocks_are_enough_and_fits_that_did_not_converge_are_counted() {
+    let problem = line_problem(&[1.0, 2.0, 3.0, 4.0]);
+    let scheme = BlockScheme::new(problem.observed_data(), 2).unwrap();
+    let count = |config: &OptimizationConfig| {
+        let runner = ReplicateRunner::new(&problem, config, &[1.0, 1.0], 1, 0).unwrap();
+        block_jackknife(&runner, &scheme).unwrap().not_converged
+    };
+    let one_iteration = OptimizationConfig::NelderMead(NelderMeadConfig {
+        max_iterations: 1,
+        ..NelderMeadConfig::default()
+    });
+
+    assert_eq!(count(&config()), 0);
+    assert_eq!(count(&one_iteration), 2);
 }
 
 fn draws_of(problem: &CalibrationProblem<ClosedForm>, values: Vec<f64>) -> ParameterSample {

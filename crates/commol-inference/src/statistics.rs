@@ -27,7 +27,20 @@ pub fn normalized_weights(log_weights: &[f64]) -> Vec<f64> {
     weights.into_iter().map(|w| w / total).collect()
 }
 
-/// The weighted quantiles of `values` at each of `levels`, in `[0, 1]`.
+/// Check that every quantile level is in `[0, 1]`.
+///
+/// # Errors
+///
+/// Returns a message with the first level outside `[0, 1]`, NaN included.
+pub fn check_levels(levels: &[f64]) -> Result<(), String> {
+    match levels.iter().find(|level| !(0.0..=1.0).contains(*level)) {
+        Some(level) => Err(format!("A quantile level is between 0 and 1, got {level}")),
+        None => Ok(()),
+    }
+}
+
+/// The weighted quantiles of `values` at each of `levels`, in `[0, 1]`
+/// ([`check_levels`]).
 ///
 /// # Panics
 ///
@@ -171,6 +184,17 @@ mod tests {
         // 50 ∓ 1.96 · 5 = 40.2 and 59.8, rounded outward.
         assert_eq!(quantile_error(&values, 0.5), (40.0, 60.0));
         assert_eq!(quantile_error(&values, 0.0), (1.0, 1.0));
+    }
+
+    #[test]
+    fn a_quantile_level_is_between_zero_and_one() {
+        assert_eq!(check_levels(&[0.0, 0.5, 1.0]), Ok(()));
+        for level in [-0.1, 1.5, f64::NAN] {
+            assert_eq!(
+                check_levels(&[0.5, level]),
+                Err(format!("A quantile level is between 0 and 1, got {level}"))
+            );
+        }
     }
 
     #[test]

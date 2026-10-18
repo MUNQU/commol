@@ -72,59 +72,6 @@ impl Default for NelderMeadConfig {
     }
 }
 
-impl NelderMeadConfig {
-    /// Create a new configuration with default values
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set maximum iterations
-    pub fn with_max_iterations(mut self, max_iterations: u64) -> Self {
-        self.max_iterations = max_iterations;
-        self
-    }
-
-    /// Set sample standard deviation tolerance (convergence criterion)
-    pub fn with_sd_tolerance(mut self, tolerance: f64) -> Self {
-        self.sd_tolerance = tolerance;
-        self
-    }
-
-    /// Set the size of the initial simplex, as a fraction of the bound width
-    pub fn with_initial_simplex_size(mut self, initial_simplex_size: f64) -> Self {
-        self.initial_simplex_size = initial_simplex_size;
-        self
-    }
-
-    /// Set reflection parameter (alpha)
-    /// Must be > 0, defaults to 1.0
-    pub fn with_alpha(mut self, alpha: f64) -> Self {
-        self.alpha = Some(alpha);
-        self
-    }
-
-    /// Set expansion parameter (gamma)
-    /// Must be > 1, defaults to 2.0
-    pub fn with_gamma(mut self, gamma: f64) -> Self {
-        self.gamma = Some(gamma);
-        self
-    }
-
-    /// Set contraction parameter (rho)
-    /// Must be in (0, 0.5], defaults to 0.5
-    pub fn with_rho(mut self, rho: f64) -> Self {
-        self.rho = Some(rho);
-        self
-    }
-
-    /// Set shrinking parameter (sigma)
-    /// Must be in (0, 1], defaults to 0.5
-    pub fn with_sigma(mut self, sigma: f64) -> Self {
-        self.sigma = Some(sigma);
-        self
-    }
-}
-
 /// Inertia weight strategy for PSO
 #[derive(Debug, Clone)]
 pub enum InertiaWeightStrategy {
@@ -259,163 +206,6 @@ impl Default for ParticleSwarmConfig {
             mutation_application: MutationApplication::None,
             seed: None,
         }
-    }
-}
-
-impl ParticleSwarmConfig {
-    /// Create a new configuration with default values
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set number of particles
-    pub fn with_num_particles(mut self, num_particles: usize) -> Self {
-        self.num_particles = num_particles;
-        self
-    }
-
-    /// Set maximum iterations
-    pub fn with_max_iterations(mut self, max_iterations: u64) -> Self {
-        self.max_iterations = max_iterations;
-        self
-    }
-
-    /// Set target cost (convergence criterion)
-    pub fn with_target_cost(mut self, target_cost: f64) -> Self {
-        self.target_cost = Some(target_cost);
-        self
-    }
-
-    /// Set constant inertia weight factor
-    /// Controls the influence of previous velocity on current velocity
-    /// Defaults to 1/(2*ln(2)) ≈ 0.721
-    pub fn with_inertia_factor(mut self, factor: f64) -> Self {
-        self.inertia_strategy = Some(InertiaWeightStrategy::Constant(factor));
-        self
-    }
-
-    /// Enable chaotic inertia weight using logistic map
-    /// Uses a logistic map to generate chaotic variation in the inertia weight
-    /// This helps particles escape local optima through non-linear dynamics.
-    ///
-    /// # Arguments
-    /// * `w_min` - Minimum inertia weight
-    /// * `w_max` - Maximum inertia weight
-    pub fn with_chaotic_inertia(mut self, w_min: f64, w_max: f64) -> Self {
-        self.inertia_strategy = Some(InertiaWeightStrategy::Chaotic { w_min, w_max });
-        self
-    }
-
-    /// Set constant cognitive and social acceleration factors
-    /// * `cognitive` - Controls attraction to particle's personal best position (default: 0.5 + ln(2))
-    /// * `social` - Controls attraction to swarm's best position (default: 0.5 + ln(2))
-    pub fn with_acceleration_factors(mut self, cognitive: f64, social: f64) -> Self {
-        self.acceleration_strategy = Some(AccelerationStrategy::Constant { cognitive, social });
-        self
-    }
-
-    /// Enable Time-Varying Acceleration Coefficients (TVAC)
-    /// TVAC adjusts cognitive (c1) and social (c2) acceleration coefficients over iterations
-    /// to balance exploration and exploitation. Typically, c1 decreases and c2 increases over
-    /// time to shift from exploration to exploitation.
-    ///
-    /// # Arguments
-    /// * `c1_initial` - Initial cognitive factor
-    /// * `c1_final` - Final cognitive factor
-    /// * `c2_initial` - Initial social factor
-    /// * `c2_final` - Final social factor
-    pub fn with_tvac(
-        mut self,
-        c1_initial: f64,
-        c1_final: f64,
-        c2_initial: f64,
-        c2_final: f64,
-    ) -> Self {
-        self.acceleration_strategy = Some(AccelerationStrategy::TimeVarying {
-            c1_initial,
-            c1_final,
-            c2_initial,
-            c2_final,
-        });
-        self
-    }
-
-    /// Set particle initialization strategy
-    /// Choose between different strategies for initializing particle positions:
-    ///
-    /// - **UniformRandom** (default): Standard uniform random initialization
-    /// - **LatinHypercube**: Latin Hypercube Sampling ensures uniform distribution across search space
-    /// - **OppositionBased**: Opposition-Based Learning generates both random and opposite positions
-    pub fn with_initialization_strategy(mut self, strategy: InitializationStrategy) -> Self {
-        self.initialization_strategy = strategy;
-        self
-    }
-
-    /// Enable velocity clamping
-    /// Limits particle velocities to prevent explosive behavior. The velocity is clamped to
-    /// +-clamp_factor * (upper_bound - lower_bound) component-wise.
-    ///
-    /// # Arguments
-    /// * `clamp_factor` - Fraction of search space range (typically 0.1 to 0.2)
-    pub fn with_velocity_clamping(mut self, clamp_factor: f64) -> Self {
-        self.velocity_clamp_factor = Some(clamp_factor);
-        self
-    }
-
-    /// Enable velocity mutation when velocity approaches zero
-    /// Reinitializes velocity components when they fall below a threshold, preventing
-    /// particle stagnation.
-    ///
-    /// # Arguments
-    /// * `threshold` - Velocity threshold below which reinitialization occurs (typically 0.001 to 0.01)
-    pub fn with_velocity_mutation(mut self, threshold: f64) -> Self {
-        self.velocity_mutation_threshold = Some(threshold);
-        self
-    }
-
-    /// Enable mutation with specified strategy and application method
-    /// Applies Gaussian or Cauchy mutation to particles with specified probability
-    /// to help escape local optima.
-    ///
-    /// # Arguments
-    /// * `strategy` - Mutation strategy (Gaussian or Cauchy with scale parameter)
-    /// * `probability` - Mutation probability per iteration (0.0 to 1.0)
-    /// * `application` - Which particles to mutate (GlobalBestOnly, AllParticles, or BelowAverage)
-    pub fn with_mutation(
-        mut self,
-        strategy: MutationStrategy,
-        probability: f64,
-        application: MutationApplication,
-    ) -> Self {
-        self.mutation_strategy = strategy;
-        self.mutation_probability = probability;
-        self.mutation_application = application;
-        self
-    }
-
-    /// Set random seed for reproducibility
-    ///
-    /// When set, the particle swarm will produce deterministic results,
-    /// allowing you to reproduce the same optimization trajectory across runs.
-    ///
-    /// Note: The seed is set via this builder method (rather than as a required
-    /// constructor parameter) to allow easy modification without creating a new
-    /// configuration. This is particularly useful when running multiple
-    /// calibrations with different seeds while keeping other parameters constant.
-    ///
-    /// # Arguments
-    /// * `seed` - Random seed value
-    ///
-    /// # Example
-    /// ```rust,ignore
-    /// let config = ParticleSwarmConfig::new()
-    ///     .with_num_particles(40)
-    ///     .with_max_iterations(500)
-    ///     .with_seed(42);  // Reproducible results
-    /// ```
-    pub fn with_seed(mut self, seed: u64) -> Self {
-        self.seed = Some(seed);
-        self
     }
 }
 
@@ -946,5 +736,42 @@ mod tests {
         assert!((x[1][0] - 0.1).abs() < 1e-12, "{:?}", x[1]);
         // 9.5 + 1.0 leaves the bounds, so the vertex moves down.
         assert!((x[2][1] - 8.5).abs() < 1e-12, "{:?}", x[2]);
+    }
+
+    #[test]
+    fn the_initial_simplex_moves_towards_the_farther_bound() {
+        let transform = SineTransform::new(vec![(-2.0, 3.0)]);
+        // 0.6 is 2.4 from the upper bound and 2.6 from the lower one.
+        let simplex = transform.initial_simplex(&[0.6], 0.1);
+        let moved = transform.to_x(&simplex[1])[0];
+        assert!((moved - 0.1).abs() < 1e-12, "{moved}");
+    }
+
+    #[test]
+    fn a_fixed_value_stays_at_every_vertex_of_a_simplex_that_still_spans_it() {
+        let transform = SineTransform::new(vec![(2.0, 2.0)]);
+        assert_eq!(transform.to_u(&[2.0]), vec![0.0]);
+        let simplex = transform.initial_simplex(&[2.0], 0.1);
+        assert_ne!(simplex[0], simplex[1]);
+        for vertex in &simplex {
+            assert_eq!(transform.to_x(vertex), vec![2.0]);
+        }
+    }
+
+    #[test]
+    fn the_initial_simplex_size_is_a_fraction_of_the_width() {
+        let transform = SineTransform::new(vec![(0.0, 1.0)]);
+        let solver = |size| {
+            let config = NelderMeadConfig {
+                initial_simplex_size: size,
+                ..NelderMeadConfig::default()
+            };
+            build_nelder_mead_solver(&transform, &[0.5], &config)
+        };
+        assert!(solver(1.0).is_ok());
+        for size in [0.0, 1.5] {
+            let error = solver(size).err().expect("an invalid size");
+            assert!(error.contains("must be in (0, 1]"), "{error}");
+        }
     }
 }

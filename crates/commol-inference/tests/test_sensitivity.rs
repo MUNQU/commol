@@ -3,7 +3,7 @@
 
 use commol_calibration::{
     CalibrationParameter, CalibrationParameterType, CalibrationProblem, LossConfig,
-    ObservedDataPoint,
+    ObservedDataPoint, ReplicateSummary, Replicates,
 };
 use commol_core::{Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
@@ -108,6 +108,12 @@ fn jacobian_of_decay_matches_the_closed_form() {
             sensitivities.errors[(i, 0)],
             &format!("∂y{t}/∂k"),
         );
+        // A difference of a cubic at most has a small estimated error.
+        assert!(
+            sensitivities.errors[(i, 0)] < 1e-6 * d_k.abs(),
+            "{}",
+            sensitivities.errors[(i, 0)]
+        );
         assert_within(
             sensitivities.jacobian[(i, 1)],
             d_f,
@@ -169,6 +175,65 @@ fn a_step_at_a_bound_stays_inside_the_bounds() {
 }
 
 #[test]
+fn a_step_at_the_lower_bound_is_forward_and_exact_for_a_quadratic() {
+    // Below k = 0 the rate moves B back into A and B goes below zero, so a
+    // difference that crossed the lower bound would fail. A_1 = 1000 (1 − k)
+    // and A_2 = 1000 (1 − k)²: both differences are exact, so their
+    // estimated errors are those of the runs alone.
+    let problem = problem(
+        difference(&[]),
+        vec![
+            ObservedDataPoint::new(1.0, "A".to_string(), 0.0),
+            ObservedDataPoint::new(2.0, "A".to_string(), 0.0),
+        ],
+        vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+    );
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+    // The error of the runs, η × the largest run × Σ|c| = 4, over the step.
+    let accuracy = problem.forward().base_engine().output_accuracy();
+    let step = source.steps(&[0.0])[0];
+    let at_zero = source.jacobian(&[0.0]).unwrap();
+    let expected = accuracy * 1000.0 * 4.0 / step;
+    assert!(
+        (at_zero.errors[(0, 0)] - expected).abs() <= 1e-6 * expected,
+        "{} against {expected}",
+        at_zero.errors[(0, 0)]
+    );
+
+    for (k, expected) in [(0.0, [-1000.0, -2000.0]), (1.0, [-1000.0, 0.0])] {
+        let sensitivities = source.jacobian(&[k]).unwrap();
+        for (i, expected) in expected.into_iter().enumerate() {
+            assert!(
+                (sensitivities.jacobian[(i, 0)] - expected).abs() < 1e-6,
+                "∂A{}/∂k at k = {k}: {}",
+                i + 1,
+                sensitivities.jacobian[(i, 0)]
+            );
+            assert!(sensitivities.errors[(i, 0)] < 1e-6, "{sensitivities:?}");
+        }
+    }
+}
+
+#[test]
+fn a_step_is_at_most_an_eighth_of_the_bound_width() {
+    // η^{1/3} = 0.01^{1/3} ≈ 0.215, above 1/8.
+    let engine = DifferentialEquations::try_from_model(&decay(
+        "DifferentialEquations",
+        &ode_settings(1e-2),
+        &[],
+    ))
+    .unwrap();
+    let problem = problem(
+        engine,
+        vec![ObservedDataPoint::new(1.0, "A".to_string(), 0.0)],
+        vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+    );
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+
+    assert_eq!(source.steps(&[0.2]), vec![0.125]);
+}
+
+#[test]
 fn the_ode_step_follows_the_solver_tolerance() {
     let engine = DifferentialEquations::try_from_model(&decay(
         "DifferentialEquations",
@@ -219,6 +284,20 @@ fn the_ode_step_follows_the_solver_tolerance() {
             &format!("∂y{t}/∂f"),
         );
     }
+}
+
+#[test]
+fn a_problem_of_replicates_has_no_finite_differences() {
+    let problem = problem(
+        difference(&[]),
+        vec![ObservedDataPoint::new(1.0, "A".to_string(), 0.0)],
+        vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+    )
+    .with_replicates(Some(Replicates::new(2, 1, ReplicateSummary::Mean).unwrap()));
+
+    let error = FiniteDifferences::new(&problem, Design::Observations).err();
+
+    assert_eq!(error, Some(SensitivityError::Stochastic));
 }
 
 #[test]

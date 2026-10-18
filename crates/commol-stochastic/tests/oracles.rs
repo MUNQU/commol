@@ -489,6 +489,25 @@ fn amounts_that_are_not_whole_need_a_rounding() {
 }
 
 #[test]
+fn a_rounding_error_names_five_amounts_and_counts_the_rest() {
+    let error = |amounts: &[f64]| {
+        let names: Vec<String> = (0..amounts.len()).map(|i| format!("B{i}")).collect();
+        let bins: Vec<(&str, f64)> = names
+            .iter()
+            .map(String::as_str)
+            .zip(amounts.iter().copied())
+            .collect();
+        let model = model("StochasticSteps", "null", &bins, &[], &[]);
+        StochasticSteps::try_from_model(&model).err().unwrap()
+    };
+    let five = error(&[10.2; 5]);
+    assert!(five.contains("'B4'") && !five.contains("more"), "{five}");
+    let six = error(&[10.5; 6]);
+    assert!(six.contains("'B4'") && !six.contains("'B5'"), "{six}");
+    assert!(six.contains(" and 1 more are not whole"), "{six}");
+}
+
+#[test]
 fn whole_amounts_need_no_rounding_and_a_total_must_be_whole() {
     assert!(StochasticEvents::try_from_model(&chain("StochasticEvents", "null")).is_ok());
     let mut model = chain("StochasticSteps", r#"{"rounding":"random"}"#);

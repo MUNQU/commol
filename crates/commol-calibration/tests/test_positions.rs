@@ -116,3 +116,17 @@ fn a_window_longer_than_its_position_is_rejected() {
         "{error}"
     );
 }
+
+#[test]
+fn a_window_is_finite_and_positive() {
+    for window in [0.0, f64::INFINITY] {
+        let observation = ObservedDataPoint::with_window(4.0, "A".to_string(), 500.0, window);
+        let error = problem(differential(), vec![observation], vec![])
+            .err()
+            .expect("the window is rejected");
+        assert!(
+            error.contains("a window must be finite and positive"),
+            "{error}"
+        );
+    }
+}

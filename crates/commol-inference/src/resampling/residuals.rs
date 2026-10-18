@@ -265,6 +265,68 @@ mod tests {
     }
 
     #[test]
+    fn the_nearest_position_is_the_earlier_one_on_a_tie() {
+        // x has residuals at the positions 2 and 6 of 0, …, 8.
+        let mut observations = vec![
+            ObservedDataPoint::new(2.0, "x".to_string(), 0.0),
+            ObservedDataPoint::new(6.0, "x".to_string(), 0.0),
+        ];
+        observations.extend(
+            [0.0, 1.0, 3.0, 4.0, 5.0, 7.0, 8.0]
+                .map(|at| ObservedDataPoint::new(at, "y".to_string(), 0.0)),
+        );
+        let mut residuals = vec![20.0, 60.0];
+        residuals.extend([0.0; 7]);
+        let grid = SeriesResiduals::new(&observations, &residuals);
+        let x = grid.series("x").unwrap();
+        assert_eq!(
+            (2..=6).map(|p| grid.at(x, p)).collect::<Vec<_>>(),
+            [20.0, 20.0, 20.0, 60.0, 60.0]
+        );
+    }
+
+    /// How often each of `positions` positions is a source, over many draws.
+    fn coverage(positions: usize, length: usize, blocks: ResidualBlocks) -> Vec<usize> {
+        let mut generator = Generator::from_seed(8);
+        let mut counts = vec![0; positions];
+        for _ in 0..200 {
+            for p in source_positions(positions, length, positions, blocks, &mut generator) {
+                counts[p] += 1;
+            }
+        }
+        counts
+    }
+
+    #[test]
+    fn every_position_is_a_source_of_both_kinds_of_block() {
+        // A stationary block of mean length 1 starts anew at every position.
+        for (length, blocks) in [
+            (3, ResidualBlocks::Moving),
+            (3, ResidualBlocks::Stationary),
+            (1, ResidualBlocks::Stationary),
+        ] {
+            let counts = coverage(10, length, blocks);
+            assert!(
+                counts.iter().all(|&count| count > 0),
+                "{blocks:?} {counts:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_stationary_block_has_the_mean_length() {
+        let mut generator = Generator::from_seed(9);
+        let source = source_positions(1000, 4, 20_000, ResidualBlocks::Stationary, &mut generator);
+        // A block ends where the next source is not the next position.
+        let ends = source
+            .windows(2)
+            .filter(|w| w[1] != (w[0] + 1) % 1000)
+            .count();
+        let mean = source.len() as f64 / (ends + 1) as f64;
+        assert!((mean - 4.0).abs() < 0.2, "{mean}");
+    }
+
+    #[test]
     fn stationary_blocks_wrap_around_the_end() {
         let mut generator = Generator::from_seed(4);
         let source = source_positions(5, 50, 200, ResidualBlocks::Stationary, &mut generator);

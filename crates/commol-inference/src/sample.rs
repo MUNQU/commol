@@ -187,13 +187,18 @@ impl ParameterSample {
 
     /// The weighted quantiles of each parameter: one row per level, one
     /// column per parameter.
-    pub fn quantiles(&self, levels: &[f64]) -> Vec<Vec<f64>> {
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when a level is not in `[0, 1]`.
+    pub fn quantiles(&self, levels: &[f64]) -> Result<Vec<Vec<f64>>, String> {
+        statistics::check_levels(levels)?;
         let per_parameter: Vec<Vec<f64>> = (0..self.names.len())
             .map(|i| statistics::quantiles(&self.column(i), &self.weights, levels))
             .collect();
-        (0..levels.len())
+        Ok((0..levels.len())
             .map(|l| per_parameter.iter().map(|q| q[l]).collect())
-            .collect()
+            .collect())
     }
 
     /// The central interval of `confidence_level` of each parameter, as
@@ -205,7 +210,7 @@ impl ParameterSample {
     /// and 1.
     pub fn interval(&self, confidence_level: f64) -> Result<[Vec<f64>; 2], String> {
         let levels = statistics::interval_levels(confidence_level)?;
-        let mut rows = self.quantiles(&levels).into_iter();
+        let mut rows = self.quantiles(&levels)?.into_iter();
         Ok([
             rows.next().expect("two levels"),
             rows.next().expect("two levels"),
@@ -282,6 +287,16 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains("outside its bounds"), "{error}");
+    }
+
+    #[test]
+    fn quantiles_have_one_row_per_level_and_one_column_per_parameter() {
+        let sample = sample(&[0.0; 3]);
+        assert_eq!(
+            sample.quantiles(&[0.0, 0.5, 1.0]),
+            Ok(vec![vec![1.0, 0.0], vec![2.0, 1.0], vec![4.0, 2.0]])
+        );
+        assert!(sample.quantiles(&[1.5]).is_err());
     }
 
     #[test]
