@@ -19,6 +19,7 @@ from commol.context.calibration import (
 from commol.context._model.report import InitialConditionEntry
 from commol.context.constants import CalibrationParameterType
 from commol.context.model import Model
+from commol.context.inference.conformal import PredictionIntervals
 from commol.context.inference.identifiability import IdentifiabilityReport
 from commol.context.inference.sample import ParameterSample, ParameterSummary
 from commol.context.report_entry import Interval, entry_interval
@@ -205,12 +206,33 @@ class AccumulatorReport(TypedDict):
     cumulative: WindowedAccumulator
 
 
+class SeriesIntervalsReport(TypedDict):
+    """The prediction intervals of one series."""
+
+    positions: list[float]
+    prediction: list[float]
+    lower: list[float]
+    upper: list[float]
+
+
+class PredictionIntervalsReport(TypedDict):
+    """Prediction intervals at a level, by series, and the unbounded ones."""
+
+    level: float
+    series: dict[str, SeriesIntervalsReport]
+    unbounded: dict[str, list[float]]
+
+
 class SimulationReport(TypedDict):
-    """Observed data, compartment series and accumulators of a run."""
+    """
+    Observed data, compartment series and accumulators of a run, and the
+    prediction intervals when the report has them.
+    """
 
     observed: dict[str, ObservedSeries]
     series: dict[str, ReportLeaf]
     accumulators: dict[str, AccumulatorReport]
+    prediction_intervals: NotRequired[PredictionIntervalsReport]
 
 
 def _reduce(
@@ -460,6 +482,7 @@ def simulation_report(
     accumulators: Iterable[str] = (),
     ensemble_runs: "Sequence[SimulationResults] | Predictive | None" = None,
     confidence_level: float | None = None,
+    prediction_intervals: PredictionIntervals | None = None,
 ) -> SimulationReport:
     """
     Report the observed data, compartment series and accumulators of a run.
@@ -494,11 +517,15 @@ def simulation_report(
         engine, or a `Predictive`, whose draws carry their weights.
     confidence_level : float | None, optional
         Confidence level of the reported intervals.
+    prediction_intervals : PredictionIntervals | None, optional
+        Prediction intervals of a conformal method
+        (``ConformalResult.intervals``), reported as they are.
 
     Returns
     -------
     SimulationReport
-        Keys ``observed``, ``series`` and ``accumulators``.
+        Keys ``observed``, ``series`` and ``accumulators``, then
+        ``prediction_intervals`` when they are given.
 
     Raises
     ------
@@ -506,7 +533,7 @@ def simulation_report(
         If the results have no value at a position the report reads.
     """
     accumulator_ids = list(accumulators)
-    return {
+    report: SimulationReport = {
         "observed": observed_report(observed_data, window, num_windows),
         "series": series_report(
             simulation,
@@ -527,6 +554,11 @@ def simulation_report(
             confidence_level,
         ),
     }
+    if prediction_intervals is not None:
+        report["prediction_intervals"] = cast(
+            "PredictionIntervalsReport", prediction_intervals.model_dump()
+        )
+    return report
 
 
 class StructuralVerdictEntry(TypedDict):

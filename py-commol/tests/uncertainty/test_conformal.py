@@ -285,3 +285,37 @@ class TestAdaptiveConformal:
             0.1, abs=0.04
         )
         assert late_miss_rate(split.intervals.series["B"], stream) > 0.4
+
+
+class TestResults:
+    @pytest.mark.parametrize(
+        ("variant", "assumption"),
+        [
+            (SplitConformal, "exchangeable"),
+            (RollingConformal, "exchangeable"),
+            (JackknifePlus, "exchangeable"),
+            (EnbPI, "mixing"),
+            (AdaptiveConformal, "no assumption"),
+        ],
+    )
+    def test_each_result_states_its_guarantee(
+        self, variant: type, assumption: str
+    ) -> None:
+        values = (C + np.random.default_rng(5).normal(0.0, 1.0, 50)).tolist()
+        calibrator = flow_calibrator(values[:30], windowed=True)
+        later = flow_observations(values[30:], windowed=True, start=31)
+        settings = {
+            SplitConformal: {"calibration_data": later, "positions": [51.0]},
+            RollingConformal: {"origins": [10.0, 15.0, 20.0], "positions": [31.0]},
+            JackknifePlus: {"block_length": 1, "positions": [31.0]},
+            EnbPI: {"replicates": 20, "block_length": 3, "positions": [31.0]},
+            AdaptiveConformal: {"step": 0.01, "stream": later},
+        }[variant]
+
+        result = calibrator.uncertainty(
+            variant(**settings, score="absolute", by="series", level=0.5)
+        )
+
+        assert assumption in result.guarantee, result.guarantee
+        assert result.intervals.level == 0.5
+        assert list(result.scores) == ["B"]
