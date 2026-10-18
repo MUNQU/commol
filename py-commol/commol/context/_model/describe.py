@@ -15,10 +15,7 @@ parameters, outputs), adds the sections of the kind
 
 from typing import TYPE_CHECKING
 
-try:
-    from commol.commol_rs import _commol_rs as commol_rs
-except ImportError as e:
-    raise ImportError(f"Error importing Rust extension: {e}") from e
+from commol.commol_rs import _commol_rs as commol_rs
 
 from commol.context.description import (
     Block,

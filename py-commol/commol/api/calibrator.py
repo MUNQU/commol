@@ -16,15 +16,8 @@ if TYPE_CHECKING:
         OptimizationConfigProtocol,
     )
 
-try:
-    from commol.commol_rs import _commol_rs as commol_rs
-
-    rust_core = commol_rs.core
-    rust_calibration = commol_rs.calibration
-except ImportError as e:
-    raise ImportError(f"Error importing Rust extension: {e}") from e
-
 from commol.api.simulation import Simulation, check_seed, draw_seed
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.context._model import engine_state
 from commol.context.calibration import (
     CalibrationEvaluation,
@@ -44,6 +37,8 @@ from commol.context.constants import (
     OptimizationAlgorithm,
 )
 from commol.context.inference.method import IdentifiabilityMethod, UncertaintyMethod
+
+rust_calibration = commol_rs.calibration
 
 logger = logging.getLogger(__name__)
 

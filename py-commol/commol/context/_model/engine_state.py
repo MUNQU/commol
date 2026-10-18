@@ -9,10 +9,7 @@ This module only asks the engine; it does not reproduce any of those rules.
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, NamedTuple
 
-try:
-    from commol.commol_rs import _commol_rs as commol_rs
-except ImportError as e:
-    raise ImportError(f"Error importing Rust extension: {e}") from e
+from commol.commol_rs import _commol_rs as commol_rs
 
 from commol.context.constants import CalibrationParameterType
 

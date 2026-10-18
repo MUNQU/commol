@@ -5,10 +5,7 @@ from typing import Self
 
 from pydantic import ConfigDict, BaseModel, Field, field_validator, model_validator
 
-try:
-    from commol.commol_rs import _commol_rs as commol_rs
-except ImportError as e:
-    raise ImportError(f"Error importing Rust extension: {e}") from e
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.stratification_condition import StratificationCondition
 from commol.utils.security import validate_expression_security
 
