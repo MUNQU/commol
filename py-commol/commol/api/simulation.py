@@ -97,7 +97,7 @@ class Simulation:
                 f"{type(model.structure).__name__}, not a ModelStructure. A model "
                 "holds the structure of its kind, such as an Aggregate."
             )
-        logging.info(f"Initializing Simulation with model: '{model.name}'")
+        logger.info(f"Initializing Simulation with model: '{model.name}'")
         self.model_definition: Model = model
         self._build_engine(model.model_dump_json())
 
@@ -106,7 +106,7 @@ class Simulation:
         self._model_json: str = model_json
         self._engine: "EngineProtocol" = build_engine(model_json)
         self._simulation_outputs: list[str] = self._engine.output_names
-        logging.info(
+        logger.info(
             f"Simulation engine ready. Outputs: {len(self._simulation_outputs)}"
         )
 
@@ -114,7 +114,7 @@ class Simulation:
         """Rebuild the engine when the model changed since it was built."""
         model_json = self.model_definition.model_dump_json()
         if model_json != self._model_json:
-            logging.info("Model changed since the engine was built; rebuilding it.")
+            logger.info("Model changed since the engine was built; rebuilding it.")
             self._build_engine(model_json)
 
     def _validate_all_parameters_calibrated(self, model: Model) -> None:
@@ -206,10 +206,10 @@ class Simulation:
         self._sync_engine()
         used_seed = self._seed_run(seed)
         self._engine.reset()
-        logging.info(f"Running simulation for {num_steps} steps.")
+        logger.info(f"Running simulation for {num_steps} steps.")
         start = time.time()
         positions, rows = self._engine.run(num_steps)
-        logging.info(f"Simulation complete. It took {time.time() - start} seconds.")
+        logger.info(f"Simulation complete. It took {time.time() - start} seconds.")
         return SimulationResults.from_rows(
             positions, self._simulation_outputs, rows, seed=used_seed
         )

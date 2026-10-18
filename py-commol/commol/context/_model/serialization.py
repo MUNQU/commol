@@ -14,10 +14,8 @@ def _is_number(value: object) -> bool:
     )
 
 
-def _is_numeric_array(payload: object) -> bool:
+def _is_numeric_array(payload: list[object]) -> bool:
     """True for a flat array of numbers, or an array of such arrays."""
-    if not isinstance(payload, list) or not payload:
-        return False
     if all(_is_number(item) for item in payload):
         return True
     return all(

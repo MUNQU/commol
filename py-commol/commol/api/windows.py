@@ -134,7 +134,8 @@ def window_ends(window: float, end: float) -> list[float]:
         If `window` is not positive.
     """
     _check_window(window)
-    count = math.floor(_windows_in(end, window)) if end > 0 else 0
+    # A non-positive end has no window: range() of a count below 1 is empty.
+    count = math.floor(_windows_in(end, window))
     return [window_end(index, window) for index in range(count)]
 
 

@@ -1,5 +1,4 @@
-import re
-
+from commol.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
 from commol.context._model import engine_state
 from commol.context.neighbors import NEIGHBORS_PREFIX, NEIGHBORS_VARIABLE
 from commol.utils.equations import (
@@ -16,89 +15,18 @@ class ModelCompartmentHelper:
 
     def __init__(self, model) -> None:
         self._model = model
-        self._expanded: (
-            tuple[list[tuple[str, dict[str, str]]], list[tuple[str, dict[str, str]]]]
-            | None
-        ) = None
-
-    # ------------------------------------------------------------------
-    # Compartment generation
-    # ------------------------------------------------------------------
-
-    def _expanded_outputs(
-        self,
-    ) -> tuple[list[tuple[str, dict[str, str]]], list[tuple[str, dict[str, str]]]]:
-        """Compartments and accumulator outputs, as the engine expands them."""
-        if self._expanded is None:
-            compartments, accumulators = engine_state.expanded_outputs(
-                self._model.process
-            )
-            self._expanded = (
-                [(output.source, output.categories) for output in compartments],
-                [(output.source, output.categories) for output in accumulators],
-            )
-        return self._expanded
-
-    def generate_compartments(self) -> list[tuple[str, dict[str, str]]]:
-        """Generate all compartment combinations from bins and stratifications.
-
-        Each element is a 2-tuple ``(bin_id, applied_categories)`` where
-        ``applied_categories`` maps each stratification ID that was actually
-        applied to this compartment to its chosen category. The engine expands
-        them.
-        """
-        return self._expanded_outputs()[0]
-
-    def generate_accumulator_outputs(self) -> list[tuple[str, dict[str, str]]]:
-        """Generate all accumulator output combinations.
-
-        Each element is a 2-tuple ``(accumulator_id, applied_categories)``,
-        following the same expansion as compartments.
-        """
-        return self._expanded_outputs()[1]
-
-    def compartment_to_string(
-        self, compartment: tuple[str, dict[str, str]], latex: bool = False
-    ) -> str:
-        """Convert compartment tuple to display string."""
-        bin_id, applied = compartment
-        parts = [bin_id] + [
-            applied[s.id]
-            for s in self._model.process.stratifications
-            if s.id in applied
-        ]
-        name = "_".join(parts)
-
-        if latex:
-            from commol.context._model.equations import latex_variable
-
-            return latex_variable(name)
-        return name
 
     # ------------------------------------------------------------------
     # Unit helpers
     # ------------------------------------------------------------------
 
     def has_all_units(self) -> bool:
-        """Check if all units are defined. Raises error if partial units."""
-        has_any_bin_unit = any(b.unit for b in self._model.process.bins)
-        has_any_param_unit = any(
-            p.unit for p in self._model.parameters if not isinstance(p.value, str)
-        )
-
-        if not has_any_bin_unit and not has_any_param_unit:
-            return False
-
-        if not all(b.unit for b in self._model.process.bins):
-            raise ValueError("Some bins have units but not all")
-        if any(
-            p.unit is None
+        """True when every bin and every constant parameter has a unit."""
+        return all(b.unit for b in self._model.process.bins) and all(
+            p.unit is not None
             for p in self._model.parameters
             if not isinstance(p.value, str)
-        ):
-            raise ValueError("Some parameters have units but not all")
-
-        return True
+        )
 
     def build_variable_units(self) -> dict[str, str]:
         """Build a mapping of all variables to their units."""
@@ -125,44 +53,66 @@ class ModelCompartmentHelper:
             if state.unit:
                 variable_units[state.id] = state.unit
 
+    def bin_units(self) -> dict[str, str]:
+        """The unit of each bin; the unit check requires every bin to have one."""
+        return {b.id: b.unit for b in self._model.process.bins if b.unit}
+
+    def _common_bin_unit(self) -> str | None:
+        """The unit every bin shares, or None when the bins have several."""
+        units = set(self.bin_units().values())
+        return units.pop() if len(units) == 1 else None
+
+    def mixed_unit_totals(self) -> set[str]:
+        """
+        The variables that add amounts of every bin: ``total``, the subgroup
+        totals ``total_<categories>``, a category and ``neighbors``. With bins
+        of different units they have none.
+        """
+        if self._common_bin_unit() is not None:
+            return set()
+        process = self._model.process
+        return {
+            TOTAL_VARIABLE,
+            NEIGHBORS_VARIABLE,
+            *(
+                name
+                for name in engine_state.subgroup_total_names(process)
+                if name.startswith(SUBGROUP_TOTAL_PREFIX)
+            ),
+            *(category for s in process.stratifications for category in s.categories),
+        }
+
     def _add_stratification_category_units(
         self, variable_units: dict[str, str]
     ) -> None:
-        if not self._model.process.bins or not self._model.process.bins[0].unit:
+        bin_unit = self._common_bin_unit()
+        if bin_unit is None:
             return
-        bin_unit = self._model.process.bins[0].unit
         for strat in self._model.process.stratifications:
             for category in strat.categories:
                 variable_units[category] = bin_unit
 
     def _add_compartment_units(self, variable_units: dict[str, str]) -> None:
-        if not self._model.process.stratifications:
-            return
-        compartments = self.generate_compartments()
-        for compartment in compartments:
-            compartment_str = self.compartment_to_string(compartment)
-            bin_id = compartment[0]
-            bin_obj = next(
-                (b for b in self._model.process.bins if b.id == bin_id), None
-            )
-            if bin_obj and bin_obj.unit:
-                variable_units[compartment_str] = bin_obj.unit
+        bin_units = self.bin_units()
+        for compartment in engine_state.initial_state(
+            self._model.process, self._model.structure
+        ):
+            variable_units[compartment.name] = bin_units[compartment.bin]
 
     def _add_predefined_variable_units(self, variable_units: dict[str, str]) -> None:
-        bin_unit = (
-            self._model.process.bins[0].unit if self._model.process.bins else None
+        bin_units = self.bin_units()
+        bin_unit = self._common_bin_unit()
+        # The amounts among the neighbors of a unit are amounts of bins.
+        for bin_id, unit in bin_units.items():
+            variable_units[f"{NEIGHBORS_PREFIX}{bin_id}"] = unit
+        if bin_unit is None:
+            return
+        variable_units.update(
+            get_predefined_variable_units(
+                engine_state.subgroup_total_names(self._model.process), bin_unit
+            )
         )
-        predefined_units = get_predefined_variable_units(
-            engine_state.subgroup_total_names(self._model.process), bin_unit
-        )
-        variable_units.update(predefined_units)
-        if bin_unit is not None:
-            # The amounts among the neighbors of a unit are amounts of bins.
-            variable_units[NEIGHBORS_VARIABLE] = bin_unit
-            for bin_item in self._model.process.bins:
-                variable_units[f"{NEIGHBORS_PREFIX}{bin_item.id}"] = (
-                    bin_item.unit or bin_unit
-                )
+        variable_units[NEIGHBORS_VARIABLE] = bin_unit
 
     def _add_special_variable_units(self, variable_units: dict[str, str]) -> None:
         # `t` is a position on the axis; `step` counts increments.
@@ -172,23 +122,33 @@ class ModelCompartmentHelper:
         variable_units["e"] = "dimensionless"
 
     def _infer_formula_parameter_units(self, variable_units: dict[str, str]) -> None:
-        max_iterations = 10
-        formula_params_without_units: list = []
+        """
+        Infer the unit of each formula parameter from the units it reads.
 
-        for _ in range(max_iterations):
-            inferred_any = self._try_infer_formula_units(
-                variable_units, formula_params_without_units
-            )
-            if not inferred_any:
-                break
+        A formula whose variables have units but no unit of its own, such as
+        ``exp(k)`` with ``k`` in ``1/day``, raises.
 
-        _validate_formula_parameter_units(variable_units, formula_params_without_units)
+        Raises
+        ------
+        UnitConsistencyError
+            If the unit of a formula cannot be inferred from its variables.
+        """
+        failures: dict[str, Exception] = {}
+        # Each round infers at least one formula, or stops.
+        while self._try_infer_formula_units(variable_units, failures):
+            pass
+        for param in self._model.parameters:
+            if param.id in failures and param.id not in variable_units:
+                raise UnitConsistencyError(
+                    f"Cannot infer unit for formula parameter '{param.id}' = "
+                    f"'{param.value}': {failures[param.id]}. Please provide an "
+                    f"explicit unit for this parameter."
+                )
 
     def _try_infer_formula_units(
-        self,
-        variable_units: dict[str, str],
-        failed_params: list,
+        self, variable_units: dict[str, str], failures: dict[str, Exception]
     ) -> bool:
+        """Infer the formulas whose variables have units; True if any was."""
         inferred_any = False
         for param in self._model.parameters:
             if param.id in variable_units or not isinstance(param.value, str):
@@ -196,19 +156,14 @@ class ModelCompartmentHelper:
             try:
                 if _infer_single_formula_unit(param, variable_units):
                     inferred_any = True
-            except Exception:
-                if param not in failed_params:
-                    failed_params.append(param)
+            except Exception as error:
+                failures[param.id] = error
         return inferred_any
 
-    def get_rate_unit(
-        self, rate: str, variable_units: dict[str, str] | None = None
-    ) -> str | None:
+    def get_rate_unit(self, rate: str, variable_units: dict[str, str]) -> str | None:
         """Calculate the unit for a transition rate expression."""
         try:
             self.register_custom_units()
-            if variable_units is None:
-                variable_units = self.build_variable_units()
             variables = get_expression_variables(rate)
             rate_variable_units: dict[str, str] = {}
             for var in variables:
@@ -223,52 +178,41 @@ class ModelCompartmentHelper:
         except Exception:
             return None
 
-    def annotate_rate_variables(
-        self, rate: str, variable_units: dict[str, str] | None = None
-    ) -> str:
+    def annotate_rate_variables(self, rate: str, variable_units: dict[str, str]) -> str:
         """Annotate variables in a rate expression with their units."""
-        if not rate:
-            return rate
+        from commol.context._model.equations import replace_variables
+
         try:
-            if variable_units is None:
-                variable_units = self.build_variable_units()
-            variables = get_expression_variables(rate)
-            annotated_rate = rate
-            sorted_vars = sorted(variables, key=lambda x: len(x), reverse=True)
-            for var in sorted_vars:
-                if var in variable_units:
-                    unit = variable_units[var]
-                    pattern = r"\b" + re.escape(var) + r"\b"
-                    replacement = f"{var}({unit})"
-                    annotated_rate = re.sub(pattern, replacement, annotated_rate)
-            return annotated_rate
+            return replace_variables(
+                rate,
+                rate,
+                lambda var: (
+                    f"{var}({variable_units[var]})" if var in variable_units else var
+                ),
+            )
         except Exception:
             return rate
 
     def format_rate_with_unit(
         self,
-        rate: str | None,
-        variable_units: dict[str, str] | None = None,
-        show_units: bool = True,
+        rate: str,
+        variable_units: dict[str, str] | None,
         latex: bool = False,
     ) -> str:
-        """Format a rate expression with variable units and final unit annotation."""
-        if not rate:
-            return "\\text{None}" if latex else "None"
-
+        """
+        Format a rate expression, with the unit of each variable and of the
+        rate when the model has units (`variable_units` is not None).
+        """
         if latex:
             from commol.context._model.equations import latex_rate_expression
 
-            if not show_units:
-                return latex_rate_expression(rate)
-            annotated_rate = self.annotate_rate_variables(rate, variable_units)
+            latex_rate = latex_rate_expression(rate, variable_units)
+            if variable_units is None:
+                return latex_rate
             unit = self.get_rate_unit(rate, variable_units)
-            latex_rate = latex_rate_expression(annotated_rate)
-            if unit:
-                return f"{latex_rate} [\\text{{{unit}}}]"
-            return latex_rate
+            return f"{latex_rate} [\\text{{{unit}}}]" if unit else latex_rate
 
-        if not show_units:
+        if variable_units is None:
             return rate
 
         annotated_rate = self.annotate_rate_variables(rate, variable_units)
@@ -293,8 +237,6 @@ class ModelCompartmentHelper:
 
 def _infer_single_formula_unit(param, variable_units: dict[str, str]) -> bool:
     """Infer unit for a single formula parameter. Returns True if successful."""
-    if not isinstance(param.value, str):
-        return False
     formula_vars = get_expression_variables(param.value)
     formula_var_units: dict[str, str] = {}
     for var in formula_vars:
@@ -310,34 +252,3 @@ def _infer_single_formula_unit(param, variable_units: dict[str, str]) -> bool:
     else:
         variable_units[param.id] = "dimensionless"
     return True
-
-
-def _validate_formula_parameter_units(
-    variable_units: dict[str, str],
-    failed_params: list,
-) -> None:
-    """Validate that all formula parameters have units, raise errors if not."""
-    for param in failed_params:
-        if param.id not in variable_units:
-            if not isinstance(param.value, str):
-                raise UnitConsistencyError(
-                    f"Cannot infer unit for parameter '{param.id}'. "
-                    f"Parameter value is not a formula string. "
-                    f"Please provide an explicit unit for this parameter."
-                )
-            formula_vars = get_expression_variables(param.value)
-            missing_vars = [v for v in formula_vars if v not in variable_units]
-            if missing_vars:
-                raise UnitConsistencyError(
-                    f"Cannot infer unit for formula parameter '{param.id}'. "
-                    f"Formula '{param.value}' references variables without "
-                    f"units: {', '.join(missing_vars)}. "
-                    f"Please specify units for all referenced parameters or "
-                    f"provide an explicit unit for '{param.id}'."
-                )
-            else:
-                raise UnitConsistencyError(
-                    f"Cannot infer unit for formula parameter '{param.id}'. "
-                    f"Formula '{param.value}' could not be parsed. "
-                    f"Please provide an explicit unit for this parameter."
-                )

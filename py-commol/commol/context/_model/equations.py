@@ -8,6 +8,7 @@ listed apart, with the positions where it moves its amount at once.
 """
 
 import re
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING
 
 try:
@@ -237,10 +238,7 @@ class DynamicsDescription:
 
     def _variable_units(self) -> dict[str, str] | None:
         """The unit of every variable, or None when the model has no units."""
-        try:
-            if not self._helper.has_all_units():
-                return None
-        except ValueError:
+        if not self._helper.has_all_units():
             return None
         return self._helper.build_variable_units()
 
@@ -253,21 +251,18 @@ class DynamicsDescription:
         source_str = ", ".join(sorted(set(transition.source))) or "none"
         target_str = ", ".join(sorted(set(transition.target))) or "none"
         schedule = f", {_impulse_schedule(transition)}" if transition.is_impulse else ""
-        show_units = units is not None
         return EquationGroup(
             heading=f"{transition.id} ({source_str} -> {target_str}{schedule})",
             equations=[
                 Equation(
                     left=_text_arrow(flow),
-                    right=self._helper.format_rate_with_unit(
-                        flow.term, units, show_units
-                    ),
+                    right=self._helper.format_rate_with_unit(flow.term, units),
                     left_latex=_latex_transition_arrow(
                         _display_name(flow.source, latex=True),
                         _display_name(flow.target, latex=True),
                     ),
                     right_latex=self._helper.format_rate_with_unit(
-                        flow.term, units, show_units, latex=True
+                        flow.term, units, latex=True
                     ),
                     relation="flow",
                 )
@@ -280,7 +275,8 @@ class DynamicsDescription:
         num_bins = len(process.bins)
         if not process.stratifications:
             return f"Total System: {num_bins} coupled equations ({num_bins} bins)"
-        num_compartments = len(self._helper.generate_compartments())
+        compartments, _ = engine_state.expanded_outputs(process)
+        num_compartments = len(compartments)
         strat_details = [
             f"{len(strat.categories)} {strat.id}" for strat in process.stratifications
         ]
@@ -569,32 +565,36 @@ def latex_variable(var_name: str) -> str:
     return var_name
 
 
-def latex_rate_expression(rate: str) -> str:
-    """Convert rate expression to LaTeX math mode."""
-    if not rate:
-        return rate
+def latex_rate_expression(rate: str, units: Mapping[str, str] | None = None) -> str:
+    """
+    Convert a rate expression to LaTeX math mode.
 
-    latex_rate = rate.replace(" * ", " \\cdot ")
+    With `units`, each variable that has one is followed by it, as in
+    ``k(\\text{1/day})``.
+    """
 
-    variables = get_expression_variables(rate)
-    sorted_vars = sorted(variables, key=lambda x: len(x), reverse=True)
-
-    for var in sorted_vars:
+    def latex(var: str) -> str:
         latex_var = latex_variable(var)
-        pattern = r"\b" + re.escape(var) + r"\b"
-        latex_rate = re.sub(pattern, latex_var.replace("\\", "\\\\"), latex_rate)
+        if units is not None and var in units:
+            latex_var += f"(\\text{{{units[var]}}})"
+        return latex_var
 
-    # Wrap units in \text{} — exclude content with LaTeX commands or math operators
-    latex_rate = re.sub(
-        r"\(([^)\\{}+\-]*[a-zA-Z][^)\\{}+\-]*)\)", r"(\\text{\1})", latex_rate
-    )
-    latex_rate = re.sub(
-        r"\[([^\]\\{}+\-]*[a-zA-Z][^\]\\{}+\-]*)\]", r"[\\text{\1}]", latex_rate
-    )
+    latex_rate = replace_variables(rate.replace(" * ", " \\cdot "), rate, latex)
+    return _convert_division_to_frac(latex_rate)
 
-    latex_rate = _convert_division_to_frac(latex_rate)
 
-    return latex_rate
+def replace_variables(text: str, rate: str, replace: Callable[[str], str]) -> str:
+    """
+    `text` with each variable of `rate` replaced by ``replace(name)``.
+
+    One pass replaces every variable, so a replacement is never read again:
+    the category ``g1`` inside ``A_{g1}``, which replaces ``A_g1``, stays.
+    """
+    variables = get_expression_variables(rate)
+    if not variables:
+        return text
+    names = "|".join(re.escape(variable) for variable in variables)
+    return re.sub(rf"\b({names})\b", lambda match: replace(match.group(1)), text)
 
 
 def _convert_division_to_frac(expr: str) -> str:
@@ -611,7 +611,7 @@ def _convert_division_to_frac(expr: str) -> str:
             paren_depth += 1
         elif expr[i] == ")":
             paren_depth -= 1
-        elif paren_depth == 0 and i + 3 <= len(expr) and expr[i : i + 3] == " / ":
+        elif paren_depth == 0 and expr[i : i + 3] == " / ":
             divisions.append(i)
             i += 2
         i += 1
@@ -669,7 +669,7 @@ def tokenize_rate(rate: str) -> list[str]:
             depth += 1
         elif rate[i] == ")":
             depth -= 1
-        elif depth == 0 and i + 3 <= len(rate) and rate[i : i + 3] == " * ":
+        elif depth == 0 and rate[i : i + 3] == " * ":
             tokens.append(rate[current_start:i].strip())
             i += 3
             current_start = i
@@ -698,10 +698,8 @@ def are_complementary_factors(varying: list[str]) -> bool:
 
     expected = "(1 - " + " - ".join(sorted(other_tokens)) + ")"
 
-    inner = complement_token[1:-1]
-    parts = [p.strip() for p in inner.split(" - ")]
-    if not parts or parts[0] != "1":
-        return False
+    # The token starts with "(1 - ", so its first part is "1".
+    parts = [p.strip() for p in complement_token[1:-1].split(" - ")]
     actual_sorted = "(1 - " + " - ".join(sorted(parts[1:])) + ")"
 
     return actual_sorted == expected
@@ -710,135 +708,40 @@ def are_complementary_factors(varying: list[str]) -> bool:
 def simplify_complementary_terms(
     raw_terms: list[tuple[int, str]],
 ) -> list[tuple[int, str]]:
-    """Simplify groups of terms with complementary percentage factors."""
-    if len(raw_terms) < 2:
-        return raw_terms
+    """
+    Merge the terms of one sign that differ only by complementary factors.
 
-    result: list[tuple[int, str]] = []
+    ``k * p`` and ``k * (1 - p)`` share the factor ``k``, and ``p`` and
+    ``(1 - p)`` are complementary, so they merge into ``k``. A merged term
+    takes the place of the first term of its group.
+    """
+    merged: dict[int, tuple[int, str]] = {}
     used: set[int] = set()
-
-    for sign_val in (-1, 1):
-        indices = [
-            i for i, (s, _) in enumerate(raw_terms) if s == sign_val and i not in used
-        ]
-        if len(indices) < 2:
-            continue
-
-        groups = find_common_factor_groups([raw_terms[i][1] for i in indices])
-
-        for group_indices, common_tokens in groups:
-            actual_indices = [indices[gi] for gi in group_indices]
-            varying = []
-            for gi in group_indices:
-                rate_tokens = tokenize_rate(raw_terms[indices[gi]][1])
-                diff = [t for t in rate_tokens if t not in common_tokens]
-                if len(diff) == 1:
-                    varying.append(diff[0])
-                else:
-                    varying = []
-                    break
-
-            if varying and are_complementary_factors(varying):
-                simplified = " * ".join(common_tokens)
-                result.append((sign_val, simplified))
-                used.update(actual_indices)
-
-    for i, term in enumerate(raw_terms):
-        if i not in used:
-            result.append(term)
-
-    return _restore_term_order(raw_terms, result, used)
-
-
-def find_common_factor_groups(
-    rates: list[str],
-) -> list[tuple[list[int], list[str]]]:
-    """Find groups of rates that share common token factors."""
-    tokenized = [tokenize_rate(r) for r in rates]
-    groups: list[tuple[list[int], list[str]]] = []
-    used_in_group: set[int] = set()
-
-    for i in range(len(rates)):
-        if i in used_in_group:
-            continue
-
-        group = _build_candidate_group(i, tokenized, used_in_group)
-
-        if len(group) >= 2:
-            common = _validate_group(group, tokenized)
-            if common:
-                groups.append((group, common))
-                used_in_group.update(group)
-
-    return groups
-
-
-def _build_candidate_group(
-    i: int,
-    tokenized: list[list[str]],
-    used: set[int],
-) -> list[int]:
-    group = [i]
-    tokens_i = tokenized[i]
-
-    for j in range(i + 1, len(tokenized)):
-        if j in used:
-            continue
-        tokens_j = tokenized[j]
-        common = [t for t in tokens_i if t in tokens_j]
-        diff_i = [t for t in tokens_i if t not in common]
-        diff_j = [t for t in tokens_j if t not in common]
-        if len(diff_i) == 1 and len(diff_j) == 1 and common:
-            group.append(j)
-
-    return group
-
-
-def _validate_group(
-    group: list[int],
-    tokenized: list[list[str]],
-) -> list[str] | None:
-    common = [t for t in tokenized[group[0]] if t in tokenized[group[1]]]
-    for idx in group:
-        diff = [t for t in tokenized[idx] if t not in common]
-        if len(diff) != 1:
-            return None
-    return common
-
-
-def _restore_term_order(
-    original: list[tuple[int, str]],
-    result: list[tuple[int, str]],
-    used: set[int],
-) -> list[tuple[int, str]]:
-    """Restore term ordering after simplification."""
-    if not used:
-        return result
-
-    original_set = set(original)
-    simplified = [t for t in result if t not in original_set]
-    non_simplified = [t for t in result if t in original_set]
-
-    ordered: list[tuple[int, str]] = []
-    simplified_iter = iter(simplified)
-    non_simplified_iter = iter(non_simplified)
-    simplified_placed = False
-
-    for i, _term in enumerate(original):
-        if i in used:
-            if not simplified_placed:
-                s = next(simplified_iter, None)
-                if s is not None:
-                    ordered.append(s)
-                simplified_placed = True
-        else:
-            ns = next(non_simplified_iter, None)
-            if ns is not None:
-                ordered.append(ns)
-
-    for s in simplified_iter:
-        ordered.append(s)
-    for ns in non_simplified_iter:
-        ordered.append(ns)
-
-    return ordered
+    for sign in (-1, 1):
+        # The terms that share the same other factors, by those factors.
+        groups: dict[tuple[str, ...], list[tuple[int, str, list[str]]]] = {}
+        for i, (term_sign, rate) in enumerate(raw_terms):
+            if term_sign != sign:
+                continue
+            tokens = tokenize_rate(rate)
+            for k, varying in enumerate(tokens):
+                common = tokens[:k] + tokens[k + 1 :]
+                if common:
+                    groups.setdefault(tuple(sorted(common)), []).append(
+                        (i, varying, common)
+                    )
+        for members in groups.values():
+            # A term already merged, or a repeat of a factor, stays out.
+            free: dict[str, tuple[int, str, list[str]]] = {}
+            for member in members:
+                if member[0] not in used:
+                    free.setdefault(member[1], member)
+            if len(free) >= 2 and are_complementary_factors(list(free)):
+                first, _, common = next(iter(free.values()))
+                merged[first] = (sign, " * ".join(common))
+                used.update(i for i, _, _ in free.values())
+    return [
+        merged.get(i, term)
+        for i, term in enumerate(raw_terms)
+        if i not in used or i in merged
+    ]

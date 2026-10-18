@@ -123,8 +123,8 @@ def _cell(value: Cell) -> str:
 
 
 def _matrix_table(matrix: Matrix) -> Table:
+    """The cells of a matrix; each renderer writes the heading of the block."""
     return Table(
-        heading=matrix.heading,
         columns=["", *matrix.column_labels],
         rows=[
             [label, *values]

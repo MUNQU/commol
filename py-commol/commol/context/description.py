@@ -9,9 +9,9 @@ or Graphviz DOT without knowing the kind.
 """
 
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 type Cell = str | int | float | bool | None
 """The value of one cell of a `Table`."""
@@ -66,6 +66,17 @@ class Table(BaseModel):
     heading: str | None = None
     columns: list[str]
     rows: list[list[Cell]]
+
+    @model_validator(mode="after")
+    def check_row_lengths(self) -> Self:
+        """Each row has one cell per column."""
+        for index, row in enumerate(self.rows):
+            if len(row) != len(self.columns):
+                raise ValueError(
+                    f"Row {index} of the table has {len(row)} cells; the table "
+                    f"has {len(self.columns)} columns: {self.columns}"
+                )
+        return self
 
 
 class Equation(BaseModel):
@@ -239,6 +250,17 @@ class Matrix(BaseModel):
     row_labels: list[str]
     column_labels: list[str]
     values: list[list[float]]
+
+    @model_validator(mode="after")
+    def check_shape(self) -> Self:
+        """One row of values per row label, one value per column label."""
+        shape = [len(row) for row in self.values]
+        if shape != [len(self.column_labels)] * len(self.row_labels):
+            raise ValueError(
+                f"A matrix of {len(self.row_labels)} rows and "
+                f"{len(self.column_labels)} columns has rows of {shape} values"
+            )
+        return self
 
 
 type Block = Annotated[

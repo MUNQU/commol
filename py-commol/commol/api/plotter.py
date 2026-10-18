@@ -179,7 +179,7 @@ class SimulationPlotter:
             tick_every,
             x_label,
         )
-        self._finalize_series_plot(axes, bins_to_plot, output_file, config)
+        self._finalize_plot(axes, bins_to_plot, output_file, config, "Series")
 
         return fig
 
@@ -251,7 +251,7 @@ class SimulationPlotter:
         self._plot_all_cumulative_bins(
             axes, bins_to_plot, cumulative_observed, calibration_result, kwargs
         )
-        self._finalize_cumulative_plot(axes, bins_to_plot, output_file, config)
+        self._finalize_plot(axes, bins_to_plot, output_file, config, "Cumulative")
 
         return fig
 
@@ -479,20 +479,20 @@ class SimulationPlotter:
         self, config: PlotConfig, bins_to_plot: list[str]
     ) -> tuple["Figure", list["Axes"]]:
         """
-        Create figure and axes array for series plotting.
+        A figure of the layout, sized by its subplots, and its axes in order.
         """
-        layout = config.layout or self._calculate_layout(len(bins_to_plot))
-        rows, cols = layout
-        figsize = (cols * 4.5, rows * 3.5 + 1.0)
-        fig, axes = plt.subplots(rows, cols, figsize=figsize, dpi=config.dpi)
+        rows, cols = config.layout or self._calculate_layout(len(bins_to_plot))
+        return self._create_figure(
+            rows, cols, (cols * 4.5, rows * 3.5 + 1.0), config.dpi
+        )
 
-        # Ensure axes is always a flat array
-        if layout[0] == 1 and layout[1] == 1:
-            axes = [axes]
-        else:
-            axes = axes.flatten() if hasattr(axes, "flatten") else [axes]
-
-        return fig, axes
+    @staticmethod
+    def _create_figure(
+        rows: int, cols: int, figsize: tuple[float, float], dpi: int
+    ) -> tuple["Figure", list["Axes"]]:
+        """A figure of `rows` by `cols` subplots, and its axes row by row."""
+        fig, axes = plt.subplots(rows, cols, figsize=figsize, dpi=dpi, squeeze=False)
+        return fig, list(axes.flat)
 
     def _plot_all_series_bins(
         self,
@@ -510,12 +510,7 @@ class SimulationPlotter:
         """
         Plot series data for all bins across subplots.
         """
-        for idx, bin_id in enumerate(bins_to_plot):
-            if idx >= len(axes):
-                break
-
-            ax = axes[idx]
-
+        for ax, bin_id in zip(axes, bins_to_plot, strict=False):
             if isinstance(calibration_result, Predictive):
                 self._plot_bin_series_predictive(
                     ax,
@@ -541,43 +536,33 @@ class SimulationPlotter:
                     x_label,
                 )
 
-    def _finalize_series_plot(
-        self,
+    @staticmethod
+    def _finalize_plot(
         axes: list["Axes"],
         bins_to_plot: list[str],
         output_file: str | None,
         config: PlotConfig,
+        name: str,
     ) -> None:
         """
-        Finalize series plot by hiding unused subplots and saving.
+        Hide the subplots no series fills, and save the figure to
+        `output_file` when there is one.
         """
-        for idx in range(len(bins_to_plot), len(axes)):
-            axes[idx].set_visible(False)
+        for ax in axes[len(bins_to_plot) :]:
+            ax.set_visible(False)
 
         plt.tight_layout()
 
         if output_file:
             plt.savefig(output_file, dpi=config.dpi, bbox_inches="tight")
-            logger.info(f"Series plot saved to {output_file}")
+            logger.info(f"{name} plot saved to {output_file}")
 
     def _create_cumulative_figure(
         self, config: PlotConfig, bins_to_plot: list[str]
     ) -> tuple["Figure", list["Axes"]]:
-        """
-        Create figure and axes array for cumulative plotting.
-        """
-        layout = config.layout or self._calculate_layout(len(bins_to_plot))
-        fig, axes = plt.subplots(
-            layout[0], layout[1], figsize=config.figsize, dpi=config.dpi
-        )
-
-        # Ensure axes is always a flat array
-        if layout[0] == 1 and layout[1] == 1:
-            axes = [axes]
-        else:
-            axes = axes.flatten() if hasattr(axes, "flatten") else [axes]
-
-        return fig, axes
+        """A figure of the layout, of the size of the configuration."""
+        rows, cols = config.layout or self._calculate_layout(len(bins_to_plot))
+        return self._create_figure(rows, cols, config.figsize, config.dpi)
 
     def _plot_all_cumulative_bins(
         self,
@@ -590,12 +575,9 @@ class SimulationPlotter:
         """
         Plot cumulative data for all bins across subplots.
         """
-        for idx, bin_id in enumerate(bins_to_plot):
-            if idx >= len(axes):
-                break
-
-            ax = axes[idx]
-
+        if not isinstance(calibration_result, Predictive):
+            cumulative_results = self._calculate_cumulative(bins_to_plot)
+        for ax, bin_id in zip(axes, bins_to_plot, strict=False):
             if isinstance(calibration_result, Predictive):
                 self._plot_bin_cumulative_predictive(
                     ax,
@@ -605,7 +587,6 @@ class SimulationPlotter:
                     dict(kwargs),
                 )
             else:
-                cumulative_results = self._calculate_cumulative(bins_to_plot)
                 self._plot_bin_cumulative(
                     ax,
                     bin_id,
@@ -613,25 +594,6 @@ class SimulationPlotter:
                     cumulative_observed.get(bin_id, []),
                     dict(kwargs),
                 )
-
-    def _finalize_cumulative_plot(
-        self,
-        axes: list["Axes"],
-        bins_to_plot: list[str],
-        output_file: str | None,
-        config: PlotConfig,
-    ) -> None:
-        """
-        Finalize cumulative plot by hiding unused subplots and saving.
-        """
-        for idx in range(len(bins_to_plot), len(axes)):
-            axes[idx].set_visible(False)
-
-        plt.tight_layout()
-
-        if output_file:
-            plt.savefig(output_file, dpi=config.dpi, bbox_inches="tight")
-            logger.info(f"Cumulative plot saved to {output_file}")
 
     def _plot_bin_series(
         self,
@@ -875,31 +837,7 @@ class SimulationPlotter:
             label=f"{self.confidence_level:.0%} of the draws",
         )
 
-        # Overlay cumulative observed data if available
-        if cumulative_observed:
-            obs_positions = [at for at, _ in cumulative_observed]
-            obs_values = [value for _, value in cumulative_observed]
-            sns.scatterplot(
-                x=obs_positions,
-                y=obs_values,
-                ax=ax,
-                label="Observed (Cumulative)",
-                color="red",
-                s=30,
-                alpha=0.7,
-                zorder=5,
-            )
-
-        model = self.simulation.model_definition
-        label = model.structure.series_label(model, bin_id)
-        unit_str = label.unit or ""
-        bin_name = label.name
-
-        ax.set_xlabel("Step")
-        ax.set_ylabel(f"{unit_str}")
-        ax.set_title(f"{bin_name}")
-        ax.legend()
-        ax.grid(True, alpha=0.3)
+        self._finish_cumulative_axes(ax, bin_id, cumulative_observed)
 
     def _calculate_cumulative(self, bins_to_plot: list[str]) -> dict[str, list[float]]:
         """
@@ -974,13 +912,19 @@ class SimulationPlotter:
         # Plot cumulative simulation results
         sns.lineplot(**params)
 
-        # Overlay cumulative observed data if available
+        self._finish_cumulative_axes(ax, bin_id, cumulative_observed)
+
+    def _finish_cumulative_axes(
+        self,
+        ax: "Axes",
+        bin_id: str,
+        cumulative_observed: list[tuple[int | float, float]],
+    ) -> None:
+        """Overlay the running total of the observations, and label the axes."""
         if cumulative_observed:
-            obs_positions = [at for at, _ in cumulative_observed]
-            obs_values = [value for _, value in cumulative_observed]
             sns.scatterplot(
-                x=obs_positions,
-                y=obs_values,
+                x=[at for at, _ in cumulative_observed],
+                y=[value for _, value in cumulative_observed],
                 ax=ax,
                 label="Observed (Cumulative)",
                 color="red",
@@ -991,11 +935,8 @@ class SimulationPlotter:
 
         model = self.simulation.model_definition
         label = model.structure.series_label(model, bin_id)
-        unit_str = label.unit or ""
-        bin_name = label.name
-
         ax.set_xlabel("Step")
-        ax.set_ylabel(f"{unit_str}")
-        ax.set_title(f"{bin_name}")
+        ax.set_ylabel(label.unit or "")
+        ax.set_title(label.name)
         ax.legend()
         ax.grid(True, alpha=0.3)
