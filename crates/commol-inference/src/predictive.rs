@@ -380,7 +380,7 @@ where
             Ok(replicates
                 .iter()
                 .map(|rows| {
-                    let mut out = vec![0.0; operator.len()];
+                    let mut out = vec![0.0; operator.count()];
                     operator.apply(rows, values, &mut out);
                     out
                 })

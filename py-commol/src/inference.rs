@@ -106,7 +106,7 @@ impl PyCalibrationProblem {
     /// The number of observations
     #[getter]
     fn observation_count(&self) -> usize {
-        self.inner.observation().len()
+        self.inner.observation().count()
     }
 
     /// The number of runs per evaluation: one per replicate, or one
@@ -200,7 +200,7 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         parameter_sets: Vec<Vec<f64>>,
     ) -> PyResult<Vec<Vec<Vec<f64>>>> {
-        let n = self.inner.observation().len();
+        let n = self.inner.observation().count();
         py.detach(|| {
             parameter_sets
                 .par_iter()

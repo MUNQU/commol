@@ -98,6 +98,11 @@ mod tests {
     }
 
     #[test]
+    fn no_starts_are_no_points() {
+        assert!(start_points(&parameters(), 0, 7).is_empty());
+    }
+
+    #[test]
     fn the_first_start_is_the_initial_guess() {
         let points = start_points(&parameters(), 5, 7);
         assert_eq!(points[0], vec![0.3, 0.0]);

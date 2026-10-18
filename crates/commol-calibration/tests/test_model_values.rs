@@ -6,9 +6,11 @@ use std::collections::HashMap;
 
 use argmin::core::CostFunction;
 use commol_calibration::{
-    check_model_values, configured_engine, CalibrationConstraint, CalibrationParameter,
-    CalibrationParameterType, CalibrationProblem, LossConfig, ObservedDataPoint,
-    OptimizationObjective,
+    check_model_values, configured_engine, optimize_from, optimize_with_observer,
+    CalibrationConstraint, CalibrationParameter, CalibrationParameterType, CalibrationProblem,
+    EvaluationError, LossConfig, MutationApplication, MutationStrategy, NelderMeadConfig,
+    NoObserver, ObservedDataPoint, OptimizationConfig, OptimizationObjective, ParticleSwarmConfig,
+    Violation, Workspace,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 
@@ -82,6 +84,9 @@ impl SimulationEngine for StartEngine {
     fn reset(&mut self) {}
 
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
+        if value.is_nan() {
+            return Err(format!("{parameter_id} is not a number"));
+        }
         self.parameters.insert(parameter_id.to_string(), value);
         Ok(())
     }
@@ -97,6 +102,9 @@ impl SimulationEngine for StartEngine {
     ) -> Result<StartPlan, String> {
         if let Some(value) = values.iter().find(|value| value.id != "start") {
             return Err(format!("this kind has no value '{}'", value.id));
+        }
+        if remainder == Some("nowhere") {
+            return Err("this kind has no remainder 'nowhere'".to_string());
         }
         Ok(StartPlan {
             ids: values.iter().map(|value| value.id.clone()).collect(),
@@ -242,4 +250,180 @@ fn a_constraint_reads_the_sums_and_the_state_total_the_engine_names() {
     .err()
     .unwrap();
     assert!(error.contains("unknown variable 'zz'"), "{error}");
+}
+
+#[test]
+fn every_entry_takes_one_value_per_parameter() {
+    let problem = problem(vec![]).unwrap();
+    let expected = "Expected 3 parameters, got 2";
+    let config = OptimizationConfig::NelderMead(NelderMeadConfig::default());
+
+    let errors = [
+        configured_engine(&StartEngine::new(), &start_and_k(), None, &[0.3, 0.8])
+            .err()
+            .unwrap(),
+        problem.configured_engine(&[0.3, 0.8]).err().unwrap(),
+        problem
+            .forward()
+            .configure(&[0.3, 0.8])
+            .err()
+            .unwrap()
+            .to_string(),
+        OptimizationObjective::new(&problem)
+            .score(&[0.3, 0.8, 1.0, 1.0])
+            .err()
+            .unwrap()
+            .to_string(),
+        optimize_from(&problem, &config, &[0.3, 0.8], None).unwrap_err(),
+    ];
+
+    assert_eq!(errors[0], expected);
+    assert_eq!(errors[1], expected);
+    assert!(errors[2].ends_with(expected), "{}", errors[2]);
+    assert_eq!(errors[3], "Expected 3 parameters, got 4");
+    assert_eq!(errors[4], "Expected 3 start values, got 2");
+}
+
+#[test]
+fn a_problem_has_observations_and_parameters_of_the_model() {
+    let new = |observed: Vec<ObservedDataPoint>, parameters: Vec<CalibrationParameter>| {
+        CalibrationProblem::new(
+            StartEngine::new(),
+            observed,
+            parameters,
+            vec![],
+            LossConfig::SumSquaredError,
+        )
+        .err()
+        .unwrap()
+    };
+    let at_one = || vec![ObservedDataPoint::new(1.0, "x".to_string(), 0.5)];
+    let mut no_outputs = at_one();
+    no_outputs[0].outputs.clear();
+
+    assert_eq!(new(vec![], start_and_k()), "No observed data provided");
+    assert_eq!(new(at_one(), vec![]), "No calibration parameters provided");
+    assert_eq!(
+        new(no_outputs, start_and_k()),
+        "Observation 'x' at 1 has an empty list of outputs"
+    );
+    assert_eq!(
+        new(
+            vec![ObservedDataPoint::new(1.0, "z".to_string(), 0.5)],
+            start_and_k()
+        ),
+        "Invalid observed output name 'z' for observation 'z' (available: x, y)"
+    );
+    assert_eq!(
+        new(
+            vec![ObservedDataPoint::with_factor(
+                1.0,
+                "x".to_string(),
+                0.5,
+                "g".to_string()
+            )],
+            start_and_k()
+        ),
+        "Invalid factor_id 'g' referenced in observed data (not found in parameters)"
+    );
+}
+
+#[test]
+fn a_constraint_compiles_and_reads_outputs_only_at_positions() {
+    let error = |expression: &str| {
+        problem(vec![CalibrationConstraint::new(
+            "c".to_string(),
+            expression.to_string(),
+        )])
+        .err()
+        .unwrap()
+    };
+
+    assert!(
+        error("k +").starts_with("Constraint 'c' has invalid expression: "),
+        "{}",
+        error("k +")
+    );
+    assert!(
+        error("typeof(k)").contains("does not compile"),
+        "{}",
+        error("typeof(k)")
+    );
+    assert_eq!(
+        error("1 - x"),
+        "Constraint 'c' references output 'x' but has no positions (`at`)"
+    );
+}
+
+#[test]
+fn an_engine_that_rejects_a_value_or_a_remainder_names_it() {
+    let problem = problem(vec![]).unwrap();
+
+    assert_eq!(
+        problem
+            .configured_engine(&[f64::NAN, 0.5, 1.0])
+            .err()
+            .unwrap(),
+        "Failed to set parameter 'k': k is not a number"
+    );
+    assert_eq!(
+        problem
+            .with_initial_condition_remainder("nowhere")
+            .err()
+            .unwrap(),
+        "this kind has no remainder 'nowhere'"
+    );
+}
+
+#[test]
+fn a_loss_or_a_run_that_is_not_finite_is_infeasible() {
+    let mut workspace = Workspace::default();
+    let infinite = CalibrationProblem::new(
+        StartEngine::new(),
+        vec![ObservedDataPoint::new(1.0, "x".to_string(), f64::INFINITY)],
+        start_and_k(),
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .unwrap();
+
+    assert!(matches!(
+        infinite.evaluate(&[1.0, 0.5, 1.0], &mut workspace),
+        Err(EvaluationError::Violation(Violation::NonFinite))
+    ));
+    let finite = problem(vec![]).unwrap();
+    assert!(matches!(
+        finite.evaluate(&[f64::INFINITY, 0.5, 1.0], &mut workspace),
+        Err(EvaluationError::Violation(Violation::NonFinite))
+    ));
+}
+
+#[test]
+fn a_swarm_with_mutation_a_target_and_an_observer_runs() {
+    let problem = problem(vec![]).unwrap();
+    for (strategy, application) in [
+        (
+            MutationStrategy::Cauchy(0.1),
+            MutationApplication::BelowAverage,
+        ),
+        (
+            MutationStrategy::Gaussian(0.1),
+            MutationApplication::AllParticles,
+        ),
+    ] {
+        let config = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
+            num_particles: 5,
+            max_iterations: 20,
+            target_cost: Some(1e-8),
+            mutation_strategy: strategy,
+            mutation_probability: 0.5,
+            mutation_application: application,
+            seed: Some(3),
+            ..ParticleSwarmConfig::default()
+        });
+
+        let result = optimize_with_observer(&problem, &config, NoObserver).unwrap();
+
+        assert!(result.final_loss < 1e-3, "{}", result.final_loss);
+    }
 }

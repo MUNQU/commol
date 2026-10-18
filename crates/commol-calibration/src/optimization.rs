@@ -280,12 +280,6 @@ pub enum OptimizationConfig {
     ParticleSwarm(ParticleSwarmConfig),
 }
 
-impl Default for OptimizationConfig {
-    fn default() -> Self {
-        OptimizationConfig::NelderMead(NelderMeadConfig::default())
-    }
-}
-
 /// Minimize the objective of `problem` from its initial guess.
 ///
 /// # Errors
@@ -689,29 +683,21 @@ where
             .map_err(|e| format!("Failed to set velocity_mutation: {}", e))?;
     }
 
-    // Apply mutation if enabled
-    if !matches!(config.mutation_strategy, MutationStrategy::None)
-        && !matches!(config.mutation_application, MutationApplication::None)
-    {
-        let argmin_mutation_strategy = match config.mutation_strategy {
-            MutationStrategy::None => ArgminMutationStrategy::None,
-            MutationStrategy::Gaussian(std_dev) => ArgminMutationStrategy::Gaussian(std_dev),
-            MutationStrategy::Cauchy(scale) => ArgminMutationStrategy::Cauchy(scale),
-        };
-
-        let argmin_mutation_application = match config.mutation_application {
-            MutationApplication::None => ArgminMutationApplication::None,
-            MutationApplication::GlobalBestOnly => ArgminMutationApplication::GlobalBestOnly,
-            MutationApplication::AllParticles => ArgminMutationApplication::AllParticles,
-            MutationApplication::BelowAverage => ArgminMutationApplication::BelowAverage,
-        };
-
+    // Apply mutation if a strategy and the particles it acts on are set
+    let mutation_strategy = match config.mutation_strategy {
+        MutationStrategy::None => None,
+        MutationStrategy::Gaussian(std_dev) => Some(ArgminMutationStrategy::Gaussian(std_dev)),
+        MutationStrategy::Cauchy(scale) => Some(ArgminMutationStrategy::Cauchy(scale)),
+    };
+    let mutation_application = match config.mutation_application {
+        MutationApplication::None => None,
+        MutationApplication::GlobalBestOnly => Some(ArgminMutationApplication::GlobalBestOnly),
+        MutationApplication::AllParticles => Some(ArgminMutationApplication::AllParticles),
+        MutationApplication::BelowAverage => Some(ArgminMutationApplication::BelowAverage),
+    };
+    if let (Some(strategy), Some(application)) = (mutation_strategy, mutation_application) {
         solver = solver
-            .with_mutation(
-                argmin_mutation_strategy,
-                config.mutation_probability,
-                argmin_mutation_application,
-            )
+            .with_mutation(strategy, config.mutation_probability, application)
             .map_err(|e| format!("Failed to set mutation: {}", e))?;
     }
 
@@ -732,10 +718,10 @@ where
         .map_err(|e| format!("Optimization failed: {}", e))?;
 
     let state = &result.state;
-    let (best, best_cost) = match &state.best_individual {
-        Some(particle) => (particle.position.clone(), particle.cost),
-        None => (start.to_vec(), f64::INFINITY),
-    };
+    let (best, best_cost) = state.best_individual.as_ref().map_or_else(
+        || (start.to_vec(), f64::INFINITY),
+        |particle| (particle.position.clone(), particle.cost),
+    );
     let calibration = CalibrationResult {
         // The values the objective scored, clamped to their bounds.
         best_parameters: problem.applied_parameter_values(&best),

@@ -424,16 +424,6 @@ impl Replicates {
     }
 }
 
-impl std::fmt::Display for LossConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LossConfig::SumSquaredError => write!(f, "Sum Squared Error"),
-            LossConfig::RootMeanSquaredError => write!(f, "Root Mean Squared Error"),
-            LossConfig::MeanAbsoluteError => write!(f, "Mean Absolute Error"),
-        }
-    }
-}
-
 /// A constraint on calibration parameters and/or compartment values defined as a mathematical expression
 ///
 /// Constraints are mathematical expressions that must evaluate to >= 0 for the
