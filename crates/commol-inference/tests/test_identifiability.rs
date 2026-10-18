@@ -5,7 +5,7 @@ use commol_core::Model;
 use commol_difference::DifferenceEquations;
 use commol_inference::ParameterSample;
 use commol_inference::identifiability::{
-    IdentifiabilityError, StructuralVerdict, collinearity, collinearity_index,
+    IdentifiabilityError, Reference, StructuralVerdict, collinearity, collinearity_index,
     sample_identifiability, structural_rank,
 };
 use commol_inference::sensitivity::{
@@ -163,7 +163,7 @@ fn contraction_of_a_spread_and_a_tight_sample() {
     let n = 1000;
     let spread: Vec<f64> = (0..n).map(|i| (i as f64 + 0.5) / n as f64).collect();
     let tight: Vec<f64> = normals(n, 1).iter().map(|z| 0.5 + 0.001 * z).collect();
-    let result = sample_identifiability(&sample(&[spread, tight]), 0.9).unwrap();
+    let result = sample_identifiability(&sample(&[spread, tight]), Reference::Bounds, 0.9).unwrap();
 
     assert!(
         result.contraction[0].abs() < 0.01,
@@ -178,7 +178,7 @@ fn a_ridge_gives_a_correlated_pair() {
     let a: Vec<f64> = normals(500, 2).iter().map(|z| 0.5 + 0.1 * z).collect();
     let b: Vec<f64> = a.iter().map(|x| 1.0 - x).collect();
     let c: Vec<f64> = normals(500, 3).iter().map(|z| 0.5 + 0.1 * z).collect();
-    let result = sample_identifiability(&sample(&[a, b, c]), 0.9).unwrap();
+    let result = sample_identifiability(&sample(&[a, b, c]), Reference::Bounds, 0.9).unwrap();
 
     assert!((result.correlation[0][1] + 1.0).abs() < 1e-9);
     assert_eq!(result.correlated_pairs.len(), 1);
@@ -193,7 +193,7 @@ fn a_correlation_equal_to_the_threshold_is_not_above_it() {
     // Centered columns with Σxy = 1 and Σx² = Σy² = 2: r = 1/2.
     let x = vec![0.75, 0.25, 0.5, 0.5];
     let y = vec![0.75, 0.5, 0.25, 0.5];
-    let result = sample_identifiability(&sample(&[x, y]), 0.5).unwrap();
+    let result = sample_identifiability(&sample(&[x, y]), Reference::Bounds, 0.5).unwrap();
 
     assert_eq!(result.correlation[0][1], 0.5);
     assert!(result.correlated_pairs.is_empty());
@@ -208,7 +208,8 @@ fn a_bimodal_marginal_is_flagged() {
         .map(|(i, z)| if i % 2 == 0 { 0.2 } else { 0.8 } + 0.03 * z)
         .collect();
     let unimodal: Vec<f64> = normals(400, 5).iter().map(|z| 0.5 + 0.1 * z).collect();
-    let result = sample_identifiability(&sample(&[bimodal, unimodal]), 0.9).unwrap();
+    let result =
+        sample_identifiability(&sample(&[bimodal, unimodal]), Reference::Bounds, 0.9).unwrap();
 
     assert_eq!(result.multimodal, [true, false]);
 }
@@ -382,9 +383,9 @@ fn a_correlation_threshold_is_strictly_between_zero_and_one() {
     let spread = |seed| normals(50, seed).iter().map(|z| 0.5 + 0.1 * z).collect();
     let draws = sample(&[spread(6), spread(7)]);
 
-    assert!(sample_identifiability(&draws, 0.5).is_ok());
+    assert!(sample_identifiability(&draws, Reference::Bounds, 0.5).is_ok());
     for threshold in [0.0, 1.0] {
-        let error = sample_identifiability(&draws, threshold).unwrap_err();
+        let error = sample_identifiability(&draws, Reference::Bounds, threshold).unwrap_err();
         assert!(matches!(error, IdentifiabilityError::Invalid(_)), "{error}");
     }
 }

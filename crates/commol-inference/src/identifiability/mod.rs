@@ -16,7 +16,7 @@ pub mod starts;
 pub mod structural;
 
 pub use collinearity::{Collinearity, Subset, collinearity, collinearity_index};
-pub use sample::{SampleIdentifiability, sample_identifiability};
+pub use sample::{Reference, SampleIdentifiability, sample_identifiability};
 pub use starts::{StartsIdentifiability, starts_identifiability};
 pub use structural::{
     Combination, PointRank, StructuralAnalysis, StructuralVerdict, structural_rank,

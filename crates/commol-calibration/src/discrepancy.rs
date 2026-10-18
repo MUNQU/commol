@@ -69,22 +69,44 @@ impl Discrepancy {
         &self.normalization
     }
 
+    /// The loss.
+    pub fn loss(&self) -> LossConfig {
+        self.loss
+    }
+
+    /// The observed values, one per observation.
+    pub fn observed(&self) -> &[f64] {
+        &self.observed
+    }
+
+    /// The weight of each observation.
+    pub fn weights(&self) -> &[f64] {
+        &self.weights
+    }
+
+    /// The loss of the predictions of one run, one value per observation,
+    /// with the weights and the normalization, whatever the summary of the
+    /// replicates.
+    pub fn of_run(&self, predictions: &[f64]) -> f64 {
+        self.loss.aggregate(
+            self.observed
+                .iter()
+                .zip(predictions)
+                .zip(&self.weights)
+                .zip(&self.normalization)
+                .map(|(((observed, predicted), &weight), normalization)| {
+                    ((observed - predicted) * normalization, weight)
+                }),
+        )
+    }
+
     /// The discrepancy of `predictions`, which hold one value per
     /// observation and replicate, replicate after replicate. The predictions
     /// are reordered.
     pub fn of(&self, predictions: &mut [f64]) -> f64 {
         let n = self.observed.len();
         match self.summary {
-            None => self.loss.aggregate(
-                self.observed
-                    .iter()
-                    .zip(predictions.iter())
-                    .zip(&self.weights)
-                    .zip(&self.normalization)
-                    .map(|(((observed, predicted), &weight), normalization)| {
-                        ((observed - predicted) * normalization, weight)
-                    }),
-            ),
+            None => self.of_run(predictions),
             Some(summary) => {
                 let replicates = predictions.len() / n.max(1);
                 let mut per_observation: Vec<Vec<f64>> = (0..n)

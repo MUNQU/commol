@@ -853,5 +853,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(by_series, m)?)?;
     m.add_function(wrap_pyfunction!(weighted_mean, m)?)?;
     crate::identifiability::register(m)?;
+    crate::smc::register(m)?;
     Ok(())
 }

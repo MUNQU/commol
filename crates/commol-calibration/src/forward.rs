@@ -201,6 +201,38 @@ impl<E: SimulationEngine> ForwardModel<E> {
         self.run_into(&mut engine, &self.schedule, &mut workspace.rows)
     }
 
+    /// Run once at the schedule into `workspace.rows`, whatever the
+    /// replicates: with `seed`, as one replicate of a stochastic engine
+    /// seeded with it; without, as the engine is.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::run_schedule`].
+    pub fn run_once(
+        &self,
+        values: &[f64],
+        seed: Option<u64>,
+        workspace: &mut Workspace,
+    ) -> Result<(), EvaluationError> {
+        let mut engine = self.configure(values)?;
+        if let Some(seed) = seed {
+            engine.set_seed(seed);
+            engine.reset();
+        }
+        workspace.rows.resize_with(1, Vec::new);
+        engine
+            .run_at_positions_into_buffer(&self.schedule, &mut workspace.rows[0])
+            .map_err(simulation_error)?;
+        if workspace.rows[0]
+            .iter()
+            .all(|row| row.iter().all(|v| v.is_finite()))
+        {
+            Ok(())
+        } else {
+            Err(Violation::NonFinite.into())
+        }
+    }
+
     /// Write the predicted observations of the rows in `workspace` into
     /// `workspace.predictions`, replicate after replicate.
     pub fn observe(&self, values: &[f64], workspace: &mut Workspace) {
