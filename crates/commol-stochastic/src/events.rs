@@ -1,8 +1,6 @@
 //! The continuous-time stochastic engine: events one at a time (Gillespie's
 //! direct method), or many in a leap (tau-leaping).
 
-use std::collections::HashMap;
-
 use commol_core::{
     EngineSettings, EngineType, EventMethod, ModelValue, SimulationError, StochasticEventsSettings,
 };
@@ -139,11 +137,6 @@ impl StochasticEvents {
         &self.units.model
     }
 
-    /// The settings of the engine.
-    pub fn settings(&self) -> &StochasticEventsSettings {
-        &self.settings
-    }
-
     /// Current amount of each compartment, without the accumulators.
     pub fn state(&self) -> Vec<f64> {
         self.units.state[..self.units.model.num_compartments()].to_vec()
@@ -188,9 +181,7 @@ impl StochasticEvents {
                 next += 1;
             }
             if stop > end {
-                for row in &mut buffer[next..] {
-                    self.units.copy_row(row);
-                }
+                // The loop above copied every position up to `end`.
                 self.position = end;
                 return Ok(());
             }
@@ -509,12 +500,14 @@ impl StochasticEvents {
         let point = self.units.generator.uniform() * total;
         let mut sum = 0.0;
         let mut last = 0;
+        // The last flow of positive propensity takes a point that the
+        // rounding of `uniform() * total` puts at the total.
         for (flow, &propensity) in self.propensities.iter().enumerate() {
             if propensity > 0.0 {
                 sum += propensity;
                 last = flow;
                 if point < sum {
-                    return Ok(flow);
+                    break;
                 }
             }
         }
@@ -684,10 +677,6 @@ impl commol_core::SimulationEngine for StochasticEvents {
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
         self.units.model.set_parameter(parameter_id, value);
         Ok(())
-    }
-
-    fn get_parameters(&self) -> &HashMap<String, f64> {
-        self.units.model.parameters()
     }
 
     fn current_position(&self) -> f64 {

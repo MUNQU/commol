@@ -166,10 +166,6 @@ impl SimulationEngine for TestEngine {
         Ok(())
     }
 
-    fn get_parameters(&self) -> &HashMap<String, f64> {
-        &self.parameters
-    }
-
     fn current_position(&self) -> f64 {
         self.position
     }
@@ -351,10 +347,6 @@ impl SimulationEngine for TestStochasticEngine {
         self.parameters.insert(parameter_id.to_string(), value);
         self.next_event = None;
         Ok(())
-    }
-
-    fn get_parameters(&self) -> &HashMap<String, f64> {
-        &self.parameters
     }
 
     fn current_position(&self) -> f64 {

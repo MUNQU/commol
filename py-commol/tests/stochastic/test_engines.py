@@ -164,3 +164,29 @@ class TestReplicates:
         assert repr(self._replicates()) == (
             "SimulationReplicates(3 replicates, seed=7, positions=[1.0, 5.0, 10.0])"
         )
+
+
+@pytest.mark.parametrize("engine", STOCHASTIC_ENGINES)
+class TestTheEngine:
+    def test_a_step_continues_the_run_where_it_stopped(
+        self, engine: EngineName
+    ) -> None:
+        simulation = Simulation(build_stochastic(a_to_b_builder(), engine))
+        two_steps = simulation.run(2, seed=8)
+        simulation.run(1, seed=8)
+
+        simulation.engine.step()
+
+        assert simulation.engine.state == [two_steps["A"][2], two_steps["B"][2]]
+
+    def test_a_rate_that_is_not_a_number_stops_the_run(
+        self, engine: EngineName
+    ) -> None:
+        simulation = Simulation(
+            build_stochastic(a_to_b_builder(rate="k * sqrt(-1)"), engine)
+        )
+
+        with pytest.raises(
+            RuntimeError, match="The rate of flow 't_ab' at .* is not a"
+        ):
+            simulation.run(2, seed=1)

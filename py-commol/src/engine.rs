@@ -4,8 +4,6 @@
 //! every engine. [`PyEngine`] builds it from a model, and [`PyEngineType`]
 //! lets Python ask the list instead of branching on engine names.
 
-use std::collections::HashMap;
-
 use commol_core::{
     EngineType, ModelKind, ModelValue, SimulationEngine, SimulationError, ValuePlan,
 };
@@ -109,17 +107,7 @@ impl Engine {
                 TestStochasticEngine::try_from_model(model).map(Self::TestStochastic)
             }
             #[allow(unreachable_patterns)]
-            (engine, kind) => Err(format!(
-                "The {} engine has no implementation for {} models; the engines of {} \
-                 models are {:?}",
-                engine.name(),
-                kind.name(),
-                kind.name(),
-                EngineType::engines_of(kind)
-                    .into_iter()
-                    .map(EngineType::name)
-                    .collect::<Vec<_>>()
-            )),
+            _ => unreachable!("check_kind accepts only the pairs above"),
         }
     }
 
@@ -239,10 +227,6 @@ impl SimulationEngine for Engine {
         dispatch!(self, engine => engine.set_parameter(parameter_id, value))
     }
 
-    fn get_parameters(&self) -> &HashMap<String, f64> {
-        dispatch!(self, engine => engine.get_parameters())
-    }
-
     fn current_position(&self) -> f64 {
         dispatch!(self, engine => engine.current_position())
     }
@@ -306,6 +290,16 @@ impl SimulationEngine for Engine {
 }
 
 /// The engine a model names, ready to simulate it.
+/// The positions of the replicates: a number of steps on the default grid of
+/// the engine, or the positions themselves.
+#[derive(FromPyObject)]
+pub enum ReplicateGrid {
+    /// The default grid of this many steps.
+    Steps(u32),
+    /// Sorted, unique positions.
+    Positions(Vec<f64>),
+}
+
 #[pyclass(name = "Engine")]
 pub struct PyEngine {
     inner: Engine,
@@ -363,47 +357,31 @@ impl PyEngine {
     /// Args:
     ///     seed: The seed of the replicates, from 0 to 2**64 - 1
     ///     count: How many replicates to run
-    ///     num_steps: Run on the default grid of this many steps, or
-    ///     positions: report at these sorted, unique positions instead
+    ///     grid: A number of steps, to run on the default grid of that many
+    ///         steps, or the sorted, unique positions to report at
     ///
     /// Returns:
     ///     The positions, the seed of each replicate, and one list of output
     ///     rows per replicate
     ///
     /// Raises:
-    ///     ValueError: If the engine is not stochastic, both or neither of
-    ///         num_steps and positions are given, or a position is not valid
-    ///         for the engine
+    ///     ValueError: If a position is not valid for the engine
     ///     InfeasibleStateError: If a replicate leaves the values the model
     ///         allows
     ///     RuntimeError: If a replicate fails for another reason
-    #[pyo3(signature = (seed, count, num_steps=None, positions=None))]
     #[allow(clippy::type_complexity)]
     fn run_replicates(
         &self,
         py: Python<'_>,
         seed: u64,
         count: u64,
-        num_steps: Option<u32>,
-        positions: Option<Vec<f64>>,
+        grid: ReplicateGrid,
     ) -> PyResult<(Vec<f64>, Vec<u64>, Vec<Vec<Vec<f64>>>)> {
-        let engine_type = self.inner.engine_type();
-        if !engine_type.is_stochastic() {
-            return Err(PyValueError::new_err(format!(
-                "The {} engine is deterministic: every replicate would be equal",
-                engine_type.name()
-            )));
-        }
         let mut start = self.inner.clone();
         start.reset();
-        let positions = match (num_steps, positions) {
-            (Some(num_steps), None) => start.grid(num_steps),
-            (None, Some(positions)) => positions,
-            _ => {
-                return Err(PyValueError::new_err(
-                    "Give num_steps or positions, not both",
-                ));
-            }
+        let positions = match grid {
+            ReplicateGrid::Steps(num_steps) => start.grid(num_steps),
+            ReplicateGrid::Positions(positions) => positions,
         };
         commol_core::check_positions(&positions, 0.0, |position| start.check_position(position))
             .map_err(PyValueError::new_err)?;
@@ -439,19 +417,6 @@ impl PyEngine {
         })
         .map_err(PyValueError::new_err)?;
         engine.run_at(&positions).map_err(simulation_error)
-    }
-
-    /// Check that the engine can report at a position on the axis
-    ///
-    /// Args:
-    ///     position: A position on the axis
-    ///
-    /// Raises:
-    ///     ValueError: If the engine does not report there
-    fn check_position(&self, position: f64) -> PyResult<()> {
-        self.inner
-            .check_position(position)
-            .map_err(PyValueError::new_err)
     }
 
     /// Advance one step
@@ -507,49 +472,9 @@ impl PyEngine {
         self.inner.set_seed(seed);
     }
 
-    /// Set a parameter value
-    ///
-    /// Args:
-    ///     parameter_id: The parameter identifier
-    ///     value: The new parameter value
-    fn set_parameter(&mut self, parameter_id: &str, value: f64) -> PyResult<()> {
-        self.inner
-            .set_parameter(parameter_id, value)
-            .map_err(PyValueError::new_err)
-    }
-
-    /// All current parameter values, by name
-    fn get_parameters(&self) -> HashMap<String, f64> {
-        self.inner.get_parameters().clone()
-    }
-
     /// Current position on the axis
     fn current_position(&self) -> f64 {
         self.inner.current_position()
-    }
-
-    /// Set the initial condition for a specific compartment
-    ///
-    /// Args:
-    ///     compartment_index: The index of the compartment (0-based)
-    ///     value: The new initial amount
-    ///
-    /// Raises:
-    ///     ValueError: If the model is not aggregate, compartment_index is
-    ///         invalid or value is negative
-    fn set_initial_condition(&mut self, compartment_index: usize, value: f64) -> PyResult<()> {
-        compartmental!(&mut self.inner, engine => engine.set_initial_condition(compartment_index, value))
-            .and_then(|result| result)
-            .map_err(PyValueError::new_err)
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "Engine(type={}, outputs={}, position={})",
-            self.inner.engine_type().name(),
-            self.inner.output_names().len(),
-            self.inner.current_position()
-        )
     }
 }
 
@@ -586,12 +511,6 @@ impl PyEngineType {
     #[staticmethod]
     fn names() -> Vec<&'static str> {
         EngineType::ALL.iter().map(|engine| engine.name()).collect()
-    }
-
-    /// Name of the engine
-    #[getter]
-    fn name(&self) -> &'static str {
-        self.inner.name()
     }
 
     /// The kinds of model the engine runs, for example ["aggregate"]
@@ -705,10 +624,6 @@ impl PyEngineType {
         let kind = ModelKind::from_name(kind).map_err(PyValueError::new_err)?;
         self.inner.check_kind(kind).map_err(PyValueError::new_err)
     }
-
-    fn __repr__(&self) -> String {
-        format!("EngineType('{}')", self.inner.name())
-    }
 }
 
 /// One kind of model the engines of the list run
@@ -747,12 +662,6 @@ impl PyModelKind {
             .collect()
     }
 
-    /// Name of the kind
-    #[getter]
-    fn name(&self) -> &'static str {
-        self.inner.name()
-    }
-
     /// Types of value of the kind that calibration may set besides
     /// parameters and factors, for example ["initial_condition"]
     fn value_types(&self) -> Vec<&'static str> {
@@ -761,10 +670,6 @@ impl PyModelKind {
             .iter()
             .map(|value_type| value_type.name())
             .collect()
-    }
-
-    fn __repr__(&self) -> String {
-        format!("ModelKind('{}')", self.inner.name())
     }
 }
 

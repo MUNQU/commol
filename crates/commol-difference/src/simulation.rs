@@ -4,7 +4,6 @@ use commol_core::{ModelValue, SimulationError};
 use commol_model::{
     CompartmentalEngine, CompiledModel, InitialConditionPlan, OutputLabels, output_sums,
 };
-use std::collections::HashMap;
 
 /// How far below zero, relative to the total at the start of a step, an
 /// amount may fall: the rounding of flows that empty a compartment exactly.
@@ -331,10 +330,6 @@ impl commol_core::SimulationEngine for DifferenceEquations {
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
         self.model.set_parameter(parameter_id, value);
         Ok(())
-    }
-
-    fn get_parameters(&self) -> &HashMap<String, f64> {
-        self.model.parameters()
     }
 
     fn current_position(&self) -> f64 {
@@ -665,26 +660,6 @@ mod tests {
             }),
             engine: ModelEngine::new(EngineType::DifferenceEquations),
         }
-    }
-
-    #[test]
-    fn get_parameters_exposes_the_total_after_step_without_compartment_context() {
-        let model = make_three_bin_model();
-        let mut engine = DifferenceEquations::from_model(&model);
-
-        engine.step().unwrap();
-
-        let params = engine.get_parameters();
-        let total = params
-            .get("total")
-            .copied()
-            .expect("total must be visible in get_parameters() after a step");
-        // The model keeps its total at 1000 across the first step.
-        assert!(
-            (total - 1000.0).abs() < 1e-6,
-            "expected total=1000, got {}",
-            total
-        );
     }
 
     #[test]

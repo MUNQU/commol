@@ -74,10 +74,6 @@ impl SimulationEngine for ClosedForm {
         Ok(())
     }
 
-    fn get_parameters(&self) -> &HashMap<String, f64> {
-        &self.parameters
-    }
-
     fn current_position(&self) -> f64 {
         0.0
     }

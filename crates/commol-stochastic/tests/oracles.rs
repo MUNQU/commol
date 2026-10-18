@@ -426,6 +426,11 @@ fn a_negative_rate_or_probabilities_above_one_fail_at_their_step() {
             2.0,
             vec!["'ab' 0.6", "'ac' 0.6", "1.2", "'A'"],
         ),
+        (
+            vec![transition("in", &[], &["B"], "if(step >= 1, -5, 5)")],
+            1.0,
+            vec!["'in'", "into compartment 'B'", "negative"],
+        ),
     ];
     for (transitions, at, names) in cases {
         let model = model(
@@ -445,6 +450,61 @@ fn a_negative_rate_or_probabilities_above_one_fail_at_their_step() {
             assert!(message.contains(name), "{name} in {message}");
         }
     }
+}
+
+#[test]
+fn a_rate_that_is_not_a_number_stops_either_engine() {
+    let model_of = |engine: &str| {
+        model(
+            engine,
+            "null",
+            &[("A", 100.0), ("B", 0.0)],
+            &[],
+            &[transition(
+                "ab",
+                &["A"],
+                &["B"],
+                "if(t >= 1, sqrt(-1), 0.1)",
+            )],
+        )
+    };
+
+    let steps_error = steps(&model_of("StochasticSteps"))
+        .run_at(&[3.0])
+        .unwrap_err();
+    let events_error = events(&model_of("StochasticEvents"))
+        .run_at(&[3.0])
+        .unwrap_err();
+
+    assert_eq!(
+        steps_error,
+        SimulationError::Failed("The rate of flow 'ab' at step 1 is not a number".to_string())
+    );
+    assert!(
+        matches!(&events_error, SimulationError::Failed(message)
+            if message.starts_with("The rate of flow 'ab' at ")
+                && message.ends_with(" is not a number")),
+        "{events_error:?}"
+    );
+}
+
+#[test]
+fn a_negative_propensity_stops_the_events() {
+    let model = model(
+        "StochasticEvents",
+        "null",
+        &[("A", 100.0), ("B", 0.0)],
+        &[],
+        &[transition("ab", &["A"], &["B"], "-0.1")],
+    );
+
+    let error = events(&model).run_at(&[1.0]).unwrap_err();
+
+    assert!(
+        matches!(&error, SimulationError::Infeasible { position, message }
+            if *position == 0.0 && message.starts_with("Flow 'ab' has the propensity -10 at 0")),
+        "{error:?}"
+    );
 }
 
 // ----------------------------------------------------------------------
@@ -585,4 +645,198 @@ fn calibrated_initial_conditions_go_through_the_rounding() {
     for part in ["StochasticSteps", "largest_remainder", "random"] {
         assert!(error.contains(part), "{part} in {error}");
     }
+}
+
+// ----------------------------------------------------------------------
+// Mechanics
+// ----------------------------------------------------------------------
+
+#[test]
+fn an_engine_runs_only_a_model_of_its_own_type() {
+    let model_of = |engine: &str| death(engine, "null", 10.0, "k");
+
+    let events_error = StochasticEvents::try_from_model(&model_of("StochasticSteps"))
+        .err()
+        .unwrap();
+    let steps_error = StochasticSteps::try_from_model(&model_of("StochasticEvents"))
+        .err()
+        .unwrap();
+
+    assert_eq!(
+        events_error,
+        "The StochasticEvents engine cannot run a StochasticSteps model"
+    );
+    assert_eq!(
+        steps_error,
+        "The StochasticSteps engine cannot run a StochasticEvents model"
+    );
+}
+
+#[test]
+fn a_chain_binomial_moves_only_at_integer_steps() {
+    let impulse = model(
+        "StochasticSteps",
+        "null",
+        &[("A", 10.0), ("B", 0.0)],
+        &[("k", 0.5)],
+        &[transition_with(
+            "ab",
+            &["A"],
+            &["B"],
+            "k",
+            r#","impulse_at":[0.5]"#,
+        )],
+    );
+    let mut series = death("StochasticSteps", "null", 10.0, "s");
+    series.parameters.push(
+        serde_json::from_str(r#"{"id":"s","value":{"data":[[1.5,0.1]],"mode":"step_function"}}"#)
+            .expect("valid parameter"),
+    );
+
+    let impulse_error = StochasticSteps::try_from_model(&impulse).err().unwrap();
+    let series_error = StochasticSteps::try_from_model(&series).err().unwrap();
+
+    assert!(
+        impulse_error.starts_with("Impulse transition 'ab' acts at 0.5, which is not an integer"),
+        "{impulse_error}"
+    );
+    assert!(
+        series_error
+            .starts_with("Series parameter 's' has a point at 1.5, which is not an integer"),
+        "{series_error}"
+    );
+}
+
+#[test]
+fn an_event_run_reports_at_finite_non_negative_positions_and_at_none() {
+    let mut engine = events(&death("StochasticEvents", "null", 10.0, "k"));
+
+    assert_eq!(engine.run_at(&[]).unwrap(), Vec::<Vec<f64>>::new());
+    let error = engine.run_at(&[-1.0]).unwrap_err().to_string();
+    assert!(
+        error.contains("finite, non-negative positions; -1 is not one"),
+        "{error}"
+    );
+}
+
+#[test]
+fn a_leap_past_the_last_report_is_taken_by_the_next_run() {
+    let model = death(
+        "StochasticEvents",
+        r#"{"method":"tau_leaping","tau":0.8}"#,
+        1000.0,
+        "k",
+    );
+    let mut whole = events(&model);
+    whole.set_seed(5);
+    let mut parts = whole.clone();
+
+    let at_once = whole.run_at(&[0.5, 1.0]).unwrap();
+    let first = parts.run_at(&[0.5]).unwrap();
+    let second = parts.run_at(&[1.0]).unwrap();
+
+    assert_eq!(at_once, [first[0].clone(), second[0].clone()]);
+    assert!(at_once[1][0] < 1000.0);
+}
+
+#[test]
+fn a_leap_that_always_overshoots_falls_back_to_one_event() {
+    let mut engine = events(&death(
+        "StochasticEvents",
+        r#"{"method":"tau_leaping","tau":1.0}"#,
+        1.0,
+        "1000000000000",
+    ));
+
+    let rows = engine.run_at(&[1.0]).unwrap();
+
+    assert_eq!(rows, [[0.0, 1.0]]);
+}
+
+#[test]
+fn an_adaptive_leap_counts_a_compartment_once_per_flow_and_skips_the_accumulators() {
+    let mut model = model(
+        "StochasticEvents",
+        r#"{"method":"tau_leaping"}"#,
+        &[("A", 1000.0), ("B", 0.0)],
+        &[("k", 0.001)],
+        &[transition_with(
+            "pair",
+            &["A", "A"],
+            &["B", "B"],
+            "k * A * A / total",
+            r#","accumulators":["met"]"#,
+        )],
+    );
+    model
+        .process
+        .accumulators
+        .push(serde_json::from_str(r#"{"id":"met","name":"met"}"#).expect("valid accumulator"));
+    let mut engine = events(&model);
+    engine.set_seed(2);
+
+    let rows = engine.run_at(&[50.0]).unwrap();
+
+    assert_eq!(rows[0][0] + rows[0][1], 1000.0);
+    assert_eq!(rows[0][2], rows[0][1] / 2.0);
+}
+
+#[test]
+fn a_rate_that_reads_t_is_integrated_through_its_zeros_and_its_breakpoints() {
+    for rate in ["0.1 * t", "max(t - 1.5, 0)"] {
+        let mut engine = events(&model(
+            "StochasticEvents",
+            "null",
+            &[("A", 50.0), ("D", 0.0)],
+            &[("k", 0.5)],
+            &[
+                transition("death", &["A"], &["D"], rate),
+                transition_with("pulse", &["A"], &["D"], "0.1", r#","impulse_at":[1]"#),
+            ],
+        ));
+        engine.set_seed(4);
+        let mut once = engine.clone();
+
+        let rows = engine.run_at(&[0.5, 1.0, 3.0]).unwrap();
+        let last = once.run_at(&[3.0]).unwrap();
+
+        assert_eq!(rows[2], last[0], "{rate}");
+        for row in &rows {
+            assert_eq!(row[0] + row[1], 50.0, "{rate}");
+            assert_eq!(row[0], row[0].round(), "{rate}");
+        }
+        assert!(rows[2][0] < 50.0, "{rate}");
+    }
+}
+
+#[test]
+fn a_rate_of_t_that_stops_being_a_number_stops_the_events() {
+    let mut engine = events(&death(
+        "StochasticEvents",
+        "null",
+        5.0,
+        "0.01 * t * sqrt(1.7 - t)",
+    ));
+
+    let error = engine.run_at(&[3.0]).unwrap_err();
+
+    assert!(
+        matches!(&error, SimulationError::Failed(message) if message.ends_with("is not a number")),
+        "{error:?}"
+    );
+}
+
+#[test]
+fn a_new_initial_amount_before_the_run_starts_from_it() {
+    use commol_model::CompartmentalEngine;
+    let mut events = events(&death("StochasticEvents", "null", 10.0, "k"));
+    let mut steps = steps(&death("StochasticSteps", "null", 10.0, "k"));
+    events.run_at(&[0.0]).unwrap();
+    steps.run_at(&[0.0]).unwrap();
+
+    events.set_initial_condition(0, 4.0).unwrap();
+    steps.set_initial_condition(0, 4.0).unwrap();
+
+    assert_eq!(events.run_at(&[0.0]).unwrap(), [[4.0, 0.0]]);
+    assert_eq!(steps.run_at(&[0.0]).unwrap(), [[4.0, 0.0]]);
 }
