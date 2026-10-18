@@ -10,7 +10,9 @@ use commol_inference::conformal::{
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
-use crate::calibration::PyObservedDataPoint;
+use commol_inference::resampling::ReplicateRunner;
+
+use crate::calibration::{PyObservedDataPoint, PyOptimizationConfig};
 use crate::inference::{PyCalibrationProblem, PyParameterSample, predictive_error};
 
 fn conformal_error(error: ConformalError) -> PyErr {
@@ -128,10 +130,53 @@ fn split_conformal(
     .map_err(conformal_error)
 }
 
+/// Rolling-origin conformal intervals at `positions`, after the data, for
+/// each series of the problem
+///
+/// Args:
+///     problem: The calibration problem
+///     config: The optimizer
+///     fit: The fit of every observation, in problem order
+///     origins: The positions of the origins
+///     positions: Where the intervals are
+///     score: "absolute" or "normalized"
+///     by: "series" or "all"
+///     level: The level of the intervals
+///     starts: Starts per fit, the fit first
+///     seed: Seed of the starts
+///
+/// Raises:
+///     ValueError: If a setting is not valid, a position is not after the
+///         data, or an origin has no observation before or after it
+///     RuntimeError: If every fit fails
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn rolling_conformal(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    config: &PyOptimizationConfig,
+    fit: Vec<f64>,
+    origins: Vec<f64>,
+    positions: Vec<f64>,
+    score: &str,
+    by: &str,
+    level: f64,
+    starts: usize,
+    seed: u64,
+) -> PyResult<PyConformalRun> {
+    let settings = settings(score, by, level)?;
+    let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
+        .map_err(PyValueError::new_err)?;
+    py.detach(|| conformal::rolling_conformal(&runner, &origins, &positions, settings))
+        .map(PyConformalRun::from)
+        .map_err(conformal_error)
+}
+
 /// Register the conformal functions with the inference module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyConformalRun>()?;
     m.add_function(wrap_pyfunction!(check_conformal_settings, m)?)?;
     m.add_function(wrap_pyfunction!(split_conformal, m)?)?;
+    m.add_function(wrap_pyfunction!(rolling_conformal, m)?)?;
     Ok(())
 }

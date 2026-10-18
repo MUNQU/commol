@@ -14,16 +14,19 @@
 //! | [`intervals`] | [`PredictionIntervals`] and [`ConformalRun`], the result of every variant |
 //! | [`predict`] | Point predictions and their spread at any observations, and the target points |
 //! | [`split`] | [`split_conformal`]: held-out observations scored against one predictor |
+//! | [`rolling`] | [`rolling_conformal`]: one fit per origin, one quantile per horizon |
 
 pub mod intervals;
 pub mod predict;
 pub mod quantile;
+pub mod rolling;
 pub mod score;
 pub mod split;
 
 pub use intervals::{ConformalRun, PredictionIntervals};
 pub use predict::{Predictions, Predictor, predict, set_predictions, targets};
 pub use quantile::{conformal_quantile, group_quantiles, lower_quantile, upper_quantile};
+pub use rolling::rolling_conformal;
 pub use score::{ConformalSettings, NonconformityScore, Pooling};
 pub use split::split_conformal;
 

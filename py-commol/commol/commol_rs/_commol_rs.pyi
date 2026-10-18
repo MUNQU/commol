@@ -614,6 +614,19 @@ class InferenceModule(Protocol):
         by: str,
         level: float,
     ) -> ConformalRunProtocol: ...
+    def rolling_conformal(
+        self,
+        problem: CalibrationProblemProtocol,
+        config: OptimizationConfigProtocol,
+        fit: list[float],
+        origins: list[float],
+        positions: list[float],
+        score: str,
+        by: str,
+        level: float,
+        starts: int,
+        seed: int,
+    ) -> ConformalRunProtocol: ...
 
 class MathExpressionProtocol(Protocol):
     def __init__(self, expression: str) -> None: ...

@@ -12,15 +12,25 @@ import pytest
 
 from commol import (
     AdaptiveConformal,
+    CalibrationProblem,
+    Calibrator,
     EnbPI,
     JackknifePlus,
+    NelderMeadConfig,
     ObservedDataPoint,
     ParameterSample,
     RollingConformal,
     SampleMethod,
+    Simulation,
     SplitConformal,
 )
-from tests.support import flow_calibrator
+from tests.support import (
+    a_to_b_builder,
+    bounded,
+    build,
+    flow_calibrator,
+    flow_observations,
+)
 
 C = 10.0
 
@@ -41,6 +51,18 @@ def _held_out(
         ObservedDataPoint(at=t, output=output, value=value)
         for t, value in zip(positions, values, strict=True)
     ]
+
+
+def _flow_calibrator(observations: list[ObservedDataPoint]) -> Calibrator:
+    """The calibrator of ``flow_calibrator`` with other observations."""
+    model = build(a_to_b_builder(parameters={"c": None}, rate="c * A / A", total=1e6))
+    problem = CalibrationProblem(
+        observed_data=observations,
+        parameters=[bounded("c", 0.0, 50.0, initial_guess=25.0)],
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-14),
+    )
+    return Calibrator(Simulation(model), problem)
 
 
 def _variant_settings() -> dict[type, dict[str, object]]:
@@ -158,3 +180,52 @@ class TestScores:
         assert intervals.series["A"].lower == [-math.inf, -math.inf]
         assert intervals.series["A"].upper == [math.inf, math.inf]
         assert all(math.isfinite(v) for v in intervals.series["B"].upper)
+
+
+class TestRollingConformal:
+    def test_horizon_intervals_widen_on_a_random_walk(self) -> None:
+        rng = np.random.default_rng(4)
+        walk = np.cumsum(rng.normal(0.0, 1.0, 60))
+        values = [C * t + walk[t - 1] for t in range(1, 61)]
+        calibrator = flow_calibrator(values, windowed=False)
+
+        result = calibrator.uncertainty(
+            RollingConformal(
+                origins=[float(t) for t in range(20, 51)],
+                score="absolute",
+                by="series",
+                level=0.8,
+                positions=[61.0, 62.0, 63.0, 64.0, 65.0, 66.0],
+            )
+        )
+
+        series = result.intervals.series["B"]
+        widths = [hi - lo for lo, hi in zip(series.lower, series.upper, strict=True)]
+        # The error of a random walk k steps ahead grows as √k.
+        assert widths[0] < widths[2] < widths[5], widths
+
+    def test_a_horizon_counts_the_observations_after_the_origin(self) -> None:
+        # Flows of 10 up to the origin at 5, then 11, 12 and 13 at irregular
+        # positions: the fit at the origin is 10, so horizon k scores k.
+        observations = flow_observations([10.0] * 5, windowed=True) + [
+            ObservedDataPoint(at=at, output="B", value=value, window=1)
+            for at, value in [(7, 11.0), (10, 12.0), (20, 13.0)]
+        ]
+        calibrator = _flow_calibrator(observations)
+
+        result = calibrator.uncertainty(
+            RollingConformal(
+                origins=[5.0],
+                score="absolute",
+                by="series",
+                level=0.5,
+                positions=[21.0, 22.0, 23.0],
+            )
+        )
+
+        assert result.scores["B"] == pytest.approx([1.0, 2.0, 3.0])
+        series = result.intervals.series["B"]
+        half_widths = [
+            (hi - lo) / 2 for lo, hi in zip(series.lower, series.upper, strict=True)
+        ]
+        assert half_widths == pytest.approx([1.0, 2.0, 3.0])
