@@ -3456,8 +3456,8 @@ merges into it, through the merge queue, and a release is a tag on it.</p>
 <td>The bodies and comments of the open issues it affects; work it leaves undone, in an open issue</td>
 </tr>
 <tr>
-<td>Order and dependencies</td>
-<td>"Blocked by" links between issues; "Why here" in the Delivery of a proposal</td>
+<td>Priority and dependencies</td>
+<td>The field <code>Priority</code> of the project (<code>Now</code>, <code>Next</code>, <code>Later</code>); "Blocked by" links between issues; "Why here" in the Delivery of a proposal</td>
 </tr>
 <tr>
 <td>Releases</td>
@@ -3478,13 +3478,26 @@ merges into it, through the merge queue, and a release is a tag on it.</p>
 </tbody>
 </table>
 <p>To find the next piece of work, in one call and one line:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>.github/scripts/next.sh<span class="w">        </span><span class="c1"># the next proposal; .github/scripts/next.sh 3 for three</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>.github/scripts/next.sh<span class="w">        </span><span class="c1"># the next issue; .github/scripts/next.sh 3 for three</span>
 </span></code></pre></div>
-<p>It lists the open proposals that no open issue blocks and nobody has taken,
-by the field <code>Order</code> of the project, not by issue number: the dependencies set
-what must come first, and <code>Order</code> the preference among the proposals that are
-ready. A new proposal gets an <code>Order</code> between those of its neighbours; the
-values go in steps of 10 so one fits in without renumbering. To see the whole
+<p>It runs <code>.github/scripts/parallel.py --next</code> and lists the open proposals and
+changes that no open issue blocks and nobody has taken, that can run at the
+same time as every issue in progress and as each other. It names each issue
+it skips and the issue in progress it would touch. A change has no section
+Touches: the paths of its section Where count as what it changes. The issues
+come by:</p>
+<ol>
+<li>Effective priority: the highest of the field <code>Priority</code> of the issue in the
+   project (<code>Now</code>, <code>Next</code>, <code>Later</code>; no value is <code>Next</code>) and of every open issue
+   it blocks, through chains of "blocked by" links. So an issue that another
+   one needs inherits the priority of that issue.</li>
+<li>Milestone: an open milestone before none; the nearest due date, then the
+   oldest. The milestones of commol have no due date, and their numbers follow
+   the versions, so the next release comes first.</li>
+<li>Number.</li>
+</ol>
+<p>The dependencies set what must come first; <code>Priority</code> is set only to move an
+issue ahead of (<code>Now</code>) or behind (<code>Later</code>) its milestone. To see the whole
 plan:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>gh<span class="w"> </span>issue<span class="w"> </span>list<span class="w"> </span>--label<span class="w"> </span>proposal<span class="w"> </span>--state<span class="w"> </span>open
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>gh<span class="w"> </span>issue<span class="w"> </span>list<span class="w"> </span>--milestone<span class="w"> </span><span class="m">0</span>.5.0
@@ -3506,7 +3519,8 @@ merges. <code>In Progress</code> is set when the work starts, by <code>.github/s
    paths and symbols, one requirement per behavior (<code>The &lt;component&gt; SHALL …</code>,
    with <code>WHEN … THEN …</code> scenarios), each scenario with the test that checks
    it. Add <code>breaking</code> when it breaks the public API, the milestone of its
-   release, its blockers and its <code>Order</code> in the project. A large proposal
+   release, its blockers and, when it is not <code>Next</code>, its <code>Priority</code> in the
+   project. A large proposal
    splits into sub-issues.</li>
 <li>Settle its decisions when its implementation starts, not before. A
    decision that changes what an earlier proposal built, or what a later one

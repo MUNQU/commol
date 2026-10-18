@@ -3364,11 +3364,15 @@
 </tr>
 <tr>
 <td><code>.github/scripts/next.sh</code></td>
-<td>The next proposals to implement: open, not blocked, not taken, by the field <code>Order</code> of the project.</td>
+<td>The next proposals and changes to implement: open, not blocked, not taken, not touching an issue in progress, by priority, milestone and number (<code>parallel.py --next</code>).</td>
 </tr>
 <tr>
 <td><code>.github/scripts/parallel.py</code></td>
-<td>The proposals that can run in parallel, from the Touches and the links of the open issues.</td>
+<td>The proposals and changes that can run in parallel, from their Touches or Where and the links of the open issues; <code>--next</code> gives the next ones.</td>
+</tr>
+<tr>
+<td><code>.github/scripts/github.py</code></td>
+<td>The REST calls of <code>parallel.py</code>: every page, and one line that says why GitHub refused a request.</td>
 </tr>
 <tr>
 <td><code>.github/scripts/affected.py</code></td>
