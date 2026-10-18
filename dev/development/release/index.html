@@ -3271,8 +3271,10 @@ milestone of the release lists the issues it ships.</p>
 it. Check the tag and the commit before you publish.</p>
 </div>
 <h3 id="step-1-choose-the-version">Step 1: Choose the Version<a class="headerlink" href="#step-1-choose-the-version" title="Permanent link">&para;</a></h3>
-<p>When every issue of the milestone is closed, list the changes since the last
-release:</p>
+<p>An issue of the milestone that will not ship in this release moves to another
+milestone, with a comment that says why
+(<a href="../workflow/#milestones">Milestones</a>). When every issue left in the milestone
+is closed, list the changes since the last release:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>fetch<span class="w"> </span>--tags<span class="w"> </span>origin
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span>--first-parent<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>git<span class="w"> </span>describe<span class="w"> </span>--tags<span class="w"> </span>--abbrev<span class="o">=</span><span class="m">0</span><span class="w"> </span>origin/main<span class="k">)</span><span class="s2">&quot;</span>..origin/main
 </span></code></pre></div>
@@ -3390,7 +3392,7 @@ publisher on PyPI first, or the upload fails.</p>
 <h2 id="release-checklist">Release Checklist<a class="headerlink" href="#release-checklist" title="Permanent link">&para;</a></h2>
 <p>The release issue repeats this list.</p>
 <ul>
-<li>[ ] Every issue of the milestone closed</li>
+<li>[ ] Every issue of the milestone closed, or moved to another milestone with a comment that says why</li>
 <li>[ ] Version chosen</li>
 <li>[ ] Changelog dated on <code>main</code>, with its opening paragraph</li>
 <li>[ ] Annotated tag <code>vX.Y.Z</code> created on <code>main</code> and pushed</li>
