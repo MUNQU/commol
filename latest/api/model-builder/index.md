@@ -95,7 +95,7 @@ class ModelBuilder:
         self._parameters: list[Parameter] = []
         self._series_counter: int = 0
 
-        logging.info(
+        logger.info(
             (
                 f"Initialized ModelBuilder: name='{self._name}', "
                 f"version='{self._version or 'N/A'}'"
@@ -123,13 +123,13 @@ class ModelBuilder:
         # Use bin-specific unit, or fall back to model-level bin_unit
         final_unit = unit if unit is not None else self._bin_unit
         self._bins.append(Bin(id=id, name=name, unit=final_unit))
-        logging.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
+        logger.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
         return self
 
     def add_accumulator(self, id: str, name: str) -> Self:
         """Add a cumulative event counter to the model outputs."""
         self._accumulators.append(Accumulator(id=id, name=name))
-        logging.info(f"Added accumulator: id='{id}', name='{name}'")
+        logger.info(f"Added accumulator: id='{id}', name='{name}'")
         return self
 
     def add_stratification(
@@ -173,13 +173,6 @@ class ModelBuilder:
         if conditions:
             declared_ids = {s.id for s in self._stratifications}
             for cond in conditions:
-                if "category" not in cond:
-                    raise ValueError(
-                        f"Stratification '{id}': condition on "
-                        f"'{cond['stratification']}' must include a 'category'. "
-                        "Category-less conditions are only valid for transition "
-                        "target overrides."
-                    )
                 if cond["stratification"] not in declared_ids:
                     raise ValueError(
                         f"Stratification '{id}': condition references "
@@ -199,7 +192,7 @@ class ModelBuilder:
                 conditions=condition_objects,
             )
         )
-        logging.info(f"Added stratification: id='{id}', categories={categories}")
+        logger.info(f"Added stratification: id='{id}', categories={categories}")
         return self
 
     def add_parameter(
@@ -271,7 +264,7 @@ class ModelBuilder:
         self._parameters.append(
             Parameter(id=id, value=param_value, description=description, unit=unit)
         )
-        logging.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
+        logger.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
         return self
 
     def _ensure_parameter_id_available(self, id: str) -> None:
@@ -282,9 +275,9 @@ class ModelBuilder:
         self,
         pattern: AxisPattern,
         *,
-        transition_id: str = "",
-        source_bin: str = "",
-        target_bin: str = "",
+        transition_id: str,
+        source_bin: str,
+        target_bin: str,
     ) -> AxisPattern:
         """Auto-register a series parameter for pulse-type patterns.
 
@@ -522,7 +515,7 @@ class ModelBuilder:
                 impulse_every=impulse_every,
             )
         )
-        logging.info(
+        logger.info(
             (
                 f"Added transition: id='{id}', source={source}, target={target}, "
                 f"rate='{rate}', stratified_rates={
@@ -618,7 +611,6 @@ class ModelBuilder:
         """
         # Determine if we're expanding over sources or targets
         has_multiple_sources = len(source) > 1
-        has_multiple_targets = len(target) > 1
 
         if has_multiple_sources:
             compartments = source
@@ -627,7 +619,7 @@ class ModelBuilder:
             compartments = target
             expand_type = "target"
 
-        logging.info(
+        logger.info(
             (
                 f"Expanding transition '{id}' with $compartment placeholder: "
                 f"{len(compartments)} {expand_type} compartments will create "
@@ -669,17 +661,13 @@ class ModelBuilder:
             # Generate unique ID for this expanded transition
             expanded_id = f"{id}__{compartment}"
 
-            # Create the expanded transition with appropriate source/target
+            # add_transition accepts several sources or several targets.
             if has_multiple_sources:
                 expanded_source = [compartment]
                 expanded_target = target
-            elif has_multiple_targets:
+            else:
                 expanded_source = source
                 expanded_target = [compartment]
-            else:
-                raise ValueError(
-                    "The transition must have multiple sources or targets."
-                )
 
             self._transitions.append(
                 Transition(
@@ -698,7 +686,7 @@ class ModelBuilder:
                 if expanded_stratified_rates
                 else ""
             )
-            logging.info(
+            logger.info(
                 (
                     f"  Created expanded transition: id='{expanded_id}', "
                     f"source=['{compartment}'], target={target}, "
@@ -706,8 +694,9 @@ class ModelBuilder:
                 )
             )
 
-        logging.info(
-            f"Successfully expanded transition '{id}' into {len(source)} transitions"
+        logger.info(
+            f"Successfully expanded transition '{id}' into {len(compartments)} "
+            "transitions"
         )
 
     def get_summary(self) -> dict[str, str | int | list[str] | None]:
@@ -842,9 +831,7 @@ class ModelBuilder:
             step_unit=self._step_unit,
         )
 
-        logging.info(
-            f"Model '{self._name}' successfully built for the {engine} engine."
-        )
+        logger.info(f"Model '{self._name}' successfully built for the {engine} engine.")
 
         return model
 ```
@@ -915,7 +902,7 @@ def __init__(
     self._parameters: list[Parameter] = []
     self._series_counter: int = 0
 
-    logging.info(
+    logger.info(
         (
             f"Initialized ModelBuilder: name='{self._name}', "
             f"version='{self._version or 'N/A'}'"
@@ -969,7 +956,7 @@ def add_bin(self, id: str, name: str, unit: str | None = None) -> Self:
     # Use bin-specific unit, or fall back to model-level bin_unit
     final_unit = unit if unit is not None else self._bin_unit
     self._bins.append(Bin(id=id, name=name, unit=final_unit))
-    logging.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
+    logger.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
     return self
 ```
 
@@ -987,7 +974,7 @@ Source code in `commol/api/model_builder.py`
 def add_accumulator(self, id: str, name: str) -> Self:
     """Add a cumulative event counter to the model outputs."""
     self._accumulators.append(Accumulator(id=id, name=name))
-    logging.info(f"Added accumulator: id='{id}', name='{name}'")
+    logger.info(f"Added accumulator: id='{id}', name='{name}'")
     return self
 ```
 
@@ -1064,13 +1051,6 @@ def add_stratification(
     if conditions:
         declared_ids = {s.id for s in self._stratifications}
         for cond in conditions:
-            if "category" not in cond:
-                raise ValueError(
-                    f"Stratification '{id}': condition on "
-                    f"'{cond['stratification']}' must include a 'category'. "
-                    "Category-less conditions are only valid for transition "
-                    "target overrides."
-                )
             if cond["stratification"] not in declared_ids:
                 raise ValueError(
                     f"Stratification '{id}': condition references "
@@ -1090,7 +1070,7 @@ def add_stratification(
             conditions=condition_objects,
         )
     )
-    logging.info(f"Added stratification: id='{id}', categories={categories}")
+    logger.info(f"Added stratification: id='{id}', categories={categories}")
     return self
 ```
 
@@ -1196,7 +1176,7 @@ def add_parameter(
     self._parameters.append(
         Parameter(id=id, value=param_value, description=description, unit=unit)
     )
-    logging.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
+    logger.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
     return self
 ```
 
@@ -1457,7 +1437,7 @@ def add_transition(
             impulse_every=impulse_every,
         )
     )
-    logging.info(
+    logger.info(
         (
             f"Added transition: id='{id}', source={source}, target={target}, "
             f"rate='{rate}', stratified_rates={
@@ -1715,9 +1695,7 @@ def build(
         step_unit=self._step_unit,
     )
 
-    logging.info(
-        f"Model '{self._name}' successfully built for the {engine} engine."
-    )
+    logger.info(f"Model '{self._name}' successfully built for the {engine} engine.")
 
     return model
 ```

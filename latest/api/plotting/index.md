@@ -63,8 +63,8 @@ class SimulationPlotter:
             ``confidence_level``, reduced replicate by replicate
             (`member_statistics`).
         confidence_level : float, default=0.95
-            Confidence level of the band of the replicates, strictly between
-            0 and 1.
+            Confidence level of the band of the replicates or of a
+            `Predictive`, strictly between 0 and 1.
         """
         self.simulation = simulation
         self.confidence_level = confidence_level
@@ -85,9 +85,7 @@ class SimulationPlotter:
         self,
         output_file: str | None = None,
         observed_data: list[ObservedDataPoint] | None = None,
-        calibration_result: CalibrationResult
-        | ProbabilisticCalibrationResult
-        | None = None,
+        calibration_result: CalibrationResult | Predictive | None = None,
         config: PlotConfig | None = None,
         series: list[str] | None = None,
         show_legend: bool = True,
@@ -102,7 +100,8 @@ class SimulationPlotter:
         Creates a figure with subplots arranged in a grid, where each subplot shows
         the evolution of one series along the axis. Optionally overlays observed data
         points.
-        If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
+        With a `Predictive`, plots the weighted median of its draws and their
+        band of ``confidence_level``.
 
         Parameters
         ----------
@@ -113,12 +112,13 @@ class SimulationPlotter:
             Model predictions with a factor_id will be scaled for plotting using
             factor values from the calibration_result, so observed values remain in
             their original units.
-        calibration_result : CalibrationResult | ProbabilisticCalibrationResult | None
-            Optional calibration result. If ProbabilisticCalibrationResult is provided,
-            plots the median prediction with confidence interval bands.
-            Factor values are extracted from best_parameters (CalibrationResult) or
-            the lowest-loss selected member (ProbabilisticCalibrationResult) to
-            multiply model predictions for comparison with observed data.
+        calibration_result : CalibrationResult | Predictive | None
+            Optional calibration result. A `CalibrationResult` gives the factor
+            values (``best_parameters``) that multiply model predictions. A
+            `Predictive` plots the band of its draws instead of the simulation
+            line; each draw's series is read through the observation operator
+            of the problem (sums, windows and factors of the observations of
+            the series), then the draws are reduced with their weights.
         config : PlotConfig | None
             Configuration for plot layout and styling (figsize, dpi, layout,
             style, palette, context). If None, uses defaults.
@@ -176,7 +176,7 @@ class SimulationPlotter:
             tick_every,
             x_label,
         )
-        self._finalize_series_plot(axes, bins_to_plot, output_file, config)
+        self._finalize_plot(axes, bins_to_plot, output_file, config, "Series")
 
         return fig
 
@@ -184,9 +184,7 @@ class SimulationPlotter:
         self,
         output_file: str | None = None,
         observed_data: list[ObservedDataPoint] | None = None,
-        calibration_result: CalibrationResult
-        | ProbabilisticCalibrationResult
-        | None = None,
+        calibration_result: CalibrationResult | Predictive | None = None,
         config: PlotConfig | None = None,
         series: list[str] | None = None,
         **kwargs: str | int | float | bool | None,
@@ -196,7 +194,7 @@ class SimulationPlotter:
 
         Creates a figure showing the running sum of each series along the axis.
         Useful for tracking totals, losses, or other accumulated quantities.
-        If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
+        With a `Predictive`, plots the band of the running totals of its draws.
 
         Parameters
         ----------
@@ -206,12 +204,11 @@ class SimulationPlotter:
             Optional observed data points to overlay (also shown as cumulative).
             Observed data points with a factor_id will be unscaled for plotting using
             factor values from the calibration_result.
-        calibration_result : CalibrationResult | ProbabilisticCalibrationResult | None
-            Optional calibration result. If ProbabilisticCalibrationResult is provided,
-            plots the median prediction with confidence interval bands.
-            Factor values are extracted from best_parameters (CalibrationResult) or
-            the lowest-loss selected member (ProbabilisticCalibrationResult) to
-            unscale observed data for comparison with model predictions.
+        calibration_result : CalibrationResult | Predictive | None
+            Optional calibration result. A `CalibrationResult` gives the factor
+            values (``best_parameters``) that unscale observed data. A
+            `Predictive` plots the band of the running total of each draw,
+            and unscales observed data by the weighted median of each factor.
         config : PlotConfig | None
             Configuration for plot layout and styling (figsize, dpi, layout,
             style, palette, context). If None, uses defaults.
@@ -251,7 +248,7 @@ class SimulationPlotter:
         self._plot_all_cumulative_bins(
             axes, bins_to_plot, cumulative_observed, calibration_result, kwargs
         )
-        self._finalize_cumulative_plot(axes, bins_to_plot, output_file, config)
+        self._finalize_plot(axes, bins_to_plot, output_file, config, "Cumulative")
 
         return fig
 
@@ -424,14 +421,15 @@ class SimulationPlotter:
 
     def _extract_factor_values(
         self,
-        calib_result: CalibrationResult | ProbabilisticCalibrationResult | None,
+        calib_result: CalibrationResult | Predictive | None,
     ) -> dict[str, float] | None:
         """
         Extract factor values from calibration result.
 
-        For CalibrationResult, returns best_parameters.
-        For ProbabilisticCalibrationResult, returns median values for all parameters.
-        The observed data factor_id decides which entries are used as factor values.
+        For a CalibrationResult, returns its best parameters. For a
+        Predictive, returns the weighted median of each parameter of its
+        sample. The observed data factor_id decides which entries are used as
+        factor values.
         """
         if calib_result is None:
             return None
@@ -439,10 +437,10 @@ class SimulationPlotter:
         if isinstance(calib_result, CalibrationResult):
             return calib_result.best_parameters
 
-        if isinstance(calib_result, ProbabilisticCalibrationResult):
-            return calib_result.selected_ensemble.point_parameters
-
-        return None
+        return {
+            name: values[0]
+            for name, values in calib_result.sample.quantiles([0.5]).items()
+        }
 
     @staticmethod
     def _model_factor_for_observed(
@@ -478,20 +476,20 @@ class SimulationPlotter:
         self, config: PlotConfig, bins_to_plot: list[str]
     ) -> tuple["Figure", list["Axes"]]:
         """
-        Create figure and axes array for series plotting.
+        A figure of the layout, sized by its subplots, and its axes in order.
         """
-        layout = config.layout or self._calculate_layout(len(bins_to_plot))
-        rows, cols = layout
-        figsize = (cols * 4.5, rows * 3.5 + 1.0)
-        fig, axes = plt.subplots(rows, cols, figsize=figsize, dpi=config.dpi)
+        rows, cols = config.layout or self._calculate_layout(len(bins_to_plot))
+        return self._create_figure(
+            rows, cols, (cols * 4.5, rows * 3.5 + 1.0), config.dpi
+        )
 
-        # Ensure axes is always a flat array
-        if layout[0] == 1 and layout[1] == 1:
-            axes = [axes]
-        else:
-            axes = axes.flatten() if hasattr(axes, "flatten") else [axes]
-
-        return fig, axes
+    @staticmethod
+    def _create_figure(
+        rows: int, cols: int, figsize: tuple[float, float], dpi: int
+    ) -> tuple["Figure", list["Axes"]]:
+        """A figure of `rows` by `cols` subplots, and its axes row by row."""
+        fig, axes = plt.subplots(rows, cols, figsize=figsize, dpi=dpi, squeeze=False)
+        return fig, list(axes.flat)
 
     def _plot_all_series_bins(
         self,
@@ -499,7 +497,7 @@ class SimulationPlotter:
         bins_to_plot: list[str],
         observed_by_bin: dict[str, list[ObservedDataPoint]],
         factor_values: dict[str, float] | None,
-        calibration_result: CalibrationResult | ProbabilisticCalibrationResult | None,
+        calibration_result: CalibrationResult | Predictive | None,
         kwargs: dict[str, str | int | float | bool | None],
         show_legend: bool = True,
         position_label: Callable[[float], str] | None = None,
@@ -509,18 +507,12 @@ class SimulationPlotter:
         """
         Plot series data for all bins across subplots.
         """
-        for idx, bin_id in enumerate(bins_to_plot):
-            if idx >= len(axes):
-                break
-
-            ax = axes[idx]
-
-            if isinstance(calibration_result, ProbabilisticCalibrationResult):
-                self._plot_bin_series_probabilistic(
+        for ax, bin_id in zip(axes, bins_to_plot, strict=False):
+            if isinstance(calibration_result, Predictive):
+                self._plot_bin_series_predictive(
                     ax,
                     bin_id,
                     observed_by_bin.get(bin_id, []),
-                    factor_values or {},
                     calibration_result,
                     dict(kwargs),
                     show_legend,
@@ -541,63 +533,50 @@ class SimulationPlotter:
                     x_label,
                 )
 
-    def _finalize_series_plot(
-        self,
+    @staticmethod
+    def _finalize_plot(
         axes: list["Axes"],
         bins_to_plot: list[str],
         output_file: str | None,
         config: PlotConfig,
+        name: str,
     ) -> None:
         """
-        Finalize series plot by hiding unused subplots and saving.
+        Hide the subplots no series fills, and save the figure to
+        `output_file` when there is one.
         """
-        for idx in range(len(bins_to_plot), len(axes)):
-            axes[idx].set_visible(False)
+        for ax in axes[len(bins_to_plot) :]:
+            ax.set_visible(False)
 
         plt.tight_layout()
 
         if output_file:
             plt.savefig(output_file, dpi=config.dpi, bbox_inches="tight")
-            logger.info(f"Series plot saved to {output_file}")
+            logger.info(f"{name} plot saved to {output_file}")
 
     def _create_cumulative_figure(
         self, config: PlotConfig, bins_to_plot: list[str]
     ) -> tuple["Figure", list["Axes"]]:
-        """
-        Create figure and axes array for cumulative plotting.
-        """
-        layout = config.layout or self._calculate_layout(len(bins_to_plot))
-        fig, axes = plt.subplots(
-            layout[0], layout[1], figsize=config.figsize, dpi=config.dpi
-        )
-
-        # Ensure axes is always a flat array
-        if layout[0] == 1 and layout[1] == 1:
-            axes = [axes]
-        else:
-            axes = axes.flatten() if hasattr(axes, "flatten") else [axes]
-
-        return fig, axes
+        """A figure of the layout, of the size of the configuration."""
+        rows, cols = config.layout or self._calculate_layout(len(bins_to_plot))
+        return self._create_figure(rows, cols, config.figsize, config.dpi)
 
     def _plot_all_cumulative_bins(
         self,
         axes: list["Axes"],
         bins_to_plot: list[str],
         cumulative_observed: dict[str, list[tuple[int | float, float]]],
-        calibration_result: CalibrationResult | ProbabilisticCalibrationResult | None,
+        calibration_result: CalibrationResult | Predictive | None,
         kwargs: dict[str, str | int | float | bool | None],
     ) -> None:
         """
         Plot cumulative data for all bins across subplots.
         """
-        for idx, bin_id in enumerate(bins_to_plot):
-            if idx >= len(axes):
-                break
-
-            ax = axes[idx]
-
-            if isinstance(calibration_result, ProbabilisticCalibrationResult):
-                self._plot_bin_cumulative_probabilistic(
+        if not isinstance(calibration_result, Predictive):
+            cumulative_results = self._calculate_cumulative(bins_to_plot)
+        for ax, bin_id in zip(axes, bins_to_plot, strict=False):
+            if isinstance(calibration_result, Predictive):
+                self._plot_bin_cumulative_predictive(
                     ax,
                     bin_id,
                     cumulative_observed.get(bin_id, []),
@@ -605,7 +584,6 @@ class SimulationPlotter:
                     dict(kwargs),
                 )
             else:
-                cumulative_results = self._calculate_cumulative(bins_to_plot)
                 self._plot_bin_cumulative(
                     ax,
                     bin_id,
@@ -613,25 +591,6 @@ class SimulationPlotter:
                     cumulative_observed.get(bin_id, []),
                     dict(kwargs),
                 )
-
-    def _finalize_cumulative_plot(
-        self,
-        axes: list["Axes"],
-        bins_to_plot: list[str],
-        output_file: str | None,
-        config: PlotConfig,
-    ) -> None:
-        """
-        Finalize cumulative plot by hiding unused subplots and saving.
-        """
-        for idx in range(len(bins_to_plot), len(axes)):
-            axes[idx].set_visible(False)
-
-        plt.tight_layout()
-
-        if output_file:
-            plt.savefig(output_file, dpi=config.dpi, bbox_inches="tight")
-            logger.info(f"Cumulative plot saved to {output_file}")
 
     def _plot_bin_series(
         self,
@@ -735,13 +694,55 @@ class SimulationPlotter:
             label=f"{self.confidence_level:.0%} of the replicates",
         )
 
-    def _plot_bin_series_probabilistic(
+    def _predictive_series_band(
+        self,
+        bin_id: str,
+        observed: list[ObservedDataPoint],
+        predictive: Predictive,
+    ) -> SeriesBand:
+        """
+        The band of one series of a predictive.
+
+        Without a window or factor in the observations of the series, the band
+        of the sum of its outputs. With one, each draw is read through the
+        observation operator at every window end, as the loss reads it.
+        """
+        component_ids = self._observed_component_ids(bin_id, observed)
+        window = next((p.window for p in observed if p.window), None)
+        factor_ids = {p.factor_id for p in observed if p.factor_id}
+        if window is None and not factor_ids:
+            return predictive.series_band(component_ids, self.confidence_level)
+        if len(factor_ids) > 1:
+            raise ValueError(
+                f"Series '{bin_id}' has observations with several factors "
+                f"{sorted(factor_ids)}; a band reads one."
+            )
+        first = predictive.positions[0]
+        last = predictive.positions[-1]
+        ends = (
+            [at for at in window_ends(window, last) if at - window >= first]
+            if window is not None
+            else predictive.positions
+        )
+        points = [
+            ObservedDataPoint(
+                at=at,
+                outputs=component_ids,
+                label=bin_id,
+                value=0.0,
+                window=window,
+                factor_id=next(iter(factor_ids), None),
+            )
+            for at in ends
+        ]
+        return predictive.at_observations(points, NoNoise()).band(self.confidence_level)
+
+    def _plot_bin_series_predictive(
         self,
         ax: "Axes",
         bin_id: str,
         observed: list[ObservedDataPoint],
-        factor_values: dict[str, float],
-        prob_result: ProbabilisticCalibrationResult,
+        predictive: Predictive,
         plot_kwargs: dict[str, str | int | float | bool | None],
         show_legend: bool = True,
         position_label: Callable[[float], str] | None = None,
@@ -749,115 +750,27 @@ class SimulationPlotter:
         x_label: str = "Step",
     ) -> None:
         """
-        Plot the series of a single bin with probabilistic confidence intervals.
+        Plot the weighted median and band of one series of a predictive.
         """
-        component_ids = self._observed_component_ids(bin_id, observed)
-        missing = [
-            component_id
-            for component_id in component_ids
-            if component_id not in prob_result.selected_ensemble.prediction_median
-        ]
-        if missing:
-            logger.warning(
-                f"Bin '{bin_id}' aggregate components not found in probabilistic "
-                f"result predictions: {missing}"
-            )
-            return
-
-        median_values = self._sum_series(
-            prob_result.selected_ensemble.prediction_median,
-            component_ids,
-        )
-        ci_lower = self._sum_series(
-            prob_result.selected_ensemble.prediction_ci_lower,
-            component_ids,
-        )
-        ci_upper = self._sum_series(
-            prob_result.selected_ensemble.prediction_ci_upper,
-            component_ids,
-        )
-
-        prediction_positions = prob_result.selected_ensemble.prediction_positions
-        windowed_median = self._apply_windows(
-            median_values, prediction_positions, observed
-        )
-        uses_memberwise_windowed_prediction = False
-        if windowed_median is not None:
-            positions, _ = windowed_median
-            win_med = prob_result.selected_ensemble.windowed_prediction_median
-            win_positions = prob_result.selected_ensemble.windowed_prediction_positions
-            if win_med and bin_id in win_med:
-                uses_memberwise_windowed_prediction = True
-                plot_median = win_med[bin_id]
-                positions = win_positions.get(bin_id, positions)
-                plot_ci_lower = (
-                    prob_result.selected_ensemble.windowed_prediction_ci_lower[bin_id]
-                )
-                plot_ci_upper = (
-                    prob_result.selected_ensemble.windowed_prediction_ci_upper[bin_id]
-                )
-            elif win_med and all(
-                component_id in win_med for component_id in component_ids
-            ):
-                uses_memberwise_windowed_prediction = True
-                plot_median = self._sum_series(win_med, component_ids)
-                positions = win_positions.get(component_ids[0], positions)
-                plot_ci_lower = self._sum_series(
-                    prob_result.selected_ensemble.windowed_prediction_ci_lower,
-                    component_ids,
-                )
-                plot_ci_upper = self._sum_series(
-                    prob_result.selected_ensemble.windowed_prediction_ci_upper,
-                    component_ids,
-                )
-            else:
-                _, plot_median = windowed_median
-                # `observed` already yielded `windowed_median`, so it carries
-                # a window and neither call returns None. The fallbacks keep
-                # the unwindowed series, matching the outer non-windowed branch.
-                windowed_ci_lower = self._apply_windows(
-                    ci_lower, prediction_positions, observed
-                )
-                windowed_ci_upper = self._apply_windows(
-                    ci_upper, prediction_positions, observed
-                )
-                plot_ci_lower = windowed_ci_lower[1] if windowed_ci_lower else ci_lower
-                plot_ci_upper = windowed_ci_upper[1] if windowed_ci_upper else ci_upper
-        else:
-            positions = prediction_positions
-            plot_median = median_values
-            plot_ci_lower = ci_lower
-            plot_ci_upper = ci_upper
-
-        model_factor = (
-            1.0
-            if uses_memberwise_windowed_prediction
-            else self._model_factor_for_observed(observed, factor_values)
-        )
-        plot_median = self._apply_factor_to_series(plot_median, model_factor)
-        plot_ci_lower = self._apply_factor_to_series(plot_ci_lower, model_factor)
-        plot_ci_upper = self._apply_factor_to_series(plot_ci_upper, model_factor)
-
-        # Build parameters for lineplot (median)
+        band = self._predictive_series_band(bin_id, observed, predictive)
+        positions = band.positions
         params = {
             "x": positions,
-            "y": plot_median,
+            "y": band.median,
             "ax": ax,
-            "label": "Median Prediction",
+            "label": "Median of the draws",
             "legend": show_legend,
         }
         params.update(plot_kwargs)
-
-        # Plot median prediction
         sns.lineplot(**params)
-
-        # Plot confidence interval as filled area
         ax.fill_between(
             positions,
-            plot_ci_lower,
-            plot_ci_upper,
+            band.lower,
+            band.upper,
             alpha=0.3,
-            label="95% CI" if show_legend else "_nolegend_",
+            label=f"{self.confidence_level:.0%} of the draws"
+            if show_legend
+            else "_nolegend_",
         )
 
         # Overlay observed data if available
@@ -890,89 +803,38 @@ class SimulationPlotter:
             ax.legend()
         ax.grid(True, alpha=0.3)
 
-    def _plot_bin_cumulative_probabilistic(
+    def _plot_bin_cumulative_predictive(
         self,
         ax: "Axes",
         bin_id: str,
         cumulative_observed: list[tuple[int | float, float]],
-        prob_result: ProbabilisticCalibrationResult,
+        predictive: Predictive,
         plot_kwargs: dict[str, str | int | float | bool | None],
     ) -> None:
         """
-        Plot cumulative data for a single bin with probabilistic confidence intervals.
+        Plot the band of the running total of one series of a predictive.
         """
-        component_ids = self._series_components(bin_id)
-        ensemble = prob_result.selected_ensemble
-        missing = [
-            component_id
-            for component_id in component_ids
-            if component_id not in ensemble.prediction_median
-        ]
-        if missing:
-            logger.warning(
-                f"Series '{bin_id}' components not found in probabilistic result "
-                f"predictions: {missing}"
-            )
-            return
-
-        # Calculate cumulative values from the probabilistic predictions
-        median_values = self._sum_series(ensemble.prediction_median, component_ids)
-        ci_lower = self._sum_series(ensemble.prediction_ci_lower, component_ids)
-        ci_upper = self._sum_series(ensemble.prediction_ci_upper, component_ids)
-
-        # Calculate cumulative sums
-        cumulative_median = np.cumsum(median_values).tolist()
-        cumulative_ci_lower = np.cumsum(ci_lower).tolist()
-        cumulative_ci_upper = np.cumsum(ci_upper).tolist()
-
-        positions = ensemble.prediction_positions
-
-        # Build parameters for lineplot (median)
+        band = predictive.series_band(
+            self._series_components(bin_id), self.confidence_level, cumulative=True
+        )
+        positions = band.positions
         params = {
             "x": positions,
-            "y": cumulative_median,
+            "y": band.median,
             "ax": ax,
-            "label": "Median Prediction (Cumulative)",
+            "label": "Median of the draws (cumulative)",
         }
         params.update(plot_kwargs)
-
-        # Plot cumulative median prediction
         sns.lineplot(**params)
-
-        # Plot cumulative confidence interval as filled area
         ax.fill_between(
             positions,
-            cumulative_ci_lower,
-            cumulative_ci_upper,
+            band.lower,
+            band.upper,
             alpha=0.3,
-            label="95% CI",
+            label=f"{self.confidence_level:.0%} of the draws",
         )
 
-        # Overlay cumulative observed data if available
-        if cumulative_observed:
-            obs_positions = [at for at, _ in cumulative_observed]
-            obs_values = [value for _, value in cumulative_observed]
-            sns.scatterplot(
-                x=obs_positions,
-                y=obs_values,
-                ax=ax,
-                label="Observed (Cumulative)",
-                color="red",
-                s=30,
-                alpha=0.7,
-                zorder=5,
-            )
-
-        model = self.simulation.model_definition
-        label = model.structure.series_label(model, bin_id)
-        unit_str = label.unit or ""
-        bin_name = label.name
-
-        ax.set_xlabel("Step")
-        ax.set_ylabel(f"{unit_str}")
-        ax.set_title(f"{bin_name}")
-        ax.legend()
-        ax.grid(True, alpha=0.3)
+        self._finish_cumulative_axes(ax, bin_id, cumulative_observed)
 
     def _calculate_cumulative(self, bins_to_plot: list[str]) -> dict[str, list[float]]:
         """
@@ -1047,13 +909,19 @@ class SimulationPlotter:
         # Plot cumulative simulation results
         sns.lineplot(**params)
 
-        # Overlay cumulative observed data if available
+        self._finish_cumulative_axes(ax, bin_id, cumulative_observed)
+
+    def _finish_cumulative_axes(
+        self,
+        ax: "Axes",
+        bin_id: str,
+        cumulative_observed: list[tuple[int | float, float]],
+    ) -> None:
+        """Overlay the running total of the observations, and label the axes."""
         if cumulative_observed:
-            obs_positions = [at for at, _ in cumulative_observed]
-            obs_values = [value for _, value in cumulative_observed]
             sns.scatterplot(
-                x=obs_positions,
-                y=obs_values,
+                x=[at for at, _ in cumulative_observed],
+                y=[value for _, value in cumulative_observed],
                 ax=ax,
                 label="Observed (Cumulative)",
                 color="red",
@@ -1064,12 +932,9 @@ class SimulationPlotter:
 
         model = self.simulation.model_definition
         label = model.structure.series_label(model, bin_id)
-        unit_str = label.unit or ""
-        bin_name = label.name
-
         ax.set_xlabel("Step")
-        ax.set_ylabel(f"{unit_str}")
-        ax.set_title(f"{bin_name}")
+        ax.set_ylabel(label.unit or "")
+        ax.set_title(label.name)
         ax.legend()
         ax.grid(True, alpha=0.3)
 ```
@@ -1086,11 +951,11 @@ Initialize the SimulationPlotter.
 
 Parameters:
 
-| Name               | Type                | Description                                                               | Default                                                                                                                                                                                                                                                                                      |
-| ------------------ | ------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `simulation`       | `Simulation`        | The simulation instance that generated the results.                       | *required*                                                                                                                                                                                                                                                                                   |
-| `results`          | \`SimulationResults | SimulationReplicates\`                                                    | Simulation results, such as those of Simulation.run or Simulation.run_at. The x axis shows their positions. For the replicates of a stochastic run (Simulation.replicates), plot_series draws their mean and a band of confidence_level, reduced replicate by replicate (member_statistics). |
-| `confidence_level` | `float`             | Confidence level of the band of the replicates, strictly between 0 and 1. | `0.95`                                                                                                                                                                                                                                                                                       |
+| Name               | Type                | Description                                                                                  | Default                                                                                                                                                                                                                                                                                      |
+| ------------------ | ------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `simulation`       | `Simulation`        | The simulation instance that generated the results.                                          | *required*                                                                                                                                                                                                                                                                                   |
+| `results`          | \`SimulationResults | SimulationReplicates\`                                                                       | Simulation results, such as those of Simulation.run or Simulation.run_at. The x axis shows their positions. For the replicates of a stochastic run (Simulation.replicates), plot_series draws their mean and a band of confidence_level, reduced replicate by replicate (member_statistics). |
+| `confidence_level` | `float`             | Confidence level of the band of the replicates or of a Predictive, strictly between 0 and 1. | `0.95`                                                                                                                                                                                                                                                                                       |
 
 Source code in `commol/api/plotter.py`
 
@@ -1116,8 +981,8 @@ def __init__(
         ``confidence_level``, reduced replicate by replicate
         (`member_statistics`).
     confidence_level : float, default=0.95
-        Confidence level of the band of the replicates, strictly between
-        0 and 1.
+        Confidence level of the band of the replicates or of a
+        `Predictive`, strictly between 0 and 1.
     """
     self.simulation = simulation
     self.confidence_level = confidence_level
@@ -1138,12 +1003,12 @@ def __init__(
 #### plot_series
 
 ```python
-plot_series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | ProbabilisticCalibrationResult | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', **kwargs: str | int | float | bool | None) -> Figure
+plot_series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | Predictive | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', **kwargs: str | int | float | bool | None) -> Figure
 ```
 
 Plot simulation results with one subplot per series.
 
-Creates a figure with subplots arranged in a grid, where each subplot shows the evolution of one series along the axis. Optionally overlays observed data points. If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
+Creates a figure with subplots arranged in a grid, where each subplot shows the evolution of one series along the axis. Optionally overlays observed data points. With a `Predictive`, plots the weighted median of its draws and their band of `confidence_level`.
 
 Parameters:
 
@@ -1151,7 +1016,7 @@ Parameters:
 | -------------------- | -------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `output_file`        | \`str                      | None\`                                                    | Path to save the figure. If None, figure is not saved (only returned).                                                                                                                                                                               |
 | `observed_data`      | \`list[ObservedDataPoint]  | None\`                                                    | Optional observed data points to overlay on corresponding bin subplots. Model predictions with a factor_id will be scaled for plotting using factor values from the calibration_result, so observed values remain in their original units.           |
-| `calibration_result` | \`CalibrationResult        | ProbabilisticCalibrationResult                            | None\`                                                                                                                                                                                                                                               |
+| `calibration_result` | \`CalibrationResult        | Predictive                                                | None\`                                                                                                                                                                                                                                               |
 | `config`             | \`PlotConfig               | None\`                                                    | Configuration for plot layout and styling (figsize, dpi, layout, style, palette, context). If None, uses defaults.                                                                                                                                   |
 | `series`             | \`list[str]                | None\`                                                    | What to plot, one subplot each. An entry is an output name (an expanded compartment or accumulator, such as A_g1) or a bin or accumulator id, which plots the sum of its outputs. An exact output name wins over an id. If None, plots every output. |
 | `show_legend`        | `bool`                     | Whether to show the legend on each subplot. Default True. | `True`                                                                                                                                                                                                                                               |
@@ -1179,9 +1044,7 @@ def plot_series(
     self,
     output_file: str | None = None,
     observed_data: list[ObservedDataPoint] | None = None,
-    calibration_result: CalibrationResult
-    | ProbabilisticCalibrationResult
-    | None = None,
+    calibration_result: CalibrationResult | Predictive | None = None,
     config: PlotConfig | None = None,
     series: list[str] | None = None,
     show_legend: bool = True,
@@ -1196,7 +1059,8 @@ def plot_series(
     Creates a figure with subplots arranged in a grid, where each subplot shows
     the evolution of one series along the axis. Optionally overlays observed data
     points.
-    If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
+    With a `Predictive`, plots the weighted median of its draws and their
+    band of ``confidence_level``.
 
     Parameters
     ----------
@@ -1207,12 +1071,13 @@ def plot_series(
         Model predictions with a factor_id will be scaled for plotting using
         factor values from the calibration_result, so observed values remain in
         their original units.
-    calibration_result : CalibrationResult | ProbabilisticCalibrationResult | None
-        Optional calibration result. If ProbabilisticCalibrationResult is provided,
-        plots the median prediction with confidence interval bands.
-        Factor values are extracted from best_parameters (CalibrationResult) or
-        the lowest-loss selected member (ProbabilisticCalibrationResult) to
-        multiply model predictions for comparison with observed data.
+    calibration_result : CalibrationResult | Predictive | None
+        Optional calibration result. A `CalibrationResult` gives the factor
+        values (``best_parameters``) that multiply model predictions. A
+        `Predictive` plots the band of its draws instead of the simulation
+        line; each draw's series is read through the observation operator
+        of the problem (sums, windows and factors of the observations of
+        the series), then the draws are reduced with their weights.
     config : PlotConfig | None
         Configuration for plot layout and styling (figsize, dpi, layout,
         style, palette, context). If None, uses defaults.
@@ -1270,7 +1135,7 @@ def plot_series(
         tick_every,
         x_label,
     )
-    self._finalize_series_plot(axes, bins_to_plot, output_file, config)
+    self._finalize_plot(axes, bins_to_plot, output_file, config, "Series")
 
     return fig
 ```
@@ -1278,23 +1143,23 @@ def plot_series(
 #### plot_cumulative
 
 ```python
-plot_cumulative(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | ProbabilisticCalibrationResult | None = None, config: PlotConfig | None = None, series: list[str] | None = None, **kwargs: str | int | float | bool | None) -> Figure
+plot_cumulative(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | Predictive | None = None, config: PlotConfig | None = None, series: list[str] | None = None, **kwargs: str | int | float | bool | None) -> Figure
 ```
 
 Plot cumulative (accumulated) simulation results with one subplot per series.
 
-Creates a figure showing the running sum of each series along the axis. Useful for tracking totals, losses, or other accumulated quantities. If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
+Creates a figure showing the running sum of each series along the axis. Useful for tracking totals, losses, or other accumulated quantities. With a `Predictive`, plots the band of the running totals of its draws.
 
 Parameters:
 
-| Name                 | Type                      | Description                    | Default                                                                                                                                                                                   |
-| -------------------- | ------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `output_file`        | \`str                     | None\`                         | Path to save the figure. If None, figure is not saved (only returned).                                                                                                                    |
-| `observed_data`      | \`list[ObservedDataPoint] | None\`                         | Optional observed data points to overlay (also shown as cumulative). Observed data points with a factor_id will be unscaled for plotting using factor values from the calibration_result. |
-| `calibration_result` | \`CalibrationResult       | ProbabilisticCalibrationResult | None\`                                                                                                                                                                                    |
-| `config`             | \`PlotConfig              | None\`                         | Configuration for plot layout and styling (figsize, dpi, layout, style, palette, context). If None, uses defaults.                                                                        |
-| `series`             | \`list[str]               | None\`                         | What to plot, one subplot each: an output name or a bin or accumulator id, as in :meth:plot_series. If None, plots every output.                                                          |
-| `**kwargs`           | \`str                     | int                            | float                                                                                                                                                                                     |
+| Name                 | Type                      | Description | Default                                                                                                                                                                                   |
+| -------------------- | ------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`        | \`str                     | None\`      | Path to save the figure. If None, figure is not saved (only returned).                                                                                                                    |
+| `observed_data`      | \`list[ObservedDataPoint] | None\`      | Optional observed data points to overlay (also shown as cumulative). Observed data points with a factor_id will be unscaled for plotting using factor values from the calibration_result. |
+| `calibration_result` | \`CalibrationResult       | Predictive  | None\`                                                                                                                                                                                    |
+| `config`             | \`PlotConfig              | None\`      | Configuration for plot layout and styling (figsize, dpi, layout, style, palette, context). If None, uses defaults.                                                                        |
+| `series`             | \`list[str]               | None\`      | What to plot, one subplot each: an output name or a bin or accumulator id, as in :meth:plot_series. If None, plots every output.                                                          |
+| `**kwargs`           | \`str                     | int         | float                                                                                                                                                                                     |
 
 Returns:
 
@@ -1315,9 +1180,7 @@ def plot_cumulative(
     self,
     output_file: str | None = None,
     observed_data: list[ObservedDataPoint] | None = None,
-    calibration_result: CalibrationResult
-    | ProbabilisticCalibrationResult
-    | None = None,
+    calibration_result: CalibrationResult | Predictive | None = None,
     config: PlotConfig | None = None,
     series: list[str] | None = None,
     **kwargs: str | int | float | bool | None,
@@ -1327,7 +1190,7 @@ def plot_cumulative(
 
     Creates a figure showing the running sum of each series along the axis.
     Useful for tracking totals, losses, or other accumulated quantities.
-    If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
+    With a `Predictive`, plots the band of the running totals of its draws.
 
     Parameters
     ----------
@@ -1337,12 +1200,11 @@ def plot_cumulative(
         Optional observed data points to overlay (also shown as cumulative).
         Observed data points with a factor_id will be unscaled for plotting using
         factor values from the calibration_result.
-    calibration_result : CalibrationResult | ProbabilisticCalibrationResult | None
-        Optional calibration result. If ProbabilisticCalibrationResult is provided,
-        plots the median prediction with confidence interval bands.
-        Factor values are extracted from best_parameters (CalibrationResult) or
-        the lowest-loss selected member (ProbabilisticCalibrationResult) to
-        unscale observed data for comparison with model predictions.
+    calibration_result : CalibrationResult | Predictive | None
+        Optional calibration result. A `CalibrationResult` gives the factor
+        values (``best_parameters``) that unscale observed data. A
+        `Predictive` plots the band of the running total of each draw,
+        and unscales observed data by the weighted median of each factor.
     config : PlotConfig | None
         Configuration for plot layout and styling (figsize, dpi, layout,
         style, palette, context). If None, uses defaults.
@@ -1382,7 +1244,7 @@ def plot_cumulative(
     self._plot_all_cumulative_bins(
         axes, bins_to_plot, cumulative_observed, calibration_result, kwargs
     )
-    self._finalize_cumulative_plot(axes, bins_to_plot, output_file, config)
+    self._finalize_plot(axes, bins_to_plot, output_file, config, "Cumulative")
 
     return fig
 ```

@@ -12,7 +12,7 @@ Calibration finds the parameter values (and, if you want, initial conditions and
 | Nelder-Mead and particle swarm settings                            | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md)                             |
 | Relations the result must respect                                  | [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md)                           |
 | Reports of a calibrated model and run                              | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                               |
-| Ensembles and confidence intervals                                 | [Probabilistic Calibration](https://munqu.github.io/commol/latest/guide/probabilistic-calibration/index.md)           |
+| Samples, predictive bands and scores                               | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                                       |
 
 ## Quick path
 
@@ -92,7 +92,6 @@ A `Simulation` follows its model: after `apply_calibration_parameters` or `updat
 | `constraints`                 | `list[CalibrationConstraint]`               | `[]`     | Relations the result must respect. See [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md).                                                                                   |
 | `normalize_observations`      | `bool`                                      | `False`  | Divides each residual by the RMS of its observation series, so series of very different size weigh the same.                                                                                                          |
 | `initial_condition_remainder` | `str \| None`                               | `None`   | The compartment or bin that absorbs the difference when initial conditions are calibrated. See [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md). |
-| `probabilistic_config`        | `ProbabilisticCalibrationConfig \| None`    | `None`   | Turns the problem into an ensemble calibration. See [Probabilistic Calibration](https://munqu.github.io/commol/latest/guide/probabilistic-calibration/index.md).                                                      |
 | `seed`                        | `int \| None`                               | `None`   | Makes every random choice reproducible.                                                                                                                                                                               |
 
 ### Observations
@@ -135,11 +134,11 @@ A `Simulation` follows its model: after `apply_calibration_parameters` or `updat
 
 How weights count
 
-Every loss uses a weight the same way: `weight=2.0` makes an observation count twice as much as one with weight 1.0. With every weight at its default of 1.0, the losses are the plain sum of squares, root mean square and mean absolute error. `LossConfig` in `crates/commol-calibration/src/types.rs` computes them, for the optimizer and for the ensemble central loss.
+Every loss uses a weight the same way: `weight=2.0` makes an observation count twice as much as one with weight 1.0. With every weight at its default of 1.0, the losses are the plain sum of squares, root mean square and mean absolute error. `LossConfig` in `crates/commol-calibration/src/types.rs` computes them; the discrepancy (`crates/commol-calibration/src/discrepancy.rs`) applies them.
 
 With `normalize_observations=True`, each residual is first divided by the RMS of the observations of its series (its `label`).
 
-A run the model does not allow gets a penalty instead of a loss: a run with values that are not finite, or a difference step that leaves an amount below zero (`InfeasibleStateError`, see [Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)). The penalty is much larger than any fit, and the run is not recorded in the history, so the optimizer moves away from it and goes on. Any other error of a run, such as a rate that cannot be evaluated, stops the calibration with its message (`CalibrationProblem::cost` in `crates/commol-calibration/src/calibration_problem.rs`).
+A run the model does not allow gets a penalty instead of a loss: a run with values that are not finite, or a difference step that leaves an amount below zero (`InfeasibleStateError`, see [Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)). The penalty is much larger than any fit, and the run is not recorded in the history, so the optimizer moves away from it and goes on. Any other error of a run, such as a rate that cannot be evaluated or that is not a number, stops the calibration with its message (`OptimizationObjective` in `crates/commol-calibration/src/objective.rs`, the only place that turns an infeasible point into a penalty).
 
 ## Stochastic engines
 
@@ -178,9 +177,9 @@ print(round(result.best_parameters["k1"], 1))  # 0.4
 | A stochastic engine needs `replicates`, `replicate_summary` and `seed`; without one, `Calibrator` raises and the message lists the summaries | `rust_loss_config` in `py-commol/commol/context/_model/engine_state.py`  |
 | A deterministic engine does not use `replicates` and `replicate_summary`                                                                     | The same                                                                 |
 | The summaries and the CRPS are computed in `LossConfig`, and the observation weights apply to every option                                   | `LossConfig::replicate_loss` in `crates/commol-calibration/src/types.rs` |
-| A constraint at positions is checked on every replicate                                                                                      | `CalibrationProblem::replicate_cost`                                     |
+| A constraint at positions is checked on every replicate                                                                                      | `CalibrationProblem::evaluate`                                           |
 
-With one replicate the CRPS is the absolute error. A probabilistic calibration runs the same objective: its ensemble holds parameter sets, and `Simulation.replicates` gives the stochastic spread of a member.
+With one replicate the CRPS is the absolute error. The [predictive](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive) of a sample runs every replicate of each draw.
 
 ## Results
 
@@ -188,23 +187,24 @@ With one replicate the CRPS is the absolute error. A probabilistic calibration r
 
 | `CalibrationResult` field | Meaning                                                                                                                                                                                                                                            |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `best_parameters`         | `dict[str, float]`: the best value of every unknown                                                                                                                                                                                                |
+| `best_parameters`         | `dict[str, float]`: the best value of every unknown, in the order of `problem.parameters`                                                                                                                                                          |
 | `final_loss`              | The loss at `best_parameters`                                                                                                                                                                                                                      |
 | `iterations`              | The optimizer iterations performed                                                                                                                                                                                                                 |
 | `converged`               | `True` only when the optimizer met its convergence test or `target_cost`; a run that used all `max_iterations` is `False`. See [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#converged-and-termination_reason). |
 | `termination_reason`      | Why it stopped                                                                                                                                                                                                                                     |
+| `starts`, `failed_runs`   | Every start that finished, and why each failed one did. See [Several starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts).                                                                                  |
 
 ```python
 print(result.converged, result.termination_reason)
 print(f"loss = {result.final_loss:.3g} after {result.iterations} iterations")
 ```
 
-| `Calibrator` member                                     | What it does                                                |
-| ------------------------------------------------------- | ----------------------------------------------------------- |
-| `run()`                                                 | Runs the optimizer and returns a `CalibrationResult`.       |
-| `run_with_history()`                                    | Also returns every evaluation the optimizer made.           |
-| `run_probabilistic()`                                   | Runs an ensemble calibration; needs `probabilistic_config`. |
-| `num_observations`, `num_parameters`, `parameter_names` | Facts about the problem.                                    |
+| `Calibrator` member                                     | What it does                                                                                                                                                                                      |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run(starts=1)`                                         | Runs the optimizer from `starts` start points and returns the best `CalibrationResult`. See [Several starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts). |
+| `run_with_history()`                                    | Returns a `CalibrationHistory`: the result and every evaluation of a feasible point.                                                                                                              |
+| `uncertainty(method)`                                   | Runs an uncertainty method. See [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/#the-entry-point).                                                                          |
+| `num_observations`, `num_parameters`, `parameter_names` | Facts about the problem.                                                                                                                                                                          |
 
 ## Writing the result back
 
@@ -216,7 +216,7 @@ print(f"loss = {result.final_loss:.3g} after {result.iterations} iterations")
 | `"initial_condition"` | The initial conditions, so the model rebuilds exactly the state the optimizer scored |
 | `"factor"`            | Nothing: it describes the observations, not the model                                |
 
-It accepts a `CalibrationResult`, a `ProbabilisticCalibrationResult` (it then applies the ensemble's `point_parameters`) or a plain `{id: value}` mapping. It computes the new definition first, so a rejected value leaves the model unchanged. To set values by hand, use `Model.update_parameters({...})`.
+It accepts a `CalibrationResult` or a plain `{id: value}` mapping, such as one of `sample.draws()`; a `ParameterSample` has no single set of values and raises `TypeError`. It computes the new definition first, so a rejected value leaves the model unchanged. To set values by hand, use `Model.update_parameters({...})`.
 
 ## Checklist
 
@@ -233,4 +233,4 @@ It accepts a `CalibrationResult`, a `ProbabilisticCalibrationResult` (it then ap
 | Fitting initial conditions              | [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
 | Fitting several or partial observations | [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)                         |
 | Tuning the optimizer                    | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md)                             |
-| Uncertainty                             | [Probabilistic Calibration](https://munqu.github.io/commol/latest/guide/probabilistic-calibration/index.md)           |
+| Uncertainty                             | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                                       |

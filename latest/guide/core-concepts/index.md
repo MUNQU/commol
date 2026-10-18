@@ -62,7 +62,7 @@ builder = (
 )
 ```
 
-The engine decides the kind when the model is built, and [`model.describe()`](https://munqu.github.io/commol/latest/guide/describing-models/index.md) shows the result: the proportional rate above shows as `k2 * B`. See [Design decisions](https://munqu.github.io/commol/latest/codebase/design-decisions/#absolute-and-proportional-rates) for the exact rule.
+The engine decides the kind when the model is built, and [`model.describe()`](https://munqu.github.io/commol/latest/guide/describing-models/index.md) shows the result: the proportional rate above shows as `k2 * B`. See [Design decisions](https://munqu.github.io/commol/latest/codebase/decisions/transitions-and-rates/#absolute-and-proportional-rates) for the exact rule.
 
 ## Accumulators
 

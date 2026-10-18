@@ -8,6 +8,65 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-19
+
+This release replaces the ensemble calibration with uncertainty methods that have a stated meaning. `Calibrator.uncertainty` resamples the data (bootstraps and the jackknife) and returns a `ParameterSample`; a `Predictive` runs its draws, and `commol.scores` scores its bands. `Calibrator.identifiability` tells which parameters the model and the data determine, and `Calibrator.run(starts=n)` fits from several start points. Before you upgrade, read the **Breaking** entries: the ensemble calibration is removed (use `BayesianBootstrap` in its place), and every interval uses one quantile, so the intervals of `member_statistics` and `SimulationReplicates.quantiles` move slightly. See [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md) and [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md).
+
+### Added
+
+- `Calibrator.run(starts=n)` runs the optimizer from `n` start points in parallel and returns the best: the initial guess, then rows of a Latin hypercube over the bounds drawn from the problem's `seed`. `CalibrationResult.starts` lists every start (`StartSummary`: start, end, loss, converged); distinct ends with equal losses show that the data do not identify the parameters. See [Several starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts).
+- `CalibrationResult.failed_runs`: why each failed start failed, also logged as a warning.
+- `ParameterSample`: weighted draws of the parameters of a problem, with their invariants checked at construction and weighted statistics computed in Rust (`mean`, `covariance`, `correlation`, `quantiles`, `interval`, `effective_size`, `draws`, `resample`, `summary`). It saves to JSON and loads back equal.
+- `Predictive(calibrator, sample, positions)`: the run of every draw, in parallel, its band (`band`, `series_band`) and every draw's value of a set of observations through the observation operator of the loss, with an observation noise that has no default (`at_observations(observed_data, noise)`: `NoNoise()` for a band of the model, `ResidualNoise(...)` for a prediction interval). `SimulationPlotter` and `simulation_report` take a predictive.
+- `commol.scores`: empirical coverage, interval score, weighted interval score, the CRPS of a weighted sample and PIT values of a predictive, per observation and per series. Each takes the observation noise, so a band of the model is never scored as a prediction interval by accident.
+- `Calibrator.uncertainty(method)`: one entry point for every uncertainty method. A method's configuration subclasses `UncertaintyMethod[R]` and registers its runner; the result type follows the configuration's type.
+- `Calibrator.identifiability(method)`: which parameters the model and the data determine, and which combinations they determine in their place. `StructuralRank` (the rank of the sensitivities at random points, on the design of the observations or a dense one), `Collinearity` (Brun's indices at a fit or over a sample), `SampleIdentifiability` (contraction, correlations and modes of a sample) and `StartsIdentifiability` (starts of equal loss that end apart). Each returns an `IdentifiabilityReport` with a structural and a practical verdict per parameter; `merge` joins reports and `identifiability_report` gives one as plain data. See [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md).
+- `InferenceMethod[R]`, the common base of `UncertaintyMethod[R]` and `IdentifiabilityMethod[R]`; each entry point refuses the other kind with a `TypeError`.
+- `weighted_quantiles`, and a `weights` argument for `member_statistics`.
+- `CalibrationHistory` and `CalibrationEvaluation`, returned by `Calibrator.run_with_history()`.
+- The crate `commol-inference`: the parameter sample, the one quantile, the predictive and the scores. See [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
+- Resampling methods with no noise model, through `Calibrator.uncertainty`: `BayesianBootstrap`, `ResidualBootstrap` and `WildBootstrap` return a `BootstrapResult` (the fit, one draw per replicate, diagnostics, and the Monte Carlo error of each interval bound, `interval_error`); `BlockJackknife` returns a `JackknifeResult` (estimate, bias, standard error, pseudo-values and the influence of each block). Blocks of consecutive positions span every series; `block_length` is an integer or `"auto"` (Politis and White). See [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md).
+- `ResidualNoise`: observation noise made of blocks of residuals of a fit, which gives a prediction interval with no noise model; `NoNoise` gives a band of the model.
+- `CalibrationProblem::with_data` (Rust): a copy of a problem with other observed values and weights.
+
+### Changed
+
+- The `latest` version of the documentation site is the documentation of the last release, published from its tag; the `dev` version follows `main`.
+- **Breaking:** every interval uses one quantile: the weighted inverse of the empirical distribution between the midpoints of the cumulative weights, NumPy's `method="hazen"` with equal weights. `member_statistics` and `SimulationReplicates.quantiles` used NumPy's `linear`; their intervals move slightly.
+- **Breaking:** `CalibrationResult.best_parameters` keeps the order of `CalibrationProblem.parameters`.
+- **Breaking:** `Calibrator.run_with_history()` returns a `CalibrationHistory` instead of the extension's object.
+- **Breaking:** `applied_parameters_report(..., sample=, confidence_level=)` reads the statistics of a `ParameterSample`; `parameter_statistics` is gone.
+- **Breaking (Rust):** `CalibrationProblem` is split into layers (`ForwardModel`, `ObservationOperator`, `Feasibility`, `Discrepancy`, `OptimizationObjective`); `optimize` takes the problem by reference, and the optimizer configurations have no `verbose` field. `CalibrationEvaluation` has no `predictions`.
+- A verbose optimizer writes its table to Python's `sys.stdout` only, and needs one start; the library never writes to the standard error.
+- A rate, a formula parameter or a constraint that the expression compiler cannot compile, such as `typeof(k)`, is rejected when the model or the calibration problem is built, with the reason; it no longer fails when it is evaluated.
+- The functions `erf`, `erfc`, `tgamma`, `lgamma`, `j0`, `j1`, `y0`, `y1`, `fdim` and `remainder` of a rate come from the `libm` crate, so they give the same values on every platform; the other functions still come from the system's math library.
+- `AxisPattern` is abstract: `AxisPattern()` raises `TypeError`. Build a pattern with one of its class methods.
+- Error messages that list ids (the stratifications of a transition, the missing and extra keys of the fractions of an `Aggregate`) list them in sorted order.
+
+### Fixed
+
+- Several starts of Nelder-Mead began at the same point: each start now comes from the run seed.
+- A parameter value could land on another parameter when results were read by name from an unordered mapping.
+- A failed run of a multi-start optimization was written to the standard error and dropped; it is now part of the result.
+- An error of the model at a vertex of the initial Nelder-Mead simplex made the optimizer panic; it now stops the calibration with its message (the argmin fork returns the error).
+- A `to` condition on a transition without a source was ignored by its flow but applied by its accumulators; `build` now rejects it, and a `category` condition chooses the compartment the flow enters.
+- `Model.from_json` read a file in the encoding of the system; it now reads UTF-8, the encoding of JSON.
+- `Model.check_unit_consistency` checked every flow of a category transition in the unit of the first bin of the model; each flow is now checked in the unit of its own bin. In a model of bins of different units, a rate that reads `total`, a subgroup total, a category or `neighbors` fails the check: these add amounts of different units.
+- The LaTeX description wrote a part of a rate in parentheses, such as `(I / N)` or the argument of `sin(t / T)`, as upright text, and wrote a unit inside the name of another variable (`A_{g1(\text{item})}`); only units are text now, each after its variable. The expanded form merges `k * p` and `k * (1 - p)` also when a third term shares another factor, and a merged term keeps the place of its first term.
+- `ModelBuilder` and `Simulation` logged to the root logger of the application; they log to the `commol` logger, as the rest of the library does, so `add_stderr_logger` shows their messages.
+- `AxisPattern.combine(mode="max")` raised "Unknown combine mode": a mode may be given by its value.
+- A quantile level outside `[0, 1]`, or NaN, gave the smallest or the largest value; `ParameterSample.quantiles` and `weighted_quantiles` now raise `ValueError`.
+- `AxisPattern.from_formula` and `AxisPattern.combine` with a `config` that allows formulas longer than the default rejected them anyway; the configuration now applies.
+- A rate of `StochasticSteps` that is not a number raised `InfeasibleStateError` and said that a rate cannot be negative; it now raises `RuntimeError`, as `StochasticEvents` does, and says that the rate is not a number.
+- A rate that is not a number gave amounts that are not numbers in `DifferenceEquations` and `DifferentialEquations`, and a calibration only penalized the run; the run now stops with `RuntimeError` that names the flow and the position, as in the stochastic engines.
+- A rate that read an id with digits, such as `e1`, `E2` or `c1star`, was rejected as a malformed number; and the exponent of a number such as `1e1` was read as the undefined variable `e1`. An identifier now starts only after a character that is not a letter, a digit or `_`, so the digits of an id belong to its name and an exponent belongs to its number.
+
+### Removed
+
+- `commol.api.model_loader.ModelLoader`: a copy of `Model.from_json` that no page documented and nothing called.
+- **Breaking:** the ensemble calibration: `Calibrator.run_probabilistic`, `ProbabilisticCalibrator`, `CalibrationProblem.probabilistic_config`, `ProbabilisticCalibrationConfig`, `ProbabilisticCalibrationResult`, `EnsembleSolution`, `EnsembleSelectionSummary`, `ParameterSetStatistics` and their settings classes. Its intervals had no statistical meaning: its members were points the optimizer visited, and the selection maximized the coverage of the data it was fitted to. The closest replacement with no noise model is `Calibrator.uncertainty(BayesianBootstrap(replicates=..., block_length=...))`: the same parallel fits, each on randomly weighted data, with a stated meaning.
+- The dependency on `scikit-learn`.
+
 ## [0.4.0] - 2026-10-16
 
 ### Added
@@ -307,6 +366,7 @@ ______________________________________________________________________
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.5.0** - Uncertainty by resampling the data, identifiability of parameters and the removal of the ensemble calibration
 - **0.4.0** - One process under several structures and engines, stochastic engines and model descriptions
 - **0.3.0** - ODE engine, positions on the axis and one interface for every model kind
 - **0.2.0** - Per-compartment initial conditions and engine-planned transitions

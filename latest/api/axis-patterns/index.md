@@ -86,9 +86,9 @@ class AxisPattern(BaseModel):
     add_group: ClassVar[_AddGroupDescriptor] = _AddGroupDescriptor()
 
     @property
+    @abstractmethod
     def formula(self) -> str:
         """The mathematical expression for this pattern (always parenthesised)."""
-        raise NotImplementedError("Subclasses must implement formula")
 
     def _as_series_data(self) -> list[tuple[int, float]] | None:
         """Return pulse data as (step, value) points if representable as a series.
@@ -286,9 +286,11 @@ class AxisPattern(BaseModel):
         - ``combine(p)`` is the identity (returns ``p`` unchanged).
         - All input patterns must share the same ``conditions`` and
           ``source_compartment`` (or have none); the result preserves them.
-        - Raises ``ValueError`` if no patterns are supplied, the inputs have
-          inconsistent group bindings, or the combined formula exceeds the
-          security length cap.
+        - ``mode`` is a `CombineMode` or its value (``"sum"``, ``"max"``,
+          ``"min"``).
+        - Raises ``ValueError`` if no patterns are supplied, ``mode`` is not a
+          mode, the inputs have inconsistent group bindings, or the combined
+          formula exceeds the security length cap.
         """
         if len(patterns) == 0:
             raise ValueError("combine() requires at least one pattern")
@@ -296,7 +298,7 @@ class AxisPattern(BaseModel):
             return patterns[0]
 
         shared_conditions, shared_source = _require_consistent_group(patterns)
-        result = _compose_formulas([p.formula for p in patterns], mode)
+        result = _compose_formulas([p.formula for p in patterns], CombineMode(mode))
         _enforce_length_cap(result, config)
 
         return _ComputedAxisPattern(
@@ -639,7 +641,8 @@ Combine patterns into a single composed pattern.
 
 - `combine(p)` is the identity (returns `p` unchanged).
 - All input patterns must share the same `conditions` and `source_compartment` (or have none); the result preserves them.
-- Raises `ValueError` if no patterns are supplied, the inputs have inconsistent group bindings, or the combined formula exceeds the security length cap.
+- `mode` is a `CombineMode` or its value (`"sum"`, `"max"`, `"min"`).
+- Raises `ValueError` if no patterns are supplied, `mode` is not a mode, the inputs have inconsistent group bindings, or the combined formula exceeds the security length cap.
 
 Source code in `commol/api/patterns.py`
 
@@ -657,9 +660,11 @@ def combine(
     - ``combine(p)`` is the identity (returns ``p`` unchanged).
     - All input patterns must share the same ``conditions`` and
       ``source_compartment`` (or have none); the result preserves them.
-    - Raises ``ValueError`` if no patterns are supplied, the inputs have
-      inconsistent group bindings, or the combined formula exceeds the
-      security length cap.
+    - ``mode`` is a `CombineMode` or its value (``"sum"``, ``"max"``,
+      ``"min"``).
+    - Raises ``ValueError`` if no patterns are supplied, ``mode`` is not a
+      mode, the inputs have inconsistent group bindings, or the combined
+      formula exceeds the security length cap.
     """
     if len(patterns) == 0:
         raise ValueError("combine() requires at least one pattern")
@@ -667,7 +672,7 @@ def combine(
         return patterns[0]
 
     shared_conditions, shared_source = _require_consistent_group(patterns)
-    result = _compose_formulas([p.formula for p in patterns], mode)
+    result = _compose_formulas([p.formula for p in patterns], CombineMode(mode))
     _enforce_length_cap(result, config)
 
     return _ComputedAxisPattern(

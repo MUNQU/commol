@@ -44,7 +44,7 @@ class Simulation:
                 f"{type(model.structure).__name__}, not a ModelStructure. A model "
                 "holds the structure of its kind, such as an Aggregate."
             )
-        logging.info(f"Initializing Simulation with model: '{model.name}'")
+        logger.info(f"Initializing Simulation with model: '{model.name}'")
         self.model_definition: Model = model
         self._build_engine(model.model_dump_json())
 
@@ -53,7 +53,7 @@ class Simulation:
         self._model_json: str = model_json
         self._engine: "EngineProtocol" = build_engine(model_json)
         self._simulation_outputs: list[str] = self._engine.output_names
-        logging.info(
+        logger.info(
             f"Simulation engine ready. Outputs: {len(self._simulation_outputs)}"
         )
 
@@ -61,7 +61,7 @@ class Simulation:
         """Rebuild the engine when the model changed since it was built."""
         model_json = self.model_definition.model_dump_json()
         if model_json != self._model_json:
-            logging.info("Model changed since the engine was built; rebuilding it.")
+            logger.info("Model changed since the engine was built; rebuilding it.")
             self._build_engine(model_json)
 
     def _validate_all_parameters_calibrated(self, model: Model) -> None:
@@ -148,15 +148,18 @@ class Simulation:
         ValueError
             If a parameter or initial condition has no value, or the seed is
             not a whole number from 0 to ``2**64 - 1``.
+        RuntimeError
+            If a rate cannot be evaluated or is not a number; the message
+            names the flow and the position.
         """
         self._validate_all_parameters_calibrated(self.model_definition)
         self._sync_engine()
         used_seed = self._seed_run(seed)
         self._engine.reset()
-        logging.info(f"Running simulation for {num_steps} steps.")
+        logger.info(f"Running simulation for {num_steps} steps.")
         start = time.time()
         positions, rows = self._engine.run(num_steps)
-        logging.info(f"Simulation complete. It took {time.time() - start} seconds.")
+        logger.info(f"Simulation complete. It took {time.time() - start} seconds.")
         return SimulationResults.from_rows(
             positions, self._simulation_outputs, rows, seed=used_seed
         )
@@ -195,6 +198,9 @@ class Simulation:
             If a parameter or initial condition has no value, the positions are
             not sorted and unique, or the engine does not report at one of them;
             the message is the engine's.
+        RuntimeError
+            If a rate cannot be evaluated or is not a number; the message
+            names the flow and the position.
         """
         positions = [float(position) for position in at]
         self._validate_all_parameters_calibrated(self.model_definition)
@@ -470,7 +476,7 @@ def __init__(self, model: Model):
             f"{type(model.structure).__name__}, not a ModelStructure. A model "
             "holds the structure of its kind, such as an Aggregate."
         )
-    logging.info(f"Initializing Simulation with model: '{model.name}'")
+    logger.info(f"Initializing Simulation with model: '{model.name}'")
     self.model_definition: Model = model
     self._build_engine(model.model_dump_json())
 ```
@@ -504,6 +510,7 @@ Raises:
 | ---------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `InfeasibleStateError` | If a step leaves an amount below zero; the message names the compartment, the step and the flows out of it. |
 | `ValueError`           | If a parameter or initial condition has no value, or the seed is not a whole number from 0 to 2\*\*64 - 1.  |
+| `RuntimeError`         | If a rate cannot be evaluated or is not a number; the message names the flow and the position.              |
 
 Source code in `commol/api/simulation.py`
 
@@ -541,15 +548,18 @@ def run(self, num_steps: int, *, seed: int | None = None) -> SimulationResults:
     ValueError
         If a parameter or initial condition has no value, or the seed is
         not a whole number from 0 to ``2**64 - 1``.
+    RuntimeError
+        If a rate cannot be evaluated or is not a number; the message
+        names the flow and the position.
     """
     self._validate_all_parameters_calibrated(self.model_definition)
     self._sync_engine()
     used_seed = self._seed_run(seed)
     self._engine.reset()
-    logging.info(f"Running simulation for {num_steps} steps.")
+    logger.info(f"Running simulation for {num_steps} steps.")
     start = time.time()
     positions, rows = self._engine.run(num_steps)
-    logging.info(f"Simulation complete. It took {time.time() - start} seconds.")
+    logger.info(f"Simulation complete. It took {time.time() - start} seconds.")
     return SimulationResults.from_rows(
         positions, self._simulation_outputs, rows, seed=used_seed
     )
@@ -584,6 +594,7 @@ Raises:
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `InfeasibleStateError` | If a step leaves an amount below zero; the message names the compartment, the step and the flows out of it.                                                           |
 | `ValueError`           | If a parameter or initial condition has no value, the positions are not sorted and unique, or the engine does not report at one of them; the message is the engine's. |
+| `RuntimeError`         | If a rate cannot be evaluated or is not a number; the message names the flow and the position.                                                                        |
 
 Source code in `commol/api/simulation.py`
 
@@ -622,6 +633,9 @@ def run_at(
         If a parameter or initial condition has no value, the positions are
         not sorted and unique, or the engine does not report at one of them;
         the message is the engine's.
+    RuntimeError
+        If a rate cannot be evaluated or is not a number; the message
+        names the flow and the position.
     """
     positions = [float(position) for position in at]
     self._validate_all_parameters_calibrated(self.model_definition)
@@ -1308,23 +1322,22 @@ class ReplicateRuns:
         self.n = n
         self.seed = seed
 
-    def _replicates(
-        self, num_steps: int | None, positions: list[float] | None
-    ) -> SimulationReplicates:
+    def _replicates(self, grid: int | list[float]) -> SimulationReplicates:
+        """The replicates on ``grid``: a number of steps or the positions."""
         simulation = self.simulation
         simulation._validate_all_parameters_calibrated(simulation.model_definition)
         engine = simulation.engine
-        grid, seeds, runs = engine.run_replicates(
-            self.seed, self.n, num_steps=num_steps, positions=positions
-        )
+        positions, seeds, runs = engine.run_replicates(self.seed, self.n, grid)
         outputs = simulation.simulation_outputs
         return SimulationReplicates(
             (
-                SimulationResults.from_rows(grid, outputs, rows, seed=replicate_seed)
+                SimulationResults.from_rows(
+                    positions, outputs, rows, seed=replicate_seed
+                )
                 for replicate_seed, rows in zip(seeds, runs, strict=True)
             ),
             seed=self.seed,
-            positions=grid,
+            positions=positions,
         )
 
     def run(self, num_steps: int) -> SimulationReplicates:
@@ -1349,7 +1362,7 @@ class ReplicateRuns:
         ValueError
             If a parameter or a value of the model has no value.
         """
-        return self._replicates(num_steps, None)
+        return self._replicates(num_steps)
 
     def run_at(self, at: Sequence[float]) -> SimulationReplicates:
         """
@@ -1373,7 +1386,7 @@ class ReplicateRuns:
             If a parameter has no value, the positions are not sorted and
             unique, or the engine does not report at one of them.
         """
-        return self._replicates(None, [float(position) for position in at])
+        return self._replicates([float(position) for position in at])
 ```
 
 ### Methods:
@@ -1467,7 +1480,7 @@ def run(self, num_steps: int) -> SimulationReplicates:
     ValueError
         If a parameter or a value of the model has no value.
     """
-    return self._replicates(num_steps, None)
+    return self._replicates(num_steps)
 ```
 
 #### run_at
@@ -1522,7 +1535,7 @@ def run_at(self, at: Sequence[float]) -> SimulationReplicates:
         If a parameter has no value, the positions are not sorted and
         unique, or the engine does not report at one of them.
     """
-    return self._replicates(None, [float(position) for position in at])
+    return self._replicates([float(position) for position in at])
 ```
 
 ## SimulationReplicates
@@ -1598,8 +1611,6 @@ class SimulationReplicates(list[SimulationResults]):
         return [run.seed for run in self if run.seed is not None]
 
     def _values(self, name: str) -> np.ndarray:
-        if not self:
-            raise ValueError("There are no replicates.")
         return np.asarray([run[name] for run in self], dtype=float)
 
     def mean(self) -> SimulationResults:
@@ -1628,6 +1639,9 @@ class SimulationReplicates(list[SimulationResults]):
         """
         Quantiles of the replicates at each position, for each output.
 
+        The quantile is the one convention of commol (`weighted_quantiles`
+        with equal weights, NumPy's ``method="hazen"``).
+
         Parameters
         ----------
         levels : Sequence[float]
@@ -1649,16 +1663,25 @@ class SimulationReplicates(list[SimulationResults]):
                 raise ValueError(f"A quantile level is between 0 and 1, got {level}.")
         if not self:
             raise ValueError("There are no replicates.")
+        from commol.api.inference.intervals import weighted_quantiles
+
         names = list(self[0])
+        per_name = {
+            name: [
+                weighted_quantiles(column.tolist(), levels)
+                for column in self._values(name).T
+            ]
+            for name in names
+        }
         return {
             level: SimulationResults(
                 self.positions,
                 {
-                    name: np.quantile(self._values(name), level, axis=0).tolist()
+                    name: [at_position[index] for at_position in per_name[name]]
                     for name in names
                 },
             )
-            for level in levels
+            for index, level in enumerate(levels)
         }
 
     def member_statistics(
@@ -1688,7 +1711,7 @@ class SimulationReplicates(list[SimulationResults]):
             If the confidence level is out of range or there are no
             replicates.
         """
-        from commol.api.probabilistic.intervals import member_statistics
+        from commol.api.inference.intervals import member_statistics
 
         if self and output not in self[0]:
             raise KeyError(
@@ -1826,6 +1849,8 @@ quantiles(levels: Sequence[float]) -> dict[float, SimulationResults]
 
 Quantiles of the replicates at each position, for each output.
 
+The quantile is the one convention of commol (`weighted_quantiles` with equal weights, NumPy's `method="hazen"`).
+
 Parameters:
 
 | Name     | Type              | Description                                                       | Default    |
@@ -1851,6 +1876,9 @@ def quantiles(self, levels: Sequence[float]) -> dict[float, SimulationResults]:
     """
     Quantiles of the replicates at each position, for each output.
 
+    The quantile is the one convention of commol (`weighted_quantiles`
+    with equal weights, NumPy's ``method="hazen"``).
+
     Parameters
     ----------
     levels : Sequence[float]
@@ -1872,16 +1900,25 @@ def quantiles(self, levels: Sequence[float]) -> dict[float, SimulationResults]:
             raise ValueError(f"A quantile level is between 0 and 1, got {level}.")
     if not self:
         raise ValueError("There are no replicates.")
+    from commol.api.inference.intervals import weighted_quantiles
+
     names = list(self[0])
+    per_name = {
+        name: [
+            weighted_quantiles(column.tolist(), levels)
+            for column in self._values(name).T
+        ]
+        for name in names
+    }
     return {
         level: SimulationResults(
             self.positions,
             {
-                name: np.quantile(self._values(name), level, axis=0).tolist()
+                name: [at_position[index] for at_position in per_name[name]]
                 for name in names
             },
         )
-        for level in levels
+        for index, level in enumerate(levels)
     }
 ```
 
@@ -1943,7 +1980,7 @@ def member_statistics(
         If the confidence level is out of range or there are no
         replicates.
     """
-    from commol.api.probabilistic.intervals import member_statistics
+    from commol.api.inference.intervals import member_statistics
 
     if self and output not in self[0]:
         raise KeyError(
@@ -2347,7 +2384,8 @@ def window_ends(window: float, end: float) -> list[float]:
         If `window` is not positive.
     """
     _check_window(window)
-    count = math.floor(_windows_in(end, window)) if end > 0 else 0
+    # A non-positive end has no window: range() of a count below 1 is empty.
+    count = math.floor(_windows_in(end, window))
     return [window_end(index, window) for index in range(count)]
 ```
 

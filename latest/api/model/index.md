@@ -107,8 +107,8 @@ class Model(BaseModel, Generic[StructureT]):
         """
         Loads a model from a JSON file.
 
-        The method reads the specified JSON file, parses its content, and validates
-        it against the Model schema.
+        The method reads the specified JSON file as UTF-8, the encoding of
+        JSON, parses its content, and validates it against the Model schema.
 
         Parameters
         ----------
@@ -127,10 +127,7 @@ class Model(BaseModel, Generic[StructureT]):
         pydantic.ValidationError
             If the JSON content does not conform to the Model schema.
         """
-        with open(file_path, "r") as f:
-            json_data = f.read()
-
-        return cls.model_validate_json(json_data)
+        return cls.model_validate_json(Path(file_path).read_text(encoding="utf-8"))
 
     def to_json(self, file_path: str | Path, indent: int = 2) -> None:
         """
@@ -218,9 +215,7 @@ class Model(BaseModel, Generic[StructureT]):
 
     def apply_calibration_parameters(
         self,
-        result: CalibrationResult
-        | ProbabilisticCalibrationResult
-        | Mapping[str, float],
+        result: CalibrationResult | Mapping[str, float],
         problem: CalibrationProblem,
     ) -> None:
         """
@@ -236,10 +231,9 @@ class Model(BaseModel, Generic[StructureT]):
 
         Parameters
         ----------
-        result : CalibrationResult | ProbabilisticCalibrationResult | Mapping
-            The calibration outcome, or a mapping of parameter id to value.
-            For a probabilistic result the point parameters of the selected
-            ensemble are applied.
+        result : CalibrationResult | Mapping
+            The calibration result, or a mapping of parameter id to value such
+            as one draw of a `ParameterSample` (``sample.draws()``).
         problem : CalibrationProblem
             The problem the result came from, used to resolve parameter types.
 
@@ -248,6 +242,9 @@ class Model(BaseModel, Generic[StructureT]):
         ValueError
             If an id is not declared in ``problem``, or the structure cannot
             write back a value of its kind.
+        TypeError
+            If `result` is a `ParameterSample`, which has no single set of
+            parameters.
         """
         values = calibrated_values(result)
         types = {param.id: param.parameter_type for param in problem.parameters}
@@ -415,7 +412,7 @@ from_json(file_path: str | Path) -> Self
 
 Loads a model from a JSON file.
 
-The method reads the specified JSON file, parses its content, and validates it against the Model schema.
+The method reads the specified JSON file as UTF-8, the encoding of JSON, parses its content, and validates it against the Model schema.
 
 Parameters:
 
@@ -444,8 +441,8 @@ def from_json(cls, file_path: str | Path) -> Self:
     """
     Loads a model from a JSON file.
 
-    The method reads the specified JSON file, parses its content, and validates
-    it against the Model schema.
+    The method reads the specified JSON file as UTF-8, the encoding of
+    JSON, parses its content, and validates it against the Model schema.
 
     Parameters
     ----------
@@ -464,10 +461,7 @@ def from_json(cls, file_path: str | Path) -> Self:
     pydantic.ValidationError
         If the JSON content does not conform to the Model schema.
     """
-    with open(file_path, "r") as f:
-        json_data = f.read()
-
-    return cls.model_validate_json(json_data)
+    return cls.model_validate_json(Path(file_path).read_text(encoding="utf-8"))
 ```
 
 #### to_json
@@ -658,7 +652,7 @@ def get_uncalibrated_parameters(self) -> list[str]:
 #### apply_calibration_parameters
 
 ```python
-apply_calibration_parameters(result: CalibrationResult | ProbabilisticCalibrationResult | Mapping[str, float], problem: CalibrationProblem) -> None
+apply_calibration_parameters(result: CalibrationResult | Mapping[str, float], problem: CalibrationProblem) -> None
 ```
 
 Write calibrated values back onto the model.
@@ -667,25 +661,24 @@ Each value is routed by the `parameter_type` declared for it in `problem`: `para
 
 Parameters:
 
-| Name      | Type                 | Description                                                        | Default    |
-| --------- | -------------------- | ------------------------------------------------------------------ | ---------- |
-| `result`  | \`CalibrationResult  | ProbabilisticCalibrationResult                                     | Mapping\`  |
-| `problem` | `CalibrationProblem` | The problem the result came from, used to resolve parameter types. | *required* |
+| Name      | Type                 | Description                                                        | Default                                                                                                               |
+| --------- | -------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `result`  | \`CalibrationResult  | Mapping\`                                                          | The calibration result, or a mapping of parameter id to value such as one draw of a ParameterSample (sample.draws()). |
+| `problem` | `CalibrationProblem` | The problem the result came from, used to resolve parameter types. | *required*                                                                                                            |
 
 Raises:
 
 | Type         | Description                                                                                  |
 | ------------ | -------------------------------------------------------------------------------------------- |
 | `ValueError` | If an id is not declared in problem, or the structure cannot write back a value of its kind. |
+| `TypeError`  | If result is a ParameterSample, which has no single set of parameters.                       |
 
 Source code in `commol/context/model.py`
 
 ```python
 def apply_calibration_parameters(
     self,
-    result: CalibrationResult
-    | ProbabilisticCalibrationResult
-    | Mapping[str, float],
+    result: CalibrationResult | Mapping[str, float],
     problem: CalibrationProblem,
 ) -> None:
     """
@@ -701,10 +694,9 @@ def apply_calibration_parameters(
 
     Parameters
     ----------
-    result : CalibrationResult | ProbabilisticCalibrationResult | Mapping
-        The calibration outcome, or a mapping of parameter id to value.
-        For a probabilistic result the point parameters of the selected
-        ensemble are applied.
+    result : CalibrationResult | Mapping
+        The calibration result, or a mapping of parameter id to value such
+        as one draw of a `ParameterSample` (``sample.draws()``).
     problem : CalibrationProblem
         The problem the result came from, used to resolve parameter types.
 
@@ -713,6 +705,9 @@ def apply_calibration_parameters(
     ValueError
         If an id is not declared in ``problem``, or the structure cannot
         write back a value of its kind.
+    TypeError
+        If `result` is a `ParameterSample`, which has no single set of
+        parameters.
     """
     values = calibrated_values(result)
     types = {param.id: param.parameter_type for param in problem.parameters}
@@ -1076,7 +1071,7 @@ class Process(BaseModel):
                     raise ValueError(
                         f"Transition '{transition.id}' is a Stratification flow "
                         f"but involves categories from multiple stratifications: "
-                        f"{', '.join(parent_stratification_ids)}. A single "
+                        f"{', '.join(sorted(parent_stratification_ids))}. A single "
                         f"transition must only move between categories belonging "
                         f"to the same parent stratification."
                     )
@@ -1238,7 +1233,7 @@ def validate_transition_ids(self) -> Self:
                 raise ValueError(
                     f"Transition '{transition.id}' is a Stratification flow "
                     f"but involves categories from multiple stratifications: "
-                    f"{', '.join(parent_stratification_ids)}. A single "
+                    f"{', '.join(sorted(parent_stratification_ids))}. A single "
                     f"transition must only move between categories belonging "
                     f"to the same parent stratification."
                 )
@@ -1534,7 +1529,7 @@ class ModelStructure(BaseModel, ABC):
         self,
         model: "Model[Self]",  # noqa: ARG002
         calibrated_ids: set[str],  # noqa: ARG002
-        parameter_statistics: "Mapping[str, ParameterSetStatistics] | None",  # noqa: ARG002
+        parameter_statistics: "Mapping[str, ParameterSummary] | None",  # noqa: ARG002
     ) -> ReportSections:
         """
         Sections of this kind in a report of applied values.
@@ -1545,8 +1540,8 @@ class ModelStructure(BaseModel, ABC):
             The model that holds the applied values.
         calibrated_ids : set[str]
             Ids that calibration set.
-        parameter_statistics : Mapping[str, ParameterSetStatistics] | None
-            Ensemble spread per id, or None without an ensemble.
+        parameter_statistics : Mapping[str, ParameterSummary] | None
+            Statistics of each id from a sample, or None without one.
 
         Returns
         -------
@@ -1952,18 +1947,18 @@ def with_calibrated_values(
 #### report_sections
 
 ```python
-report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statistics: Mapping[str, ParameterSetStatistics] | None) -> ReportSections
+report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statistics: Mapping[str, ParameterSummary] | None) -> ReportSections
 ```
 
 Sections of this kind in a report of applied values.
 
 Parameters:
 
-| Name                   | Type                                   | Description                              | Default                                              |
-| ---------------------- | -------------------------------------- | ---------------------------------------- | ---------------------------------------------------- |
-| `model`                | `Model`                                | The model that holds the applied values. | *required*                                           |
-| `calibrated_ids`       | `set[str]`                             | Ids that calibration set.                | *required*                                           |
-| `parameter_statistics` | \`Mapping[str, ParameterSetStatistics] | None\`                                   | Ensemble spread per id, or None without an ensemble. |
+| Name                   | Type                             | Description                              | Default                                                   |
+| ---------------------- | -------------------------------- | ---------------------------------------- | --------------------------------------------------------- |
+| `model`                | `Model`                          | The model that holds the applied values. | *required*                                                |
+| `calibrated_ids`       | `set[str]`                       | Ids that calibration set.                | *required*                                                |
+| `parameter_statistics` | \`Mapping[str, ParameterSummary] | None\`                                   | Statistics of each id from a sample, or None without one. |
 
 Returns:
 
@@ -1978,7 +1973,7 @@ def report_sections(
     self,
     model: "Model[Self]",  # noqa: ARG002
     calibrated_ids: set[str],  # noqa: ARG002
-    parameter_statistics: "Mapping[str, ParameterSetStatistics] | None",  # noqa: ARG002
+    parameter_statistics: "Mapping[str, ParameterSummary] | None",  # noqa: ARG002
 ) -> ReportSections:
     """
     Sections of this kind in a report of applied values.
@@ -1989,8 +1984,8 @@ def report_sections(
         The model that holds the applied values.
     calibrated_ids : set[str]
         Ids that calibration set.
-    parameter_statistics : Mapping[str, ParameterSetStatistics] | None
-        Ensemble spread per id, or None without an ensemble.
+    parameter_statistics : Mapping[str, ParameterSummary] | None
+        Statistics of each id from a sample, or None without one.
 
     Returns
     -------
@@ -2297,7 +2292,7 @@ class Aggregate(ModelStructure, InitialConditions):
         self,
         model: "Model[Self]",
         calibrated_ids: set[str],
-        parameter_statistics: "Mapping[str, ParameterSetStatistics] | None",
+        parameter_statistics: "Mapping[str, ParameterSummary] | None",
     ) -> ReportSections:
         """
         The ``initial_conditions`` section of a report of applied values.
@@ -2310,8 +2305,8 @@ class Aggregate(ModelStructure, InitialConditions):
             The model that holds the applied values.
         calibrated_ids : set[str]
             Ids that calibration set.
-        parameter_statistics : Mapping[str, ParameterSetStatistics] | None
-            Ensemble spread per id, or None without an ensemble.
+        parameter_statistics : Mapping[str, ParameterSummary] | None
+            Statistics of each id from a sample, or None without one.
 
         Returns
         -------
@@ -2514,8 +2509,8 @@ class Aggregate(ModelStructure, InitialConditions):
         if actual_bins != expected_bins:
             raise ValueError(
                 f"Initial bin fractions keys must exactly match bin ids. "
-                f"Missing ids: {expected_bins - actual_bins}, "
-                f"Extra ids: {actual_bins - expected_bins}."
+                f"Missing ids: {sorted(expected_bins - actual_bins)}, "
+                f"Extra ids: {sorted(actual_bins - expected_bins)}."
             )
 
     def _check_stratification_fractions(self, process: Process) -> None:
@@ -2526,8 +2521,9 @@ class Aggregate(ModelStructure, InitialConditions):
         if actual_strat != expected_strat:
             raise ValueError(
                 f"Initial stratification fractions keys must exactly match "
-                f"stratification ids. Missing ids: {expected_strat - actual_strat}, "
-                f"Extra ids: {actual_strat - expected_strat}."
+                f"stratification ids. "
+                f"Missing ids: {sorted(expected_strat - actual_strat)}, "
+                f"Extra ids: {sorted(actual_strat - expected_strat)}."
             )
 
         for strat_id, fractions in self.stratification_fractions.items():
@@ -2539,8 +2535,8 @@ class Aggregate(ModelStructure, InitialConditions):
                 raise ValueError(
                     f"Categories for stratification '{strat_id}' must exactly "
                     f"match defined categories in instance '{strat_instance.id}'. "
-                    f"Missing categories: {expected - actual}, "
-                    f"Extra categories: {actual - expected}."
+                    f"Missing categories: {sorted(expected - actual)}, "
+                    f"Extra categories: {sorted(actual - expected)}."
                 )
 
             total = sum(fractions.values())
@@ -2646,17 +2642,6 @@ class Aggregate(ModelStructure, InitialConditions):
             f"Available bins: "
             f"{', '.join(sorted(bin_ids)) if bin_ids else 'none'}."
         )
-        if any(var.startswith(SUBGROUP_TOTAL_PREFIX) for var in undefined_vars):
-            names = sorted(
-                name
-                for name in engine_state.subgroup_total_names(process)
-                if name.startswith(SUBGROUP_TOTAL_PREFIX)
-            )
-            message += (
-                " Subgroup total names follow the declaration order of the "
-                "stratifications. Available subgroup totals: "
-                f"{', '.join(names) if names else 'none'}."
-            )
         raise ValueError(message)
 ```
 
@@ -2933,7 +2918,7 @@ def with_calibrated_values(
 #### report_sections
 
 ```python
-report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statistics: Mapping[str, ParameterSetStatistics] | None) -> ReportSections
+report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statistics: Mapping[str, ParameterSummary] | None) -> ReportSections
 ```
 
 The `initial_conditions` section of a report of applied values.
@@ -2942,11 +2927,11 @@ See :func:`commol.applied_parameters_report`.
 
 Parameters:
 
-| Name                   | Type                                   | Description                              | Default                                              |
-| ---------------------- | -------------------------------------- | ---------------------------------------- | ---------------------------------------------------- |
-| `model`                | `Model`                                | The model that holds the applied values. | *required*                                           |
-| `calibrated_ids`       | `set[str]`                             | Ids that calibration set.                | *required*                                           |
-| `parameter_statistics` | \`Mapping[str, ParameterSetStatistics] | None\`                                   | Ensemble spread per id, or None without an ensemble. |
+| Name                   | Type                             | Description                              | Default                                                   |
+| ---------------------- | -------------------------------- | ---------------------------------------- | --------------------------------------------------------- |
+| `model`                | `Model`                          | The model that holds the applied values. | *required*                                                |
+| `calibrated_ids`       | `set[str]`                       | Ids that calibration set.                | *required*                                                |
+| `parameter_statistics` | \`Mapping[str, ParameterSummary] | None\`                                   | Statistics of each id from a sample, or None without one. |
 
 Returns:
 
@@ -2961,7 +2946,7 @@ def report_sections(
     self,
     model: "Model[Self]",
     calibrated_ids: set[str],
-    parameter_statistics: "Mapping[str, ParameterSetStatistics] | None",
+    parameter_statistics: "Mapping[str, ParameterSummary] | None",
 ) -> ReportSections:
     """
     The ``initial_conditions`` section of a report of applied values.
@@ -2974,8 +2959,8 @@ def report_sections(
         The model that holds the applied values.
     calibrated_ids : set[str]
         Ids that calibration set.
-    parameter_statistics : Mapping[str, ParameterSetStatistics] | None
-        Ensemble spread per id, or None without an ensemble.
+    parameter_statistics : Mapping[str, ParameterSummary] | None
+        Statistics of each id from a sample, or None without one.
 
     Returns
     -------
@@ -4001,6 +3986,42 @@ class Table(BaseModel):
     heading: str | None = None
     columns: list[str]
     rows: list[list[Cell]]
+
+    @model_validator(mode="after")
+    def check_row_lengths(self) -> Self:
+        """Each row has one cell per column."""
+        for index, row in enumerate(self.rows):
+            if len(row) != len(self.columns):
+                raise ValueError(
+                    f"Row {index} of the table has {len(row)} cells; the table "
+                    f"has {len(self.columns)} columns: {self.columns}"
+                )
+        return self
+```
+
+### Methods:
+
+#### check_row_lengths
+
+```python
+check_row_lengths() -> Self
+```
+
+Each row has one cell per column.
+
+Source code in `commol/context/description.py`
+
+```python
+@model_validator(mode="after")
+def check_row_lengths(self) -> Self:
+    """Each row has one cell per column."""
+    for index, row in enumerate(self.rows):
+        if len(row) != len(self.columns):
+            raise ValueError(
+                f"Row {index} of the table has {len(row)} cells; the table "
+                f"has {len(self.columns)} columns: {self.columns}"
+            )
+    return self
 ```
 
 ## Equations
@@ -4300,6 +4321,42 @@ class Matrix(BaseModel):
     row_labels: list[str]
     column_labels: list[str]
     values: list[list[float]]
+
+    @model_validator(mode="after")
+    def check_shape(self) -> Self:
+        """One row of values per row label, one value per column label."""
+        shape = [len(row) for row in self.values]
+        if shape != [len(self.column_labels)] * len(self.row_labels):
+            raise ValueError(
+                f"A matrix of {len(self.row_labels)} rows and "
+                f"{len(self.column_labels)} columns has rows of {shape} values"
+            )
+        return self
+```
+
+### Methods:
+
+#### check_shape
+
+```python
+check_shape() -> Self
+```
+
+One row of values per row label, one value per column label.
+
+Source code in `commol/context/description.py`
+
+```python
+@model_validator(mode="after")
+def check_shape(self) -> Self:
+    """One row of values per row label, one value per column label."""
+    shape = [len(row) for row in self.values]
+    if shape != [len(self.column_labels)] * len(self.row_labels):
+        raise ValueError(
+            f"A matrix of {len(self.row_labels)} rows and "
+            f"{len(self.column_labels)} columns has rows of {shape} values"
+        )
+    return self
 ```
 
 ## UnitConsistencyError

@@ -51,7 +51,7 @@ In JSON the structure is an object with its `kind`, its `variant` and the fields
 }
 ```
 
-`Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete` and `Groups` are documented in [Model API](https://munqu.github.io/commol/latest/api/model/index.md). The engine must run the kind of the structure: a model whose engine runs another kind is rejected when it is made, with an error that names the engine, both kinds and the engines of the kind of the model. A variant keeps the kind, the fields and the engines of its structure, and loads back as its own class ([Design decisions](https://munqu.github.io/commol/latest/codebase/design-decisions/#a-model-is-a-header-a-process-a-structure-and-an-engine)).
+`Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete` and `Groups` are documented in [Model API](https://munqu.github.io/commol/latest/api/model/index.md). The engine must run the kind of the structure: a model whose engine runs another kind is rejected when it is made, with an error that names the engine, both kinds and the engines of the kind of the model. A variant keeps the kind, the fields and the engines of its structure, and loads back as its own class ([Design decisions](https://munqu.github.io/commol/latest/codebase/decisions/model-kinds/#a-model-is-a-header-a-process-a-structure-and-an-engine)).
 
 ## Bins and accumulators
 
@@ -791,12 +791,7 @@ class Transition(BaseModel):
         """
         if value is None:
             return value
-        try:
-            validate_expression_security(value)
-            commol_rs.core.MathExpression(value).validate()
-        except ValueError as e:
-            raise ValueError(f"Validation failed for rate '{value}': {e}")
-        return value
+        return _checked_rate(value)
 ```
 
 ### Attributes
@@ -874,12 +869,7 @@ def validate_rate(cls, value: str | None) -> str | None:
     """
     if value is None:
         return value
-    try:
-        validate_expression_security(value)
-        commol_rs.core.MathExpression(value).validate()
-    except ValueError as e:
-        raise ValueError(f"Validation failed for rate '{value}': {e}")
-    return value
+    return _checked_rate(value)
 ```
 
 ## StratifiedRate
@@ -957,12 +947,7 @@ class StratifiedRate(BaseModel):
     @classmethod
     def validate_rate(cls, value: str) -> str:
         """Perform security and syntax validation on the rate expression."""
-        try:
-            validate_expression_security(value)
-            commol_rs.core.MathExpression(value).validate()
-        except ValueError as e:
-            raise ValueError(f"Validation failed for rate '{value}': {e}")
-        return value
+        return _checked_rate(value)
 ```
 
 ### Methods:
@@ -1032,12 +1017,7 @@ Source code in `commol/context/transition.py`
 @classmethod
 def validate_rate(cls, value: str) -> str:
     """Perform security and syntax validation on the rate expression."""
-    try:
-        validate_expression_security(value)
-        commol_rs.core.MathExpression(value).validate()
-    except ValueError as e:
-        raise ValueError(f"Validation failed for rate '{value}': {e}")
-    return value
+    return _checked_rate(value)
 ```
 
 ## Engine
