@@ -1,36 +1,15 @@
 #!/usr/bin/env bash
-# The next proposals to implement, in one GraphQL call and a few lines of
-# output: open, blocked by no open issue, assigned to nobody, sorted by the
-# field Order of the project (an issue with no Order comes last).
+# The next issues to implement: the proposals and changes that are open,
+# blocked by no open issue and assigned to nobody, that can run at the same
+# time as every issue in progress and as each other. They come by effective
+# priority (the field Priority, Now, Next or Later, raised by the open issues
+# each one blocks in any repository; no value is Next), then milestone, then
+# number. It prints the priority and where an inherited one comes from, and
+# names each issue it skips and the issue it would touch
+# (.github/scripts/parallel.py).
 #
-# Usage, from anywhere: .github/scripts/next.sh [count]   (default 1)
+# Usage, from anywhere in the repository: .github/scripts/next.sh [count]   (default 1)
 set -euo pipefail
-count="${1:-1}"
-gh api graphql -f query='
-query {
-  organization(login: "MUNQU") {
-    projectV2(number: 1) {
-      items(first: 100) {
-        nodes {
-          order: fieldValueByName(name: "Order") {
-            ... on ProjectV2ItemFieldNumberValue { number }
-          }
-          content {
-            ... on Issue {
-              number title state
-              labels(first: 20) { nodes { name } }
-              assignees(first: 1) { totalCount }
-              issueDependenciesSummary { blockedBy }
-            }
-          }
-        }
-      }
-    }
-  }
-}' --jq "[.data.organization.projectV2.items.nodes[]
-  | select(.content.state == \"OPEN\"
-      and .content.issueDependenciesSummary.blockedBy == 0
-      and .content.assignees.totalCount == 0
-      and ([.content.labels.nodes[].name] | index(\"proposal\")))
-  | {order: (.order.number // 1e9), number: .content.number, title: .content.title}]
-  | sort_by(.order) | .[:${count}][] | \"#\(.number) \(.title)\""
+root=$(git rev-parse --show-toplevel)
+exec uv run --project "$root/py-commol" --locked python \
+    "$root/.github/scripts/parallel.py" --next "${1:-1}"

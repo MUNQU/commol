@@ -103,8 +103,9 @@ Use this page when you know what to change but not where it belongs.
 | `docs/` | This site. `docs/codebase/` is for maintainers; the rest is for users. |
 | `.github/ISSUE_TEMPLATE/` | The templates of a proposal, a bug or small change, and a release ([Planning](../development/workflow.md#planning)). |
 | `.github/scripts/start.sh` | Start an issue: take it, set it to `In Progress`, and create its branch and worktree, linked to the issue. |
-| `.github/scripts/next.sh` | The next proposals to implement: open, not blocked, not taken, by the field `Order` of the project. |
-| `.github/scripts/parallel.py` | The proposals that can run in parallel, from the Touches and the links of the open issues. |
+| `.github/scripts/next.sh` | The next proposals and changes to implement: open, not blocked, not taken, not touching an issue in progress, by priority, milestone and number (`parallel.py --next`). |
+| `.github/scripts/parallel.py` | The proposals and changes that can run in parallel, from their Touches or Where and the links of the open issues; `--next` gives the next ones. |
+| `.github/scripts/github.py` | The REST calls of `parallel.py`: every page, and one line that says why GitHub refused a request. |
 | `.github/scripts/affected.py` | The open issues that the changes of a branch affect: those whose body names a changed path. |
 | `.github/scripts/release_notes.py` | The notes of a GitHub release, from its section of the changelog. |
 | `.github/workflows/` | CI: code quality, build, docs, release, and the coverage studies (`coverage.yaml`), which Build and the release call. |

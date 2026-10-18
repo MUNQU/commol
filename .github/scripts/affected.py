@@ -30,7 +30,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 
-from parallel import ITEM, REPO, gh_json, split, touches
+from parallel import ITEM, issue_of, open_issues, split, touches
 
 INDEXES = {
     "AGENTS.md",
@@ -138,27 +138,16 @@ def main() -> None:
     if not files:
         print(f"No changes against {options.base}.")
         return
-    issues = gh_json(
-        "issue",
-        "list",
-        "--repo",
-        REPO,
-        "--state",
-        "open",
-        "--limit",
-        "500",
-        "--json",
-        "number,title,body",
-    )
+    issues = [issue_of(item) for item in open_issues()]
     affected = 0
-    for issue in sorted(issues, key=lambda issue: issue["number"]):
-        if issue["number"] in options.closes:
+    for issue in sorted(issues, key=lambda issue: issue.number):
+        if issue.number in options.closes:
             continue
-        found = matches(issue["body"] or "", files)
+        found = matches(issue.body, files)
         if not found:
             continue
         affected += 1
-        print(f"#{issue['number']} {issue['title']}")
+        print(f"#{issue.number} {issue.title}")
         for match in found:
             shown = ", ".join(match.files[:SHOWN])
             more = len(match.files) - SHOWN

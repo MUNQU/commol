@@ -55,7 +55,7 @@ Planned work lives in GitHub issues, written from the templates of
 | The specification of a change | The body of its issue |
 | Decisions and findings during the work | Comments of the issue (`L<n> (decision|implementation): …`), and the Decisions table of the body |
 | What a change does to other work | The bodies and comments of the open issues it affects; work it leaves undone, in an open issue |
-| Order and dependencies | "Blocked by" links between issues; "Why here" in the Delivery of a proposal |
+| Priority and dependencies | The field `Priority` of the project (`Now`, `Next`, `Later`); "Blocked by" links between issues; "Why here" in the Delivery of a proposal |
 | Releases | A milestone per release, and its release issue |
 | Status | The [commol project](https://github.com/orgs/MUNQU/projects/1): "Board" by status, "By release" by milestone |
 | Evidence of the delivery | The body of the pull request: each requirement and the tests that pass |
@@ -64,14 +64,27 @@ Planned work lives in GitHub issues, written from the templates of
 To find the next piece of work, in one call and one line:
 
 ```bash
-.github/scripts/next.sh        # the next proposal; .github/scripts/next.sh 3 for three
+.github/scripts/next.sh        # the next issue; .github/scripts/next.sh 3 for three
 ```
 
-It lists the open proposals that no open issue blocks and nobody has taken,
-by the field `Order` of the project, not by issue number: the dependencies set
-what must come first, and `Order` the preference among the proposals that are
-ready. A new proposal gets an `Order` between those of its neighbours; the
-values go in steps of 10 so one fits in without renumbering. To see the whole
+It runs `.github/scripts/parallel.py --next` and lists the open proposals and
+changes that no open issue blocks and nobody has taken, that can run at the
+same time as every issue in progress and as each other. It names each issue
+it skips and the issue in progress it would touch. A change has no section
+Touches: the paths of its section Where count as what it changes. The issues
+come by:
+
+1. Effective priority: the highest of the field `Priority` of the issue in the
+   project (`Now`, `Next`, `Later`; no value is `Next`) and of every open issue
+   it blocks, through chains of "blocked by" links. So an issue that another
+   one needs inherits the priority of that issue.
+2. Milestone: an open milestone before none; the nearest due date, then the
+   oldest. The milestones of commol have no due date, and their numbers follow
+   the versions, so the next release comes first.
+3. Number.
+
+The dependencies set what must come first; `Priority` is set only to move an
+issue ahead of (`Now`) or behind (`Later`) its milestone. To see the whole
 plan:
 
 ```bash
@@ -100,7 +113,8 @@ gh project item-edit --project-id PVT_kwDODcfAw84BnXyo --id "$item" \
    paths and symbols, one requirement per behavior (`The <component> SHALL …`,
    with `WHEN … THEN …` scenarios), each scenario with the test that checks
    it. Add `breaking` when it breaks the public API, the milestone of its
-   release, its blockers and its `Order` in the project. A large proposal
+   release, its blockers and, when it is not `Next`, its `Priority` in the
+   project. A large proposal
    splits into sub-issues.
 2. Settle its decisions when its implementation starts, not before. A
    decision that changes what an earlier proposal built, or what a later one
