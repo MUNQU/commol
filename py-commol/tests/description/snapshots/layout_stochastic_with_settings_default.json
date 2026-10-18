@@ -1,0 +1,454 @@
+{
+  "title": "At rest",
+  "layout": "default",
+  "sections": [
+    {
+      "key": "overview",
+      "title": "Overview",
+      "blocks": [
+        {
+          "type": "table",
+          "heading": null,
+          "columns": [
+            "Field",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Name",
+              "At rest"
+            ],
+            [
+              "Description",
+              "Two bins at rest."
+            ],
+            [
+              "Kind",
+              "aggregate"
+            ],
+            [
+              "Engine",
+              "StochasticEvents"
+            ],
+            [
+              "Engine settings",
+              "{\"method\":\"tau_leaping\",\"tau\":null,\"epsilon\":0.03,\"tolerance\":1e-8,\"rounding\":null}"
+            ],
+            [
+              "Dynamics",
+              "stochastic events"
+            ],
+            [
+              "Step unit",
+              "step"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "key": "entities",
+      "title": "Entities and state variables",
+      "blocks": [
+        {
+          "type": "table",
+          "heading": "Bins",
+          "columns": [
+            "Bin",
+            "Name",
+            "Unit"
+          ],
+          "rows": [
+            [
+              "A",
+              "A",
+              null
+            ],
+            [
+              "B",
+              "B",
+              null
+            ]
+          ]
+        },
+        {
+          "type": "table",
+          "heading": "Compartments",
+          "columns": [
+            "Compartment",
+            "Bin",
+            "Categories"
+          ],
+          "rows": [
+            [
+              "A",
+              "A",
+              ""
+            ],
+            [
+              "B",
+              "B",
+              ""
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "key": "dynamics",
+      "title": "Dynamics",
+      "blocks": [
+        {
+          "type": "state_graph",
+          "heading": "States and transitions",
+          "name": "states",
+          "nodes": [
+            {
+              "id": "A",
+              "label": "A",
+              "group": "bin"
+            },
+            {
+              "id": "B",
+              "label": "B",
+              "group": "bin"
+            }
+          ],
+          "edges": [
+            {
+              "source": "A",
+              "target": "B",
+              "label": "ab: 0 * A * B"
+            },
+            {
+              "source": "B",
+              "target": "B",
+              "label": "ab: 0 * A * B"
+            },
+            {
+              "source": null,
+              "target": "A",
+              "label": "in: 0"
+            },
+            {
+              "source": null,
+              "target": "B",
+              "label": "in: 0"
+            },
+            {
+              "source": "B",
+              "target": null,
+              "label": "out: 0"
+            },
+            {
+              "source": "A",
+              "target": "B",
+              "label": "dose: 0"
+            }
+          ],
+          "expanded": false
+        },
+        {
+          "type": "state_graph",
+          "heading": "Expanded compartments",
+          "name": "compartments",
+          "nodes": [
+            {
+              "id": "A",
+              "label": "A",
+              "group": "A"
+            },
+            {
+              "id": "B",
+              "label": "B",
+              "group": "B"
+            }
+          ],
+          "edges": [
+            {
+              "source": "A",
+              "target": "B",
+              "label": "ab: 0 * A * B"
+            },
+            {
+              "source": "B",
+              "target": "B",
+              "label": "ab: 0 * A * B"
+            },
+            {
+              "source": null,
+              "target": "A",
+              "label": "in: 0"
+            },
+            {
+              "source": null,
+              "target": "B",
+              "label": "in: 0"
+            },
+            {
+              "source": "B",
+              "target": null,
+              "label": "out: 0 * B"
+            },
+            {
+              "source": "A",
+              "target": "B",
+              "label": "dose: 0 * A"
+            }
+          ],
+          "expanded": true
+        },
+        {
+          "type": "equations",
+          "heading": "Compact form",
+          "title": "Bin Transitions",
+          "groups": [
+            {
+              "heading": "ab (A, B -> B)",
+              "equations": [
+                {
+                  "left": "A -> B",
+                  "right": "0 * A * B",
+                  "left_latex": "A \\to B",
+                  "right_latex": "0 \\cdot A \\cdot B",
+                  "relation": "flow"
+                },
+                {
+                  "left": "B -> B",
+                  "right": "0 * A * B",
+                  "left_latex": "B \\to B",
+                  "right_latex": "0 \\cdot A \\cdot B",
+                  "relation": "flow"
+                }
+              ]
+            },
+            {
+              "heading": "in (none -> A, B)",
+              "equations": [
+                {
+                  "left": "none -> A",
+                  "right": "0",
+                  "left_latex": "\\varnothing \\to A",
+                  "right_latex": "0",
+                  "relation": "flow"
+                },
+                {
+                  "left": "none -> B",
+                  "right": "0",
+                  "left_latex": "\\varnothing \\to B",
+                  "right_latex": "0",
+                  "relation": "flow"
+                }
+              ]
+            },
+            {
+              "heading": "out (B -> none)",
+              "equations": [
+                {
+                  "left": "B -> none",
+                  "right": "0 * B",
+                  "left_latex": "B \\to \\varnothing",
+                  "right_latex": "0 \\cdot B",
+                  "relation": "flow"
+                }
+              ]
+            },
+            {
+              "heading": "dose (A -> B, impulse at 1)",
+              "equations": [
+                {
+                  "left": "A -> B",
+                  "right": "0 * A",
+                  "left_latex": "A \\to B",
+                  "right_latex": "0 \\cdot A",
+                  "relation": "flow"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "heading": null,
+          "text": "Total System: 2 coupled equations (2 bins)"
+        },
+        {
+          "type": "table",
+          "heading": "Events",
+          "columns": [
+            "Transition",
+            "Change",
+            "Propensity"
+          ],
+          "rows": [
+            [
+              "ab",
+              "A -1, B +1",
+              "0 * A * B"
+            ],
+            [
+              "in",
+              "A +1, B +1",
+              "0"
+            ],
+            [
+              "out",
+              "B -1",
+              "0 * B"
+            ]
+          ]
+        },
+        {
+          "type": "text",
+          "heading": null,
+          "text": "Each event moves one unit. A flow has no events while one of its sources holds fewer units than an event takes."
+        },
+        {
+          "type": "equations",
+          "heading": "Impulses",
+          "title": null,
+          "groups": [
+            {
+              "heading": "dose, impulse at 1",
+              "equations": [
+                {
+                  "left": "A -> B",
+                  "right": "0 * A",
+                  "left_latex": "A \\to B",
+                  "right_latex": "0 \\cdot A",
+                  "relation": "flow"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "heading": "Neighbors",
+          "text": "Every unit is a neighbor of every other (Complete): neighbors_<bin> is the bin total and neighbors is total."
+        }
+      ]
+    },
+    {
+      "key": "schedule",
+      "title": "Schedule",
+      "blocks": [
+        {
+          "type": "text",
+          "heading": null,
+          "text": "Events happen one at a time, at random times: each event of a flow moves one unit from its sources to its targets, with a probability per unit of the axis (its propensity) of the rate times its source for a proportional rate, or the rate for an absolute one. The engine stops at each impulse, where the impulses act first, and at each position where a rate jumps."
+        },
+        {
+          "type": "table",
+          "heading": "Settings",
+          "columns": [
+            "Setting",
+            "Value"
+          ],
+          "rows": [
+            [
+              "method",
+              "tau_leaping"
+            ],
+            [
+              "tau",
+              "none"
+            ],
+            [
+              "epsilon",
+              0.03
+            ],
+            [
+              "tolerance",
+              1e-8
+            ],
+            [
+              "rounding",
+              "none"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "key": "initialization",
+      "title": "Initialization",
+      "blocks": [
+        {
+          "type": "table",
+          "heading": "Bin fractions",
+          "columns": [
+            "Bin",
+            "Fraction",
+            "Amount"
+          ],
+          "rows": [
+            [
+              "A",
+              0.5,
+              5.0
+            ],
+            [
+              "B",
+              0.5,
+              5.0
+            ]
+          ]
+        },
+        {
+          "type": "table",
+          "heading": "Initial state (total 10)",
+          "columns": [
+            "Compartment",
+            "Amount"
+          ],
+          "rows": [
+            [
+              "A",
+              5.0
+            ],
+            [
+              "B",
+              5.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "key": "parameters",
+      "title": "Parameters",
+      "blocks": [
+        {
+          "type": "text",
+          "heading": null,
+          "text": "The model has no parameters."
+        }
+      ]
+    },
+    {
+      "key": "outputs",
+      "title": "Outputs",
+      "blocks": [
+        {
+          "type": "table",
+          "heading": null,
+          "columns": [
+            "Source",
+            "Outputs"
+          ],
+          "rows": [
+            [
+              "A",
+              "A"
+            ],
+            [
+              "B",
+              "B"
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

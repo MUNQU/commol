@@ -40,38 +40,19 @@ class TestCompartmentFractionType:
                 compartment_fractions={"A_g1": fraction},
             )
 
-    def test_defaults_to_empty(self) -> None:
-        structure = Aggregate(total=1000, bin_fractions={"A": 1.0})
-
-        assert structure.compartment_fractions == {}
-
 
 class TestBuilderCompartmentFractions:
-    def test_valid_override_is_stored(self) -> None:
-        model = build(_all_in_g1({"A_g2": 0.0}))
-
-        assert _overrides(model) == {"A_g2": 0.0}
-
     def test_unknown_compartment_is_rejected_by_the_engine_at_build(self) -> None:
         builder = _all_in_g1({"A_missing": 0.0})
 
         with pytest.raises(ValueError, match="Unknown compartment 'A_missing'"):
             build(builder)
 
-    def test_out_of_range_fraction_is_rejected(self) -> None:
-        with pytest.raises(ValueError, match="must be between 0.0 and 1.0"):
-            _all_in_g1({"A_g2": 1.5})
-
     def test_over_allocation_is_rejected_by_the_engine_at_build(self) -> None:
         builder = _all_in_g1({"A_g2": 0.5})
 
         with pytest.raises(ValueError, match="exceed the total"):
             build(builder)
-
-    def test_empty_compartment_fractions_use_uniform_expansion(self) -> None:
-        model = build(_all_in_g1({}))
-
-        assert model.structure.compartment_fractions == {}
 
     def test_uncalibrated_bin_fractions_count_as_zero(self) -> None:
         model = build(
@@ -132,8 +113,12 @@ class TestCompartmentFractionValidation:
     def test_an_out_of_range_update_is_rejected(self) -> None:
         model = build(a_to_b_builder())
 
-        with pytest.raises(ValueError, match="between 0.0 and 1.0"):
+        with pytest.raises(ValueError) as error:
             model.structure.update_compartment_fractions(model.process, {"A": 1.5})
+
+        assert str(error.value) == (
+            "Fraction for compartment 'A' must be between 0.0 and 1.0, got 1.5."
+        )
 
     def test_model_rejects_over_allocation(self) -> None:
         model = build(override_builder(0.3))

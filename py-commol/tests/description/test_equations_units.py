@@ -117,10 +117,15 @@ class TestUnits:
 
     @pytest.mark.parametrize("units", [{"k1": "1/day"}, {}])
     def test_partial_units_are_left_out(self, units: dict[str, str]) -> None:
-        output = equation_forms(_ab_into_b(bin_unit="item", units=units))
+        model = _ab_into_b(bin_unit="item", units=units)
+
+        output = equation_forms(model)
+        latex = equation_forms(model, latex=True)
 
         assert "  A -> B: k1 * A * B / total" in output
         assert "[item" not in output
+        assert "  $B \\to C: k2 \\cdot B$\n" in latex
+        assert "text{item" not in latex
 
     def test_compact_with_different_bin_units(self) -> None:
         model = build(

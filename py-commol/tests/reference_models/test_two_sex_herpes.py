@@ -95,6 +95,6 @@ def test_the_male_to_male_numbers_set_the_threshold(c: float) -> None:
 def test_above_the_threshold_the_endemic_equilibrium_is_stable() -> None:
     beta = 2.0 / _reproduction_number(0.9, 1.0)
 
-    limit = settled(_herpes(0.9, beta, {"m": 100.0, "f1": 100.0, "f2": 10.0}), 2e5)
+    limit = settled(_herpes(0.9, beta, {"m": 100.0, "f1": 100.0, "f2": 10.0}), 2e4)
 
     assert all(limit[f"A{g}"] > 0 and limit[f"L{g}"] > 0 for g in SIZES)

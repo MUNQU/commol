@@ -35,13 +35,22 @@ class TestSteps:
     def test_a_result_near_an_integer_is_that_integer(self) -> None:
         assert AxisUnits(step_unit="minute").steps(4.1, "hour") == 246.0
 
+    def test_a_large_result_is_near_an_integer_by_its_distance_alone(self) -> None:
+        assert AxisUnits(step_unit="second").steps(1e10 + 0.5, "second") == 1e10 + 0.5
+
     def test_a_value_of_another_dimension_names_both_units(self) -> None:
         with pytest.raises(ValueError, match=r"'day'.*'meter'"):
             AxisUnits(step_unit="meter").steps(3, "day")
 
     def test_a_physical_unit_on_the_default_step_says_to_declare_one(self) -> None:
-        with pytest.raises(ValueError, match="step_unit in ModelBuilder"):
+        with pytest.raises(ValueError) as error:
             AxisUnits().steps(3, "day")
+
+        assert str(error.value).startswith("Cannot convert 3 day to steps of 'step'")
+        assert str(error.value).endswith(
+            "'step' has dimension [step]. Declare the unit of a step (step_unit in "
+            "ModelBuilder) to convert values in that unit."
+        )
 
     def test_a_unit_pint_does_not_define_is_its_own_dimension(self) -> None:
         generations = AxisUnits(step_unit="generation")
@@ -84,8 +93,13 @@ DAILY_DIFFERENTIAL = AxisUnits(step_unit="day", engine="DifferentialEquations")
 
 class TestRates:
     def test_a_rate_needs_an_engine(self) -> None:
-        with pytest.raises(ValueError, match="Model.axis_units"):
+        with pytest.raises(ValueError) as error:
             AxisUnits(step_unit="day").rate_from_mean_span(4, "day")
+
+        assert str(error.value) == (
+            "A rate needs the engine that reads it: give AxisUnits an engine, "
+            "or use Model.axis_units()."
+        )
 
     def test_an_unknown_engine_is_rejected(self) -> None:
         with pytest.raises(ValidationError, match="Unknown engine"):

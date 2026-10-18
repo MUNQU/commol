@@ -9,7 +9,9 @@ from commol import (
     Calibrator,
     NelderMeadConfig,
     ObservedDataPoint,
+    ParameterSample,
     ParticleSwarmConfig,
+    SampleMethod,
     Simulation,
 )
 from commol.api.model_builder import ModelBuilder
@@ -235,6 +237,26 @@ class TestWriteBackReadability:
         assert rebuilt["B_g1"] == 0.0
         assert sum(rebuilt.values()) == pytest.approx(1000.0)
 
+    def test_a_compartment_value_leaves_a_category_value_to_its_fraction(
+        self,
+    ) -> None:
+        model = build(
+            a_to_b_builder(
+                rate="k * A",
+                per_compartment=True,
+                fractions={"A": 0.6, "B": 0.4},
+                stratifications={"group": {"g1": 0.5, "g2": 0.5}},
+            )
+        )
+        values = {"B_g1": 0.1, "g1": 0.3}
+
+        model.apply_calibration_parameters(values, initial_condition_problem(*values))
+
+        assert model.structure.stratification_fractions == {
+            "group": {"g1": 0.3, "g2": 0.7}
+        }
+        assert _overrides(model) == {"B_g1": 0.1}
+
     def test_without_remainder_values_are_applied_as_given(self) -> None:
         model = build(_flat_category())
 
@@ -308,6 +330,30 @@ class TestSharedCategory:
 
 
 class TestAtomicity:
+    @pytest.mark.parametrize(("factory", "values", "remainder"), WRITE_BACK_CASES)
+    def test_the_written_back_structure_is_a_copy(
+        self, factory, values, remainder
+    ) -> None:
+        model = build(factory())
+        before = model.structure.model_copy(deep=True)
+        problem = initial_condition_problem(*values, remainder=remainder)
+
+        written = model.structure.with_calibrated_values(model, problem, values)
+
+        assert model.structure == before
+        assert written != before
+
+    def test_no_initial_condition_value_gives_an_independent_copy(self) -> None:
+        model = build(override_builder())
+
+        written = model.structure.with_calibrated_values(
+            model, initial_condition_problem("A_g1"), {}
+        )
+        written.compartment_fractions["A_g1"] = 0.1
+
+        assert written.bin_fractions == model.structure.bin_fractions
+        assert model.structure.compartment_fractions == {"A_g1": 0.3}
+
     def test_unresolvable_initial_condition_leaves_the_model_unchanged(self) -> None:
         model = build(override_builder())
         problem = initial_condition_problem("A", "missing")
@@ -464,6 +510,20 @@ class TestApplyCalibrationParameters:
         group = model.structure.stratification_fractions["group"]
         assert group["group1"] == pytest.approx(0.4)
 
+    def test_a_sample_is_rejected_for_one_of_its_draws(self) -> None:
+        model = _binary_split()
+        sample = ParameterSample.equally_weighted(
+            ["k1"], [(0.0, 1.0)], [[0.1], [0.2]], SampleMethod(name="test")
+        )
+
+        with pytest.raises(TypeError) as error:
+            model.apply_calibration_parameters(sample, _split_problem())  # ty: ignore[invalid-argument-type]
+
+        assert str(error.value) == (
+            "A ParameterSample has no single set of parameters; pass one of "
+            "sample.draws() instead."
+        )
+
     def test_scale_parameters_are_ignored(self) -> None:
         model = _binary_split()
         problem = _split_problem()
@@ -486,17 +546,6 @@ class TestApplyCalibrationParameters:
 
         with pytest.raises(ValueError, match="no declared parameter type"):
             model.apply_calibration_parameters({"mystery": 0.15}, _split_problem())
-
-    def test_per_compartment_initial_condition_is_written_back(self) -> None:
-        model = _binary_split()
-        problem = initial_condition_problem("A_group1", "A_group2")
-
-        model.apply_calibration_parameters({"A_group1": 0.3, "A_group2": 0.7}, problem)
-
-        assert _overrides(model) == {
-            "A_group1": pytest.approx(0.3),
-            "A_group2": pytest.approx(0.7),
-        }
 
     def test_per_compartment_initial_condition_is_upserted(self) -> None:
         model = _binary_split()

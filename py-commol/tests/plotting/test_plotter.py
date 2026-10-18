@@ -58,16 +58,6 @@ def _observed_b(results: dict[str, list[float]]) -> list[ObservedDataPoint]:
 
 
 class TestSimulationPlotter:
-    def test_plotter_initialization(self, abc_simulation: Simulation) -> None:
-        results = abc_simulation.run(100)
-
-        plotter = SimulationPlotter(abc_simulation, results)
-
-        assert plotter.simulation == abc_simulation
-        assert plotter.results == results
-        assert len(plotter.bins) == 3
-        assert plotter.results.positions == [float(step) for step in range(101)]
-
     def test_plot_series_draws_every_bin(self, plotter: SimulationPlotter) -> None:
         fig = plotter.plot_series()
 
@@ -147,13 +137,6 @@ class TestSimulationPlotter:
         assert fig.dpi == 150
         _assert_draws(fig, {name: plotter.results[name] for name in BINS})
 
-    def test_plot_series_with_seaborn_config(self, plotter: SimulationPlotter) -> None:
-        config = PlotConfig(style="dark", palette="husl", context="talk")
-
-        fig = plotter.plot_series(config=config)
-
-        _assert_draws(fig, {name: plotter.results[name] for name in BINS})
-
     def test_plot_cumulative_draws_the_running_sums(
         self, plotter: SimulationPlotter
     ) -> None:
@@ -182,6 +165,112 @@ class TestSimulationPlotter:
         markers = _scatter(_visible(fig)[1])
         np.testing.assert_allclose(
             markers[:, 1], np.cumsum([p.value for p in observed])
+        )
+
+    def test_a_cumulative_plot_has_the_size_of_its_configuration(
+        self, plotter: SimulationPlotter
+    ) -> None:
+        config = PlotConfig(figsize=(10, 6), dpi=80, layout=(1, 4))
+
+        fig = plotter.plot_cumulative(config=config)
+
+        assert tuple(fig.get_size_inches()) == (10, 6)
+        assert fig.dpi == 80
+        assert (len(fig.axes), len(_visible(fig))) == (4, 3)
+
+    def test_a_series_plot_has_the_size_of_its_subplots(
+        self, plotter: SimulationPlotter
+    ) -> None:
+        fig = plotter.plot_series(config=PlotConfig(layout=(2, 2)))
+
+        assert tuple(fig.get_size_inches()) == (9.0, 8.0)
+        assert (len(fig.axes), len(_visible(fig))) == (4, 3)
+
+    @pytest.mark.parametrize("method", ["plot_series", "plot_cumulative"])
+    def test_a_plot_of_one_series_has_one_subplot(
+        self, plotter: SimulationPlotter, method: str
+    ) -> None:
+        fig = getattr(plotter, method)(series=["B"])
+
+        assert [ax.get_title() for ax in fig.axes] == ["State B"]
+
+    @pytest.mark.parametrize(
+        ("method", "name"),
+        [("plot_series", "Series"), ("plot_cumulative", "Cumulative")],
+    )
+    def test_a_saved_plot_is_cropped_and_logged(
+        self,
+        plotter: SimulationPlotter,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+        method: str,
+        name: str,
+    ) -> None:
+        path = tmp_path / "plot.png"
+        uncropped = tmp_path / "uncropped.png"
+
+        with caplog.at_level("INFO", logger="commol"):
+            fig = getattr(plotter, method)(output_file=str(path))
+        fig.savefig(uncropped, dpi=fig.dpi)
+
+        assert caplog.messages[0] == f"Starting {method}"
+        assert f"{name} plot saved to {path}" in caplog.messages
+        assert plt.imread(path).shape != plt.imread(uncropped).shape
+
+    def test_a_cumulative_plot_labels_its_line_and_its_observations(
+        self, plotter: SimulationPlotter
+    ) -> None:
+        fig = plotter.plot_cumulative(observed_data=_observed_b(plotter.results))
+
+        ax = _visible(fig)[1]
+        (markers,) = [c for c in ax.collections if len(c.get_offsets()) == 10]
+        np.testing.assert_allclose(_scatter(ax)[:, 0], range(0, 100, 10))
+        assert (ax.get_xlabel(), ax.get_ylabel(), ax.get_title()) == (
+            "Step",
+            "",
+            "State B",
+        )
+        grid = ax.xaxis.get_gridlines()[0]
+        assert (grid.get_visible(), grid.get_alpha()) == (True, 0.3)
+        assert ax.lines[0].get_label() == "Simulation (Cumulative)"
+        assert [t.get_text() for t in ax.get_legend().get_texts()] == [
+            "Simulation (Cumulative)",
+            "Observed (Cumulative)",
+        ]
+        np.testing.assert_allclose(markers.get_facecolor(), [[1.0, 0.0, 0.0, 0.7]])
+        assert (list(markers.get_sizes()), markers.get_zorder()) == ([30.0], 5)
+
+    def test_a_cumulative_plot_labels_the_unit_of_its_series(self) -> None:
+        simulation = Simulation(build(abc_builder(bin_unit="item")))
+
+        fig = SimulationPlotter(simulation, simulation.run(5)).plot_cumulative()
+
+        assert [ax.get_ylabel() for ax in _visible(fig)] == ["item"] * 3
+
+    def test_cumulative_observations_of_a_factor_are_divided_by_it(
+        self, plotter: SimulationPlotter
+    ) -> None:
+        observed = [
+            ObservedDataPoint(at=step, output="B", value=10.0, factor_id="rate")
+            for step in (10, 20)
+        ] + [
+            ObservedDataPoint(at=30, output="B", value=10.0),
+            ObservedDataPoint(at=40, output="B", value=10.0, factor_id="other"),
+        ]
+        result = CalibrationResult(
+            best_parameters={"rate": 0.5},
+            final_loss=0.0,
+            iterations=1,
+            converged=True,
+            termination_reason="Test",
+        )
+
+        fig = plotter.plot_cumulative(
+            observed_data=observed, calibration_result=result, series=["B"]
+        )
+
+        np.testing.assert_allclose(
+            _scatter(fig.axes[0])[:, 1], [20.0, 40.0, 50.0, 60.0]
         )
 
     def test_calculate_layout(self, plotter: SimulationPlotter) -> None:
@@ -226,9 +315,14 @@ class TestSimulationPlotter:
     ) -> None:
         _fig, ax = plt.subplots()
 
-        plotter._apply_x_labels(ax, [5, 10, 15], str, tick_every=None)
+        plotter._apply_x_labels(ax, [5, 10, 15], lambda p: f"day {p}", tick_every=None)
 
         assert list(ax.get_xticks()) == [5, 10, 15]
+        labels = ax.get_xticklabels()
+        assert [label.get_text() for label in labels] == ["day 5", "day 10", "day 15"]
+        assert {(label.get_rotation(), label.get_ha()) for label in labels} == {
+            (45.0, "right")
+        }
 
     def test_apply_x_labels_with_empty_series(self, plotter: SimulationPlotter) -> None:
         """An empty series produces no ticks instead of an index error."""
@@ -260,22 +354,39 @@ class TestSimulationPlotter:
             assert (ax.lines[0].get_linewidth(), ax.lines[0].get_alpha()) == (2.0, 0.8)
 
     @pytest.mark.parametrize(
-        ("preset", "figsize", "dpi", "context"),
+        ("preset", "expected"),
         [
-            (PlotConfig.presentation, (16, 10), 150, "talk"),
-            (PlotConfig.publication, (8, 6), 300, "paper"),
-            (PlotConfig.notebook, (12, 8), 100, "notebook"),
+            (
+                PlotConfig.presentation,
+                PlotConfig(
+                    figsize=(16, 10),
+                    dpi=150,
+                    style="whitegrid",
+                    context="talk",
+                    palette="colorblind",
+                ),
+            ),
+            (
+                PlotConfig.publication,
+                PlotConfig(figsize=(8, 6), dpi=300, style="ticks", context="paper"),
+            ),
+            (
+                PlotConfig.notebook,
+                PlotConfig(
+                    figsize=(12, 8), dpi=100, style="whitegrid", context="notebook"
+                ),
+            ),
         ],
     )
     def test_plot_config_presets(
-        self, plotter: SimulationPlotter, preset, figsize, dpi, context
+        self, plotter: SimulationPlotter, preset, expected: PlotConfig
     ) -> None:
         config = preset()
 
         fig = plotter.plot_series(config=config)
 
-        assert (config.figsize, config.dpi, config.context) == (figsize, dpi, context)
-        assert fig.dpi == dpi
+        assert config == expected
+        assert fig.dpi == expected.dpi
 
 
 class TestPredictiveSeries:
@@ -337,6 +448,32 @@ class TestPredictiveSeries:
         band = filled[0].get_paths()[0].vertices[:, 1]
         assert band.min() == pytest.approx(min(low["B"]))
         assert band.max() == pytest.approx(max(high["B"]))
+
+    def test_a_cumulative_band_spans_the_running_totals_of_its_draws(self) -> None:
+        predictive = self._predictive([0.02, 0.1])
+        low, high = predictive.runs()
+        plotter = SimulationPlotter(predictive.calibrator.simulation, low)
+        observed = [ObservedDataPoint(at=at, output="B", value=1.0) for at in (5, 9)]
+
+        figure = plotter.plot_cumulative(
+            observed_data=observed, calibration_result=predictive, series=["B"]
+        )
+
+        ax = figure.axes[0]
+        band = [c for c in ax.collections if c.get_paths()][0]
+        vertices = band.get_paths()[0].vertices[:, 1]
+        assert vertices.max() == pytest.approx(float(np.cumsum(high["B"])[-1]))
+        edges = band.get_paths()[0].vertices
+        # The closed path repeats a vertex.
+        at_the_end = sorted({round(float(y), 6) for x, y in edges if x == 40})
+        assert at_the_end == pytest.approx(
+            [float(np.cumsum(low["B"])[-1]), float(np.cumsum(high["B"])[-1])]
+        )
+        assert band.get_alpha() == 0.3
+        assert "95% of the draws" in [t.get_text() for t in ax.get_legend().get_texts()]
+        assert ax.lines[0].get_label() == "Median of the draws (cumulative)"
+        np.testing.assert_allclose(_scatter(ax), [[5.0, 1.0], [9.0, 2.0]])
+        assert ax.get_title() == "B"
 
 
 class TestSeriesSelection:

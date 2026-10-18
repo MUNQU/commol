@@ -459,6 +459,12 @@ mod tests {
     }
 
     #[test]
+    fn two_positions_are_the_same_within_a_relative_tolerance() {
+        assert!(same_position(1e6, 1e6 + 1e-4));
+        assert!(!same_position(1.0, 1.0 + 1e-8));
+    }
+
+    #[test]
     fn pulse_series_only_fires_on_listed_steps() {
         let series = series(vec![(5.0, 2.0), (1.0, 1.0)], SeriesMode::Pulse);
 

@@ -116,8 +116,8 @@ class Model(BaseModel, Generic[StructureT]):
         """
         Loads a model from a JSON file.
 
-        The method reads the specified JSON file, parses its content, and validates
-        it against the Model schema.
+        The method reads the specified JSON file as UTF-8, the encoding of
+        JSON, parses its content, and validates it against the Model schema.
 
         Parameters
         ----------
@@ -136,10 +136,7 @@ class Model(BaseModel, Generic[StructureT]):
         pydantic.ValidationError
             If the JSON content does not conform to the Model schema.
         """
-        with open(file_path, "r") as f:
-            json_data = f.read()
-
-        return cls.model_validate_json(json_data)
+        return cls.model_validate_json(Path(file_path).read_text(encoding="utf-8"))
 
     def to_json(self, file_path: str | Path, indent: int = 2) -> None:
         """

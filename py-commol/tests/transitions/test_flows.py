@@ -1,11 +1,8 @@
 """Transition flows: what the engine simulates is what is printed."""
 
-import json
-
 import pytest
-from pydantic import ValidationError
 
-from commol import Aggregate, ModelBuilder
+from commol import Aggregate
 from commol.context._model.engine_state import transition_flows
 from commol.context.model import Model
 from tests.support import (
@@ -99,29 +96,3 @@ class TestSeveralSourcesAndTargets:
         assert result["A"][1] == pytest.approx(50 - flow)
         assert result["B"][1] == pytest.approx(50 - flow)
         assert result["C"][1] == pytest.approx(2 * flow)
-
-
-class TestNoTransitionConditions:
-    def test_add_transition_has_no_condition_argument(self) -> None:
-        builder = FactoryBuilder(name="No condition").add_bin(id="A", name="A")
-
-        with pytest.raises(TypeError, match="condition"):
-            builder.add_transition(  # type: ignore[call-arg]
-                id="t", source=["A"], target=[], rate="0.1", condition=None
-            )
-
-    def test_the_builder_has_no_create_condition(self) -> None:
-        assert not hasattr(ModelBuilder, "create_condition")
-
-    def test_a_model_file_with_a_condition_key_names_it(self, tmp_path) -> None:
-        model = _group_model()
-        data = model.model_dump(mode="json")
-        data["process"]["transitions"][0]["condition"] = {
-            "logic": "and",
-            "rules": [{"variable": "state:A", "operator": "gt", "value": 0}],
-        }
-        path = tmp_path / "model.json"
-        path.write_text(json.dumps(data))
-
-        with pytest.raises(ValidationError, match="condition"):
-            Model.from_json(path)

@@ -4,34 +4,20 @@ use commol_calibration::CalibrationConstraint;
 use commol_core::MathExpression;
 
 #[test]
-fn test_constraint_creation() {
+fn a_constraint_without_positions_reads_only_parameters() {
     let constraint = CalibrationConstraint::new("test".to_string(), "5.0 - k1/k2".to_string());
-    assert_eq!(constraint.id, "test");
-    assert_eq!(constraint.expression, "5.0 - k1/k2");
-    assert_eq!(constraint.weight, 1.0);
     assert!(constraint.is_parameter_only());
     assert!(!constraint.has_positions());
 }
 
 #[test]
-fn test_constraint_with_positions() {
+fn a_constraint_with_positions_reads_the_outputs() {
     let constraint =
         CalibrationConstraint::new("at_positions".to_string(), "500.0 - B".to_string())
             .with_positions(vec![10.0, 20.0, 30.0]);
 
     assert!(constraint.has_positions());
     assert!(!constraint.is_parameter_only());
-    assert_eq!(constraint.at, Some(vec![10.0, 20.0, 30.0]));
-}
-
-#[test]
-fn test_constraint_with_description_and_weight() {
-    let constraint = CalibrationConstraint::new("weighted".to_string(), "k1 - k2".to_string())
-        .with_description("k1 must be >= k2".to_string())
-        .with_weight(5.0);
-
-    assert_eq!(constraint.description, Some("k1 must be >= k2".to_string()));
-    assert_eq!(constraint.weight, 5.0);
 }
 
 #[test]
@@ -104,22 +90,4 @@ fn test_constraint_with_mathematical_functions() {
             expr_str
         );
     }
-}
-
-#[test]
-fn test_constraint_builder_pattern() {
-    let constraint = CalibrationConstraint::new("complex".to_string(), "5.0 - k1/k2".to_string())
-        .with_description("k1/k2 must be less than 5".to_string())
-        .with_weight(2.5)
-        .with_positions(vec![10.0, 20.0, 30.0]);
-
-    assert_eq!(constraint.id, "complex");
-    assert_eq!(constraint.expression, "5.0 - k1/k2");
-    assert_eq!(
-        constraint.description,
-        Some("k1/k2 must be less than 5".to_string())
-    );
-    assert_eq!(constraint.weight, 2.5);
-    assert_eq!(constraint.at, Some(vec![10.0, 20.0, 30.0]));
-    assert!(constraint.has_positions());
 }

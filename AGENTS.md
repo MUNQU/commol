@@ -36,7 +36,7 @@ Run them from `py-commol/` with the virtual environment `py-commol/.venv`.
 | Build the extension | `source .venv/bin/activate && maturin develop --release --features test-kind` (the tests need the test model kind; a release never has it) |
 | Python tests | `pytest` |
 | Documentation checks (examples, API coverage) | `pytest -m docs` |
-| Coverage studies of the uncertainty methods (slow; weekly in CI) | `pytest -m coverage_study` |
+| Coverage studies of the uncertainty methods (slow; CI runs them when what they run changes, and before a release) | `pytest -m coverage_study` |
 | Python lint, types and dead code | `ruff check . ../.github/scripts && ruff format --check . ../.github/scripts && ty check commol && vulture commol .vulture_allowlist.py --min-confidence 80` |
 | Rust tests (from the root) | `cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-stochastic -p commol && cargo test -p commol --features test-kind` |
 | Test coverage, as CI measures it | `pytest --cov=commol`; from the root, `cargo llvm-cov --all-features --workspace` (needs `cargo-llvm-cov` and the `llvm-tools-preview` component) |
@@ -44,7 +44,8 @@ Run them from `py-commol/` with the virtual environment `py-commol/.venv`.
 | Documentation (from the root) | `mkdocs build --strict` |
 | Rust docs (from the root) | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-stochastic` |
 
-Rebuild the extension after every Rust change, before you run `pytest`.
+Rebuild the extension after every Rust change and every `uv sync`, before you
+run `pytest`; uv never builds it (`package = false`).
 `cargo build --workspace` does not link the PyO3 crate outside `maturin`; use
 `clippy` and the per-crate tests instead.
 <!-- --8<-- [end:commands] -->

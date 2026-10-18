@@ -2,21 +2,40 @@ name: Coverage Studies
 
 # Coverage studies check that the intervals of each uncertainty method cover
 # the truth at their nominal rate (tests marked `coverage_study`,
-# py-commol/tests/support/coverage.py). Each runs many fits, so they run every
-# week and on demand, never in a pull request.
+# py-commol/tests/support/coverage.py). Each runs many fits, so a pull request
+# runs them only when it changes what they run: Build calls this workflow for
+# such a pull request, the release calls it before it publishes, and anyone
+# can run it by hand.
 
 on:
-  schedule:
-    - cron: "0 4 * * 1"
+  workflow_call:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # One job per group of studies, so the slowest study sets the wait. Every
+  # study is in one group (tests/suite/test_rules.py checks it).
   coverage-studies:
-    name: Coverage studies
+    name: Coverage studies (${{ matrix.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: residual block bootstrap
+            tests: tests/uncertainty/test_resampling_coverage.py::TestResidualBlockBootstrap
+          - name: Bayesian bootstrap
+            tests: tests/uncertainty/test_resampling_coverage.py::TestBayesianBootstrap
+          - name: harness, wild bootstrap and prediction interval
+            tests: >-
+              tests/uncertainty/test_coverage.py::TestHarness
+              tests/uncertainty/test_resampling_coverage.py::TestWildBootstrap
+              tests/uncertainty/test_resampling_coverage.py::TestResidualPredictionInterval
     defaults:
       run:
         working-directory: ./py-commol
@@ -45,4 +64,6 @@ jobs:
         run: uv run maturin develop --release --features test-kind
 
       - name: Run the coverage studies
-        run: uv run pytest -m coverage_study
+        env:
+          TESTS: ${{ matrix.tests }}
+        run: uv run pytest -m coverage_study --durations=0 $TESTS

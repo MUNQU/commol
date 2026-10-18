@@ -269,6 +269,11 @@ class ParameterSample(BaseModel):
         -------
         dict[str, list[float]]
             One quantile per level for each name.
+
+        Raises
+        ------
+        ValueError
+            If a level is not between 0 and 1.
         """
         rows = self._rust.quantiles([float(level) for level in levels])
         return {

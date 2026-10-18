@@ -20,6 +20,7 @@ from tests.support import (
     assert_close,
     assert_total_conserved,
     build,
+    build_stochastic,
     reference_run,
     abc_builder,
     abc_flows,
@@ -52,6 +53,20 @@ B = 10 + 99 - 0.5 = 108.5 and C = 0.5.
 
 
 class TestResults:
+    def test_results_print_their_positions_their_seed_and_their_values(self) -> None:
+        plain = Simulation(build(abc_builder())).run(1)
+        drawn = Simulation(build_stochastic(abc_builder(), "StochasticEvents")).run(
+            1, seed=3
+        )
+
+        assert repr(plain) == (
+            "SimulationResults(positions=[0.0, 1.0], {'A': [990.0, 987.03], "
+            "'B': [10.0, 11.97], 'C': [0.0, 1.0]})"
+        )
+        assert repr(drawn).startswith(
+            "SimulationResults(positions=[0.0, 1.0], seed=3, {'A': [990.0, "
+        )
+
     def test_results_map_each_output_to_its_values(self) -> None:
         result = Simulation(_proportional_abc()).run(10)
 
@@ -133,6 +148,15 @@ class TestModelChanges:
         model.update_parameters({"k": 0.5})
 
         assert simulation.run(1)["A"][1] == pytest.approx(500.0)
+
+    def test_an_unknown_parameter_names_the_parameters_of_the_model(self) -> None:
+        model = build(abc_builder())
+
+        with pytest.raises(
+            ValueError,
+            match="Parameter 'x' not found in model. Available parameters: k1, k2",
+        ):
+            model.update_parameters({"x": 1.0})
 
     def test_a_direct_field_edit(self) -> None:
         model = _model(k=0.1)

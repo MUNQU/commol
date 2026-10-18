@@ -59,11 +59,6 @@ impl CompiledModel {
         self.compartments.len()
     }
 
-    /// Length of the state: compartments plus accumulators.
-    pub fn state_len(&self) -> usize {
-        self.initial_state.len()
-    }
-
     /// Initial state: compartments, then accumulators (zero).
     pub fn initial_state(&self) -> &[f64] {
         &self.initial_state
@@ -112,7 +107,7 @@ impl CompiledModel {
     /// The right-hand side of the model: the net flow into each component of
     /// the state.
     ///
-    /// `state` and `out` have [`Self::state_len`] components. It is
+    /// `state` and `out` have the length of [`Self::initial_state`]. It is
     /// `Σ changes × flow` over the flows of the model: each flow
     /// ([`Self::flow_rates`]) is subtracted from its sources, added to its
     /// targets and added to each accumulator that counts it
@@ -313,14 +308,6 @@ impl CompiledModel {
     /// Whether the model has impulse transitions.
     pub fn has_impulses(&self) -> bool {
         !self.impulse_flows.is_empty()
-    }
-
-    /// Whether a rate or a formula parameter reads `step` or a pulse series.
-    ///
-    /// When it does, the right-hand side may jump at every integer position,
-    /// so a differential engine restarts its integration there.
-    pub fn depends_on_step(&self) -> bool {
-        self.depends_on_step
     }
 
     /// Positions in `[from, to]` where an impulse acts, ascending and without

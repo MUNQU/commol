@@ -33,7 +33,7 @@
 //!     vec![],
 //!     LossConfig::SumSquaredError,
 //! )?;
-//! let config = OptimizationConfig::NelderMead(NelderMeadConfig::new());
+//! let config = OptimizationConfig::NelderMead(NelderMeadConfig::default());
 //! let result = optimize(&problem, &config)?;
 //! ```
 

@@ -68,16 +68,6 @@ class TestUpdateStratificationFractions:
         assert _fractions_of(model, "group") == {"group1": 0.25, "group2": 0.75}
         assert _fractions_of(model, "tier") == {"low": 0.1, "mid": 0.4, "high": 0.5}
 
-    def test_fractions_still_sum_to_one(self) -> None:
-        model = _stratified_model()
-
-        model.structure.update_stratification_fractions(
-            {"group1": 0.123, "low": 0.077, "mid": 0.401}
-        )
-
-        assert sum(_fractions_of(model, "group").values()) == pytest.approx(1.0)
-        assert sum(_fractions_of(model, "tier").values()) == pytest.approx(1.0)
-
     def test_two_omitted_categories_are_rejected(self) -> None:
         model = _stratified_model()
 
@@ -112,8 +102,40 @@ class TestUpdateStratificationFractions:
     def test_out_of_range_fraction_is_rejected(self, value: float) -> None:
         model = _stratified_model()
 
-        with pytest.raises(ValueError, match="between 0.0 and 1.0"):
+        with pytest.raises(ValueError) as error:
             model.structure.update_stratification_fractions({"group1": value})
+
+        assert str(error.value) == (
+            f"Fraction for category 'group1' must be between 0.0 and 1.0, got {value}."
+        )
+
+    def test_a_complete_update_may_miss_one_by_its_tolerance(self) -> None:
+        model = _stratified_model()
+
+        model.structure.update_stratification_fractions(
+            {"group1": 0.6000005, "group2": 0.4}
+        )
+
+        assert _fractions_of(model, "group") == {"group1": 0.6000005, "group2": 0.4}
+
+    def test_a_partial_update_may_pass_one_by_its_tolerance(self) -> None:
+        model = _stratified_model()
+        near_one = 1.0 + 1e-6 - 0.5
+
+        model.structure.update_stratification_fractions({"low": 0.5, "mid": near_one})
+
+        assert _fractions_of(model, "tier") == {
+            "low": 0.5,
+            "mid": near_one,
+            "high": 0.0,
+        }
+
+    def test_a_partial_update_just_below_one_leaves_its_remainder(self) -> None:
+        model = _stratified_model()
+
+        model.structure.update_stratification_fractions({"low": 0.5, "mid": 0.4999995})
+
+        assert _fractions_of(model, "tier")["high"] == pytest.approx(5e-7, abs=1e-12)
 
     def test_boundary_values_are_allowed(self) -> None:
         model = _stratified_model()
@@ -132,8 +154,13 @@ class TestUpdateStratificationFractions:
     def test_a_bare_shared_category_is_rejected_as_ambiguous(self) -> None:
         model = build(shared_category_builder())
 
-        with pytest.raises(ValueError, match="ambiguous"):
+        with pytest.raises(ValueError) as error:
             model.structure.update_stratification_fractions({"c1": 0.6})
+
+        assert str(error.value) == (
+            "Category 'c1' is ambiguous: it is declared by stratifications "
+            "['group', 'level']. Qualify it as 'group:c1' or 'level:c1'."
+        )
 
 
 class TestQualifiedCategoryReads:

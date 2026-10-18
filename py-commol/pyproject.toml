@@ -40,6 +40,7 @@ dependencies = [
 dev = [
     "maturin>=1.9.1,<1.16.0",
     "pre-commit>=3.8,<5.0",
+    "pydot>=4.0,<5.0",
     "pytest>=9.0,<10.0",
     "pytest-cov>=6.2,<8.0",
     "ruff>=0.12,<0.18",
@@ -78,7 +79,7 @@ addopts = "--log-cli-level=WARN -m 'not coverage_study'"
 filterwarnings = ["error::pytest.PytestRemovedIn10Warning"]
 markers = [
     "docs: checks the documentation, its examples and its API coverage (tests/docs/)",
-    "coverage_study: checks that the intervals of a method cover at their nominal rate; excluded by default, run with -m coverage_study (weekly in CI)",
+    "coverage_study: checks that the intervals of a method cover at their nominal rate; excluded by default, run with -m coverage_study (in CI when what they run changes, and before a release)",
 ]
 log_cli_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
@@ -142,3 +143,9 @@ skip-magic-trailing-comma = false
 
 [tool.ty.src]
 exclude = [".vulture_allowlist.py"]
+
+# uv installs the tools and never builds commol: `maturin develop` builds it,
+# with the features a task needs. A `uv sync` then removes that install; run
+# `maturin develop` again.
+[tool.uv]
+package = false

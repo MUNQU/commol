@@ -18,7 +18,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 | Comments | Describe the code as it is | Review |
 | Documentation | Mandatory with every change: [definition of done](#documentation-definition-of-done) | CI and review |
 | Doc examples | Abstract names; every block runs | `pytest -m docs` (CI) and review |
-| Tests | One package per guide page; shared factories; every test checks a result: [Tests](tests.md) | Review; pytest 10 deprecations fail the run (`filterwarnings`) |
+| Tests | One package per guide page; shared factories; every test checks a result, once, within its time budget: [Tests](tests.md) | `tests/suite/` (CI) and review; pytest 10 deprecations fail the run (`filterwarnings`) |
 | Commits | `type(scope): description` | Review |
 
 ## Python
@@ -136,15 +136,15 @@ every match.
 |---|---|---|
 | The site builds with no broken internal link or anchor | `mkdocs build --strict` (with `validation:` in `mkdocs.yaml`) | CI (Documentation) |
 | External links answer | lychee (`.github/workflows/links.yaml`) | CI on documentation changes, weekly; not a required check |
-| The documentation examples run | `pytest -m docs` (from `py-commol/`) | CI (Code Quality) |
-| Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Code Quality) |
-| Every crate under `crates/` is named in [Architecture](architecture.md) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Code Quality) |
-| Every test or definition a page names as `<file>::<name>` exists in that file (the dated design records `development/design-*.md` keep the names of their date) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Code Quality) |
+| The documentation examples run | `pytest -m docs` (from `py-commol/`) | CI (Python Coverage, and Test of Build) |
+| Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
+| Every crate under `crates/` is named in [Architecture](architecture.md) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
+| Every test or definition a page names as `<file>::<name>` exists in that file (the dated design records `development/design-*.md` keep the names of their date) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
 | Public Python modules, classes, functions and arguments have docstrings | `ruff check . ../.github/scripts` (rules `D1`, `D417`, NumPy convention) | pre-commit, CI |
-| Every path a page of `AGENTS.md` or `docs/codebase/` names in code format exists, and a bare file name matches one file | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Code Quality) |
-| Every area page of decisions has a row on the index, and no link points to a decision on the index | `pytest -m docs` (`tests/docs/test_layout.py`) | CI (Code Quality) |
-| No run of 12 words is in two pages of `AGENTS.md`, `docs/codebase/` or `docs/development/`; the repository map and the workflow include the task table and the commands of `AGENTS.md` | `pytest -m docs` (`tests/docs/test_layout.py`) | CI (Code Quality) |
-| `AGENTS.md` stays within 110 lines, a page of `docs/codebase/` within 300 and a page of `docs/codebase/decisions/` within 250 | `pytest -m docs` (`tests/docs/test_layout.py`) | CI (Code Quality) |
+| Every path a page of `AGENTS.md` or `docs/codebase/` names in code format exists, and a bare file name matches one file | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
+| Every area page of decisions has a row on the index, and no link points to a decision on the index | `pytest -m docs` (`tests/docs/test_layout.py`) | CI (Python Coverage, and Test of Build) |
+| No run of 12 words is in two pages of `AGENTS.md`, `docs/codebase/` or `docs/development/`; the repository map and the workflow include the task table and the commands of `AGENTS.md` | `pytest -m docs` (`tests/docs/test_layout.py`) | CI (Python Coverage, and Test of Build) |
+| `AGENTS.md` stays within 110 lines, a page of `docs/codebase/` within 300 and a page of `docs/codebase/decisions/` within 250 | `pytest -m docs` (`tests/docs/test_layout.py`) | CI (Python Coverage, and Test of Build) |
 | Public Rust items have docs, without broken links | `#![warn(missing_docs)]` in every crate (denied by `clippy -D warnings`); `RUSTDOCFLAGS="-D warnings" cargo doc` | pre-commit (clippy), CI |
 | The table in step 1 is complete for this change | — | Pull request checklist and review |
 | The format in step 2 is followed | — | Review |

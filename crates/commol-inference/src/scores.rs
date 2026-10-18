@@ -239,13 +239,27 @@ mod tests {
 
     #[test]
     fn the_pit_of_a_tie_lies_between_the_two_sides() {
+        // Weights of any scale: the PIT divides by their sum.
         let draws = ObservationDraws {
             values: vec![vec![0.0], vec![1.0], vec![1.0], vec![2.0]],
-            weights: vec![0.25; 4],
+            weights: vec![2.0; 4],
         };
         let value = pit(&draws, &[1.0], 5).unwrap()[0];
-        assert!((0.25..=0.75).contains(&value), "{value}");
+        assert!(value > 0.25 && value < 0.75, "{value}");
         assert_eq!(pit(&draws, &[3.0], 5).unwrap(), vec![1.0]);
+        assert_eq!(pit(&draws, &[0.5], 5).unwrap(), vec![0.25]);
+    }
+
+    #[test]
+    fn a_score_needs_one_value_per_observation_and_a_draw() {
+        let draws = uniform_draws();
+        let error = coverage(&draws, &[1.0, 2.0], 0.9).unwrap_err();
+        assert!(error.contains("1 observations; 2 observed"), "{error}");
+        let empty = ObservationDraws {
+            values: vec![],
+            weights: vec![],
+        };
+        assert!(crps(&empty, &[]).unwrap_err().contains("at least one draw"));
     }
 
     #[test]

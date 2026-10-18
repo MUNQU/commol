@@ -23,6 +23,50 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    defaults:
+      run:
+        working-directory: ./py-commol
+
+    # Linters read the source and the stubs (`_commol_rs.pyi`), so this job
+    # builds nothing and answers in seconds; the tests run in Python Coverage.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: py-commol/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --locked --extra dev
+
+      - name: Run Ruff linting
+        run: uv run ruff check . ../.github/scripts
+
+      - name: Run Ruff formatting check
+        run: uv run ruff format --check . ../.github/scripts
+
+      - name: Run Vulture dead code detection
+        run: uv run vulture commol .vulture_allowlist.py --min-confidence 80
+
+      - name: Run ty type checking
+        run: uv run ty check commol
+
+  # Every test, the documentation examples included, under coverage. It runs
+  # for every change, the documentation too, so a page whose example breaks
+  # fails here. Coverage slows the tests, so the time budget is measured in
+  # the job Test of Build instead (test_slow_tests_are_listed skips here).
+  python-coverage:
+    name: Python Coverage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
       id-token: write
     defaults:
       run:
@@ -36,8 +80,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      # The toolchain of rust-toolchain.toml, the one every local build uses,
-      # so clippy here and in the pre-commit hook has the same lints.
       - name: Set up Rust
         run: rustup toolchain install
 
@@ -55,20 +97,16 @@ jobs:
       - name: Build Rust extension
         run: uv run maturin develop --release --features test-kind
 
-      - name: Run Ruff linting
-        run: uv run ruff check . ../.github/scripts
-
-      - name: Run Ruff formatting check
-        run: uv run ruff format --check . ../.github/scripts
-
-      - name: Run Vulture dead code detection
-        run: uv run vulture commol .vulture_allowlist.py --min-confidence 80
-
-      - name: Run ty type checking
-        run: uv run ty check commol
+      # The test that compiles the LaTeX description needs latexmk, which the
+      # runner does not have.
+      - name: Install LaTeX
+        run: >-
+          sudo apt-get update &&
+          sudo apt-get install --no-install-recommends -y latexmk
+          texlive-latex-base texlive-latex-recommended texlive-fonts-recommended
 
       - name: Run pytest (including the documentation examples)
-        run: uv run pytest --cov=commol --cov-report=xml --cov-report=term
+        run: uv run pytest --cov=commol --cov-report=xml --cov-report=term --durations=20
 
       # Codecov authenticates the upload with the OIDC token of the run, so the
       # repository keeps no Codecov secret. A pull request from a fork has no

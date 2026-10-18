@@ -27,7 +27,20 @@ pub fn normalized_weights(log_weights: &[f64]) -> Vec<f64> {
     weights.into_iter().map(|w| w / total).collect()
 }
 
-/// The weighted quantiles of `values` at each of `levels`, in `[0, 1]`.
+/// Check that every quantile level is in `[0, 1]`.
+///
+/// # Errors
+///
+/// Returns a message with the first level outside `[0, 1]`, NaN included.
+pub fn check_levels(levels: &[f64]) -> Result<(), String> {
+    match levels.iter().find(|level| !(0.0..=1.0).contains(*level)) {
+        Some(level) => Err(format!("A quantile level is between 0 and 1, got {level}")),
+        None => Ok(()),
+    }
+}
+
+/// The weighted quantiles of `values` at each of `levels`, in `[0, 1]`
+/// ([`check_levels`]).
 ///
 /// # Panics
 ///
@@ -174,6 +187,17 @@ mod tests {
     }
 
     #[test]
+    fn a_quantile_level_is_between_zero_and_one() {
+        assert_eq!(check_levels(&[0.0, 0.5, 1.0]), Ok(()));
+        for level in [-0.1, 1.5, f64::NAN] {
+            assert_eq!(
+                check_levels(&[0.5, level]),
+                Err(format!("A quantile level is between 0 and 1, got {level}"))
+            );
+        }
+    }
+
+    #[test]
     fn equal_weights_give_the_hazen_quantile() {
         // NumPy: percentile([1, 2, 4, 8], [10, 50, 80], method="hazen").
         let values = [4.0, 1.0, 8.0, 2.0];
@@ -213,9 +237,25 @@ mod tests {
     }
 
     #[test]
+    fn the_covariance_does_not_depend_on_the_scale_of_the_weights() {
+        let x = [1.0, 2.0, 4.0];
+        let y = [2.0, 1.0, 0.0];
+        assert!(close(covariance(&x, &y, &[3.0; 3]), -1.5));
+    }
+
+    #[test]
     fn kish_size_counts_equal_weights_and_shrinks_with_unequal_ones() {
         assert!(close(effective_size(&[0.25; 4]), 4.0));
+        assert!(close(effective_size(&[2.0; 4]), 4.0));
         assert!(close(effective_size(&[0.5, 0.25, 0.25]), 1.0 / 0.375));
+    }
+
+    #[test]
+    fn an_interval_level_is_strictly_between_zero_and_one() {
+        assert_eq!(interval_levels(0.5), Ok([0.25, 0.75]));
+        for level in [0.0, 1.0] {
+            assert!(interval_levels(level).is_err(), "{level} is accepted");
+        }
     }
 
     #[test]

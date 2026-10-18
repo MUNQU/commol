@@ -73,7 +73,8 @@ def weighted_quantiles(
     Raises
     ------
     ValueError
-        If the lengths differ or no weight is positive.
+        If the lengths differ, no weight is positive or a level is not in
+        ``[0, 1]``.
     """
     values = [float(value) for value in values]
     if weights is None:

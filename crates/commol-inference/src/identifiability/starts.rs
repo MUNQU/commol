@@ -77,3 +77,56 @@ pub fn starts_identifiability(
         flagged,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn compare(losses: &[f64], parameter_tolerance: f64) -> StartsIdentifiability {
+        let ends = [vec![1.5], vec![2.5], vec![2.9]];
+        starts_identifiability(
+            &ends,
+            losses,
+            &[true; 3],
+            &[(1.0, 3.0)],
+            parameter_tolerance,
+            0.1,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn the_starts_near_the_best_lose_at_most_its_share_of_the_best_loss() {
+        // 10.5 is within 0.1 × 10 of the best; 12 is not.
+        let result = compare(&[10.0, 10.5, 12.0], 0.1);
+        assert_eq!(result.near_best, vec![0, 1]);
+    }
+
+    #[test]
+    fn the_spread_is_a_share_of_the_bound_width_and_flags_above_the_tolerance() {
+        let result = compare(&[10.0, 10.5, 12.0], 0.5);
+        // The ends 1.5 and 2.5 differ by half the width of (1, 3).
+        assert_eq!(result.spread, vec![0.5]);
+        assert_eq!(result.flagged, vec![false]);
+        assert_eq!(compare(&[10.0, 10.5, 12.0], 0.4).flagged, vec![true]);
+    }
+
+    #[test]
+    fn the_inputs_have_one_value_per_start_and_tolerances_of_zero_or_more() {
+        let check = |losses: &[f64], converged: &[bool], tolerances: (f64, f64)| {
+            starts_identifiability(
+                &[vec![1.0], vec![2.0]],
+                losses,
+                converged,
+                &[(0.0, 3.0)],
+                tolerances.0,
+                tolerances.1,
+            )
+        };
+        assert!(check(&[1.0, 1.0], &[true, true], (0.1, 0.1)).is_ok());
+        assert!(check(&[1.0], &[true, true], (0.1, 0.1)).is_err());
+        assert!(check(&[1.0, 1.0], &[true], (0.1, 0.1)).is_err());
+        assert!(check(&[1.0, 1.0], &[true, true], (-0.1, 0.1)).is_err());
+        assert!(check(&[1.0, 1.0], &[true, true], (0.1, -0.1)).is_err());
+    }
+}

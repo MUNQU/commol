@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from commol import ParameterSample, SampleMethod
+from commol import ParameterSample, SampleMethod, weighted_quantiles
 from commol import CalibrationProblem, NelderMeadConfig, ObservedDataPoint
 from tests.support import abc_builder, bounded, build
 
@@ -94,6 +94,18 @@ class TestStatistics:
             tuple(sample.quantiles([0.25, 0.75])["k1"])
         )
 
+    @pytest.mark.parametrize("level", [-0.1, 2.0, float("nan")])
+    def test_a_quantile_level_is_between_zero_and_one(self, level: float) -> None:
+        with pytest.raises(ValueError, match="A quantile level is between 0 and 1"):
+            _sample([0.0, 0.0, 0.0]).quantiles([0.5, level])
+        with pytest.raises(ValueError, match="A quantile level is between 0 and 1"):
+            weighted_quantiles([1.0, 2.0], levels=[level])
+
+    def test_a_summary_holds_the_extremes_and_the_median(self) -> None:
+        summary = _sample([0.0, 0.0, 0.0]).summary(0.5)["k1"]
+
+        assert (summary.min, summary.median, summary.max) == (1.0, 2.0, 4.0)
+
     def test_a_confidence_level_is_a_fraction(self) -> None:
         with pytest.raises(ValueError, match="strictly between 0 and 1"):
             _sample([0.0, 0.0, 0.0]).interval(95)
@@ -111,6 +123,10 @@ class TestStatistics:
         assert share == pytest.approx(0.75, abs=0.03)
         assert [1.0, 2.0] in drawn.values and [2.0, 1.0] not in drawn.values
         assert drawn.values == sample.resample(4000, seed=1).values
+        assert drawn.method == SampleMethod(
+            name="resample",
+            settings={"of": METHOD.name, "count": 4000, "seed": 1},
+        )
 
 
 def _k1_problem() -> CalibrationProblem:

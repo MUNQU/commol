@@ -4,8 +4,8 @@
 use std::collections::HashMap;
 
 use commol_calibration::{
-    optimize_starts, CalibrationParameter, CalibrationProblem, LossConfig, NelderMeadConfig,
-    ObservedDataPoint, OptimizationConfig,
+    optimize, optimize_starts, CalibrationParameter, CalibrationProblem, LossConfig,
+    NelderMeadConfig, ObservedDataPoint, OptimizationConfig, ParticleSwarmConfig,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 
@@ -82,6 +82,11 @@ impl SimulationEngine for LineEngine {
 }
 
 fn problem() -> CalibrationProblem<LineEngine> {
+    problem_within(1.0)
+}
+
+/// The problem with `k` between 0 and `max`.
+fn problem_within(max: f64) -> CalibrationProblem<LineEngine> {
     CalibrationProblem::new(
         LineEngine {
             parameters: HashMap::from([("k".to_string(), 0.0)]),
@@ -90,7 +95,7 @@ fn problem() -> CalibrationProblem<LineEngine> {
         vec![CalibrationParameter::with_initial_guess(
             "k".to_string(),
             0.0,
-            1.0,
+            max,
             0.1,
         )],
         vec![],
@@ -100,7 +105,10 @@ fn problem() -> CalibrationProblem<LineEngine> {
 }
 
 fn config() -> OptimizationConfig {
-    OptimizationConfig::NelderMead(NelderMeadConfig::new().with_sd_tolerance(1e-12))
+    OptimizationConfig::NelderMead(NelderMeadConfig {
+        sd_tolerance: 1e-12,
+        ..NelderMeadConfig::default()
+    })
 }
 
 #[test]
@@ -130,4 +138,23 @@ fn one_seed_gives_one_set_of_outcomes() {
         outcomes.iter().map(|o| o.start.clone()).collect::<Vec<_>>()
     };
     assert_eq!(starts(&first), starts(&again));
+}
+
+#[test]
+fn the_first_start_of_a_particle_swarm_runs_its_seed_and_the_others_their_own() {
+    let config = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
+        num_particles: 4,
+        max_iterations: 3,
+        seed: Some(5),
+        ..ParticleSwarmConfig::default()
+    });
+    // Below 2/3, where every run succeeds.
+    let problem = problem_within(0.6);
+    let outcomes = optimize_starts(&problem, &config, 3, 11);
+    let result = |index: usize| outcomes[index].result.clone().unwrap();
+
+    let alone = optimize(&problem, &config).unwrap();
+    assert_eq!(result(0).best_parameters, alone.best_parameters);
+    assert_ne!(result(1).best_parameters, result(2).best_parameters);
+    assert_ne!(result(1).best_parameters, alone.best_parameters);
 }

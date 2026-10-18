@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from commol.context._model.serialization import INLINE_ARRAY_MIN_LENGTH, render_json
 from commol.context.model import Model
 from commol.context.parameter import SeriesValue
 from tests.support import a_to_b_builder, build, initial_state
@@ -103,6 +104,21 @@ class TestToJson:
 
         assert Model.from_json(path) == model
 
+    def test_a_file_is_ascii_and_a_file_in_utf_8_loads(self, tmp_path: Path) -> None:
+        model = _model().model_copy(update={"description": "Población en régimen"})
+        written = tmp_path / "written.json"
+        by_hand = tmp_path / "by_hand.json"
+
+        model.to_json(written)
+        by_hand.write_bytes(
+            json.dumps(model.model_dump(mode="json"), ensure_ascii=False).encode()
+        )
+
+        assert written.read_bytes().isascii()
+        assert not by_hand.read_bytes().isascii()
+        assert Model.from_json(written) == model
+        assert Model.from_json(by_hand) == model
+
     def test_an_uncalibrated_parameter_round_trips(self, tmp_path: Path) -> None:
         model = _model(k=None)
         path = tmp_path / "model.json"
@@ -123,13 +139,33 @@ class TestToJson:
         assert restored == model
         assert restored.structure.uncalibrated_values() == ["A"]
 
-    def test_accepts_a_string_path(self, tmp_path: Path) -> None:
-        model = _model()
-        path = tmp_path / "model.json"
+    @pytest.mark.parametrize(
+        "array",
+        [
+            list(range(INLINE_ARRAY_MIN_LENGTH)),
+            [1.5, None] * (INLINE_ARRAY_MIN_LENGTH // 2),
+            [[0, 1]] * INLINE_ARRAY_MIN_LENGTH,
+        ],
+    )
+    def test_an_array_of_numbers_or_nulls_of_the_minimum_length_is_one_line(
+        self, array: list
+    ) -> None:
+        assert render_json({"a": array}) == f'{{\n  "a": {json.dumps(array)}\n}}'
 
-        model.to_json(str(path))
-
-        assert Model.from_json(path) == model
+    @pytest.mark.parametrize(
+        "array",
+        [
+            list(range(INLINE_ARRAY_MIN_LENGTH - 1)),
+            ["x"] * INLINE_ARRAY_MIN_LENGTH,
+            [True] * INLINE_ARRAY_MIN_LENGTH,
+            [["x"]] * INLINE_ARRAY_MIN_LENGTH,
+            [1, [2]] * (INLINE_ARRAY_MIN_LENGTH // 2),
+        ],
+    )
+    def test_a_shorter_array_or_one_of_other_values_is_indented(
+        self, array: list
+    ) -> None:
+        assert render_json({"a": array}) == json.dumps({"a": array}, indent=2)
 
     def test_long_numeric_arrays_are_written_on_one_line(self, tmp_path: Path) -> None:
         model = _model()
@@ -149,8 +185,12 @@ class TestToJson:
         wide = tmp_path / "wide.json"
         narrow = tmp_path / "narrow.json"
 
+        default = tmp_path / "default.json"
+
         model.to_json(wide, indent=8)
         model.to_json(narrow, indent=2)
+        model.to_json(default)
 
         assert len(wide.read_text()) > len(narrow.read_text())
+        assert default.read_text() == narrow.read_text()
         assert Model.from_json(wide) == Model.from_json(narrow)

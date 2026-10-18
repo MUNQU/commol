@@ -682,10 +682,12 @@ fn best_ms(repeats: usize, mut run: impl FnMut()) -> f64 {
         .fold(f64::INFINITY, f64::min)
 }
 
-fn bdf_ms(model: &Model, sparse: bool, steps: u32) -> f64 {
+/// The best time of three `bdf` runs of `steps` steps, and the state they end in.
+fn bdf_ms(model: &Model, sparse: bool, steps: u32) -> (f64, Vec<f64>) {
     let engine = engine(model);
     let positions: Vec<f64> = (0..=steps).map(f64::from).collect();
-    best_ms(3, || {
+    let mut last = Vec::new();
+    let ms = best_ms(3, || {
         let mut engine = engine.clone();
         let mut state = engine.state.clone();
         let mut rows = vec![Vec::new(); positions.len() - 1];
@@ -699,32 +701,37 @@ fn bdf_ms(model: &Model, sparse: bool, steps: u32) -> f64 {
             &mut rows,
         )
         .unwrap();
-    })
+        last = state;
+    });
+    (ms, last)
+}
+
+/// The best time of a dense and a sparse `bdf` run of `model`, after checking
+/// that both end in the same state.
+fn dense_and_sparse_ms(model: &Model) -> (f64, f64) {
+    let (dense_ms, dense) = bdf_ms(model, false, 50);
+    let (sparse_ms, sparse) = bdf_ms(model, true, 50);
+    for (sparse, dense) in sparse.iter().zip(&dense) {
+        assert_close(*sparse, *dense, 1e-6, "sparse against dense bdf");
+    }
+    (dense_ms, sparse_ms)
 }
 
 /// Dense against sparse `bdf`, and the cost against the difference engine.
-/// Run with `cargo test --release -p commol-differential -- --ignored
-/// --nocapture benchmark`.
 #[test]
-#[ignore = "benchmark: run on demand in release mode"]
+#[ignore = "benchmark: run on demand with cargo test --release -p commol-differential -- --ignored --nocapture benchmark"]
 fn benchmark_dense_against_sparse_bdf() {
     println!("| model | states | dense bdf (ms) | sparse bdf (ms) |");
     println!("|---|---|---|---|");
     for n in [16, 32, 64, 128, 256, 512] {
-        let chain = stiff_chain(n);
-        println!(
-            "| stiff chain | {n} | {:.2} | {:.2} |",
-            bdf_ms(&chain, false, 50),
-            bdf_ms(&chain, true, 50)
-        );
+        let (dense, sparse) = dense_and_sparse_ms(&stiff_chain(n));
+        println!("| stiff chain | {n} | {dense:.2} | {sparse:.2} |");
     }
     for groups in [8, 16, 32, 64, 128] {
-        let coupled = coupled_groups(groups, "bdf");
+        let (dense, sparse) = dense_and_sparse_ms(&coupled_groups(groups, "bdf"));
         println!(
-            "| coupled groups | {} | {:.2} | {:.2} |",
-            3 * groups,
-            bdf_ms(&coupled, false, 50),
-            bdf_ms(&coupled, true, 50)
+            "| coupled groups | {} | {dense:.2} | {sparse:.2} |",
+            3 * groups
         );
     }
 
@@ -757,10 +764,9 @@ fn benchmark_dense_against_sparse_bdf() {
 /// `run(n)` against `run_at` on the same full grid, and `run_at` on every
 /// 50th position, for a difference model of 150 states: `run(n)` builds its
 /// grid in Rust and runs at positions, so the two full-grid runs cost the same
-/// (axis-positions D2). Run with `cargo test --release -p commol-differential
-/// -- --ignored --nocapture benchmark_run_against_run_at`.
+/// (axis-positions D2).
 #[test]
-#[ignore = "benchmark: run on demand in release mode"]
+#[ignore = "benchmark: run on demand with cargo test --release -p commol-differential -- --ignored --nocapture benchmark"]
 fn benchmark_run_against_run_at() {
     let mut model = coupled_groups(50, "bdf");
     model.engine = commol_core::ModelEngine::new(commol_core::EngineType::DifferenceEquations);
@@ -770,6 +776,11 @@ fn benchmark_run_against_run_at() {
     for n in [100_u32, 2000] {
         let grid: Vec<f64> = (0..=n).map(f64::from).collect();
         let sparse: Vec<f64> = (0..=n).step_by(50).map(f64::from).collect();
+        assert_eq!(
+            difference.clone().run(n).unwrap().rows,
+            difference.clone().run_at(&grid).unwrap(),
+            "run(n) and run_at on its grid report the same rows"
+        );
         println!(
             "| {n} | {:.3} | {:.3} | {:.3} |",
             best_ms(40, || {

@@ -12,7 +12,7 @@ from commol import (
     Simulation,
 )
 from commol.context.model import Model
-from tests.support import bounded, build, observed, abc_builder
+from tests.support import assert_accepted, bounded, build, observed, abc_builder
 
 SEED = 42
 
@@ -194,9 +194,7 @@ class TestExpressionSecurity:
         ("expression", "at"),
         [("5.0 - k1/k2", None), ("500.0 - B", [10, 20, 30])],
     )
-    def test_a_safe_expression_is_kept(
+    def test_a_safe_expression_is_accepted(
         self, expression: str, at: list[int] | None
     ) -> None:
-        constraint = CalibrationConstraint(id="safe", expression=expression, at=at)
-
-        assert constraint.expression == expression
+        assert_accepted(CalibrationConstraint, id="safe", expression=expression, at=at)

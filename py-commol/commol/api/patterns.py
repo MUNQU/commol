@@ -127,17 +127,10 @@ def _require_consistent_group(
 
 def _compose_formulas(sub_formulas: list[str], mode: "CombineMode") -> str:
     if mode is CombineMode.SUM:
-        body = " + ".join(sub_formulas)
-    elif mode is CombineMode.MAX:
-        body = sub_formulas[0]
-        for f in sub_formulas[1:]:
-            body = f"max({body}, {f})"
-    elif mode is CombineMode.MIN:
-        body = sub_formulas[0]
-        for f in sub_formulas[1:]:
-            body = f"min({body}, {f})"
-    else:
-        raise ValueError(f"Unknown combine mode: {mode!r}")
+        return f"({' + '.join(sub_formulas)})"
+    body = sub_formulas[0]
+    for f in sub_formulas[1:]:
+        body = f"{mode.value}({body}, {f})"
     return f"({body})"
 
 
@@ -188,11 +181,6 @@ class _AddGroupDescriptor:
     and registers the first group; when accessed via a schedule instance it
     appends to that schedule.
     """
-
-    _owner: type["AxisPattern"]
-
-    def __set_name__(self, owner: type["AxisPattern"], name: str) -> None:
-        self._owner = owner
 
     def __get__(
         self,
@@ -508,9 +496,11 @@ class AxisPattern(BaseModel):
         - ``combine(p)`` is the identity (returns ``p`` unchanged).
         - All input patterns must share the same ``conditions`` and
           ``source_compartment`` (or have none); the result preserves them.
-        - Raises ``ValueError`` if no patterns are supplied, the inputs have
-          inconsistent group bindings, or the combined formula exceeds the
-          security length cap.
+        - ``mode`` is a `CombineMode` or its value (``"sum"``, ``"max"``,
+          ``"min"``).
+        - Raises ``ValueError`` if no patterns are supplied, ``mode`` is not a
+          mode, the inputs have inconsistent group bindings, or the combined
+          formula exceeds the security length cap.
         """
         if len(patterns) == 0:
             raise ValueError("combine() requires at least one pattern")
@@ -518,7 +508,7 @@ class AxisPattern(BaseModel):
             return patterns[0]
 
         shared_conditions, shared_source = _require_consistent_group(patterns)
-        result = _compose_formulas([p.formula for p in patterns], mode)
+        result = _compose_formulas([p.formula for p in patterns], CombineMode(mode))
         _enforce_length_cap(result, config)
 
         return _ComputedAxisPattern(
@@ -772,7 +762,7 @@ class _ScheduleAxisPattern(AxisPattern):
             "pass it to ModelBuilder.add_transition(rate=...) instead."
         )
 
-    def __str__(self) -> str:  # pragma: no cover — descriptive only
+    def __str__(self) -> str:
         return (
             f"<AxisPattern schedule with {len(self.patterns)} pattern(s), "
             f"default={'set' if self._has_default else 'unset'}>"
@@ -827,7 +817,7 @@ class _ScheduleAxisPattern(AxisPattern):
                 "The default rate is applied to every unmatched compartment, "
                 "so binding it to one compartment is almost certainly a bug."
             )
-        self.patterns.append(_GroupEntry(pattern=pattern, absolute=None))
+        self.patterns.append(_GroupEntry(pattern=pattern))
         self._has_default = True
         return self
 
@@ -840,6 +830,7 @@ class _ScheduleAxisPattern(AxisPattern):
         return None
 
     def _builder_stratified_rates(self) -> list[StratifiedRateDict] | None:
+        # A schedule starts with add_group, so it has a group with conditions.
         result = []
         for entry in self.patterns:
             if entry.pattern.conditions:
@@ -847,7 +838,7 @@ class _ScheduleAxisPattern(AxisPattern):
                 if entry.absolute is not None:
                     d["absolute"] = entry.absolute
                 result.append(d)
-        return result if result else None
+        return result
 
 
 __all__ = [

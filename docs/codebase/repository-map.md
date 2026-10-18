@@ -98,7 +98,7 @@ Use this page when you know what to change but not where it belongs.
 
 | Path | Owns |
 |---|---|
-| `py-commol/tests/` | Python tests: one package per page of the user guide (`building/`, `transitions/`, `rates/`, `axis_patterns/`, `initial_conditions/`, `simulation/`, `stochastic/`, `units/`, `calibration/`, `uncertainty/`, `reporting/`, `plotting/`, `docs/`); `reference_models/`, published models checked against their stated results; `model_kinds/`, the test model kind through every generic layer; and `support/` with the shared model factories, the test kind (`kinds.py`), the test uncertainty method (`methods.py`), the coverage harness (`coverage.py`), the flow models, the reference solver, the oracles and the assertions. See [Tests](tests.md). |
+| `py-commol/tests/` | Python tests: one package per page of the user guide (`building/`, `transitions/`, `rates/`, `axis_patterns/`, `initial_conditions/`, `simulation/`, `stochastic/`, `units/`, `calibration/`, `uncertainty/`, `reporting/`, `plotting/`, `docs/`); `reference_models/`, published models checked against their stated results; `model_kinds/`, the test model kind through every generic layer; `suite/`, the checks of the rules of the tests; and `support/` with the shared model factories, the test kind (`kinds.py`), the test uncertainty method (`methods.py`), the coverage harness (`coverage.py`), the flow models, the reference solver, the oracles and the assertions. See [Tests](tests.md). |
 | `crates/*/tests/`, `#[cfg(test)]` modules | Rust tests. |
 | `docs/` | This site. `docs/codebase/` is for maintainers; the rest is for users. |
 | `.github/ISSUE_TEMPLATE/` | The templates of a proposal, a bug or small change, and a release ([Planning](../development/workflow.md#planning)). |
@@ -107,7 +107,7 @@ Use this page when you know what to change but not where it belongs.
 | `.github/scripts/parallel.py` | The proposals that can run in parallel, from the Touches and the links of the open issues. |
 | `.github/scripts/affected.py` | The open issues that the changes of a branch affect: those whose body names a changed path. |
 | `.github/scripts/release_notes.py` | The notes of a GitHub release, from its section of the changelog. |
-| `.github/workflows/` | CI: code quality, build, docs, release, and the weekly coverage studies (`coverage.yaml`). |
+| `.github/workflows/` | CI: code quality, build, docs, release, and the coverage studies (`coverage.yaml`), which Build and the release call. |
 
 ## If you need to…
 

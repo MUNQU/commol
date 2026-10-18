@@ -99,17 +99,6 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
         self.design
     }
 
-    /// The observations the source differentiates: the problem's, or those
-    /// of the dense design, with their values set to zero.
-    pub fn observed_data(&self) -> &[ObservedDataPoint] {
-        &self.observed_data
-    }
-
-    /// The output accuracy `η` the steps come from.
-    pub fn accuracy(&self) -> f64 {
-        self.accuracy
-    }
-
     /// The step `h_j` of each parameter at `values`.
     pub fn steps(&self, values: &[f64]) -> Vec<f64> {
         let factor = self.accuracy.cbrt();

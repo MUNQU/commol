@@ -2,9 +2,17 @@
 
 import pytest
 
+from commol import Aggregate
+from commol.context._model.equations import DynamicsDescription
 from commol.context.model import Model
 from tests.support.description import equation_forms
-from tests.support import build, build_ode, abcd_builder, abc_builder
+from tests.support import (
+    FactoryBuilder,
+    abc_builder,
+    build,
+    build_ode,
+    build_stochastic,
+)
 
 
 def _without_ab_rate() -> Model:
@@ -43,36 +51,6 @@ class TestText:
         )
         assert output == expected
 
-    def test_the_forms_of_four_bins(self) -> None:
-        output = equation_forms(build(abcd_builder(name="ABCD Model")))
-
-        expected = (
-            "========================================\n"
-            "COMPACT FORM\n"
-            "========================================\n"
-            "\n"
-            "Bin Transitions:\n"
-            "ab (A -> B):\n"
-            "  A -> B: k1 * A * C / total\n"
-            "\n"
-            "bc (B -> C):\n"
-            "  B -> C: k3 * B\n"
-            "\n"
-            "cd (C -> D):\n"
-            "  C -> D: k2 * C\n"
-            "\n"
-            "Total System: 4 coupled equations (4 bins)\n"
-            "\n"
-            "========================================\n"
-            "EXPANDED FORM\n"
-            "========================================\n"
-            "[A(t+Dt) - A(t)] / Dt = - (k1 * A * C / total)\n"
-            "[B(t+Dt) - B(t)] / Dt = (k1 * A * C / total) - (k3 * B)\n"
-            "[C(t+Dt) - C(t)] / Dt = (k3 * B) - (k2 * C)\n"
-            "[D(t+Dt) - D(t)] / Dt = (k2 * C)"
-        )
-        assert output == expected
-
     def test_without_rate(self) -> None:
         output = equation_forms(_without_ab_rate())
 
@@ -98,6 +76,37 @@ class TestText:
             "[C(t+Dt) - C(t)] / Dt = (k2 * B)"
         )
         assert output == expected
+
+    def test_a_model_of_category_transitions_only_lists_them(self) -> None:
+        builder = (
+            FactoryBuilder(name="Moves")
+            .add_bin(id="A", name="A")
+            .add_stratification(id="group", categories=["g1", "g2"])
+            .add_transition(id="move", source=["g1"], target=["g2"], rate="0.1")
+        )
+        builder.set_structure(
+            Aggregate(
+                total=100,
+                bin_fractions={"A": 1.0},
+                stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
+            )
+        )
+
+        text = build(builder).describe().render("text")
+
+        assert "Group Stratification Transitions:\nmove (g1 -> g2):\n" in text
+        assert "Bin Transitions" not in text
+
+    def test_an_engine_without_equations_has_no_expanded_form(self) -> None:
+        model = build_stochastic(abc_builder(), "StochasticEvents")
+
+        with pytest.raises(ValueError) as error:
+            DynamicsDescription(model).expanded_form()
+
+        assert str(error.value) == (
+            "The StochasticEvents engine has no equations: its dynamics are "
+            "stochastic_events"
+        )
 
     def test_an_unknown_format_lists_the_formats(self) -> None:
         description = build(abc_builder(name="ABC Model")).describe()

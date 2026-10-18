@@ -111,6 +111,107 @@ class TestExpansion:
         ] == [["d_g1 * A", "d_g2 * A"], ["d_g1 * B", "d_g2 * B"]]
 
 
+class TestExpansionOverTargets:
+    def test_a_source_feeds_each_target_and_keeps_its_schedule(self) -> None:
+        builder = FactoryBuilder(name="Split")
+        for bin_id in ("A", "B", "C"):
+            builder.add_bin(id=bin_id, name=bin_id)
+
+        builder.add_transition(
+            id="split",
+            source=["A"],
+            target=["B", "C"],
+            rate="k * $compartment",
+            stratified_rates=[
+                {
+                    "conditions": [{"stratification": "group", "category": "g1"}],
+                    "rate": 0.5,
+                }
+            ],
+            impulse_at=[2.0],
+        )
+
+        transitions = builder._transitions
+        assert [
+            (t.id, t.source, t.target, t.rate, t.impulse_at) for t in transitions
+        ] == [
+            ("split__B", ["A"], ["B"], "k * B", [2.0]),
+            ("split__C", ["A"], ["C"], "k * C", [2.0]),
+        ]
+        assert [r.rate for t in transitions for r in t.stratified_rates or []] == [
+            "0.5",
+            "0.5",
+        ]
+
+    def test_an_expansion_over_sources_is_logged(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        builder = FactoryBuilder(name="Merge")
+        for bin_id in ("A", "B", "C"):
+            builder.add_bin(id=bin_id, name=bin_id)
+
+        caplog.clear()
+        with caplog.at_level("INFO", logger="commol"):
+            builder.add_transition(
+                id="merge", source=["A", "B"], target=["C"], rate="k * $compartment"
+            )
+
+        assert caplog.messages == [
+            "Expanding transition 'merge' with $compartment placeholder: 2 source "
+            "compartments will create 2 separate transitions",
+            "  Created expanded transition: id='merge__A', source=['A'], "
+            "target=['C'], rate='k * A'",
+            "  Created expanded transition: id='merge__B', source=['B'], "
+            "target=['C'], rate='k * B'",
+            "Successfully expanded transition 'merge' into 2 transitions",
+        ]
+
+    def test_each_expanded_transition_keeps_a_periodic_impulse(self) -> None:
+        builder = FactoryBuilder(name="Split")
+        for bin_id in ("A", "B", "C"):
+            builder.add_bin(id=bin_id, name=bin_id)
+
+        builder.add_transition(
+            id="split",
+            source=["A"],
+            target=["B", "C"],
+            rate="0.1 * $compartment",
+            impulse_every=(7.0, 1.0),
+        )
+
+        assert [t.impulse_every for t in builder._transitions] == [(7.0, 1.0)] * 2
+
+    def test_an_expansion_is_logged(self, caplog: pytest.LogCaptureFixture) -> None:
+        builder = FactoryBuilder(name="Split")
+        for bin_id in ("A", "B", "C"):
+            builder.add_bin(id=bin_id, name=bin_id)
+
+        caplog.clear()
+        with caplog.at_level("INFO", logger="commol"):
+            builder.add_transition(
+                id="split",
+                source=["A"],
+                target=["B", "C"],
+                rate="k * $compartment",
+                stratified_rates=[
+                    {
+                        "conditions": [{"stratification": "group", "category": "g1"}],
+                        "rate": 0.5,
+                    }
+                ],
+            )
+
+        assert caplog.messages[-1] == (
+            "Successfully expanded transition 'split' into 2 transitions"
+        )
+        assert caplog.messages[:2] == [
+            "Expanding transition 'split' with $compartment placeholder: 2 target "
+            "compartments will create 2 separate transitions",
+            "  Created expanded transition: id='split__B', source=['B'], "
+            "target=['B', 'C'], rate='k * B', 1 stratified rates",
+        ]
+
+
 class TestErrors:
     def test_a_single_source_is_rejected(self) -> None:
         builder = FactoryBuilder(name="Single").add_bin(id="A", name="A")

@@ -63,11 +63,6 @@ impl Discrepancy {
         self.summary = summary;
     }
 
-    /// The loss.
-    pub fn loss(&self) -> LossConfig {
-        self.loss
-    }
-
     /// The factor each residual is multiplied by: `1 / rms` of its series
     /// when normalization is enabled, otherwise 1.
     pub fn normalization(&self) -> &[f64] {

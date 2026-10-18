@@ -6,6 +6,7 @@ from commol.utils.security import (
     SecurityConfig,
     ExpressionSecurityValidator,
 )
+from tests.support import assert_accepted
 
 
 class TestBasicValidation:
@@ -46,7 +47,7 @@ class TestBasicValidation:
             "k1 * (1 + 0.1 * sin(2 * pi * step / 365))",
         ]
         for expr in valid_expressions:
-            validate_expression_security(expr)
+            assert_accepted(validate_expression_security, expr)
 
     def test_numeric_formats(self):
         """Test various numeric format validations."""
@@ -67,7 +68,7 @@ class TestBasicValidation:
             "0o777",
         ]
         for num in valid_numbers:
-            validate_expression_security(num)
+            assert_accepted(validate_expression_security, num)
 
     def test_safe_mathematical_functions(self):
         """Test all safe mathematical functions are allowed."""
@@ -106,7 +107,7 @@ class TestBasicValidation:
             "e",
         ]
         for func in safe_functions:
-            validate_expression_security(func)
+            assert_accepted(validate_expression_security, func)
 
     def test_tokenization(self):
         """Test expression tokenization."""
@@ -489,7 +490,7 @@ class TestDisallowedCharacters:
             "a % b",  # Modulo operator
         ]
         for expr in allowed_expressions:
-            validate_expression_security(expr)
+            assert_accepted(validate_expression_security, expr)
 
 
 class TestStrictModeValidation:

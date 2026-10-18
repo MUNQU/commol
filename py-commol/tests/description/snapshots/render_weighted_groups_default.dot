@@ -1,0 +1,18 @@
+digraph "states" {
+    rankdir=LR;
+    n0 [label="State \"A\" \\ start"];
+    n1 [label="State B"];
+    n0 -> n1 [label="ab: s * k * neighbors_B / neighbors"];
+}
+digraph "compartments" {
+    rankdir=LR;
+    n0 [label="A_g1_t1"];
+    n1 [label="A_g1_t2"];
+    n2 [label="A_g2"];
+    n3 [label="B_g1_t1"];
+    n4 [label="B_g1_t2"];
+    n5 [label="B_g2"];
+    n0 -> n3 [label="ab: s * k * ((B_g1_t1 + B_g1_t2) + 0.5 * B_g2) / ((A_g1_t1 + A_g1_t2 + B_g1_t1 + B_g1_t2) + 0.5 * (A_g2 + B_g2)) * A_g1_t1"];
+    n1 -> n4 [label="ab: s * k * ((B_g1_t1 + B_g1_t2) + 0.5 * B_g2) / ((A_g1_t1 + A_g1_t2 + B_g1_t1 + B_g1_t2) + 0.5 * (A_g2 + B_g2)) * A_g1_t2"];
+    n2 -> n5 [label="ab: s * k * (0.5 * (B_g1_t1 + B_g1_t2) + B_g2) / (0.5 * (A_g1_t1 + A_g1_t2 + B_g1_t1 + B_g1_t2) + (A_g2 + B_g2)) * A_g2"];
+}

@@ -121,6 +121,12 @@ jobs:
                   name: sdist
                   path: dist/*.tar.gz
 
+    # A published version is final, so the intervals of the uncertainty
+    # methods must cover at their level before it is.
+    coverage-studies:
+        name: Coverage studies
+        uses: ./.github/workflows/coverage.yaml
+
     publish-to-pypi:
         name: Publish to PyPI
         needs:
@@ -129,6 +135,7 @@ jobs:
                 build-wheels-windows,
                 build-wheels-macos,
                 build-sdist,
+                coverage-studies,
             ]
         runs-on: ubuntu-latest
         environment:

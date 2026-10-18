@@ -101,6 +101,10 @@ class TestGroups:
         with pytest.raises(ValidationError, match="'level'"):
             build(_abc("k1 * neighbors_B", Groups("level"), stratifications=GROUPS))
 
+    def test_groups_take_no_other_field(self) -> None:
+        with pytest.raises(ValidationError, match="Extra inputs"):
+            Groups("group", unknown=1)
+
     def test_weights_need_every_pair_of_categories(self) -> None:
         weights = {"g1": {"g1": 1.0}, "g2": {"g1": 0.5, "g2": 1.0}}
 

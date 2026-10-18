@@ -733,13 +733,9 @@ class ParticleSwarmConfig(BaseModel):
             )
         if type == PSOInertiaType.CONSTANT:
             self._inertia = PSOConstantInertia(factor=kwargs.get("factor", 0.721))
-        elif type == PSOInertiaType.CHAOTIC:
+        else:
             self._inertia = PSOChaoticInertia(
                 w_min=kwargs["w_min"], w_max=kwargs["w_max"]
-            )
-        else:
-            raise ValueError(
-                f"Unknown inertia type: {type}. Use 'constant' or 'chaotic'"
             )
         return self
 
@@ -810,16 +806,12 @@ class ParticleSwarmConfig(BaseModel):
                 cognitive=kwargs.get("cognitive", 1.193),
                 social=kwargs.get("social", 1.193),
             )
-        elif type == PSOAccelerationType.TIME_VARYING:
+        else:
             self._acceleration = PSOTimeVaryingAcceleration(
                 c1_initial=kwargs["c1_initial"],
                 c1_final=kwargs["c1_final"],
                 c2_initial=kwargs["c2_initial"],
                 c2_final=kwargs["c2_final"],
-            )
-        else:
-            raise ValueError(
-                f"Unknown acceleration type: {type}. Use 'constant' or 'time_varying'"
             )
         return self
 

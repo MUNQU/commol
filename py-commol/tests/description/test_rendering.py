@@ -17,12 +17,24 @@ import pytest
 
 from commol import ModelBuilder
 from commol.api.description import mermaid
-from commol.context.description import ModelDescription
+from commol.context.description import (
+    Equation,
+    EquationGroup,
+    Equations,
+    Matrix,
+    ModelDescription,
+    Section,
+    Table,
+)
 from commol.context.model import Model
 from tests.support import FactoryBuilder, abc_builder, build
+from tests.support.described import (
+    every_flow,
+    stochastic_with_settings,
+    weighted_groups,
+)
+from tests.support.description import matches_snapshot
 from commol import Aggregate
-
-SNAPSHOTS = Path(__file__).parent / "snapshots"
 
 
 def _graph_model() -> Model:
@@ -52,15 +64,6 @@ def _graph_model() -> Model:
     return build(builder)
 
 
-def _matches_snapshot(name: str, rendered: str) -> None:
-    path = SNAPSHOTS / name
-    if not path.exists():
-        SNAPSHOTS.mkdir(exist_ok=True)
-        path.write_text(rendered, encoding="utf-8")
-        pytest.fail(f"Wrote the snapshot {path}; review it and run again")
-    assert rendered == path.read_text(encoding="utf-8")
-
-
 class TestText:
     def test_the_text_keeps_the_compact_and_expanded_forms(self) -> None:
         text = build(abc_builder()).describe().render("text")
@@ -82,6 +85,7 @@ class TestText:
         )
         assert compact in text
         assert expanded in text
+        assert build(abc_builder()).describe().render() == text
 
     def test_the_text_draws_no_diagram(self) -> None:
         text = _graph_model().describe().render("text")
@@ -116,7 +120,7 @@ class TestMarkdown:
     def test_the_mermaid_graph_matches_its_snapshot(self) -> None:
         states = _graph_model().describe().graphs()[0]
 
-        _matches_snapshot("graph.mmd", mermaid(states) + "\n")
+        matches_snapshot("graph.mmd", mermaid(states) + "\n")
 
 
 class TestDot:
@@ -127,11 +131,13 @@ class TestDot:
         assert dot.count("digraph") == 2
         assert 'digraph "states"' in dot
         assert 'digraph "compartments"' in dot
-        _matches_snapshot("graph.dot", dot)
+        matches_snapshot("graph.dot", dot)
 
     @pytest.mark.skipif(
         importlib.util.find_spec("pydot") is None, reason="pydot is not installed"
     )
+    # pydot 4 calls pyparsing names that pyparsing 3.3 deprecates.
+    @pytest.mark.filterwarnings("ignore::DeprecationWarning:pydot.dot_parser")
     def test_the_dot_file_parses(self) -> None:
         import pydot
 
@@ -143,7 +149,7 @@ class TestDot:
 
 class TestLatex:
     def test_the_latex_document_matches_its_snapshot(self) -> None:
-        _matches_snapshot("graph.tex", _graph_model().describe().render("latex"))
+        matches_snapshot("graph.tex", _graph_model().describe().render("latex"))
 
     @pytest.mark.skipif(shutil.which("latexmk") is None, reason="latexmk is missing")
     @pytest.mark.parametrize("layout", ["default", "odd"])
@@ -228,3 +234,68 @@ class TestEveryKindRenders:
 
         assert "dA/dt" not in model.describe().render("text")
         assert "[A(t+Dt) - A(t)] / Dt = - (0.1 * A)" in model.describe().render("text")
+
+
+class TestEveryBlock:
+    """Every kind of block, with and without a heading and with empty cells."""
+
+    def test_a_matrix_has_one_value_per_row_and_column(self) -> None:
+        with pytest.raises(ValueError, match="2 rows and 2 columns has rows of"):
+            Matrix(row_labels=["a", "b"], column_labels=["a", "b"], values=[[1.0, 0.0]])
+
+    def test_a_matrix_shows_its_heading(self) -> None:
+        block = Matrix(
+            heading="Weights",
+            row_labels=["a", "b"],
+            column_labels=["a", "b"],
+            values=[[1.0, 0.5], [0.5, 1.0]],
+        )
+        description = ModelDescription(
+            title="t",
+            layout="default",
+            sections=[Section(key="s", title="S", blocks=[block])],
+        )
+
+        assert "### Weights\n" in description.render("markdown")
+        assert "Weights" in description.render("text")
+
+    def test_a_row_has_one_cell_per_column(self) -> None:
+        with pytest.raises(ValueError, match="Row 1 of the table has 1 cells"):
+            Table(columns=["a", "b"], rows=[["x", "y"], ["z"]])
+
+    def test_a_group_without_a_heading_is_followed_by_the_next(self) -> None:
+        def equation(name: str) -> Equation:
+            return Equation(left=name, right="0", left_latex=name, right_latex="0")
+
+        block = Equations(
+            groups=[
+                EquationGroup(equations=[equation("x")]),
+                EquationGroup(heading="h", equations=[equation("y")]),
+            ]
+        )
+        description = ModelDescription(
+            title="t",
+            layout="default",
+            sections=[Section(key="s", title="S", blocks=[block])],
+        )
+
+        assert "x = 0\n\nh:\n  y = 0" in description.render("text")
+
+    @pytest.mark.parametrize(
+        ("model", "layout"),
+        [
+            (weighted_groups, "default"),
+            (stochastic_with_settings, "odd"),
+            (every_flow, "default"),
+        ],
+    )
+    @pytest.mark.parametrize(
+        ("format", "suffix"),
+        [("text", "txt"), ("markdown", "md"), ("latex", "tex"), ("dot", "dot")],
+    )
+    def test_a_rendering_matches_its_snapshot(
+        self, model, layout: str, format: str, suffix: str
+    ) -> None:
+        rendered = model().describe(layout).render(format)
+
+        matches_snapshot(f"render_{model.__name__}_{layout}.{suffix}", rendered)

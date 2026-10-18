@@ -18,6 +18,27 @@ class TestBuild:
         assert model.structure.total == 1000
 
 
+class TestSummary:
+    def test_a_summary_lists_what_was_added(self) -> None:
+        builder = abc_builder(
+            name="ABC", stratifications={"group": {"g1": 0.5, "g2": 0.5}}
+        )
+
+        assert builder.get_summary() == {
+            "name": "ABC",
+            "description": None,
+            "version": "1.0",
+            "bins_count": 3,
+            "bin_ids": ["A", "B", "C"],
+            "stratifications_count": 1,
+            "stratification_ids": ["group"],
+            "transitions_count": 2,
+            "transition_ids": ["ab", "bc"],
+            "parameters_count": 2,
+            "parameter_ids": ["k1", "k2"],
+        }
+
+
 class TestCloneAndReset:
     def test_a_clone_builds_the_same_model(self) -> None:
         original = a_to_b_builder(accumulator="moved")

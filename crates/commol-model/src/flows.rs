@@ -122,7 +122,8 @@ fn driving_compartments(
 /// Returns a message when a transition mixes bins and categories, when a
 /// category transition does not have exactly one source and one target, when
 /// a stratified rate matches no compartment the transition starts from, when a
-/// transition with several sources has a proportional rate, or when a flow ends
+/// transition without a source has a `to` condition, when a transition with
+/// several sources has a proportional rate, or when a flow ends
 /// in categories no compartment has.
 pub(crate) fn plan_transition_flows(
     process: &Process,
@@ -168,7 +169,7 @@ pub(crate) fn plan_transition_flows(
             if let TransitionKind::Categories(stratification) = kind {
                 overrides.insert(stratification.id.as_str(), transition.target[0].as_str());
             }
-            let end_categories = if transition.source.is_empty() || overrides.is_empty() {
+            let end_categories = if overrides.is_empty() {
                 source_categories.clone()
             } else {
                 target_categories(&applied, stratifications, &overrides)
@@ -361,13 +362,23 @@ fn group_sum(
 }
 
 /// Reject a stratified rate whose category conditions hold for none of the
-/// compartments the transition starts from: it could never be applied.
+/// compartments the transition starts from: it could never be applied. Reject
+/// a `to` condition on a transition without a source: it starts from the
+/// compartments it enters, so there is no target to redirect.
 fn check_stratified_rates_match(
     transition: &Transition,
     driving: &[usize],
     layout: &CompartmentLayout,
 ) -> Result<(), String> {
     for stratified_rate in transition.stratified_rates.iter().flatten() {
+        if transition.source.is_empty() && stratified_rate.conditions.iter().any(|c| c.to.is_some())
+        {
+            return Err(format!(
+                "Transition '{}' has no source, so a 'to' condition has no target to \
+                 redirect. Use a category to choose the compartment the flow enters.",
+                transition.id
+            ));
+        }
         let matches_some = driving.iter().any(|&idx| {
             let label = &layout.labels()[idx];
             stratified_rate.conditions.iter().all(|condition| {

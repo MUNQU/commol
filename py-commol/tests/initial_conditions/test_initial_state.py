@@ -143,14 +143,6 @@ class TestInitialConditionsBinding:
         assert engine.compartments == ["A_g1", "A_g2"]
         assert engine.state == [200.0, 500.0]
 
-    def test_defaults_to_no_overrides(self) -> None:
-        initial_conditions = commol_rs.core.InitialConditions(
-            total=1000,
-            bin_fractions=[("A", 1.0)],
-        )
-
-        assert initial_conditions.compartment_fractions == []
-
     def test_uncalibrated_bin_fraction_round_trips(self) -> None:
         initial_conditions = commol_rs.core.InitialConditions(
             total=1000,

@@ -47,7 +47,8 @@ by the configuration's type and knows no method. A static type checker infers
 Every random number of a method comes from the `commol-random` generator,
 seeded from `CalibrationProblem.seed` (`replicate_seed`). Coverage studies
 (`tests/support/coverage.py`, marker `coverage_study`) check that a method's
-intervals cover the truth at their level; they run weekly
+intervals cover the truth at their level; they run for a pull request that
+changes what they run and before a release
 (`.github/workflows/coverage.yaml`).
 
 **Guards:** `tests/uncertainty/test_entry_point.py`,

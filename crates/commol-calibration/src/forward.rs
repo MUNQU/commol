@@ -100,11 +100,6 @@ impl<E: SimulationEngine> ForwardModel<E> {
         &self.parameters
     }
 
-    /// The positions every evaluation runs at.
-    pub fn schedule(&self) -> &[f64] {
-        &self.schedule
-    }
-
     /// The operator that turns the rows of a run at the schedule into
     /// observations.
     pub fn observation(&self) -> &ObservationOperator {

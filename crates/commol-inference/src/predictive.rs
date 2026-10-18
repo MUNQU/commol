@@ -170,11 +170,6 @@ impl Predictive {
         })
     }
 
-    /// The positions of the trajectories.
-    pub fn positions(&self) -> &[f64] {
-        &self.positions
-    }
-
     /// The trajectory of every draw, `[draw][position][output]`.
     pub fn trajectories(&self) -> &[Vec<Vec<f64>>] {
         &self.trajectories

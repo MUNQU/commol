@@ -35,7 +35,7 @@ layers.
 | [Repository map](repository-map.md) | Which module owns which behavior, and where new code goes. |
 | [Design decisions](design-decisions.md) | The rules that are not obvious from the code, one page per area, with the tests that guard them. |
 | [Conventions](conventions.md) | How code, comments, docs and commits are written. |
-| [Tests](tests.md) | The layout, the models, the oracles and the tolerances of the Python tests. |
+| [Tests](tests.md) | The layout, the models, the oracles and the tolerances of the tests; what a test must not check, duplicates, skips, the time budget and mutation testing. |
 | [Maintainer playbook](maintainer-playbook.md) | Checklists by type of change. |
 
 ## Recommended reading path

@@ -23,12 +23,15 @@ env:
 
 jobs:
     # Whether the change touches more than the documentation and the planning
-    # files, which compile nothing. A scheduled or manual run tests everything.
+    # files, which compile nothing (a scheduled or manual run tests
+    # everything), and whether a pull request changes what the coverage
+    # studies run.
     changes:
         name: Changed files
         runs-on: ubuntu-latest
         outputs:
             code: ${{ steps.diff.outputs.code }}
+            studies: ${{ steps.diff.outputs.studies }}
         steps:
             - uses: actions/checkout@v7
               with:
@@ -53,6 +56,17 @@ jobs:
                       echo "code=true" >> "$GITHUB_OUTPUT"
                   else
                       echo "code=false" >> "$GITHUB_OUTPUT"
+                  fi
+                  # What the coverage studies run: the uncertainty methods and the
+                  # crates they depend on, the difference engine of their models,
+                  # the bindings, the Python package, the support code of the
+                  # tests, and the locks and toolchain that build them
+                  # (tests/suite/test_rules.py checks the crates).
+                  studies='^(crates/commol-(core|model|difference|calibration|random|inference)/|py-commol/(src|commol)/|py-commol/tests/(support/|conftest\.py$|uncertainty/test_[a-z_]*coverage\.py$)|py-commol/(Cargo\.toml|pyproject\.toml|uv\.lock)$|Cargo\.(toml|lock)$|rust-toolchain\.toml$|\.github/workflows/coverage\.yaml$)'
+                  if [ "$EVENT" = "pull_request" ] && printf '%s\n' "$files" | grep -q -E "$studies"; then
+                      echo "studies=true" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "studies=false" >> "$GITHUB_OUTPUT"
                   fi
 
     # Tests run on the runner's own architecture, so the target architecture
@@ -98,19 +112,39 @@ jobs:
               # The test model kind is for the tests only; wheels never have it.
               run: uv run maturin develop --release --features test-kind
 
-            # The documentation examples run once, in the Code Quality workflow,
-            # and the coverage studies weekly, in the Coverage Studies workflow.
+            # The test that compiles the LaTeX description needs latexmk. The
+            # time budget of a test is set on Ubuntu, so LaTeX is installed
+            # there, and every test is timed there (test_slow_tests_are_listed).
+            - name: Install LaTeX
+              if: runner.os == 'Linux'
+              run: >-
+                  sudo apt-get update &&
+                  sudo apt-get install --no-install-recommends -y latexmk
+                  texlive-latex-base texlive-latex-recommended texlive-fonts-recommended
+
+            # Every test but the coverage studies, which run in the job
+            # coverage-studies below; the documentation examples run here too, so
+            # the time budget covers them.
             - name: Run tests
               working-directory: ./py-commol
-              run: uv run pytest -m "not docs and not coverage_study"
+              run: uv run pytest -m "not coverage_study"
+
+    # The coverage studies, for a pull request that changes what they run. The
+    # merge queue does not run them again: the pull request already ran them.
+    coverage-studies:
+        name: Coverage studies
+        needs: changes
+        if: needs.changes.outputs.studies == 'true'
+        uses: ./.github/workflows/coverage.yaml
 
     # Single required status check for the whole workflow, so the ruleset does
     # not have to list every job. When only the documentation or the planning
-    # files change, the tests are skipped and count as passed.
+    # files change, the tests are skipped and count as passed; the coverage
+    # studies pass, or are skipped when nothing they run changes.
     build-passed:
         name: Build Passed
         if: always()
-        needs: [changes, test]
+        needs: [changes, test, coverage-studies]
         runs-on: ubuntu-latest
         steps:
             - name: Fail unless the tests passed, or were skipped for a change of documentation
@@ -118,11 +152,18 @@ jobs:
                   CHANGES: ${{ needs.changes.result }}
                   CODE: ${{ needs.changes.outputs.code }}
                   TESTS: ${{ needs.test.result }}
+                  STUDIES_CHANGED: ${{ needs.changes.outputs.studies }}
+                  STUDIES: ${{ needs.coverage-studies.result }}
               run: |
-                  echo "changes: $CHANGES, code: $CODE, test: $TESTS"
+                  echo "changes: $CHANGES, code: $CODE, test: $TESTS, studies changed: $STUDIES_CHANGED, studies: $STUDIES"
                   test "$CHANGES" = "success"
                   if [ "$CODE" = "true" ]; then
                       test "$TESTS" = "success"
                   else
                       test "$TESTS" = "skipped"
+                  fi
+                  if [ "$STUDIES_CHANGED" = "true" ]; then
+                      test "$STUDIES" = "success"
+                  else
+                      test "$STUDIES" = "skipped"
                   fi

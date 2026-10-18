@@ -63,8 +63,9 @@ class UnitChecker:
     def __init__(self, model) -> None:
         self._model = model
         self._helper = ModelCompartmentHelper(model)
+        self._mixed_unit_totals = self._helper.mixed_unit_totals()
 
-    def check_unit_consistency(self, verbose: bool = False) -> None:
+    def check_unit_consistency(self, verbose: bool) -> None:
         """Check unit consistency of all equations in the model."""
         self._validate_unit_check_preconditions()
         self._step_unit()
@@ -120,26 +121,38 @@ class UnitChecker:
 
         The engine plans the flows (``engine_state.transition_flows``), so a
         proportional rate is checked as its flow, the rate times its source,
-        and a read of the neighbors of a unit as the sums it is.
+        and a read of the neighbors of a unit as the sums it is. A flow moves
+        the unit of the bin of its source compartment, or of its target
+        compartment when it has no source.
         """
         errors: list[str] = []
-        impulses = {t.id for t in self._model.process.transitions if t.is_impulse}
-        checked: set[tuple[str, str]] = set()
-        flows = engine_state.transition_flows(
-            self._model.process, self._model.structure
-        )
+        process = self._model.process
+        impulses = {t.id for t in process.transitions if t.is_impulse}
+        bin_units = {bin_item.id: bin_item.unit for bin_item in process.bins}
+        compartment_units = {
+            compartment.name: bin_units[compartment.bin]
+            for compartment in engine_state.initial_state(
+                process, self._model.structure
+            )
+        }
+        checked: set[tuple[str, str, str]] = set()
+        flows = engine_state.transition_flows(process, self._model.structure)
         for flow in flows:
-            if (flow.transition, flow.term) in checked:
+            compartment = flow.source if flow.source is not None else flow.target
+            assert compartment is not None, "a flow has a source or a target"
+            bin_unit = str(compartment_units[compartment])
+            if (flow.transition, flow.term, bin_unit) in checked:
                 continue
-            checked.add((flow.transition, flow.term))
-            is_consistent, error_msg = self._check_transition_rate_units(
+            checked.add((flow.transition, flow.term, bin_unit))
+            error = self._flow_unit_error(
                 flow.term,
                 flow.transition,
                 variable_units,
+                bin_unit,
                 flow.transition in impulses,
             )
-            if not is_consistent and error_msg:
-                errors.append(error_msg)
+            if error is not None:
+                errors.append(error)
 
         return errors
 
@@ -156,15 +169,16 @@ class UnitChecker:
             return check_step_unit(self._model.step_unit)
         return DEFAULT_STEP_UNIT
 
-    def _check_transition_rate_units(
+    def _flow_unit_error(
         self,
         rate: str,
         transition_id: str,
         variable_units: dict[str, str],
-        is_impulse: bool = False,
-    ) -> tuple[bool, str | None]:
+        bin_unit: str,
+        is_impulse: bool,
+    ) -> str | None:
         """
-        Check the units of one flow of a transition.
+        The error of the units of one flow of a transition, or None.
 
         A flow moves ``<bin unit>`` per step; an impulse moves ``<bin unit>``
         at once.
@@ -173,47 +187,25 @@ class UnitChecker:
 
         rate_variable_units: dict[str, str] = {}
         for var in variables:
-            if var in variable_units:
-                rate_variable_units[var] = variable_units[var]
-            else:
+            if var in self._mixed_unit_totals:
+                units = ", ".join(sorted(set(self._helper.bin_units().values())))
                 return (
-                    False,
-                    (
-                        f"Transition '{transition_id}': Variable '{var}' in rate "
-                        f"'{rate}' has no defined unit"
-                    ),
+                    f"Transition '{transition_id}': Variable '{var}' in rate "
+                    f"'{rate}' adds bins of different units ({units}); read the "
+                    "bins or the compartments it sums instead"
                 )
+            if var not in variable_units:
+                return (
+                    f"Transition '{transition_id}': Variable '{var}' in rate "
+                    f"'{rate}' has no defined unit"
+                )
+            rate_variable_units[var] = variable_units[var]
 
-        bin_unit = self._get_transition_bin_unit(transition_id)
-        if not bin_unit:
-            bin_unit = self._model.process.bins[0].unit
-
-        expected_unit = (
-            str(bin_unit) if is_impulse else f"{bin_unit}/{self._step_unit()}"
-        )
+        expected_unit = bin_unit if is_impulse else f"{bin_unit}/{self._step_unit()}"
 
         is_consistent, error_msg = check_equation_units(
             rate, rate_variable_units, expected_unit
         )
-
         if not is_consistent:
-            return (
-                False,
-                f"Transition '{transition_id}': {error_msg}",
-            )
-
-        return (True, None)
-
-    def _get_transition_bin_unit(self, transition_id: str) -> str | None:
-        """Get the bin unit for a specific transition."""
-        for transition in self._model.process.transitions:
-            if transition.id == transition_id:
-                bin_ids = transition.source + transition.target
-
-                for bin_id in bin_ids:
-                    for bin_obj in self._model.process.bins:
-                        if bin_obj.id == bin_id and bin_obj.unit:
-                            return bin_obj.unit
-                break
-
+            return f"Transition '{transition_id}': {error_msg}"
         return None

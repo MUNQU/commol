@@ -71,32 +71,9 @@ impl ObservedDataPoint {
         }
     }
 
-    /// Create an observation of one output with a custom weight
-    pub fn with_weight(at: f64, output: String, value: f64, weight: f64) -> Self {
-        Self {
-            weight,
-            ..Self::new(at, output, value)
-        }
-    }
-
     /// Create an observation of one output with a factor parameter
     pub fn with_factor(at: f64, output: String, value: f64, factor_id: String) -> Self {
         Self {
-            factor_id: Some(factor_id),
-            ..Self::new(at, output, value)
-        }
-    }
-
-    /// Create an observation of one output with both weight and factor
-    pub fn with_weight_and_factor(
-        at: f64,
-        output: String,
-        value: f64,
-        weight: f64,
-        factor_id: String,
-    ) -> Self {
-        Self {
-            weight,
             factor_id: Some(factor_id),
             ..Self::new(at, output, value)
         }
@@ -195,11 +172,6 @@ impl CalibrationParameter {
     pub fn initial_value(&self) -> f64 {
         self.initial_guess
             .unwrap_or_else(|| (self.min_bound + self.max_bound) / 2.0)
-    }
-
-    /// Check if a value is within the parameter bounds
-    pub fn is_within_bounds(&self, value: f64) -> bool {
-        value >= self.min_bound && value <= self.max_bound
     }
 }
 
@@ -733,12 +705,12 @@ mod replicate_tests {
         let loss = LossConfig::SumSquaredError.replicate_loss(
             ReplicateSummary::Mean,
             [
-                (4.0, first.as_mut_slice(), 2.0, 1.0),
+                (4.0, first.as_mut_slice(), 2.0, 3.0),
                 (12.0, second.as_mut_slice(), 1.0, 1.0),
             ],
         );
-        // Means 2 and 12: residuals 2 and 0, weighted 2 and 1.
-        assert_eq!(loss, 8.0);
+        // Means 2 and 12: residuals 2 × 3 and 0, weighted 2 and 1.
+        assert_eq!(loss, 72.0);
     }
 
     #[test]
@@ -749,10 +721,16 @@ mod replicate_tests {
             ReplicateSummary::Crps,
             [
                 (4.5, first.as_mut_slice(), 1.0, 1.0),
-                (3.0, second.as_mut_slice(), 3.0, 1.0),
+                (3.0, second.as_mut_slice(), 3.0, 2.0),
             ],
         );
-        assert!((loss - (2.5 + 3.0 * 0.8125) / 4.0).abs() < 1e-12);
+        assert!((loss - (2.5 + 3.0 * 2.0 * 0.8125) / 4.0).abs() < 1e-12);
+        let mut only = [2.0];
+        let unweighted = LossConfig::SumSquaredError.replicate_loss(
+            ReplicateSummary::Crps,
+            [(1.0, only.as_mut_slice(), 0.0, 1.0)],
+        );
+        assert_eq!(unweighted, 0.0);
     }
 
     #[test]

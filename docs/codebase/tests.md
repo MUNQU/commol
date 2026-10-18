@@ -2,8 +2,9 @@
 
 [Back to Codebase Guide](index.md)
 
-Where a Python test goes, how it builds its model, and what it must check.
-The tests live in `py-commol/tests/`.
+Where a Python test goes, how it builds its model, what it must check, and
+how long it may take. The Python tests live in `py-commol/tests/`; the Rust
+tests are `#[cfg(test)]` modules and the `tests/` folder of each crate.
 
 ## Layout: one package per guide page
 
@@ -33,6 +34,7 @@ kind that is not aggregate through every generic layer.
 | `docs/` | The documentation examples and the API coverage (marker `docs`) | — |
 | `reference_models/` | Published models against their stated results, one module per model family | — (across features) |
 | `model_kinds/` | The test model kind (`support/kinds.py`) through a simulation, a calibration, a report and a plot; the check that an engine runs its kind; the variants of a structure (`UnstratifiedVariant`). It needs the extension built with `--features test-kind`. | — (across features; [Design decisions](decisions/model-kinds.md#one-interface-for-every-model-kind)) |
+| `suite/` | The rules of this page that a program can check (`test_rules.py`), and the plugin that records how long each test takes (`durations.py`) | — |
 | `support/` | No tests: the code the tests share | — |
 
 Keep a test module under about 600 lines. When it grows past that, split it by
@@ -77,7 +79,41 @@ A test compares a result with an oracle:
 
 "It runs" is not a result. A test whose only check is that no exception
 occurs is allowed only when the exception is its subject, such as a validator
-that accepts a valid input.
+that accepts a valid input; it calls `assert_accepted(check, *args)`
+(`tests/support/assertions.py`), which fails with the message of the
+rejection.
+
+A test checks the behavior of commol. It does not check:
+
+- the behavior of Python, pydantic, NumPy or another library, such as a
+  `str` path that `pathlib` accepts, or an unknown keyword that Python rejects;
+- a default of a pydantic model or of a binding;
+- an attribute read back as the test set it;
+- the absence of an API that was removed: that is history, not behavior.
+
+`tests/suite/test_rules.py` checks the part of this that a program can read:
+every Python test has an `assert`, a `pytest.raises`, `pytest.warns` or
+`pytest.fail`, a call of `np.testing.assert_*`, or a call of a helper of
+`tests/` that has one; every Rust test has an `assert*!`, `panic!` or
+`unreachable!`, calls a function of its crate that has one, is
+`#[should_panic]`, or returns a `Result`. Review checks the rest.
+
+## Duplicates
+
+Two tests do not check the same behavior with the same inputs. Candidates
+come from the coverage of each test:
+
+```bash
+COVERAGE_CORE=ctrace pytest --cov=commol --cov-context=test --cov-report=
+```
+
+The `sysmon` core, the default of coverage on Python 3.14, records a line only
+for the first test that runs it, so it gives most tests no context. Two tests of one module whose covered lines are equal,
+or one inside the other, are a candidate. Coverage does not decide: two tests
+can run the same lines and check different results. Read both, and keep one
+only when the other checks nothing that it does not: the same output for the
+same input, or a weaker check of the same output (`"+" in formula` against
+the exact formula).
 
 ## Tolerances
 
@@ -93,6 +129,10 @@ that accepts a valid input.
   computed by hand.
 - An optimizer result states the tolerance its convergence allows, for example
   `abs=1e-5` for Nelder-Mead on noise-free data.
+- `np.testing.assert_allclose` skips masked values. Read the points of a
+  matplotlib collection as floats (`np.asarray(offsets, dtype=float)`, as
+  `_scatter` in `tests/plotting/test_plotter.py` does), so a point at `None`
+  is NaN and fails.
 
 ## Reference models
 
@@ -118,12 +158,90 @@ result (`test_the_fixed_point_starts_the_periodic_orbit`).
   differential one; an asymptotic result is read with `settled`, and the test
   states its horizon.
 - **Gaps.** A model that commol cannot state, or computes wrong, gets a test
-  marked `xfail(strict=True, reason="F<n>: …")` that names a finding of the
-  task that added it, so a fix makes the test pass and forces the marker out.
+  marked as [Skips, expected failures and ignored tests](#skips-expected-failures-and-ignored-tests)
+  says, with the open issue of the finding.
 
 To add a test, write the model with `Flow` and `flow_model` (`tests/support/flows.py`)
 from the initial value of each bin, compute the stated result in the test,
 and cite the papers.
+
+## Skips, expected failures and ignored tests
+
+- An `xfail` is `strict=True` and its reason starts with the open issue that
+  fixes it (`reason="#196: …"`): the fix makes the test pass, and the strict
+  marker then fails the run until the fix removes it.
+- A test that skips when an optional dependency is missing runs in at least
+  one CI job: the `dev` extra installs `pydot`, and Python Coverage and the
+  job Test of Build on Ubuntu install `latexmk`.
+- A Rust `#[ignore]` gives a reason with the `cargo test` command that runs it,
+  such as the benchmarks of `crates/commol-differential/src/tests.rs`. A
+  benchmark also asserts that the methods it times give the same result.
+
+`tests/suite/test_rules.py` checks the `xfail` markers and the reasons of
+`#[ignore]`.
+
+## Time budget
+
+A test takes at most 1 s, setup and teardown included, in the job Test of
+Build on Ubuntu, which runs every test without coverage. Coverage slows a test
+that runs much Python up to ten times, so the run under coverage (Python
+Coverage) skips the check, and so does a run off Linux. A test over 0.5 s stays only if it checks what no faster test checks,
+with the smallest inputs that still check it: a shorter horizon, fewer steps,
+fewer replicates. `tests/suite/durations.py` records the time of each test,
+and `test_slow_tests_are_listed` runs last and fails on a test over the budget
+that the table below does not list.
+
+The coverage studies (`coverage_study`) are the one exception. A study counts
+how often an interval covers the truth over hundreds of synthetic data sets;
+fewer data sets widen its tolerance until it checks nothing, so it cannot
+shrink to the budget. They do not run less often than the code they check:
+Build runs them for every pull request that changes what they run,
+and the release runs them before it publishes ([CI pipelines](../development/workflow.md#continuous-integration-pipelines)).
+`test_every_coverage_study_runs_in_a_group_of_the_workflow` checks that
+`coverage.yaml` runs each of them, and
+`test_the_studies_run_for_a_change_of_any_crate_they_use` that a change of
+`commol-inference`, of a crate it depends on or of the difference engine runs
+them.
+
+The check reads the wall time of the run, so a machine that runs other work
+at the same time can exceed the budget. `pytest --durations=20` shows the
+slowest tests; Python Coverage prints them, slowed by coverage. A row names
+a test, or one case of a parametrized test with its parameter in brackets.
+
+| Test | Why it takes longer |
+|---|---|
+| `tests/description/test_rendering.py::TestLatex::test_the_latex_document_compiles` | It compiles the LaTeX description with `latexmk`; the first TeX run of the job loads its formats. No other test checks that the document compiles. |
+| `tests/docs/test_examples.py::test_page_examples_run[docs/guide/simulations.md]` | It runs every example of the page, which draws and saves four figures with matplotlib, one label per plotted position; the figures are what the page documents. |
+
+## Mutation testing
+
+Coverage says that a line ran, not that a test notices when it changes.
+Mutation testing changes the code, one small change at a time, and reports
+the changes that no test fails on. It runs on demand, not in CI, because a
+full run takes hours:
+
+```bash
+cargo install --locked cargo-mutants
+cargo mutants -j 2 --timeout 120 -p commol-model --test-package commol-model \
+  --test-package commol-difference --test-package commol-differential \
+  --test-package commol-stochastic \
+  --exclude-re 'replace \+= with .* in CompiledModel::breakpoints'
+```
+
+A mutant can loop without end and fill the memory: the loop of
+`CompiledModel::breakpoints` never ends when its step does not grow, so the
+command leaves those mutants out, and `--timeout` stops the others. Run
+`cargo-mutants` and `mutmut` one at a time.
+
+For Python, `mutmut` (`uv pip install mutmut`) with `[tool.mutmut]`
+`paths_to_mutate = ["commol/context/", "commol/api/"]` in a copy of
+`py-commol/`. A missed mutant gets a test that fails on it, or a reason: an
+equivalent mutant changes no behavior. The Python suite also runs the Rust
+code, so check a Rust mutant that the Rust tests miss against `pytest`
+before you write a test for it. `mutmut` imports the package before it
+activates a mutant, so a mutant of code that runs at import, such as the
+registration of a model kind, survives every test: check it with
+`MUTANT_UNDER_TEST=<name>` set before Python starts.
 
 ## Navigation
 

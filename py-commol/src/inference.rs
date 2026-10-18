@@ -675,8 +675,8 @@ impl PyParameterSample {
     }
 
     /// The weighted quantiles: one row per level, one column per parameter
-    fn quantiles(&self, levels: Vec<f64>) -> Vec<Vec<f64>> {
-        self.inner.quantiles(&levels)
+    fn quantiles(&self, levels: Vec<f64>) -> PyResult<Vec<Vec<f64>>> {
+        self.inner.quantiles(&levels).map_err(value_error)
     }
 
     /// The central interval of `confidence_level`, as `(lower, upper)` rows
@@ -706,12 +706,6 @@ pub struct PyPredictive {
 
 #[pymethods]
 impl PyPredictive {
-    /// The positions of the trajectories
-    #[getter]
-    fn positions(&self) -> Vec<f64> {
-        self.inner.positions().to_vec()
-    }
-
     /// The trajectory of every draw, `[draw][position][output]`
     #[getter]
     fn trajectories(&self) -> Vec<Vec<Vec<f64>>> {
@@ -773,20 +767,6 @@ impl PyObservationDraws {
         self.inner.weights.clone()
     }
 
-    /// The weighted quantiles of each observation: `[level][observation]`
-    fn quantiles(&self, levels: Vec<f64>) -> Vec<Vec<f64>> {
-        let n = self.inner.values.first().map_or(0, Vec::len);
-        let per_observation: Vec<Vec<f64>> = (0..n)
-            .map(|i| {
-                let column: Vec<f64> = self.inner.values.iter().map(|row| row[i]).collect();
-                statistics::quantiles(&column, &self.inner.weights, &levels)
-            })
-            .collect();
-        (0..levels.len())
-            .map(|l| per_observation.iter().map(|q| q[l]).collect())
-            .collect()
-    }
-
     /// The band of each observation: `(mean, median, lower, upper)`, one
     /// value per observation
     #[allow(clippy::type_complexity)]
@@ -833,7 +813,8 @@ impl PyObservationDraws {
 /// `method="hazen"`.
 ///
 /// Raises:
-///     ValueError: If the lengths differ or no weight is positive
+///     ValueError: If the lengths differ, no weight is positive or a level is
+///         not in [0, 1]
 #[pyfunction]
 fn weighted_quantiles(values: Vec<f64>, weights: Vec<f64>, levels: Vec<f64>) -> PyResult<Vec<f64>> {
     if values.len() != weights.len() {
@@ -848,6 +829,7 @@ fn weighted_quantiles(values: Vec<f64>, weights: Vec<f64>, levels: Vec<f64>) -> 
             "A quantile needs a positive weight".to_string(),
         ));
     }
+    statistics::check_levels(&levels).map_err(value_error)?;
     Ok(statistics::quantiles(&values, &weights, &levels))
 }
 

@@ -1,0 +1,263 @@
+{
+ "key": "entities",
+ "title": "Entities",
+ "blocks": [
+  {
+   "type": "table",
+   "heading": "Bins",
+   "columns": [
+    "Bin",
+    "Name",
+    "Unit"
+   ],
+   "rows": [
+    [
+     "A",
+     "State \"A\" \\ start",
+     "item"
+    ],
+    [
+     "B",
+     "State B",
+     "item"
+    ]
+   ]
+  },
+  {
+   "type": "table",
+   "heading": "Accumulators",
+   "columns": [
+    "Accumulator",
+    "Name"
+   ],
+   "rows": [
+    [
+     "moved",
+     "Moved"
+    ]
+   ]
+  },
+  {
+   "type": "table",
+   "heading": "Stratifications",
+   "columns": [
+    "Stratification",
+    "Categories",
+    "Splits"
+   ],
+   "rows": [
+    [
+     "group",
+     "g1, g2",
+     "every compartment"
+    ],
+    [
+     "tier",
+     "t1, t2",
+     "where group = g1"
+    ]
+   ]
+  },
+  {
+   "type": "table",
+   "heading": "Compartments",
+   "columns": [
+    "Compartment",
+    "Bin",
+    "Categories"
+   ],
+   "rows": [
+    [
+     "A_g1_t1",
+     "A",
+     "group=g1, tier=t1"
+    ],
+    [
+     "A_g1_t2",
+     "A",
+     "group=g1, tier=t2"
+    ],
+    [
+     "A_g2",
+     "A",
+     "group=g2"
+    ],
+    [
+     "B_g1_t1",
+     "B",
+     "group=g1, tier=t1"
+    ],
+    [
+     "B_g1_t2",
+     "B",
+     "group=g1, tier=t2"
+    ],
+    [
+     "B_g2",
+     "B",
+     "group=g2"
+    ]
+   ]
+  }
+ ]
+}
+{
+ "key": "initialization",
+ "title": "Initialization",
+ "blocks": [
+  {
+   "type": "table",
+   "heading": "Bin fractions",
+   "columns": [
+    "Bin",
+    "Fraction",
+    "Amount"
+   ],
+   "rows": [
+    [
+     "A",
+     "set by calibration",
+     null
+    ],
+    [
+     "B",
+     0.4,
+     400.0
+    ]
+   ]
+  },
+  {
+   "type": "table",
+   "heading": "Stratification fractions",
+   "columns": [
+    "Stratification",
+    "Category",
+    "Fraction",
+    "Of"
+   ],
+   "rows": [
+    [
+     "group",
+     "g1",
+     0.25,
+     "total"
+    ],
+    [
+     "group",
+     "g2",
+     0.75,
+     "total"
+    ],
+    [
+     "tier",
+     "t1",
+     0.5,
+     "g1"
+    ],
+    [
+     "tier",
+     "t2",
+     0.5,
+     "g1"
+    ]
+   ]
+  },
+  {
+   "type": "table",
+   "heading": "Compartment overrides",
+   "columns": [
+    "Compartment",
+    "Fraction of the total",
+    "Amount"
+   ],
+   "rows": [
+    [
+     "B_g2",
+     0.2,
+     200.0
+    ]
+   ]
+  },
+  {
+   "type": "table",
+   "heading": "Initial state (total 1000)",
+   "columns": [
+    "Compartment",
+    "Amount"
+   ],
+   "rows": [
+    [
+     "A_g1_t1",
+     0.0
+    ],
+    [
+     "A_g1_t2",
+     0.0
+    ],
+    [
+     "A_g2",
+     0.0
+    ],
+    [
+     "B_g1_t1",
+     50.0
+    ],
+    [
+     "B_g1_t2",
+     50.0
+    ],
+    [
+     "B_g2",
+     200.0
+    ]
+   ]
+  }
+ ]
+}
+{
+ "key": "design_concepts",
+ "title": "Design concepts",
+ "blocks": [
+  {
+   "type": "table",
+   "heading": null,
+   "columns": [
+    "Element",
+    "Description"
+   ],
+   "rows": [
+    [
+     "Interaction",
+     "A rate that reads neighbors_<bin> or neighbors depends on the units of the categories of 'group', weighted by the matrix of the neighbors."
+    ]
+   ]
+  }
+ ]
+}
+{
+ "type": "text",
+ "heading": "Neighbors",
+ "text": "Units are neighbors by the categories of 'group' (Groups): in a compartment of category g, neighbors_<bin> is the sum over g' of w[g][g'] times the amount of the bin in g', and neighbors the same sum over every bin. The weights w[g][g'] are:"
+}
+{
+ "type": "matrix",
+ "heading": null,
+ "row_labels": [
+  "g1",
+  "g2"
+ ],
+ "column_labels": [
+  "g1",
+  "g2"
+ ],
+ "values": [
+  [
+   1.0,
+   0.5
+  ],
+  [
+   0.5,
+   1.0
+  ]
+ ]
+}

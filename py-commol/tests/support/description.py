@@ -1,14 +1,30 @@
-"""The equations of a description, in the layout `print_equations` had.
+"""The equations of a description, in the layout `print_equations` had, and
+the snapshots of renderings.
 
 `equation_forms` rebuilds the compact form, the expanded form and the
 impulses from the blocks of the ``dynamics`` section, in text or in LaTeX, so
 a test checks the same lines the equations of a model always had.
 """
 
+from pathlib import Path
+
+import pytest
+
 from commol.context.description import Equation, Equations, Text
 from commol.context.model import Model
 
 BANNER = "=" * 40
+SNAPSHOTS = Path(__file__).parent.parent / "description" / "snapshots"
+
+
+def matches_snapshot(name: str, rendered: str) -> None:
+    """`rendered` equals the snapshot `name`; a missing one is written, and fails."""
+    path = SNAPSHOTS / name
+    if not path.exists():
+        SNAPSHOTS.mkdir(exist_ok=True)
+        path.write_text(rendered, encoding="utf-8")
+        pytest.fail(f"Wrote the snapshot {path}; review it and run again")
+    assert rendered == path.read_text(encoding="utf-8")
 
 
 def _banner(title: str) -> list[str]:

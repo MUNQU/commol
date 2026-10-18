@@ -2,7 +2,7 @@
 //! one event of each flow times its value (`flow_changes`ᵀ · `flow_rates`).
 
 use commol_core::Model;
-use commol_model::CompiledModel;
+use commol_model::{CompiledModel, subgroup_total_names};
 
 /// A model of bins A, B and C stratified by `group` into `g0` and `g1`, with
 /// an accumulator `moved`, read from its JSON with the given transitions.
@@ -148,6 +148,25 @@ fn one_event_takes_one_unit_from_each_source_and_counts_once() {
 }
 
 #[test]
+fn an_event_takes_as_many_units_as_a_source_appears() {
+    let model = model(&[&transition(
+        "double",
+        &["A", "A"],
+        &["B", "C"],
+        "k1 * A * A / total",
+        "",
+    )]);
+    let compiled = CompiledModel::try_from_model(&model).unwrap();
+    let names = compiled.output_names();
+    let takes: Vec<(&str, u32)> = compiled.flow_changes()[0]
+        .takes()
+        .iter()
+        .map(|&(index, count)| (names[index].as_str(), count))
+        .collect();
+    assert_eq!(takes, vec![("A_g0", 2)]);
+}
+
+#[test]
 fn a_rate_of_t_or_a_linear_series_reads_time() {
     let [steady, _, periodic] = <[Model; 3]>::try_from(models()).ok().unwrap();
     assert!(!CompiledModel::try_from_model(&steady).unwrap().reads_time());
@@ -156,4 +175,109 @@ fn a_rate_of_t_or_a_linear_series_reads_time() {
             .unwrap()
             .reads_time()
     );
+}
+
+/// The rate of `ab` per unit of `A_g0`, with the given stratified rates.
+fn rate_of_a_g0(stratified_rates: &str) -> f64 {
+    let extra = format!(r#","stratified_rates":[{stratified_rates}]"#);
+    let model = model(&[&transition("ab", &["A"], &["B"], "k2", &extra)]);
+    let mut compiled = CompiledModel::try_from_model(&model).unwrap();
+    let state = compiled.initial_state().to_vec();
+    let mut rates = vec![0.0; compiled.flow_changes().len()];
+    compiled.flow_rates(0.0, 0.0, &state, &mut rates).unwrap();
+    let a_g0 = compiled
+        .output_names()
+        .iter()
+        .position(|name| name == "A_g0")
+        .unwrap();
+    rates[0] / state[a_g0]
+}
+
+#[test]
+fn the_most_specific_stratified_rate_wins_and_the_first_on_a_tie() {
+    let any = r#"{"conditions":[],"rate":"r"}"#;
+    let g0 = |rate: &str| {
+        format!(
+            r#"{{"conditions":[{{"stratification":"group","category":"g0"}}],"rate":"{rate}"}}"#
+        )
+    };
+    assert_eq!(rate_of_a_g0(&format!("{any},{}", g0("k1"))), 0.3);
+    assert_eq!(rate_of_a_g0(&format!("{},{}", g0("k1"), g0("k2"))), 0.3);
+}
+
+#[test]
+fn a_bin_at_the_start_of_a_rate_is_its_compartment() {
+    // Per compartment, B reads B_g0 in the flow of g0 and B_g1 in that of g1.
+    let rate = |expression: &str| {
+        let extra = r#","per_compartment":true"#;
+        let model = model(&[&transition("ab", &["A"], &["B"], expression, extra)]);
+        let mut compiled = CompiledModel::try_from_model(&model).unwrap();
+        let state = compiled.initial_state().to_vec();
+        let mut rates = vec![0.0; compiled.flow_changes().len()];
+        compiled.flow_rates(0.0, 0.0, &state, &mut rates).unwrap();
+        rates
+    };
+    let rates = rate("B * k1 / total");
+    assert_eq!(rates, rate("k1 * B / total"));
+    assert_ne!(rates[0], rates[1]);
+}
+
+#[test]
+fn a_category_transition_has_one_source_and_one_target() {
+    let model = model(&[&transition("swap", &["g0"], &["g1", "g1"], "k2", "")]);
+    let error = CompiledModel::try_from_model(&model).err().unwrap();
+    assert!(
+        error.contains("exactly one source and one target"),
+        "{error}"
+    );
+}
+
+#[test]
+fn a_partial_bin_total_leaves_out_the_compartments() {
+    let json = r#"{"name":"m","parameters":[],"engine":{"type":"DifferenceEquations"},
+        "process":{"bins":[{"id":"A","name":"A"}],"accumulators":[],
+        "stratifications":[{"id":"group","categories":["g0","g1"]},
+        {"id":"age","categories":["y","o"]}],"transitions":[]},
+        "structure":{"kind":"aggregate","total":1000,"bin_fractions":{"A":1.0}}}"#;
+    let model: Model = serde_json::from_str(json).expect("valid model JSON");
+    let names = subgroup_total_names(&model.process);
+    assert!(names.contains(&"A_g0".to_string()), "{names:?}");
+    assert!(names.contains(&"total_g0_y".to_string()), "{names:?}");
+    assert!(!names.contains(&"A_g0_y".to_string()), "{names:?}");
+}
+
+#[test]
+fn an_inflow_chooses_its_compartment_with_a_category_and_has_no_to() {
+    let inflow = |condition: &str| {
+        model(&[&transition(
+            "in",
+            &[],
+            &["A"],
+            "r",
+            &format!(
+                r#","stratified_rates":[{{"conditions":[{{"stratification":"group",{condition}}}],"rate":"k1"}}]"#
+            ),
+        )])
+    };
+    let error = CompiledModel::try_from_model(&inflow(r#""to":"g1""#))
+        .err()
+        .unwrap();
+    assert!(error.contains("no target to redirect"), "{error}");
+    let mut compiled = CompiledModel::try_from_model(&inflow(r#""category":"g1""#)).unwrap();
+    let mut rates = vec![0.0; 2];
+    let state = compiled.initial_state().to_vec();
+    compiled.flow_rates(0.0, 0.0, &state, &mut rates).unwrap();
+    assert_eq!(rates, [2.5, 0.3]);
+}
+
+#[test]
+fn a_bin_in_a_rate_is_the_total_of_the_bin_without_per_compartment() {
+    let mut compiled =
+        CompiledModel::try_from_model(&model(&[&transition("ab", &["A"], &["B"], "k1 * A", "")]))
+            .unwrap();
+    let state = compiled.initial_state().to_vec();
+    let mut rates = vec![0.0; 2];
+    compiled.flow_rates(0.0, 0.0, &state, &mut rates).unwrap();
+    // A holds 700 split 280 and 420 by group; each flow reads the whole bin.
+    assert_eq!(rates, [0.3 * 700.0, 0.3 * 700.0]);
 }

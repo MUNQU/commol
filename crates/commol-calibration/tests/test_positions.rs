@@ -86,12 +86,12 @@ fn a_difference_engine_names_the_constraint_at_a_non_integer_position() {
 #[test]
 fn a_differential_engine_accepts_non_integer_positions() {
     let observation = ObservedDataPoint::with_window(4.0, "A".to_string(), 500.0, 1.5);
-    problem(
+    let result = problem(
         differential(),
         vec![at(2.5), observation],
         vec![bounded(vec![0.25, 3.5])],
-    )
-    .expect("every position is accepted");
+    );
+    assert!(result.is_ok(), "{:?}", result.err());
 }
 
 #[test]
@@ -115,4 +115,18 @@ fn a_window_longer_than_its_position_is_rejected() {
         error.contains("Observation 'A' at 1 with the window 2"),
         "{error}"
     );
+}
+
+#[test]
+fn a_window_is_finite_and_positive() {
+    for window in [0.0, f64::INFINITY] {
+        let observation = ObservedDataPoint::with_window(4.0, "A".to_string(), 500.0, window);
+        let error = problem(differential(), vec![observation], vec![])
+            .err()
+            .expect("the window is rejected");
+        assert!(
+            error.contains("a window must be finite and positive"),
+            "{error}"
+        );
+    }
 }

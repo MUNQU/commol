@@ -238,6 +238,37 @@ fn negative_remainder_is_infeasible() {
 }
 
 #[test]
+fn a_remainder_below_zero_is_its_share_of_the_total() {
+    // A = 0.95 and C = 100 leave B at −50, 0.05 of the total.
+    let error =
+        written_state(FrozenEngine::with_fixed_c(), &["A"], Some("B"), &[0.95]).unwrap_err();
+
+    assert!(error.contains("'B' 0.050000 of the total"), "{error}");
+}
+
+#[test]
+fn a_bin_of_empty_compartments_splits_its_value_evenly() {
+    let engine = FrozenEngine::with(
+        &["A_cat0", "A_cat1", "B_cat0", "B_cat1"],
+        &[0.0, 0.0, 400.0, 300.0],
+    );
+    let state = written_state(engine, &["A"], None, &[0.3]).unwrap();
+
+    assert_close(&state, &[150.0, 150.0, 400.0, 300.0]);
+}
+
+#[test]
+fn a_remainder_of_empty_compartments_splits_evenly() {
+    let engine = FrozenEngine::with(
+        &["A_cat0", "A_cat1", "B_cat0", "B_cat1"],
+        &[500.0, 500.0, 0.0, 0.0],
+    );
+    let state = written_state(engine, &["A"], Some("B"), &[0.6]).unwrap();
+
+    assert_close(&state, &[300.0, 300.0, 200.0, 200.0]);
+}
+
+#[test]
 fn remainder_overlapping_a_calibrated_value_is_rejected() {
     let error =
         written_state(FrozenEngine::two_bins(), &["A"], Some("A_cat0"), &[0.5]).unwrap_err();
