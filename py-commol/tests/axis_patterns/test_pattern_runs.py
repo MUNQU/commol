@@ -6,6 +6,7 @@ import pytest
 
 from commol import ModelBuilder, Simulation, AxisPattern
 from commol.context.model import Model
+from commol.context.parameter import SeriesValue
 from tests.support import a_to_b_builder, assert_close, build, build_ode, run
 
 
@@ -292,6 +293,91 @@ class TestAddTransitionAcceptsAxisPattern:
                     stratified_rates=[{"conditions": [], "rate": "0.0"}],
                 )
             )
+
+    def test_a_series_of_a_group_is_named_by_its_flow(self):
+        cat1 = [{"stratification": "group", "category": "cat1"}]
+        builder = (
+            ModelBuilder("AB")
+            .add_bin("A", "Source")
+            .add_bin("B", "Sink")
+            .add_stratification("group", ["cat1", "cat2"])
+            .add_transition(
+                "flow",
+                ["A"],
+                ["B"],
+                rate=AxisPattern.add_group(
+                    conditions=cat1,
+                    schedule=AxisPattern.pulse(at=2, value=0.1),
+                    source_compartment="A_cat1",
+                )
+                .add_group(
+                    conditions=[
+                        {"stratification": "group", "category": "cat2", "to": "cat1"}
+                    ],
+                    schedule=AxisPattern.pulses(at=[3, 4], value=0.2),
+                )
+                .add_group(
+                    conditions=[{"stratification": "group", "to": "cat2"}],
+                    schedule=AxisPattern.pulses(at=[5, 6], value=[0.3, 0.4]),
+                ),
+            )
+        )
+
+        assert [(p.id, p.value) for p in builder._parameters] == [
+            ("flow_A_cat1_to_B_cat1", SeriesValue(data=[(2, 0.1)], mode="pulse")),
+            (
+                "flow_A_cat2_to_B_cat1",
+                SeriesValue(data=[(3, 0.2), (4, 0.2)], mode="pulse"),
+            ),
+            (
+                "flow_A__to_B_cat2",
+                SeriesValue(data=[(5, 0.3), (6, 0.4)], mode="pulse"),
+            ),
+        ]
+        (transition,) = builder._transitions
+        assert (transition.stratified_rates or [])[0].rate == (
+            "flow_A_cat1_to_B_cat1 * A_cat1"
+        )
+
+    def test_a_series_of_an_inflow_an_outflow_and_two_categories_is_named(self):
+        both = [
+            {"stratification": "group", "category": "cat1"},
+            {"stratification": "age", "category": "young"},
+        ]
+
+        def schedule(value: float) -> AxisPattern:
+            return AxisPattern.add_group(
+                conditions=both, schedule=AxisPattern.pulse(at=1, value=value)
+            )
+
+        builder = (
+            ModelBuilder("AB")
+            .add_bin("A", "Source")
+            .add_bin("B", "Sink")
+            .add_stratification("group", ["cat1", "cat2"])
+            .add_stratification("age", ["young", "old"])
+            .add_transition("in", [], ["A"], rate=schedule(1.0))
+            .add_transition("out", ["B"], [], rate=schedule(0.1))
+        )
+
+        assert [p.id for p in builder._parameters] == [
+            "in_cat1_young_to_A_cat1_young",
+            "out_B_cat1_young_to_cat1_young",
+        ]
+
+    def test_a_series_of_no_group_is_numbered_until_a_reset(self):
+        def add(builder: ModelBuilder, id: str) -> ModelBuilder:
+            return builder.add_transition(
+                id, ["A"], ["B"], rate=AxisPattern.pulse(at=1, value=0.1)
+            )
+
+        builder = ModelBuilder("AB").add_bin("A", "Source").add_bin("B", "Sink")
+        add(add(add(builder, "first"), "second"), "third")
+        numbered = [p.id for p in builder._parameters]
+        add(builder.reset().add_bin("A", "Source").add_bin("B", "Sink"), "again")
+
+        assert numbered == ["_series_0", "_series_1", "_series_2"]
+        assert [p.id for p in builder._parameters] == ["_series_0"]
 
     def test_generated_series_parameter_collision_raises(self):
         with pytest.raises(ValueError, match="already exists"):

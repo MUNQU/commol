@@ -21,9 +21,13 @@ from commol import (
     StructuralRank,
 )
 from commol.context.inference.identifiability import (
+    CollinearitySection,
     ParameterVerdicts,
     PracticalVerdict,
     PracticalVerdictName,
+    SampleSection,
+    StartsSection,
+    StructuralSection,
     StructuralVerdict,
     StructuralVerdictName,
 )
@@ -252,6 +256,66 @@ class TestPractical:
         assert verdict is not None
         assert verdict.verdict == "poorly_determined"
 
+    def test_a_sample_gives_the_reason_of_each_verdict(
+        self, product: Calibrator
+    ) -> None:
+        # k1 and s lie on a line; k2 has two clusters, apart from both.
+        k1 = [0.1 + 0.5 * (i + 0.5) / 100 for i in range(100)]
+        k2 = [0.05 + 0.2 * (i % 2) + 0.01 * ((i * 37) % 11) / 11 for i in range(100)]
+        lines = ParameterSample.equally_weighted(
+            ["k1", "s", "k2"],
+            [(0.1, 0.6), (0.5, 2.0), (0.02, 0.3)],
+            [[k, 2.1 - 2.0 * k, c] for k, c in zip(k1, k2, strict=True)],
+            SampleMethod(name="given"),
+        )
+        near = ParameterSample.equally_weighted(
+            ["k1", "s", "k2"],
+            [(0.1, 0.6), (0.5, 2.0), (0.02, 0.3)],
+            [[0.3 + 0.001 * ((i * 13) % 7), 1.0, 0.1] for i in range(50)],
+            SampleMethod(name="given"),
+        )
+
+        def reasons(sample: ParameterSample) -> dict[str, tuple[str, list[str]]]:
+            report = product.identifiability(
+                SampleIdentifiability(
+                    sample=sample, reference="bounds", correlation_threshold=0.9
+                )
+            )
+            return {
+                name: (verdict.practical.verdict, verdict.practical.reasons)
+                for name, verdict in report.verdicts.items()
+                if verdict.practical is not None
+            }
+
+        assert reasons(lines) == {
+            "k1": ("poorly_determined", ["Sample: correlation -1.000 with s."]),
+            "s": ("poorly_determined", ["Sample: correlation -1.000 with k1."]),
+            "k2": ("poorly_determined", ["Sample: its marginal has 2 modes."]),
+        }
+        assert reasons(near)["k1"] == (
+            "determined",
+            ["Sample: contraction 1.00, no strong pair."],
+        )
+
+    def test_a_sample_of_other_parameters_is_rejected(
+        self, product: Calibrator
+    ) -> None:
+        sample = ParameterSample.equally_weighted(
+            ["k1", "s"], [(0.1, 0.6), (0.5, 2.0)], [[0.3, 1.0]], SampleMethod(name="g")
+        )
+
+        with pytest.raises(ValueError) as error:
+            product.identifiability(
+                SampleIdentifiability(
+                    sample=sample, reference="bounds", correlation_threshold=0.9
+                )
+            )
+
+        assert str(error.value) == (
+            "The sample's parameters ['k1', 's'] are not the problem's "
+            "['k1', 's', 'k2']."
+        )
+
     def test_starts_with_equal_losses_flag_the_parameters_that_differ(
         self, product: Calibrator
     ) -> None:
@@ -272,6 +336,40 @@ class TestPractical:
 
         assert flagged.starts[0].flagged == ["k1", "s"]
         assert still.starts[0].flagged == []
+        assert {n: v.practical for n, v in flagged.verdicts.items()} == {
+            "k1": PracticalVerdict(
+                verdict="poorly_determined",
+                reasons=[
+                    "Starts: the 2 converged starts of equal loss end 60% of its "
+                    "bounds apart."
+                ],
+            ),
+            "s": PracticalVerdict(
+                verdict="poorly_determined",
+                reasons=[
+                    "Starts: the 2 converged starts of equal loss end 60% of its "
+                    "bounds apart."
+                ],
+            ),
+            "k2": PracticalVerdict(
+                verdict="determined",
+                reasons=["Starts: the 2 converged starts of equal loss agree on it."],
+            ),
+        }
+
+    def test_a_start_without_a_parameter_is_rejected(self, product: Calibrator) -> None:
+        result = _result(
+            [{"k1": 0.2, "s": 1.5}, {"k1": 0.5, "s": 0.6, "k2": 0.1}], [1.0, 1.0]
+        )
+
+        with pytest.raises(ValueError) as error:
+            product.identifiability(
+                StartsIdentifiability(
+                    result=result, parameter_tolerance=0.05, loss_tolerance=1e-3
+                )
+            )
+
+        assert str(error.value) == "A start has no value of ['k2']."
 
     def test_starts_identifiability_needs_two_starts(self, product: Calibrator) -> None:
         one = _result([{"k1": 0.3, "s": 1.0, "k2": 0.1}], [1.0])
@@ -323,6 +421,67 @@ class TestReport:
         assert verdict is not None
         assert verdict.verdict == "conflicting"
         assert verdict.reasons == ["identifiable", "non_identifiable"]
+
+    def test_merge_of_disagreeing_practical_verdicts_is_conflicting(self) -> None:
+        merged = _report(practical="determined").merge(
+            _report(practical="poorly_determined")
+        )
+
+        assert merged.verdicts["k"].practical == PracticalVerdict(
+            verdict="conflicting", reasons=["determined", "poorly_determined"]
+        )
+
+    def test_merge_keeps_each_combination_once_in_order(self) -> None:
+        def report(*combinations: str) -> IdentifiabilityReport:
+            verdict = StructuralVerdict(
+                verdict="in_combination", combinations=list(combinations)
+            )
+            return IdentifiabilityReport(
+                parameters=["k"], verdicts={"k": ParameterVerdicts(structural=verdict)}
+            )
+
+        merged = report("k · s", "k / s").merge(report("k / s", "k · t"))
+
+        assert merged.verdicts["k"].structural == StructuralVerdict(
+            verdict="in_combination", combinations=["k · s", "k / s", "k · t"]
+        )
+
+    def test_merge_keeps_the_sections_of_every_report_in_order(self) -> None:
+        sections = {
+            "structural": StructuralSection,
+            "collinearity": CollinearitySection,
+            "sample": SampleSection,
+            "starts": StartsSection,
+        }
+
+        def report() -> tuple[IdentifiabilityReport, dict[str, object]]:
+            held = {name: kind.model_construct() for name, kind in sections.items()}
+            return _report().model_copy(
+                update={name: [section] for name, section in held.items()}
+            ), held
+
+        first, first_sections = report()
+        second, second_sections = report()
+        merged = first.merge(second)
+
+        for name in sections:
+            assert getattr(merged, name) == [
+                first_sections[name],
+                second_sections[name],
+            ]
+            assert getattr(merged, name)[0] is first_sections[name]
+
+    def test_reports_of_other_parameters_do_not_merge(self) -> None:
+        other = IdentifiabilityReport(
+            parameters=["s"], verdicts={"s": ParameterVerdicts()}
+        )
+
+        with pytest.raises(ValueError) as error:
+            _report().merge(other)
+
+        assert str(error.value) == (
+            "Reports of different parameters cannot merge: ['k'] and ['s']."
+        )
 
 
 class TestEntryPoint:

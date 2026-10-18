@@ -1,0 +1,193 @@
+{
+  "title": "decay",
+  "layout": "odd",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "Purpose and patterns",
+      "blocks": [
+        {
+          "type": "text",
+          "heading": null,
+          "text": "To be written by the modeller."
+        }
+      ]
+    },
+    {
+      "key": "entities",
+      "title": "Entities, state variables and scales",
+      "blocks": [
+        {
+          "type": "table",
+          "heading": "Scales",
+          "columns": [
+            "Scale",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Axis",
+              "one step is 1 step"
+            ],
+            [
+              "Advance",
+              "continuous (TestEngine)"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "key": "process_overview",
+      "title": "Process overview and scheduling",
+      "blocks": [
+        {
+          "type": "text",
+          "heading": "Scheduling",
+          "text": "The solver integrates dX/dt = sum of the flows in continuous time: a rate is an instantaneous rate per unit of the axis. The integration stops and restarts at each impulse and at each position where a rate jumps."
+        }
+      ]
+    },
+    {
+      "key": "design_concepts",
+      "title": "Design concepts",
+      "blocks": [
+        {
+          "type": "table",
+          "heading": null,
+          "columns": [
+            "Element",
+            "Description"
+          ],
+          "rows": [
+            [
+              "Basic principles",
+              "To be written by the modeller."
+            ],
+            [
+              "Emergence",
+              "To be written by the modeller."
+            ],
+            [
+              "Adaptation",
+              "To be written by the modeller."
+            ],
+            [
+              "Objectives",
+              "To be written by the modeller."
+            ],
+            [
+              "Learning",
+              "To be written by the modeller."
+            ],
+            [
+              "Prediction",
+              "To be written by the modeller."
+            ],
+            [
+              "Sensing",
+              "To be written by the modeller."
+            ],
+            [
+              "Interaction",
+              "To be written by the modeller."
+            ],
+            [
+              "Stochasticity",
+              "None: each output decays alone."
+            ],
+            [
+              "Collectives",
+              "To be written by the modeller."
+            ],
+            [
+              "Observation",
+              "A run returns each output."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "key": "initialization",
+      "title": "Initialization",
+      "blocks": [
+        {
+          "type": "text",
+          "heading": null,
+          "text": "To be written by the modeller."
+        }
+      ]
+    },
+    {
+      "key": "input_data",
+      "title": "Input data",
+      "blocks": [
+        {
+          "type": "text",
+          "heading": null,
+          "text": "None: the model reads no series of values."
+        }
+      ]
+    },
+    {
+      "key": "submodels",
+      "title": "Submodels",
+      "blocks": [
+        {
+          "type": "equations",
+          "heading": null,
+          "title": null,
+          "groups": [
+            {
+              "heading": null,
+              "equations": [
+                {
+                  "left": "dx/dt",
+                  "right": "-k * x",
+                  "left_latex": "\\frac{dx}{dt}",
+                  "right_latex": "-k x",
+                  "relation": "equals"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "heading": "Parameters",
+          "columns": [
+            "Parameter",
+            "Value",
+            "Unit",
+            "Set by calibration",
+            "Description"
+          ],
+          "rows": [
+            [
+              "k",
+              0.5,
+              null,
+              false,
+              null
+            ]
+          ]
+        },
+        {
+          "type": "table",
+          "heading": "Outputs",
+          "columns": [
+            "Source",
+            "Outputs"
+          ],
+          "rows": [
+            [
+              "x",
+              "x"
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

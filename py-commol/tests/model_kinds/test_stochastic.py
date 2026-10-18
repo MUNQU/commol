@@ -232,3 +232,7 @@ class TestCalibration:
     def test_a_quantile_level_is_between_zero_and_one(self) -> None:
         with pytest.raises(ValueError, match="less than or equal to 1"):
             Quantile(1.5)
+
+    def test_a_quantile_takes_no_other_field(self) -> None:
+        with pytest.raises(ValueError, match="Extra inputs"):
+            Quantile(0.5, unknown=1)

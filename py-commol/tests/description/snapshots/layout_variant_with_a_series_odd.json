@@ -1,0 +1,465 @@
+{
+  "title": "ABC",
+  "layout": "odd",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "Purpose and patterns",
+      "blocks": [
+        {
+          "type": "text",
+          "heading": null,
+          "text": "To be written by the modeller."
+        }
+      ]
+    },
+    {
+      "key": "entities",
+      "title": "Entities, state variables and scales",
+      "blocks": [
+        {
+          "type": "table",
+          "heading": "Bins",
+          "columns": [
+            "Bin",
+            "Name",
+            "Unit"
+          ],
+          "rows": [
+            [
+              "A",
+              "State A",
+              null
+            ],
+            [
+              "B",
+              "State B",
+              null
+            ],
+            [
+              "C",
+              "State C",
+              null
+            ]
+          ]
+        },
+        {
+          "type": "table",
+          "heading": "Compartments",
+          "columns": [
+            "Compartment",
+            "Bin",
+            "Categories"
+          ],
+          "rows": [
+            [
+              "A",
+              "A",
+              ""
+            ],
+            [
+              "B",
+              "B",
+              ""
+            ],
+            [
+              "C",
+              "C",
+              ""
+            ]
+          ]
+        },
+        {
+          "type": "table",
+          "heading": "Scales",
+          "columns": [
+            "Scale",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Axis",
+              "one step is 1 day"
+            ],
+            [
+              "Advance",
+              "discrete steps (DifferenceEquations)"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "key": "process_overview",
+      "title": "Process overview and scheduling",
+      "blocks": [
+        {
+          "type": "table",
+          "heading": "Processes",
+          "columns": [
+            "Process",
+            "From",
+            "To",
+            "When"
+          ],
+          "rows": [
+            [
+              "ab",
+              "A",
+              "B",
+              "every step"
+            ],
+            [
+              "bc",
+              "B",
+              "C",
+              "every step"
+            ]
+          ]
+        },
+        {
+          "type": "text",
+          "heading": "Scheduling",
+          "text": "Each step applies every flow once, computed from the state at the start of the step: X(n + 1) = X(n) + sum of the flows. The impulses of a step act first, and its flows run from the new state."
+        }
+      ]
+    },
+    {
+      "key": "design_concepts",
+      "title": "Design concepts",
+      "blocks": [
+        {
+          "type": "table",
+          "heading": null,
+          "columns": [
+            "Element",
+            "Description"
+          ],
+          "rows": [
+            [
+              "Basic principles",
+              "To be written by the modeller."
+            ],
+            [
+              "Emergence",
+              "To be written by the modeller."
+            ],
+            [
+              "Adaptation",
+              "To be written by the modeller."
+            ],
+            [
+              "Objectives",
+              "To be written by the modeller."
+            ],
+            [
+              "Learning",
+              "To be written by the modeller."
+            ],
+            [
+              "Prediction",
+              "To be written by the modeller."
+            ],
+            [
+              "Sensing",
+              "To be written by the modeller."
+            ],
+            [
+              "Interaction",
+              "To be written by the modeller."
+            ],
+            [
+              "Stochasticity",
+              "None: the DifferenceEquations engine is deterministic, so a run depends only on the model."
+            ],
+            [
+              "Collectives",
+              "To be written by the modeller."
+            ],
+            [
+              "Observation",
+              "A run returns the value of every output at every position it reports; the submodels list the outputs."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "key": "initialization",
+      "title": "Initialization",
+      "blocks": [
+        {
+          "type": "table",
+          "heading": "Bin fractions",
+          "columns": [
+            "Bin",
+            "Fraction",
+            "Amount"
+          ],
+          "rows": [
+            [
+              "A",
+              0.99,
+              990.0
+            ],
+            [
+              "B",
+              0.01,
+              10.0
+            ],
+            [
+              "C",
+              0.0,
+              0.0
+            ]
+          ]
+        },
+        {
+          "type": "table",
+          "heading": "Initial state (total 1000)",
+          "columns": [
+            "Compartment",
+            "Amount"
+          ],
+          "rows": [
+            [
+              "A",
+              990.0
+            ],
+            [
+              "B",
+              10.0
+            ],
+            [
+              "C",
+              0.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "key": "input_data",
+      "title": "Input data",
+      "blocks": [
+        {
+          "type": "table",
+          "heading": null,
+          "columns": [
+            "Parameter",
+            "Mode",
+            "Points"
+          ],
+          "rows": [
+            [
+              "s",
+              "linear",
+              "(0, 1), (5, 2.5)"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "key": "submodels",
+      "title": "Submodels",
+      "blocks": [
+        {
+          "type": "state_graph",
+          "heading": "States and transitions",
+          "name": "states",
+          "nodes": [
+            {
+              "id": "A",
+              "label": "State A",
+              "group": "bin"
+            },
+            {
+              "id": "B",
+              "label": "State B",
+              "group": "bin"
+            },
+            {
+              "id": "C",
+              "label": "State C",
+              "group": "bin"
+            }
+          ],
+          "edges": [
+            {
+              "source": "A",
+              "target": "B",
+              "label": "ab: k1 * A * B / total"
+            },
+            {
+              "source": "B",
+              "target": "C",
+              "label": "bc: k2 * B"
+            }
+          ],
+          "expanded": false
+        },
+        {
+          "type": "state_graph",
+          "heading": "Expanded compartments",
+          "name": "compartments",
+          "nodes": [
+            {
+              "id": "A",
+              "label": "A",
+              "group": "A"
+            },
+            {
+              "id": "B",
+              "label": "B",
+              "group": "B"
+            },
+            {
+              "id": "C",
+              "label": "C",
+              "group": "C"
+            }
+          ],
+          "edges": [
+            {
+              "source": "A",
+              "target": "B",
+              "label": "ab: k1 * A * B / total"
+            },
+            {
+              "source": "B",
+              "target": "C",
+              "label": "bc: k2 * B"
+            }
+          ],
+          "expanded": true
+        },
+        {
+          "type": "equations",
+          "heading": "Compact form",
+          "title": "Bin Transitions",
+          "groups": [
+            {
+              "heading": "ab (A -> B)",
+              "equations": [
+                {
+                  "left": "A -> B",
+                  "right": "k1 * A * B / total",
+                  "left_latex": "A \\to B",
+                  "right_latex": "\\frac{k1 \\cdot A \\cdot B}{total}",
+                  "relation": "flow"
+                }
+              ]
+            },
+            {
+              "heading": "bc (B -> C)",
+              "equations": [
+                {
+                  "left": "B -> C",
+                  "right": "k2 * B",
+                  "left_latex": "B \\to C",
+                  "right_latex": "k2 \\cdot B",
+                  "relation": "flow"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "heading": null,
+          "text": "Total System: 3 coupled equations (3 bins)"
+        },
+        {
+          "type": "equations",
+          "heading": "Expanded form",
+          "title": null,
+          "groups": [
+            {
+              "heading": null,
+              "equations": [
+                {
+                  "left": "[A(t+Dt) - A(t)] / Dt",
+                  "right": "- (k1 * A * B / total)",
+                  "left_latex": "\\frac{A(t+\\Delta t) - A(t)}{\\Delta t}",
+                  "right_latex": "- (\\frac{k1 \\cdot A \\cdot B}{total})",
+                  "relation": "equals"
+                },
+                {
+                  "left": "[B(t+Dt) - B(t)] / Dt",
+                  "right": "(k1 * A * B / total) - (k2 * B)",
+                  "left_latex": "\\frac{B(t+\\Delta t) - B(t)}{\\Delta t}",
+                  "right_latex": "(\\frac{k1 \\cdot A \\cdot B}{total}) - (k2 \\cdot B)",
+                  "relation": "equals"
+                },
+                {
+                  "left": "[C(t+Dt) - C(t)] / Dt",
+                  "right": "(k2 * B)",
+                  "left_latex": "\\frac{C(t+\\Delta t) - C(t)}{\\Delta t}",
+                  "right_latex": "(k2 \\cdot B)",
+                  "relation": "equals"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "heading": "Parameters",
+          "columns": [
+            "Parameter",
+            "Value",
+            "Unit",
+            "Set by calibration",
+            "Description"
+          ],
+          "rows": [
+            [
+              "k1",
+              0.3,
+              null,
+              false,
+              null
+            ],
+            [
+              "k2",
+              0.1,
+              null,
+              false,
+              null
+            ],
+            [
+              "s",
+              "series (linear, 2 points)",
+              null,
+              false,
+              null
+            ]
+          ]
+        },
+        {
+          "type": "table",
+          "heading": "Outputs",
+          "columns": [
+            "Source",
+            "Outputs"
+          ],
+          "rows": [
+            [
+              "A",
+              "A"
+            ],
+            [
+              "B",
+              "B"
+            ],
+            [
+              "C",
+              "C"
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

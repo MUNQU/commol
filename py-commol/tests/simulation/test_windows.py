@@ -35,6 +35,8 @@ class TestWindowEnds:
 
     def test_run_shorter_than_one_window_gives_nothing(self) -> None:
         assert window_ends(5, 3) == []
+        assert window_ends(5, 0) == []
+        assert window_ends(5, -5) == []
 
     def test_a_window_need_not_be_a_whole_number(self) -> None:
         assert window_ends(0.1, 0.3) == pytest.approx([0.1, 0.2, 0.3])
@@ -129,6 +131,22 @@ class TestWindowedTotals:
         with pytest.raises(ValueError, match="no complete window"):
             windowed_totals([0.0, 1.0, 2.0], range(3), 5, [2])
 
+    def test_a_window_may_start_before_zero_by_the_tolerance_of_its_end(
+        self,
+    ) -> None:
+        series = [float(value) for value in range(1001)]
+
+        assert windowed_totals(series, range(1001), 1000 + 1e-7, [1000]) == [1000.0]
+        assert windowed_totals(series[:2], range(2), 1 + 0.5e-9, [1]) == [1.0]
+        with pytest.raises(ValueError) as error:
+            windowed_totals(series[:2], range(2), 1 + 1.5e-9, [1])
+        assert str(error.value) == (
+            f"Position 1 has no complete window of {1 + 1.5e-9} before it."
+        )
+
+    def test_an_empty_series_has_no_windows(self) -> None:
+        assert windowed_totals([], [], 1) == []
+
     def test_end_beyond_the_series_is_rejected(self) -> None:
         with pytest.raises(ValueError, match="no value at 9"):
             windowed_totals([0.0, 1.0, 2.0], range(3), 1, [9])
@@ -143,8 +161,12 @@ class TestWindowedTotals:
         results = simulation.run(NUM_STEPS)
 
         by_hand = windowed_totals(results["events"], results.positions, WINDOW)
+        at = [7, 12]
 
         assert simulation.windowed_totals(results, ["events"], WINDOW) == by_hand
+        assert simulation.windowed_totals(results, ["events"], WINDOW, at) == (
+            windowed_totals(results["events"], results.positions, WINDOW, at)
+        )
 
 
 class TestAgreementWithTheCalibrationLoss:

@@ -70,69 +70,122 @@ class TestScheduleUnit:
         assert isinstance(builder_rate, str)
         assert "0.01" in builder_rate
 
-    def test_add_group_on_single_pattern_raises(self):
-        """Single AxisPatterns reject instance-level add_group (use the class)."""
-        p = AxisPattern.pulse(at=5, value=0.1)
-        with pytest.raises(TypeError, match="class-level"):
-            p.add_group(conditions=[condition("group", "cat1")], schedule=p)
+    @pytest.mark.parametrize(
+        ("misuse", "error", "message"),
+        [
+            pytest.param(
+                lambda: AxisPattern.pulse(at=5, value=0.1).add_group(
+                    conditions=[condition("group", "cat1")], schedule=_rate("0.1")
+                ),
+                TypeError,
+                "add_group on a single AxisPattern is only valid as a class-level "
+                "factory (AxisPattern.add_group(...)); call it on the class to "
+                "start a new schedule.",
+                id="add_group-on-a-pattern",
+            ),
+            pytest.param(
+                lambda: AxisPattern.pulse(at=5, value=0.1).set_default(_rate("0.01")),
+                TypeError,
+                "set_default is only valid on a schedule AxisPattern; start one "
+                "with AxisPattern.add_group(...) first.",
+                id="set_default-on-a-pattern",
+            ),
+            pytest.param(
+                lambda: AxisPattern.add_group(conditions=[], schedule=_rate("0.1")),
+                ValueError,
+                "'conditions' must be non-empty. Use set_default() for the "
+                "condition-free fallback.",
+                id="no-conditions",
+            ),
+            pytest.param(
+                lambda: _cat1().add_group(
+                    conditions=[condition("group", "cat1")], schedule=_rate("0.2")
+                ),
+                ValueError,
+                "A group with conditions [{'stratification': 'group', 'category': "
+                "'cat1'}] has already been registered.",
+                id="same-group-twice",
+            ),
+            pytest.param(
+                lambda: _cat1().set_default(_rate("0.05")).set_default(_rate("0.02")),
+                ValueError,
+                "A default pattern has already been registered.",
+                id="two-defaults",
+            ),
+            pytest.param(
+                lambda: _cat1().set_default(
+                    _rate("0.05").for_group([condition("group", "cat2")])
+                ),
+                ValueError,
+                "Default pattern must not have conditions. Use add_group() for "
+                "sub-group-specific patterns.",
+                id="default-with-conditions",
+            ),
+            pytest.param(
+                lambda: _cat1().set_default(
+                    _rate("0.1").model_copy(update={"source_compartment": "A_cat1"})
+                ),
+                ValueError,
+                "Default pattern must not have source_compartment set. The default "
+                "rate is applied to every unmatched compartment, so binding it to "
+                "one compartment is almost certainly a bug.",
+                id="default-with-a-compartment",
+            ),
+            pytest.param(
+                lambda: AxisPattern.add_group(
+                    conditions=cast(list[ConditionDict], [{"strat": "g"}]),
+                    schedule=_rate("0.1"),
+                ),
+                ValueError,
+                "Condition is missing required key 'stratification': {'strat': 'g'}",
+                id="condition-without-stratification",
+            ),
+        ],
+    )
+    def test_a_misuse_of_a_schedule_says_how_to_fix_it(
+        self, misuse, error: type[Exception], message: str
+    ) -> None:
+        with pytest.raises(error) as raised:
+            misuse()
 
-    def test_set_default_on_single_pattern_raises(self):
-        p = AxisPattern.pulse(at=5, value=0.1)
-        with pytest.raises(TypeError, match="schedule"):
-            p.set_default(AxisPattern.from_formula("0.01"))
+        assert str(raised.value) == message
 
-    def test_add_group_empty_conditions_raises(self):
-        with pytest.raises(ValueError, match="non-empty"):
-            AxisPattern.add_group(
-                conditions=[], schedule=AxisPattern.from_formula("0.1")
-            )
+    def test_groups_that_differ_only_in_their_target_are_two_groups(self):
+        rate = AxisPattern.add_group(
+            conditions=[{"stratification": "group", "to": "cat1"}],
+            schedule=_rate("0.1"),
+        ).add_group(
+            conditions=[{"stratification": "group", "to": "cat2"}],
+            schedule=_rate("0.2"),
+        )
 
-    def test_add_group_duplicate_raises(self):
-        with pytest.raises(ValueError, match="already been registered"):
-            (
-                AxisPattern.add_group(
-                    conditions=[condition("group", "cat1")],
-                    schedule=AxisPattern.from_formula("0.1"),
-                ).add_group(
-                    conditions=[condition("group", "cat1")],
-                    schedule=AxisPattern.from_formula("0.2"),
-                )
-            )
+        assert len(rate._builder_stratified_rates() or []) == 2
 
-    def test_set_default_twice_raises(self):
+    def test_add_group_keeps_its_compartment_and_its_absolute_flag(self):
         rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=AxisPattern.from_formula("0.1"),
-        ).set_default(AxisPattern.from_formula("0.05"))
-        with pytest.raises(ValueError, match="already been registered"):
-            rate.set_default(AxisPattern.from_formula("0.02"))
-
-    def test_set_default_rejects_conditions(self):
-        with pytest.raises(ValueError, match="conditions"):
-            AxisPattern.add_group(
-                conditions=[condition("group", "cat1")],
-                schedule=AxisPattern.from_formula("0.1"),
-            ).set_default(
-                AxisPattern.from_formula("0.05").for_group([condition("group", "cat2")])
-            )
-
-    def test_set_default_rejects_source_compartment(self):
-        default_with_comp = AxisPattern.from_formula("0.1").model_copy(
-            update={"source_compartment": "A_cat1"}
+            schedule=_rate("0.1"),
+            source_compartment="A_cat1",
+            absolute=True,
+        ).add_group(
+            conditions=[condition("group", "cat2")],
+            schedule=_rate("0.2"),
+            source_compartment="A_cat2",
+            absolute=False,
         )
-        with pytest.raises(ValueError, match="source_compartment"):
-            AxisPattern.add_group(
-                conditions=[condition("group", "cat1")],
-                schedule=AxisPattern.from_formula("0.1"),
-            ).set_default(default_with_comp)
 
-    def test_malformed_condition_missing_keys_raises(self):
-        with pytest.raises(ValueError, match="missing required key"):
-            bad_condition: dict[str, str] = {"strat": "g", "cat": "c1"}
-            AxisPattern.add_group(
-                conditions=cast(list[ConditionDict], [bad_condition]),
-                schedule=AxisPattern.from_formula("0.1"),
-            )
+        entries = rate._builder_stratified_rates() or []
+        assert [entry["absolute"] for entry in entries] == [True, False]
+        assert [entry.pattern.source_compartment for entry in rate.patterns] == [
+            "A_cat1",
+            "A_cat2",
+        ]
+
+    def test_a_schedule_prints_its_groups_and_its_default(self):
+        assert str(_cat1()) == "<AxisPattern schedule with 1 pattern(s), default=unset>"
+        assert str(_cat1().set_default(_rate("0.05"))) == (
+            "<AxisPattern schedule with 2 pattern(s), default=set>"
+        )
 
     def test_schedule_has_no_single_formula(self):
         rate = AxisPattern.add_group(
@@ -327,3 +380,14 @@ class TestScheduleIntegration:
 
         assert cat1_flow == pytest.approx(10.0, rel=1e-6)
         assert cat2_flow == pytest.approx(50.0, rel=1e-6)
+
+
+def _rate(formula: str) -> AxisPattern:
+    return AxisPattern.from_formula(formula)
+
+
+def _cat1() -> AxisPattern:
+    """A schedule of one group, ``group = cat1``."""
+    return AxisPattern.add_group(
+        conditions=[condition("group", "cat1")], schedule=_rate("0.1")
+    )

@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from commol import Aggregate, Model, ModelStructure, Simulation
 from commol.context.engine import ModelEngine
 from commol.context.process import Process
+from commol.context.structure import SeriesLabel
 from tests.support import a_to_b_builder, abc_builder, build
 from tests.support.kinds import DecayStructure, UnstratifiedVariant, decay_model
 
@@ -72,6 +73,50 @@ class TestStructureInterface:
         with pytest.raises(TypeError, match="outputs_by_source"):
             Incomplete()
 
+    def test_a_concrete_kind_is_the_structure_of_its_kind(self, monkeypatch) -> None:
+        monkeypatch.setattr(ModelStructure, "_kinds", dict(ModelStructure._kinds))
+
+        class Registered(DecayStructure):
+            kind: Literal["registered"] = "registered"  # ty: ignore[invalid-assignment]
+
+        assert ModelStructure.of_kind("registered") is Registered
+
+    def test_an_abstract_kind_is_no_structure(self, monkeypatch) -> None:
+        monkeypatch.setattr(ModelStructure, "_kinds", dict(ModelStructure._kinds))
+
+        class Abstract(ModelStructure):
+            kind: Literal["test"] = "test"
+
+        assert Abstract.__abstractmethods__
+        assert ModelStructure.of_kind("test") is DecayStructure
+
+    def test_a_kind_is_the_structure_of_one_class(self, monkeypatch) -> None:
+        monkeypatch.setattr(ModelStructure, "_kinds", dict(ModelStructure._kinds))
+
+        with pytest.raises(
+            TypeError,
+            match="Model kind 'test' with variant None is already the structure "
+            "of DecayStructure",
+        ):
+
+            class Other(DecayStructure):
+                pass
+
+    def test_a_class_defined_again_stays_the_structure_of_its_kind(
+        self, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(ModelStructure, "_kinds", dict(ModelStructure._kinds))
+
+        def define() -> type[ModelStructure]:
+            class Again(DecayStructure):
+                kind: Literal["again"] = "again"  # ty: ignore[invalid-assignment]
+
+            return Again
+
+        define()
+        again = define()
+        assert ModelStructure.of_kind("again") is again
+
     def test_a_simulation_rejects_a_structure_that_is_not_a_model_structure(
         self,
     ) -> None:
@@ -116,6 +161,25 @@ class TestStructureInterface:
             engine.compartments
         with pytest.raises(ValueError, match="only an aggregate model"):
             engine.state
+
+    def test_a_kind_without_a_unit_check_says_so(self) -> None:
+        with pytest.raises(NotImplementedError) as error:
+            decay_model().check_unit_consistency()
+
+        assert str(error.value) == "A test model has no unit check"
+
+    def test_a_kind_names_a_series_by_its_id_unless_it_knows_better(
+        self, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(ModelStructure, "_kinds", dict(ModelStructure._kinds))
+
+        class Plain(DecayStructure):
+            kind: Literal["plain"] = "plain"  # ty: ignore[invalid-assignment]
+            series_label = ModelStructure.series_label
+
+        structure = Plain(outputs=[])
+
+        assert structure.series_label(decay_model(), "x") == SeriesLabel("x", None)
 
     def test_a_kind_describes_itself_through_the_interface(self) -> None:
         description = decay_model().describe()

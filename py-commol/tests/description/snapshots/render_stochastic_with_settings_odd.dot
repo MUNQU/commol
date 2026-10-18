@@ -1,0 +1,28 @@
+digraph "states" {
+    rankdir=LR;
+    n0 [label="A"];
+    n1 [label="B"];
+    n0 -> n1 [label="ab: 0 * A * B"];
+    n1 -> n1 [label="ab: 0 * A * B"];
+    in2 [shape=point, label=""];
+    in2 -> n0 [label="in: 0"];
+    in3 [shape=point, label=""];
+    in3 -> n1 [label="in: 0"];
+    out4 [shape=point, label=""];
+    n1 -> out4 [label="out: 0"];
+    n0 -> n1 [label="dose: 0"];
+}
+digraph "compartments" {
+    rankdir=LR;
+    n0 [label="A"];
+    n1 [label="B"];
+    n0 -> n1 [label="ab: 0 * A * B"];
+    n1 -> n1 [label="ab: 0 * A * B"];
+    in2 [shape=point, label=""];
+    in2 -> n0 [label="in: 0"];
+    in3 [shape=point, label=""];
+    in3 -> n1 [label="in: 0"];
+    out4 [shape=point, label=""];
+    n1 -> out4 [label="out: 0 * B"];
+    n0 -> n1 [label="dose: 0 * A"];
+}

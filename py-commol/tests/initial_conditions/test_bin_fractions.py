@@ -20,6 +20,17 @@ class TestBinFractionUpdates:
         with pytest.raises(ValueError, match="must sum to 1.0"):
             conditions.update_bin_fractions({"A": 0.9, "B": 0.9})
 
+    def test_an_unknown_bin_names_the_bins(self) -> None:
+        conditions = _conditions()
+
+        with pytest.raises(ValueError) as error:
+            conditions.update_bin_fractions({"C": 0.5, "A": 0.5})
+
+        assert str(error.value) == (
+            "Bin(s) ['C'] not found in initial conditions. Available bins: ['A', 'B']"
+        )
+        assert conditions.bin_fractions == {"A": 0.5, "B": 0.5}
+
     def test_rejected_update_leaves_the_bins_unchanged(self) -> None:
         conditions = _conditions()
 

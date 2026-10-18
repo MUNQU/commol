@@ -54,9 +54,23 @@ class TestPulses:
         with pytest.raises(ValidationError):
             AxisPattern.pulses(at=[3, 3, 7], value=1.0)
 
-    def test_amount_with_comma_rejected(self):
-        with pytest.raises(ValueError):
-            AxisPattern.pulses(at=[1, 2], value="1, 0")
+    @pytest.mark.parametrize(
+        "pattern",
+        [
+            lambda: AxisPattern.pulses(at=[1, 2], value="1, 0"),
+            lambda: AxisPattern.pulse(at=1, value="1, 0"),
+            lambda: AxisPattern.periodic(period=2, value="1, 0"),
+            lambda: AxisPattern.interval(start=1, end=2, value="1, 0"),
+        ],
+    )
+    def test_amount_with_comma_rejected(self, pattern):
+        with pytest.raises(ValueError) as error:
+            pattern()
+
+        assert str(error.value) == (
+            "'value' string must not contain commas (got '1, 0'); commas would "
+            "break the surrounding if(...) expression"
+        )
 
     def test_per_step_amounts_formula(self):
         p = AxisPattern.pulses(at=[2, 5, 9], value=[0.1, 0.2, 0.3])
@@ -156,6 +170,10 @@ class TestSinusoid:
         p = AxisPattern.sinusoid(amplitude=1.0, period="period_param")
         assert "period_param" in str(p)
 
+    def test_a_sinusoid_starts_at_phase_zero_around_zero(self):
+        formula = str(AxisPattern.sinusoid(amplitude=2.0, period=12.0))
+        assert formula == "(0.0 + 2.0 * sin(2 * pi * (t - 0.0) / 12.0))"
+
     def test_formula_places_every_parameter(self):
         formula = str(
             AxisPattern.sinusoid(amplitude=2.0, period=12.0, phase=3.0, baseline=1.0)
@@ -192,11 +210,46 @@ class TestLinearRamp:
 
 
 class TestCombine:
-    def test_min_contains_min(self):
-        a = AxisPattern.pulse(at=1, value=0.1)
-        b = AxisPattern.pulse(at=2, value=0.2)
-        result = str(AxisPattern.combine(a, b, mode=AxisPattern.MIN))
-        assert "min" in result
+    @pytest.mark.parametrize(
+        ("mode", "formula"),
+        [
+            (AxisPattern.SUM, "((a) + (b) + (c))"),
+            (AxisPattern.MAX, "(max(max((a), (b)), (c)))"),
+            (AxisPattern.MIN, "(min(min((a), (b)), (c)))"),
+            ("min", "(min(min((a), (b)), (c)))"),
+        ],
+    )
+    def test_a_mode_nests_its_function_over_the_patterns(self, mode, formula):
+        a, b, c = (AxisPattern.from_formula(name) for name in "abc")
+        assert str(AxisPattern.combine(a, b, c, mode=mode)) == formula
+
+    def test_an_unknown_mode_is_rejected(self):
+        a, b = AxisPattern.from_formula("a"), AxisPattern.from_formula("b")
+        with pytest.raises(ValueError, match="'mean' is not a valid CombineMode"):
+            AxisPattern.combine(a, b, mode="mean")  # ty: ignore[invalid-argument-type]
+
+    def test_a_combined_formula_may_reach_the_length_cap(self):
+        a, b = AxisPattern.from_formula("a"), AxisPattern.from_formula("b")
+        length = len("((a) + (b))")
+
+        combined = AxisPattern.combine(
+            a, b, config=SecurityConfig(max_expression_length=length)
+        )
+
+        assert str(combined) == "((a) + (b))"
+        with pytest.raises(ValueError) as error:
+            AxisPattern.combine(
+                a, b, config=SecurityConfig(max_expression_length=length - 1)
+            )
+        assert str(error.value) == (
+            f"Combined formula length {length} exceeds maximum {length - 1} characters"
+        )
+
+    def test_a_formula_is_checked_with_its_configuration(self):
+        with pytest.raises(SecurityError, match="6 characters \\(maximum: 4\\)"):
+            AxisPattern.from_formula(
+                "abcd", config=SecurityConfig(max_expression_length=4)
+            )
 
     def test_single_pattern_is_identity(self):
         """combine(p) returns p unchanged."""
@@ -204,8 +257,10 @@ class TestCombine:
         assert AxisPattern.combine(a) is a
 
     def test_zero_patterns_raises(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as error:
             AxisPattern.combine()
+
+        assert str(error.value) == "combine() requires at least one pattern"
 
     def test_three_patterns_sum(self):
         a = AxisPattern.pulse(at=1, value=0.1)
@@ -236,8 +291,13 @@ class TestCombine:
     def test_combine_rejects_inconsistent_conditions(self):
         a = AxisPattern.pulse(at=1, value=0.1).for_group([condition("group", "cat1")])
         b = AxisPattern.pulse(at=2, value=0.2).for_group([condition("group", "cat2")])
-        with pytest.raises(ValueError, match="conditions"):
+        with pytest.raises(ValueError) as error:
             AxisPattern.combine(a, b)
+
+        assert str(error.value) == (
+            "combine() requires all input patterns to share the same conditions "
+            "(use for_group on the combined result instead)"
+        )
 
     def test_combine_rejects_inconsistent_source_compartment(self):
         conds = [condition("group", "cat1")]
@@ -247,15 +307,12 @@ class TestCombine:
         b = AxisPattern.pulse(at=2, value=0.2).for_group(
             conds, source_compartment="B_cat1"
         )
-        with pytest.raises(ValueError, match="source_compartment"):
+        with pytest.raises(ValueError) as error:
             AxisPattern.combine(a, b)
 
-    def test_combine_security_cap_raises_clear_error(self):
-        """Repeatedly combining hits the security-length cap with a clear error."""
-        # Each periodic formula is ~47 chars; need enough to exceed the 10000-char cap.
-        periodics = [AxisPattern.periodic(period=7, value=0.1) for _ in range(220)]
-        with pytest.raises(ValueError, match="exceeds maximum"):
-            AxisPattern.combine(*periodics)
+        assert str(error.value) == (
+            "combine() requires all input patterns to share the same source_compartment"
+        )
 
 
 class TestFromFormula:
@@ -267,9 +324,12 @@ class TestFromFormula:
         p = AxisPattern.from_formula("(x + y)")
         assert "(x + y)" in str(p)
 
-    def test_empty_raises(self):
-        with pytest.raises((ValueError, ValidationError)):
-            AxisPattern.from_formula("")
+    @pytest.mark.parametrize("expr", ["", "   "])
+    def test_empty_raises(self, expr: str):
+        with pytest.raises(ValueError) as error:
+            AxisPattern.from_formula(expr)
+
+        assert str(error.value) == "'expr' must be a non-empty expression"
 
     def test_too_long_raises(self):
         config = SecurityConfig()

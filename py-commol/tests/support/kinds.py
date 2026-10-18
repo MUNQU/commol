@@ -19,6 +19,7 @@ from commol.context.description import (
     EquationGroup,
     Equations,
     Section,
+    Table,
 )
 from commol.context.structure import ReportSections, SeriesLabel
 from commol.context.parameter import Parameter
@@ -91,7 +92,10 @@ class DecayStructure(ModelStructure):
         self,
         model: "Model[Self]",  # noqa: ARG002
     ) -> list[Section]:
-        """A ``dynamics`` section: ``dx/dt = -k * x`` for each output."""
+        """
+        A ``dynamics`` section, ``dx/dt = -k * x`` for each output, and the
+        design concepts a decay fills.
+        """
         return [
             Section(
                 key="dynamics",
@@ -113,7 +117,20 @@ class DecayStructure(ModelStructure):
                         ]
                     )
                 ],
-            )
+            ),
+            Section(
+                key="design_concepts",
+                title="Design concepts",
+                blocks=[
+                    Table(
+                        columns=["Element", "Description"],
+                        rows=[
+                            ["Stochasticity", "None: each output decays alone."],
+                            ["Observation", "A run returns each output."],
+                        ],
+                    )
+                ],
+            ),
         ]
 
     def report_sections(

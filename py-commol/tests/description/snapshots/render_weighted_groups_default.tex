@@ -1,0 +1,147 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{longtable}
+\usepackage[margin=2cm]{geometry}
+\title{Weighted}
+\date{}
+\begin{document}
+\maketitle
+\section*{Overview}
+\begin{longtable}{p{0.45\linewidth}p{0.45\linewidth}}
+Field & Value \\
+\hline
+\endhead
+Name & Weighted \\
+Kind & aggregate \\
+Engine & DifferenceEquations \\
+Engine settings & defaults \\
+Dynamics & difference equation \\
+Step unit & step \\
+\end{longtable}
+\section*{Entities and state variables}
+\subsection*{Bins}
+\begin{longtable}{p{0.3\linewidth}p{0.3\linewidth}p{0.3\linewidth}}
+Bin & Name & Unit \\
+\hline
+\endhead
+A & State "A" \textbackslash{} start & item \\
+B & State B & item \\
+\end{longtable}
+\subsection*{Accumulators}
+\begin{longtable}{p{0.45\linewidth}p{0.45\linewidth}}
+Accumulator & Name \\
+\hline
+\endhead
+moved & Moved \\
+\end{longtable}
+\subsection*{Stratifications}
+\begin{longtable}{p{0.3\linewidth}p{0.3\linewidth}p{0.3\linewidth}}
+Stratification & Categories & Splits \\
+\hline
+\endhead
+group & g1, g2 & every compartment \\
+tier & t1, t2 & where group = g1 \\
+\end{longtable}
+\subsection*{Compartments}
+\begin{longtable}{p{0.3\linewidth}p{0.3\linewidth}p{0.3\linewidth}}
+Compartment & Bin & Categories \\
+\hline
+\endhead
+A\_g1\_t1 & A & group=g1, tier=t1 \\
+A\_g1\_t2 & A & group=g1, tier=t2 \\
+A\_g2 & A & group=g2 \\
+B\_g1\_t1 & B & group=g1, tier=t1 \\
+B\_g1\_t2 & B & group=g1, tier=t2 \\
+B\_g2 & B & group=g2 \\
+\end{longtable}
+\section*{Dynamics}
+\subsection*{Compact form}
+\subsubsection*{Bin Transitions}
+\noindent\texttt{ab (A -\textgreater{} B)}
+\begin{align*}
+A_{g1,t1} \to B_{g1,t1} &: \frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t1}} \\
+A_{g1,t2} \to B_{g1,t2} &: \frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t2}} \\
+A_{g2} \to B_{g2} &: \frac{s \cdot k \cdot (0.5 \cdot (B_{g1,t1} + B_{g1,t2}) + B_{g2})}{(0.5 \cdot (A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + (A_{g2} + B_{g2})) \cdot A_{g2}}
+\end{align*}
+Total System: 6 coupled equations (2 bins $\times$ 2 group $\times$ 2 tier)
+
+\subsection*{Expanded form}
+\begin{align*}
+\frac{A_{g1,t1}(t+\Delta t) - A_{g1,t1}(t)}{\Delta t} &= - (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t1}}) \\
+\frac{A_{g1,t2}(t+\Delta t) - A_{g1,t2}(t)}{\Delta t} &= - (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t2}}) \\
+\frac{A_{g2}(t+\Delta t) - A_{g2}(t)}{\Delta t} &= - (\frac{s \cdot k \cdot (0.5 \cdot (B_{g1,t1} + B_{g1,t2}) + B_{g2})}{(0.5 \cdot (A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + (A_{g2} + B_{g2})) \cdot A_{g2}}) \\
+\frac{B_{g1,t1}(t+\Delta t) - B_{g1,t1}(t)}{\Delta t} &= (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t1}}) \\
+\frac{B_{g1,t2}(t+\Delta t) - B_{g1,t2}(t)}{\Delta t} &= (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t2}}) \\
+\frac{B_{g2}(t+\Delta t) - B_{g2}(t)}{\Delta t} &= (\frac{s \cdot k \cdot (0.5 \cdot (B_{g1,t1} + B_{g1,t2}) + B_{g2})}{(0.5 \cdot (A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + (A_{g2} + B_{g2})) \cdot A_{g2}})
+\end{align*}
+\subsection*{Neighbors}
+Units are neighbors by the categories of 'group' (Groups): in a compartment of category g, neighbors\_\textless{}bin\textgreater{} is the sum over g' of w[g][g'] times the amount of the bin in g', and neighbors the same sum over every bin. The weights w[g][g'] are:
+
+\begin{longtable}{p{0.3\linewidth}p{0.3\linewidth}p{0.3\linewidth}}
+ & g1 & g2 \\
+\hline
+\endhead
+g1 & 1 & 0.5 \\
+g2 & 0.5 & 1 \\
+\end{longtable}
+\section*{Schedule}
+Each step applies every flow once, computed from the state at the start of the step: X(n + 1) = X(n) + sum of the flows. The impulses of a step act first, and its flows run from the new state.
+
+\section*{Initialization}
+\subsection*{Bin fractions}
+\begin{longtable}{p{0.3\linewidth}p{0.3\linewidth}p{0.3\linewidth}}
+Bin & Fraction & Amount \\
+\hline
+\endhead
+A & set by calibration &  \\
+B & 0.4 & 400 \\
+\end{longtable}
+\subsection*{Stratification fractions}
+\begin{longtable}{p{0.225\linewidth}p{0.225\linewidth}p{0.225\linewidth}p{0.225\linewidth}}
+Stratification & Category & Fraction & Of \\
+\hline
+\endhead
+group & g1 & 0.25 & total \\
+group & g2 & 0.75 & total \\
+tier & t1 & 0.5 & g1 \\
+tier & t2 & 0.5 & g1 \\
+\end{longtable}
+\subsection*{Compartment overrides}
+\begin{longtable}{p{0.3\linewidth}p{0.3\linewidth}p{0.3\linewidth}}
+Compartment & Fraction of the total & Amount \\
+\hline
+\endhead
+B\_g2 & 0.2 & 200 \\
+\end{longtable}
+\subsection*{Initial state (total 1000)}
+\begin{longtable}{p{0.45\linewidth}p{0.45\linewidth}}
+Compartment & Amount \\
+\hline
+\endhead
+A\_g1\_t1 & 0 \\
+A\_g1\_t2 & 0 \\
+A\_g2 & 0 \\
+B\_g1\_t1 & 50 \\
+B\_g1\_t2 & 50 \\
+B\_g2 & 200 \\
+\end{longtable}
+\section*{Parameters}
+\begin{longtable}{p{0.18\linewidth}p{0.18\linewidth}p{0.18\linewidth}p{0.18\linewidth}p{0.18\linewidth}}
+Parameter & Value & Unit & Set by calibration & Description \\
+\hline
+\endhead
+k & 0.1 &  & no & rate | per step \\
+s &  &  & yes &  \\
+\end{longtable}
+\section*{Outputs}
+\begin{longtable}{p{0.45\linewidth}p{0.45\linewidth}}
+Source & Outputs \\
+\hline
+\endhead
+A & A\_g1\_t1, A\_g1\_t2, A\_g2 \\
+B & B\_g1\_t1, B\_g1\_t2, B\_g2 \\
+moved & moved\_g1\_t1, moved\_g1\_t2, moved\_g2 \\
+\end{longtable}
+\end{document}

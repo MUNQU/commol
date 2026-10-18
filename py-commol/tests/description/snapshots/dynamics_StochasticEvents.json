@@ -1,0 +1,650 @@
+{
+ "key": "dynamics",
+ "title": "Dynamics",
+ "blocks": [
+  {
+   "type": "state_graph",
+   "heading": "States and transitions",
+   "name": "states",
+   "nodes": [
+    {
+     "id": "A",
+     "label": "State A",
+     "group": "bin"
+    },
+    {
+     "id": "B",
+     "label": "State B",
+     "group": "bin"
+    },
+    {
+     "id": "C",
+     "label": "State C",
+     "group": "bin"
+    },
+    {
+     "id": "group:g1",
+     "label": "g1",
+     "group": "group"
+    },
+    {
+     "id": "group:g2",
+     "label": "g2",
+     "group": "group"
+    }
+   ],
+   "edges": [
+    {
+     "source": "A",
+     "target": "C",
+     "label": "pair: k1 * A * B"
+    },
+    {
+     "source": "B",
+     "target": "C",
+     "label": "pair: k1 * A * B"
+    },
+    {
+     "source": "A",
+     "target": "B",
+     "label": "spread: k1 * A * B / total"
+    },
+    {
+     "source": "B",
+     "target": "B",
+     "label": "spread: k1 * A * B / total"
+    },
+    {
+     "source": "A",
+     "target": "B",
+     "label": "split: 0.05"
+    },
+    {
+     "source": "A",
+     "target": "C",
+     "label": "split: 0.05"
+    },
+    {
+     "source": "B",
+     "target": "B",
+     "label": "loop: 0.1"
+    },
+    {
+     "source": null,
+     "target": "A",
+     "label": "inflow: b"
+    },
+    {
+     "source": "A",
+     "target": "B",
+     "label": "dose: 0.1"
+    },
+    {
+     "source": "C",
+     "target": null,
+     "label": "outflow: 0.01"
+    },
+    {
+     "source": "group:g1",
+     "target": "group:g2",
+     "label": "move: stratified rates"
+    },
+    {
+     "source": "A",
+     "target": "C",
+     "label": "pending: no rate"
+    },
+    {
+     "source": "B",
+     "target": "C",
+     "label": "boost: 0.5"
+    }
+   ],
+   "expanded": false
+  },
+  {
+   "type": "state_graph",
+   "heading": "Expanded compartments",
+   "name": "compartments",
+   "nodes": [
+    {
+     "id": "A_g1",
+     "label": "A_g1",
+     "group": "A"
+    },
+    {
+     "id": "A_g2",
+     "label": "A_g2",
+     "group": "A"
+    },
+    {
+     "id": "B_g1",
+     "label": "B_g1",
+     "group": "B"
+    },
+    {
+     "id": "B_g2",
+     "label": "B_g2",
+     "group": "B"
+    },
+    {
+     "id": "C_g1",
+     "label": "C_g1",
+     "group": "C"
+    },
+    {
+     "id": "C_g2",
+     "label": "C_g2",
+     "group": "C"
+    }
+   ],
+   "edges": [
+    {
+     "source": "A_g1",
+     "target": "C_g1",
+     "label": "pair: k1 * A * B"
+    },
+    {
+     "source": "B_g1",
+     "target": "C_g1",
+     "label": "pair: k1 * A * B"
+    },
+    {
+     "source": "A_g2",
+     "target": "C_g2",
+     "label": "pair: k1 * A * B"
+    },
+    {
+     "source": "B_g2",
+     "target": "C_g2",
+     "label": "pair: k1 * A * B"
+    },
+    {
+     "source": "A_g1",
+     "target": "B_g1",
+     "label": "spread: k1 * A * B / total"
+    },
+    {
+     "source": "B_g1",
+     "target": "B_g1",
+     "label": "spread: k1 * A * B / total"
+    },
+    {
+     "source": "A_g2",
+     "target": "B_g2",
+     "label": "spread: k1 * A * B / total"
+    },
+    {
+     "source": "B_g2",
+     "target": "B_g2",
+     "label": "spread: k1 * A * B / total"
+    },
+    {
+     "source": "A_g1",
+     "target": "B_g1",
+     "label": "split: 0.05 * A_g1"
+    },
+    {
+     "source": null,
+     "target": "C_g1",
+     "label": "split: 0.05 * A_g1"
+    },
+    {
+     "source": "A_g2",
+     "target": "B_g2",
+     "label": "split: 0.05 * A_g2"
+    },
+    {
+     "source": null,
+     "target": "C_g2",
+     "label": "split: 0.05 * A_g2"
+    },
+    {
+     "source": "B_g1",
+     "target": "B_g1",
+     "label": "loop: 0.1 * B_g1"
+    },
+    {
+     "source": "B_g2",
+     "target": "B_g2",
+     "label": "loop: 0.1 * B_g2"
+    },
+    {
+     "source": null,
+     "target": "A_g1",
+     "label": "inflow: b"
+    },
+    {
+     "source": null,
+     "target": "A_g2",
+     "label": "inflow: b"
+    },
+    {
+     "source": "A_g1",
+     "target": "B_g1",
+     "label": "dose: 0.1 * A_g1"
+    },
+    {
+     "source": "A_g2",
+     "target": "B_g2",
+     "label": "dose: 0.1 * A_g2"
+    },
+    {
+     "source": "C_g1",
+     "target": null,
+     "label": "outflow: 0.01 * C_g1"
+    },
+    {
+     "source": "C_g2",
+     "target": null,
+     "label": "outflow: 0.01 * C_g2"
+    },
+    {
+     "source": "A_g1",
+     "target": "A_g2",
+     "label": "move: 0.02 * A_g1"
+    },
+    {
+     "source": "B_g1",
+     "target": "B_g2",
+     "label": "move: 0.02 * B_g1"
+    },
+    {
+     "source": "C_g1",
+     "target": "C_g2",
+     "label": "move: 0.02 * C_g1"
+    },
+    {
+     "source": "B_g1",
+     "target": "C_g1",
+     "label": "boost: 0.5 * B_g1"
+    },
+    {
+     "source": "B_g2",
+     "target": "C_g2",
+     "label": "boost: 0.5 * B_g2"
+    }
+   ],
+   "expanded": true
+  },
+  {
+   "type": "equations",
+   "heading": "Compact form",
+   "title": "Bin Transitions",
+   "groups": [
+    {
+     "heading": "pair (A, B -> C)",
+     "equations": [
+      {
+       "left": "A_g1 -> C_g1",
+       "right": "k1 * A * B",
+       "left_latex": "A_{g1} \\to C_{g1}",
+       "right_latex": "k1 \\cdot A \\cdot B",
+       "relation": "flow"
+      },
+      {
+       "left": "B_g1 -> C_g1",
+       "right": "k1 * A * B",
+       "left_latex": "B_{g1} \\to C_{g1}",
+       "right_latex": "k1 \\cdot A \\cdot B",
+       "relation": "flow"
+      },
+      {
+       "left": "A_g2 -> C_g2",
+       "right": "k1 * A * B",
+       "left_latex": "A_{g2} \\to C_{g2}",
+       "right_latex": "k1 \\cdot A \\cdot B",
+       "relation": "flow"
+      },
+      {
+       "left": "B_g2 -> C_g2",
+       "right": "k1 * A * B",
+       "left_latex": "B_{g2} \\to C_{g2}",
+       "right_latex": "k1 \\cdot A \\cdot B",
+       "relation": "flow"
+      }
+     ]
+    },
+    {
+     "heading": "spread (A, B -> B)",
+     "equations": [
+      {
+       "left": "A_g1 -> B_g1",
+       "right": "k1 * A * B / total",
+       "left_latex": "A_{g1} \\to B_{g1}",
+       "right_latex": "\\frac{k1 \\cdot A \\cdot B}{total}",
+       "relation": "flow"
+      },
+      {
+       "left": "B_g1 -> B_g1",
+       "right": "k1 * A * B / total",
+       "left_latex": "B_{g1} \\to B_{g1}",
+       "right_latex": "\\frac{k1 \\cdot A \\cdot B}{total}",
+       "relation": "flow"
+      },
+      {
+       "left": "A_g2 -> B_g2",
+       "right": "k1 * A * B / total",
+       "left_latex": "A_{g2} \\to B_{g2}",
+       "right_latex": "\\frac{k1 \\cdot A \\cdot B}{total}",
+       "relation": "flow"
+      },
+      {
+       "left": "B_g2 -> B_g2",
+       "right": "k1 * A * B / total",
+       "left_latex": "B_{g2} \\to B_{g2}",
+       "right_latex": "\\frac{k1 \\cdot A \\cdot B}{total}",
+       "relation": "flow"
+      }
+     ]
+    },
+    {
+     "heading": "split (A -> B, C)",
+     "equations": [
+      {
+       "left": "A_g1 -> B_g1",
+       "right": "0.05 * A_g1",
+       "left_latex": "A_{g1} \\to B_{g1}",
+       "right_latex": "0.05 \\cdot A_{g1}",
+       "relation": "flow"
+      },
+      {
+       "left": "none -> C_g1",
+       "right": "0.05 * A_g1",
+       "left_latex": "\\varnothing \\to C_{g1}",
+       "right_latex": "0.05 \\cdot A_{g1}",
+       "relation": "flow"
+      },
+      {
+       "left": "A_g2 -> B_g2",
+       "right": "0.05 * A_g2",
+       "left_latex": "A_{g2} \\to B_{g2}",
+       "right_latex": "0.05 \\cdot A_{g2}",
+       "relation": "flow"
+      },
+      {
+       "left": "none -> C_g2",
+       "right": "0.05 * A_g2",
+       "left_latex": "\\varnothing \\to C_{g2}",
+       "right_latex": "0.05 \\cdot A_{g2}",
+       "relation": "flow"
+      }
+     ]
+    },
+    {
+     "heading": "loop (B -> B)",
+     "equations": [
+      {
+       "left": "B_g1 -> B_g1",
+       "right": "0.1 * B_g1",
+       "left_latex": "B_{g1} \\to B_{g1}",
+       "right_latex": "0.1 \\cdot B_{g1}",
+       "relation": "flow"
+      },
+      {
+       "left": "B_g2 -> B_g2",
+       "right": "0.1 * B_g2",
+       "left_latex": "B_{g2} \\to B_{g2}",
+       "right_latex": "0.1 \\cdot B_{g2}",
+       "relation": "flow"
+      }
+     ]
+    },
+    {
+     "heading": "inflow (none -> A)",
+     "equations": [
+      {
+       "left": "none -> A_g1",
+       "right": "b",
+       "left_latex": "\\varnothing \\to A_{g1}",
+       "right_latex": "b",
+       "relation": "flow"
+      },
+      {
+       "left": "none -> A_g2",
+       "right": "b",
+       "left_latex": "\\varnothing \\to A_{g2}",
+       "right_latex": "b",
+       "relation": "flow"
+      }
+     ]
+    },
+    {
+     "heading": "dose (A -> B, impulse at 1, 3)",
+     "equations": [
+      {
+       "left": "A_g1 -> B_g1",
+       "right": "0.1 * A_g1",
+       "left_latex": "A_{g1} \\to B_{g1}",
+       "right_latex": "0.1 \\cdot A_{g1}",
+       "relation": "flow"
+      },
+      {
+       "left": "A_g2 -> B_g2",
+       "right": "0.1 * A_g2",
+       "left_latex": "A_{g2} \\to B_{g2}",
+       "right_latex": "0.1 \\cdot A_{g2}",
+       "relation": "flow"
+      }
+     ]
+    },
+    {
+     "heading": "outflow (C -> none)",
+     "equations": [
+      {
+       "left": "C_g1 -> none",
+       "right": "0.01 * C_g1",
+       "left_latex": "C_{g1} \\to \\varnothing",
+       "right_latex": "0.01 \\cdot C_{g1}",
+       "relation": "flow"
+      },
+      {
+       "left": "C_g2 -> none",
+       "right": "0.01 * C_g2",
+       "left_latex": "C_{g2} \\to \\varnothing",
+       "right_latex": "0.01 \\cdot C_{g2}",
+       "relation": "flow"
+      }
+     ]
+    },
+    {
+     "heading": "pending (A -> C)",
+     "equations": []
+    },
+    {
+     "heading": "boost (B -> C, impulse every 7 from 0)",
+     "equations": [
+      {
+       "left": "B_g1 -> C_g1",
+       "right": "0.5 * B_g1",
+       "left_latex": "B_{g1} \\to C_{g1}",
+       "right_latex": "0.5 \\cdot B_{g1}",
+       "relation": "flow"
+      },
+      {
+       "left": "B_g2 -> C_g2",
+       "right": "0.5 * B_g2",
+       "left_latex": "B_{g2} \\to C_{g2}",
+       "right_latex": "0.5 \\cdot B_{g2}",
+       "relation": "flow"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "equations",
+   "heading": null,
+   "title": "Group Stratification Transitions",
+   "groups": [
+    {
+     "heading": "move (g1 -> g2)",
+     "equations": [
+      {
+       "left": "A_g1 -> A_g2",
+       "right": "0.02 * A_g1",
+       "left_latex": "A_{g1} \\to A_{g2}",
+       "right_latex": "0.02 \\cdot A_{g1}",
+       "relation": "flow"
+      },
+      {
+       "left": "B_g1 -> B_g2",
+       "right": "0.02 * B_g1",
+       "left_latex": "B_{g1} \\to B_{g2}",
+       "right_latex": "0.02 \\cdot B_{g1}",
+       "relation": "flow"
+      },
+      {
+       "left": "C_g1 -> C_g2",
+       "right": "0.02 * C_g1",
+       "left_latex": "C_{g1} \\to C_{g2}",
+       "right_latex": "0.02 \\cdot C_{g1}",
+       "relation": "flow"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "text",
+   "heading": null,
+   "text": "Total System: 6 coupled equations (3 bins × 2 group)"
+  },
+  {
+   "type": "table",
+   "heading": "Events",
+   "columns": [
+    "Transition",
+    "Change",
+    "Propensity"
+   ],
+   "rows": [
+    [
+     "pair",
+     "A_g1 -1, C_g1 +2, B_g1 -1",
+     "k1 * A * B"
+    ],
+    [
+     "pair",
+     "A_g2 -1, C_g2 +2, B_g2 -1",
+     "k1 * A * B"
+    ],
+    [
+     "spread",
+     "A_g1 -1, B_g1 +1",
+     "k1 * A * B / total"
+    ],
+    [
+     "spread",
+     "A_g2 -1, B_g2 +1",
+     "k1 * A * B / total"
+    ],
+    [
+     "split",
+     "A_g1 -1, B_g1 +1, C_g1 +1",
+     "0.05 * A_g1"
+    ],
+    [
+     "split",
+     "A_g2 -1, B_g2 +1, C_g2 +1",
+     "0.05 * A_g2"
+    ],
+    [
+     "loop",
+     "none",
+     "0.1 * B_g1"
+    ],
+    [
+     "loop",
+     "none",
+     "0.1 * B_g2"
+    ],
+    [
+     "inflow",
+     "A_g1 +1",
+     "b"
+    ],
+    [
+     "inflow",
+     "A_g2 +1",
+     "b"
+    ],
+    [
+     "outflow",
+     "C_g1 -1",
+     "0.01 * C_g1"
+    ],
+    [
+     "outflow",
+     "C_g2 -1",
+     "0.01 * C_g2"
+    ],
+    [
+     "move",
+     "A_g1 -1, A_g2 +1",
+     "0.02 * A_g1"
+    ],
+    [
+     "move",
+     "B_g1 -1, B_g2 +1",
+     "0.02 * B_g1"
+    ],
+    [
+     "move",
+     "C_g1 -1, C_g2 +1",
+     "0.02 * C_g1"
+    ]
+   ]
+  },
+  {
+   "type": "text",
+   "heading": null,
+   "text": "Each event moves one unit. A flow has no events while one of its sources holds fewer units than an event takes."
+  },
+  {
+   "type": "equations",
+   "heading": "Impulses",
+   "title": null,
+   "groups": [
+    {
+     "heading": "dose, impulse at 1, 3",
+     "equations": [
+      {
+       "left": "A_g1 -> B_g1",
+       "right": "0.1 * A_g1",
+       "left_latex": "A_{g1} \\to B_{g1}",
+       "right_latex": "0.1 \\cdot A_{g1}",
+       "relation": "flow"
+      },
+      {
+       "left": "A_g2 -> B_g2",
+       "right": "0.1 * A_g2",
+       "left_latex": "A_{g2} \\to B_{g2}",
+       "right_latex": "0.1 \\cdot A_{g2}",
+       "relation": "flow"
+      }
+     ]
+    },
+    {
+     "heading": "boost, impulse every 7 from 0",
+     "equations": [
+      {
+       "left": "B_g1 -> C_g1",
+       "right": "0.5 * B_g1",
+       "left_latex": "B_{g1} \\to C_{g1}",
+       "right_latex": "0.5 \\cdot B_{g1}",
+       "relation": "flow"
+      },
+      {
+       "left": "B_g2 -> C_g2",
+       "right": "0.5 * B_g2",
+       "left_latex": "B_{g2} \\to C_{g2}",
+       "right_latex": "0.5 \\cdot B_{g2}",
+       "relation": "flow"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

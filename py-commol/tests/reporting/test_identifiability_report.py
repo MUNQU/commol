@@ -53,4 +53,9 @@ def test_the_report_lists_each_parameter_and_section() -> None:
     }
     assert data["parameters"]["f"] == {"structural": None, "practical": None}
     assert data["sections"]["starts"][0]["flagged"] == ["k"]
-    assert data["sections"]["structural"] == []
+    assert {key: len(sections) for key, sections in data["sections"].items()} == {
+        "structural": 0,
+        "collinearity": 0,
+        "sample": 0,
+        "starts": 1,
+    }

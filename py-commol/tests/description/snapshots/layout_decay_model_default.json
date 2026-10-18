@@ -1,0 +1,138 @@
+{
+  "title": "decay",
+  "layout": "default",
+  "sections": [
+    {
+      "key": "overview",
+      "title": "Overview",
+      "blocks": [
+        {
+          "type": "table",
+          "heading": null,
+          "columns": [
+            "Field",
+            "Value"
+          ],
+          "rows": [
+            [
+              "Name",
+              "decay"
+            ],
+            [
+              "Kind",
+              "test"
+            ],
+            [
+              "Engine",
+              "TestEngine"
+            ],
+            [
+              "Engine settings",
+              "defaults"
+            ],
+            [
+              "Dynamics",
+              "differential equation"
+            ],
+            [
+              "Step unit",
+              "step"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "key": "entities",
+      "title": "Entities and state variables",
+      "blocks": []
+    },
+    {
+      "key": "dynamics",
+      "title": "Dynamics",
+      "blocks": [
+        {
+          "type": "equations",
+          "heading": null,
+          "title": null,
+          "groups": [
+            {
+              "heading": null,
+              "equations": [
+                {
+                  "left": "dx/dt",
+                  "right": "-k * x",
+                  "left_latex": "\\frac{dx}{dt}",
+                  "right_latex": "-k x",
+                  "relation": "equals"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "schedule",
+      "title": "Schedule",
+      "blocks": [
+        {
+          "type": "text",
+          "heading": null,
+          "text": "The solver integrates dX/dt = sum of the flows in continuous time: a rate is an instantaneous rate per unit of the axis. The integration stops and restarts at each impulse and at each position where a rate jumps."
+        }
+      ]
+    },
+    {
+      "key": "initialization",
+      "title": "Initialization",
+      "blocks": []
+    },
+    {
+      "key": "parameters",
+      "title": "Parameters",
+      "blocks": [
+        {
+          "type": "table",
+          "heading": null,
+          "columns": [
+            "Parameter",
+            "Value",
+            "Unit",
+            "Set by calibration",
+            "Description"
+          ],
+          "rows": [
+            [
+              "k",
+              0.5,
+              null,
+              false,
+              null
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "key": "outputs",
+      "title": "Outputs",
+      "blocks": [
+        {
+          "type": "table",
+          "heading": null,
+          "columns": [
+            "Source",
+            "Outputs"
+          ],
+          "rows": [
+            [
+              "x",
+              "x"
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

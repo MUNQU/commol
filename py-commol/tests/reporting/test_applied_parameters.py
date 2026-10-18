@@ -95,6 +95,18 @@ class TestParameters:
             "calibrated": True,
         }
 
+    def test_a_scale_parameter_gains_the_statistics_of_a_sample(self) -> None:
+        report = applied_parameters_report(
+            _model(),
+            {"k1": 0.3, "reporting_rate": 0.5},
+            _problem(scale=True),
+            sample=_sample("reporting_rate", [0.4, 0.6]),
+            confidence_level=0.95,
+        )
+
+        interval = report["parameters"]["reporting_rate"]["interval"]
+        assert interval["mean"] == pytest.approx(0.5)
+
     def test_scale_parameters_are_absent_without_the_problem(self) -> None:
         report = applied_parameters_report(_model(), {"k1": 0.3, "reporting_rate": 0.5})
 
@@ -257,6 +269,40 @@ class TestCompartmentOverrides:
         assert entry["value"] == pytest.approx(600.0)
         assert report["initial_conditions"]["A_g1"]["value"] == pytest.approx(225.0)
 
+    @pytest.mark.parametrize("category_id", ["g1", "group:g1"])
+    def test_an_override_a_calibrated_category_covers_reports_calibrated(
+        self, category_id: str
+    ) -> None:
+        model = build(override_builder(0.3))
+
+        report = applied_parameters_report(
+            model, {category_id: 0.5}, initial_condition_problem(category_id)
+        )
+
+        assert report["initial_conditions"]["A_g1"]["calibrated"] is True
+        assert report["initial_conditions"]["g2"]["calibrated"] is False
+
+    def test_a_chain_of_conditions_names_its_group_with_plus(self) -> None:
+        model = build(
+            a_to_b_builder(
+                fractions={"A": 0.9, "B": 0.1},
+                stratifications={
+                    "group": {"group1": 0.6, "group2": 0.4},
+                    "sub": {"s1": 0.25, "s2": 0.75},
+                    "deep": {"d1": 0.5, "d2": 0.5},
+                },
+                conditions={
+                    "sub": {"group": "group1"},
+                    "deep": {"group": "group1", "sub": "s1"},
+                },
+            )
+        )
+
+        report = applied_parameters_report(model, {})["initial_conditions"]
+
+        assert report["d1"]["group"] == "group1+s1"
+        assert report["d1"]["fraction"] == pytest.approx(0.6 * 0.25 * 0.5)
+
     def test_diverted_override_order_is_deterministic(self) -> None:
         model = build(override_builder(0.3))
 
@@ -291,10 +337,12 @@ class TestIntervals:
         )
 
     def test_a_sample_needs_a_confidence_level(self) -> None:
-        with pytest.raises(ValueError, match="needs a confidence_level"):
+        with pytest.raises(ValueError) as error:
             applied_parameters_report(
                 _model(), {"k1": 0.3}, sample=_sample("k1", [0.8, 1.2])
             )
+
+        assert str(error.value) == "A report of a sample needs a confidence_level."
 
     def test_conditional_category_interval_is_rescaled_to_the_total(
         self,
@@ -316,6 +364,48 @@ class TestIntervals:
         assert interval["ci_lower"] == pytest.approx(0.2 * 0.6)
         assert interval["ci_upper"] == pytest.approx(0.3 * 0.6)
         assert interval["ci_lower"] < entry["fraction"] < interval["ci_upper"]
+        assert interval["median"] == pytest.approx(0.25 * 0.6)
+        assert interval["min"] == pytest.approx(0.2 * 0.6)
+        assert interval["max"] == pytest.approx(0.3 * 0.6)
+        assert interval["std"] == pytest.approx(0.05 * 0.6)  # the sample std
+
+    def test_bin_category_and_override_rows_gain_their_statistics(self) -> None:
+        sample = ParameterSample.equally_weighted(
+            ["A", "g1", "A_g1"],
+            [(0.0, 1.0)] * 3,
+            [[0.2, 0.4, 0.1], [0.4, 0.6, 0.3]],
+            SampleMethod(name="test"),
+        )
+
+        report = applied_parameters_report(
+            build(override_builder(0.3)), {}, sample=sample, confidence_level=0.95
+        )["initial_conditions"]
+
+        assert report["A"]["interval"]["mean"] == pytest.approx(0.3)
+        assert report["g1"]["interval"]["mean"] == pytest.approx(0.5)
+        assert report["A_g1"]["interval"]["mean"] == pytest.approx(0.2)
+
+    def test_a_conditional_interval_with_overrides_is_rescaled_by_the_engine_state(
+        self,
+    ) -> None:
+        model = build(
+            a_to_b_builder(
+                fractions={"A": 0.9, "B": 0.1},
+                stratifications={
+                    "group": {"group1": 0.6, "group2": 0.4},
+                    "sub": {"s1": 0.25, "s2": 0.75},
+                },
+                conditions={"sub": {"group": "group1"}},
+                compartment_fractions={"B_group2": 0.04},
+            )
+        )
+
+        report = applied_parameters_report(
+            model, {}, sample=_sample("s1", [0.2, 0.3]), confidence_level=0.95
+        )
+
+        interval = report["initial_conditions"]["s1"]["interval"]
+        assert interval["mean"] == pytest.approx(0.25 * 0.6)
 
     def test_entries_without_statistics_have_no_interval(self) -> None:
         report = applied_parameters_report(
@@ -331,6 +421,7 @@ class TestIntervals:
         report = applied_parameters_report(_model(), {}, confidence_level=0.95)
 
         assert list(report)[0] == "confidence_level"
+        assert report["confidence_level"] == 0.95
 
     def test_no_confidence_level_key_without_one(self) -> None:
         report = applied_parameters_report(_model(), {})

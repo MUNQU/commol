@@ -113,8 +113,12 @@ class TestCompartmentFractionValidation:
     def test_an_out_of_range_update_is_rejected(self) -> None:
         model = build(a_to_b_builder())
 
-        with pytest.raises(ValueError, match="between 0.0 and 1.0"):
+        with pytest.raises(ValueError) as error:
             model.structure.update_compartment_fractions(model.process, {"A": 1.5})
+
+        assert str(error.value) == (
+            "Fraction for compartment 'A' must be between 0.0 and 1.0, got 1.5."
+        )
 
     def test_model_rejects_over_allocation(self) -> None:
         model = build(override_builder(0.3))

@@ -1,0 +1,184 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{longtable}
+\usepackage[margin=2cm]{geometry}
+\title{Every flow}
+\date{}
+\begin{document}
+\maketitle
+\section*{Overview}
+\begin{longtable}{p{0.45\linewidth}p{0.45\linewidth}}
+Field & Value \\
+\hline
+\endhead
+Name & Every flow \\
+Version & 1.0 \\
+Kind & aggregate \\
+Engine & DifferenceEquations \\
+Engine settings & defaults \\
+Dynamics & difference equation \\
+Step unit & step \\
+\end{longtable}
+\section*{Entities and state variables}
+\subsection*{Bins}
+\begin{longtable}{p{0.3\linewidth}p{0.3\linewidth}p{0.3\linewidth}}
+Bin & Name & Unit \\
+\hline
+\endhead
+A & State A &  \\
+B & State B &  \\
+C & State C &  \\
+\end{longtable}
+\subsection*{Stratifications}
+\begin{longtable}{p{0.3\linewidth}p{0.3\linewidth}p{0.3\linewidth}}
+Stratification & Categories & Splits \\
+\hline
+\endhead
+group & g1, g2 & every compartment \\
+\end{longtable}
+\subsection*{Compartments}
+\begin{longtable}{p{0.3\linewidth}p{0.3\linewidth}p{0.3\linewidth}}
+Compartment & Bin & Categories \\
+\hline
+\endhead
+A\_g1 & A & group=g1 \\
+A\_g2 & A & group=g2 \\
+B\_g1 & B & group=g1 \\
+B\_g2 & B & group=g2 \\
+C\_g1 & C & group=g1 \\
+C\_g2 & C & group=g2 \\
+\end{longtable}
+\section*{Dynamics}
+\subsection*{Compact form}
+\subsubsection*{Bin Transitions}
+\noindent\texttt{pair (A, B -\textgreater{} C)}
+\begin{align*}
+A_{g1} \to C_{g1} &: k1 \cdot A \cdot B \\
+B_{g1} \to C_{g1} &: k1 \cdot A \cdot B \\
+A_{g2} \to C_{g2} &: k1 \cdot A \cdot B \\
+B_{g2} \to C_{g2} &: k1 \cdot A \cdot B
+\end{align*}
+\noindent\texttt{spread (A, B -\textgreater{} B)}
+\begin{align*}
+A_{g1} \to B_{g1} &: \frac{k1 \cdot A \cdot B}{total} \\
+B_{g1} \to B_{g1} &: \frac{k1 \cdot A \cdot B}{total} \\
+A_{g2} \to B_{g2} &: \frac{k1 \cdot A \cdot B}{total} \\
+B_{g2} \to B_{g2} &: \frac{k1 \cdot A \cdot B}{total}
+\end{align*}
+\noindent\texttt{split (A -\textgreater{} B, C)}
+\begin{align*}
+A_{g1} \to B_{g1} &: 0.05 \cdot A_{g1} \\
+\varnothing \to C_{g1} &: 0.05 \cdot A_{g1} \\
+A_{g2} \to B_{g2} &: 0.05 \cdot A_{g2} \\
+\varnothing \to C_{g2} &: 0.05 \cdot A_{g2}
+\end{align*}
+\noindent\texttt{loop (B -\textgreater{} B)}
+\begin{align*}
+B_{g1} \to B_{g1} &: 0.1 \cdot B_{g1} \\
+B_{g2} \to B_{g2} &: 0.1 \cdot B_{g2}
+\end{align*}
+\noindent\texttt{inflow (none -\textgreater{} A)}
+\begin{align*}
+\varnothing \to A_{g1} &: b \\
+\varnothing \to A_{g2} &: b
+\end{align*}
+\noindent\texttt{dose (A -\textgreater{} B, impulse at 1, 3)}
+\begin{align*}
+A_{g1} \to B_{g1} &: 0.1 \cdot A_{g1} \\
+A_{g2} \to B_{g2} &: 0.1 \cdot A_{g2}
+\end{align*}
+\noindent\texttt{outflow (C -\textgreater{} none)}
+\begin{align*}
+C_{g1} \to \varnothing &: 0.01 \cdot C_{g1} \\
+C_{g2} \to \varnothing &: 0.01 \cdot C_{g2}
+\end{align*}
+\noindent\texttt{pending (A -\textgreater{} C)}
+(none)
+
+\noindent\texttt{boost (B -\textgreater{} C, impulse every 7 from 0)}
+\begin{align*}
+B_{g1} \to C_{g1} &: 0.5 \cdot B_{g1} \\
+B_{g2} \to C_{g2} &: 0.5 \cdot B_{g2}
+\end{align*}
+\subsubsection*{Group Stratification Transitions}
+\noindent\texttt{move (g1 -\textgreater{} g2)}
+\begin{align*}
+A_{g1} \to A_{g2} &: 0.02 \cdot A_{g1} \\
+B_{g1} \to B_{g2} &: 0.02 \cdot B_{g1} \\
+C_{g1} \to C_{g2} &: 0.02 \cdot C_{g1}
+\end{align*}
+Total System: 6 coupled equations (3 bins $\times$ 2 group)
+
+\subsection*{Expanded form}
+\begin{align*}
+\frac{A_{g1}(t+\Delta t) - A_{g1}(t)}{\Delta t} &= - (k1 \cdot A \cdot B) - (\frac{k1 \cdot A \cdot B}{total}) - (0.05 \cdot A_{g1}) + (b) - (0.02 \cdot A_{g1}) \\
+\frac{A_{g2}(t+\Delta t) - A_{g2}(t)}{\Delta t} &= - (k1 \cdot A \cdot B) - (\frac{k1 \cdot A \cdot B}{total}) - (0.05 \cdot A_{g2}) + (b) + (0.02 \cdot A_{g1}) \\
+\frac{B_{g1}(t+\Delta t) - B_{g1}(t)}{\Delta t} &= - (k1 \cdot A \cdot B) + (\frac{k1 \cdot A \cdot B}{total}) + (0.05 \cdot A_{g1}) - (0.02 \cdot B_{g1}) \\
+\frac{B_{g2}(t+\Delta t) - B_{g2}(t)}{\Delta t} &= - (k1 \cdot A \cdot B) + (\frac{k1 \cdot A \cdot B}{total}) + (0.05 \cdot A_{g2}) + (0.02 \cdot B_{g1}) \\
+\frac{C_{g1}(t+\Delta t) - C_{g1}(t)}{\Delta t} &= (2 \cdot k1 \cdot A \cdot B) + (0.05 \cdot A_{g1}) - (0.01 \cdot C_{g1}) - (0.02 \cdot C_{g1}) \\
+\frac{C_{g2}(t+\Delta t) - C_{g2}(t)}{\Delta t} &= (2 \cdot k1 \cdot A \cdot B) + (0.05 \cdot A_{g2}) - (0.01 \cdot C_{g2}) + (0.02 \cdot C_{g1})
+\end{align*}
+\subsection*{Impulses}
+\noindent\texttt{dose, impulse at 1, 3}
+\begin{align*}
+A_{g1} \to B_{g1} &: 0.1 \cdot A_{g1} \\
+A_{g2} \to B_{g2} &: 0.1 \cdot A_{g2}
+\end{align*}
+\noindent\texttt{boost, impulse every 7 from 0}
+\begin{align*}
+B_{g1} \to C_{g1} &: 0.5 \cdot B_{g1} \\
+B_{g2} \to C_{g2} &: 0.5 \cdot B_{g2}
+\end{align*}
+\section*{Schedule}
+Each step applies every flow once, computed from the state at the start of the step: X(n + 1) = X(n) + sum of the flows. The impulses of a step act first, and its flows run from the new state.
+
+\section*{Initialization}
+\subsection*{Bin fractions}
+\begin{longtable}{p{0.3\linewidth}p{0.3\linewidth}p{0.3\linewidth}}
+Bin & Fraction & Amount \\
+\hline
+\endhead
+A & 0.5 & 500 \\
+B & 0.5 & 500 \\
+C & 0 & 0 \\
+\end{longtable}
+\subsection*{Stratification fractions}
+\begin{longtable}{p{0.225\linewidth}p{0.225\linewidth}p{0.225\linewidth}p{0.225\linewidth}}
+Stratification & Category & Fraction & Of \\
+\hline
+\endhead
+group & g1 & 0.5 & total \\
+group & g2 & 0.5 & total \\
+\end{longtable}
+\subsection*{Initial state (total 1000)}
+\begin{longtable}{p{0.45\linewidth}p{0.45\linewidth}}
+Compartment & Amount \\
+\hline
+\endhead
+A\_g1 & 250 \\
+A\_g2 & 250 \\
+B\_g1 & 250 \\
+B\_g2 & 250 \\
+C\_g1 & 0 \\
+C\_g2 & 0 \\
+\end{longtable}
+\section*{Parameters}
+\begin{longtable}{p{0.18\linewidth}p{0.18\linewidth}p{0.18\linewidth}p{0.18\linewidth}p{0.18\linewidth}}
+Parameter & Value & Unit & Set by calibration & Description \\
+\hline
+\endhead
+k1 & 0.001 &  & no &  \\
+b & 1 &  & no &  \\
+\end{longtable}
+\section*{Outputs}
+\begin{longtable}{p{0.45\linewidth}p{0.45\linewidth}}
+Source & Outputs \\
+\hline
+\endhead
+A & A\_g1, A\_g2 \\
+B & B\_g1, B\_g2 \\
+C & C\_g1, C\_g2 \\
+\end{longtable}
+\end{document}
