@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-19
+
+This release replaces the ensemble calibration with uncertainty methods that
+have a stated meaning. `Calibrator.uncertainty` resamples the data (bootstraps
+and the jackknife) and returns a `ParameterSample`; a `Predictive` runs its
+draws, and `commol.scores` scores its bands. `Calibrator.identifiability` tells
+which parameters the model and the data determine, and `Calibrator.run(starts=n)`
+fits from several start points. Before you upgrade, read the **Breaking**
+entries: the ensemble calibration is removed (use `BayesianBootstrap` in its
+place), and every interval uses one quantile, so the intervals of
+`member_statistics` and `SimulationReplicates.quantiles` move slightly. See
+[Uncertainty](../guide/uncertainty/index.md) and
+[Resampling](../guide/uncertainty/resampling.md).
+
 ### Added
 
 - `Calibrator.run(starts=n)` runs the optimizer from `n` start points in
@@ -816,6 +830,7 @@ the details of these versions.
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.5.0** - Uncertainty by resampling the data, identifiability of parameters and the removal of the ensemble calibration
 - **0.4.0** - One process under several structures and engines, stochastic engines and model descriptions
 - **0.3.0** - ODE engine, positions on the axis and one interface for every model kind
 - **0.2.0** - Per-compartment initial conditions and engine-planned transitions
