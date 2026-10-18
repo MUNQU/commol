@@ -2375,19 +2375,19 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 
 ## `Simulation`
 
-| Member                                           | Returns                | What it does                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------------------------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Simulation(model)`                              | —                      | Builds the engine for the model. A model with uncalibrated parameters can be built, but not run.                                                                                                                                                                                                                                                                             |
-| `run(num_steps, *, seed=None)`                   | `SimulationResults`    | Runs from the initial state, with the model as it is now, and reports at the positions `0, 1, …, num_steps`. Raises `ValueError` if a parameter is still `None`, and `InfeasibleStateError` if a difference step leaves an amount below zero ([Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)).                            |
-| `run_at(at, *, seed=None)`                       | `SimulationResults`    | Runs from the initial state and reports at the given sorted positions only. The engine decides which positions its model type accepts: a `DifferentialEquations` model any non-negative position, such as `0.5`; a `DifferenceEquations` model only integer steps. Otherwise `ValueError`, with the engine's message. See [Differential equations](#differential-equations). |
-| `replicates(n, *, seed=None)`                    | `ReplicateRuns`        | For a stochastic engine: an object whose `run` and `run_at` return `SimulationReplicates`, `n` runs with one seed each. See [Randomness, seeds and replicates](#randomness-seeds-and-replicates).                                                                                                                                                                            |
-| `is_stochastic`                                  | `bool`                 | Whether the engine draws random numbers.                                                                                                                                                                                                                                                                                                                                     |
-| `simulation_outputs`                             | `list[str]`            | The output names, in engine order: compartments first, then accumulators.                                                                                                                                                                                                                                                                                                    |
-| `outputs_for(id)`                                | `list[str]`            | The outputs of one bin or accumulator.                                                                                                                                                                                                                                                                                                                                       |
-| `group_outputs(ids)`                             | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id.                                                                                                                                                                                                                                                                                                                    |
-| `total_series(results, ids)`                     | `list[float]`          | The sum of all outputs of the given ids, at each position of the results.                                                                                                                                                                                                                                                                                                    |
-| `windowed_totals(results, ids, window, at=None)` | `list[float]`          | What the given accumulators gained in each window.                                                                                                                                                                                                                                                                                                                           |
-| `engine`                                         | engine                 | The underlying Rust engine, for the model as it is now: the engine `model.engine.type` names (`engine.engine_type`). `engine.step()` advances it one step; `engine.reset()` returns it to the initial state.                                                                                                                                                                 |
+| Member                                           | Returns                | What it does                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------ | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Simulation(model)`                              | —                      | Builds the engine for the model. A model with uncalibrated parameters can be built, but not run.                                                                                                                                                                                                                                                                                                                                 |
+| `run(num_steps, *, seed=None)`                   | `SimulationResults`    | Runs from the initial state, with the model as it is now, and reports at the positions `0, 1, …, num_steps`. Raises `ValueError` if a parameter is still `None`, `InfeasibleStateError` if a difference step leaves an amount below zero ([Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)), and `RuntimeError` that names the flow and the position if a rate is not a number. |
+| `run_at(at, *, seed=None)`                       | `SimulationResults`    | Runs from the initial state and reports at the given sorted positions only. The engine decides which positions its model type accepts: a `DifferentialEquations` model any non-negative position, such as `0.5`; a `DifferenceEquations` model only integer steps. Otherwise `ValueError`, with the engine's message. See [Differential equations](#differential-equations).                                                     |
+| `replicates(n, *, seed=None)`                    | `ReplicateRuns`        | For a stochastic engine: an object whose `run` and `run_at` return `SimulationReplicates`, `n` runs with one seed each. See [Randomness, seeds and replicates](#randomness-seeds-and-replicates).                                                                                                                                                                                                                                |
+| `is_stochastic`                                  | `bool`                 | Whether the engine draws random numbers.                                                                                                                                                                                                                                                                                                                                                                                         |
+| `simulation_outputs`                             | `list[str]`            | The output names, in engine order: compartments first, then accumulators.                                                                                                                                                                                                                                                                                                                                                        |
+| `outputs_for(id)`                                | `list[str]`            | The outputs of one bin or accumulator.                                                                                                                                                                                                                                                                                                                                                                                           |
+| `group_outputs(ids)`                             | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id.                                                                                                                                                                                                                                                                                                                                                                        |
+| `total_series(results, ids)`                     | `list[float]`          | The sum of all outputs of the given ids, at each position of the results.                                                                                                                                                                                                                                                                                                                                                        |
+| `windowed_totals(results, ids, window, at=None)` | `list[float]`          | What the given accumulators gained in each window.                                                                                                                                                                                                                                                                                                                                                                               |
+| `engine`                                         | engine                 | The underlying Rust engine, for the model as it is now: the engine `model.engine.type` names (`engine.engine_type`). `engine.step()` advances it one step; `engine.reset()` returns it to the initial state.                                                                                                                                                                                                                     |
 
 Every `run` starts again from the initial state, so two calls with the same model give the same result (`Simulation.run` resets the engine first). To continue a run step by step, use the engine:
 
@@ -3122,7 +3122,7 @@ Every loss uses a weight the same way: `weight=2.0` makes an observation count t
 
 With `normalize_observations=True`, each residual is first divided by the RMS of the observations of its series (its `label`).
 
-A run the model does not allow gets a penalty instead of a loss: a run with values that are not finite, or a difference step that leaves an amount below zero (`InfeasibleStateError`, see [Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)). The penalty is much larger than any fit, and the run is not recorded in the history, so the optimizer moves away from it and goes on. Any other error of a run, such as a rate that cannot be evaluated, stops the calibration with its message (`OptimizationObjective` in `crates/commol-calibration/src/objective.rs`, the only place that turns an infeasible point into a penalty).
+A run the model does not allow gets a penalty instead of a loss: a run with values that are not finite, or a difference step that leaves an amount below zero (`InfeasibleStateError`, see [Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)). The penalty is much larger than any fit, and the run is not recorded in the history, so the optimizer moves away from it and goes on. Any other error of a run, such as a rate that cannot be evaluated or that is not a number, stops the calibration with its message (`OptimizationObjective` in `crates/commol-calibration/src/objective.rs`, the only place that turns an infeasible point into a penalty).
 
 ## Stochastic engines
 
@@ -18333,6 +18333,9 @@ class Simulation:
         ValueError
             If a parameter or initial condition has no value, or the seed is
             not a whole number from 0 to ``2**64 - 1``.
+        RuntimeError
+            If a rate cannot be evaluated or is not a number; the message
+            names the flow and the position.
         """
         self._validate_all_parameters_calibrated(self.model_definition)
         self._sync_engine()
@@ -18380,6 +18383,9 @@ class Simulation:
             If a parameter or initial condition has no value, the positions are
             not sorted and unique, or the engine does not report at one of them;
             the message is the engine's.
+        RuntimeError
+            If a rate cannot be evaluated or is not a number; the message
+            names the flow and the position.
         """
         positions = [float(position) for position in at]
         self._validate_all_parameters_calibrated(self.model_definition)
@@ -18689,6 +18695,7 @@ Raises:
 | ---------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `InfeasibleStateError` | If a step leaves an amount below zero; the message names the compartment, the step and the flows out of it. |
 | `ValueError`           | If a parameter or initial condition has no value, or the seed is not a whole number from 0 to 2\*\*64 - 1.  |
+| `RuntimeError`         | If a rate cannot be evaluated or is not a number; the message names the flow and the position.              |
 
 Source code in `commol/api/simulation.py`
 
@@ -18726,6 +18733,9 @@ def run(self, num_steps: int, *, seed: int | None = None) -> SimulationResults:
     ValueError
         If a parameter or initial condition has no value, or the seed is
         not a whole number from 0 to ``2**64 - 1``.
+    RuntimeError
+        If a rate cannot be evaluated or is not a number; the message
+        names the flow and the position.
     """
     self._validate_all_parameters_calibrated(self.model_definition)
     self._sync_engine()
@@ -18769,6 +18779,7 @@ Raises:
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `InfeasibleStateError` | If a step leaves an amount below zero; the message names the compartment, the step and the flows out of it.                                                           |
 | `ValueError`           | If a parameter or initial condition has no value, the positions are not sorted and unique, or the engine does not report at one of them; the message is the engine's. |
+| `RuntimeError`         | If a rate cannot be evaluated or is not a number; the message names the flow and the position.                                                                        |
 
 Source code in `commol/api/simulation.py`
 
@@ -18807,6 +18818,9 @@ def run_at(
         If a parameter or initial condition has no value, the positions are
         not sorted and unique, or the engine does not report at one of them;
         the message is the engine's.
+    RuntimeError
+        If a rate cannot be evaluated or is not a number; the message
+        names the flow and the position.
     """
     positions = [float(position) for position in at]
     self._validate_all_parameters_calibrated(self.model_definition)
@@ -25953,6 +25967,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - A quantile level outside `[0, 1]`, or NaN, gave the smallest or the largest value; `ParameterSample.quantiles` and `weighted_quantiles` now raise `ValueError`.
 - `AxisPattern.from_formula` and `AxisPattern.combine` with a `config` that allows formulas longer than the default rejected them anyway; the configuration now applies.
 - A rate of `StochasticSteps` that is not a number raised `InfeasibleStateError` and said that a rate cannot be negative; it now raises `RuntimeError`, as `StochasticEvents` does, and says that the rate is not a number.
+- A rate that is not a number gave amounts that are not numbers in `DifferenceEquations` and `DifferentialEquations`, and a calibration only penalized the run; the run now stops with `RuntimeError` that names the flow and the position, as in the stochastic engines.
 - A rate that read an id with digits, such as `e1`, `E2` or `c1star`, was rejected as a malformed number; and the exponent of a number such as `1e1` was read as the undefined variable `e1`. An identifier now starts only after a character that is not a letter, a digit or `_`, so the digits of an id belong to its name and an exponent belongs to its number.
 
 ### Removed

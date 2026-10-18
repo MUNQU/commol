@@ -3568,6 +3568,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>InfeasibleStateError</code> and said that a rate cannot be negative; it now raises
   <code>RuntimeError</code>, as <code>StochasticEvents</code> does, and says that the rate is not a
   number.</li>
+<li>A rate that is not a number gave amounts that are not numbers in
+  <code>DifferenceEquations</code> and <code>DifferentialEquations</code>, and a calibration only
+  penalized the run; the run now stops with <code>RuntimeError</code> that names the flow
+  and the position, as in the stochastic engines.</li>
 <li>A rate that read an id with digits, such as <code>e1</code>, <code>E2</code> or <code>c1star</code>, was
   rejected as a malformed number; and the exponent of a number such as <code>1e1</code>
   was read as the undefined variable <code>e1</code>. An identifier now starts only after

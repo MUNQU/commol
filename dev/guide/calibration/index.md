@@ -138,7 +138,7 @@ Every loss uses a weight the same way: `weight=2.0` makes an observation count t
 
 With `normalize_observations=True`, each residual is first divided by the RMS of the observations of its series (its `label`).
 
-A run the model does not allow gets a penalty instead of a loss: a run with values that are not finite, or a difference step that leaves an amount below zero (`InfeasibleStateError`, see [Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)). The penalty is much larger than any fit, and the run is not recorded in the history, so the optimizer moves away from it and goes on. Any other error of a run, such as a rate that cannot be evaluated, stops the calibration with its message (`OptimizationObjective` in `crates/commol-calibration/src/objective.rs`, the only place that turns an infeasible point into a penalty).
+A run the model does not allow gets a penalty instead of a loss: a run with values that are not finite, or a difference step that leaves an amount below zero (`InfeasibleStateError`, see [Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)). The penalty is much larger than any fit, and the run is not recorded in the history, so the optimizer moves away from it and goes on. Any other error of a run, such as a rate that cannot be evaluated or that is not a number, stops the calibration with its message (`OptimizationObjective` in `crates/commol-calibration/src/objective.rs`, the only place that turns an infeasible point into a penalty).
 
 ## Stochastic engines
 
