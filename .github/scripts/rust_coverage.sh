@@ -44,7 +44,9 @@ cargo test --all-features --workspace
 (
     cd py-commol
     maturin develop --features test-kind
-    pytest -q
+    # A debug extension is slow, so the time budget is left to the job Test
+    # of Build, which times the release extension.
+    pytest -q --deselect tests/suite/test_rules.py::test_slow_tests_are_listed
 )
 
 # The test model kind (py-commol/src/test_kind.rs) is code of the tests, built
