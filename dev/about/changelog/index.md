@@ -34,6 +34,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Breaking:** `applied_parameters_report(..., sample=, confidence_level=)` reads the statistics of a `ParameterSample`; `parameter_statistics` is gone.
 - **Breaking (Rust):** `CalibrationProblem` is split into layers (`ForwardModel`, `ObservationOperator`, `Feasibility`, `Discrepancy`, `OptimizationObjective`); `optimize` takes the problem by reference, and the optimizer configurations have no `verbose` field. `CalibrationEvaluation` has no `predictions`.
 - A verbose optimizer writes its table to Python's `sys.stdout` only, and needs one start; the library never writes to the standard error.
+- A rate, a formula parameter or a constraint that the expression compiler cannot compile, such as `typeof(k)`, is rejected when the model or the calibration problem is built, with the reason; it no longer fails when it is evaluated.
+- The functions `erf`, `erfc`, `tgamma`, `lgamma`, `j0`, `j1`, `y0`, `y1`, `fdim` and `remainder` of a rate come from the `libm` crate, so they give the same values on every platform; the other functions still come from the system's math library.
+- `AxisPattern` is abstract: `AxisPattern()` raises `TypeError`. Build a pattern with one of its class methods.
+- Error messages that list ids (the stratifications of a transition, the missing and extra keys of the fractions of an `Aggregate`) list them in sorted order.
 
 ### Fixed
 
@@ -48,6 +52,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `ModelBuilder` and `Simulation` logged to the root logger of the application; they log to the `commol` logger, as the rest of the library does, so `add_stderr_logger` shows their messages.
 - `AxisPattern.combine(mode="max")` raised "Unknown combine mode": a mode may be given by its value.
 - A quantile level outside `[0, 1]`, or NaN, gave the smallest or the largest value; `ParameterSample.quantiles` and `weighted_quantiles` now raise `ValueError`.
+- `AxisPattern.from_formula` and `AxisPattern.combine` with a `config` that allows formulas longer than the default rejected them anyway; the configuration now applies.
+- A rate of `StochasticSteps` that is not a number raised `InfeasibleStateError` and said that a rate cannot be negative; it now raises `RuntimeError`, as `StochasticEvents` does, and says that the rate is not a number.
 
 ### Removed
 

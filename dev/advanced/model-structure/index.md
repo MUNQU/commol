@@ -791,12 +791,7 @@ class Transition(BaseModel):
         """
         if value is None:
             return value
-        try:
-            validate_expression_security(value)
-            commol_rs.core.MathExpression(value).validate()
-        except ValueError as e:
-            raise ValueError(f"Validation failed for rate '{value}': {e}")
-        return value
+        return _checked_rate(value)
 ```
 
 ### Attributes
@@ -874,12 +869,7 @@ def validate_rate(cls, value: str | None) -> str | None:
     """
     if value is None:
         return value
-    try:
-        validate_expression_security(value)
-        commol_rs.core.MathExpression(value).validate()
-    except ValueError as e:
-        raise ValueError(f"Validation failed for rate '{value}': {e}")
-    return value
+    return _checked_rate(value)
 ```
 
 ## StratifiedRate
@@ -957,12 +947,7 @@ class StratifiedRate(BaseModel):
     @classmethod
     def validate_rate(cls, value: str) -> str:
         """Perform security and syntax validation on the rate expression."""
-        try:
-            validate_expression_security(value)
-            commol_rs.core.MathExpression(value).validate()
-        except ValueError as e:
-            raise ValueError(f"Validation failed for rate '{value}': {e}")
-        return value
+        return _checked_rate(value)
 ```
 
 ### Methods:
@@ -1032,12 +1017,7 @@ Source code in `commol/context/transition.py`
 @classmethod
 def validate_rate(cls, value: str) -> str:
     """Perform security and syntax validation on the rate expression."""
-    try:
-        validate_expression_security(value)
-        commol_rs.core.MathExpression(value).validate()
-    except ValueError as e:
-        raise ValueError(f"Validation failed for rate '{value}': {e}")
-    return value
+    return _checked_rate(value)
 ```
 
 ## Engine

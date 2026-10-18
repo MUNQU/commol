@@ -65,7 +65,7 @@ class Calibrator:
             commol_rs.inference.CalibrationProblem(
                 self._engine,
                 engine_state.rust_observed_data(problem.observed_data),
-                self._rust_parameters(),
+                engine_state.rust_parameters(problem.parameters),
                 engine_state.rust_constraints(problem.constraints),
                 loss_config,
                 initial_condition_remainder=problem.initial_condition_remainder,
@@ -312,19 +312,6 @@ class Calibrator:
 
         return run_method(self, method, IdentifiabilityMethod)
 
-    def _to_rust_parameter_type(
-        self, param_type: str
-    ) -> "CalibrationParameterTypeProtocol":
-        """Convert Python CalibrationParameterType to Rust type."""
-        if param_type == CalibrationParameterType.PARAMETER:
-            return rust_calibration.CalibrationParameterType.Parameter
-        elif param_type == CalibrationParameterType.INITIAL_CONDITION:
-            return rust_calibration.CalibrationParameterType.InitialCondition
-        elif param_type == CalibrationParameterType.FACTOR:
-            return rust_calibration.CalibrationParameterType.Factor
-        else:
-            raise ValueError(f"Unknown parameter type: {param_type}")
-
     def _build_loss_config(self) -> "LossConfigProtocol":
         """The Rust loss, with the replicates of a stochastic engine."""
         return engine_state.rust_loss_config(
@@ -349,13 +336,7 @@ class Calibrator:
             )
             return rust_calibration.OptimizationConfig.nelder_mead(nm_config)
 
-        elif isinstance(opt_config, ParticleSwarmConfig):
-            return self._build_pso_config(opt_config)
-
-        else:
-            raise ValueError(
-                f"Unsupported optimization config type: {type(opt_config).__name__}"
-            )
+        return self._build_pso_config(opt_config)
 
     def _build_pso_config(
         self, opt_config: ParticleSwarmConfig
@@ -405,11 +386,9 @@ class Calibrator:
             return None
         if isinstance(inertia, PSOConstantInertia):
             return rust_calibration.PSOInertiaConstant(factor=inertia.factor)
-        if isinstance(inertia, PSOChaoticInertia):
-            return rust_calibration.PSOInertiaChaotic(
-                w_min=inertia.w_min, w_max=inertia.w_max
-            )
-        return None
+        return rust_calibration.PSOInertiaChaotic(
+            w_min=inertia.w_min, w_max=inertia.w_max
+        )
 
     def _build_rust_acceleration(
         self, acceleration: PSOConstantAcceleration | PSOTimeVaryingAcceleration | None
@@ -422,14 +401,12 @@ class Calibrator:
                 cognitive=acceleration.cognitive,
                 social=acceleration.social,
             )
-        if isinstance(acceleration, PSOTimeVaryingAcceleration):
-            return rust_calibration.PSOAccelerationTimeVarying(
-                c1_initial=acceleration.c1_initial,
-                c1_final=acceleration.c1_final,
-                c2_initial=acceleration.c2_initial,
-                c2_final=acceleration.c2_final,
-            )
-        return None
+        return rust_calibration.PSOAccelerationTimeVarying(
+            c1_initial=acceleration.c1_initial,
+            c1_final=acceleration.c1_final,
+            c2_initial=acceleration.c2_initial,
+            c2_final=acceleration.c2_final,
+        )
 
     @property
     def num_parameters(self) -> int:
@@ -445,19 +422,6 @@ class Calibrator:
     def parameter_names(self) -> list[str]:
         """Names of parameters being calibrated."""
         return [param.id for param in self.problem.parameters]
-
-    def _rust_parameters(self) -> list["CalibrationParameterProtocol"]:
-        """Calibration parameters as engine types, in problem order."""
-        return [
-            rust_calibration.CalibrationParameter(
-                id=param.id,
-                parameter_type=self._to_rust_parameter_type(param.parameter_type),
-                min_bound=param.min_bound,
-                max_bound=param.max_bound,
-                initial_guess=param.initial_guess,
-            )
-            for param in self.problem.parameters
-        ]
 
     def _validate_calibration_parameters(self) -> None:
         """
@@ -525,9 +489,6 @@ class Calibrator:
 
     def _warn_constraint_positions_beyond_observations(self) -> None:
         """Warn when constraints at positions extend beyond observed data."""
-        if not self.problem.observed_data:
-            return
-
         max_observed_position = max(obs.at for obs in self.problem.observed_data)
         for constraint in self.problem.constraints:
             if constraint.at and max(constraint.at) > max_observed_position:
@@ -676,7 +637,7 @@ def __init__(
         commol_rs.inference.CalibrationProblem(
             self._engine,
             engine_state.rust_observed_data(problem.observed_data),
-            self._rust_parameters(),
+            engine_state.rust_parameters(problem.parameters),
             engine_state.rust_constraints(problem.constraints),
             loss_config,
             initial_condition_remainder=problem.initial_condition_remainder,
@@ -2148,10 +2109,10 @@ class ParticleSwarmConfig(BaseModel):
             )
 
         self._mutation = PSOMutationConfig(
-            strategy=strategy,
+            strategy=PSOMutationStrategy(strategy),
             scale=scale,
             probability=probability,
-            application=application,
+            application=PSOMutationApplication(application),
         )
         return self
 
@@ -2489,10 +2450,10 @@ def mutation(
         )
 
     self._mutation = PSOMutationConfig(
-        strategy=strategy,
+        strategy=PSOMutationStrategy(strategy),
         scale=scale,
         probability=probability,
-        application=application,
+        application=PSOMutationApplication(application),
     )
     return self
 ```

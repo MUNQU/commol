@@ -86,9 +86,9 @@ class AxisPattern(BaseModel):
     add_group: ClassVar[_AddGroupDescriptor] = _AddGroupDescriptor()
 
     @property
+    @abstractmethod
     def formula(self) -> str:
         """The mathematical expression for this pattern (always parenthesised)."""
-        raise NotImplementedError("Subclasses must implement formula")
 
     def _as_series_data(self) -> list[tuple[int, float]] | None:
         """Return pulse data as (step, value) points if representable as a series.

@@ -2367,6 +2367,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coverage and Mutation Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/maintainer-playbook/" class="md-nav__link">
         
   
@@ -3484,6 +3512,19 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   no <code>predictions</code>.</li>
 <li>A verbose optimizer writes its table to Python's <code>sys.stdout</code> only, and needs
   one start; the library never writes to the standard error.</li>
+<li>A rate, a formula parameter or a constraint that the expression compiler
+  cannot compile, such as <code>typeof(k)</code>, is rejected when the model or the
+  calibration problem is built, with the reason; it no longer fails when it is
+  evaluated.</li>
+<li>The functions <code>erf</code>, <code>erfc</code>, <code>tgamma</code>, <code>lgamma</code>, <code>j0</code>, <code>j1</code>, <code>y0</code>, <code>y1</code>,
+  <code>fdim</code> and <code>remainder</code> of a rate come from the <code>libm</code> crate, so they give the
+  same values on every platform; the other functions still come from the
+  system's math library.</li>
+<li><code>AxisPattern</code> is abstract: <code>AxisPattern()</code> raises <code>TypeError</code>. Build a
+  pattern with one of its class methods.</li>
+<li>Error messages that list ids (the stratifications of a transition, the
+  missing and extra keys of the fractions of an <code>Aggregate</code>) list them in
+  sorted order.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3520,6 +3561,13 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>A quantile level outside <code>[0, 1]</code>, or NaN, gave the smallest or the largest
   value; <code>ParameterSample.quantiles</code> and <code>weighted_quantiles</code> now raise
   <code>ValueError</code>.</li>
+<li><code>AxisPattern.from_formula</code> and <code>AxisPattern.combine</code> with a <code>config</code> that
+  allows formulas longer than the default rejected them anyway; the
+  configuration now applies.</li>
+<li>A rate of <code>StochasticSteps</code> that is not a number raised
+  <code>InfeasibleStateError</code> and said that a rate cannot be negative; it now raises
+  <code>RuntimeError</code>, as <code>StochasticEvents</code> does, and says that the rate is not a
+  number.</li>
 </ul>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
 <ul>

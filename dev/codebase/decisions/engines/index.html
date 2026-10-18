@@ -2496,6 +2496,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coverage and Mutation Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../maintainer-playbook/" class="md-nav__link">
         
   
@@ -3050,9 +3078,9 @@ event only when the event happens.</p>
 </tbody>
 </table>
 <p>Reproducibility has three levels: the same machine and commol version give
-the same run; another platform gives the same random numbers, but the rate
-functions come from the system's <code>libm</code> through the JIT
-(<code>math_expression/jit/libm.rs</code>), which can differ in the last bit, so a run
+the same run; another platform gives the same random numbers, but most rate
+functions come from the system's <code>libm</code> (<code>address</code> in
+<code>math_expression/jit/libm.rs</code>), which can differ in the last bit, so a run
 there is equal in distribution and rarely differs draw by draw; another commol
 version may change a run, and the changelog says so.</p>
 <table>
@@ -3076,8 +3104,12 @@ version may change a run, and the changelog says so.</p>
 <td><code>StdRng</code> is slower and its security is not needed; <code>SmallRng</code> is documented as not portable.</td>
 </tr>
 <tr>
-<td>A pure-Rust <code>libm</code> in the JIT</td>
-<td>Costs speed in every engine for a difference in the last bit; the levels above are documented instead.</td>
+<td>A pure-Rust <code>libm</code> for every function of the JIT</td>
+<td><code>pow</code> takes 4 times as long (21 ns against 5 ns) and <code>exp</code>, <code>log</code> and <code>sin</code> about 40 % more, in every engine, for a difference in the last bit; the levels above are documented instead. The <code>libm</code> crate gives only the functions the standard library does not have (<code>erf</code>, <code>erfc</code>, <code>tgamma</code>, <code>lgamma</code>, the Bessel functions, <code>fdim</code>, <code>remainder</code>).</td>
+</tr>
+<tr>
+<td>The JIT looks each function up in the process (<code>dlsym</code>)</td>
+<td>A Linux binary links the system <code>libm</code> only for the functions Rust calls, so <code>floor</code> can be missing and the build fails; Windows names some functions otherwise (<code>_j0</code>). <code>address</code> gives the JIT the address of each function.</td>
 </tr>
 <tr>
 <td>One run per calibration evaluation</td>

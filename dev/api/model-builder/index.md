@@ -173,13 +173,6 @@ class ModelBuilder:
         if conditions:
             declared_ids = {s.id for s in self._stratifications}
             for cond in conditions:
-                if "category" not in cond:
-                    raise ValueError(
-                        f"Stratification '{id}': condition on "
-                        f"'{cond['stratification']}' must include a 'category'. "
-                        "Category-less conditions are only valid for transition "
-                        "target overrides."
-                    )
                 if cond["stratification"] not in declared_ids:
                     raise ValueError(
                         f"Stratification '{id}': condition references "
@@ -1058,13 +1051,6 @@ def add_stratification(
     if conditions:
         declared_ids = {s.id for s in self._stratifications}
         for cond in conditions:
-            if "category" not in cond:
-                raise ValueError(
-                    f"Stratification '{id}': condition on "
-                    f"'{cond['stratification']}' must include a 'category'. "
-                    "Category-less conditions are only valid for transition "
-                    "target overrides."
-                )
             if cond["stratification"] not in declared_ids:
                 raise ValueError(
                     f"Stratification '{id}': condition references "

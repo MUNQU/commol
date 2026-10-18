@@ -5448,9 +5448,9 @@ class AxisPattern(BaseModel):
     add_group: ClassVar[_AddGroupDescriptor] = _AddGroupDescriptor()
 
     @property
+    @abstractmethod
     def formula(self) -> str:
         """The mathematical expression for this pattern (always parenthesised)."""
-        raise NotImplementedError("Subclasses must implement formula")
 
     def _as_series_data(self) -> list[tuple[int, float]] | None:
         """Return pulse data as (step, value) points if representable as a series.
@@ -6630,7 +6630,7 @@ class Calibrator:
             commol_rs.inference.CalibrationProblem(
                 self._engine,
                 engine_state.rust_observed_data(problem.observed_data),
-                self._rust_parameters(),
+                engine_state.rust_parameters(problem.parameters),
                 engine_state.rust_constraints(problem.constraints),
                 loss_config,
                 initial_condition_remainder=problem.initial_condition_remainder,
@@ -6877,19 +6877,6 @@ class Calibrator:
 
         return run_method(self, method, IdentifiabilityMethod)
 
-    def _to_rust_parameter_type(
-        self, param_type: str
-    ) -> "CalibrationParameterTypeProtocol":
-        """Convert Python CalibrationParameterType to Rust type."""
-        if param_type == CalibrationParameterType.PARAMETER:
-            return rust_calibration.CalibrationParameterType.Parameter
-        elif param_type == CalibrationParameterType.INITIAL_CONDITION:
-            return rust_calibration.CalibrationParameterType.InitialCondition
-        elif param_type == CalibrationParameterType.FACTOR:
-            return rust_calibration.CalibrationParameterType.Factor
-        else:
-            raise ValueError(f"Unknown parameter type: {param_type}")
-
     def _build_loss_config(self) -> "LossConfigProtocol":
         """The Rust loss, with the replicates of a stochastic engine."""
         return engine_state.rust_loss_config(
@@ -6914,13 +6901,7 @@ class Calibrator:
             )
             return rust_calibration.OptimizationConfig.nelder_mead(nm_config)
 
-        elif isinstance(opt_config, ParticleSwarmConfig):
-            return self._build_pso_config(opt_config)
-
-        else:
-            raise ValueError(
-                f"Unsupported optimization config type: {type(opt_config).__name__}"
-            )
+        return self._build_pso_config(opt_config)
 
     def _build_pso_config(
         self, opt_config: ParticleSwarmConfig
@@ -6970,11 +6951,9 @@ class Calibrator:
             return None
         if isinstance(inertia, PSOConstantInertia):
             return rust_calibration.PSOInertiaConstant(factor=inertia.factor)
-        if isinstance(inertia, PSOChaoticInertia):
-            return rust_calibration.PSOInertiaChaotic(
-                w_min=inertia.w_min, w_max=inertia.w_max
-            )
-        return None
+        return rust_calibration.PSOInertiaChaotic(
+            w_min=inertia.w_min, w_max=inertia.w_max
+        )
 
     def _build_rust_acceleration(
         self, acceleration: PSOConstantAcceleration | PSOTimeVaryingAcceleration | None
@@ -6987,14 +6966,12 @@ class Calibrator:
                 cognitive=acceleration.cognitive,
                 social=acceleration.social,
             )
-        if isinstance(acceleration, PSOTimeVaryingAcceleration):
-            return rust_calibration.PSOAccelerationTimeVarying(
-                c1_initial=acceleration.c1_initial,
-                c1_final=acceleration.c1_final,
-                c2_initial=acceleration.c2_initial,
-                c2_final=acceleration.c2_final,
-            )
-        return None
+        return rust_calibration.PSOAccelerationTimeVarying(
+            c1_initial=acceleration.c1_initial,
+            c1_final=acceleration.c1_final,
+            c2_initial=acceleration.c2_initial,
+            c2_final=acceleration.c2_final,
+        )
 
     @property
     def num_parameters(self) -> int:
@@ -7010,19 +6987,6 @@ class Calibrator:
     def parameter_names(self) -> list[str]:
         """Names of parameters being calibrated."""
         return [param.id for param in self.problem.parameters]
-
-    def _rust_parameters(self) -> list["CalibrationParameterProtocol"]:
-        """Calibration parameters as engine types, in problem order."""
-        return [
-            rust_calibration.CalibrationParameter(
-                id=param.id,
-                parameter_type=self._to_rust_parameter_type(param.parameter_type),
-                min_bound=param.min_bound,
-                max_bound=param.max_bound,
-                initial_guess=param.initial_guess,
-            )
-            for param in self.problem.parameters
-        ]
 
     def _validate_calibration_parameters(self) -> None:
         """
@@ -7090,9 +7054,6 @@ class Calibrator:
 
     def _warn_constraint_positions_beyond_observations(self) -> None:
         """Warn when constraints at positions extend beyond observed data."""
-        if not self.problem.observed_data:
-            return
-
         max_observed_position = max(obs.at for obs in self.problem.observed_data)
         for constraint in self.problem.constraints:
             if constraint.at and max(constraint.at) > max_observed_position:
@@ -7241,7 +7202,7 @@ def __init__(
         commol_rs.inference.CalibrationProblem(
             self._engine,
             engine_state.rust_observed_data(problem.observed_data),
-            self._rust_parameters(),
+            engine_state.rust_parameters(problem.parameters),
             engine_state.rust_constraints(problem.constraints),
             loss_config,
             initial_condition_remainder=problem.initial_condition_remainder,
@@ -8713,10 +8674,10 @@ class ParticleSwarmConfig(BaseModel):
             )
 
         self._mutation = PSOMutationConfig(
-            strategy=strategy,
+            strategy=PSOMutationStrategy(strategy),
             scale=scale,
             probability=probability,
-            application=application,
+            application=PSOMutationApplication(application),
         )
         return self
 
@@ -9054,10 +9015,10 @@ def mutation(
         )
 
     self._mutation = PSOMutationConfig(
-        strategy=strategy,
+        strategy=PSOMutationStrategy(strategy),
         scale=scale,
         probability=probability,
-        application=application,
+        application=PSOMutationApplication(application),
     )
     return self
 ```
@@ -10460,13 +10421,6 @@ class ModelBuilder:
         if conditions:
             declared_ids = {s.id for s in self._stratifications}
             for cond in conditions:
-                if "category" not in cond:
-                    raise ValueError(
-                        f"Stratification '{id}': condition on "
-                        f"'{cond['stratification']}' must include a 'category'. "
-                        "Category-less conditions are only valid for transition "
-                        "target overrides."
-                    )
                 if cond["stratification"] not in declared_ids:
                     raise ValueError(
                         f"Stratification '{id}': condition references "
@@ -11345,13 +11299,6 @@ def add_stratification(
     if conditions:
         declared_ids = {s.id for s in self._stratifications}
         for cond in conditions:
-            if "category" not in cond:
-                raise ValueError(
-                    f"Stratification '{id}': condition on "
-                    f"'{cond['stratification']}' must include a 'category'. "
-                    "Category-less conditions are only valid for transition "
-                    "target overrides."
-                )
             if cond["stratification"] not in declared_ids:
                 raise ValueError(
                     f"Stratification '{id}': condition references "
@@ -13074,7 +13021,7 @@ class Process(BaseModel):
                     raise ValueError(
                         f"Transition '{transition.id}' is a Stratification flow "
                         f"but involves categories from multiple stratifications: "
-                        f"{', '.join(parent_stratification_ids)}. A single "
+                        f"{', '.join(sorted(parent_stratification_ids))}. A single "
                         f"transition must only move between categories belonging "
                         f"to the same parent stratification."
                     )
@@ -13236,7 +13183,7 @@ def validate_transition_ids(self) -> Self:
                 raise ValueError(
                     f"Transition '{transition.id}' is a Stratification flow "
                     f"but involves categories from multiple stratifications: "
-                    f"{', '.join(parent_stratification_ids)}. A single "
+                    f"{', '.join(sorted(parent_stratification_ids))}. A single "
                     f"transition must only move between categories belonging "
                     f"to the same parent stratification."
                 )
@@ -14512,8 +14459,8 @@ class Aggregate(ModelStructure, InitialConditions):
         if actual_bins != expected_bins:
             raise ValueError(
                 f"Initial bin fractions keys must exactly match bin ids. "
-                f"Missing ids: {expected_bins - actual_bins}, "
-                f"Extra ids: {actual_bins - expected_bins}."
+                f"Missing ids: {sorted(expected_bins - actual_bins)}, "
+                f"Extra ids: {sorted(actual_bins - expected_bins)}."
             )
 
     def _check_stratification_fractions(self, process: Process) -> None:
@@ -14524,8 +14471,9 @@ class Aggregate(ModelStructure, InitialConditions):
         if actual_strat != expected_strat:
             raise ValueError(
                 f"Initial stratification fractions keys must exactly match "
-                f"stratification ids. Missing ids: {expected_strat - actual_strat}, "
-                f"Extra ids: {actual_strat - expected_strat}."
+                f"stratification ids. "
+                f"Missing ids: {sorted(expected_strat - actual_strat)}, "
+                f"Extra ids: {sorted(actual_strat - expected_strat)}."
             )
 
         for strat_id, fractions in self.stratification_fractions.items():
@@ -14537,8 +14485,8 @@ class Aggregate(ModelStructure, InitialConditions):
                 raise ValueError(
                     f"Categories for stratification '{strat_id}' must exactly "
                     f"match defined categories in instance '{strat_instance.id}'. "
-                    f"Missing categories: {expected - actual}, "
-                    f"Extra categories: {actual - expected}."
+                    f"Missing categories: {sorted(expected - actual)}, "
+                    f"Extra categories: {sorted(actual - expected)}."
                 )
 
             total = sum(fractions.values())
@@ -14644,17 +14592,6 @@ class Aggregate(ModelStructure, InitialConditions):
             f"Available bins: "
             f"{', '.join(sorted(bin_ids)) if bin_ids else 'none'}."
         )
-        if any(var.startswith(SUBGROUP_TOTAL_PREFIX) for var in undefined_vars):
-            names = sorted(
-                name
-                for name in engine_state.subgroup_total_names(process)
-                if name.startswith(SUBGROUP_TOTAL_PREFIX)
-            )
-            message += (
-                " Subgroup total names follow the declaration order of the "
-                "stratifications. Available subgroup totals: "
-                f"{', '.join(names) if names else 'none'}."
-            )
         raise ValueError(message)
 ```
 
@@ -19554,23 +19491,22 @@ class ReplicateRuns:
         self.n = n
         self.seed = seed
 
-    def _replicates(
-        self, num_steps: int | None, positions: list[float] | None
-    ) -> SimulationReplicates:
+    def _replicates(self, grid: int | list[float]) -> SimulationReplicates:
+        """The replicates on ``grid``: a number of steps or the positions."""
         simulation = self.simulation
         simulation._validate_all_parameters_calibrated(simulation.model_definition)
         engine = simulation.engine
-        grid, seeds, runs = engine.run_replicates(
-            self.seed, self.n, num_steps=num_steps, positions=positions
-        )
+        positions, seeds, runs = engine.run_replicates(self.seed, self.n, grid)
         outputs = simulation.simulation_outputs
         return SimulationReplicates(
             (
-                SimulationResults.from_rows(grid, outputs, rows, seed=replicate_seed)
+                SimulationResults.from_rows(
+                    positions, outputs, rows, seed=replicate_seed
+                )
                 for replicate_seed, rows in zip(seeds, runs, strict=True)
             ),
             seed=self.seed,
-            positions=grid,
+            positions=positions,
         )
 
     def run(self, num_steps: int) -> SimulationReplicates:
@@ -19595,7 +19531,7 @@ class ReplicateRuns:
         ValueError
             If a parameter or a value of the model has no value.
         """
-        return self._replicates(num_steps, None)
+        return self._replicates(num_steps)
 
     def run_at(self, at: Sequence[float]) -> SimulationReplicates:
         """
@@ -19619,7 +19555,7 @@ class ReplicateRuns:
             If a parameter has no value, the positions are not sorted and
             unique, or the engine does not report at one of them.
         """
-        return self._replicates(None, [float(position) for position in at])
+        return self._replicates([float(position) for position in at])
 ```
 
 ### Methods:
@@ -19713,7 +19649,7 @@ def run(self, num_steps: int) -> SimulationReplicates:
     ValueError
         If a parameter or a value of the model has no value.
     """
-    return self._replicates(num_steps, None)
+    return self._replicates(num_steps)
 ```
 
 #### run_at
@@ -19768,7 +19704,7 @@ def run_at(self, at: Sequence[float]) -> SimulationReplicates:
         If a parameter has no value, the positions are not sorted and
         unique, or the engine does not report at one of them.
     """
-    return self._replicates(None, [float(position) for position in at])
+    return self._replicates([float(position) for position in at])
 ```
 
 ## SimulationReplicates
@@ -19844,8 +19780,6 @@ class SimulationReplicates(list[SimulationResults]):
         return [run.seed for run in self if run.seed is not None]
 
     def _values(self, name: str) -> np.ndarray:
-        if not self:
-            raise ValueError("There are no replicates.")
         return np.asarray([run[name] for run in self], dtype=float)
 
     def mean(self) -> SimulationResults:
@@ -24758,12 +24692,7 @@ class Transition(BaseModel):
         """
         if value is None:
             return value
-        try:
-            validate_expression_security(value)
-            commol_rs.core.MathExpression(value).validate()
-        except ValueError as e:
-            raise ValueError(f"Validation failed for rate '{value}': {e}")
-        return value
+        return _checked_rate(value)
 ```
 
 ### Attributes
@@ -24841,12 +24770,7 @@ def validate_rate(cls, value: str | None) -> str | None:
     """
     if value is None:
         return value
-    try:
-        validate_expression_security(value)
-        commol_rs.core.MathExpression(value).validate()
-    except ValueError as e:
-        raise ValueError(f"Validation failed for rate '{value}': {e}")
-    return value
+    return _checked_rate(value)
 ```
 
 ## StratifiedRate
@@ -24924,12 +24848,7 @@ class StratifiedRate(BaseModel):
     @classmethod
     def validate_rate(cls, value: str) -> str:
         """Perform security and syntax validation on the rate expression."""
-        try:
-            validate_expression_security(value)
-            commol_rs.core.MathExpression(value).validate()
-        except ValueError as e:
-            raise ValueError(f"Validation failed for rate '{value}': {e}")
-        return value
+        return _checked_rate(value)
 ```
 
 ### Methods:
@@ -24999,12 +24918,7 @@ Source code in `commol/context/transition.py`
 @classmethod
 def validate_rate(cls, value: str) -> str:
     """Perform security and syntax validation on the rate expression."""
-    try:
-        validate_expression_security(value)
-        commol_rs.core.MathExpression(value).validate()
-    except ValueError as e:
-        raise ValueError(f"Validation failed for rate '{value}': {e}")
-    return value
+    return _checked_rate(value)
 ```
 
 ## Engine
@@ -26017,6 +25931,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Breaking:** `applied_parameters_report(..., sample=, confidence_level=)` reads the statistics of a `ParameterSample`; `parameter_statistics` is gone.
 - **Breaking (Rust):** `CalibrationProblem` is split into layers (`ForwardModel`, `ObservationOperator`, `Feasibility`, `Discrepancy`, `OptimizationObjective`); `optimize` takes the problem by reference, and the optimizer configurations have no `verbose` field. `CalibrationEvaluation` has no `predictions`.
 - A verbose optimizer writes its table to Python's `sys.stdout` only, and needs one start; the library never writes to the standard error.
+- A rate, a formula parameter or a constraint that the expression compiler cannot compile, such as `typeof(k)`, is rejected when the model or the calibration problem is built, with the reason; it no longer fails when it is evaluated.
+- The functions `erf`, `erfc`, `tgamma`, `lgamma`, `j0`, `j1`, `y0`, `y1`, `fdim` and `remainder` of a rate come from the `libm` crate, so they give the same values on every platform; the other functions still come from the system's math library.
+- `AxisPattern` is abstract: `AxisPattern()` raises `TypeError`. Build a pattern with one of its class methods.
+- Error messages that list ids (the stratifications of a transition, the missing and extra keys of the fractions of an `Aggregate`) list them in sorted order.
 
 ### Fixed
 
@@ -26031,6 +25949,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `ModelBuilder` and `Simulation` logged to the root logger of the application; they log to the `commol` logger, as the rest of the library does, so `add_stderr_logger` shows their messages.
 - `AxisPattern.combine(mode="max")` raised "Unknown combine mode": a mode may be given by its value.
 - A quantile level outside `[0, 1]`, or NaN, gave the smallest or the largest value; `ParameterSample.quantiles` and `weighted_quantiles` now raise `ValueError`.
+- `AxisPattern.from_formula` and `AxisPattern.combine` with a `config` that allows formulas longer than the default rejected them anyway; the configuration now applies.
+- A rate of `StochasticSteps` that is not a number raised `InfeasibleStateError` and said that a rate cannot be negative; it now raises `RuntimeError`, as `StochasticEvents` does, and says that the rate is not a number.
 
 ### Removed
 
