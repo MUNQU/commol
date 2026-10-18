@@ -112,11 +112,22 @@ jobs:
               # The test model kind is for the tests only; wheels never have it.
               run: uv run maturin develop --release --features test-kind
 
-            # The documentation examples run once, in the Code Quality workflow,
-            # and the coverage studies in the job coverage-studies below.
+            # The test that compiles the LaTeX description needs latexmk. The
+            # time budget of a test is set on Ubuntu, so LaTeX is installed
+            # there, and every test is timed there (test_slow_tests_are_listed).
+            - name: Install LaTeX
+              if: runner.os == 'Linux'
+              run: >-
+                  sudo apt-get update &&
+                  sudo apt-get install --no-install-recommends -y latexmk
+                  texlive-latex-base texlive-latex-recommended texlive-fonts-recommended
+
+            # Every test but the coverage studies, which run in the job
+            # coverage-studies below; the documentation examples run here too, so
+            # the time budget covers them.
             - name: Run tests
               working-directory: ./py-commol
-              run: uv run pytest -m "not docs and not coverage_study"
+              run: uv run pytest -m "not coverage_study"
 
     # The coverage studies, for a pull request that changes what they run. The
     # merge queue does not run them again: the pull request already ran them.

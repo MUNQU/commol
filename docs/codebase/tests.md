@@ -171,7 +171,8 @@ and cite the papers.
   fixes it (`reason="#196: …"`): the fix makes the test pass, and the strict
   marker then fails the run until the fix removes it.
 - A test that skips when an optional dependency is missing runs in at least
-  one CI job: Code Quality installs `pydot` (the `dev` extra) and `latexmk`.
+  one CI job: the `dev` extra installs `pydot`, and Python Coverage and the
+  job Test of Build on Ubuntu install `latexmk`.
 - A Rust `#[ignore]` gives a reason with the `cargo test` command that runs it,
   such as the benchmarks of `crates/commol-differential/src/tests.rs`. A
   benchmark also asserts that the methods it times give the same result.
@@ -181,8 +182,10 @@ and cite the papers.
 
 ## Time budget
 
-A test takes at most 1 s, setup and teardown included, on the Ubuntu runner
-of CI. A test over 0.5 s stays only if it checks what no faster test checks,
+A test takes at most 1 s, setup and teardown included, in the job Test of
+Build on Ubuntu, which runs every test without coverage. Coverage slows a test
+that runs much Python up to ten times, so the run under coverage (Python
+Coverage) skips the check, and so does a run off Linux. A test over 0.5 s stays only if it checks what no faster test checks,
 with the smallest inputs that still check it: a shorter horizon, fewer steps,
 fewer replicates. `tests/suite/durations.py` records the time of each test,
 and `test_slow_tests_are_listed` runs last and fails on a test over the budget
@@ -202,7 +205,7 @@ them.
 
 The check reads the wall time of the run, so a machine that runs other work
 at the same time can exceed the budget. `pytest --durations=20` shows the
-slowest tests; Code Quality prints them.
+slowest tests; Python Coverage prints them, slowed by coverage.
 
 | Test | Why it takes longer |
 |---|---|

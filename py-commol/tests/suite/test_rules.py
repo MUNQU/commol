@@ -5,10 +5,14 @@ The rules are in ``docs/codebase/tests.md``."""
 
 import ast
 import re
+import sys
 import tomllib
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
+
+import coverage
+import pytest
 
 from tests.suite.durations import DURATIONS
 
@@ -345,6 +349,10 @@ def listed_slow_tests() -> set[str]:
 def test_slow_tests_are_listed() -> None:
     """No test of this run takes over the budget unless the conventions list it.
     It runs after every other test (``durations.py``)."""
+    if coverage.Coverage.current() is not None:
+        pytest.skip("coverage slows the tests; the job Test of Build times them")
+    if sys.platform != "linux":
+        pytest.skip("the budget is set on Linux, where the job Test of Build runs")
     listed = listed_slow_tests()
     slow = [
         f"{nodeid}: {seconds:.2f} s"
