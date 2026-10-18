@@ -42,7 +42,13 @@ is per unit of the axis, and only what its value means differs (see
 [What a rate means](core-concepts.md#what-a-rate-means)).
 It reads the flows the engine plans (`transition_flows`), so a proportional
 rate is checked as its flow, the rate times its source: `k2` in `1/day` from a
-bin in `item` gives `item/day`. A rate that reads the
+bin in `item` gives `item/day`. The bin unit of a flow is the unit of the bin
+it leaves, or of the bin it enters when it has no source; so a category
+transition in a model of bins in `item` and `kg` moves `item/day` in one bin
+and `kg/day` in the other. In such a model `total`, a subgroup total
+`total_<categories>`, a category and `neighbors` add amounts of different
+units, so they have none, and a rate that reads one fails the check; read the
+bins or the compartments instead. A rate that reads the
 [neighbors of a unit](building-models.md#neighbors) is checked as the sums
 they are. It raises `UnitConsistencyError` (from `commol.utils.equations`) and
 lists every transition that fails.

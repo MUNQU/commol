@@ -342,6 +342,9 @@ print(redirect.describe().render("text"))
 # A_g1 -> A_g2_s1: k * A_g1   and   B_g1 -> B_g2_s1: k * B_g1
 ```
 
+A transition without a source starts from the compartments it enters, so its
+`category` conditions choose them and `build` rejects a `to`.
+
 ## Limiting when a transition runs
 
 A transition runs at every step. To limit a flow, write the condition in the
@@ -455,7 +458,8 @@ simulate as written:
 | A category transition without exactly one source and one target | The transition |
 | A rate variable that is not a parameter, bin, compartment or special variable | The variable and the available names |
 | Several sources with a proportional rate | The transition; use an absolute rate or `$compartment` |
-| A stratified rate whose `category` conditions match no source compartment | The categories; use `to` to reach another stratification |
+| A stratified rate whose `category` conditions match no source compartment | The transition; use `to` to reach another stratification |
+| A `to` condition on a transition without a source | The transition; use `category` to choose the compartment it enters |
 | A flow that ends in categories no compartment has | The transition; add a `to` condition |
 | `impulse_at` and `impulse_every` together, a negative step, or a period that is not positive | The transition |
 | A non-integer impulse step in a `DifferenceEquations` model | The transition and the step |
