@@ -1,7 +1,7 @@
 //! Evaluation of the compiled rate of a flow.
 //!
 //! A rate takes the fastest path it supports: the specialized fast-path
-//! interpreter, the JIT with pre-resolved slots, or the evalexpr fallback.
+//! interpreter, or the JIT with pre-resolved slots.
 
 use crate::types::{FastRateExpression, FastRateOp, TransitionFlow, VarSlot};
 use commol_core::{MathExpression, MathExpressionContext, RateMathExpression};
@@ -16,8 +16,8 @@ pub(crate) struct Clock {
 }
 
 /// Evaluate a transition flow's rate, choosing the fastest path the rate
-/// supports: the specialized fast-path interpreter, the JIT with pre-resolved
-/// slots, or the evalexpr fallback.
+/// supports: the specialized fast-path interpreter, or the JIT with
+/// pre-resolved slots.
 #[inline]
 pub(crate) fn evaluate_rate(
     flow: &TransitionFlow,
@@ -26,16 +26,16 @@ pub(crate) fn evaluate_rate(
     clock: Clock,
     jit_buf: &mut [f64; 16],
 ) -> Result<f64, String> {
-    let rate_result = if let Some(fast_expr) = &flow.fast_rate_expression {
-        eval_fast_rate(fast_expr, amounts, ctx, clock)
-    } else if let (RateMathExpression::Formula(expr), Some(slots)) =
-        (&flow.rate_expression, &flow.resolved_slots)
-    {
-        evaluate_jit_rate(expr, slots, amounts, ctx, clock, jit_buf)
-    } else {
-        flow.rate_expression
-            .evaluate(ctx)
-            .map_err(|error| error.to_string())
+    let rate_result = match (
+        &flow.fast_rate_expression,
+        &flow.rate_expression,
+        &flow.resolved_slots,
+    ) {
+        (Some(fast_expr), _, _) => eval_fast_rate(fast_expr, amounts, ctx, clock),
+        (None, RateMathExpression::Formula(expr), Some(slots)) => {
+            evaluate_jit_rate(expr, slots, amounts, ctx, clock, jit_buf)
+        }
+        _ => unreachable!("the builder gives every rate a fast path or the slots of its JIT"),
     };
 
     rate_result.map_err(|error| {

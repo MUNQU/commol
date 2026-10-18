@@ -1,7 +1,6 @@
 //! Expansion of a model and its compilation into a [`CompiledModel`].
 
 use crate::flows::{PlannedFlow, plan_transition_flows};
-use crate::helpers::rate_to_string;
 use crate::labels::OutputLabels;
 use crate::layout::CompartmentLayout;
 use crate::types::{
@@ -120,6 +119,9 @@ impl CompiledModel {
                 }
                 Some(commol_core::ParameterValue::Formula(formula)) => {
                     let rate_expr = RateMathExpression::from_string(formula.clone());
+                    rate_expr
+                        .compiles()
+                        .map_err(|error| format!("Parameter '{}': {error}", p.id))?;
                     formula_parameters.push((p.id.clone(), rate_expr));
                 }
                 Some(commol_core::ParameterValue::Series { data, mode }) => {
@@ -211,7 +213,7 @@ impl CompiledModel {
             .into_iter()
             .partition(|flow| schedules.contains_key(&flow.transition_id));
         let impulse_flows: Vec<ImpulseFlow> =
-            compile_transition_flows(impulse_plans, &compartment_map, &expression_context)
+            compile_transition_flows(impulse_plans, &compartment_map, &expression_context)?
                 .into_iter()
                 .map(|flow| ImpulseFlow {
                     schedule: schedules[&flow.transition_id].clone(),
@@ -219,7 +221,7 @@ impl CompiledModel {
                 })
                 .collect();
         let transition_flows =
-            compile_transition_flows(flow_plans, &compartment_map, &expression_context);
+            compile_transition_flows(flow_plans, &compartment_map, &expression_context)?;
 
         let used_context_variables = collect_used_context_variables(
             transition_flows
@@ -255,20 +257,11 @@ impl CompiledModel {
         subgroup_total_mappings
             .retain(|mapping| used_context_variables.contains(&mapping.parameter_name));
 
-        // The HashMap-backed compartment context is only needed when an
-        // expression must fall back to evalexpr. Both the JIT path (via
-        // `resolved_slots`) and the fast path (via `fast_rate_expression`)
-        // read compartment values directly from the state, so they do
-        // not require the HashMap to be kept up to date.
-        let requires_compartment_context = !formula_parameters.is_empty()
-            || transition_flows
-                .iter()
-                .chain(impulse_flows.iter().map(|impulse| &impulse.flow))
-                .any(|flow| {
-                    matches!(flow.rate_expression, RateMathExpression::Formula(_))
-                        && flow.resolved_slots.is_none()
-                        && flow.fast_rate_expression.is_none()
-                });
+        // The HashMap-backed compartment context is only needed by the
+        // formula parameters, which read it through their compiled function.
+        // The rates of the flows read the state directly, through
+        // `resolved_slots` or `fast_rate_expression`.
+        let requires_compartment_context = !formula_parameters.is_empty();
 
         let initial_state: Vec<f64> = amounts
             .into_iter()
@@ -673,21 +666,28 @@ pub fn initial_state(
 }
 
 /// Compile planned transition flows into runtime flows.
+///
+/// # Errors
+///
+/// Returns a message when the rate of a flow does not compile.
 fn compile_transition_flows(
     planned_flows: Vec<PlannedFlow>,
     compartment_map: &HashMap<String, usize>,
     expression_context: &MathExpressionContext,
-) -> Vec<TransitionFlow> {
+) -> Result<Vec<TransitionFlow>, String> {
     planned_flows
         .into_iter()
         .map(|flow| {
             let rate_expression = RateMathExpression::from_string(flow.rate);
+            rate_expression
+                .compiles()
+                .map_err(|error| format!("Transition '{}': {error}", flow.transition_id))?;
             let resolved_slots =
                 resolve_jit_slots(&rate_expression, compartment_map, expression_context);
             let fast_rate_expression =
                 build_fast_rate_expression(&rate_expression, compartment_map, expression_context);
             let (source_index, target_index) = flow.pieces[0];
-            TransitionFlow {
+            Ok(TransitionFlow {
                 transition_id: flow.transition_id,
                 source_index,
                 target_index,
@@ -697,7 +697,7 @@ fn compile_transition_flows(
                 fast_rate_expression,
                 is_absolute_flow: flow.absolute,
                 resolved_slots,
-            }
+            })
         })
         .collect()
 }
@@ -894,8 +894,7 @@ pub fn check_model(model: &Model) -> Result<(), String> {
     let mut used: HashSet<String> = HashSet::new();
     for transition in &process.transitions {
         if let Some(rate) = &transition.rate {
-            // A deserialized rate is a `Parameter` until it is parsed again.
-            used.extend(RateMathExpression::from_string(rate_to_string(rate)).get_variables());
+            used.extend(RateMathExpression::from_string(rate.clone()).get_variables());
         }
         for stratified in transition.stratified_rates.iter().flatten() {
             used.extend(RateMathExpression::from_string(stratified.rate.clone()).get_variables());
@@ -975,7 +974,7 @@ pub(crate) fn missing_neighbors(transition_id: &str, term: &str) -> String {
 fn check_neighbor_terms(model: &Model, aggregate: &Aggregate) -> Result<(), String> {
     let process = &model.process;
     for transition in &process.transitions {
-        let rates = transition.rate.iter().map(rate_to_string).chain(
+        let rates = transition.rate.iter().cloned().chain(
             transition
                 .stratified_rates
                 .iter()
@@ -1875,13 +1874,41 @@ mod tests {
             source: vec!["A".to_string()],
             target: vec!["B".to_string()],
             accumulators: vec![],
-            rate: Some(RateMathExpression::from_string(rate.to_string())),
+            rate: Some(rate.to_string()),
             stratified_rates: None,
             per_compartment: None,
             impulse_at: None,
             impulse_every: None,
         }];
         model
+    }
+
+    #[test]
+    fn a_rate_or_a_formula_parameter_that_does_not_compile_is_a_build_error() {
+        use commol_core::{Parameter, ParameterValue};
+        let error = CompiledModel::try_from_model(&model_with_rate("k * typeof(A)"))
+            .err()
+            .expect("the JIT has no typeof");
+        assert!(
+            error.starts_with(
+                "Transition 'ab': Invalid expression: 'k * typeof(A)' does not compile"
+            ),
+            "{error}"
+        );
+
+        let mut model = model_with_rate("k");
+        model.parameters.push(Parameter {
+            id: "f".to_string(),
+            value: Some(ParameterValue::Formula("typeof(k)".to_string())),
+            description: None,
+        });
+        let error = CompiledModel::try_from_model(&model)
+            .err()
+            .expect("the JIT has no typeof");
+        assert!(
+            error.starts_with("Parameter 'f': Invalid expression: 'typeof(k)' does not compile"),
+            "{error}"
+        );
     }
 
     #[test]

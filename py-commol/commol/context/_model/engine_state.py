@@ -301,7 +301,6 @@ def rust_constraints(
         commol_rs.calibration.CalibrationConstraint(
             id=constraint.id,
             expression=constraint.expression,
-            description=constraint.description,
             weight=constraint.weight,
             at=constraint.at,
         )

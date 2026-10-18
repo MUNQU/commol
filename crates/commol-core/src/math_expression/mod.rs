@@ -76,10 +76,9 @@
 //! - `max(a, b, ...)` - Maximum value (variadic)
 //! - `if(condition, value_if_true, value_if_false)` - Conditional expression
 
-use evalexpr::{ContextWithMutableVariables, HashMapContext, Node, Value, build_operator_tree};
-use serde::{Deserialize, Serialize};
+use evalexpr::{ContextWithMutableVariables, HashMapContext, Value};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, PoisonError};
 
 pub mod context;
 pub mod error;
@@ -101,52 +100,37 @@ use preprocessing::{get_variables, preprocess_formula, reads_variable};
 /// Without caching, each JIT compilation can produce slightly different machine code
 /// (due to memory layout, instruction scheduling, etc.) that leads to ULP-level
 /// differences in floating-point results.
-static JIT_CACHE: std::sync::LazyLock<RwLock<HashMap<String, Arc<JITFunction>>>> =
-    std::sync::LazyLock::new(|| RwLock::new(HashMap::new()));
+static JIT_CACHE: std::sync::LazyLock<Mutex<HashMap<String, Arc<JITFunction>>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
 
-/// Get or compile a JIT function for the given preprocessed formula.
+/// The JIT function of a preprocessed formula: the cached one, or a new one
+/// compiled and cached. Expressions are compiled when a model is built, not
+/// while it runs, so one lock serves every caller.
 ///
-/// Returns a cached JIT function if available, otherwise compiles and caches a new one.
-fn get_or_compile_jit(preprocessed: &str) -> Option<Arc<JITFunction>> {
-    // First, try to get from cache with a read lock
-    {
-        let cache = JIT_CACHE.read().ok()?;
-        if let Some(jit_fn) = cache.get(preprocessed) {
-            return Some(Arc::clone(jit_fn));
-        }
-    }
-
-    // Not in cache, need to compile
-    // Acquire write lock and check again (another thread might have compiled it)
-    let mut cache = JIT_CACHE.write().ok()?;
+/// # Errors
+///
+/// Returns a message when the formula does not compile.
+fn get_or_compile_jit(preprocessed: &str) -> Result<Arc<JITFunction>, String> {
+    // A thread that panicked while it held the lock left a complete map: an
+    // entry is inserted whole or not at all.
+    let mut cache = JIT_CACHE.lock().unwrap_or_else(PoisonError::into_inner);
     if let Some(jit_fn) = cache.get(preprocessed) {
-        return Some(Arc::clone(jit_fn));
+        return Ok(Arc::clone(jit_fn));
     }
-
-    // Compile the expression
-    let compiler = JITCompiler::new().ok()?;
-    let jit_fn = compiler.compile(preprocessed).ok()?;
-    let arc_fn = Arc::new(jit_fn);
-
-    // Cache it
-    cache.insert(preprocessed.to_string(), Arc::clone(&arc_fn));
-
-    Some(arc_fn)
-}
-
-/// Internal representation of compiled expression
-#[derive(Debug, Clone)]
-enum CompiledExpr {
-    /// JIT-compiled function (fast path) - wrapped in Arc for sharing from cache
-    Jit(Arc<JITFunction>),
-    /// Generic evalexpr fallback
-    Generic(Node),
+    let jit_fn = Arc::new(
+        JITCompiler::new()
+            .and_then(|compiler| compiler.compile(preprocessed))
+            .map_err(|error| error.to_string())?,
+    );
+    cache.insert(preprocessed.to_string(), Arc::clone(&jit_fn));
+    Ok(jit_fn)
 }
 
 /// A mathematical expression that can be evaluated
 ///
-/// Expressions are JIT-compiled to native machine code for optimal performance.
-/// If JIT compilation fails, the expression falls back to evalexpr interpretation.
+/// Expressions are JIT-compiled to native machine code. An expression that
+/// does not compile keeps the reason, and evaluating it returns that reason
+/// as an error.
 ///
 /// ## Example
 /// ```rust
@@ -160,70 +144,25 @@ enum CompiledExpr {
 /// context.set_compartment("B".to_string(), 10.0);
 /// let result = expr.evaluate(&mut context).unwrap();
 /// ```
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct MathExpression {
     /// The original mathematical formula as a string
     pub formula: String,
     /// Preprocessed formula (cached for performance)
-    #[serde(skip)]
     preprocessed: String,
-    /// Compiled expression (JIT or evalexpr fallback)
-    #[serde(skip)]
-    compiled: CompiledExpr,
-}
-
-// Custom deserialize to ensure preprocessed field is populated
-impl<'de> Deserialize<'de> for MathExpression {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        struct MathExpressionData {
-            formula: String,
-        }
-
-        let data = MathExpressionData::deserialize(deserializer)?;
-        Ok(MathExpression::new(data.formula))
-    }
+    /// The compiled function, or why the formula does not compile.
+    compiled: Result<Arc<JITFunction>, String>,
 }
 
 impl MathExpression {
     /// Create a new expression (preprocesses and JIT-compiles the formula)
-    ///
-    /// Attempts to JIT-compile the expression for optimal performance.
-    /// Falls back to evalexpr interpretation if JIT compilation fails.
     ///
     /// JIT-compiled functions are cached globally to ensure deterministic
     /// floating-point results. Without caching, each compilation could produce
     /// slightly different machine code leading to ULP-level differences.
     pub fn new(formula: String) -> Self {
         let preprocessed = preprocess_formula(&formula);
-
-        // Try to get JIT function from cache, or compile and cache it
-        let compiled = match get_or_compile_jit(&preprocessed) {
-            Some(jit_fn) => {
-                // JIT compilation succeeded (from cache or fresh) - use fast path
-                CompiledExpr::Jit(jit_fn)
-            }
-            None => {
-                // JIT compilation failed - fall back to evalexpr
-                // Build the operator tree once and cache it
-                match build_operator_tree(&preprocessed) {
-                    Ok(tree) => CompiledExpr::Generic(tree),
-                    Err(_) => {
-                        // If even tree building fails, create a dummy tree
-                        // This will error during evaluation, but won't panic during construction
-                        // We'll just use an empty/error tree
-                        match build_operator_tree("0") {
-                            Ok(tree) => CompiledExpr::Generic(tree),
-                            Err(_) => unreachable!("Failed to build even a constant tree"),
-                        }
-                    }
-                }
-            }
-        };
-
+        let compiled = get_or_compile_jit(&preprocessed);
         Self {
             formula,
             preprocessed,
@@ -231,30 +170,41 @@ impl MathExpression {
         }
     }
 
+    /// The compiled function.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MathExpressionError::InvalidExpression`] with the reason
+    /// when the formula does not compile.
+    fn jit(&self) -> Result<&JITFunction, MathExpressionError> {
+        self.compiled.as_deref().map_err(|reason| {
+            MathExpressionError::InvalidExpression(format!(
+                "'{}' does not compile: {reason}",
+                self.formula
+            ))
+        })
+    }
+
+    /// Check that the formula compiles.
+    ///
+    /// # Errors
+    ///
+    /// Returns the reason when it does not.
+    pub fn compiles(&self) -> Result<(), MathExpressionError> {
+        self.jit().map(|_| ())
+    }
+
     /// Evaluate the expression with the given context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the formula does not compile or reads a
+    /// variable the context does not hold.
     pub fn evaluate(
         &self,
         context: &mut MathExpressionContext,
     ) -> Result<f64, MathExpressionError> {
-        match &self.compiled {
-            CompiledExpr::Jit(jit_fn) => {
-                // Use JIT-compiled function (fast path)
-                jit_fn.call(context)
-            }
-            CompiledExpr::Generic(tree) => {
-                // Fallback to evalexpr interpretation
-                let evalexpr_context = context.get_evalexpr_context();
-
-                match tree.eval_with_context(evalexpr_context) {
-                    Ok(Value::Float(result)) => Ok(result),
-                    Ok(Value::Int(result)) => Ok(result as f64),
-                    Ok(_) => Err(MathExpressionError::InvalidExpression(
-                        "Expression must evaluate to a number".to_string(),
-                    )),
-                    Err(e) => Err(MathExpressionError::EvalError(e)),
-                }
-            }
-        }
+        self.jit()?.call(context)
     }
 
     /// Validate that the expression is syntactically correct
@@ -316,32 +266,27 @@ impl MathExpression {
         &self.preprocessed
     }
 
-    /// If this expression was JIT-compiled, return the JIT function's variable
-    /// names (in the order required by `call_jit_with_buffer`). Returns `None`
-    /// when JIT compilation fell back to evalexpr.
+    /// The variable names of the compiled function, in the order
+    /// `call_jit_with_buffer` reads them, or `None` when the formula does not
+    /// compile.
     pub fn jit_variable_names(&self) -> Option<&[String]> {
-        match &self.compiled {
-            CompiledExpr::Jit(jit_fn) => Some(jit_fn.variables()),
-            CompiledExpr::Generic(_) => None,
-        }
+        self.jit().ok().map(JITFunction::variables)
     }
 
-    /// Invoke the JIT path with a pre-filled value buffer. The buffer must be
-    /// laid out in the order returned by `jit_variable_names`. Returns `Err`
-    /// when the expression is not JIT-compiled.
+    /// Invoke the compiled function with a pre-filled value buffer, laid out
+    /// in the order of `jit_variable_names`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the formula does not compile or the buffer has
+    /// another length.
     pub fn call_jit_with_buffer(&self, buffer: &[f64]) -> Result<f64, MathExpressionError> {
-        match &self.compiled {
-            CompiledExpr::Jit(jit_fn) => jit_fn.call_with_buffer(buffer),
-            CompiledExpr::Generic(_) => Err(MathExpressionError::InvalidExpression(
-                "expression is not JIT-compiled".to_string(),
-            )),
-        }
+        self.jit()?.call_with_buffer(buffer)
     }
 }
 
 /// Represents different types of rate expressions
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone)]
 pub enum RateMathExpression {
     /// Simple parameter reference (backward compatibility)
     Parameter(String),
@@ -356,8 +301,9 @@ impl RateMathExpression {
     ///
     /// - Numeric values become `Constant`
     /// - Single variable names become `Parameter` (e.g., "k1")
-    /// - Complex expressions become `Formula` (e.g., "k1 * 2")
-    /// - Invalid expressions are treated as `Parameter` for backward compatibility
+    /// - Expressions with an operator or a call become `Formula` (e.g.,
+    ///   "k1 * 2"); one that does not compile keeps the reason
+    ///   ([`Self::compiles`])
     pub fn from_string(s: String) -> Self {
         // First check if it's a numeric constant
         if let Ok(value) = s.parse::<f64>() {
@@ -375,19 +321,23 @@ impl RateMathExpression {
             || s.contains('(')
             || s.contains(')');
 
-        if !has_operators {
-            // Simple identifier - treat as parameter
-            return Self::Parameter(s);
+        if has_operators {
+            Self::Formula(MathExpression::new(s))
+        } else {
+            Self::Parameter(s)
         }
+    }
 
-        // Try to parse as expression - just validate it's parseable
-        // Use turbofish to specify default numeric types
-        if evalexpr::build_operator_tree::<evalexpr::DefaultNumericTypes>(&s).is_ok() {
-            return Self::Formula(MathExpression::new(s));
+    /// Check that a formula compiles; a parameter or a constant always does.
+    ///
+    /// # Errors
+    ///
+    /// Returns the reason when a formula does not compile.
+    pub fn compiles(&self) -> Result<(), MathExpressionError> {
+        match self {
+            Self::Formula(expr) => expr.compiles(),
+            Self::Parameter(_) | Self::Constant(_) => Ok(()),
         }
-
-        // Fallback: treat as parameter for backward compatibility
-        Self::Parameter(s)
     }
 
     /// Evaluate the rate expression
@@ -470,6 +420,44 @@ mod tests {
         let expr = MathExpression::new("exp(x)".to_string());
         let result = expr.evaluate(&mut ctx).unwrap();
         assert!((result - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn an_expression_that_does_not_compile_fails_with_the_reason() {
+        let expr = MathExpression::new("typeof(k1)".to_string());
+        let mut ctx = MathExpressionContext::new();
+        ctx.set_parameter("k1".to_string(), 0.5);
+
+        let reason = expr.compiles().unwrap_err().to_string();
+
+        assert!(
+            reason.contains("'typeof(k1)' does not compile: "),
+            "{reason}"
+        );
+        assert_eq!(expr.evaluate(&mut ctx).unwrap_err().to_string(), reason);
+        assert_eq!(
+            expr.call_jit_with_buffer(&[0.5]).unwrap_err().to_string(),
+            reason
+        );
+        assert_eq!(expr.jit_variable_names(), None);
+        let rate = RateMathExpression::from_string("typeof(k1)".to_string());
+        assert_eq!(rate.compiles().unwrap_err().to_string(), reason);
+        assert!(
+            RateMathExpression::from_string("k1".to_string())
+                .compiles()
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn an_expression_prints_its_formula_and_the_variables_it_reads() {
+        let printed = format!("{:?}", MathExpression::new("k1 * A".to_string()));
+
+        assert!(printed.contains("formula: \"k1 * A\""), "{printed}");
+        assert!(
+            printed.contains("variable_names: [\"k1\", \"A\"]"),
+            "{printed}"
+        );
     }
 
     #[test]

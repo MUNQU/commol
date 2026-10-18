@@ -120,6 +120,26 @@ pub enum InitializationStrategy {
     OppositionBased,
 }
 
+impl InitializationStrategy {
+    /// The strategy of a name: `"uniform"`, `"latin_hypercube"` or
+    /// `"opposition_based"`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that lists the names when `name` is none of them.
+    pub fn from_name(name: &str) -> Result<Self, String> {
+        match name {
+            "uniform" => Ok(Self::UniformRandom),
+            "latin_hypercube" => Ok(Self::LatinHypercube),
+            "opposition_based" => Ok(Self::OppositionBased),
+            _ => Err(format!(
+                "Unknown initialization strategy '{name}'; the strategies are 'uniform', \
+                 'latin_hypercube' and 'opposition_based'"
+            )),
+        }
+    }
+}
+
 /// Mutation strategy for avoiding local optima
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MutationStrategy {
@@ -129,6 +149,23 @@ pub enum MutationStrategy {
     Gaussian(f64),
     /// Cauchy mutation with specified scale parameter
     Cauchy(f64),
+}
+
+impl MutationStrategy {
+    /// The mutation of a name, `"gaussian"` or `"cauchy"`, at `scale`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that lists the names when `name` is none of them.
+    pub fn from_name(name: &str, scale: f64) -> Result<Self, String> {
+        match name {
+            "gaussian" => Ok(Self::Gaussian(scale)),
+            "cauchy" => Ok(Self::Cauchy(scale)),
+            _ => Err(format!(
+                "Unknown mutation strategy '{name}'; the strategies are 'gaussian' and 'cauchy'"
+            )),
+        }
+    }
 }
 
 /// Determines which particles to apply mutation to
@@ -142,6 +179,26 @@ pub enum MutationApplication {
     AllParticles,
     /// Apply mutation only to particles with below-average fitness (balanced approach)
     BelowAverage,
+}
+
+impl MutationApplication {
+    /// The particles of a name: `"global_best"`, `"all_particles"` or
+    /// `"below_average"`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that lists the names when `name` is none of them.
+    pub fn from_name(name: &str) -> Result<Self, String> {
+        match name {
+            "global_best" => Ok(Self::GlobalBestOnly),
+            "all_particles" => Ok(Self::AllParticles),
+            "below_average" => Ok(Self::BelowAverage),
+            _ => Err(format!(
+                "Unknown mutation application '{name}'; the applications are 'global_best', \
+                 'all_particles' and 'below_average'"
+            )),
+        }
+    }
 }
 
 /// Configuration for Particle Swarm Optimization
@@ -694,6 +751,44 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_name_gives_its_strategy_and_an_unknown_name_lists_the_names() {
+        assert!(matches!(
+            InitializationStrategy::from_name("latin_hypercube"),
+            Ok(InitializationStrategy::LatinHypercube)
+        ));
+        assert!(matches!(
+            InitializationStrategy::from_name("opposition_based"),
+            Ok(InitializationStrategy::OppositionBased)
+        ));
+        assert_eq!(
+            MutationStrategy::from_name("cauchy", 0.2),
+            Ok(MutationStrategy::Cauchy(0.2))
+        );
+        assert_eq!(
+            MutationApplication::from_name("below_average"),
+            Ok(MutationApplication::BelowAverage)
+        );
+        let unknown = [
+            InitializationStrategy::from_name("sobol").map(|_| ()),
+            MutationStrategy::from_name("uniform", 0.1).map(|_| ()),
+            MutationApplication::from_name("worst").map(|_| ()),
+        ];
+        assert_eq!(
+            unknown.map(Result::unwrap_err),
+            [
+                "Unknown initialization strategy 'sobol'; the strategies are 'uniform', \
+                 'latin_hypercube' and 'opposition_based'"
+                    .to_string(),
+                "Unknown mutation strategy 'uniform'; the strategies are 'gaussian' and 'cauchy'"
+                    .to_string(),
+                "Unknown mutation application 'worst'; the applications are 'global_best', \
+                 'all_particles' and 'below_average'"
+                    .to_string(),
+            ]
+        );
+    }
 
     #[test]
     fn only_convergence_and_target_cost_count_as_converged() {

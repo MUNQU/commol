@@ -4,23 +4,6 @@ use commol_calibration::CalibrationConstraint;
 use commol_core::MathExpression;
 
 #[test]
-fn a_constraint_without_positions_reads_only_parameters() {
-    let constraint = CalibrationConstraint::new("test".to_string(), "5.0 - k1/k2".to_string());
-    assert!(constraint.is_parameter_only());
-    assert!(!constraint.has_positions());
-}
-
-#[test]
-fn a_constraint_with_positions_reads_the_outputs() {
-    let constraint =
-        CalibrationConstraint::new("at_positions".to_string(), "500.0 - B".to_string())
-            .with_positions(vec![10.0, 20.0, 30.0]);
-
-    assert!(constraint.has_positions());
-    assert!(!constraint.is_parameter_only());
-}
-
-#[test]
 fn test_constraint_compilation() {
     let constraint = CalibrationConstraint::new("ratio".to_string(), "5.0 - k1/k2".to_string());
 

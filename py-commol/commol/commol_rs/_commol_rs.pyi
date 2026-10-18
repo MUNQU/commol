@@ -1,87 +1,20 @@
 from typing import ClassVar, Literal, Protocol
 
-class BinProtocol(Protocol):
-    id: str
-    name: str
-
-class StratificationProtocol(Protocol):
-    id: str
-    categories: list[str]
-
-class StratificationConditionProtocol(Protocol):
-    stratification: str
-    category: str
-
-class StratifiedRateProtocol(Protocol):
-    conditions: list[StratificationConditionProtocol]
-    rate: str
-
-class TransitionProtocol(Protocol):
-    id: str
-    source: list[str]
-    target: list[str]
-    rate: RateMathExpressionProtocol | None
-    stratified_rates: list[StratifiedRateProtocol] | None
-
-class ParameterProtocol(Protocol):
-    id: str
-    value: float
-    description: str | None
-
-class StratificationFractionProtocol(Protocol):
-    category: str
-    fraction: float
-
-class StratificationFractionsProtocol(Protocol):
-    stratification: str
-    fractions: list[StratificationFractionProtocol]
-
-class InitialConditionsProtocol(Protocol):
-    def __init__(
-        self,
-        total: float,
-        bin_fractions: list[tuple[str, float | None]],
-        stratification_fractions: dict[str, dict[str, float]] | None = None,
-        compartment_fractions: list[tuple[str, float]] | None = None,
-    ) -> None: ...
-    total: float
-    bin_fractions: list[tuple[str, float | None]]
-    stratification_fractions: list[tuple[str, list[tuple[str, float]]]]
-    compartment_fractions: list[tuple[str, float]]
-
 class RustProcessProtocol(Protocol):
     """The process of a model: bins, accumulators, stratifications and transitions."""
 
-    def __init__(
-        self,
-        bins: list[BinProtocol],
-        stratifications: list[StratificationProtocol],
-        transitions: list[TransitionProtocol] | None = None,
-        accumulators: list[object] | None = None,
-    ) -> None: ...
     @staticmethod
     def from_json(json_str: str) -> RustProcessProtocol: ...
 
 class RustAggregateProtocol(Protocol):
     """The aggregate structure: amounts per compartment."""
 
-    def __init__(self, initial_conditions: InitialConditionsProtocol) -> None: ...
     @staticmethod
     def from_json(json_str: str) -> RustAggregateProtocol: ...
 
 class RustModelProtocol(Protocol):
     """A model of any kind: its header, process, structure and engine."""
 
-    def __init__(
-        self,
-        name: str,
-        process: RustProcessProtocol,
-        structure: RustAggregateProtocol,
-        parameters: list[ParameterProtocol],
-        engine: str,
-        description: str | None = None,
-        version: str | None = None,
-    ) -> None: ...
     @staticmethod
     def from_json(json_str: str) -> RustModelProtocol: ...
 
@@ -188,8 +121,6 @@ class ObservedDataPointProtocol(Protocol):
         factor_id: str | None = None,
         window: float | None = None,
     ) -> None: ...
-    @property
-    def at(self) -> float: ...
 
 class CalibrationParameterTypeProtocol(Protocol):
     Parameter: ClassVar["CalibrationParameterTypeProtocol"]
@@ -219,20 +150,9 @@ class CalibrationConstraintProtocol(Protocol):
         self,
         id: str,
         expression: str,
-        description: str | None = None,
         weight: float = 1.0,
         at: list[float] | None = None,
     ) -> None: ...
-    @property
-    def id(self) -> str: ...
-    @property
-    def expression(self) -> str: ...
-    @property
-    def description(self) -> str | None: ...
-    @property
-    def weight(self) -> float: ...
-    @property
-    def at(self) -> list[float] | None: ...
 
 class LossConfigProtocol(Protocol):
     @staticmethod
@@ -245,7 +165,6 @@ class LossConfigProtocol(Protocol):
     def with_replicates(
         self, count: int, seed: int, summary: str, quantile: float | None = None
     ) -> LossConfigProtocol: ...
-    def aggregate(self, residuals: list[float], weights: list[float]) -> float: ...
     @property
     def normalize_observations(self) -> bool: ...
 
@@ -675,32 +594,11 @@ class MathExpressionProtocol(Protocol):
     def __init__(self, expression: str) -> None: ...
     def validate(self) -> None: ...
 
-class RateMathExpressionProtocol(Protocol):
-    @staticmethod
-    def from_string_py(s: str) -> RateMathExpressionProtocol: ...
-    @staticmethod
-    def parameter(name: str) -> RateMathExpressionProtocol: ...
-    @staticmethod
-    def formula(formula: str) -> RateMathExpressionProtocol: ...
-    @staticmethod
-    def constant(value: float) -> RateMathExpressionProtocol: ...
-    def py_get_variables(self) -> list[str]: ...
-
 class CoreModule(Protocol):
     Model: type[RustModelProtocol]
     Process: type[RustProcessProtocol]
     Aggregate: type[RustAggregateProtocol]
-    Bin: type[BinProtocol]
-    Stratification: type[StratificationProtocol]
-    StratificationCondition: type[StratificationConditionProtocol]
-    StratifiedRate: type[StratifiedRateProtocol]
-    Transition: type[TransitionProtocol]
-    Parameter: type[ParameterProtocol]
-    InitialConditions: type[InitialConditionsProtocol]
-    StratificationFraction: type[StratificationFractionProtocol]
-    StratificationFractions: type[StratificationFractionsProtocol]
     MathExpression: type[MathExpressionProtocol]
-    RateMathExpression: type[RateMathExpressionProtocol]
 
 class RustCommolModule(Protocol):
     core: CoreModule

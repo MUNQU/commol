@@ -401,7 +401,7 @@ mod tests {
     use super::*;
     use commol_core::{
         Aggregate, Bin, EngineType, InitialConditions, Model, ModelEngine, ModelStructure, Process,
-        RateMathExpression, SimulationEngine, Transition,
+        SimulationEngine, Transition,
     };
 
     /// One difference step is exactly `state + derivatives(n, state)`.
@@ -452,9 +452,7 @@ mod tests {
                     source: vec!["A".to_string()],
                     target: vec!["B".to_string()],
                     accumulators: vec![],
-                    rate: Some(RateMathExpression::from_string(
-                        "if(step - floor(step / 7) * 7 == 0, 0.1, 0)".to_string(),
-                    )),
+                    rate: Some("if(step - floor(step / 7) * 7 == 0, 0.1, 0)".to_string()),
                     stratified_rates: None,
                     per_compartment: None,
                     impulse_at: None,
@@ -501,7 +499,7 @@ mod tests {
                     source: vec!["A".to_string()],
                     target: vec!["B".to_string()],
                     accumulators: vec![],
-                    rate: Some(RateMathExpression::from_string("missing * A".to_string())),
+                    rate: Some("missing * A".to_string()),
                     stratified_rates: None,
                     per_compartment: None,
                     impulse_at: None,
@@ -630,9 +628,7 @@ mod tests {
                         source: vec!["A".to_string()],
                         target: vec!["B".to_string()],
                         accumulators: vec![],
-                        rate: Some(RateMathExpression::from_string(
-                            "k1 * A * B / total".to_string(),
-                        )),
+                        rate: Some("k1 * A * B / total".to_string()),
                         stratified_rates: None,
                         per_compartment: None,
                         impulse_at: None,
@@ -643,7 +639,7 @@ mod tests {
                         source: vec!["B".to_string()],
                         target: vec!["C".to_string()],
                         accumulators: vec![],
-                        rate: Some(RateMathExpression::from_string("k2".to_string())),
+                        rate: Some("k2".to_string()),
                         stratified_rates: None,
                         per_compartment: None,
                         impulse_at: None,
@@ -715,7 +711,7 @@ mod tests {
             source: vec!["A".to_string()],
             target: vec!["B".to_string()],
             accumulators: vec![],
-            rate: Some(RateMathExpression::from_string(rate.to_string())),
+            rate: Some(rate.to_string()),
             stratified_rates: None,
             per_compartment: None,
             impulse_at: None,
@@ -738,7 +734,7 @@ mod tests {
             source: vec![source.to_string()],
             target: vec![target.to_string()],
             accumulators: vec![],
-            rate: Some(RateMathExpression::from_string(rate.to_string())),
+            rate: Some(rate.to_string()),
             stratified_rates: None,
             per_compartment: None,
             impulse_at: (!impulse_at.is_empty()).then(|| impulse_at.to_vec()),

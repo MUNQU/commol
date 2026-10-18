@@ -296,6 +296,26 @@ pub enum ReplicateSummary {
 }
 
 impl ReplicateSummary {
+    /// The summary of a name: `"mean"`, `"median"`, `"crps"`, or
+    /// `"quantile"` with its `level`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that lists the names when `name` is none of them, a
+    /// quantile has no level, or another summary has one.
+    pub fn from_name(name: &str, level: Option<f64>) -> Result<Self, String> {
+        match (name, level) {
+            ("mean", None) => Ok(Self::Mean),
+            ("median", None) => Ok(Self::Median),
+            ("crps", None) => Ok(Self::Crps),
+            ("quantile", Some(level)) => Ok(Self::Quantile(level)),
+            _ => Err(format!(
+                "Unknown replicate summary '{name}' with quantile {level:?}; the summaries are \
+                 'mean', 'median', 'crps' and 'quantile' with a level"
+            )),
+        }
+    }
+
     /// The summary of a set of replicate values, which are reordered.
     ///
     /// # Panics
@@ -496,9 +516,6 @@ pub struct CalibrationConstraint {
     /// - "500.0 - B" (with `at`) → B <= 500 at those positions
     pub expression: String,
 
-    /// Human-readable description (optional, for diagnostics)
-    pub description: Option<String>,
-
     /// Penalty weight multiplier (default 1.0)
     ///
     /// Higher values make this constraint more important relative to others.
@@ -520,16 +537,9 @@ impl CalibrationConstraint {
         Self {
             id,
             expression,
-            description: None,
             weight: 1.0,
             at: None,
         }
-    }
-
-    /// Set the description
-    pub fn with_description(mut self, description: String) -> Self {
-        self.description = Some(description);
-        self
     }
 
     /// Set the weight
@@ -542,16 +552,6 @@ impl CalibrationConstraint {
     pub fn with_positions(mut self, at: Vec<f64>) -> Self {
         self.at = Some(at);
         self
-    }
-
-    /// Check if this is a parameter-only constraint
-    pub fn is_parameter_only(&self) -> bool {
-        self.at.is_none()
-    }
-
-    /// Check if this constraint is evaluated at positions of a run
-    pub fn has_positions(&self) -> bool {
-        self.at.is_some()
     }
 }
 
@@ -731,6 +731,26 @@ mod replicate_tests {
             [(1.0, only.as_mut_slice(), 0.0, 1.0)],
         );
         assert_eq!(unweighted, 0.0);
+    }
+
+    #[test]
+    fn a_summary_is_named_and_only_a_quantile_has_a_level() {
+        assert_eq!(
+            ReplicateSummary::from_name("quantile", Some(0.9)),
+            Ok(ReplicateSummary::Quantile(0.9))
+        );
+        assert_eq!(
+            ReplicateSummary::from_name("crps", None),
+            Ok(ReplicateSummary::Crps)
+        );
+        for (name, level) in [("mean", Some(0.5)), ("quantile", None), ("mode", None)] {
+            assert!(
+                ReplicateSummary::from_name(name, level)
+                    .unwrap_err()
+                    .starts_with(&format!("Unknown replicate summary '{name}'")),
+                "{name}"
+            );
+        }
     }
 
     #[test]

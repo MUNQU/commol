@@ -1,29 +1,7 @@
 //! Helper functions for stratification handling and rate resolution.
 
-use commol_core::{
-    RateMathExpression, Stratification, StratificationCondition, StratifiedRate, Transition,
-};
+use commol_core::{Stratification, StratificationCondition, StratifiedRate, Transition};
 use std::collections::HashMap;
-
-/// Convert a RateMathExpression to its string representation.
-///
-/// This helper extracts the string form of a rate expression, whether it's
-/// a parameter name, formula, or constant value.
-///
-/// # Arguments
-///
-/// * `rate` - The rate expression to convert
-///
-/// # Returns
-///
-/// The string representation of the rate expression.
-pub(crate) fn rate_to_string(rate: &RateMathExpression) -> String {
-    match rate {
-        RateMathExpression::Parameter(param) => param.clone(),
-        RateMathExpression::Formula(formula) => formula.formula.clone(),
-        RateMathExpression::Constant(value) => value.to_string(),
-    }
-}
 
 /// Result of matching a stratified rate for a compartment.
 ///
@@ -56,11 +34,7 @@ pub(crate) fn get_rate_string_for_compartment<'a>(
     // If no stratified rates defined, use default rate
     if transition.stratified_rates.is_none() {
         return transition.rate.as_ref().map(|r| MatchedRate {
-            rate_string: match r {
-                RateMathExpression::Parameter(p) => p.clone(),
-                RateMathExpression::Formula(f) => f.formula.clone(),
-                RateMathExpression::Constant(c) => c.to_string(),
-            },
+            rate_string: r.clone(),
             stratified_rate: None,
         });
     }
@@ -111,7 +85,7 @@ pub(crate) fn get_rate_string_for_compartment<'a>(
 
     // Fall back to default rate
     transition.rate.as_ref().map(|r| MatchedRate {
-        rate_string: rate_to_string(r),
+        rate_string: r.clone(),
         stratified_rate: None,
     })
 }
