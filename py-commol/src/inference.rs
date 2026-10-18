@@ -486,11 +486,11 @@ impl PyCalibrationProblem {
             BlockDrawing::NonOverlapping,
         )?;
         let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
-        if scheme.len() < 2 {
+        if scheme.count() < 2 {
             return Err(value_error(format!(
                 "block_length {} makes {} block; a jackknife needs at least two",
                 scheme.length(),
-                scheme.len()
+                scheme.count()
             )));
         }
         let jackknife = py

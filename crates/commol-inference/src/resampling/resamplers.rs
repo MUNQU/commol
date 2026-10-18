@@ -40,7 +40,7 @@ impl BayesianBootstrap {
         Self {
             weights: observations.iter().map(|obs| obs.weight).collect(),
             block_of: blocks.block_of(),
-            blocks: blocks.len(),
+            blocks: blocks.count(),
         }
     }
 }
@@ -166,7 +166,7 @@ impl WildBootstrap {
         Self {
             residuals,
             block_of: scheme.block_of(),
-            blocks: scheme.len(),
+            blocks: scheme.count(),
             multipliers,
         }
     }

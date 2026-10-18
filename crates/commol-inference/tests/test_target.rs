@@ -44,3 +44,29 @@ fn the_discrepancy_is_read_inside_the_support_only() {
     assert_eq!(at(0.7), None, "k = 0.7 breaks the constraint");
     assert_eq!(at(1.5), None, "k = 1.5 is outside the bounds");
 }
+
+#[test]
+fn a_run_that_fails_is_an_error_not_a_point_outside_the_support() {
+    let mut model: Model = serde_json::from_str(
+        r#"{"name":"m","parameters":[{"id":"k","value":0.1},{"id":"z","value":null}],
+        "engine":{"type":"DifferenceEquations"},
+        "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
+        "accumulators":[],"stratifications":[],
+        "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"k * z"}]},
+        "structure":{"kind":"aggregate","total":1000,"bin_fractions":{"A":1.0,"B":0.0}}}"#,
+    )
+    .expect("valid model JSON");
+    model.process.transitions[0].stratified_rates = None;
+    let problem = CalibrationProblem::new(
+        DifferenceEquations::try_from_model(&model).unwrap(),
+        vec![ObservedDataPoint::new(2.0, "A".to_string(), 600.0)],
+        vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .unwrap();
+
+    let error = discrepancy_in_support(&problem, &[0.2], &mut Workspace::default()).unwrap_err();
+
+    assert!(error.contains("not found"), "{error}");
+}

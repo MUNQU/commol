@@ -375,3 +375,57 @@ fn a_zero_series_has_scale_one() {
 
     assert_eq!(observation_scales(&observed_data), [rms, rms, 1.0, 1.0]);
 }
+
+#[test]
+fn a_parameter_of_no_width_has_a_zero_column() {
+    let problem = problem(
+        difference(&[]),
+        vec![ObservedDataPoint::new(1.0, "A".to_string(), 0.0)],
+        vec![CalibrationParameter::new("k".to_string(), 0.2, 0.2)],
+    );
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+
+    let sensitivities = source.jacobian(&[0.2]).unwrap();
+
+    assert_eq!(sensitivities.jacobian[(0, 0)], 0.0);
+}
+
+#[test]
+fn a_center_that_cannot_be_run_says_why() {
+    let observed = vec![ObservedDataPoint::new(1.0, "A".to_string(), 0.0)];
+    let jacobian = |model: Model, parameter: CalibrationParameter, at: f64| {
+        let engine = DifferenceEquations::try_from_model(&model).unwrap();
+        let problem = problem(engine, observed.clone(), vec![parameter]);
+        FiniteDifferences::new(&problem, Design::Observations)
+            .unwrap()
+            .jacobian(&[at])
+            .unwrap_err()
+    };
+    let mut not_a_number = decay("DifferenceEquations", "", &[]);
+    not_a_number.process.transitions[0].rate = Some("k * sqrt(k - 1)".to_string());
+    let mut without_z = decay("DifferenceEquations", "", &["z"]);
+    without_z.process.transitions[0].rate = Some("k * z".to_string());
+    without_z.parameters[1].value = None;
+    let start = CalibrationParameter::with_type(
+        "A".to_string(),
+        CalibrationParameterType::InitialCondition,
+        0.0,
+        2.0,
+    );
+
+    let k = || CalibrationParameter::new("k".to_string(), 0.0, 1.0);
+    assert_eq!(
+        jacobian(not_a_number, k(), 0.5),
+        SensitivityError::InfeasiblePoint("a value of the run is not finite".to_string())
+    );
+    assert!(
+        matches!(jacobian(without_z, k(), 0.5), SensitivityError::Failed(message)
+            if message.contains("not found")),
+    );
+    assert_eq!(
+        jacobian(decay("DifferenceEquations", "", &[]), start, 1.5),
+        SensitivityError::InfeasiblePoint(
+            "the starting state is infeasible (excess 0.5)".to_string()
+        )
+    );
+}

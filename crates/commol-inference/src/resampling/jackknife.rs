@@ -108,11 +108,11 @@ pub fn block_jackknife<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
-    if scheme.len() < 2 {
+    if scheme.count() < 2 {
         return Err(format!(
             "block_length {} makes {} block; a jackknife needs at least two",
             scheme.length(),
-            scheme.len()
+            scheme.count()
         ));
     }
     let problem = runner.problem();

@@ -79,13 +79,8 @@ impl BlockScheme {
     }
 
     /// The number of blocks.
-    pub fn len(&self) -> usize {
+    pub fn count(&self) -> usize {
         self.blocks.len()
-    }
-
-    /// Whether there are no blocks; never true for a built scheme.
-    pub fn is_empty(&self) -> bool {
-        self.blocks.is_empty()
     }
 }
 
@@ -180,15 +175,8 @@ pub fn automatic_length(series: &[f64], drawing: BlockDrawing) -> f64 {
         Some(m) => (2 * m.max(1)).min(max_bandwidth),
         None => max_bandwidth,
     };
-    let kernel = |t: f64| {
-        if t <= 0.5 {
-            1.0
-        } else if t <= 1.0 {
-            2.0 * (1.0 - t)
-        } else {
-            0.0
-        }
-    };
+    // The flat-top kernel on `[0, 1]`, the lags up to the bandwidth.
+    let kernel = |t: f64| if t <= 0.5 { 1.0 } else { 2.0 * (1.0 - t) };
     let mut g = 0.0;
     let mut spectral = autocovariance[0];
     for (lag, &value) in autocovariance
@@ -261,6 +249,32 @@ pub fn automatic_block_length(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_series_of_no_dependence_at_the_first_lags_has_blocks_of_one() {
+        // ±1 six positions apart, of mean 0: every lag up to 5 is exactly 0.
+        let series: Vec<f64> = (0..60)
+            .map(|i| match (i % 6, (i / 6) % 2) {
+                (0, 0) => 1.0,
+                (0, _) => -1.0,
+                _ => 0.0,
+            })
+            .collect();
+
+        assert_eq!(automatic_length(&series, BlockDrawing::Moving), 1.0);
+    }
+
+    #[test]
+    fn a_trend_that_never_quiets_takes_the_widest_bandwidth_within_the_caps() {
+        let series: Vec<f64> = (0..50).map(f64::from).collect();
+
+        let length = automatic_length(&series, BlockDrawing::Stationary);
+
+        assert!(
+            length > 1.0 && length <= (3.0 * 50f64.sqrt()).min(50.0 / 3.0),
+            "{length}"
+        );
+    }
 
     fn observed(positions: &[f64], label: &str) -> Vec<ObservedDataPoint> {
         positions

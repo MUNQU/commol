@@ -173,6 +173,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_stochastic_engine_has_no_derivatives() {
+        assert_eq!(
+            SensitivityError::Stochastic.to_string(),
+            "Derivatives need a deterministic engine: the runs of a stochastic engine change \
+             in jumps with its parameters"
+        );
+    }
+
+    #[test]
     fn scaling_multiplies_by_the_magnitude_and_divides_by_the_scale() {
         let jacobian = Matrix::from_row_slice(2, 2, &[1.0, 2.0, 3.0, 4.0]);
         let sensitivities = Sensitivities {
