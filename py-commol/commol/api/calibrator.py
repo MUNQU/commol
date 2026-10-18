@@ -348,14 +348,12 @@ class Calibrator:
         self, param_type: str
     ) -> "CalibrationParameterTypeProtocol":
         """Convert Python CalibrationParameterType to Rust type."""
-        if param_type == CalibrationParameterType.PARAMETER:
-            return rust_calibration.CalibrationParameterType.Parameter
-        elif param_type == CalibrationParameterType.INITIAL_CONDITION:
-            return rust_calibration.CalibrationParameterType.InitialCondition
-        elif param_type == CalibrationParameterType.FACTOR:
-            return rust_calibration.CalibrationParameterType.Factor
-        else:
-            raise ValueError(f"Unknown parameter type: {param_type}")
+        rust_types = rust_calibration.CalibrationParameterType
+        return {
+            CalibrationParameterType.PARAMETER: rust_types.Parameter,
+            CalibrationParameterType.INITIAL_CONDITION: rust_types.InitialCondition,
+            CalibrationParameterType.FACTOR: rust_types.Factor,
+        }[CalibrationParameterType(param_type)]
 
     def _build_loss_config(self) -> "LossConfigProtocol":
         """The Rust loss, with the replicates of a stochastic engine."""
@@ -381,13 +379,7 @@ class Calibrator:
             )
             return rust_calibration.OptimizationConfig.nelder_mead(nm_config)
 
-        elif isinstance(opt_config, ParticleSwarmConfig):
-            return self._build_pso_config(opt_config)
-
-        else:
-            raise ValueError(
-                f"Unsupported optimization config type: {type(opt_config).__name__}"
-            )
+        return self._build_pso_config(opt_config)
 
     def _build_pso_config(
         self, opt_config: ParticleSwarmConfig
@@ -437,11 +429,9 @@ class Calibrator:
             return None
         if isinstance(inertia, PSOConstantInertia):
             return rust_calibration.PSOInertiaConstant(factor=inertia.factor)
-        if isinstance(inertia, PSOChaoticInertia):
-            return rust_calibration.PSOInertiaChaotic(
-                w_min=inertia.w_min, w_max=inertia.w_max
-            )
-        return None
+        return rust_calibration.PSOInertiaChaotic(
+            w_min=inertia.w_min, w_max=inertia.w_max
+        )
 
     def _build_rust_acceleration(
         self, acceleration: PSOConstantAcceleration | PSOTimeVaryingAcceleration | None
@@ -454,14 +444,12 @@ class Calibrator:
                 cognitive=acceleration.cognitive,
                 social=acceleration.social,
             )
-        if isinstance(acceleration, PSOTimeVaryingAcceleration):
-            return rust_calibration.PSOAccelerationTimeVarying(
-                c1_initial=acceleration.c1_initial,
-                c1_final=acceleration.c1_final,
-                c2_initial=acceleration.c2_initial,
-                c2_final=acceleration.c2_final,
-            )
-        return None
+        return rust_calibration.PSOAccelerationTimeVarying(
+            c1_initial=acceleration.c1_initial,
+            c1_final=acceleration.c1_final,
+            c2_initial=acceleration.c2_initial,
+            c2_final=acceleration.c2_final,
+        )
 
     @property
     def num_parameters(self) -> int:
@@ -557,9 +545,6 @@ class Calibrator:
 
     def _warn_constraint_positions_beyond_observations(self) -> None:
         """Warn when constraints at positions extend beyond observed data."""
-        if not self.problem.observed_data:
-            return
-
         max_observed_position = max(obs.at for obs in self.problem.observed_data)
         for constraint in self.problem.constraints:
             if constraint.at and max(constraint.at) > max_observed_position:

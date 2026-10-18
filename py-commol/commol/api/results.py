@@ -250,8 +250,6 @@ class SimulationReplicates(list[SimulationResults]):
         return [run.seed for run in self if run.seed is not None]
 
     def _values(self, name: str) -> np.ndarray:
-        if not self:
-            raise ValueError("There are no replicates.")
         return np.asarray([run[name] for run in self], dtype=float)
 
     def mean(self) -> SimulationResults:

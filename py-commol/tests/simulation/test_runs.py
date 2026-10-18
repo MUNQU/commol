@@ -11,6 +11,7 @@ from commol import (
     NelderMeadConfig,
     ObservedDataPoint,
     Simulation,
+    SimulationResults,
 )
 from commol.context.model import Model
 from tests.support import (
@@ -66,6 +67,10 @@ class TestResults:
         assert repr(drawn).startswith(
             "SimulationResults(positions=[0.0, 1.0], seed=3, {'A': [990.0, "
         )
+
+    def test_results_have_one_value_per_position(self) -> None:
+        with pytest.raises(ValueError, match="'A' has 1 values for 2 positions"):
+            SimulationResults([0.0, 1.0], {"A": [1.0]})
 
     def test_results_map_each_output_to_its_values(self) -> None:
         result = Simulation(_proportional_abc()).run(10)

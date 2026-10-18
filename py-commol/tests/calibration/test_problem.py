@@ -4,8 +4,12 @@ import math
 
 import pytest
 
+from pydantic import ValidationError
+
 from commol import (
+    CalibrationParameter,
     CalibrationProblem,
+    CalibrationResult,
     Calibrator,
     NelderMeadConfig,
     ObservedDataPoint,
@@ -95,3 +99,114 @@ class TestWorkflow:
             {"k1": 0.1, "k2": 0.05}, abs=1e-5
         )
         assert rerun["B"] == pytest.approx(truth["B"], rel=1e-3)
+
+
+class TestValidation:
+    @pytest.mark.parametrize(
+        ("bounds", "message"),
+        [
+            ({"min_bound": 1.0, "max_bound": 1.0}, "max_bound .* greater than"),
+            (
+                {"min_bound": 0.0, "max_bound": 1.0, "initial_guess": 2.0},
+                "initial_guess .* between",
+            ),
+        ],
+    )
+    def test_a_parameter_needs_an_interval_that_holds_its_guess(
+        self, bounds: dict[str, float], message: str
+    ) -> None:
+        with pytest.raises(ValidationError, match=message):
+            CalibrationParameter(id="k1", parameter_type="parameter", **bounds)
+
+    def test_a_parameter_type_is_one_of_the_known_ones(self) -> None:
+        with pytest.raises(ValidationError, match="Invalid parameter_type: rate"):
+            CalibrationParameter(
+                id="k1", parameter_type="rate", min_bound=0.0, max_bound=1.0
+            )
+
+    def test_a_loss_function_is_one_of_the_known_ones(self) -> None:
+        with pytest.raises(ValidationError, match="Invalid loss_function: mse"):
+            CalibrationProblem(
+                observed_data=[ObservedDataPoint(at=0, output="B", value=1.0)],
+                parameters=[bounded("k1")],
+                loss_function="mse",
+                optimization_config=NelderMeadConfig(max_iterations=1),
+            )
+
+    def test_a_parameter_is_fitted_once(self) -> None:
+        with pytest.raises(ValidationError, match=r"Duplicate parameter IDs.*'k1'"):
+            CalibrationProblem(
+                observed_data=[ObservedDataPoint(at=0, output="B", value=1.0)],
+                parameters=[bounded("k1"), bounded("k1")],
+                loss_function="sse",
+                optimization_config=NelderMeadConfig(max_iterations=1),
+            )
+
+
+class TestResult:
+    def test_a_result_prints_its_outcome(self) -> None:
+        result = CalibrationResult(
+            best_parameters={"k1": 0.1},
+            final_loss=0.25,
+            iterations=12,
+            converged=True,
+            termination_reason="tolerance",
+        )
+
+        assert str(result) == (
+            "CalibrationResult(\n"
+            "  converged=True,\n"
+            "  final_loss=0.250000,\n"
+            "  iterations=12,\n"
+            "  best_parameters={'k1': 0.1},\n"
+            "  termination_reason='tolerance',\n"
+            "  starts=0,\n"
+            "  failed_runs=0\n"
+            ")"
+        )
+
+
+class TestProblemAgainstTheModel:
+    @staticmethod
+    def _calibrator(
+        truth: Model,
+        parameters: list[CalibrationParameter],
+        observed_data: list[ObservedDataPoint] | None = None,
+    ) -> Calibrator:
+        problem = CalibrationProblem(
+            observed_data=observed_data
+            or [ObservedDataPoint(at=0, output="B", value=1.0)],
+            parameters=parameters,
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=1),
+        )
+        return Calibrator(Simulation(truth), problem)
+
+    def test_a_calibrator_states_the_size_of_its_problem(self, truth: Model) -> None:
+        observations = [
+            ObservedDataPoint(at=at, output="B", value=1.0) for at in (0, 5, 10)
+        ]
+
+        calibrator = self._calibrator(
+            truth, [bounded("k1"), bounded("k2")], observations
+        )
+
+        assert calibrator.num_parameters == 2
+        assert calibrator.num_observations == 3
+        assert calibrator.parameter_names == ["k1", "k2"]
+
+    def test_a_parameter_is_one_of_the_model(self, truth: Model) -> None:
+        with pytest.raises(ValueError, match=r"'k9' not found .*\['k1', 'k2'\]"):
+            self._calibrator(truth, [bounded("k9")])
+
+    def test_a_factor_has_positive_bounds(self, truth: Model) -> None:
+        with pytest.raises(ValueError, match="'f' must have positive bounds"):
+            self._calibrator(truth, [bounded("f", 0.0, 1.0, kind="factor")])
+
+    def test_an_observation_is_of_an_output_of_the_model(self, truth: Model) -> None:
+        with pytest.raises(ValueError, match=r"\['D'\] for observation 'D' not found"):
+            self._calibrator(
+                truth,
+                [bounded("k1")],
+                [ObservedDataPoint(at=0, output="D", value=1.0)],
+            )

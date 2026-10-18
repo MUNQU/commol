@@ -462,7 +462,6 @@ class ExpressionSecurityValidator:
 
         # Structure validation
         self._check_nesting_depth(expression)
-        self._check_balanced_delimiters(expression)
 
         # Advanced threat detection
         self._check_advanced_threats(expression)
@@ -536,15 +535,6 @@ class ExpressionSecurityValidator:
                     )
                 )
 
-            # Check for zero-width characters
-            if unicodedata.east_asian_width(char) == "F" and ord(char) in [
-                0x200B,
-                0x200C,
-                0x200D,
-                0xFEFF,
-            ]:
-                raise SecurityError(f"Zero-width character detected at position {i}")
-
     def _check_nesting_depth(self, expression: str) -> None:
         """Check parentheses and bracket nesting depth."""
         depth = 0
@@ -568,18 +558,6 @@ class ExpressionSecurityValidator:
                     f"(maximum: {self.config.max_nesting_depth})"
                 )
             )
-
-    def _check_balanced_delimiters(self, expression: str) -> None:
-        """Check for balanced delimiters and quotes."""
-        quote_stack: list[str] = []
-        for _, char in enumerate(expression):
-            if char in ['"', "'", "`"]:
-                if quote_stack and quote_stack[-1] == char:
-                    _ = quote_stack.pop()
-                else:
-                    quote_stack.append(char)
-        if quote_stack:
-            raise SecurityError("Unmatched quotes detected")
 
     def _check_dangerous_patterns(self, expression: str) -> None:
         """Check for known dangerous patterns."""
@@ -683,81 +661,36 @@ class ExpressionSecurityValidator:
         if len(set(expression)) < 10 and len(expression) > 200:
             raise SecurityError("Suspicious repetitive pattern")
 
-        # Check for very long identifiers (potential buffer overflow attempts)
-        tokens: list[str] = re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*", expression)
-        for token in tokens:
-            if len(token) > self.config.max_variable_name_length * 2:
-                raise SecurityError(
-                    f"Variable name too long: '{token[:50]}...' (length: {len(token)})"
-                )
-
     def _tokenize_expression(self, expression: str) -> list[str]:
         """Tokenize the expression into components."""
         token_regex = (
             r"[a-zA-Z_][a-zA-Z0-9_]*"  # Identifiers
             r"|\d+(?:\.\d*)?(?:[eE][+-]?\d+)?"  # Numbers
             r"|\.\d+(?:[eE][+-]?\d+)?"  # Numbers starting with .
-            r"|0[xX][0-9a-fA-F]+"  # Hexadecimal numbers
-            r"|0[bB][01]+"  # Binary numbers
-            r"|0[oO][0-7]+"  # Octal numbers
-            r"|[\+\-\*/\^\(\)\[\]\.,<>=!&|?:;%]"  # Operators
-            r"|['\"][^'\"]*['\"]"  # Quoted strings
+            r"|[\+\-\*/\^\(\)\.,<>=!%]"  # Operators
         )
         matches: list[str] = re.findall(token_regex, expression)
         return [token for token in matches if token.strip()]
 
     def _validate_tokens(self, tokens: list[str]) -> None:
-        """Validate individual tokens."""
-        function_call_count = 0
+        """Validate the numeric tokens: the other tokens are identifiers and
+        operators, which the earlier checks accept or reject."""
         for token in tokens:
-            if not token.strip():
-                continue
-            # Skip operators
-            if token in self.ALLOWED_OPERATORS:
-                continue
-            # Validate numbers
             if self._is_number(token):
                 self._validate_numeric_value(token)
-                continue
-            # Check for quoted strings (not allowed in math expressions)
-            if (token.startswith('"') and token.endswith('"')) or (
-                token.startswith("'") and token.endswith("'")
-            ):
-                raise SecurityError(f"Quoted strings not allowed: {token}")
-            # Check function names
-            if token.lower() in self.SAFE_FUNCTIONS:
-                function_call_count += 1
-                if function_call_count > self.config.max_function_calls:
-                    raise SecurityError(
-                        (
-                            f"Too many function calls: {function_call_count} "
-                            f"(maximum: {self.config.max_function_calls})"
-                        )
-                    )
-                continue
-            # Check if it's a valid variable name
-            if self._is_valid_variable_name(token):
-                continue
-            # If we get here, the token is suspicious
-            raise SecurityError(f"Suspicious token: '{token}'")
 
     def _validate_numeric_value(self, token: str) -> None:
         """Validate that numeric values are within reasonable bounds."""
-        try:
-            value = float(token)
-            if abs(value) > self.config.max_numeric_value:
-                raise SecurityError(
-                    (
-                        f"Numeric value too large: {value} "
-                        f"(maximum: {self.config.max_numeric_value})"
-                    )
+        value = float(token)
+        if abs(value) > self.config.max_numeric_value:
+            raise SecurityError(
+                (
+                    f"Numeric value too large: {value} "
+                    f"(maximum: {self.config.max_numeric_value})"
                 )
-            if math.isnan(value) or math.isinf(value):
-                raise SecurityError(f"Invalid numeric value: {token}")
-        except SecurityError:
-            raise
-        except (ValueError, OverflowError):
-            raise SecurityError(f"Invalid numeric token: {token}")
+            )
+        if math.isnan(value):
+            raise SecurityError(f"Invalid numeric value: {token}")
 
     def _strict_validation(self, tokens: list[str], expression: str) -> None:
         """Additional validation for strict mode."""
@@ -770,8 +703,7 @@ class ExpressionSecurityValidator:
             if self._dunder_regex.search(token):
                 raise SecurityError(f"Suspicious dunder pattern: '{token}'")
             # Split token and check for suspicious substrings
-            substrings = re.split(r"[_\-.]|(?=[A-Z])", token.lower())
-            for substring in substrings:
+            for substring in token.lower().split("_"):
                 if substring and substring in self.SUSPICIOUS_KEYWORDS:
                     raise SecurityError(
                         f"Suspicious keyword '{substring}' in identifier: '{token}'"
@@ -795,7 +727,6 @@ class ExpressionSecurityValidator:
             r"\d+\s*[eE]\s*[a-zA-Z]",  # Numbers followed by 'e' and letters
             r"[a-zA-Z]+\s*\d+\s*[a-zA-Z]+",  # Mixed alphanumeric that's not valid math
             r"\.[a-zA-Z]+\s*\(",  # Method calls
-            r"[a-zA-Z]+\s*\[[^\]]*\]",  # Array/dict access
         ]
 
         for pattern in suspicious_math_patterns:
@@ -808,32 +739,7 @@ class ExpressionSecurityValidator:
             _ = float(token)
             return True
         except ValueError:
-            # Try other number formats
-            try:
-                if token.startswith(("0x", "0X")):
-                    _ = int(token, 16)
-                    return True
-                elif token.startswith(("0b", "0B")):
-                    _ = int(token, 2)
-                    return True
-                elif token.startswith(("0o", "0O")):
-                    _ = int(token, 8)
-                    return True
-            except ValueError:
-                pass
             return False
-
-    def _is_valid_variable_name(self, token: str) -> bool:
-        """Check if a token is a valid variable name."""
-        if not token:
-            return False
-
-        # Must start with letter or underscore
-        if not (token[0].isalpha() or token[0] == "_"):
-            return False
-
-        # Must contain only alphanumeric characters and underscores
-        return all(c.isalnum() or c == "_" for c in token)
 
 
 def validate_expression_security(

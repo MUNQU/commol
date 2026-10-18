@@ -172,6 +172,14 @@ class TestPositionsAndEngines:
         with pytest.raises(ValidationError, match="exactly one"):
             ObservedDataPoint(at=3, output="B", outputs=["C"], label="x", value=1.0)
 
+    def test_a_sum_needs_an_output(self) -> None:
+        with pytest.raises(ValidationError, match="outputs must be non-empty"):
+            ObservedDataPoint(at=3, outputs=[], label="x", value=1.0)
+
+    def test_a_window_does_not_start_before_zero(self) -> None:
+        with pytest.raises(ValidationError, match=r"window \(4.0\) must be <= at"):
+            ObservedDataPoint(at=3, output="B", window=4, value=1.0)
+
     def test_a_difference_model_rejects_a_non_integer_observation(self) -> None:
         problem = CalibrationProblem(
             observed_data=[ObservedDataPoint(at=2.5, output="A", value=1.0)],

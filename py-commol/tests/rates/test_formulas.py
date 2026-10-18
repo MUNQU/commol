@@ -384,6 +384,10 @@ class TestInvalidFormulas:
                 )
             )
 
+    def test_a_rate_that_does_not_parse_names_itself(self) -> None:
+        with pytest.raises(ValueError, match=r"Validation failed for rate 'k1 \+\* 2'"):
+            abc_builder(parameters={"k1": 0.1, "k2": 0.05}, ab="k1 +* 2")
+
     def test_an_undefined_parameter_is_rejected_at_build(self) -> None:
         builder = abc_builder(
             parameters={"k1": 0.1},

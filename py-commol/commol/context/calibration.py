@@ -552,7 +552,7 @@ class PSOMutationConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    strategy: str = Field(
+    strategy: PSOMutationStrategy = Field(
         default=...,
         description='Mutation strategy: "gaussian" or "cauchy"',
     )
@@ -565,29 +565,10 @@ class PSOMutationConfig(BaseModel):
         le=1.0,
         description="Mutation probability per iteration (0.0-1.0)",
     )
-    application: str = Field(
+    application: PSOMutationApplication = Field(
         default=...,
         description='Application: "global_best", "all_particles", or "below_average"',
     )
-
-    @field_validator("strategy")
-    @classmethod
-    def validate_strategy(cls, v: str) -> str:
-        if v not in PSOMutationStrategy:
-            raise ValueError(
-                f"Invalid strategy: {v}. Must be one of {list(PSOMutationStrategy)}"
-            )
-        return v
-
-    @field_validator("application")
-    @classmethod
-    def validate_application(cls, v: str) -> str:
-        if v not in PSOMutationApplication:
-            raise ValueError(
-                f"Invalid application: {v}. "
-                f"Must be one of {list(PSOMutationApplication)}"
-            )
-        return v
 
 
 class PSOVelocityConfig(BaseModel):
@@ -856,10 +837,10 @@ class ParticleSwarmConfig(BaseModel):
             )
 
         self._mutation = PSOMutationConfig(
-            strategy=strategy,
+            strategy=PSOMutationStrategy(strategy),
             scale=scale,
             probability=probability,
-            application=application,
+            application=PSOMutationApplication(application),
         )
         return self
 
