@@ -214,3 +214,19 @@ def test_a_step_of_the_engine_continues_the_run(ode: bool) -> None:
     assert simulation.engine.state == pytest.approx(
         [two_steps[name][2] for name in ("A", "B", "C")], rel=1e-6
     )
+
+
+@pytest.mark.parametrize(
+    ("ode", "position"),
+    [(False, "2"), (True, r"1\.5\d*")],
+    ids=["difference", "differential"],
+)
+def test_a_rate_that_is_not_a_number_stops_the_run(ode: bool, position: str) -> None:
+    builder = a_to_b_builder(rate="k * sqrt(1.5 - t)")
+    simulation = Simulation(build_ode(builder) if ode else build(builder))
+
+    with pytest.raises(
+        RuntimeError,
+        match=f"The rate of flow 't_ab' at {position} is not a number",
+    ):
+        simulation.run(3)

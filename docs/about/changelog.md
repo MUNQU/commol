@@ -149,6 +149,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `InfeasibleStateError` and said that a rate cannot be negative; it now raises
   `RuntimeError`, as `StochasticEvents` does, and says that the rate is not a
   number.
+- A rate that is not a number gave amounts that are not numbers in
+  `DifferenceEquations` and `DifferentialEquations`, and a calibration only
+  penalized the run; the run now stops with `RuntimeError` that names the flow
+  and the position, as in the stochastic engines.
 
 ### Removed
 

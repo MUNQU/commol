@@ -113,7 +113,11 @@ impl CompiledModel {
     /// # Errors
     ///
     /// Returns a message when a formula parameter or a rate cannot be
-    /// evaluated, for example because a variable is missing.
+    /// evaluated, for example because a variable is missing, and a message
+    /// that names the flow and `t` when a flow is not a number while every
+    /// compartment of `state` is one. A compartment that is not a number
+    /// gives flows that are not numbers without an error: `diffsol` finds
+    /// the sparse pattern of the Jacobian that way.
     pub fn derivatives(
         &mut self,
         step: f64,
@@ -122,7 +126,9 @@ impl CompiledModel {
         out: &mut [f64],
     ) -> Result<(), String> {
         let mut flows = std::mem::take(&mut self.flow_buffer);
-        let result = self.flow_rates(step, t, state, &mut flows);
+        let result = self
+            .flow_rates(step, t, state, &mut flows)
+            .and_then(|()| self.check_flows(t, state, &flows));
         if result.is_ok() {
             out.fill(0.0);
             for (change, &flow) in self.flow_changes.iter().zip(&flows) {
@@ -131,6 +137,25 @@ impl CompiledModel {
         }
         self.flow_buffer = flows;
         result
+    }
+
+    /// Returns a message that names the first flow of `flows` that is not a
+    /// number when every compartment of `state` is one: its rate at `t` is
+    /// then not a number.
+    fn check_flows(&self, t: f64, state: &[f64], flows: &[f64]) -> Result<(), String> {
+        let Some(flow) = flows.iter().position(|flow| flow.is_nan()) else {
+            return Ok(());
+        };
+        if state[..self.compartments.len()]
+            .iter()
+            .any(|amount| amount.is_nan())
+        {
+            return Ok(());
+        }
+        Err(format!(
+            "The rate of flow '{}' at {t} is not a number",
+            self.flow_changes[flow].transition_id
+        ))
     }
 
     /// The value of each flow of the model: the term

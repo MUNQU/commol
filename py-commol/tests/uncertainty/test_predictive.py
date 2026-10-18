@@ -37,11 +37,11 @@ def _sample(values: list[list[float]], weights: list[float] | None = None):
 
 class TestBands:
     @pytest.mark.parametrize(
-        ("rate", "value", "error", "message"),
+        ("inflow", "value", "error", "message"),
         [
-            ("k", 1.5, InfeasibleStateError, "Parameter set 0 is not feasible"),
+            ("0", 1.5, InfeasibleStateError, "Parameter set 0 is not feasible"),
             (
-                "k * sqrt(k - 0.6)",
+                "exp(10000 * k)",
                 0.5,
                 ValueError,
                 "Parameter set 0 gives a value that is not finite",
@@ -50,9 +50,12 @@ class TestBands:
         ids=["infeasible", "not finite"],
     )
     def test_a_draw_without_a_run_names_its_set(
-        self, rate: str, value: float, error: type[Exception], message: str
+        self, inflow: str, value: float, error: type[Exception], message: str
     ) -> None:
-        model = build(a_to_b_builder(parameters={"k": None}, rate=rate))
+        builder = a_to_b_builder(parameters={"k": None}).add_transition(
+            id="t_in", source=[], target=["B"], rate=inflow
+        )
+        model = build(builder)
         problem = CalibrationProblem(
             observed_data=[ObservedDataPoint(at=1, output="A", value=900.0)],
             parameters=[bounded("k", 0.0, 2.0)],

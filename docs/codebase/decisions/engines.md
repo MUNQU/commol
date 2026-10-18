@@ -65,7 +65,18 @@ ones, which gives the main test oracle. The positions where a rate can jump
 come from the same model (`CompiledModel::breakpoints`), so the differential
 and the continuous-time stochastic engines stop at the same positions.
 
-**Guards:** `crates/commol-model/tests/flows.rs`,
+A rate that is not a number stops the run in every engine, with a
+`RuntimeError` that names the flow and the position: a calibration fails with
+the cause instead of a penalty for a run of NaN. `derivatives` checks the flows
+of both deterministic engines (`check_flows`); each stochastic engine checks
+its own rates. A flow that is not a number is not an error when a compartment
+of the state is not a number, because `diffsol` finds the sparse pattern of the
+Jacobian by passing NaN through `J·v` ([The solver is `diffsol`](#the-solver-is-diffsol)).
+
+**Guards:** `crates/commol-model/tests/flows.rs`
+(`a_rate_that_is_not_a_number_names_its_flow_and_its_position`,
+`a_compartment_that_is_not_a_number_gives_flows_that_are_not_numbers`),
+`tests/simulation/test_runs.py::test_a_rate_that_is_not_a_number_stops_the_run`,
 `crates/commol-difference/src/simulation.rs::one_step_adds_the_derivatives_exactly`,
 `crates/commol-stochastic/tests/oracles.rs`
 (`the_mean_of_many_runs_is_the_solution_of_the_ode`,

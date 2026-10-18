@@ -46,7 +46,7 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | Member | Returns | What it does |
 |---|---|---|
 | `Simulation(model)` | — | Builds the engine for the model. A model with uncalibrated parameters can be built, but not run. |
-| `run(num_steps, *, seed=None)` | `SimulationResults` | Runs from the initial state, with the model as it is now, and reports at the positions `0, 1, …, num_steps`. Raises `ValueError` if a parameter is still `None`, and `InfeasibleStateError` if a difference step leaves an amount below zero ([Amounts below zero](transitions.md#amounts-below-zero)). |
+| `run(num_steps, *, seed=None)` | `SimulationResults` | Runs from the initial state, with the model as it is now, and reports at the positions `0, 1, …, num_steps`. Raises `ValueError` if a parameter is still `None`, `InfeasibleStateError` if a difference step leaves an amount below zero ([Amounts below zero](transitions.md#amounts-below-zero)), and `RuntimeError` that names the flow and the position if a rate is not a number. |
 | `run_at(at, *, seed=None)` | `SimulationResults` | Runs from the initial state and reports at the given sorted positions only. The engine decides which positions its model type accepts: a `DifferentialEquations` model any non-negative position, such as `0.5`; a `DifferenceEquations` model only integer steps. Otherwise `ValueError`, with the engine's message. See [Differential equations](#differential-equations). |
 | `replicates(n, *, seed=None)` | `ReplicateRuns` | For a stochastic engine: an object whose `run` and `run_at` return `SimulationReplicates`, `n` runs with one seed each. See [Randomness, seeds and replicates](#randomness-seeds-and-replicates). |
 | `is_stochastic` | `bool` | Whether the engine draws random numbers. |

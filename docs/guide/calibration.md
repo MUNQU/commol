@@ -159,7 +159,8 @@ zero (`InfeasibleStateError`, see
 [Amounts below zero](transitions.md#amounts-below-zero)). The penalty is much
 larger than any fit, and the run is not recorded in the history, so the
 optimizer moves away from it and goes on. Any other error of a run, such as a
-rate that cannot be evaluated, stops the calibration with its message
+rate that cannot be evaluated or that is not a number, stops the calibration
+with its message
 (`OptimizationObjective` in `crates/commol-calibration/src/objective.rs`, the
 only place that turns an infeasible point into a penalty).
 
