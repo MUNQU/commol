@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from commol import (
+    InfeasibleStateError,
     CalibrationProblem,
     NelderMeadConfig,
     NoNoise,
@@ -19,7 +20,7 @@ from commol import (
     member_statistics,
     simulation_report,
 )
-from tests.support import a_to_b_builder, bounded, build_stochastic
+from tests.support import a_to_b_builder, bounded, build, build_stochastic
 
 POSITIONS = list(range(51))
 
@@ -35,6 +36,37 @@ def _sample(values: list[list[float]], weights: list[float] | None = None):
 
 
 class TestBands:
+    @pytest.mark.parametrize(
+        ("rate", "value", "error", "message"),
+        [
+            ("k", 1.5, InfeasibleStateError, "Parameter set 0 is not feasible"),
+            (
+                "k * sqrt(k - 0.6)",
+                0.5,
+                ValueError,
+                "Parameter set 0 gives a value that is not finite",
+            ),
+        ],
+        ids=["infeasible", "not finite"],
+    )
+    def test_a_draw_without_a_run_names_its_set(
+        self, rate: str, value: float, error: type[Exception], message: str
+    ) -> None:
+        model = build(a_to_b_builder(parameters={"k": None}, rate=rate))
+        problem = CalibrationProblem(
+            observed_data=[ObservedDataPoint(at=1, output="A", value=900.0)],
+            parameters=[bounded("k", 0.0, 2.0)],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=1),
+        )
+        calibrator = Calibrator(Simulation(model), problem)
+        sample = ParameterSample.equally_weighted(
+            ["k"], [(0.0, 2.0)], [[value]], SampleMethod(name="t")
+        )
+
+        with pytest.raises(error, match=message):
+            Predictive(calibrator, sample, [0, 1, 2])
+
     def test_a_band_of_an_unknown_output_names_the_outputs(
         self, calibrator: Calibrator
     ) -> None:

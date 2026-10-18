@@ -782,3 +782,31 @@ fn a_jackknife_reports_the_blocks_it_could_not_fit() {
         "{one}"
     );
 }
+
+#[test]
+fn a_name_gives_its_setting_and_an_unknown_name_lists_the_names() {
+    assert!(matches!(
+        ResidualScale::from_name("multiplicative"),
+        Ok(ResidualScale::Multiplicative)
+    ));
+    assert!(matches!(
+        ResidualBlocks::from_name("stationary"),
+        Ok(ResidualBlocks::Stationary)
+    ));
+    assert!(matches!(
+        Multipliers::from_name("mammen"),
+        Ok(Multipliers::Mammen)
+    ));
+    assert_eq!(
+        ResidualScale::from_name("log").err().as_deref(),
+        Some("residual_scale is 'log'; it must be \"additive\" or \"multiplicative\"")
+    );
+    assert_eq!(
+        ResidualBlocks::from_name("circular").err().as_deref(),
+        Some("scheme is 'circular'; it must be \"moving\" or \"stationary\"")
+    );
+    assert_eq!(
+        Multipliers::from_name("gauss").err().as_deref(),
+        Some("multipliers is 'gauss'; it must be \"rademacher\" or \"mammen\"")
+    );
+}

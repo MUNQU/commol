@@ -266,7 +266,7 @@ class TestFailedReplicates:
             negative_values=0,
         )
         calibrator._rust_problem = SimpleNamespace(  # type: ignore[assignment]
-            optimize=engine.optimize, bootstrap=lambda *_, **__: run
+            optimize=engine.optimize, bayesian_bootstrap=lambda *_: run
         )
 
         with caplog.at_level(logging.WARNING, logger="commol.api.inference"):

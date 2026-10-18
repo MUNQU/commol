@@ -331,12 +331,6 @@ class CalibrationProblemProtocol(Protocol):
         loss_config: LossConfigProtocol,
         initial_condition_remainder: str | None = None,
     ) -> None: ...
-    @property
-    def parameter_names(self) -> list[str]: ...
-    @property
-    def observation_count(self) -> int: ...
-    @property
-    def replicate_count(self) -> int: ...
     def optimize(
         self, config: OptimizationConfigProtocol, starts: int, seed: int
     ) -> list[StartOutcomeProtocol]: ...
@@ -346,9 +340,6 @@ class CalibrationProblemProtocol(Protocol):
     def predict_observations(
         self, parameter_sets: list[list[float]]
     ) -> list[list[list[float]]]: ...
-    def predict_positions(
-        self, parameter_sets: list[list[float]], positions: list[float]
-    ) -> list[list[list[list[float]]]]: ...
     def predictive(
         self, sample: ParameterSampleProtocol, positions: list[float]
     ) -> PredictiveProtocol: ...
@@ -359,18 +350,35 @@ class CalibrationProblemProtocol(Protocol):
         seed: int,
         residual_noise: tuple[list[float], int, str] | None = None,
     ) -> ObservationDrawsProtocol: ...
-    def bootstrap(
+    def bayesian_bootstrap(
         self,
         config: OptimizationConfigProtocol,
         fit: list[float],
-        method: str,
         replicates: int,
         block_length: int | None,
         starts: int,
         seed: int,
-        residual_scale: str | None = None,
-        scheme: str | None = None,
-        multipliers: str | None = None,
+    ) -> BootstrapRunProtocol: ...
+    def residual_bootstrap(
+        self,
+        config: OptimizationConfigProtocol,
+        fit: list[float],
+        replicates: int,
+        block_length: int | None,
+        starts: int,
+        seed: int,
+        residual_scale: str,
+        scheme: str,
+    ) -> BootstrapRunProtocol: ...
+    def wild_bootstrap(
+        self,
+        config: OptimizationConfigProtocol,
+        fit: list[float],
+        replicates: int,
+        block_length: int | None,
+        starts: int,
+        seed: int,
+        multipliers: str,
     ) -> BootstrapRunProtocol: ...
     def jackknife(
         self,

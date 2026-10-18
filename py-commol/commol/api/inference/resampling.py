@@ -115,10 +115,9 @@ def run_bayesian_bootstrap(
         The fit, one draw per replicate and the diagnostics.
     """
     fit = calibrator.run(starts=method.starts)
-    run = calibrator.rust_problem.bootstrap(
+    run = calibrator.rust_problem.bayesian_bootstrap(
         calibrator.rust_optimizer,
         fit_values(calibrator, fit),
-        "bayesian",
         method.replicates,
         _rust_length(method.block_length),
         method.starts,
@@ -153,16 +152,15 @@ def run_residual_bootstrap(
         The fit, one draw per replicate and the diagnostics.
     """
     fit = calibrator.run(starts=method.starts)
-    run = calibrator.rust_problem.bootstrap(
+    run = calibrator.rust_problem.residual_bootstrap(
         calibrator.rust_optimizer,
         fit_values(calibrator, fit),
-        "residual",
         method.replicates,
         _rust_length(method.block_length),
         method.starts,
         calibrator.seed,
-        residual_scale=method.residual_scale,
-        scheme=method.scheme,
+        method.residual_scale,
+        method.scheme,
     )
     return _bootstrap_result(
         calibrator,
@@ -193,15 +191,14 @@ def run_wild_bootstrap(
         The fit, one draw per replicate and the diagnostics.
     """
     fit = calibrator.run(starts=method.starts)
-    run = calibrator.rust_problem.bootstrap(
+    run = calibrator.rust_problem.wild_bootstrap(
         calibrator.rust_optimizer,
         fit_values(calibrator, fit),
-        "wild",
         method.replicates,
         _rust_length(method.block_length),
         method.starts,
         calibrator.seed,
-        multipliers=method.multipliers,
+        method.multipliers,
     )
     return _bootstrap_result(
         calibrator,
