@@ -17,7 +17,7 @@ input reaches is removed, not tested.
 | What | Command | Threshold |
 |---|---|---|
 | Python (`py-commol/commol/`) | `pytest --cov=commol --cov-fail-under=100`, from `py-commol/` | 100 % of the statements, in the job Python Coverage |
-| Rust (`crates/`, `py-commol/src/`) | `.github/scripts/rust_coverage.sh`, from the root, with the virtual environment of `py-commol` active | `RUST_LINES` of the script, in the job Rust Code Quality |
+| Rust (`crates/`, `py-commol/src/`) | `.github/scripts/rust_coverage.sh`, from the root, with the virtual environment of `py-commol` active | `RUST_LINES` of the script (98.6 % of the lines), in the job Rust Code Quality |
 
 The bindings have no Rust tests: `pytest` runs them. So the script builds the
 Rust tests and the extension with the instrumentation of `cargo llvm-cov`,

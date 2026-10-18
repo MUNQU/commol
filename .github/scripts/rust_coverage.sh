@@ -25,7 +25,7 @@
 #   .github/scripts/rust_coverage.sh --lcov --output-path lcov.info
 set -euo pipefail
 
-RUST_LINES=0
+RUST_LINES=98.6
 
 root=$(git rev-parse --show-toplevel)
 cd "$root"
