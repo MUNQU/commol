@@ -316,3 +316,32 @@ fn a_stratification_condition_without_a_category_filters_nothing() {
 
     assert_eq!(compiled.compartments(), ["A_g1", "A_g2", "B_g1", "B_g2"]);
 }
+
+#[test]
+fn a_rate_that_is_not_a_number_names_its_flow_and_its_position() {
+    let model = model(&[&transition("bc", &["B"], &["C"], "k2 * sqrt(1 - t)", "")]);
+    let mut compiled = CompiledModel::try_from_model(&model).unwrap();
+    let state = compiled.initial_state().to_vec();
+    let mut derivatives = vec![0.0; state.len()];
+
+    assert_eq!(
+        compiled.derivatives(2.0, 2.5, &state, &mut derivatives),
+        Err("The rate of flow 'bc' at 2.5 is not a number".to_string())
+    );
+}
+
+#[test]
+fn a_compartment_that_is_not_a_number_gives_flows_that_are_not_numbers() {
+    let model = model(&[&transition("bc", &["B"], &["C"], "k2", "")]);
+    let mut compiled = CompiledModel::try_from_model(&model).unwrap();
+    let mut state = compiled.initial_state().to_vec();
+    let source = compiled.flow_changes()[0].proportional_to().unwrap();
+    state[source] = f64::NAN;
+    let mut derivatives = vec![0.0; state.len()];
+
+    compiled
+        .derivatives(0.0, 0.0, &state, &mut derivatives)
+        .unwrap();
+
+    assert!(derivatives[source].is_nan());
+}

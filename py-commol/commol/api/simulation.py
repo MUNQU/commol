@@ -198,6 +198,9 @@ class Simulation:
         ValueError
             If a parameter or initial condition has no value, or the seed is
             not a whole number from 0 to ``2**64 - 1``.
+        RuntimeError
+            If a rate cannot be evaluated or is not a number; the message
+            names the flow and the position.
         """
         self._validate_all_parameters_calibrated(self.model_definition)
         self._sync_engine()
@@ -245,6 +248,9 @@ class Simulation:
             If a parameter or initial condition has no value, the positions are
             not sorted and unique, or the engine does not report at one of them;
             the message is the engine's.
+        RuntimeError
+            If a rate cannot be evaluated or is not a number; the message
+            names the flow and the position.
         """
         positions = [float(position) for position in at]
         self._validate_all_parameters_calibrated(self.model_definition)
