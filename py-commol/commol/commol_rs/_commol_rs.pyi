@@ -556,6 +556,14 @@ class ConformalRunProtocol(Protocol):
     def scores(self) -> list[tuple[str, float]]: ...
     @property
     def failed(self) -> list[tuple[int, str]]: ...
+    @property
+    def bound(self) -> float | None: ...
+    @property
+    def blocks(self) -> int | None: ...
+    @property
+    def block_length(self) -> int | None: ...
+    @property
+    def block_length_estimates(self) -> list[tuple[str, float]] | None: ...
 
 class InferenceModule(Protocol):
     CalibrationProblem: type[CalibrationProblemProtocol]
@@ -620,6 +628,19 @@ class InferenceModule(Protocol):
         config: OptimizationConfigProtocol,
         fit: list[float],
         origins: list[float],
+        positions: list[float],
+        score: str,
+        by: str,
+        level: float,
+        starts: int,
+        seed: int,
+    ) -> ConformalRunProtocol: ...
+    def jackknife_plus(
+        self,
+        problem: CalibrationProblemProtocol,
+        config: OptimizationConfigProtocol,
+        fit: list[float],
+        block_length: int | None,
         positions: list[float],
         score: str,
         by: str,

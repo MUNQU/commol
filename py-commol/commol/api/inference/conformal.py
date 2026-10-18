@@ -10,11 +10,12 @@ import logging
 from typing import TYPE_CHECKING
 
 from commol.api.inference.registry import register
-from commol.api.inference.resampling import fit_values
+from commol.api.inference.resampling import fit_values, rust_block_length
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context._model import engine_state
 from commol.context.inference.conformal import (
     ConformalResult,
+    JackknifePlus,
     PredictionIntervals,
     RollingConformal,
     SeriesIntervals,
@@ -149,5 +150,49 @@ def run_rolling_conformal(
     )
 
 
+def run_jackknife_plus(
+    calibrator: "Calibrator", method: JackknifePlus
+) -> ConformalResult:
+    """
+    Run jackknife+ with blocks.
+
+    Parameters
+    ----------
+    calibrator : Calibrator
+        The calibration problem.
+    method : JackknifePlus
+        The settings.
+
+    Returns
+    -------
+    ConformalResult
+        The intervals at the positions, the left-out residuals and the
+        guarantee, with the CV+ bound of its blocks.
+    """
+    fit = calibrator.run(starts=method.starts)
+    run = commol_rs.inference.jackknife_plus(
+        calibrator.rust_problem,
+        calibrator.rust_optimizer,
+        fit_values(calibrator, fit),
+        rust_block_length(method.block_length),
+        method.positions,
+        method.score,
+        method.by,
+        method.level,
+        method.starts,
+        calibrator.seed,
+    )
+    _log_failed(run)
+    return _result(
+        run,
+        method.level,
+        f"Each interval covers a new observation with probability at least "
+        f"{run.bound:.4g} when the blocks are exchangeable: 1 − 2α with one "
+        f"observation per block, and the CV+ bound of Barber et al. (2021) with "
+        f"K = {run.blocks} blocks of {run.block_length} positions otherwise.",
+    )
+
+
 register(SplitConformal, run_split_conformal)
 register(RollingConformal, run_rolling_conformal)
+register(JackknifePlus, run_jackknife_plus)

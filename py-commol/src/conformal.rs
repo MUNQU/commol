@@ -10,10 +10,12 @@ use commol_inference::conformal::{
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
-use commol_inference::resampling::ReplicateRunner;
+use commol_inference::resampling::{
+    BlockDrawing, BlockScheme, ReplicateRunner, ResidualScale, Residuals,
+};
 
 use crate::calibration::{PyObservedDataPoint, PyOptimizationConfig};
-use crate::inference::{PyCalibrationProblem, PyParameterSample, predictive_error};
+use crate::inference::{BlockLength, PyCalibrationProblem, PyParameterSample, predictive_error};
 
 fn conformal_error(error: ConformalError) -> PyErr {
     match error {
@@ -46,6 +48,14 @@ pub struct PyConformalRun {
     scores: Vec<(String, f64)>,
     /// The index and reason of each refit that failed
     failed: Vec<(usize, String)>,
+    /// The guaranteed coverage, when the method computes one
+    bound: Option<f64>,
+    /// The number of blocks refitted, for a method with blocks
+    blocks: Option<usize>,
+    /// The block length used, for a method with blocks
+    block_length: Option<usize>,
+    /// The estimate of each series, with the automatic length
+    block_length_estimates: Option<Vec<(String, f64)>>,
 }
 
 impl From<ConformalRun> for PyConformalRun {
@@ -59,6 +69,10 @@ impl From<ConformalRun> for PyConformalRun {
             upper: intervals.upper,
             scores: run.scores,
             failed: run.failed,
+            bound: None,
+            blocks: None,
+            block_length: None,
+            block_length_estimates: None,
         }
     }
 }
@@ -172,11 +186,77 @@ fn rolling_conformal(
         .map_err(conformal_error)
 }
 
+/// The blocks of `runner`'s problem with `block_length` positions, or the
+/// automatic length of the residuals of its fit
+fn blocks(
+    runner: &ReplicateRunner<'_, crate::engine::Engine>,
+    block_length: Option<usize>,
+    drawing: BlockDrawing,
+) -> PyResult<(BlockScheme, BlockLength)> {
+    let problem = runner.problem();
+    let residuals = Residuals::new(problem, runner.fit(), ResidualScale::Additive)
+        .map_err(PyValueError::new_err)?;
+    let chosen = BlockLength::resolve(problem.observed_data(), &residuals, block_length, drawing);
+    let scheme =
+        BlockScheme::new(problem.observed_data(), chosen.length).map_err(PyValueError::new_err)?;
+    Ok((scheme, chosen))
+}
+
+/// Jackknife+ intervals at `positions`, for each series of the problem
+///
+/// Args:
+///     problem: The calibration problem
+///     config: The optimizer
+///     fit: The fit of every observation, in problem order
+///     block_length: Positions per block, or None for the automatic length
+///     positions: Where the intervals are
+///     score: "absolute", "normalized" or "spread"
+///     by: "series" or "all"
+///     level: The level of the intervals
+///     starts: Starts per refit, the fit first
+///     seed: Seed of the starts
+///
+/// Raises:
+///     ValueError: If a setting is not valid or the blocks are fewer than
+///         two
+///     RuntimeError: If fewer than two refits succeed
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn jackknife_plus(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    config: &PyOptimizationConfig,
+    fit: Vec<f64>,
+    block_length: Option<usize>,
+    positions: Vec<f64>,
+    score: &str,
+    by: &str,
+    level: f64,
+    starts: usize,
+    seed: u64,
+) -> PyResult<PyConformalRun> {
+    let settings = settings(score, by, level)?;
+    let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
+        .map_err(PyValueError::new_err)?;
+    let (scheme, chosen) = blocks(&runner, block_length, BlockDrawing::NonOverlapping)?;
+    let run = py
+        .detach(|| conformal::jackknife_plus(&runner, &scheme, &positions, settings))
+        .map_err(conformal_error)?;
+    Ok(PyConformalRun {
+        bound: Some(run.bound),
+        blocks: Some(run.blocks),
+        block_length: Some(chosen.length),
+        block_length_estimates: chosen.estimates,
+        ..PyConformalRun::from(run.run)
+    })
+}
+
 /// Register the conformal functions with the inference module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyConformalRun>()?;
     m.add_function(wrap_pyfunction!(check_conformal_settings, m)?)?;
     m.add_function(wrap_pyfunction!(split_conformal, m)?)?;
     m.add_function(wrap_pyfunction!(rolling_conformal, m)?)?;
+    m.add_function(wrap_pyfunction!(jackknife_plus, m)?)?;
     Ok(())
 }

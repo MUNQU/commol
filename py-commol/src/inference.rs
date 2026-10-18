@@ -505,13 +505,13 @@ impl PyCalibrationProblem {
 }
 
 /// The block length a method runs with, and the estimates of `"auto"`.
-struct BlockLength {
-    length: usize,
-    estimates: Option<Vec<(String, f64)>>,
+pub(crate) struct BlockLength {
+    pub(crate) length: usize,
+    pub(crate) estimates: Option<Vec<(String, f64)>>,
 }
 
 impl BlockLength {
-    fn resolve(
+    pub(crate) fn resolve(
         observed: &[commol_calibration::ObservedDataPoint],
         residuals: &Residuals,
         requested: Option<usize>,
