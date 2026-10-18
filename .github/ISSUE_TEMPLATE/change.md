@@ -5,6 +5,8 @@ title: "<type>(<scope>): <outcome>"
 labels: change
 ---
 
+<!-- Put a bug in the milestone of the nearest release it fits when you open it. -->
+
 ## Behavior
 
 - **Now:** <what happens, with the error message if any>
