@@ -269,6 +269,20 @@ def test_the_repository_comes_from_the_remote_url(url: str) -> None:
     assert github.repository_of(url) == "MUNQU/commol"
 
 
+def test_the_repository_ignores_an_insteadof_rule(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def git(*arguments: str) -> None:
+        subprocess.run(["git", *arguments], cwd=tmp_path, check=True)
+
+    git("init", "-q")
+    git("remote", "add", "origin", "git@github.com:MUNQU/commol.git")
+    git("config", "url.https://mirror.example/.insteadOf", "git@github.com:")
+    monkeypatch.chdir(tmp_path)
+
+    assert github.repository.__wrapped__() == "MUNQU/commol"
+
+
 def test_every_page_is_read() -> None:
     pages = [
         response(
