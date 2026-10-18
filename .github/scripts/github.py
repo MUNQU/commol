@@ -34,7 +34,7 @@ def repository_of(url: str) -> str:
 def repository() -> str:
     """Return the ``owner/name`` of this checkout, from its remote ``origin``."""
     result = subprocess.run(
-        ["git", "remote", "get-url", "origin"],
+        ["git", "config", "--get", "remote.origin.url"],
         capture_output=True,
         text=True,
         check=False,
