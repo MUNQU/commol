@@ -106,6 +106,19 @@ mod tests {
         })
     }
 
+    #[cfg(feature = "test-kind")]
+    #[test]
+    fn a_test_model_has_no_aggregate_structure() {
+        let mut json = model_json();
+        json["engine"] = json!({"type": "TestEngine"});
+        json["structure"] = json!({"kind": "test", "outputs": []});
+        let mut model: Model = serde_json::from_value(json).unwrap();
+        let expected = "Model 'm' is a test model, not an aggregate model";
+
+        assert_eq!(model.aggregate().unwrap_err(), expected);
+        assert_eq!(model.aggregate_mut().unwrap_err(), expected);
+    }
+
     #[test]
     fn a_model_reads_back_with_its_structure() {
         let model: Model = serde_json::from_value(model_json()).unwrap();

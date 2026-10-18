@@ -34,7 +34,9 @@ cargo test --release --all-features --workspace
     pytest -q
 )
 
-cargo llvm-cov report --release "$@"
+# The test model kind (py-commol/src/test_kind.rs) is code of the tests, built
+# only with the feature test-kind: docs/codebase/tests.md, "Test coverage".
+cargo llvm-cov report --release --ignore-filename-regex 'py-commol/src/test_kind\.rs' "$@"
 
 if [ -z "${CI:-}" ]; then
     unset CARGO_TARGET_DIR RUSTC_WRAPPER LLVM_PROFILE_FILE

@@ -450,6 +450,34 @@ mod tests {
     }
 
     #[test]
+    fn a_formula_that_does_not_parse_is_not_valid() {
+        let error = MathExpression::new("(k1 + 2".to_string())
+            .validate()
+            .unwrap_err();
+
+        assert!(
+            matches!(error, MathExpressionError::EvalError(_)),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn a_parameter_slot_is_set_by_its_index() {
+        let mut ctx = MathExpressionContext::new();
+        ctx.reserve_parameters(["k1".to_string()]);
+        let index = ctx.parameter_index("k1").unwrap();
+
+        ctx.set_parameter_by_index(index, 0.3).unwrap();
+
+        assert_eq!(ctx.get_parameter("k1"), Some(0.3));
+        assert_eq!(ctx.get_parameters()["k1"], 0.3);
+        assert_eq!(
+            ctx.set_parameter_by_index(index + 1, 0.3),
+            Err(format!("Parameter index '{}' not found", index + 1))
+        );
+    }
+
+    #[test]
     fn an_expression_prints_its_formula_and_the_variables_it_reads() {
         let printed = format!("{:?}", MathExpression::new("k1 * A".to_string()));
 

@@ -66,10 +66,3 @@ pub struct Transition {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub impulse_every: Option<(f64, f64)>,
 }
-
-impl Transition {
-    /// Whether the transition is an impulse rather than a continuous flow.
-    pub fn is_impulse(&self) -> bool {
-        self.impulse_at.is_some() || self.impulse_every.is_some()
-    }
-}

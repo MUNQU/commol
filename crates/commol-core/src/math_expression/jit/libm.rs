@@ -80,11 +80,6 @@ impl LibmRegistry {
     ) -> Result<FuncId, MathExpressionError> {
         self.import_function(module, name, 3)
     }
-
-    /// Get a function ID by name (if already imported)
-    pub fn get(&self, name: &str) -> Option<FuncId> {
-        self.functions.get(name).copied()
-    }
 }
 
 /// List of all single-argument math functions we support
