@@ -11,18 +11,11 @@ References
 """
 
 import pytest
-from pydantic import ValidationError
 
 from commol import Simulation
 from tests.support import ODE_REL, Flow, assert_close, flow_model
 
 TIMES = [0.5, 1.0, 4.0, 20.0]
-
-ZERO_TOTAL = pytest.mark.xfail(
-    strict=True,
-    raises=ValidationError,
-    reason="#196: the total of the initial state must be greater than 0",
-)
 
 
 def _decay(y0: float) -> dict[str, list[float]]:
@@ -35,6 +28,5 @@ def test_every_initial_value_gives_one_over_t_plus_c(y0: float) -> None:
     assert_close(_decay(y0)["Y"], [1 / (t + 1 / y0) for t in TIMES], rel=ODE_REL)
 
 
-@ZERO_TOTAL
 def test_zero_is_the_solution_from_zero() -> None:
     assert _decay(0.0)["Y"] == [0.0] * len(TIMES)

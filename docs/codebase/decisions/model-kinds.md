@@ -11,7 +11,7 @@ The layers that do not depend on how a model is built (`Simulation`,
 use only `Model` and the methods of `ModelStructure`
 (`py-commol/commol/context/structure.py`), and in Rust only the
 `SimulationEngine` trait (`crates/commol-core/src/simulation_engine.rs`). What
-only an aggregate model has (compartments, initial fractions) is behind them:
+only an aggregate model has (compartments, initial amounts) is behind them:
 `Aggregate` (`context/aggregate.py`), and in Rust `CompartmentalEngine` and
 `InitialConditionPlan` (`crates/commol-model/`). A new kind, such as an agent
 network, is a new `ModelStructure` subclass with its engines in the list;
@@ -50,7 +50,7 @@ kinds of model: `Aggregate` lays the process out as amounts per compartment;
 `Network` and `Agents` come with their proposals ([#144](https://github.com/MUNQU/commol/issues/144), [#145](https://github.com/MUNQU/commol/issues/145)). It is tagged in JSON by `kind`. In
 Python `Model` is generic in its structure class: `ModelBuilder.build(structure,
 engine)` returns a `Model` of the class of `structure` (a `TypeVar`, never a
-value), so `model.structure.total` type-checks, and `Model.from_json` reads the
+value), so `model.structure.bin_amounts` type-checks, and `Model.from_json` reads the
 class from the `kind` and `variant` of the file. The engine is part of the
 model because it sets what a rate means.
 
@@ -75,9 +75,9 @@ reads the variant only to run its checks (`AggregateVariant::check`), so the
 engines do not change. A subclass with no tag would load back as its base class
 and compare unequal; a kind per narrower form would split the structures again.
 
-The fractions of `Aggregate` are mappings by id (`bin_fractions={"A": 0.99}`),
-in Python and in the file, and Rust keeps their order (`IndexMap`). A list of
-`{"bin", "fraction"}` records needs a second shape for the constructor, and
+The amounts and fractions of `Aggregate` are mappings by id
+(`bin_amounts={"A": 990}`), in Python and in the file, and Rust keeps their
+order (`IndexMap`). A list of `{"bin", "amount"}` records needs a second shape for the constructor, and
 Pydantic calls a custom `__init__` when it validates a file too.
 
 **Guards:** `crates/commol-core/src/types/model.rs` (tests),

@@ -449,12 +449,14 @@ mod tests {
             structure: ModelStructure::Aggregate(Aggregate {
                 variant: None,
                 initial_conditions: InitialConditions {
-                    total: 1000.0,
-                    bin_fractions: [("A".to_string(), Some(1.0)), ("B".to_string(), Some(0.0))]
-                        .into_iter()
-                        .collect(),
+                    bin_amounts: [
+                        ("A".to_string(), Some(1000.0)),
+                        ("B".to_string(), Some(0.0)),
+                    ]
+                    .into_iter()
+                    .collect(),
                     stratification_fractions: Default::default(),
-                    compartment_fractions: Default::default(),
+                    compartment_amounts: Default::default(),
                 },
                 neighbors: None,
             }),
@@ -496,12 +498,14 @@ mod tests {
             structure: ModelStructure::Aggregate(Aggregate {
                 variant: None,
                 initial_conditions: InitialConditions {
-                    total: 1000.0,
-                    bin_fractions: [("A".to_string(), Some(1.0)), ("B".to_string(), Some(0.0))]
-                        .into_iter()
-                        .collect(),
+                    bin_amounts: [
+                        ("A".to_string(), Some(1000.0)),
+                        ("B".to_string(), Some(0.0)),
+                    ]
+                    .into_iter()
+                    .collect(),
                     stratification_fractions: Default::default(),
-                    compartment_fractions: Default::default(),
+                    compartment_amounts: Default::default(),
                 },
                 neighbors: None,
             }),
@@ -637,16 +641,15 @@ mod tests {
             structure: ModelStructure::Aggregate(Aggregate {
                 variant: None,
                 initial_conditions: InitialConditions {
-                    total: 1000.0,
-                    bin_fractions: [
-                        ("A".to_string(), Some(0.99)),
-                        ("B".to_string(), Some(0.01)),
+                    bin_amounts: [
+                        ("A".to_string(), Some(990.0)),
+                        ("B".to_string(), Some(10.0)),
                         ("C".to_string(), Some(0.0)),
                     ]
                     .into_iter()
                     .collect(),
                     stratification_fractions: Default::default(),
-                    compartment_fractions: Default::default(),
+                    compartment_amounts: Default::default(),
                 },
                 neighbors: None,
             }),
@@ -919,7 +922,7 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(engine.apply_values(&plan, &[0.25]).unwrap(), 0.0);
+        assert_eq!(engine.apply_values(&plan, &[250.0]).unwrap(), 0.0);
         engine.step().unwrap();
         engine.reset();
 

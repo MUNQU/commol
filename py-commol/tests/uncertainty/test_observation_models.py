@@ -91,7 +91,11 @@ def _sd(sample: ParameterSample) -> float:
 
 def _flow_simulation() -> Simulation:
     return Simulation(
-        build(a_to_b_builder(parameters={"c": None}, rate="c * A / A", total=1e6))
+        build(
+            a_to_b_builder(
+                parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": 0}
+            )
+        )
     )
 
 
@@ -148,7 +152,9 @@ class TestModels:
             Calibrator(_flow_simulation(), problem)
 
     def test_a_stochastic_engine_needs_a_loss(self) -> None:
-        model = build_stochastic(a_to_b_builder(parameters={"k": None}, total=100))
+        model = build_stochastic(
+            a_to_b_builder(parameters={"k": None}, amounts={"A": 100, "B": 0})
+        )
         problem = CalibrationProblem(
             observed_data=[ObservedDataPoint(at=1, output="B", value=10.0)],
             parameters=[bounded("k", 0.0, 1.0)],

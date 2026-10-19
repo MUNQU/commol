@@ -19,6 +19,9 @@ Session.vim
 
 ## Rust
 /target
+# Coverage profiles that an instrumented binary writes where it runs
+*.profraw
+*.profdata
 
 ## Python
 __pycache__/

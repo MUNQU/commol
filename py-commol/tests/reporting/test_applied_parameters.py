@@ -9,6 +9,7 @@ from commol import (
     CalibrationProblem,
     CalibrationResult,
     Model,
+    ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
     ParameterSample,
@@ -27,7 +28,7 @@ from tests.support import (
 )
 
 
-def _model(*, conditional: bool = False, s_fraction: float | None = 0.9) -> Model:
+def _model(*, conditional: bool = False, a_amount: float | None = 900) -> Model:
     """A numeric parameter k1, a formula k2, and a 60/40 split of ``group``."""
     stratifications = {"group": {"group1": 0.6, "group2": 0.4}}
     if conditional:
@@ -36,7 +37,7 @@ def _model(*, conditional: bool = False, s_fraction: float | None = 0.9) -> Mode
         a_to_b_builder(
             parameters={"k1": 0.3, "k2": "k1 * 2"},
             rate="k1",
-            fractions={"A": s_fraction, "B": 0.1},
+            amounts={"A": a_amount, "B": 100},
             stratifications=stratifications,
             conditions={"sub": {"group": "group1"}} if conditional else None,
         )
@@ -113,179 +114,77 @@ class TestParameters:
         assert "reporting_rate" not in report["parameters"]
 
 
-class TestInitialConditions:
-    def test_the_total_is_reported_as_total(self) -> None:
-        report = applied_parameters_report(_model(), {})
-
-        assert report["initial_conditions"]["total"] == {
-            "group": "total",
-            "fraction": 1.0,
-            "value": 1000.0,
-            "calibrated": False,
-        }
-
-    def test_bin_fractions_are_taken_of_the_total(self) -> None:
-        report = applied_parameters_report(_model(), {})
-
-        assert report["initial_conditions"]["A"] == {
-            "group": "total",
-            "fraction": 0.9,
-            "value": pytest.approx(900.0),
-            "calibrated": False,
-        }
-
-    def test_unconditional_categories_are_taken_of_the_total(self) -> None:
-        report = applied_parameters_report(_model(), {})
-
-        entry = report["initial_conditions"]["group1"]
-        assert entry["group"] == "total"
-        assert entry["value"] == pytest.approx(600.0)
-
-    def test_conditional_category_fractions_use_the_total_as_denominator(
-        self,
-    ) -> None:
-        report = applied_parameters_report(_model(conditional=True), {})
-
-        entry = report["initial_conditions"]["s1"]
-        assert entry["group"] == "group1"
-        # The amount is 0.25 of the group1 subgroup; the reported fraction
-        # is that amount over the declared total, so every row shares one
-        # denominator.
-        assert entry["value"] == pytest.approx(0.25 * 600.0)
-        assert entry["fraction"] == pytest.approx(150.0 / 1000.0)
-
-    def test_an_uncalibrated_fraction_reports_no_value(self) -> None:
-        report = applied_parameters_report(_model(s_fraction=None), {})
-
-        assert report["initial_conditions"]["A"]["fraction"] is None
-        assert report["initial_conditions"]["A"]["value"] is None
-
-    def test_shared_category_rows_are_qualified(self) -> None:
-        model = build(shared_category_builder(group=(0.3, 0.7), level=(0.6, 0.4)))
-
-        report = applied_parameters_report(model, {"level:c1": 0.6})
-        rows = report["initial_conditions"]
-
-        assert rows["group:c1"]["fraction"] == pytest.approx(0.3)
-        assert rows["level:c1"]["fraction"] == pytest.approx(0.6)
-        assert rows["level:c1"]["calibrated"] is True
-        assert rows["group:c1"]["calibrated"] is False
-        assert "c1" not in rows
-
-
-class TestCompartmentOverrides:
-    """``override_builder``: A_g1 is set, A_g2 keeps its uniform 0.5."""
-
-    def test_declared_compartment_overrides_are_reported(self) -> None:
-        report = applied_parameters_report(build(override_builder(0.2)), {})
-
-        assert report["initial_conditions"]["A_g1"] == {
-            "group": "total",
-            "fraction": 0.2,
-            "value": pytest.approx(200.0),
-            "calibrated": False,
-        }
-
-    def test_total_group_rows_share_the_total_as_denominator(self) -> None:
-        report = applied_parameters_report(build(override_builder(0.3)), {})
-        rows = report["initial_conditions"]
-
-        effective = 0.3 + 0.5  # A_g1 override + uniform A_g2
-        assert rows["A"]["fraction"] + rows["B"]["fraction"] == pytest.approx(effective)
-        assert rows["g1"]["fraction"] + rows["g2"]["fraction"] == pytest.approx(
-            effective
-        )
-        assert rows["A"]["fraction"] == pytest.approx(0.8)
-        assert rows["g1"]["fraction"] == pytest.approx(0.3)
-        assert rows["g2"]["fraction"] == pytest.approx(0.5)
-
-    def test_bin_rows_report_the_effective_amount(self) -> None:
-        report = applied_parameters_report(build(override_builder(0.3)), {})
-
-        entry = report["initial_conditions"]["A"]
-        assert entry["fraction"] == pytest.approx(0.8)
-        assert entry["value"] == pytest.approx(800.0)
-
-    def test_category_rows_report_the_effective_amount(self) -> None:
-        report = applied_parameters_report(build(override_builder(0.3)), {})
-
-        assert report["initial_conditions"]["g1"]["value"] == pytest.approx(300.0)
-        assert report["initial_conditions"]["g2"]["value"] == pytest.approx(500.0)
-
-    def test_uncalibrated_bin_keeps_its_marker_with_overrides(self) -> None:
-        model = build(
-            a_to_b_builder(
-                rate="k * A",
-                fractions={"A": None, "B": 0.5},
-                stratifications={"group": {"g1": 0.5, "g2": 0.5}},
-                compartment_fractions={"A_g1": 0.3},
+class TestInitialAmounts:
+    def test_amounts_of_different_units_are_reported_in_their_units(self) -> None:
+        model = (
+            ModelBuilder(name="Mixed units")
+            .add_bin(id="A", name="State A", unit="item")
+            .add_bin(id="B", name="State B", unit="item")
+            .add_bin(id="C", name="State C", unit="mg/l")
+            .add_stratification(id="zone", categories=["up", "down"])
+            .add_parameter(id="k", value=0.1)
+            .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
+            .build(
+                Aggregate(
+                    bin_amounts={"A": 990, "B": 10, "C": 1e5},
+                    stratification_fractions={"zone": {"up": 0.25, "down": 0.75}},
+                    compartment_amounts={"C_up": 4e4},
+                ),
+                engine="DifferenceEquations",
             )
         )
 
         report = applied_parameters_report(model, {})
 
-        assert report["initial_conditions"]["A"]["fraction"] is None
-        assert report["initial_conditions"]["A"]["value"] is None
-        # The override row still carries its own number.
-        assert report["initial_conditions"]["A_g1"]["fraction"] == pytest.approx(0.3)
-        assert report["initial_conditions"]["A_g1"]["value"] == pytest.approx(300.0)
+        assert report["initial_amounts"] == {
+            "A": {"amount": 990, "unit": "item", "calibrated": False},
+            "B": {"amount": 10, "unit": "item", "calibrated": False},
+            "C": {"amount": 1.15e5, "unit": "mg/l", "calibrated": False},
+            "C_up": {"amount": 4e4, "unit": "mg/l", "calibrated": False},
+        }
+        assert report["category_splits"] == {
+            "up": {"group": [], "fraction": 0.25, "calibrated": False},
+            "down": {"group": [], "fraction": 0.75, "calibrated": False},
+        }
 
-    def test_exact_compartment_row_reports_calibrated(self) -> None:
-        model = build(override_builder(0.2))
-        problem = initial_condition_problem("A_g1", "A_g2")
-        values = {"A_g1": 0.3, "A_g2": 0.7}
+    def test_a_bin_reports_its_declared_amount(self) -> None:
+        report = applied_parameters_report(_model(), {})
 
-        model.apply_calibration_parameters(values, problem)
-        report = applied_parameters_report(model, values, problem)
+        assert report["initial_amounts"]["A"] == {
+            "amount": 900,
+            "unit": None,
+            "calibrated": False,
+        }
 
-        entry = report["initial_conditions"]["A_g1"]
-        assert entry["fraction"] == pytest.approx(0.3)
-        assert entry["calibrated"] is True
+    def test_an_uncalibrated_amount_reports_none(self) -> None:
+        report = applied_parameters_report(_model(a_amount=None), {})
 
-    def test_aggregate_row_written_to_overrides_reports_calibrated(self) -> None:
-        model = build(override_builder(0.3))
-        problem = initial_condition_problem("A")
+        assert report["initial_amounts"]["A"]["amount"] is None
 
-        model.apply_calibration_parameters({"A": 0.6}, problem)
-        report = applied_parameters_report(model, {"A": 0.6}, problem)
 
-        assert report["initial_conditions"]["A_g1"]["calibrated"] is True
-        assert report["initial_conditions"]["A_g2"]["calibrated"] is True
+class TestCategorySplits:
+    def test_an_unconditional_category_splits_every_bin(self) -> None:
+        report = applied_parameters_report(_model(), {})
 
-    def test_aggregate_row_written_to_overrides_reports_the_engine_state(
-        self,
-    ) -> None:
-        model = build(override_builder(0.3))
-        problem = initial_condition_problem("A")
+        assert report["category_splits"]["group1"] == {
+            "group": [],
+            "fraction": 0.6,
+            "calibrated": False,
+        }
 
-        # A = 0.6 over the override A_g1 = 0.3 and A_g2 = 0.5 is shared
-        # 0.375 / 0.625, so the engine scores 225 and 375.
-        model.apply_calibration_parameters({"A": 0.6}, problem)
-        report = applied_parameters_report(model, {"A": 0.6}, problem)
+    def test_a_conditional_category_reports_its_split_of_its_group(self) -> None:
+        report = applied_parameters_report(_model(conditional=True), {})
 
-        entry = report["initial_conditions"]["A"]
-        assert entry["calibrated"] is True
-        assert entry["fraction"] == pytest.approx(0.6)
-        assert entry["value"] == pytest.approx(600.0)
-        assert report["initial_conditions"]["A_g1"]["value"] == pytest.approx(225.0)
+        assert report["category_splits"]["s1"] == {
+            "group": ["group1"],
+            "fraction": 0.25,
+            "calibrated": False,
+        }
 
-    @pytest.mark.parametrize("category_id", ["g1", "group:g1"])
-    def test_an_override_a_calibrated_category_covers_reports_calibrated(
-        self, category_id: str
-    ) -> None:
-        model = build(override_builder(0.3))
-
-        report = applied_parameters_report(
-            model, {category_id: 0.5}, initial_condition_problem(category_id)
-        )
-
-        assert report["initial_conditions"]["A_g1"]["calibrated"] is True
-        assert report["initial_conditions"]["g2"]["calibrated"] is False
-
-    def test_a_chain_of_conditions_names_its_group_with_plus(self) -> None:
+    def test_a_chain_of_conditions_names_every_category_of_its_group(self) -> None:
         model = build(
             a_to_b_builder(
-                fractions={"A": 0.9, "B": 0.1},
+                amounts={"A": 900, "B": 100},
                 stratifications={
                     "group": {"group1": 0.6, "group2": 0.4},
                     "sub": {"s1": 0.25, "s2": 0.75},
@@ -298,16 +197,105 @@ class TestCompartmentOverrides:
             )
         )
 
-        report = applied_parameters_report(model, {})["initial_conditions"]
+        report = applied_parameters_report(model, {})["category_splits"]
 
-        assert report["d1"]["group"] == "group1+s1"
-        assert report["d1"]["fraction"] == pytest.approx(0.6 * 0.25 * 0.5)
+        assert report["d1"]["group"] == ["group1", "s1"]
+        assert report["d1"]["fraction"] == 0.5
+
+    def test_shared_category_rows_are_qualified(self) -> None:
+        model = build(shared_category_builder(group=(0.3, 0.7), level=(0.6, 0.4)))
+
+        report = applied_parameters_report(model, {"level:c1": 0.6})
+        rows = report["category_splits"]
+
+        assert rows["group:c1"]["fraction"] == pytest.approx(0.3)
+        assert rows["level:c1"]["fraction"] == pytest.approx(0.6)
+        assert rows["level:c1"]["calibrated"] is True
+        assert rows["group:c1"]["calibrated"] is False
+        assert "c1" not in rows
+
+
+class TestCompartmentOverrides:
+    """``override_builder``: A_g1 is set, A_g2 keeps its uniform 500."""
+
+    def test_declared_compartment_overrides_are_reported(self) -> None:
+        report = applied_parameters_report(build(override_builder(200)), {})
+
+        assert report["initial_amounts"]["A_g1"] == {
+            "amount": 200,
+            "unit": None,
+            "calibrated": False,
+        }
+
+    def test_bin_rows_report_the_effective_amount(self) -> None:
+        report = applied_parameters_report(build(override_builder(300)), {})
+
+        assert report["initial_amounts"]["A"]["amount"] == pytest.approx(800.0)
+
+    def test_uncalibrated_bin_keeps_its_marker_with_overrides(self) -> None:
+        model = build(
+            a_to_b_builder(
+                rate="k * A",
+                amounts={"A": None, "B": 500},
+                stratifications={"group": {"g1": 0.5, "g2": 0.5}},
+                compartment_amounts={"A_g1": 300},
+            )
+        )
+
+        report = applied_parameters_report(model, {})
+
+        assert report["initial_amounts"]["A"]["amount"] is None
+        # The override row still carries its own number.
+        assert report["initial_amounts"]["A_g1"]["amount"] == 300
+
+    def test_exact_compartment_row_reports_calibrated(self) -> None:
+        model = build(override_builder(200))
+        problem = initial_condition_problem("A_g1", "A_g2")
+        values = {"A_g1": 300, "A_g2": 700}
+
+        model.apply_calibration_parameters(values, problem)
+        report = applied_parameters_report(model, values, problem)
+
+        entry = report["initial_amounts"]["A_g1"]
+        assert entry["amount"] == pytest.approx(300)
+        assert entry["calibrated"] is True
+
+    def test_aggregate_row_written_to_overrides_reports_the_engine_state(
+        self,
+    ) -> None:
+        model = build(override_builder(300))
+        problem = initial_condition_problem("A")
+
+        # A = 600 over the override A_g1 = 300 and A_g2 = 500 is shared
+        # 0.375 / 0.625, so the engine scores 225 and 375.
+        model.apply_calibration_parameters({"A": 600}, problem)
+        report = applied_parameters_report(model, {"A": 600}, problem)
+        rows = report["initial_amounts"]
+
+        assert rows["A"]["calibrated"] is True
+        assert rows["A"]["amount"] == pytest.approx(600.0)
+        assert rows["A_g1"] == {"amount": 225.0, "unit": None, "calibrated": True}
+        assert rows["A_g2"] == {"amount": 375.0, "unit": None, "calibrated": True}
+
+    @pytest.mark.parametrize("category_id", ["g1", "group:g1"])
+    def test_an_override_a_calibrated_category_covers_reports_calibrated(
+        self, category_id: str
+    ) -> None:
+        model = build(override_builder(300))
+
+        report = applied_parameters_report(
+            model, {category_id: 0.5}, initial_condition_problem(category_id)
+        )
+
+        assert report["initial_amounts"]["A_g1"]["calibrated"] is True
+        assert report["category_splits"]["g1"]["calibrated"] is True
+        assert report["category_splits"]["g2"]["calibrated"] is False
 
     def test_diverted_override_order_is_deterministic(self) -> None:
-        model = build(override_builder(0.3))
+        model = build(override_builder(300))
 
-        model.apply_calibration_parameters({"A": 0.6}, initial_condition_problem("A"))
-        names = list(model.structure.compartment_fractions)
+        model.apply_calibration_parameters({"A": 600}, initial_condition_problem("A"))
+        names = list(model.structure.compartment_amounts)
 
         assert names == sorted(names)
 
@@ -344,12 +332,9 @@ class TestIntervals:
 
         assert str(error.value) == "A report of a sample needs a confidence_level."
 
-    def test_conditional_category_interval_is_rescaled_to_the_total(
+    def test_a_conditional_category_interval_is_in_the_split_it_reports(
         self,
     ) -> None:
-        # A conditional category is calibrated as a fraction of its subgroup but
-        # reported as a fraction of the total. The interval must be
-        # rescaled by the group share so it brackets the reported fraction.
         report = applied_parameters_report(
             _model(conditional=True),
             {},
@@ -357,55 +342,30 @@ class TestIntervals:
             confidence_level=0.95,
         )
 
-        entry = report["initial_conditions"]["s1"]
+        entry = report["category_splits"]["s1"]
         interval = entry["interval"]
-        assert entry["fraction"] == pytest.approx(0.25 * 0.6)
-        assert interval["mean"] == pytest.approx(0.25 * 0.6)
-        assert interval["ci_lower"] == pytest.approx(0.2 * 0.6)
-        assert interval["ci_upper"] == pytest.approx(0.3 * 0.6)
+        assert interval["mean"] == pytest.approx(0.25)
+        assert interval["ci_lower"] == pytest.approx(0.2)
+        assert interval["ci_upper"] == pytest.approx(0.3)
         assert interval["ci_lower"] < entry["fraction"] < interval["ci_upper"]
-        assert interval["median"] == pytest.approx(0.25 * 0.6)
-        assert interval["min"] == pytest.approx(0.2 * 0.6)
-        assert interval["max"] == pytest.approx(0.3 * 0.6)
-        assert interval["std"] == pytest.approx(0.05 * 0.6)  # the sample std
 
     def test_bin_category_and_override_rows_gain_their_statistics(self) -> None:
         sample = ParameterSample.equally_weighted(
             ["A", "g1", "A_g1"],
-            [(0.0, 1.0)] * 3,
-            [[0.2, 0.4, 0.1], [0.4, 0.6, 0.3]],
+            [(0.0, 1000.0), (0.0, 1.0), (0.0, 1000.0)],
+            [[200, 0.4, 100], [400, 0.6, 300]],
             SampleMethod(name="test"),
         )
 
         report = applied_parameters_report(
-            build(override_builder(0.3)), {}, sample=sample, confidence_level=0.95
-        )["initial_conditions"]
-
-        assert report["A"]["interval"]["mean"] == pytest.approx(0.3)
-        assert report["g1"]["interval"]["mean"] == pytest.approx(0.5)
-        assert report["A_g1"]["interval"]["mean"] == pytest.approx(0.2)
-
-    def test_a_conditional_interval_with_overrides_is_rescaled_by_the_engine_state(
-        self,
-    ) -> None:
-        model = build(
-            a_to_b_builder(
-                fractions={"A": 0.9, "B": 0.1},
-                stratifications={
-                    "group": {"group1": 0.6, "group2": 0.4},
-                    "sub": {"s1": 0.25, "s2": 0.75},
-                },
-                conditions={"sub": {"group": "group1"}},
-                compartment_fractions={"B_group2": 0.04},
-            )
+            build(override_builder(300)), {}, sample=sample, confidence_level=0.95
         )
 
-        report = applied_parameters_report(
-            model, {}, sample=_sample("s1", [0.2, 0.3]), confidence_level=0.95
+        assert report["initial_amounts"]["A"]["interval"]["mean"] == pytest.approx(300)
+        assert report["category_splits"]["g1"]["interval"]["mean"] == pytest.approx(0.5)
+        assert report["initial_amounts"]["A_g1"]["interval"]["mean"] == pytest.approx(
+            200
         )
-
-        interval = report["initial_conditions"]["s1"]["interval"]
-        assert interval["mean"] == pytest.approx(0.25 * 0.6)
 
     def test_entries_without_statistics_have_no_interval(self) -> None:
         report = applied_parameters_report(
@@ -415,7 +375,8 @@ class TestIntervals:
             confidence_level=0.95,
         )
 
-        assert "interval" not in report["initial_conditions"]["A"]
+        assert "interval" not in report["initial_amounts"]["A"]
+        assert "interval" not in report["category_splits"]["group1"]
 
     def test_confidence_level_leads_the_report(self) -> None:
         report = applied_parameters_report(_model(), {}, confidence_level=0.95)
@@ -427,7 +388,7 @@ class TestIntervals:
         report = applied_parameters_report(_model(), {})
 
         assert "confidence_level" not in report
-        assert list(report) == ["parameters", "initial_conditions"]
+        assert list(report) == ["parameters", "initial_amounts", "category_splits"]
 
 
 class TestResultObjects:
@@ -459,8 +420,7 @@ class TestReportPerformance:
         model = build(
             builder.set_structure(
                 Aggregate(
-                    total=1000,
-                    bin_fractions={"A": 1.0},
+                    bin_amounts={"A": 1000},
                     stratification_fractions=stratify(
                         builder,
                         {f"s{i}": {f"g{i}a": 0.5, f"g{i}b": 0.5} for i in range(8)},
@@ -473,13 +433,13 @@ class TestReportPerformance:
             for compartment in model.structure.initial_state(model.process)
         ]
         assert len(names) == 256
-        model.structure.update_compartment_fractions(
-            model.process, {name: 1 / 256 for name in names[:128]}
+        model.structure.update_compartment_amounts(
+            model.process, dict.fromkeys(names[:128], 1000 / 256)
         )
 
         start = time.perf_counter()
         report = applied_parameters_report(model, {"g0a": 0.5})
         elapsed = time.perf_counter() - start
 
-        assert report["initial_conditions"]["g0a"]["calibrated"] is True
+        assert report["category_splits"]["g0a"]["calibrated"] is True
         assert elapsed < 3.0

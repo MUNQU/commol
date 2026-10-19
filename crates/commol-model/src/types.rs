@@ -408,7 +408,8 @@ impl FlowChange {
 #[derive(Clone)]
 pub struct CompiledModel {
     pub(crate) compartments: Vec<String>,
-    /// The total the initial fractions are taken of.
+    /// The sum of the initial amounts the model states, before any calibrated
+    /// value is written.
     pub(crate) total: f64,
     /// Source and applied categories of each output, parallel to `output_names`
     pub(crate) output_labels: Vec<crate::labels::OutputLabels>,

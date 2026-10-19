@@ -11,10 +11,13 @@ from tests.support import a_to_b_builder, assert_close, build, build_ode, run
 
 
 def _run_ab(
-    rate: str, *, steps: int = 20, total: float = 1000
+    rate: str, *, steps: int = 20, amount: float = 1000
 ) -> dict[str, list[float]]:
-    """Run A → B with the given rate formula."""
-    return run(a_to_b_builder(rate=rate, parameters={}, total=total), steps)
+    """Run A → B with the given rate formula, from `amount` in A."""
+    return run(
+        a_to_b_builder(rate=rate, parameters={}, amounts={"A": amount, "B": 0}),
+        steps,
+    )
 
 
 class TestPulseIntegration:
@@ -32,7 +35,7 @@ class TestPulseIntegration:
             assert a[t] - a[t + 1] == pytest.approx(0.0, abs=1e-6)
 
     def test_pulse_keeps_the_total(self):
-        result = _run_ab(str(AxisPattern.pulse(at=5, value=0.3)), steps=10, total=1000)
+        result = _run_ab(str(AxisPattern.pulse(at=5, value=0.3)), steps=10, amount=1000)
         for t in range(11):
             assert result["A"][t] + result["B"][t] == pytest.approx(1000.0, abs=1e-4)
 
@@ -124,7 +127,7 @@ class TestSinusoidIntegration:
         result = _run_ab(
             str(AxisPattern.sinusoid(amplitude=0.001, period=10, baseline=0.005)),
             steps=200,
-            total=10_000,
+            amount=10_000,
         )
         a = result["A"]
         # flow at step t = a[t] - a[t+1], proportional rate ≈ 0.005 on average
@@ -172,7 +175,7 @@ class TestGaussianPulseIntegration:
         center = 20
         # Small peak so depletion is negligible (< 5% total over all steps)
         p = AxisPattern.gaussian_pulse(center=float(center), width=3.0, peak=0.001)
-        result = _run_ab(str(p), steps=40, total=100_000)
+        result = _run_ab(str(p), steps=40, amount=100_000)
         a = result["A"]
         flows = [a[t] - a[t + 1] for t in range(40)]
         assert flows[center] == max(flows)
@@ -181,7 +184,7 @@ class TestGaussianPulseIntegration:
         """Flows are approximately symmetric around the center."""
         center = 20
         p = AxisPattern.gaussian_pulse(center=float(center), width=3.0, peak=0.001)
-        result = _run_ab(str(p), steps=40, total=100_000)
+        result = _run_ab(str(p), steps=40, amount=100_000)
         a = result["A"]
         # flow 3 steps left of center vs 3 steps right of center
         left_flow = a[center - 3] - a[center - 2]  # step center-3
@@ -248,7 +251,7 @@ class TestPerCompartmentInteraction:
                 rate=p_str,
                 parameters={},
                 per_compartment=True,
-                total=2000,
+                amounts={"A": 2000, "B": 0},
                 stratifications={"group": {"cat1": 0.5, "cat2": 0.5}},
             )
         )

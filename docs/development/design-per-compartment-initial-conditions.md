@@ -10,6 +10,10 @@
   initial state, a head count is an amount, and `calibrated_initial_population`
   is `calibrated_initial_state`; see
   [State, amount, total and subgroup total](../codebase/decisions/model-structure.md#state-amount-total-and-subgroup-total).
+  Today there is no declared total either: `compartment_fractions` is
+  `compartment_amounts` and `bin_fractions` is `bin_amounts`, amounts in the
+  unit of each bin; see
+  [The initial state is an amount per bin](../codebase/decisions/model-structure.md#the-initial-state-is-an-amount-per-bin).
 
 ## Problem
 

@@ -86,8 +86,7 @@ class TestText:
         )
         builder.set_structure(
             Aggregate(
-                total=100,
-                bin_fractions={"A": 1.0},
+                bin_amounts={"A": 100},
                 stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
             )
         )

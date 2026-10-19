@@ -150,7 +150,8 @@ class TestAbcSmc:
             stay_probability=0.05,
         )
         model = build_stochastic(
-            a_to_b_builder(parameters={"k": None}, total=UNITS), "StochasticSteps"
+            a_to_b_builder(parameters={"k": None}, amounts={"A": UNITS, "B": 0}),
+            "StochasticSteps",
         )
 
         def interval(index: int, rng: np.random.Generator) -> dict[str, Interval]:

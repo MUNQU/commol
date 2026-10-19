@@ -401,7 +401,7 @@ def check_model_values(
     parameters : Sequence[CalibrationParameter]
         Calibration parameters, in problem order.
     remainder : str | None
-        The id that takes what the values leave of the total the kind keeps,
+        The id that takes what the values leave of the sum the kind keeps,
         such as a compartment or bin of an aggregate model.
 
     Raises
@@ -432,6 +432,41 @@ def check_model_values(
         )
     except ValueError as error:
         raise ValueError(f"Calibration initial condition: {error}") from error
+
+
+def initial_condition_coverage(
+    engine: "EngineProtocol",
+    parameters: Sequence["CalibrationParameter"],
+    remainder: str | None,
+) -> tuple[list[list[str]], list[str]]:
+    """
+    The compartments each initial-condition value sets, and the remainder's.
+
+    Parameters
+    ----------
+    engine : EngineProtocol
+        The engine built from an aggregate model.
+    parameters : Sequence[CalibrationParameter]
+        Initial-condition calibration parameters, in problem order.
+    remainder : str | None
+        The id that takes what the values leave, if any.
+
+    Returns
+    -------
+    tuple[list[list[str]], list[str]]
+        For each parameter, the compartments it sets (none for a category
+        split), and the compartments of the remainder (none without one).
+    """
+    values, remainder_indices = commol_rs.calibration.initial_condition_coverage(
+        engine,
+        rust_parameters(parameters),
+        initial_condition_remainder=remainder,
+    )
+    names = engine.compartments
+    return (
+        [[names[index] for index in indices] for indices in values],
+        [names[index] for index in remainder_indices],
+    )
 
 
 class CalibratedInitialState(NamedTuple):
@@ -465,8 +500,8 @@ def calibrated_initial_state[S: "Aggregate"](
 
     The engine applies the values as the calibration objective does: clamped
     to their bounds, written as bins, then category splits, then exact
-    compartments, with the remainder absorbing the difference to the
-    total.
+    compartments, with the remainder taking what the others leave of the
+    amounts the model states.
 
     Parameters
     ----------
@@ -477,7 +512,7 @@ def calibrated_initial_state[S: "Aggregate"](
     values : Sequence[float]
         Value of each parameter, parallel to ``parameters``.
     remainder : str | None
-        Compartment or bin that absorbs the difference to the total.
+        Compartment or bin that takes what the other compartments leave.
 
     Returns
     -------
@@ -488,7 +523,7 @@ def calibrated_initial_state[S: "Aggregate"](
     ------
     ValueError
         If an initial-condition id or the remainder cannot be resolved, or the
-        initial amounts exceed the total.
+        values leave the remainder below zero.
     """
     engine = build_engine(model)
     applied, state, covered = commol_rs.calibration.calibrated_initial_state(

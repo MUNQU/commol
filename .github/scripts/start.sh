@@ -8,7 +8,10 @@
 #   3. sets it to `In Progress` in the project (and adds it to the project if
 #      it is not there);
 #   4. creates its branch from `main`, linked to the issue, in a worktree that
-#      is a sibling of the repository (or in this checkout with --here).
+#      is a sibling of the repository (or in this checkout with --here);
+#   5. writes the precedence level of each open issue into the field Level of
+#      the project (parallel.py --levels); a failure there leaves the start
+#      done.
 #
 # Usage, from the root of the repository:
 #   .github/scripts/start.sh <number> <type>/<name> [--here] [--dry-run]
@@ -120,6 +123,12 @@ else
         --checkout --worktree "$worktree"
     where="$worktree"
 fi
+
+# 5. The precedence levels.
+root=$(git rev-parse --show-toplevel)
+run uv run --project "$root/py-commol" --locked python \
+    "$root/.github/scripts/parallel.py" --levels ||
+    echo "The levels were not written: run .github/scripts/parallel.py --levels." >&2
 
 if $dry; then
     echo "Dry run: nothing changed."

@@ -103,38 +103,38 @@ Each step applies every flow once, computed from the state at the start of the s
 
 ## Initialization
 
-### Bin fractions
+### Bin amounts
 
-| Bin | Fraction | Amount |
+| Bin | Amount | Unit |
 |---|---|---|
-| A | set by calibration |  |
-| B | 0.4 | 400 |
+| A | set by calibration | item |
+| B | 400 | item |
 
 ### Stratification fractions
 
 | Stratification | Category | Fraction | Of |
 |---|---|---|---|
-| group | g1 | 0.25 | total |
-| group | g2 | 0.75 | total |
+| group | g1 | 0.25 | each bin |
+| group | g2 | 0.75 | each bin |
 | tier | t1 | 0.5 | g1 |
 | tier | t2 | 0.5 | g1 |
 
 ### Compartment overrides
 
-| Compartment | Fraction of the total | Amount |
+| Compartment | Amount | Unit |
 |---|---|---|
-| B_g2 | 0.2 | 200 |
+| B_g2 | 200 | item |
 
-### Initial state (total 1000)
+### Initial state
 
-| Compartment | Amount |
-|---|---|
-| A_g1_t1 | 0 |
-| A_g1_t2 | 0 |
-| A_g2 | 0 |
-| B_g1_t1 | 50 |
-| B_g1_t2 | 50 |
-| B_g2 | 200 |
+| Compartment | Amount | Unit |
+|---|---|---|
+| A_g1_t1 | 0 | item |
+| A_g1_t2 | 0 | item |
+| A_g2 | 0 | item |
+| B_g1_t1 | 50 | item |
+| B_g1_t2 | 50 | item |
+| B_g2 | 200 | item |
 
 ## Parameters
 

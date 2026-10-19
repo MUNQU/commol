@@ -44,7 +44,7 @@ def decay_model(k1: float | None):
         .add_parameter(id="k1", value=k1)
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A")
         .build(
-            Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}),
+            Aggregate(bin_amounts={"A": 1000, "B": 0}),
             engine="DifferenceEquations",
         )
     )

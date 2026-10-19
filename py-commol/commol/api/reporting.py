@@ -16,7 +16,7 @@ from commol.context.calibration import (
     ObservedDataPoint,
     calibrated_values,
 )
-from commol.context._model.report import InitialConditionEntry
+from commol.context._model.report import CategorySplitEntry, InitialAmountEntry
 from commol.context.constants import CalibrationParameterType
 from commol.context.model import Model
 from commol.context.inference.conformal import PredictionIntervals
@@ -37,13 +37,15 @@ class AppliedParametersReport(TypedDict):
     """
     Every parameter of a calibrated model, and the sections of its kind.
 
-    An aggregate model adds ``initial_conditions``; another kind adds the
-    sections its structure gives (`ModelStructure.report_sections`).
+    An aggregate model adds ``initial_amounts`` and ``category_splits``;
+    another kind adds the sections its structure gives
+    (`ModelStructure.report_sections`).
     """
 
     confidence_level: NotRequired[float]
     parameters: dict[str, ParameterEntry]
-    initial_conditions: NotRequired[dict[str, InitialConditionEntry]]
+    initial_amounts: NotRequired[dict[str, InitialAmountEntry]]
+    category_splits: NotRequired[dict[str, CategorySplitEntry]]
 
 
 def _parameter_entry(
@@ -89,30 +91,26 @@ def applied_parameters_report(
     it, so entries the calibration left alone appear alongside the fitted ones.
     The structure of the model adds the sections of its kind
     (`ModelStructure.report_sections`); an aggregate model adds
-    ``initial_conditions``.
+    ``initial_amounts`` and ``category_splits``.
 
     Parameters that are not a single number, such as a formula or a
     series, are omitted: they are inputs rather than fitted values.
     ``factor`` and ``noise`` parameters have no place in the model, so they are
     reported from `problem` when it is given.
 
-    Initial conditions of an aggregate model carry the effective
-    ``value`` the engine builds
-    from the uniform expansion plus the declared compartment overrides, its
-    ``fraction`` as that value over the declared total, and the
-    ``group`` it belongs to: ``total`` for bins and unconditional
-    stratifications, and the conditioning categories for a conditional one.
-    The ``total`` row is the declared total, with fraction 1.0. A bin left
-    uncalibrated keeps a ``None`` fraction and ``None`` value as its "needs
-    calibration" marker even when overrides touch some of its compartments.
+    ``initial_amounts`` gives each bin and each overridden compartment of an
+    aggregate model its ``amount`` the engine builds and the ``unit`` of its
+    bin, so bins of different units are reported side by side; no row is a
+    share of a total. A bin left uncalibrated keeps a ``None`` amount as its
+    "needs calibration" marker even when overrides touch some of its
+    compartments. ``category_splits`` gives each category its ``fraction`` of
+    the group it splits, and that ``group``: the categories a conditional
+    stratification is conditioned on, empty when it splits every bin.
 
     With a `sample` each entry gains an ``interval`` holding the weighted
-    statistics of its draws (`ParameterSample.summary`). A parameter is in
-    the unit it was calibrated in. An
-    initial-condition entry is in the fraction the row reports: a conditional
-    stratification's category is calibrated as a group fraction but reported
-    over the total, so its interval is rescaled by the group's share of the
-    total and brackets the reported fraction.
+    statistics of its draws (`ParameterSample.summary`). Every entry is in
+    the unit it was calibrated in: a parameter in its own, an amount in the
+    unit of its bin, and a category split as a fraction of its group.
 
     Parameters
     ----------
@@ -132,9 +130,9 @@ def applied_parameters_report(
     Returns
     -------
     AppliedParametersReport
-        Key ``parameters`` and the sections of the kind (``initial_conditions``
-        for an aggregate model), preceded by ``confidence_level`` when there
-        is one.
+        Key ``parameters`` and the sections of the kind (``initial_amounts``
+        and ``category_splits`` for an aggregate model), preceded by
+        ``confidence_level`` when there is one.
 
     Raises
     ------

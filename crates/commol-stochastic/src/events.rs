@@ -107,7 +107,7 @@ impl StochasticEvents {
     /// # Errors
     ///
     /// Returns a message when the model is not of this engine, or when
-    /// [`CompiledModel::try_from_model`] fails (a total that is not whole, or
+    /// [`CompiledModel::try_from_model`] fails (a bin whose amount is not whole, or
     /// amounts that are not whole and no rounding).
     pub fn try_from_model(model: &commol_core::Model) -> Result<Self, String> {
         let EngineSettings::StochasticEvents(settings) = *model.engine.settings() else {

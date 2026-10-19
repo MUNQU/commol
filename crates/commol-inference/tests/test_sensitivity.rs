@@ -29,7 +29,7 @@ fn decay(engine: &str, settings: &str, extra: &[&str]) -> Model {
         "accumulators":[],"stratifications":[],
         "transitions":[{{"id":"ab","source":["A"],"target":["B"],"rate":"k",
         "stratified_rates":null,"per_compartment":null}}]}},
-        "structure":{{"kind":"aggregate","total":1000,"bin_fractions":{{"A":1.0,"B":0.0}}}}}}"#,
+        "structure":{{"kind":"aggregate","bin_amounts":{{"A":1000.0,"B":0.0}}}}}}"#,
         parameters.join(",")
     );
     serde_json::from_str(&json).expect("valid model JSON")
@@ -412,8 +412,13 @@ fn a_center_that_cannot_be_run_says_why() {
         "A".to_string(),
         CalibrationParameterType::InitialCondition,
         0.0,
-        2.0,
+        4000.0,
     );
+    // A and B keep 1000, so A = 2000 leaves the remainder B at -1000, half of
+    // the amount A sets.
+    let beyond_the_remainder = problem(difference(&[]), observed.clone(), vec![start])
+        .with_initial_condition_remainder("B")
+        .unwrap();
 
     let k = || CalibrationParameter::new("k".to_string(), 0.0, 1.0);
     assert_eq!(
@@ -425,7 +430,10 @@ fn a_center_that_cannot_be_run_says_why() {
             if message.contains("not found")),
     );
     assert_eq!(
-        jacobian(decay("DifferenceEquations", "", &[]), start, 1.5),
+        FiniteDifferences::new(&beyond_the_remainder, Design::Observations)
+            .unwrap()
+            .jacobian(&[2000.0])
+            .unwrap_err(),
         SensitivityError::InfeasiblePoint(
             "the starting state is infeasible (excess 0.5)".to_string()
         )

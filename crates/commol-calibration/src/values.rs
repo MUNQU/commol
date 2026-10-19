@@ -135,7 +135,7 @@ pub(crate) fn configure_engine<E: SimulationEngine>(
 }
 
 /// Check that the engine resolves every value of its model kind and the
-/// remainder.
+/// remainder, and return the plan it resolves them to.
 ///
 /// The engine resolves them as the calibration objective does, so the first
 /// check that sees an id gives the engine's message, for example that a
@@ -149,8 +149,8 @@ pub fn check_model_values<E: SimulationEngine>(
     engine: &E,
     parameters: &[CalibrationParameter],
     remainder: Option<&str>,
-) -> Result<(), String> {
-    ValueWriter::new(engine, parameters, remainder).map(|_| ())
+) -> Result<E::ValuePlan, String> {
+    ValueWriter::new(engine, parameters, remainder).map(|writer| writer.plan)
 }
 
 /// An engine with calibration values applied exactly as the calibration

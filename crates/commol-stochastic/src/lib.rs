@@ -18,9 +18,10 @@
 //! are the mean-field limits of these.
 //!
 //! Both engines draw every random number from one `commol_random::Generator`
-//! seeded by `SimulationEngine::set_seed`, and start from whole units: a
-//! total that is not whole is an error, and initial amounts that are not
-//! whole need a [`commol_core::Rounding`] in the settings of the engine.
+//! seeded by `SimulationEngine::set_seed`, and start from whole units: a bin
+//! whose amount is not whole is an error, and initial amounts that are not
+//! whole need a [`commol_core::Rounding`] in the settings of the engine, which
+//! makes the compartments of each bin whole.
 
 #![warn(missing_docs)]
 

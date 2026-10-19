@@ -56,8 +56,7 @@ def _graph_model() -> Model:
     )
     builder.set_structure(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.5, "B": 0.5, "C": 0.0},
+            bin_amounts={"A": 500, "B": 500, "C": 0},
             stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
         )
     )
@@ -229,7 +228,7 @@ class TestEveryKindRenders:
         builder.add_transition(id="out", source=["A"], target=[], rate="0.1")
 
         model = builder.build(
-            Aggregate(total=10, bin_fractions={"A": 1.0}), engine="DifferenceEquations"
+            Aggregate(bin_amounts={"A": 10}), engine="DifferenceEquations"
         )
 
         assert "dA/dt" not in model.describe().render("text")

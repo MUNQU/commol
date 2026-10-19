@@ -76,17 +76,17 @@ Observation       A run returns the value of every output at every position it r
 Initialization
 --------------
 
-Bin fractions
-~~~~~~~~~~~~~
-Bin  Fraction  Amount
----  --------  ------
-A    0.5       5
-B    0.5       5
+Bin amounts
+~~~~~~~~~~~
+Bin  Amount  Unit
+---  ------  ----
+A    5
+B    5
 
-Initial state (total 10)
-~~~~~~~~~~~~~~~~~~~~~~~~
-Compartment  Amount
------------  ------
+Initial state
+~~~~~~~~~~~~~
+Compartment  Amount  Unit
+-----------  ------  ----
 A            5
 B            5
 

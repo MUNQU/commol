@@ -17,7 +17,7 @@ fn problem() -> CalibrationProblem<DifferenceEquations> {
         "accumulators":[],"stratifications":[],
         "transitions":[{"id":"ab","source":["A"],
         "target":["B"],"rate":"k","stratified_rates":null,"per_compartment":null}]},
-        "structure":{"kind":"aggregate","total":1000,"bin_fractions":{"A":1.0,"B":0.0}}}"#;
+        "structure":{"kind":"aggregate","bin_amounts":{"A":1000.0,"B":0.0}}}"#;
     let model: Model = serde_json::from_str(json).expect("valid model JSON");
     CalibrationProblem::new(
         DifferenceEquations::try_from_model(&model).unwrap(),
@@ -53,7 +53,7 @@ fn a_run_that_fails_is_an_error_not_a_point_outside_the_support() {
         "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
         "accumulators":[],"stratifications":[],
         "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"k * z"}]},
-        "structure":{"kind":"aggregate","total":1000,"bin_fractions":{"A":1.0,"B":0.0}}}"#,
+        "structure":{"kind":"aggregate","bin_amounts":{"A":1000.0,"B":0.0}}}"#,
     )
     .expect("valid model JSON");
     model.process.transitions[0].stratified_rates = None;

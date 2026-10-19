@@ -157,7 +157,7 @@ class TestValues:
             ModelBuilder("M").add_parameter("x", [(0, math.inf)], mode="pulse")
 
     def test_a_run_names_the_initial_conditions_left_to_calibrate(self) -> None:
-        model = build(a_to_b_builder(fractions={"A": 0.5, "B": None}))
+        model = build(a_to_b_builder(amounts={"A": 500, "B": None}))
 
         with pytest.raises(
             ValueError, match="Initial conditions requiring calibration: B"

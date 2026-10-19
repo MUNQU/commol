@@ -206,9 +206,7 @@ class TestVariants:
 
     @staticmethod
     def _variant() -> UnstratifiedVariant:
-        return UnstratifiedVariant(
-            total=1000, bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0}
-        )
+        return UnstratifiedVariant(bin_amounts={"A": 990, "B": 10, "C": 0})
 
     def test_a_variant_saves_its_variant_and_loads_back_as_its_class(
         self, tmp_path
@@ -239,8 +237,7 @@ class TestVariants:
     def test_the_engine_runs_the_checks_of_the_variant(self) -> None:
         builder = abc_builder(stratifications={"group": {"g1": 0.5, "g2": 0.5}})
         variant = UnstratifiedVariant(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
             stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
         )
 
@@ -282,5 +279,5 @@ def test_the_process_of_a_model_is_saved_apart_from_its_structure() -> None:
         "transitions",
     }
     assert "bins" not in data["structure"]
-    assert data["structure"]["total"] == 1000
+    assert data["structure"]["bin_amounts"] == {"A": 1000, "B": 0}
     assert Process.model_validate(data["process"]) == model.process

@@ -100,8 +100,9 @@ impl PyCalibrationProblem {
     ///     constraints: Constraints on parameters and outputs
     ///     loss_config: Loss, normalization and replicates; None with
     ///         observation models
-    ///     initial_condition_remainder: Compartment or bin that absorbs the
-    ///         difference to the total, if any
+    ///     initial_condition_remainder: Compartment or bin that takes what
+    ///         the other compartments leave of the amounts the model states,
+    ///         if any
     ///     observation_models: `(series label, model)` of each series; None
     ///         with a loss
     ///

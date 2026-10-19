@@ -19,9 +19,8 @@ use pyo3::prelude::*;
 ///     pairs applied to the compartment, in declaration order.
 ///
 /// Raises:
-///     ValueError: If the total is not finite or not greater than 0, or an
-///         override names an unknown or repeated compartment, holds a fraction
-///         outside [0, 1], or makes the initial amounts exceed the total
+///     ValueError: If a bin amount or an override is not finite or is
+///         negative, or an override names an unknown compartment
 #[pyfunction]
 #[allow(clippy::type_complexity)]
 fn initial_state(

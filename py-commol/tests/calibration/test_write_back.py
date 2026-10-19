@@ -33,7 +33,7 @@ SEED = 42
 
 
 def _two_bins() -> ModelBuilder:
-    return a_to_b_builder(rate="k * A", fractions={"A": 0.5, "B": 0.5})
+    return a_to_b_builder(rate="k * A", amounts={"A": 500, "B": 500})
 
 
 def _flat_category() -> ModelBuilder:
@@ -45,7 +45,7 @@ def _flat_category() -> ModelBuilder:
 
 
 def _shared_category_override() -> ModelBuilder:
-    return shared_category_builder(compartment_fractions={"A_c1_c1": 0.0})
+    return shared_category_builder(compartment_amounts={"A_c1_c1": 0})
 
 
 def _mixed_replay() -> ModelBuilder:
@@ -53,7 +53,7 @@ def _mixed_replay() -> ModelBuilder:
     return a_to_b_builder(
         rate="k * A",
         per_compartment=True,
-        fractions={"A": 0.6, "B": 0.4},
+        amounts={"A": 600, "B": 400},
         stratifications={
             "group": {"c1": 0.5, "c2": 0.5},
             "level": {"c1": 0.5, "c2": 0.5},
@@ -73,8 +73,7 @@ def _prefixed_bins() -> ModelBuilder:
     )
     return builder.set_structure(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.5, "A_x": 0.5},
+            bin_amounts={"A": 500, "A_x": 500},
             stratification_fractions=stratify(
                 builder, {"group": {"g1": 0.5, "g2": 0.5}}
             ),
@@ -100,19 +99,19 @@ def _scored(
 
 
 def _overrides(model: Model) -> dict[str, float]:
-    return dict(model.structure.compartment_fractions)
+    return dict(model.structure.compartment_amounts)
 
 
 WRITE_BACK_CASES = [
-    pytest.param(override_builder, {"A_g1": 0.2}, None, id="single-exact"),
-    pytest.param(override_builder, {"A_g1": 0.2}, "B", id="single-exact-remainder"),
-    pytest.param(override_builder, {"A_g1": 0.2, "A_g2": 0.6}, None, id="two-exact"),
-    pytest.param(override_builder, {"A": 0.6}, None, id="bin-over-override"),
+    pytest.param(override_builder, {"A_g1": 200}, None, id="single-exact"),
+    pytest.param(override_builder, {"A_g1": 200}, "B", id="single-exact-remainder"),
+    pytest.param(override_builder, {"A_g1": 200, "A_g2": 600}, None, id="two-exact"),
+    pytest.param(override_builder, {"A": 600}, None, id="bin-over-override"),
     pytest.param(override_builder, {"g1": 0.3}, None, id="category-over-override"),
-    pytest.param(override_builder, {"A": 0.6, "g1": 0.3}, "B", id="bin-and-category"),
-    pytest.param(override_builder, {"g1": 0.3, "A": 0.6}, "B", id="category-and-bin"),
-    pytest.param(_two_bins, {"A": 0.6}, "B", id="bin-with-remainder"),
-    pytest.param(_two_bins, {"A": 0.4, "B": 0.6}, None, id="complete-bins"),
+    pytest.param(override_builder, {"A": 600, "g1": 0.3}, "B", id="bin-and-category"),
+    pytest.param(override_builder, {"g1": 0.3, "A": 600}, "B", id="category-and-bin"),
+    pytest.param(_two_bins, {"A": 600}, "B", id="bin-with-remainder"),
+    pytest.param(_two_bins, {"A": 400, "B": 600}, None, id="complete-bins"),
     pytest.param(_flat_category, {"g1": 0.3}, None, id="flat-category"),
     pytest.param(_flat_category, {"g1": 0.3, "g2": 0.3}, None, id="both-categories"),
     pytest.param(shared_category_builder, {"level:c1": 0.6}, None, id="qualified"),
@@ -122,10 +121,10 @@ WRITE_BACK_CASES = [
         None,
         id="qualified-over-override",
     ),
-    pytest.param(_mixed_replay, {"A": 0.5, "g1": 0.4}, "B", id="mixed"),
+    pytest.param(_mixed_replay, {"A": 500, "g1": 0.4}, "B", id="mixed"),
     pytest.param(
         conditional_pathway_builder,
-        {"B_g2_t2": 0.07},
+        {"B_g2_t2": 70},
         "A",
         id="composite-state",
     ),
@@ -162,26 +161,46 @@ class TestWriteBackRebuildsTheScoredState:
 
 
 class TestWriteBackReadability:
-    """Values the declared fractions express are written to those fractions."""
+    """Values the declared amounts and splits express are written to them."""
 
-    def test_complete_bin_values_update_the_bin_fractions(self) -> None:
+    def test_an_amount_in_the_unit_of_its_bin_is_written_back(self) -> None:
+        model = (
+            ModelBuilder(name="Mixed units")
+            .add_bin(id="A", name="State A", unit="item")
+            .add_bin(id="B", name="State B", unit="item")
+            .add_bin(id="C", name="State C", unit="mg/l")
+            .add_parameter(id="k", value=0.1)
+            .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
+            .build(
+                Aggregate(bin_amounts={"A": 990, "B": 10, "C": None}),
+                engine="DifferenceEquations",
+            )
+        )
+
+        model.apply_calibration_parameters({"C": 2.5e5}, initial_condition_problem("C"))
+
+        assert model.structure.bin_amounts == {"A": 990, "B": 10, "C": 2.5e5}
+        assert _overrides(model) == {}
+        assert initial_state(model) == {"A": 990, "B": 10, "C": 2.5e5}
+
+    def test_complete_bin_values_update_the_bin_amounts(self) -> None:
         model = build(_two_bins())
 
         model.apply_calibration_parameters(
-            {"A": 0.4, "B": 0.6}, initial_condition_problem("A", "B")
+            {"A": 400, "B": 600}, initial_condition_problem("A", "B")
         )
 
-        assert model.structure.bin_fractions == pytest.approx({"A": 0.4, "B": 0.6})
+        assert model.structure.bin_amounts == pytest.approx({"A": 400, "B": 600})
         assert _overrides(model) == {}
 
-    def test_remainder_bin_takes_the_rest_of_the_total(self) -> None:
+    def test_remainder_bin_takes_what_the_others_leave(self) -> None:
         model = build(_two_bins())
 
         model.apply_calibration_parameters(
-            {"A": 0.7}, initial_condition_problem("A", remainder="B")
+            {"A": 700}, initial_condition_problem("A", remainder="B")
         )
 
-        assert model.structure.bin_fractions == pytest.approx({"A": 0.7, "B": 0.3})
+        assert model.structure.bin_amounts == pytest.approx({"A": 700, "B": 300})
         assert _overrides(model) == {}
 
     def test_category_value_updates_the_category_fraction(self) -> None:
@@ -225,18 +244,19 @@ class TestWriteBackReadability:
         model = build(conditional_pathway_builder())
 
         model.apply_calibration_parameters(
-            {"B_g2_t2": 0.07},
+            {"B_g2_t2": 70},
             initial_condition_problem("B_g2_t2", remainder="A"),
         )
 
-        # B totals 0 + 25 + 70 = 95, so A takes the remaining 905 and keeps
-        # its split; only the B compartments need overrides.
-        assert model.structure.bin_fractions == pytest.approx({"A": 0.905, "B": 0.095})
-        assert set(_overrides(model)) == {"B_g1", "B_g2_t1", "B_g2_t2"}
+        # A and B_g2_t2 keep their declared 900 + 25, so A takes 925 - 70 =
+        # 855 and keeps its split. B keeps its amount, and only the
+        # compartment the value sets joins the override of B_g1.
+        assert model.structure.bin_amounts == pytest.approx({"A": 855, "B": 100})
+        assert set(_overrides(model)) == {"B_g1", "B_g2_t2"}
         rebuilt = initial_state(model)
         assert rebuilt["B_g2_t2"] == pytest.approx(70.0)
         assert rebuilt["B_g1"] == 0.0
-        assert sum(rebuilt.values()) == pytest.approx(1000.0)
+        assert sum(rebuilt.values()) == pytest.approx(950.0)
 
     def test_a_compartment_value_leaves_a_category_value_to_its_fraction(
         self,
@@ -245,36 +265,43 @@ class TestWriteBackReadability:
             a_to_b_builder(
                 rate="k * A",
                 per_compartment=True,
-                fractions={"A": 0.6, "B": 0.4},
+                amounts={"A": 600, "B": 400},
                 stratifications={"group": {"g1": 0.5, "g2": 0.5}},
             )
         )
-        values = {"B_g1": 0.1, "g1": 0.3}
+        values = {"B_g1": 100, "g1": 0.3}
 
         model.apply_calibration_parameters(values, initial_condition_problem(*values))
 
         assert model.structure.stratification_fractions == {
             "group": {"g1": 0.3, "g2": 0.7}
         }
-        assert _overrides(model) == {"B_g1": 0.1}
+        assert _overrides(model) == {"B_g1": 100}
 
     def test_without_remainder_values_are_applied_as_given(self) -> None:
         model = build(_flat_category())
 
         model.apply_calibration_parameters(
-            {"A_g1": 0.2}, initial_condition_problem("A_g1")
+            {"A_g1": 200}, initial_condition_problem("A_g1")
         )
 
         assert initial_state(model)["A_g1"] == pytest.approx(200.0)
         assert sum(initial_state(model).values()) == pytest.approx(200.0)
 
-    def test_without_remainder_an_excess_is_rejected(self) -> None:
+    def test_without_remainder_the_other_bins_keep_their_amounts(self) -> None:
+        model = build(_two_bins())
+
+        model.apply_calibration_parameters({"A": 600}, initial_condition_problem("A"))
+
+        assert model.structure.bin_amounts == {"A": 600, "B": 500}
+
+    def test_a_remainder_left_below_zero_leaves_the_model_unchanged(self) -> None:
         model = build(_two_bins())
         before = model.model_dump_json()
 
-        with pytest.raises(ValueError, match="exceed the total"):
+        with pytest.raises(ValueError, match="remainder 'B' keeps by 0.166667"):
             model.apply_calibration_parameters(
-                {"A": 0.6}, initial_condition_problem("A")
+                {"A": 1200}, initial_condition_problem("A", remainder="B")
             )
 
         assert model.model_dump_json() == before
@@ -282,10 +309,10 @@ class TestWriteBackReadability:
     def test_applying_the_written_back_values_again_is_a_no_op(self) -> None:
         model = build(_two_bins())
         problem = initial_condition_problem("A", remainder="B")
-        model.apply_calibration_parameters({"A": 0.7}, problem)
+        model.apply_calibration_parameters({"A": 700}, problem)
         first = model.model_dump_json()
 
-        model.apply_calibration_parameters({"A": 0.7}, problem)
+        model.apply_calibration_parameters({"A": 700}, problem)
 
         assert model.model_dump_json() == first
 
@@ -293,10 +320,10 @@ class TestWriteBackReadability:
         model = build(_prefixed_bins())
 
         model.apply_calibration_parameters(
-            {"A": 0.3}, initial_condition_problem("A", remainder="A_x")
+            {"A": 300}, initial_condition_problem("A", remainder="A_x")
         )
 
-        assert model.structure.bin_fractions == pytest.approx({"A": 0.3, "A_x": 0.7})
+        assert model.structure.bin_amounts == pytest.approx({"A": 300, "A_x": 700})
         assert _overrides(model) == {}
         assert initial_state(model) == pytest.approx(
             {"A_g1": 150.0, "A_g2": 150.0, "A_x_g1": 350.0, "A_x_g2": 350.0}
@@ -320,7 +347,7 @@ class TestSharedCategory:
 
         assert model.model_dump_json() == before
 
-    def test_qualified_id_keeps_the_total(self) -> None:
+    def test_qualified_id_keeps_the_sum_of_the_bin(self) -> None:
         model = build(shared_category_builder())
 
         model.apply_calibration_parameters(
@@ -350,10 +377,10 @@ class TestAtomicity:
         written = model.structure.with_calibrated_values(
             model, initial_condition_problem("A_g1"), {}
         )
-        written.compartment_fractions["A_g1"] = 0.1
+        written.compartment_amounts["A_g1"] = 100
 
-        assert written.bin_fractions == model.structure.bin_fractions
-        assert model.structure.compartment_fractions == {"A_g1": 0.3}
+        assert written.bin_amounts == model.structure.bin_amounts
+        assert model.structure.compartment_amounts == {"A_g1": 300}
 
     def test_unresolvable_initial_condition_leaves_the_model_unchanged(self) -> None:
         model = build(override_builder())
@@ -367,7 +394,7 @@ class TestAtomicity:
 
         with pytest.raises(ValueError, match="missing"):
             model.apply_calibration_parameters(
-                {"k": 0.5, "A": 0.4, "missing": 0.1}, problem
+                {"k": 0.5, "A": 400, "missing": 100}, problem
             )
 
         assert model.model_dump_json() == before
@@ -378,7 +405,9 @@ class TestCompositeStateCalibration:
 
     def test_calibrated_composite_state_is_written_back(self) -> None:
         truth = build(conditional_pathway_builder())
-        truth.structure.update_compartment_fractions(truth.process, {"B_g2_t2": 0.07})
+        # The remainder A keeps the declared 900 + 25 of A and B_g2_t2.
+        truth.structure.update_compartment_amounts(truth.process, {"B_g2_t2": 70})
+        truth.structure.update_bin_amounts({"A": 855})
         observed = Simulation(truth).run(10)
         problem = CalibrationProblem(
             observed_data=[
@@ -394,7 +423,7 @@ class TestCompositeStateCalibration:
                     id="B_g2_t2",
                     parameter_type="initial_condition",
                     min_bound=0.0,
-                    max_bound=0.1,
+                    max_bound=100.0,
                 ),
             ],
             initial_condition_remainder="A",
@@ -411,8 +440,8 @@ class TestCompositeStateCalibration:
         assert rebuilt == pytest.approx(expected)
         assert rebuilt["B_g1"] == 0.0
         assert rebuilt["B_g2_t2"] == pytest.approx(70.0, abs=0.5)
-        assert sum(rebuilt.values()) == pytest.approx(1000.0)
-        assert result.best_parameters["B_g2_t2"] == pytest.approx(0.07, abs=5e-4)
+        assert sum(rebuilt.values()) == pytest.approx(950.0)
+        assert result.best_parameters["B_g2_t2"] == pytest.approx(70, abs=0.5)
 
 
 def _binary_split(group1_fraction: float = 0.5) -> Model:
@@ -552,11 +581,11 @@ class TestApplyCalibrationParameters:
         model = _binary_split()
         problem = initial_condition_problem("A_group1", "A_group2")
 
-        model.apply_calibration_parameters({"A_group1": 0.3, "A_group2": 0.7}, problem)
-        model.apply_calibration_parameters({"A_group1": 0.4, "A_group2": 0.6}, problem)
+        model.apply_calibration_parameters({"A_group1": 300, "A_group2": 700}, problem)
+        model.apply_calibration_parameters({"A_group1": 400, "A_group2": 600}, problem)
 
-        overrides = list(model.structure.compartment_fractions.items())
+        overrides = list(model.structure.compartment_amounts.items())
         assert overrides == [
-            ("A_group1", pytest.approx(0.4)),
-            ("A_group2", pytest.approx(0.6)),
+            ("A_group1", pytest.approx(400)),
+            ("A_group2", pytest.approx(600)),
         ]

@@ -30,7 +30,7 @@ def _impulse_model(
         impulse_at=impulse_at,
         impulse_every=impulse_every,
     )
-    builder.set_structure(Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}))
+    builder.set_structure(Aggregate(bin_amounts={"A": 1000, "B": 0}))
     return build_ode(builder) if ode else build(builder)
 
 
@@ -54,7 +54,7 @@ class TestJump:
         builder.add_parameter("p", 0.25).add_parameter("k", 0.1)
         builder.add_transition("jump", ["A"], ["B"], rate="p", impulse_at=[1])
         builder.add_transition("flow", ["A"], ["B"], rate="k")
-        builder.set_structure(Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0}))
+        builder.set_structure(Aggregate(bin_amounts={"A": 1000, "B": 0}))
 
         results = Simulation(build(builder)).run(2)
 
@@ -79,7 +79,7 @@ class TestJump:
         builder.add_transition(
             "av", ["A"], ["V"], rate="p", impulse_every=(period, period)
         )
-        builder.set_structure(Aggregate(total=1000, bin_fractions={"A": 1.0, "V": 0}))
+        builder.set_structure(Aggregate(bin_amounts={"A": 1000, "V": 0}))
         steps = [j * period for j in range(1, 201)]
 
         results = Simulation(build_ode(builder, TIGHT)).run_at(steps)

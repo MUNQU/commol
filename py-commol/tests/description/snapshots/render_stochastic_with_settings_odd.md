@@ -70,19 +70,19 @@ Events happen one at a time, at random times: each event of a flow moves one uni
 
 ## Initialization
 
-### Bin fractions
+### Bin amounts
 
-| Bin | Fraction | Amount |
+| Bin | Amount | Unit |
 |---|---|---|
-| A | 0.5 | 5 |
-| B | 0.5 | 5 |
+| A | 5 |  |
+| B | 5 |  |
 
-### Initial state (total 10)
+### Initial state
 
-| Compartment | Amount |
-|---|---|
-| A | 5 |
-| B | 5 |
+| Compartment | Amount | Unit |
+|---|---|---|
+| A | 5 |  |
+| B | 5 |  |
 
 ## Input data
 

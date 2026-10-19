@@ -190,49 +190,53 @@
       "blocks": [
         {
           "type": "table",
-          "heading": "Bin fractions",
+          "heading": "Bin amounts",
           "columns": [
             "Bin",
-            "Fraction",
-            "Amount"
+            "Amount",
+            "Unit"
           ],
           "rows": [
             [
               "A",
-              0.99,
-              990.0
+              990.0,
+              null
             ],
             [
               "B",
-              0.01,
-              10.0
+              10.0,
+              null
             ],
             [
               "C",
               0.0,
-              0.0
+              null
             ]
           ]
         },
         {
           "type": "table",
-          "heading": "Initial state (total 1000)",
+          "heading": "Initial state",
           "columns": [
             "Compartment",
-            "Amount"
+            "Amount",
+            "Unit"
           ],
           "rows": [
             [
               "A",
-              990.0
+              990.0,
+              null
             ],
             [
               "B",
-              10.0
+              10.0,
+              null
             ],
             [
               "C",
-              0.0
+              0.0,
+              null
             ]
           ]
         }

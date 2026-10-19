@@ -24,7 +24,7 @@ def _seeded(
 ):
     builder = a_to_b_builder(
         rate="k * B / total",
-        fractions={"A": 0.995, "B": 0.005},
+        amounts={"A": 995, "B": 5},
         stratifications=GROUPS,
     )
     return build_stochastic(builder, engine, settings)
@@ -55,15 +55,16 @@ class TestWholeUnits:
         assert engine in str(error.value)
         assert "'A_g0' (99.5)" in str(error.value)
 
-    def test_a_total_that_is_not_whole_names_the_engine(
+    def test_a_bin_that_is_not_whole_names_the_engine_and_the_bin(
         self, engine: EngineName
     ) -> None:
-        builder = a_to_b_builder(total=1000.5)
+        builder = a_to_b_builder(amounts={"A": 1000.5, "B": 0})
 
         with pytest.raises(ValueError, match=f"The {engine} engine") as error:
             build_stochastic(builder, engine, _settings(engine, "random"))
 
-        assert "1000.5" in str(error.value)
+        assert "the amount of each bin must be a whole number" in str(error.value)
+        assert "'A' (1000.5)" in str(error.value)
 
     def test_the_largest_remainder_starts_every_run_alike(
         self, engine: EngineName

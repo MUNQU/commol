@@ -29,7 +29,7 @@ def test_an_engine_variable_is_not_a_bin_id(name: str) -> None:
     builder.add_bin(id=name, name=name).add_bin(id="B", name="B")
     builder.add_parameter(id="k", value=0.1)
     builder.add_transition(id="flow", source=[name], target=["B"], rate="k")
-    builder.set_structure(Aggregate(total=1000, bin_fractions={name: 1.0, "B": 0.0}))
+    builder.set_structure(Aggregate(bin_amounts={name: 1000, "B": 0}))
 
     with pytest.raises(ValueError, match=f"bin '{name}'"):
         build(builder)
@@ -52,8 +52,7 @@ def test_a_bin_name_that_reads_as_a_subgroup_total_is_rejected() -> None:
     halves = {"y": 0.5, "o": 0.5}
     builder.set_structure(
         Aggregate(
-            total=1000,
-            bin_fractions={"total_y": 1.0, "B": 0.0},
+            bin_amounts={"total_y": 1000, "B": 0},
             stratification_fractions={"group": halves, "type": halves},
         )
     )
@@ -103,7 +102,7 @@ def test_a_bin_named_n_builds_and_runs() -> None:
     builder.add_transition(
         id="growth", source=["N"], target=["P"], rate="uptake * P / total"
     )
-    builder.set_structure(Aggregate(total=2.5, bin_fractions={"N": 0.8, "P": 0.2}))
+    builder.set_structure(Aggregate(bin_amounts={"N": 2, "P": 0.5}))
 
     result = Simulation(build(builder)).run(1)
 

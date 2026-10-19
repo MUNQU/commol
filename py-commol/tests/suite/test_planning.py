@@ -246,6 +246,103 @@ def test_the_priorities_of_a_repository_are_read_from_the_items() -> None:
     assert parallel.priorities_of(items, "o/a") == {1: "Now"}
 
 
+# The precedence level
+
+
+def test_an_issue_is_one_level_above_its_highest_blocker() -> None:
+    issues = {
+        1: an_issue(1),
+        2: an_issue(2, blocked_by=frozenset({1})),
+        3: an_issue(3, blocked_by=frozenset({1, 2})),
+    }
+
+    assert parallel.levels(issues) == {1: 0, 2: 1, 3: 2}
+
+
+def test_a_blocker_of_another_repository_counts_as_level_zero() -> None:
+    elsewhere = an_issue(1)
+    elsewhere.blocked_elsewhere = 1
+
+    assert parallel.levels({1: elsewhere, 2: an_issue(2)}) == {1: 1, 2: 0}
+
+
+def test_a_cycle_of_blockers_ends() -> None:
+    issues = {
+        1: an_issue(1, blocked_by=frozenset({2})),
+        2: an_issue(2, blocked_by=frozenset({1})),
+    }
+
+    assert set(parallel.levels(issues)) == {1, 2}
+
+
+def test_the_levels_of_a_repository_are_read_from_the_items() -> None:
+    def item(item_id: int, number: int, repository: str, level: int | None) -> dict:
+        return {
+            "id": item_id,
+            "content_type": "Issue",
+            "content": {
+                "number": number,
+                "repository_url": f"https://api.github.com/repos/{repository}",
+            },
+            "fields": [{"name": "Level", "value": level}],
+        }
+
+    items = [
+        item(10, 1, "o/a", 2),
+        item(20, 2, "o/a", None),
+        item(30, 3, "o/b", 1),
+        {"id": 40, "content_type": "DraftIssue", "content": {}, "fields": []},
+    ]
+
+    assert parallel.levels_of(items, "o/a") == {1: (10, 2), 2: (20, None)}
+
+
+def test_only_the_levels_that_change_are_written() -> None:
+    current = {1: (10, 0), 2: (20, None), 3: (30, 1.0), 4: (40, 2), 5: (50, None)}
+
+    # 1 keeps its level, 2 gets one, 3 moves, 4 has closed, 5 is closed already.
+    written = parallel.level_changes({1: 0, 2: 1, 3: 2}, current)
+
+    assert written == [(20, 1), (30, 2), (40, None)]
+
+
+def test_an_open_issue_outside_the_project_gets_no_level() -> None:
+    assert parallel.level_changes({1: 0}, {}) == []
+
+
+def run_main(*arguments: str) -> dict[str, list[tuple]]:
+    """Run ``parallel.main`` with ``arguments``; the writes of the levels fail.
+
+    Returns the calls of ``show_next`` and ``show_parallel``.
+    """
+    calls: dict[str, list[tuple]] = {"next": [], "parallel": []}
+    failure = SystemExit("GitHub: PATCH orgs/o/projectsV2/1/items/10: HTTP 403")
+    with (
+        patch.object(sys, "argv", ["parallel.py", *arguments]),
+        patch.object(parallel, "load", return_value={}),
+        patch.object(parallel, "write_levels", side_effect=failure),
+        patch.object(parallel, "show_next", lambda *a: calls["next"].append(a)),
+        patch.object(parallel, "show_parallel", lambda *a: calls["parallel"].append(a)),
+    ):
+        parallel.main()
+    return calls
+
+
+def test_a_failed_level_write_still_lists_the_next_issues(capsys) -> None:
+    calls = run_main("--levels", "--next", "2")
+
+    assert calls["next"] == [({}, 2)]
+    assert "Level: not written: GitHub: PATCH" in capsys.readouterr().err
+
+
+def test_levels_and_write_also_write_what_can_run_in_parallel() -> None:
+    assert run_main("--levels", "--write")["parallel"] == [({}, True)]
+
+
+def test_levels_alone_print_nothing_else() -> None:
+    assert run_main("--levels") == {"next": [], "parallel": []}
+
+
 def test_the_milestone_of_an_issue_is_its_due_date_and_number() -> None:
     due = {"milestone": {"number": 2, "due_on": "2026-11-01T00:00:00Z"}}
 

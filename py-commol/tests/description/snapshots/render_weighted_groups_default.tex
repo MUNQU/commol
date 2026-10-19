@@ -90,42 +90,42 @@ g2 & 0.5 & 1 \\
 Each step applies every flow once, computed from the state at the start of the step: X(n + 1) = X(n) + sum of the flows. The impulses of a step act first, and its flows run from the new state.
 
 \section*{Initialization}
-\subsection*{Bin fractions}
+\subsection*{Bin amounts}
 \begin{longtable}{p{0.3\linewidth}p{0.3\linewidth}p{0.3\linewidth}}
-Bin & Fraction & Amount \\
+Bin & Amount & Unit \\
 \hline
 \endhead
-A & set by calibration &  \\
-B & 0.4 & 400 \\
+A & set by calibration & item \\
+B & 400 & item \\
 \end{longtable}
 \subsection*{Stratification fractions}
 \begin{longtable}{p{0.225\linewidth}p{0.225\linewidth}p{0.225\linewidth}p{0.225\linewidth}}
 Stratification & Category & Fraction & Of \\
 \hline
 \endhead
-group & g1 & 0.25 & total \\
-group & g2 & 0.75 & total \\
+group & g1 & 0.25 & each bin \\
+group & g2 & 0.75 & each bin \\
 tier & t1 & 0.5 & g1 \\
 tier & t2 & 0.5 & g1 \\
 \end{longtable}
 \subsection*{Compartment overrides}
 \begin{longtable}{p{0.3\linewidth}p{0.3\linewidth}p{0.3\linewidth}}
-Compartment & Fraction of the total & Amount \\
+Compartment & Amount & Unit \\
 \hline
 \endhead
-B\_g2 & 0.2 & 200 \\
+B\_g2 & 200 & item \\
 \end{longtable}
-\subsection*{Initial state (total 1000)}
-\begin{longtable}{p{0.45\linewidth}p{0.45\linewidth}}
-Compartment & Amount \\
+\subsection*{Initial state}
+\begin{longtable}{p{0.3\linewidth}p{0.3\linewidth}p{0.3\linewidth}}
+Compartment & Amount & Unit \\
 \hline
 \endhead
-A\_g1\_t1 & 0 \\
-A\_g1\_t2 & 0 \\
-A\_g2 & 0 \\
-B\_g1\_t1 & 50 \\
-B\_g1\_t2 & 50 \\
-B\_g2 & 200 \\
+A\_g1\_t1 & 0 & item \\
+A\_g1\_t2 & 0 & item \\
+A\_g2 & 0 & item \\
+B\_g1\_t1 & 50 & item \\
+B\_g1\_t2 & 50 & item \\
+B\_g2 & 200 & item \\
 \end{longtable}
 \section*{Parameters}
 \begin{longtable}{p{0.18\linewidth}p{0.18\linewidth}p{0.18\linewidth}p{0.18\linewidth}p{0.18\linewidth}}

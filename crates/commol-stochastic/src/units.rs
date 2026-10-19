@@ -16,12 +16,16 @@ pub(crate) fn rounded(value: f64) -> f64 {
 /// After a reset the state holds the initial amounts of the model, as they
 /// are written ([`Self::set_initial_condition`]); the first run makes them
 /// whole ([`Self::begin`]), with the rounding of the settings, so a rounding
-/// that draws reads the generator after the values calibration writes.
+/// that draws reads the generator after the values calibration writes. The
+/// rounding makes the compartments of each bin whole and keeps the amount of
+/// the bin, so no unit moves to a bin of another unit.
 #[derive(Clone)]
 pub(crate) struct Units {
     pub(crate) model: CompiledModel,
     engine: EngineType,
     rounding: Option<Rounding>,
+    /// Indices of the compartments of each bin, in engine order.
+    bins: Vec<Vec<usize>>,
     seed: u64,
     pub(crate) generator: Generator,
     /// Current state: compartments, then accumulators.
@@ -40,10 +44,21 @@ impl Units {
         rounding: Option<Rounding>,
     ) -> Self {
         let state = model.initial_state().to_vec();
+        let mut bins: Vec<(String, Vec<usize>)> = Vec::new();
+        for (index, label) in model.output_labels()[..model.num_compartments()]
+            .iter()
+            .enumerate()
+        {
+            match bins.iter_mut().find(|(bin, _)| *bin == label.source) {
+                Some((_, indices)) => indices.push(index),
+                None => bins.push((label.source.clone(), vec![index])),
+            }
+        }
         Self {
             model,
             engine,
             rounding,
+            bins: bins.into_iter().map(|(_, indices)| indices).collect(),
             seed: 0,
             generator: Generator::from_seed(0),
             state,
@@ -79,8 +94,7 @@ impl Units {
                 .iter()
                 .map(|&amount| as_whole(amount).unwrap_or_else(|| amount.round()))
                 .collect(),
-            Some(Rounding::LargestRemainder) => largest_remainder(amounts),
-            Some(Rounding::Random) => random_rounding(amounts, &mut self.generator),
+            Some(rounding) => round_bins(amounts, &self.bins, rounding, &mut self.generator),
         };
         self.state[..num_compartments].copy_from_slice(&whole);
         self.started = true;
@@ -187,6 +201,28 @@ impl Units {
     }
 }
 
+/// Whole amounts in which the compartments of each bin sum to the rounded
+/// amount of the bin, with `rounding` applied to each bin in turn.
+pub(crate) fn round_bins(
+    amounts: &[f64],
+    bins: &[Vec<usize>],
+    rounding: Rounding,
+    generator: &mut Generator,
+) -> Vec<f64> {
+    let mut whole = amounts.to_vec();
+    for bin in bins {
+        let of_bin: Vec<f64> = bin.iter().map(|&index| amounts[index]).collect();
+        let rounded = match rounding {
+            Rounding::LargestRemainder => largest_remainder(&of_bin),
+            Rounding::Random => random_rounding(&of_bin, generator),
+        };
+        for (&index, value) in bin.iter().zip(rounded) {
+            whole[index] = value;
+        }
+    }
+    whole
+}
+
 /// Whole amounts that sum to the rounded sum of `amounts`: each amount
 /// rounded down, and one more unit to each of the largest remainders, the
 /// first compartment first on a tie.
@@ -245,6 +281,25 @@ mod tests {
             largest_remainder(&[699.999_999_999_9, 300.0]),
             vec![700.0, 300.0]
         );
+    }
+
+    #[test]
+    fn each_bin_keeps_its_amount_when_rounded() {
+        // Over all four compartments, the largest remainders would give both
+        // units left to the first bin.
+        let amounts = [0.5, 0.5, 0.5, 0.5];
+        let bins = [vec![0, 1], vec![2, 3]];
+        let mut generator = Generator::from_seed(5);
+
+        assert_eq!(
+            round_bins(&amounts, &bins, Rounding::LargestRemainder, &mut generator),
+            [1.0, 0.0, 1.0, 0.0]
+        );
+        for _ in 0..100 {
+            let whole = round_bins(&amounts, &bins, Rounding::Random, &mut generator);
+            assert_eq!(whole[0] + whole[1], 1.0, "{whole:?}");
+            assert_eq!(whole[2] + whole[3], 1.0, "{whole:?}");
+        }
     }
 
     #[test]

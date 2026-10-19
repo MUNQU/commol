@@ -3,15 +3,19 @@
 //! This module is the single source of truth for how an initial-condition
 //! value reaches a compartmental engine: how its id resolves to compartments,
 //! in which order the values are written, and how the remainder keeps the
-//! total. Both engines resolve and write values of their kind through it
+//! sum of the amounts the model states. Both engines resolve and write values of their kind through it
 //! ([`commol_core::SimulationEngine::plan_values`] and
 //! [`commol_core::SimulationEngine::apply_values`]), so the calibration
 //! objective, the calibrated predictions and the model write-back all use it.
 //!
 //! Initial conditions are written in the same layers as a model definition:
 //! bin values first, then stratification-category splits, then exact
-//! compartments, and finally the remainder, which absorbs the difference to the
-//! total. Within a layer, values are written in the order given.
+//! compartments, and finally the remainder. A bin or compartment value is an
+//! amount in the unit of its bin; a category value is a split. The remainder
+//! takes the sum of the amounts the model states less every other
+//! compartment, so a compartment that no value covers, such as a bin of
+//! another unit, keeps its amount and cancels out. Within a layer, values are
+//! written in the order given.
 
 use commol_core::{ModelValue, ModelValueType, ValuePlan};
 
@@ -21,18 +25,17 @@ use crate::labels::OutputLabels;
 /// Separator of a qualified category id, as in `group:g1`.
 const CATEGORY_SEPARATOR: char = ':';
 
-/// Relative tolerance under which the sum of the initial amounts is taken to
-/// match the total.
-const TOTAL_TOLERANCE: f64 = 1e-9;
+/// Relative tolerance under which an excess over the sum the remainder keeps
+/// is taken to be zero.
+const EXCESS_TOLERANCE: f64 = 1e-9;
 
 /// Compartments an initial-condition value is written to.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum InitialConditionTarget {
-    /// A bin or a bin prefix. The value is the fraction of the total the
-    /// covered compartments hold, shared by weights taken from the base
-    /// state.
+    /// A bin or a bin prefix. The value is the amount the covered
+    /// compartments hold, shared by weights taken from the base state.
     Aggregate { entries: Vec<(usize, f64)> },
-    /// One expanded compartment. The value is its fraction of the total.
+    /// One expanded compartment. The value is its amount.
     Exact { index: usize },
     /// A category of a binary stratification. The value splits each
     /// `(category, complement)` pair of compartments.
@@ -81,10 +84,10 @@ impl InitialConditionTarget {
 pub struct InitialConditionPlan {
     /// Id and target of each value, in the order their numbers come.
     targets: Vec<(String, InitialConditionTarget)>,
-    /// The total the fractions are taken of.
+    /// The sum of the initial amounts the model states.
     total: f64,
-    /// Compartments that absorb the difference to the total, if
-    /// any, with the id they were resolved from.
+    /// Compartments that take what the other compartments leave of `total`,
+    /// if any, with the id they were resolved from.
     remainder: Option<(String, Vec<usize>)>,
 }
 
@@ -98,10 +101,8 @@ impl InitialConditionPlan {
     /// - a bin or a bin prefix (`A`, or `A_g1` over a deeper stratification);
     /// - a category of exactly one binary stratification (`g1`).
     ///
-    /// # Errors
-    ///
-    /// The remainder, when given, names the compartments that absorb the
-    /// difference to the total.
+    /// The remainder, when given, names the compartments that take what the
+    /// other compartments leave of the sum of the amounts the model states.
     ///
     /// # Errors
     ///
@@ -139,7 +140,7 @@ impl InitialConditionPlan {
         }
     }
 
-    /// Name the compartments that absorb the difference to the total.
+    /// Name the compartments that take what the others leave.
     ///
     /// # Errors
     ///
@@ -199,19 +200,36 @@ impl InitialConditionPlan {
         covered
     }
 
+    /// The compartments each value sets, in the order of the values, and the
+    /// compartments of the remainder (empty without one). A category split
+    /// keeps the pair totals, so it sets none.
+    pub fn coverage(&self) -> (Vec<Vec<usize>>, Vec<usize>) {
+        let values = self
+            .targets
+            .iter()
+            .map(|(_, target)| target.covered_compartments())
+            .collect();
+        let remainder = self
+            .remainder
+            .as_ref()
+            .map_or_else(Vec::new, |(_, indices)| indices.clone());
+        (values, remainder)
+    }
+
     /// Write initial-condition values into an engine.
     ///
     /// The values are written layer by layer (bins, category splits, exact
-    /// compartments) and then the remainder takes the difference to the
-    /// total, keeping its own split.
+    /// compartments) and then the remainder takes the sum of the amounts the
+    /// model states less every other compartment, keeping its own split.
     ///
     /// # Returns
     ///
-    /// How far the sum of the initial amounts exceeds the total, as a
-    /// fraction of it: `0.0` for a feasible state. With a remainder, the
-    /// remainder is floored at zero and the deficit is reported. Without one,
-    /// the excess of the sum over the total is reported. An excess within the
-    /// tolerance is `0.0`.
+    /// How far the amounts the values set exceed the sum the remainder keeps
+    /// (the declared amounts of every compartment the values and the
+    /// remainder cover), as a fraction of those amounts: `0.0` for a feasible
+    /// state. The remainder is floored at zero. Without a remainder every
+    /// state is feasible, because the engine rejects a negative amount. An
+    /// excess within the tolerance is `0.0`.
     ///
     /// # Errors
     ///
@@ -229,31 +247,42 @@ impl InitialConditionPlan {
                 values.len()
             ));
         }
-        let total = self.total;
         for layer in 0..3 {
             for ((id, target), value) in self.targets.iter().zip(values) {
                 if target.layer() == layer {
-                    write_target(engine, target, *value, total).map_err(|e| {
+                    write_target(engine, target, *value).map_err(|e| {
                         format!("Failed to set initial condition for '{}': {}", id, e)
                     })?;
                 }
             }
         }
 
-        let state = engine.state();
         let Some((_, indices)) = &self.remainder else {
-            let sum: f64 = state.iter().sum();
-            return Ok(feasible_or((sum / total - 1.0).max(0.0)));
+            return Ok(0.0);
         };
-
+        let state = engine.state();
+        let covered = self.covered_compartments();
         let others: f64 = state
             .iter()
             .enumerate()
             .filter(|(idx, _)| !indices.contains(idx))
             .map(|(_, value)| value)
             .sum();
-        let remainder = total - others;
-        let deficit = (-remainder / total).max(0.0);
+        let uncovered: f64 = state
+            .iter()
+            .enumerate()
+            .filter(|(idx, _)| !covered.contains(idx))
+            .map(|(_, value)| value)
+            .sum();
+        // The remainder is what the values leave of the sum it keeps, so a
+        // deficit is never larger than the amounts the values set.
+        let remainder = self.total - others;
+        let set = others - uncovered;
+        let excess = if remainder < 0.0 {
+            -remainder / set
+        } else {
+            0.0
+        };
         let remainder = remainder.max(0.0);
 
         let current: f64 = indices.iter().map(|&idx| state[idx]).sum();
@@ -267,30 +296,24 @@ impl InitialConditionPlan {
                 .set_initial_condition(idx, remainder * share)
                 .map_err(|e| format!("Failed to set the initial-condition remainder: {}", e))?;
         }
-        Ok(feasible_or(deficit))
+        Ok(feasible_or(excess))
     }
 }
 
 impl ValuePlan for InitialConditionPlan {
     fn infeasibility(&self, excess: f64) -> String {
-        match &self.remainder {
-            Some((id, _)) => format!(
-                "Invalid initial conditions: the calibrated values leave the \
-                 remainder '{}' {:.6} of the total below zero",
-                id, excess
-            ),
-            None => format!(
-                "Invalid initial conditions: the calibrated values exceed the \
-                 total by {:.6} of it",
-                excess
-            ),
-        }
+        let remainder = self.remainder.as_ref().map_or("", |(id, _)| id.as_str());
+        format!(
+            "Invalid initial conditions: the calibrated amounts exceed the sum the \
+             remainder '{remainder}' keeps by {excess:.6} of them"
+        )
     }
 }
 
-/// An excess of the total, or `0.0` when it is within the tolerance.
+/// An excess over the sum the remainder keeps, or `0.0` when it is within
+/// the tolerance.
 fn feasible_or(excess: f64) -> f64 {
-    if excess > TOTAL_TOLERANCE {
+    if excess > EXCESS_TOLERANCE {
         excess
     } else {
         0.0
@@ -301,16 +324,15 @@ fn write_target<E: CompartmentalEngine>(
     engine: &mut E,
     target: &InitialConditionTarget,
     value: f64,
-    total: f64,
 ) -> Result<(), String> {
     match target {
         InitialConditionTarget::Aggregate { entries } => {
             for &(idx, weight) in entries {
-                engine.set_initial_condition(idx, value * weight * total)?;
+                engine.set_initial_condition(idx, value * weight)?;
             }
         }
         InitialConditionTarget::Exact { index } => {
-            engine.set_initial_condition(*index, value * total)?;
+            engine.set_initial_condition(*index, value)?;
         }
         InitialConditionTarget::PairedCategory { pairs } => {
             let state = engine.state();

@@ -54,8 +54,7 @@ def flow_model(
     Parameters
     ----------
     values : Mapping[str, float]
-        Bin id to its initial value, in declaration order. Their sum is the
-        total, so it must be finite and greater than 0.
+        Bin id to its initial value, in declaration order.
     flows : Sequence[Flow]
         The transitions.
     parameters : Mapping[str, float | str] | None
@@ -89,13 +88,7 @@ def flow_model(
             impulse_every=flow.impulse_every,
             accumulators=list(flow.accumulators) or None,
         )
-    total = sum(values.values())
-    builder.structure = Aggregate(
-        total=total,
-        bin_fractions={
-            bin_id: value / total if total else 0.0 for bin_id, value in values.items()
-        },
-    )
+    builder.structure = Aggregate(bin_amounts=dict(values))
     return build_ode(builder, settings) if ode else build(builder)
 
 

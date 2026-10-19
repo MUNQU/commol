@@ -149,9 +149,7 @@ class TestUnits:
                 id="forward", source=["A", "B"], target=["C", "C"], rate="k1 * A * B"
             )
             .add_transition(id="backward", source=["C"], target=["A"], rate="k2 * C")
-            .set_structure(
-                Aggregate(total=100, bin_fractions={"A": 0.4, "B": 0.4, "C": 0.2})
-            )
+            .set_structure(Aggregate(bin_amounts={"A": 40, "B": 40, "C": 20}))
         )
 
         output = equation_forms(model)

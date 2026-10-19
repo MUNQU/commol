@@ -43,7 +43,7 @@ def flow_model(engine: str):
         .add_parameter(id="c", value=None)
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="c * A / A")
         .build(
-            Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}),
+            Aggregate(bin_amounts={"A": 1000, "B": 0}),
             engine=engine,
         )
     )
