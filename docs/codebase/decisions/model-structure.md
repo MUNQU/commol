@@ -25,14 +25,9 @@ The library names what the compartments hold without assuming individuals:
 | Term | Meaning | Where |
 |---|---|---|
 | **State** | The vector of the amount of every compartment | `CompartmentalEngine::state`, `Engine.state` |
-| **Amount** | The value of one compartment | `InitialCompartment.amount` |
-| **Total** | The sum of every compartment, accumulators excluded; the initial fractions are taken of it | `InitialConditions.total`, the rate variable `total` (`SPECIAL_VAR_TOTAL`) |
+| **Amount** | The value of one compartment, in the unit of its bin | `InitialCompartment.amount`, `InitialConditions.bin_amounts` |
+| **Total** | The sum of every compartment, accumulators excluded | the rate variable `total` (`SPECIAL_VAR_TOTAL`) |
 | **Subgroup total** | The sum of the compartments with some categories | `subgroup_total`, the rate variables `total_<cat>…` (`SUBGROUP_TOTAL_PREFIX`) |
-
-The total is a real number, finite and greater than 0, so a model of a count, a
-mass or a concentration can be stated. `0` is rejected: every fraction of it is
-zero, and the report divides by it (`initial_state` in
-`crates/commol-model/src/builder.rs`, `InitialConditions.validate_total`).
 
 **Rule:** use these four terms in code, docs and tests. `AxisPattern` takes a
 `value`, so "amount" means only the value of a compartment.
@@ -48,11 +43,38 @@ zero, and the report divides by it (`initial_state` in
 | "size" | Reads as a count. |
 | A function `total(g1, t1)` | No reserved names, but the expression language has no text arguments (`jit/ast.rs`), so the parser, the JIT and the security check would change. |
 
-**Guards:** `builder.rs` tests
-`a_real_total_starts_with_amounts_that_sum_to_it` and
-`a_total_that_is_not_finite_and_positive_is_a_build_error`;
-`tests/building/test_reserved_names.py::test_a_bin_named_n_builds_and_runs`;
-`tests/initial_conditions/test_bin_fractions.py::TestTotal`.
+**Guards:** `tests/building/test_reserved_names.py::test_a_bin_named_n_builds_and_runs`.
+
+## The initial state is an amount per bin
+
+An aggregate structure states the initial amount of each bin in the unit of
+that bin (`bin_amounts`), the split of each bin among the categories
+(`stratification_fractions`) and the amount of single compartments
+(`compartment_amounts`). There is no declared total: a model of a count and of
+a concentration has none, because a total over bins of different units has
+no unit, and the [unit check](../../guide/units-and-equations.md) rejects a
+rate that reads one. An amount is a real number, finite and not negative, so a
+model of a count, a mass or a concentration can be stated, and a model whose
+bins all start at `0` builds and runs (`initial_state` in
+`crates/commol-model/src/builder.rs`, `InitialConditions.validate_bin_amounts`).
+A structure that states `total`, `bin_fractions` or `compartment_fractions` is
+rejected with the fields to use (`InitialConditions.reject_fractions_of_a_total`).
+
+**Why, against the alternatives:**
+
+| Alternative | Why not |
+|---|---|
+| Fractions of one total when every bin shares a unit, amounts otherwise | Two forms of one thing and two paths in the engine, the write-back and the report; a calibrated value would be a fraction in one model and an amount in another. |
+| A total per unit and fractions within it | The unit of a bin is optional free text, and Rust has no units, so the engine could not group the bins. |
+| Fractions of one total | It has no meaning over bins of different units, and a total of 0 makes every fraction 0. |
+
+The cost: a model of one unit writes `{"A": 990, "B": 10}` where it wrote
+`total=1000` and `{"A": 0.99, "B": 0.01}`.
+
+**Guards:** `tests/initial_conditions/test_bin_amounts.py`,
+`tests/reference_models/test_quadratic_decay.py::test_zero_is_the_solution_from_zero`,
+`builder.rs` tests `bins_that_all_start_at_zero_build` and
+`a_bin_amount_that_is_not_finite_or_is_negative_is_a_build_error`.
 
 ## Stratification order is part of the model
 

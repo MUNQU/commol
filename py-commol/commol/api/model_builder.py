@@ -792,8 +792,8 @@ class ModelBuilder:
         The process is written once; the structure lays it out and sets the
         kind of the model, so one builder builds every kind its process fits:
 
-        ``builder.build(Aggregate(total=1000, bin_fractions={"A": 0.99,
-        "B": 0.01, "C": 0.0}), engine="DifferentialEquations")``
+        ``builder.build(Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0}),
+        engine="DifferentialEquations")``
 
         Parameters
         ----------

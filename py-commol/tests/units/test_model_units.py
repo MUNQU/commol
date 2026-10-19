@@ -69,11 +69,7 @@ def _with_v(rate: str, threshold_unit: str = "item") -> Model:
         .add_transition(id="av", source=["A"], target=["V"], rate=rate)
         .add_transition(id="ab", source=["A"], target=["B"], rate="k1 * A * B / total")
         .add_transition(id="bc", source=["B"], target=["C"], rate="k2 * B")
-        .set_structure(
-            Aggregate(
-                total=1000, bin_fractions={"A": 0.98, "V": 0.0, "B": 0.02, "C": 0.0}
-            )
-        )
+        .set_structure(Aggregate(bin_amounts={"A": 980, "V": 0, "B": 20, "C": 0}))
     )
 
 
@@ -289,8 +285,7 @@ class TestInconsistentModels:
                 .add_transition(id="t", source=source, target=target, rate=rate)
                 .set_structure(
                     Aggregate(
-                        total=1000,
-                        bin_fractions={"A": 0.5, "C": 0.5},
+                        bin_amounts={"A": 500, "C": 500},
                         stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
                     )
                 )
@@ -477,9 +472,7 @@ def _two_rates(
         .add_parameter(id="k2", value=0.1, unit=k2_unit)
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A")
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-        .set_structure(
-            Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0, "C": 0.0})
-        )
+        .set_structure(Aggregate(bin_amounts={"A": 1000, "B": 0, "C": 0}))
     )
 
 
@@ -587,9 +580,7 @@ class TestAxisUnit:
                 .add_transition(
                     id="t_ab", source=["A"], target=["B"], rate="p * A", impulse_at=[1]
                 )
-                .set_structure(
-                    Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0})
-                )
+                .set_structure(Aggregate(bin_amounts={"A": 1000, "B": 0}))
             )
 
         impulse("dimensionless").check_unit_consistency()
@@ -663,8 +654,7 @@ class TestVariableUnits:
             .add_transition(id="t", source=["g1"], target=["g2"], rate="f")
             .set_structure(
                 Aggregate(
-                    total=1000,
-                    bin_fractions={"A": 0.5, "C": 0.5},
+                    bin_amounts={"A": 500, "C": 500},
                     stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
                 )
             )
@@ -742,8 +732,7 @@ class TestVariableUnits:
             )
             .set_structure(
                 Aggregate(
-                    total=1000,
-                    bin_fractions={"A": 0.5, "C": 0.5},
+                    bin_amounts={"A": 500, "C": 500},
                     stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
                 )
             )
@@ -783,7 +772,7 @@ class TestVariableUnits:
             .add_parameter(id="k", value=0.1, unit="1/step")
             .add_parameter(id="f", value="exp(k)")
             .add_transition(id="t", source=["A"], target=[], rate="k")
-            .set_structure(Aggregate(total=100, bin_fractions={"A": 1.0}))
+            .set_structure(Aggregate(bin_amounts={"A": 100}))
         )
 
         with pytest.raises(UnitConsistencyError) as error:

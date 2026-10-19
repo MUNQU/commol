@@ -313,6 +313,12 @@ class CalibrationModule(Protocol):
         parameters: list[CalibrationParameterProtocol],
         initial_condition_remainder: str | None = None,
     ) -> None: ...
+    def initial_condition_coverage(
+        self,
+        engine: EngineProtocol,
+        parameters: list[CalibrationParameterProtocol],
+        initial_condition_remainder: str | None = None,
+    ) -> tuple[list[list[int]], list[int]]: ...
     def calibrated_initial_state(
         self,
         engine: EngineProtocol,

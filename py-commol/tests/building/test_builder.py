@@ -19,7 +19,7 @@ class TestBuild:
         assert [bin_.id for bin_ in model.process.bins] == ["A", "B", "C"]
         assert [parameter.id for parameter in model.parameters] == ["k1", "k2"]
         assert [t.id for t in model.process.transitions] == ["ab", "bc"]
-        assert model.structure.total == 1000
+        assert sum(model.structure.bin_amounts.values()) == 1000
 
 
 class TestSummary:
@@ -68,7 +68,7 @@ class TestCloneAndReset:
             .add_bin(id="B", name="B")
             .add_parameter(id="k", value=0.1)
             .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
-            .set_structure(Aggregate(total=100, bin_fractions={"A": 1.0, "B": 0.0}))
+            .set_structure(Aggregate(bin_amounts={"A": 100, "B": 0}))
         )
 
         assert model.process.accumulators == []
@@ -132,9 +132,7 @@ class TestProcessChecks:
         builder = FactoryBuilder(name="m")
         for bin_id in bins:
             builder.add_bin(bin_id, bin_id)
-        builder.set_structure(
-            Aggregate(total=10, bin_fractions=dict.fromkeys(bins, 1.0))
-        )
+        builder.set_structure(Aggregate(bin_amounts=dict.fromkeys(bins, 10)))
 
         with pytest.raises(ValidationError, match=message):
             build(builder)

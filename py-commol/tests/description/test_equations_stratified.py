@@ -22,7 +22,7 @@ def _conditional(second: str, categories: tuple[str, str]) -> ModelBuilder:
         parameters={"k1": 0.3, "k2": 0.1, "k3": 0.01},
         ab=None,
         bc=None,
-        fractions={"A": 0.99, "B": 0.005, "C": 0.005},
+        amounts={"A": 990, "B": 5, "C": 5},
         stratifications={
             "group": {"g1": 0.7, "g2": 0.3},
             second: {categories[0]: 0.6, categories[1]: 0.4},

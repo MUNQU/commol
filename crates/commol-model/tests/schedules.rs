@@ -20,8 +20,8 @@ fn model(ab: &str, ac: &str, mode: &str, extra: &str) -> Model {
         {{"id":"C","name":"C"}}],"accumulators":[],"stratifications":[],
         "transitions":[{{"id":"ab","source":["A"],"target":["B"],"rate":"{ab}"{extra}}},
         {{"id":"ac","source":["A"],"target":["C"],"rate":"{ac}"}}]}},
-        "structure":{{"kind":"aggregate","total":1000,
-        "bin_fractions":{{"A":0.8,"B":0.2,"C":0.0}}}}}}"#
+        "structure":{{"kind":"aggregate",
+        "bin_amounts":{{"A":800.0,"B":200.0,"C":0.0}}}}}}"#
     );
     serde_json::from_str(&json).expect("valid model JSON")
 }
@@ -165,21 +165,6 @@ fn a_whole_number_is_whole_within_a_relative_tolerance() {
     assert_eq!(as_whole(1.0 + 1e-6), None);
 }
 
-#[test]
-fn overrides_may_not_take_the_amounts_above_the_total() {
-    let mut model = model("k", "k", "step_function", "");
-    let amounts =
-        |model: &Model| CompiledModel::try_from_model(model).map(|m| m.initial_state()[2]);
-    let fractions = &mut model
-        .aggregate_mut()
-        .unwrap()
-        .initial_conditions
-        .compartment_fractions;
-    fractions.insert("C".to_string(), 0.0005);
-    let error = amounts(&model).err().unwrap();
-    assert!(error.contains("exceed the total"), "{error}");
-}
-
 /// `model` with `k` left without a value, as before calibration.
 fn without_k(ab: &str, extra: &str) -> CompiledModel {
     let mut model = model(ab, "z", "step_function", extra);
@@ -246,8 +231,8 @@ fn only_the_impulses_of_a_position_act_and_an_absolute_one_moves_its_rate() {
         "transitions":[
         {"id":"ab","source":["A"],"target":["B"],"rate":"k","impulse_at":[1]},
         {"id":"ac","source":["A"],"target":["C"],"rate":"k * A / 4","impulse_at":[2]}]},
-        "structure":{"kind":"aggregate","total":1000,
-        "bin_fractions":{"A":0.8,"B":0.2,"C":0.0}}}"#;
+        "structure":{"kind":"aggregate",
+        "bin_amounts":{"A":800.0,"B":200.0,"C":0.0}}}"#;
     let mut model = compiled(&serde_json::from_str(json).expect("valid model JSON"));
     let mut state = model.initial_state().to_vec();
 

@@ -48,9 +48,7 @@ class TestExpansion:
                 target=["C"],
                 rate="k * $compartment",
             )
-            .set_structure(
-                Aggregate(total=1000, bin_fractions={"B1": 0.6, "B2": 0.3, "C": 0.1})
-            )
+            .set_structure(Aggregate(bin_amounts={"B1": 600, "B2": 300, "C": 100}))
         )
 
         model = build(builder)
@@ -253,7 +251,7 @@ class TestRuns:
             _with_outflow(
                 abc_builder(
                     parameters={"k1": 0.3, "k2": 0.2},
-                    fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+                    amounts={"A": 990, "B": 10, "C": 0},
                 ),
                 ["A", "B", "C"],
             )

@@ -35,7 +35,7 @@ impl CompiledModel {
     ///
     /// This constructor performs several pre-computation steps for efficiency:
     /// 1. Generates all stratified compartment combinations
-    /// 2. Distributes the total across the compartments
+    /// 2. Splits the amount of each bin among its compartments
     /// 3. Pre-computes transition flows with parsed rate expressions
     /// 4. Pre-computes the subgroup total mappings for stratifications
     ///
@@ -84,6 +84,7 @@ impl CompiledModel {
                 .eq(compartments.iter())
         );
         let amounts: Vec<f64> = state.iter().map(|c| c.amount).collect();
+        let total = amounts.iter().sum();
 
         // Labels of every output: compartments first, then accumulators
         let output_labels: Vec<OutputLabels> = layout
@@ -282,7 +283,7 @@ impl CompiledModel {
 
         Ok(Self {
             compartments,
-            total: aggregate.initial_conditions.total,
+            total,
             output_labels,
             output_names,
             initial_state,
@@ -306,39 +307,67 @@ impl CompiledModel {
 }
 
 /// Relative tolerance with which an amount is a whole number: the rounding
-/// of a fraction times the total.
+/// of an amount times a fraction.
 const WHOLE_TOLERANCE: f64 = 1e-9;
 
-/// The whole number `value` is, within the rounding of a fraction times a
-/// total, or `None` when it is not one.
+/// The whole number `value` is, within the rounding of an amount times a
+/// fraction, or `None` when it is not one.
 pub fn as_whole(value: f64) -> Option<f64> {
     let whole = value.round();
     ((value - whole).abs() <= WHOLE_TOLERANCE * whole.abs().max(1.0)).then_some(whole)
 }
 
+/// The first five of `items`, joined, and how many more there are.
+fn first_five(items: &[String]) -> String {
+    let shown = items.len().min(5);
+    let more = if items.len() > shown {
+        format!(" and {} more", items.len() - shown)
+    } else {
+        String::new()
+    };
+    format!("{}{more}", items[..shown].join(", "))
+}
+
 /// Check that a stochastic engine can start the model from whole units.
 ///
-/// A stochastic engine moves whole units, so the total must be a whole
-/// number. When an initial amount is not, the settings of the engine must
-/// name how to make it whole ([`commol_core::Rounding`]); there is no
-/// default.
+/// A stochastic engine moves whole units, and it makes the compartments of
+/// each bin whole without moving a unit to another bin, so the amount of
+/// every bin must be a whole number. When the amount of a compartment is not,
+/// the settings of the engine must name how to make it whole
+/// ([`commol_core::Rounding`]); there is no default.
 fn check_whole_units(model: &Model, aggregate: &Aggregate) -> Result<(), String> {
     let engine = model.engine.engine_type();
     if !engine.is_stochastic() {
         return Ok(());
     }
-    let total = aggregate.initial_conditions.total;
-    if as_whole(total).is_none() {
+    let state = initial_state(&model.process, aggregate)?;
+    let fractional_bins: Vec<String> = model
+        .process
+        .bins
+        .iter()
+        .filter_map(|bin| {
+            let amount: f64 = state
+                .iter()
+                .filter(|compartment| compartment.bin == bin.id)
+                .map(|compartment| compartment.amount)
+                .sum();
+            as_whole(amount)
+                .is_none()
+                .then(|| format!("'{}' ({amount})", bin.id))
+        })
+        .collect();
+    if !fractional_bins.is_empty() {
         return Err(format!(
-            "The {} engine moves whole units, so the total must be a whole number, \
-             got {total}",
-            engine.name()
+            "The {} engine moves whole units, so the amount of each bin must be a whole \
+             number, and the amounts of {} are not whole",
+            engine.name(),
+            first_five(&fractional_bins),
         ));
     }
     if model.engine.settings().rounding().is_some() {
         return Ok(());
     }
-    let fractional: Vec<String> = initial_state(&model.process, aggregate)?
+    let fractional: Vec<String> = state
         .into_iter()
         .filter(|compartment| as_whole(compartment.amount).is_none())
         .map(|compartment| format!("'{}' ({})", compartment.name, compartment.amount))
@@ -346,19 +375,13 @@ fn check_whole_units(model: &Model, aggregate: &Aggregate) -> Result<(), String>
     if fractional.is_empty() {
         return Ok(());
     }
-    let shown = fractional.len().min(5);
-    let more = if fractional.len() > shown {
-        format!(" and {} more", fractional.len() - shown)
-    } else {
-        String::new()
-    };
     Err(format!(
-        "The {} engine moves whole units, and the initial amounts of {}{more} are not \
-         whole. Name a rounding in the settings of the engine: \"{}\" (the same whole \
-         amounts in every run, which sum to the total) or \"{}\" (each run draws its \
-         amounts from a multinomial of the total with the fractions of the model)",
+        "The {} engine moves whole units, and the initial amounts of {} are not whole. \
+         Name a rounding in the settings of the engine: \"{}\" (the same whole amounts \
+         in every run, which sum to the amount of each bin) or \"{}\" (each run draws \
+         the amounts of each bin from a multinomial with the fractions of the model)",
         engine.name(),
-        fractional[..shown].join(", "),
+        first_five(&fractional),
         Rounding::LargestRemainder.name(),
         Rounding::Random.name(),
     ))
@@ -534,70 +557,71 @@ pub struct InitialCompartment {
     /// stratification declaration order. A conditional stratification whose
     /// conditions the compartment does not meet is absent.
     pub categories: Vec<(String, String)>,
-    /// Initial amount, including `compartment_fractions` overrides.
+    /// Initial amount, in the unit of the bin, including
+    /// `compartment_amounts` overrides.
     pub amount: f64,
 }
 
-/// Relative tolerance of the check that overrides keep the sum of the initial
-/// amounts within the total.
-const TOTAL_TOLERANCE: f64 = 1e-9;
+/// Check that an initial amount is finite and not negative.
+fn check_amount(what: &str, amount: f64) -> Result<(), String> {
+    if amount.is_finite() && amount >= 0.0 {
+        Ok(())
+    } else {
+        Err(format!(
+            "The initial amount of {what} must be finite and not negative, got {amount}."
+        ))
+    }
+}
 
 /// Expand a process into its compartments and their initial amounts.
 ///
-/// This is the single source of truth for the initial state of a
-/// aggregate model. Bins
-/// are expanded over the stratifications in declaration order; when a
-/// stratification has conditions that a compartment's already-applied
-/// categories do not meet, that compartment is kept as-is and its amount
-/// is not split by that stratification's fractions. An uncalibrated bin
-/// fraction counts as zero.
+/// This is the single source of truth for the initial state of an aggregate
+/// model. Bins are expanded over the stratifications in declaration order;
+/// when a stratification has conditions that a compartment's already-applied
+/// categories do not meet, that compartment is kept as-is and its amount is
+/// not split by that stratification's fractions. Each compartment holds the
+/// amount of its bin, in the unit of the bin, times the fraction of each
+/// category applied to it. An uncalibrated bin amount counts as zero.
 ///
-/// After the uniform distribution is computed, `compartment_fractions` overrides
-/// replace the value of the named compartments with `total * fraction`.
+/// After the expansion, `compartment_amounts` overrides replace the amount
+/// of the named compartments.
 ///
 /// # Errors
 ///
-/// Returns a message when the total is not finite or not greater than 0, or
-/// when an override names a compartment that is not part of the expansion,
-/// names a compartment twice, holds a fraction outside `[0.0, 1.0]`, or makes
-/// the sum of the initial amounts exceed the total.
+/// Returns a message when a bin amount or an override is not finite or is
+/// negative, or when an override names a compartment that is not part of the
+/// expansion.
 pub fn initial_state(
     process: &Process,
     aggregate: &Aggregate,
 ) -> Result<Vec<InitialCompartment>, String> {
     let initial_conditions = &aggregate.initial_conditions;
-    let total = initial_conditions.total;
-    if !total.is_finite() || total <= 0.0 {
-        return Err(format!(
-            "The total of the initial conditions must be finite and greater than 0, got {total}."
-        ));
+    let bin_amounts = &initial_conditions.bin_amounts;
+    for (bin, amount) in bin_amounts {
+        if let Some(amount) = amount {
+            check_amount(&format!("bin '{bin}'"), *amount)?;
+        }
     }
-
-    let bin_fractions = &initial_conditions.bin_fractions;
     let stratification_fractions = &initial_conditions.stratification_fractions;
 
-    // Each compartment holds its bin's share of the total, split by the
-    // fraction of every category applied to it. An uncalibrated bin or an
-    // undeclared category counts as zero.
     let mut state: Vec<InitialCompartment> = expand_compartments(process)
         .into_iter()
         .map(|output| {
-            let bin_fraction = bin_fractions
+            let bin_amount = bin_amounts
                 .get(output.source.as_str())
-                .and_then(|f| *f)
+                .and_then(|amount| *amount)
                 .unwrap_or(0.0);
-            let amount =
-                output
-                    .categories
-                    .iter()
-                    .fold(total * bin_fraction, |amount, (id, cat)| {
-                        amount
-                            * stratification_fractions
-                                .get(id.as_str())
-                                .and_then(|fractions| fractions.get(cat.as_str()))
-                                .copied()
-                                .unwrap_or(0.0)
-                    });
+            let amount = output
+                .categories
+                .iter()
+                .fold(bin_amount, |amount, (id, cat)| {
+                    amount
+                        * stratification_fractions
+                            .get(id.as_str())
+                            .and_then(|fractions| fractions.get(cat.as_str()))
+                            .copied()
+                            .unwrap_or(0.0)
+                });
             InitialCompartment {
                 name: output.name,
                 bin: output.source,
@@ -607,7 +631,7 @@ pub fn initial_state(
         })
         .collect();
 
-    let overrides = &initial_conditions.compartment_fractions;
+    let overrides = &initial_conditions.compartment_amounts;
     if overrides.is_empty() {
         return Ok(state);
     }
@@ -620,7 +644,7 @@ pub fn initial_state(
 
     // Validate every override before applying any of them, so a rejected
     // configuration names the first offending entry.
-    for (compartment, &fraction) in overrides {
+    for (compartment, &amount) in overrides {
         if !compartment_index.contains_key(compartment) {
             let available: Vec<&str> = state.iter().map(|c| c.name.as_str()).collect();
             return Err(format!(
@@ -628,24 +652,11 @@ pub fn initial_state(
                  compartments: {available:?}"
             ));
         }
-        if !(0.0..=1.0).contains(&fraction) {
-            return Err(format!(
-                "Fraction for compartment '{compartment}' must be between 0.0 and 1.0, got \
-                 {fraction}."
-            ));
-        }
+        check_amount(&format!("compartment '{compartment}'"), amount)?;
     }
 
-    for (compartment, fraction) in overrides {
-        state[compartment_index[compartment]].amount = total * fraction;
-    }
-
-    let sum: f64 = state.iter().map(|c| c.amount).sum();
-    if sum > total * (1.0 + TOTAL_TOLERANCE) {
-        return Err(format!(
-            "Per-compartment overrides would make the initial amounts exceed \
-             the total ({sum} > {total})."
-        ));
+    for (compartment, amount) in overrides {
+        state[compartment_index[compartment]].amount = *amount;
     }
 
     Ok(state)
@@ -1621,7 +1632,7 @@ mod tests {
     fn make_model(
         stratifications: Vec<Stratification>,
         stratification_fractions: Vec<Fractions>,
-        compartment_fractions: Vec<(&str, f64)>,
+        compartment_amounts: Vec<(&str, f64)>,
     ) -> Model {
         Model {
             name: "test".to_string(),
@@ -1647,10 +1658,12 @@ mod tests {
             structure: ModelStructure::Aggregate(Aggregate {
                 variant: None,
                 initial_conditions: InitialConditions {
-                    total: 1000.0,
-                    bin_fractions: [("A".to_string(), Some(1.0)), ("B".to_string(), Some(0.0))]
-                        .into_iter()
-                        .collect(),
+                    bin_amounts: [
+                        ("A".to_string(), Some(1000.0)),
+                        ("B".to_string(), Some(0.0)),
+                    ]
+                    .into_iter()
+                    .collect(),
                     stratification_fractions: stratification_fractions
                         .into_iter()
                         .map(|(id, fractions)| {
@@ -1661,9 +1674,9 @@ mod tests {
                             (id.to_string(), fractions)
                         })
                         .collect(),
-                    compartment_fractions: compartment_fractions
+                    compartment_amounts: compartment_amounts
                         .into_iter()
-                        .map(|(name, fraction)| (name.to_string(), fraction))
+                        .map(|(name, amount)| (name.to_string(), amount))
                         .collect(),
                 },
                 neighbors: None,
@@ -1704,7 +1717,7 @@ mod tests {
         let model = make_model(
             vec![group_stratification()],
             vec![group_fractions(0.6, 0.4)],
-            vec![("A_g2", 0.25)],
+            vec![("A_g2", 250.0)],
         );
         let (compartments, _) = generate_compartments(&model);
         let amounts = initial_amounts(&model, &compartments).unwrap();
@@ -1727,7 +1740,7 @@ mod tests {
         let model = make_model(
             vec![group_stratification(), sub],
             vec![group_fractions(0.7, 0.3), sub_fractions(0.5, 0.5)],
-            vec![("A_g2", 0.1)],
+            vec![("A_g2", 100.0)],
         );
         let (compartments, _) = generate_compartments(&model);
         let amounts = initial_amounts(&model, &compartments).unwrap();
@@ -1741,7 +1754,7 @@ mod tests {
 
     #[test]
     fn unknown_compartment_override_is_a_build_error() {
-        let model = make_model(vec![], vec![], vec![("Missing", 0.1)]);
+        let model = make_model(vec![], vec![], vec![("Missing", 100.0)]);
         let (compartments, _) = generate_compartments(&model);
         let error = initial_amounts(&model, &compartments).unwrap_err();
 
@@ -1749,68 +1762,47 @@ mod tests {
     }
 
     #[test]
-    fn the_total_is_kept_with_overrides() {
+    fn overrides_set_the_amounts_they_name() {
         let model = make_model(
             vec![group_stratification()],
             vec![group_fractions(0.6, 0.4)],
-            vec![("A_g1", 0.4), ("A_g2", 0.6)],
+            vec![("A_g1", 400.0), ("A_g2", 600.0)],
         );
         let (compartments, _) = generate_compartments(&model);
         let amounts = initial_amounts(&model, &compartments).unwrap();
 
         assert_eq!(amounts, vec![400.0, 600.0, 0.0, 0.0]);
-        assert!((amounts.iter().sum::<f64>() - 1000.0).abs() < 1e-9);
     }
 
     #[test]
-    fn negative_compartment_fraction_is_a_build_error() {
-        let model = make_model(
-            vec![group_stratification()],
-            vec![group_fractions(0.6, 0.4)],
-            vec![("A_g1", -0.5)],
-        );
-        let (compartments, _) = generate_compartments(&model);
-        let error = initial_amounts(&model, &compartments).unwrap_err();
+    fn an_override_that_is_not_finite_or_is_negative_is_a_build_error() {
+        for amount in [-0.5, f64::NAN, f64::INFINITY] {
+            let model = make_model(
+                vec![group_stratification()],
+                vec![group_fractions(0.6, 0.4)],
+                vec![("A_g1", amount)],
+            );
+            let (compartments, _) = generate_compartments(&model);
+            let error = initial_amounts(&model, &compartments).unwrap_err();
 
-        assert!(error.contains("between 0.0 and 1.0"), "{error}");
+            assert!(
+                error.contains("compartment 'A_g1' must be finite and not negative"),
+                "{error}"
+            );
+        }
     }
 
     #[test]
-    fn fraction_above_one_is_a_build_error() {
+    fn an_override_above_the_amount_of_its_bin_builds() {
         let model = make_model(
             vec![group_stratification()],
             vec![group_fractions(0.6, 0.4)],
-            vec![("A_g1", 1.5)],
-        );
-        let (compartments, _) = generate_compartments(&model);
-        let error = initial_amounts(&model, &compartments).unwrap_err();
-
-        assert!(error.contains("between 0.0 and 1.0"), "{error}");
-    }
-
-    #[test]
-    fn boundary_compartment_fractions_are_accepted() {
-        let model = make_model(
-            vec![group_stratification()],
-            vec![group_fractions(0.6, 0.4)],
-            vec![("A_g1", 0.0), ("A_g2", 1.0)],
+            vec![("A_g1", 0.0), ("B_g1", 5000.0)],
         );
         let (compartments, _) = generate_compartments(&model);
         let amounts = initial_amounts(&model, &compartments).unwrap();
 
-        assert_eq!(amounts, vec![0.0, 1000.0, 0.0, 0.0]);
-    }
-
-    #[test]
-    fn override_exceeding_the_total_is_a_build_error() {
-        let model = make_model(
-            vec![group_stratification()],
-            vec![group_fractions(0.6, 0.4)],
-            vec![("B_g1", 0.5)],
-        );
-        let error = model_initial_state(&model).unwrap_err();
-
-        assert!(error.contains("exceed the total"), "{error}");
+        assert_eq!(amounts, vec![0.0, 400.0, 5000.0, 0.0]);
     }
 
     #[test]
@@ -2080,29 +2072,80 @@ mod tests {
         assert!(check_model(&model).is_ok());
     }
 
+    fn set_bin_amount(model: &mut Model, bin: &str, amount: f64) {
+        aggregate_mut(model)
+            .initial_conditions
+            .bin_amounts
+            .insert(bin.to_string(), Some(amount));
+    }
+
     #[test]
-    fn a_real_total_starts_with_amounts_that_sum_to_it() {
+    fn a_real_bin_amount_splits_into_its_categories() {
         let mut model = make_model(
             vec![group_stratification()],
             vec![group_fractions(0.6, 0.4)],
             vec![],
         );
-        aggregate_mut(&mut model).initial_conditions.total = 2.5;
+        set_bin_amount(&mut model, "A", 2.5);
         let state = model_initial_state(&model).unwrap();
 
-        let sum: f64 = state.iter().map(|compartment| compartment.amount).sum();
-        assert!((sum - 2.5).abs() < 1e-12, "{sum}");
+        let amounts: Vec<f64> = state.iter().map(|compartment| compartment.amount).collect();
+        assert_eq!(amounts, vec![1.5, 1.0, 0.0, 0.0]);
         assert!(CompiledModel::try_from_model(&model).is_ok());
     }
 
     #[test]
-    fn a_total_that_is_not_finite_and_positive_is_a_build_error() {
-        for total in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+    fn bins_that_all_start_at_zero_build() {
+        let mut model = make_model(vec![], vec![], vec![]);
+        set_bin_amount(&mut model, "A", 0.0);
+        let compiled = CompiledModel::try_from_model(&model).unwrap();
+
+        assert_eq!(compiled.initial_state(), [0.0, 0.0]);
+        assert_eq!(compiled.total(), 0.0);
+    }
+
+    #[test]
+    fn a_bin_amount_that_is_not_finite_or_is_negative_is_a_build_error() {
+        for amount in [-1.0, f64::NAN, f64::INFINITY] {
             let mut model = make_model(vec![], vec![], vec![]);
-            aggregate_mut(&mut model).initial_conditions.total = total;
+            set_bin_amount(&mut model, "B", amount);
             let error = model_initial_state(&model).unwrap_err();
 
-            assert!(error.contains("finite and greater than 0"), "{error}");
+            assert!(
+                error.contains("bin 'B' must be finite and not negative"),
+                "{error}"
+            );
         }
+    }
+
+    #[test]
+    fn a_bin_that_is_not_whole_is_a_build_error_of_a_stochastic_engine() {
+        let mut model = make_model(vec![], vec![], vec![]);
+        set_bin_amount(&mut model, "B", 10.5);
+        model.engine = ModelEngine::new(EngineType::StochasticEvents);
+
+        let error = check_model(&model).unwrap_err();
+
+        assert!(
+            error.contains("the amount of each bin must be a whole number"),
+            "{error}"
+        );
+        assert!(error.contains("'B' (10.5)"), "{error}");
+        assert!(!error.contains("'A'"), "{error}");
+    }
+
+    #[test]
+    fn a_stochastic_engine_names_the_compartments_that_are_not_whole() {
+        let mut model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(1.0 / 3.0, 2.0 / 3.0)],
+            vec![],
+        );
+        model.engine = ModelEngine::new(EngineType::StochasticEvents);
+
+        let error = check_model(&model).unwrap_err();
+
+        assert!(error.contains("'A_g1' (333.3"), "{error}");
+        assert!(error.contains("Name a rounding"), "{error}");
     }
 }

@@ -26,7 +26,7 @@ fn decay(rate: &str, ids: &[&str]) -> DifferenceEquations {
         "accumulators":[],"stratifications":[],
         "transitions":[{{"id":"ab","source":["A"],"target":["B"],"rate":"{rate}",
         "stratified_rates":null,"per_compartment":null}}]}},
-        "structure":{{"kind":"aggregate","total":1000,"bin_fractions":{{"A":1.0,"B":0.0}}}}}}"#,
+        "structure":{{"kind":"aggregate","bin_amounts":{{"A":1000.0,"B":0.0}}}}}}"#,
         parameters.join(",")
     );
     let model: Model = serde_json::from_str(&json).expect("valid model JSON");

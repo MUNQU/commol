@@ -98,8 +98,7 @@ mod tests {
             "structure": {
                 "kind": "aggregate",
                 "variant": null,
-                "total": 10.0,
-                "bin_fractions": {"A": 1.0},
+                "bin_amounts": {"A": 10.0},
                 "stratification_fractions": {},
                 "neighbors": {"type": "complete"}
             }
@@ -125,12 +124,12 @@ mod tests {
         assert_eq!(model.structure.kind().name(), "aggregate");
         assert_eq!(model.process.bins[0].id, "A");
         let aggregate = model.aggregate().unwrap();
-        assert_eq!(aggregate.initial_conditions.total, 10.0);
+        assert_eq!(aggregate.initial_conditions.bin_amounts["A"], Some(10.0));
         assert_eq!(aggregate.neighbors, Some(Neighbors::Complete));
         assert_eq!(model.check_kind(), Ok(()));
         let json = serde_json::to_value(&model).unwrap();
         assert_eq!(json["structure"]["kind"], "aggregate");
-        assert_eq!(json["structure"]["total"], 10.0);
+        assert_eq!(json["structure"]["bin_amounts"]["A"], 10.0);
         assert_eq!(json["process"]["bins"][0]["id"], "A");
         let again: Model = serde_json::from_value(json).unwrap();
         assert_eq!(again.process.bins.len(), 1);
@@ -212,8 +211,7 @@ mod aggregate_tests {
     fn an_unknown_variant_does_not_read() {
         let error = serde_json::from_value::<crate::types::aggregate::Aggregate>(json!({
             "variant": "no_such_variant",
-            "total": 1.0,
-            "bin_fractions": {}
+            "bin_amounts": {}
         }))
         .unwrap_err()
         .to_string();

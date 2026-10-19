@@ -376,40 +376,43 @@
       "blocks": [
         {
           "type": "table",
-          "heading": "Bin fractions",
+          "heading": "Bin amounts",
           "columns": [
             "Bin",
-            "Fraction",
-            "Amount"
+            "Amount",
+            "Unit"
           ],
           "rows": [
             [
               "A",
-              0.5,
-              5.0
+              5.0,
+              null
             ],
             [
               "B",
-              0.5,
-              5.0
+              5.0,
+              null
             ]
           ]
         },
         {
           "type": "table",
-          "heading": "Initial state (total 10)",
+          "heading": "Initial state",
           "columns": [
             "Compartment",
-            "Amount"
+            "Amount",
+            "Unit"
           ],
           "rows": [
             [
               "A",
-              5.0
+              5.0,
+              null
             ],
             [
               "B",
-              5.0
+              5.0,
+              null
             ]
           ]
         }

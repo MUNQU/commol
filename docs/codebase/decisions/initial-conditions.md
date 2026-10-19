@@ -2,16 +2,20 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-How initial fractions compose, and how calibrated values reach the initial state.
+How the fractions of the categories compose, and how calibrated values reach
+the initial state. The initial state itself is an amount per bin
+([Model structure](model-structure.md#the-initial-state-is-an-amount-per-bin)).
 
-## Subgroup totals compose down the condition chain
+## Category fractions compose down the condition chain
 
 The fractions of a conditional stratification are relative to the subgroup that
-its conditions select, not to the total. Subgroup totals therefore
-multiply along the chain: `total × fraction(group1) × fraction(cat1)`.
-`Aggregate.subgroup_total` and `Aggregate.get_conditioning_categories` own
-this (`context/aggregate.py`); with per-compartment overrides,
-`subgroup_total` sums the state the engine builds.
+its conditions select, not to the whole bin. The amount of a compartment
+therefore multiplies along the chain:
+`bin amount × fraction(group1) × fraction(cat1)` (`initial_state` in
+`crates/commol-model/src/builder.rs`). `Aggregate.subgroup_total` sums the state
+the engine builds, overrides included, and
+`Aggregate.get_conditioning_categories` names the subgroup
+(`context/aggregate.py`).
 
 **Guard:** `tests/simulation/test_outputs.py::TestSubgroupTotal` compares the
 result with the state the engine starts from.
@@ -21,7 +25,8 @@ result with the state the engine starts from.
 `InitialConditionPlan` in `crates/commol-model/src/initial_conditions.rs`
 applies calibrated values in a fixed order: bins, category splits, exact
 compartments, and then the remainder named by
-`CalibrationProblem.initial_condition_remainder`. Both engines of the aggregate
+`CalibrationProblem.initial_condition_remainder`. A bin, prefix or compartment
+value is an amount in the unit of its bin; a category value is a split. Both engines of the aggregate
 kind
 resolve and write initial conditions through it
 (`SimulationEngine::plan_values` and `apply_values`), and the calibration
@@ -30,12 +35,40 @@ writes every value through the engine (`ValueWriter` in
 and the write-back (`configured_engine`, then the binding
 `calibrated_initial_state`) agree by construction.
 `Aggregate.with_calibrated_values`
-(`context/_model/calibration_write_back.py`) writes the values back as
-fractions, and pins as per-compartment overrides every compartment that the
-fractions cannot reproduce.
+(`context/_model/calibration_write_back.py`) writes back the amount of every bin
+whose every compartment a value or the remainder sets and the split of every
+calibrated category, and pins as per-compartment overrides every compartment
+that these cannot reproduce.
+
+## The remainder keeps the sum the model declares
+
+The remainder takes the sum of the amounts the model states
+(`CompartmentalEngine::total`, fixed when the engine is built), less every
+other compartment after the values are written. A compartment that no value
+covers keeps its declared amount and cancels out, so the remainder keeps the
+declared sum of the compartments the values and it cover, and a bin of another
+unit does not enter. A bin left `None` counts as 0, so the model states the sum
+on the remainder (`{"A": 1000, "B": None}`). Without a remainder every state is
+feasible, because the engine rejects a negative amount. With one, a remainder
+below zero is infeasible by its share of the amounts the values set, a number
+with no unit that is never a division by zero.
+
+Units live only in Python (the Rust `Bin` has none), so
+`Aggregate.check_calibration_values` rejects a remainder whose unit is not the
+unit of every compartment a value sets, from the coverage the engine resolves
+(`InitialConditionPlan::coverage`, the binding `initial_condition_coverage`).
+
+| Alternative | Why not |
+|---|---|
+| A total in the problem that the remainder keeps | It repeats a number of the model and can contradict it. |
+| The sum of the bins of the unit of the remainder | The engine has no units, and the unit of a bin is optional free text. |
+| The deficit as a share of the sum the remainder keeps | That sum can be 0, as when every bin starts empty. |
 
 **Guards:**
-`tests/calibration/test_write_back.py::TestApplyCalibrationParameters::test_applied_model_reproduces_the_loss_the_optimizer_scored`;
+`tests/calibration/test_write_back.py::TestApplyCalibrationParameters::test_applied_model_reproduces_the_loss_the_optimizer_scored`,
+`tests/calibration/test_write_back.py::TestWriteBackReadability::test_an_amount_in_the_unit_of_its_bin_is_written_back`,
+`tests/calibration/test_initial_conditions.py::TestRemainderUnits`;
 `crates/commol-model/tests/initial_conditions.rs` (the layers, the remainder
-and the targets of an id).
+and the targets of an id, and
+`the_remainder_keeps_the_declared_sum_of_what_it_covers`).
 See also [Per-compartment initial conditions](../../development/design-per-compartment-initial-conditions.md).

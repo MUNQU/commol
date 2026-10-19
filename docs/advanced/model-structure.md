@@ -31,10 +31,9 @@ Model                      name, description, version, step_unit
 │       └── stratified_rates: [StratifiedRate]
 │           └── conditions: [StratificationCondition]
 └── structure: Aggregate                   (kind: "aggregate", variant: None)
-    ├── total: float
-    ├── bin_fractions: {bin: fraction | None}
+    ├── bin_amounts: {bin: amount | None}          (in the unit of the bin)
     ├── stratification_fractions: {stratification: {category: fraction}}
-    ├── compartment_fractions: {compartment: fraction}
+    ├── compartment_amounts: {compartment: amount}
     └── neighbors: Complete | Groups | None
 ```
 
@@ -50,10 +49,9 @@ fields of its class:
   "structure": {
     "kind": "aggregate",
     "variant": null,
-    "total": 1000.0,
-    "bin_fractions": {"A": 0.99, "B": 0.01},
+    "bin_amounts": {"A": 990.0, "B": 10.0},
     "stratification_fractions": {},
-    "compartment_fractions": {},
+    "compartment_amounts": {},
     "neighbors": null
   },
   "step_unit": null

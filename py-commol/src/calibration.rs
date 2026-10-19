@@ -721,8 +721,8 @@ impl PyStartOutcome {
 ///     engine: Engine built from a compartmental model, before calibration
 ///     parameters: Calibration parameters, in problem order
 ///     values: Value of each parameter, parallel to `parameters`
-///     initial_condition_remainder: Compartment or bin that absorbs the
-///         difference to the total, if any
+///     initial_condition_remainder: Compartment or bin that takes what the
+///         other compartments leave of the amounts the model states, if any
 ///
 /// Returns:
 ///     A `(values, state, covered)` tuple: the values the engine applied,
@@ -733,7 +733,7 @@ impl PyStartOutcome {
 /// Raises:
 ///     ValueError: If the engine is not compartmental, an initial-condition id
 ///         cannot be resolved, the number of values is wrong, or the
-///         initial-condition fractions exceed 1.0
+///         calibrated amounts leave the remainder below zero
 #[pyfunction]
 #[pyo3(signature = (engine, parameters, values, initial_condition_remainder=None))]
 fn calibrated_initial_state(
@@ -762,7 +762,7 @@ fn calibrated_initial_state(
 ///     engine: The simulation engine
 ///     parameters: Calibration parameters, in problem order
 ///     initial_condition_remainder: The id that takes what the values leave
-///         of the total the model kind keeps (a compartment or bin of a
+///         of the sum the model kind keeps (a compartment or bin of a
 ///         compartmental model), if any
 ///
 /// Raises:
@@ -782,6 +782,41 @@ fn check_model_values(
         &parameters,
         initial_condition_remainder.as_deref(),
     )
+    .map(|_| ())
+    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
+}
+
+/// The compartments each initial-condition value sets, and those of the
+/// remainder, as the engine resolves them
+///
+/// Args:
+///     engine: Engine built from a compartmental model
+///     parameters: Initial-condition calibration parameters, in problem order
+///     initial_condition_remainder: The id that takes what the values leave,
+///         if any
+///
+/// Returns:
+///     A `(values, remainder)` tuple: for each parameter, the indices of the
+///     compartments it sets (none for a category split), and the indices of
+///     the compartments of the remainder (none without one)
+///
+/// Raises:
+///     ValueError: If the engine is not compartmental, or a value or the
+///         remainder cannot be resolved
+#[pyfunction]
+#[pyo3(signature = (engine, parameters, initial_condition_remainder=None))]
+fn initial_condition_coverage(
+    engine: PyRef<'_, PyEngine>,
+    parameters: Vec<PyCalibrationParameter>,
+    initial_condition_remainder: Option<String>,
+) -> PyResult<(Vec<Vec<usize>>, Vec<usize>)> {
+    let parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
+    commol_calibration::check_model_values(
+        &engine.engine(),
+        &parameters,
+        initial_condition_remainder.as_deref(),
+    )
+    .and_then(|plan| crate::engine::compartmental_coverage(&plan))
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
 }
 
@@ -829,6 +864,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyStartOutcome>()?;
     m.add_function(wrap_pyfunction!(calibrated_initial_state, m)?)?;
     m.add_function(wrap_pyfunction!(check_model_values, m)?)?;
+    m.add_function(wrap_pyfunction!(initial_condition_coverage, m)?)?;
     m.add_function(wrap_pyfunction!(check_positions, m)?)?;
     Ok(())
 }

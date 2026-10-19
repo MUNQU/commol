@@ -15,14 +15,14 @@ def _make_schedule_ab(
     *,
     categories: list[str] | None = None,
     steps: int = 20,
-    total: float = 1000,
+    amount: float = 1000,
 ) -> dict[str, list[float]]:
-    """Run A → B split by ``group``, with a AxisPattern rate."""
+    """Run A → B split by ``group``, from `amount` in A, with a AxisPattern rate."""
     categories = categories or ["cat1", "cat2"]
     builder = a_to_b_builder(
         rate=rate,
         parameters={},
-        total=total,
+        amounts={"A": amount, "B": 0},
         stratifications={
             "group": {category: 1.0 / len(categories) for category in categories}
         },
@@ -296,8 +296,7 @@ class TestScheduleIntegration:
             .add_transition("flow", ["A"], ["A"], rate=rate)
             .set_structure(
                 Aggregate(
-                    total=1000,
-                    bin_fractions={"A": 1.0},
+                    bin_amounts={"A": 1000},
                     stratification_fractions={"status": {"s0": 1.0, "s1": 0.0}},
                 )
             )
@@ -331,8 +330,7 @@ class TestScheduleIntegration:
             )
             .set_structure(
                 Aggregate(
-                    total=1000,
-                    bin_fractions={"A": 1.0, "B": 0.0},
+                    bin_amounts={"A": 1000, "B": 0},
                     stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
                 )
             )
@@ -353,7 +351,7 @@ class TestScheduleIntegration:
             conditions=[condition("group", "cat2")],
             schedule=AxisPattern.periodic(period=7, value=0.1),
         )
-        result = _make_schedule_ab(rate, steps=30, total=1000)
+        result = _make_schedule_ab(rate, steps=30, amount=1000)
         for t in range(31):
             total = (
                 result["A_cat1"][t]
@@ -374,7 +372,7 @@ class TestScheduleIntegration:
             absolute=False,
         )
 
-        result = _make_schedule_ab(rate, steps=10, total=1000)
+        result = _make_schedule_ab(rate, steps=10, amount=1000)
         cat1_flow = result["A_cat1"][5] - result["A_cat1"][6]
         cat2_flow = result["A_cat2"][5] - result["A_cat2"][6]
 

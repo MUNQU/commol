@@ -16,8 +16,8 @@ fn model(transitions: &[&str]) -> Model {
         {{"id":"C","name":"C"}}],"accumulators":[{{"id":"moved","name":"moved"}}],
         "stratifications":[{{"id":"group","categories":["g0","g1"]}}],
         "transitions":[{}]}},
-        "structure":{{"kind":"aggregate","total":1000,
-        "bin_fractions":{{"A":0.7,"B":0.2,"C":0.1}},
+        "structure":{{"kind":"aggregate",
+        "bin_amounts":{{"A":700.0,"B":200.0,"C":100.0}},
         "stratification_fractions":{{"group":{{"g0":0.4,"g1":0.6}}}}}}}}"#,
         transitions.join(",")
     );
@@ -238,7 +238,7 @@ fn a_partial_bin_total_leaves_out_the_compartments() {
         "process":{"bins":[{"id":"A","name":"A"}],"accumulators":[],
         "stratifications":[{"id":"group","categories":["g0","g1"]},
         {"id":"age","categories":["y","o"]}],"transitions":[]},
-        "structure":{"kind":"aggregate","total":1000,"bin_fractions":{"A":1.0}}}"#;
+        "structure":{"kind":"aggregate","bin_amounts":{"A":1000.0}}}"#;
     let model: Model = serde_json::from_str(json).expect("valid model JSON");
     let names = subgroup_total_names(&model.process);
     assert!(names.contains(&"A_g0".to_string()), "{names:?}");
@@ -292,7 +292,7 @@ fn conditional(conditions: &str, rate: &str) -> Model {
         "accumulators":[],
         "stratifications":[{{"id":"g","categories":["g1","g2"],"conditions":{conditions}}}],
         "transitions":[{{"id":"ab","source":["A"],"target":["B"],"rate":"{rate}"}}]}},
-        "structure":{{"kind":"aggregate","total":1000,"bin_fractions":{{"A":1.0,"B":0.0}},
+        "structure":{{"kind":"aggregate","bin_amounts":{{"A":1000.0,"B":0.0}},
         "stratification_fractions":{{"g":{{"g1":0.5,"g2":0.5}}}}}}}}"#
     );
     serde_json::from_str(&json).expect("valid model JSON")

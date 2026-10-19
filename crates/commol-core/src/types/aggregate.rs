@@ -2,8 +2,9 @@
 //!
 //! An [`Aggregate`] lays a [`Process`] out as amounts: the bins expand over
 //! the stratifications into compartments, each compartment holds an amount,
-//! and the structure says how much starts where (`total` and fractions) and
-//! who the neighbors of a unit are ([`Neighbors`]).
+//! and the structure says how much starts where (an amount per bin, in the
+//! unit of the bin, and the split of each bin among the categories) and who
+//! the neighbors of a unit are ([`Neighbors`]).
 
 use std::collections::BTreeMap;
 
@@ -12,24 +13,26 @@ use serde::{Deserialize, Serialize};
 
 use super::process::Process;
 
-/// How the compartments of a model start: the total and the fractions of it,
-/// each keyed by the id it applies to, in the order the model declares them.
+/// How the compartments of a model start: the amount of each bin and the
+/// split of it among the categories, each keyed by the id it applies to, in
+/// the order the model declares them.
+///
+/// Every amount is in the unit of its bin, so bins of different units, such
+/// as people and a concentration, start without a total over them.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InitialConditions {
-    /// The sum of every compartment at the start, finite and greater than 0.
-    pub total: f64,
-    /// Fraction of the total in each bin, by bin id; `None` needs
+    /// Amount of each bin, by bin id, finite and not negative; `None` needs
     /// calibration.
-    pub bin_fractions: IndexMap<String, Option<f64>>,
+    pub bin_amounts: IndexMap<String, Option<f64>>,
     /// Fraction of each category of the group a stratification splits, by
     /// stratification id and category; the fractions of one stratification
     /// sum to 1.0.
     #[serde(default)]
     pub stratification_fractions: IndexMap<String, IndexMap<String, f64>>,
-    /// Fraction of the total in single expanded compartments, by compartment
-    /// name, applied after the expansion.
+    /// Amount of single expanded compartments, by compartment name, applied
+    /// after the expansion.
     #[serde(default)]
-    pub compartment_fractions: IndexMap<String, f64>,
+    pub compartment_amounts: IndexMap<String, f64>,
 }
 
 /// Who the neighbors of a unit are, for the rate variables `neighbors_<bin>`
@@ -255,28 +258,27 @@ mod tests {
     }
 
     #[test]
-    fn initial_conditions_without_compartment_fractions_deserialize() {
-        let json = r#"{"total": 1000.0, "bin_fractions": {"A": 1.0}}"#;
+    fn initial_conditions_without_compartment_amounts_deserialize() {
+        let json = r#"{"bin_amounts": {"A": 1000.0}}"#;
         let conditions: InitialConditions = serde_json::from_str(json).unwrap();
 
-        assert!(conditions.compartment_fractions.is_empty());
+        assert!(conditions.compartment_amounts.is_empty());
         assert!(conditions.stratification_fractions.is_empty());
     }
 
     #[test]
-    fn fractions_keep_their_order_and_uncalibrated_values() {
+    fn amounts_keep_their_order_and_uncalibrated_values() {
         let json = r#"{
-            "total": 1000.0,
-            "bin_fractions": {"B": 0.75, "A": null},
+            "bin_amounts": {"B": 750.0, "A": null},
             "stratification_fractions": {"group": {"g2": 0.5, "g1": 0.5}},
-            "compartment_fractions": {"B_g1": 0.25}
+            "compartment_amounts": {"B_g1": 250.0}
         }"#;
         let conditions: InitialConditions = serde_json::from_str(json).unwrap();
 
-        let bins: Vec<(&String, &Option<f64>)> = conditions.bin_fractions.iter().collect();
+        let bins: Vec<(&String, &Option<f64>)> = conditions.bin_amounts.iter().collect();
         assert_eq!(
             bins,
-            [(&"B".to_string(), &Some(0.75)), (&"A".to_string(), &None)]
+            [(&"B".to_string(), &Some(750.0)), (&"A".to_string(), &None)]
         );
         assert_eq!(
             conditions.stratification_fractions["group"]
@@ -284,6 +286,6 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["g2", "g1"]
         );
-        assert_eq!(conditions.compartment_fractions["B_g1"], 0.25);
+        assert_eq!(conditions.compartment_amounts["B_g1"], 250.0);
     }
 }

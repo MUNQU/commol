@@ -212,13 +212,13 @@ class TestSubgroupTotal:
             )
 
     def test_overrides_are_folded_into_each_subgroup(self) -> None:
-        model = build(override_builder(0.3))
+        model = build(override_builder(300))
 
-        # group1 selects A_g1 (the 0.3 override) and B_g1 (0.0).
+        # group1 selects A_g1 (the override of 300) and B_g1 (0).
         assert model.structure.subgroup_total(model.process, ("g1",)) == pytest.approx(
             300.0
         )
-        # group2 selects A_g2 (0.5) and B_g2 (0.0).
+        # group2 selects A_g2 (500) and B_g2 (0).
         assert model.structure.subgroup_total(model.process, ("g2",)) == pytest.approx(
             500.0
         )
@@ -228,7 +228,7 @@ class TestSubgroupTotal:
             a_to_b_builder(
                 rate="k * A",
                 stratifications={"group": {"group1": 1.0, "group2": 0.0}},
-                compartment_fractions={"A_group1": 0.2},
+                compartment_amounts={"A_group1": 200},
             )
         )
 

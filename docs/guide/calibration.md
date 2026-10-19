@@ -43,8 +43,7 @@ def basic_model(k1: float | None, k2: float | None, engine="DifferenceEquations"
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+                bin_amounts={"A": 990, "B": 10, "C": 0},
             ),
             engine=engine,
         )
@@ -125,7 +124,7 @@ also when it was created while a parameter was `None`. See
 | `parameter_type` | `id` names | The value is |
 |---|---|---|
 | `"parameter"` | A model parameter, usually declared with `value=None` | The parameter value |
-| `"initial_condition"` | A bin, a category, or an expanded compartment | A fraction of the total; see [Calibrating Initial Conditions](calibration-initial-conditions.md) |
+| `"initial_condition"` | A bin, a category, or an expanded compartment | An amount in the unit of its bin, or the split of a category; see [Calibrating Initial Conditions](calibration-initial-conditions.md) |
 | `"factor"` | Any new id, used by observations through `factor_id` | A factor on the predictions; not part of the model |
 
 `"parameter"` and `"factor"` work with every kind of model. The other types are

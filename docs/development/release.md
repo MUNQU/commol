@@ -175,8 +175,7 @@ model = (
     .add_transition(id="b_to_c", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )

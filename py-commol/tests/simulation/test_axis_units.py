@@ -75,7 +75,7 @@ class TestModelAxisUnits:
         builder.add_bin(id="A", name="A")
         builder.add_bin(id="B", name="B")
         builder.add_transition(id="ab", source=["A"], target=["B"], rate=0.1)
-        builder.set_structure(Aggregate(total=1, bin_fractions={"A": 1.0, "B": 0.0}))
+        builder.set_structure(Aggregate(bin_amounts={"A": 1, "B": 0}))
 
         units = build_ode(builder).axis_units()
 

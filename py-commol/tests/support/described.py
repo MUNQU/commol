@@ -60,8 +60,7 @@ def every_flow_builder() -> FactoryBuilder:
     )
     builder.set_structure(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.5, "B": 0.5, "C": 0.0},
+            bin_amounts={"A": 500, "B": 500, "C": 0},
             stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
         )
     )
@@ -80,7 +79,7 @@ def variant_with_a_series() -> Model:
         id="s", value=SeriesValue(data=[(0, 1.0), (5, 2.5)], mode="linear")
     )
     return builder.build(
-        UnstratifiedVariant(total=1000, bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0}),
+        UnstratifiedVariant(bin_amounts={"A": 990, "B": 10, "C": 0}),
         engine="DifferenceEquations",
     )
 
@@ -99,9 +98,7 @@ def stochastic_with_settings() -> Model:
         .add_transition(id="out", source=["B"], target=[], rate="0")
         .add_transition(id="dose", source=["A"], target=["B"], rate="0", impulse_at=[1])
     )
-    builder.set_structure(
-        Aggregate(total=10, bin_fractions={"A": 0.5, "B": 0.5}, neighbors=Complete())
-    )
+    builder.set_structure(Aggregate(bin_amounts={"A": 5, "B": 5}, neighbors=Complete()))
     return builder.build(
         builder.structure,
         engine="StochasticEvents",
@@ -139,13 +136,12 @@ def weighted_groups() -> Model:
     )
     builder.set_structure(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": None, "B": 0.4},
+            bin_amounts={"A": None, "B": 400},
             stratification_fractions={
                 "group": {"g1": 0.25, "g2": 0.75},
                 "tier": {"t1": 0.5, "t2": 0.5},
             },
-            compartment_fractions={"B_g2": 0.2},
+            compartment_amounts={"B_g2": 200},
             neighbors=Groups(
                 "group",
                 weights={"g1": {"g1": 1.0, "g2": 0.5}, "g2": {"g1": 0.5, "g2": 1.0}},
@@ -180,8 +176,7 @@ def identity_groups() -> Model:
     )
     builder.set_structure(
         Aggregate(
-            total=100,
-            bin_fractions={"A": 0.5, "B": 0.5},
+            bin_amounts={"A": 50, "B": 50},
             stratification_fractions={
                 "group": {"g1": 0.5, "g2": 0.5},
                 "tier": {"t1": 0.5, "t2": 0.5},

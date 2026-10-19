@@ -691,12 +691,14 @@ impl Default for OdeSolver {
 /// which compartments start with a unit, so it is a choice of the model.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Rounding {
-    /// The same whole amounts in every run: each amount rounded down, and the
-    /// units left over to the largest remainders, so they sum to the total.
+    /// The same whole amounts in every run: in each bin, each amount rounded
+    /// down, and the units left over to the largest remainders, so they sum
+    /// to the amount of the bin.
     #[serde(rename = "largest_remainder")]
     LargestRemainder,
-    /// A multinomial draw of the total with the fractions of the model in
-    /// each run, so the mean start equals the amounts of the model.
+    /// A multinomial draw of the amount of each bin with the fractions of
+    /// the model in each run, so the mean start equals the amounts of the
+    /// model.
     #[serde(rename = "random")]
     Random,
 }

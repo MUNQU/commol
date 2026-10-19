@@ -16,7 +16,7 @@ def _stratified_model() -> Model:
     """One binary and one ternary stratification."""
     return build(
         a_to_b_builder(
-            fractions={"A": 0.9, "B": 0.1},
+            amounts={"A": 900, "B": 100},
             stratifications={
                 "group": {"group1": 0.6, "group2": 0.4},
                 "tier": {"low": 0.5, "mid": 0.3, "high": 0.2},
@@ -186,9 +186,11 @@ class TestQualifiedCategoryReads:
         assert model.structure.subgroup_total(
             model.process, ["group:c1"]
         ) == pytest.approx(500.0)
+        assert model.structure.get_category_fraction("level:c1") == 0.8
+        assert model.structure.get_category_fraction("group:c1") == 0.5
 
     def test_qualified_name_with_overrides_sums_the_engine_state(self) -> None:
-        model = build(shared_category_builder(compartment_fractions={"A_c1_c1": 0.0}))
+        model = build(shared_category_builder(compartment_amounts={"A_c1_c1": 0}))
 
         # A_c1_c1 is pinned to 0, so only A_c2_c1 holds level:c1.
         assert model.structure.subgroup_total(
@@ -237,8 +239,7 @@ class TestNames:
         builder = a_to_b_builder(stratifications={"g": ["g1", "g2"]})
         builder.set_structure(
             Aggregate(
-                total=10,
-                bin_fractions={"A": 1.0, "B": 0.0},
+                bin_amounts={"A": 10, "B": 0},
                 stratification_fractions=fractions,
             )
         )

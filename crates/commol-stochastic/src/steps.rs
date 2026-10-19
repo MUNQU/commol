@@ -47,7 +47,7 @@ impl StochasticSteps {
     /// # Errors
     ///
     /// Returns a message when the model is not of this engine, when
-    /// [`CompiledModel::try_from_model`] fails (a total that is not whole, or
+    /// [`CompiledModel::try_from_model`] fails (a bin whose amount is not whole, or
     /// amounts that are not whole and no rounding), or when an impulse or a
     /// series point is not at an integer step.
     pub fn try_from_model(model: &commol_core::Model) -> Result<Self, String> {

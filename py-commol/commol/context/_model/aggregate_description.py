@@ -161,18 +161,22 @@ def _neighbors[S: "Aggregate"](model: "Model[S]") -> list[Block]:
 def _initialization[S: "Aggregate"](model: "Model[S]") -> list[Block]:
     structure = model.structure
     process = model.process
-    total = structure.total
+
+    def unit(bin_id: str) -> str | None:
+        bin_item = process.bin(bin_id)
+        return None if bin_item is None else bin_item.unit
+
     blocks: list[Block] = [
         Table(
-            heading="Bin fractions",
-            columns=["Bin", "Fraction", "Amount"],
+            heading="Bin amounts",
+            columns=["Bin", "Amount", "Unit"],
             rows=[
                 [
                     bin_id,
-                    "set by calibration" if fraction is None else fraction,
-                    None if fraction is None else fraction * total,
+                    "set by calibration" if amount is None else amount,
+                    unit(bin_id),
                 ]
-                for bin_id, fraction in structure.bin_fractions.items()
+                for bin_id, amount in structure.bin_amounts.items()
             ],
         )
     ]
@@ -182,7 +186,7 @@ def _initialization[S: "Aggregate"](model: "Model[S]") -> list[Block]:
             group = structure.get_conditioning_categories(process, stratification)
             for category, fraction in categories.items():
                 rows.append(
-                    [stratification, category, fraction, "+".join(group) or "total"]
+                    [stratification, category, fraction, "+".join(group) or "each bin"]
                 )
         blocks.append(
             Table(
@@ -191,24 +195,26 @@ def _initialization[S: "Aggregate"](model: "Model[S]") -> list[Block]:
                 rows=rows,
             )
         )
-    if structure.compartment_fractions:
+    state = structure.initial_state(process)
+    bin_of = {compartment.name: compartment.bin for compartment in state}
+    if structure.compartment_amounts:
         blocks.append(
             Table(
                 heading="Compartment overrides",
-                columns=["Compartment", "Fraction of the total", "Amount"],
+                columns=["Compartment", "Amount", "Unit"],
                 rows=[
-                    [compartment, fraction, fraction * total]
-                    for compartment, fraction in structure.compartment_fractions.items()
+                    [compartment, amount, unit(bin_of[compartment])]
+                    for compartment, amount in structure.compartment_amounts.items()
                 ],
             )
         )
     blocks.append(
         Table(
-            heading=f"Initial state (total {total:g})",
-            columns=["Compartment", "Amount"],
+            heading="Initial state",
+            columns=["Compartment", "Amount", "Unit"],
             rows=[
-                [compartment.name, compartment.amount]
-                for compartment in structure.initial_state(process)
+                [compartment.name, compartment.amount, unit(compartment.bin)]
+                for compartment in state
             ],
         )
     )

@@ -9,10 +9,11 @@ use commol_model::{CompartmentalEngine, InitialConditionPlan, OutputLabels};
 
 /// A compartmental engine that holds its state and does not move it.
 /// Compartment names are `<bin>` or `<bin>_<category>` of one stratification
-/// `group`, and the total is 1000.
+/// `group`, and the total is the sum of the state it starts with.
 #[derive(Clone)]
 struct FrozenEngine {
     compartments: Vec<String>,
+    total: f64,
     initial_state: Vec<f64>,
     state: Vec<f64>,
     parameters: HashMap<String, f64>,
@@ -22,6 +23,7 @@ impl FrozenEngine {
     fn with(compartments: &[&str], state: &[f64]) -> Self {
         Self {
             compartments: compartments.iter().map(|name| name.to_string()).collect(),
+            total: state.iter().sum(),
             initial_state: state.to_vec(),
             state: state.to_vec(),
             parameters: HashMap::new(),
@@ -134,7 +136,7 @@ impl CompartmentalEngine for FrozenEngine {
     }
 
     fn total(&self) -> f64 {
-        1000.0
+        self.total
     }
 
     fn set_initial_condition(
@@ -182,16 +184,17 @@ fn assert_close(actual: &[f64], expected: &[f64]) {
 
 #[test]
 fn a_bin_value_keeps_the_split_of_its_compartments() {
-    // A = 0.65 of 1000 keeps its 300:200 split: 390 and 260.
-    let state = written_state(FrozenEngine::two_bins(), &["A", "B"], None, &[0.65, 0.35]).unwrap();
+    // A = 650 keeps its 300:200 split: 390 and 260.
+    let state =
+        written_state(FrozenEngine::two_bins(), &["A", "B"], None, &[650.0, 350.0]).unwrap();
 
     assert_close(&state, &[390.0, 260.0, 280.0, 70.0]);
 }
 
 #[test]
 fn remainder_absorbs_the_difference_and_keeps_its_split() {
-    // A = 0.65 keeps its 300:200 split; B takes the remaining 350 at 400:100.
-    let state = written_state(FrozenEngine::two_bins(), &["A"], Some("B"), &[0.65]).unwrap();
+    // A = 650 keeps its 300:200 split; B takes the remaining 350 at 400:100.
+    let state = written_state(FrozenEngine::two_bins(), &["A"], Some("B"), &[650.0]).unwrap();
 
     assert_close(&state, &[390.0, 260.0, 280.0, 70.0]);
 }
@@ -199,47 +202,65 @@ fn remainder_absorbs_the_difference_and_keeps_its_split() {
 #[test]
 fn remainder_leaves_fixed_compartments_alone() {
     // C stays at 100, so B takes 1000 - 300 - 100 = 600 at 300:100.
-    let state = written_state(FrozenEngine::with_fixed_c(), &["A"], Some("B"), &[0.3]).unwrap();
+    let state = written_state(FrozenEngine::with_fixed_c(), &["A"], Some("B"), &[300.0]).unwrap();
 
     assert_close(&state, &[180.0, 120.0, 100.0, 450.0, 150.0]);
 }
 
 #[test]
 fn single_exact_value_is_free_with_a_remainder() {
-    let state = written_state(FrozenEngine::two_bins(), &["A_cat1"], Some("B"), &[0.1]).unwrap();
+    let state = written_state(FrozenEngine::two_bins(), &["A_cat1"], Some("B"), &[100.0]).unwrap();
 
     assert_close(&state, &[300.0, 100.0, 480.0, 120.0]);
 }
 
 #[test]
 fn without_remainder_values_are_applied_as_given() {
-    let state = written_state(FrozenEngine::two_bins(), &["A_cat0"], None, &[0.1]).unwrap();
+    let state = written_state(FrozenEngine::two_bins(), &["A_cat0"], None, &[100.0]).unwrap();
 
     assert_close(&state, &[100.0, 200.0, 400.0, 100.0]);
 }
 
 #[test]
-fn without_remainder_an_excess_over_the_total_is_infeasible() {
-    let error = written_state(FrozenEngine::two_bins(), &["A_cat0"], None, &[0.5]).unwrap_err();
+fn without_remainder_any_amount_is_feasible() {
+    let state = written_state(FrozenEngine::two_bins(), &["A_cat0"], None, &[5000.0]).unwrap();
 
-    assert!(error.contains("exceed the total"), "{error}");
+    assert_close(&state, &[5000.0, 200.0, 400.0, 100.0]);
 }
 
 #[test]
 fn negative_remainder_is_infeasible() {
     let error =
-        written_state(FrozenEngine::with_fixed_c(), &["A"], Some("B"), &[0.95]).unwrap_err();
+        written_state(FrozenEngine::with_fixed_c(), &["A"], Some("B"), &[950.0]).unwrap_err();
 
     assert!(error.contains("remainder 'B'"), "{error}");
 }
 
 #[test]
-fn a_remainder_below_zero_is_its_share_of_the_total() {
-    // A = 0.95 and C = 100 leave B at −50, 0.05 of the total.
+fn an_excess_over_the_remainder_is_its_share_of_the_amounts_set() {
+    // A and B keep 900, so A = 950 leaves B at −50, 50 / 950 of A.
     let error =
-        written_state(FrozenEngine::with_fixed_c(), &["A"], Some("B"), &[0.95]).unwrap_err();
+        written_state(FrozenEngine::with_fixed_c(), &["A"], Some("B"), &[950.0]).unwrap_err();
 
-    assert!(error.contains("'B' 0.050000 of the total"), "{error}");
+    assert!(error.contains("'B' keeps by 0.052632 of them"), "{error}");
+}
+
+#[test]
+fn the_remainder_keeps_the_declared_sum_of_what_it_covers() {
+    // A and B hold a count and C a concentration: B = 12 takes 2 from A,
+    // and C, which nothing covers, keeps its amount.
+    let engine = FrozenEngine::with(&["A", "B", "C"], &[990.0, 10.0, 1e5]);
+    let state = written_state(engine, &["B"], Some("A"), &[12.0]).unwrap();
+
+    assert_close(&state, &[988.0, 12.0, 1e5]);
+}
+
+#[test]
+fn a_remainder_of_bins_that_start_at_zero_cannot_give_an_amount() {
+    let engine = FrozenEngine::with(&["A", "B", "C"], &[0.0, 0.0, 5.0]);
+    let error = written_state(engine, &["B"], Some("A"), &[3.0]).unwrap_err();
+
+    assert!(error.contains("'A' keeps by 1.000000 of them"), "{error}");
 }
 
 #[test]
@@ -248,7 +269,7 @@ fn a_bin_of_empty_compartments_splits_its_value_evenly() {
         &["A_cat0", "A_cat1", "B_cat0", "B_cat1"],
         &[0.0, 0.0, 400.0, 300.0],
     );
-    let state = written_state(engine, &["A"], None, &[0.3]).unwrap();
+    let state = written_state(engine, &["A"], None, &[300.0]).unwrap();
 
     assert_close(&state, &[150.0, 150.0, 400.0, 300.0]);
 }
@@ -259,7 +280,7 @@ fn a_remainder_of_empty_compartments_splits_evenly() {
         &["A_cat0", "A_cat1", "B_cat0", "B_cat1"],
         &[500.0, 500.0, 0.0, 0.0],
     );
-    let state = written_state(engine, &["A"], Some("B"), &[0.6]).unwrap();
+    let state = written_state(engine, &["A"], Some("B"), &[600.0]).unwrap();
 
     assert_close(&state, &[300.0, 300.0, 200.0, 200.0]);
 }
@@ -267,20 +288,20 @@ fn a_remainder_of_empty_compartments_splits_evenly() {
 #[test]
 fn remainder_overlapping_a_calibrated_value_is_rejected() {
     let error =
-        written_state(FrozenEngine::two_bins(), &["A"], Some("A_cat0"), &[0.5]).unwrap_err();
+        written_state(FrozenEngine::two_bins(), &["A"], Some("A_cat0"), &[500.0]).unwrap_err();
 
     assert!(error.contains("overlaps"), "{error}");
 }
 
 #[test]
 fn category_splits_apply_after_bin_values_whatever_the_order() {
-    // A = 0.6 first (360 / 240), then cat1 = 0.1 splits every pair, and the
+    // A = 600 first (360 / 240), then cat1 = 0.1 splits every pair, and the
     // remainder B takes 400 at the new 450:50 split.
     let state = written_state(
         FrozenEngine::two_bins(),
         &["cat1", "A"],
         Some("B"),
-        &[0.1, 0.6],
+        &[0.1, 600.0],
     )
     .unwrap();
 
@@ -317,14 +338,14 @@ fn category_names_come_from_the_labels() {
 
 #[test]
 fn an_expanded_compartment_is_a_target() {
-    let state = written_state(FrozenEngine::two_bins(), &["A_cat0"], None, &[0.2]).unwrap();
+    let state = written_state(FrozenEngine::two_bins(), &["A_cat0"], None, &[200.0]).unwrap();
 
     assert_close(&state, &[200.0, 200.0, 400.0, 100.0]);
 }
 
 #[test]
 fn an_unknown_id_names_the_compartments() {
-    let error = written_state(FrozenEngine::two_bins(), &["X"], None, &[0.2]).unwrap_err();
+    let error = written_state(FrozenEngine::two_bins(), &["X"], None, &[200.0]).unwrap_err();
 
     assert!(error.contains("'X'") && error.contains("A_cat0"), "{error}");
 }
@@ -343,7 +364,7 @@ fn the_plan_covers_what_its_values_and_remainder_set() {
 
 #[test]
 fn a_remainder_is_a_compartment_or_a_bin() {
-    let error = written_state(FrozenEngine::two_bins(), &["A"], Some("X"), &[0.5]).unwrap_err();
+    let error = written_state(FrozenEngine::two_bins(), &["A"], Some("X"), &[500.0]).unwrap_err();
 
     assert_eq!(
         error,
@@ -354,7 +375,7 @@ fn a_remainder_is_a_compartment_or_a_bin() {
 
 #[test]
 fn a_plan_takes_one_value_per_initial_condition() {
-    let error = written_state(FrozenEngine::two_bins(), &["A"], None, &[0.5, 0.2]).unwrap_err();
+    let error = written_state(FrozenEngine::two_bins(), &["A"], None, &[500.0, 200.0]).unwrap_err();
 
     assert_eq!(error, "Expected 1 initial-condition values, got 2");
 }

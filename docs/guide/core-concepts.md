@@ -26,7 +26,7 @@ see [Building Models](building-models.md).
 
 ## Compartments
 
-A compartment (a *bin*) holds an amount: a part of the total. A model can have
+A compartment (a *bin*) holds an amount, in the unit of the bin. A model can have
 any number of them, with any ids.
 
 ```python
@@ -102,21 +102,20 @@ With stratifications, an accumulator expands like a bin (`cum_ab_g1`,
 
 The calls above write the **process**: what changes and how. The
 **structure** lays the process out. `Aggregate` holds an amount per
-compartment, and gives the total and the fraction of it that starts in each
-bin. The total is a real number, finite and greater than 0:
+compartment, and gives the amount that each bin starts with, in the unit of
+the bin. An amount is a real number, finite and not negative:
 
 ```python
-structure = Aggregate(total=1000, bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0})
+structure = Aggregate(bin_amounts={"A": 900, "B": 100, "C": 0})
 ```
 
 | Rule | Checked when |
 |---|---|
-| `total` is finite and greater than 0 | `Aggregate(...)` |
-| The bin fractions sum to 1.0 | `Aggregate(...)` |
-| Every bin has a fraction | The model is built |
+| Every amount is finite and not negative | `Aggregate(...)` |
+| Every bin has an amount | The model is built |
 | Every stratification has fractions, and they sum to 1.0 | The model is built |
 
-A fraction may be `None` when calibration will find it; see
+An amount may be `None` when calibration will find it; see
 [Model Calibration](calibration.md).
 
 ## Build and run
@@ -143,7 +142,7 @@ every kind its process fits. Here `model.structure` is an `Aggregate`:
 print(model.engine.type)                    # DifferenceEquations
 print(model.structure.kind)                 # aggregate
 print([b.id for b in model.process.bins])   # ['A', 'B', 'C']
-print(model.structure.total)                # 1000.0
+print(model.structure.bin_amounts)          # {'A': 900.0, 'B': 100.0, 'C': 0.0}
 ```
 
 Four engines run an aggregate model, with the same process and structure:
@@ -199,8 +198,8 @@ Stratifications group = [g1, g2] and type = [t1, t2]
 A -> A_g1_t1, A_g1_t2, A_g2_t1, A_g2_t2      8 compartments for 2 bins
 ```
 
-The initial amount of each compartment is the total times the product of its
-fractions:
+The initial amount of each compartment is the amount of its bin times the
+product of the fractions of its categories:
 
 ```python
 stratified = (
@@ -212,8 +211,7 @@ stratified = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
     .build(
         Aggregate(
-            total=10000,
-            bin_fractions={"A": 0.9, "B": 0.1},
+            bin_amounts={"A": 9000, "B": 1000},
             stratification_fractions={"group": {"g1": 0.6, "g2": 0.4}},
         ),
         engine="DifferenceEquations",
@@ -265,8 +263,7 @@ conditional = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
     .build(
         Aggregate(
-            total=10000,
-            bin_fractions={"A": 0.9, "B": 0.1},
+            bin_amounts={"A": 9000, "B": 1000},
             stratification_fractions={
                 "group": {"g1": 0.6, "g2": 0.4},
                 "subtype": {"s1": 0.5, "s2": 0.5},
@@ -281,8 +278,9 @@ print([c.name for c in conditional.structure.initial_state(conditional.process)]
 ```
 
 The fractions of a conditional stratification are fractions of the subgroup it
-splits, not of the total. `subgroup_total` multiplies along the chain to give
-the total of a subgroup, and `get_conditioning_categories` names the subgroup:
+splits, not of the whole bin, so they multiply along the chain.
+`subgroup_total` sums the initial state over the compartments of a subgroup,
+and `get_conditioning_categories` names the subgroup:
 
 ```python
 aggregate, process = conditional.structure, conditional.process
@@ -298,9 +296,9 @@ for the full API.
 ### Per-compartment overrides
 
 When the product of fractions cannot express the starting state, for example a
-state that is empty in only one category, `compartment_fractions` overrides
-single expanded compartments. Each fraction is a fraction of the **total** and
-replaces the product for that compartment only:
+state that is empty in only one category, `compartment_amounts` overrides
+single expanded compartments. Each amount is in the unit of the bin of its
+compartment and replaces the product for that compartment only:
 
 ```python
 overridden = (
@@ -312,10 +310,9 @@ overridden = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
     .build(
         Aggregate(
-            total=10000,
-            bin_fractions={"A": 0.9, "B": 0.1},
+            bin_amounts={"A": 9000, "B": 1000},
             stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
-            compartment_fractions={"B_g1": 0.0},
+            compartment_amounts={"B_g1": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -327,24 +324,24 @@ print({c.name: c.amount for c in overridden.structure.initial_state(overridden.p
 
 | Rule | Checked when |
 |---|---|
-| Each fraction is between 0.0 and 1.0 | `Aggregate(...)` |
+| Each amount is finite and not negative | `Aggregate(...)` |
 | Each name is an expanded compartment | The model is built |
-| The initial amounts do not sum to more than `total` | The model is built |
 
-`model.structure.update_compartment_fractions(model.process, {"B_g1": 0.05})`
+An override may hold more than the product gave its compartment: the bins keep
+no sum. `model.structure.update_compartment_amounts(model.process, {"B_g1": 50})`
 changes or adds overrides on a built model; the engine checks them against
 the expansion of the process before they are stored.
 
-### Updating fractions after building
+### Updating the initial state after building
 
 ```python
-overridden.structure.update_bin_fractions({"A": 0.85, "B": 0.15})
+overridden.structure.update_bin_amounts({"A": 8500, "B": 1500})
 overridden.structure.update_stratification_fractions({"g1": 0.7})  # g2 becomes 0.3
 ```
 
 | Method | Rule |
 |---|---|
-| `update_bin_fractions` | After the update, the bin fractions sum to 1.0. Move an amount between bins in one call. |
+| `update_bin_amounts` | Each amount is finite and not negative, or `None` for calibration. The other bins keep their amounts. |
 | `update_stratification_fractions` | Within each stratification you may omit one category; it receives what remains of 1.0. Omitting two raises. |
 
 A category name that two stratifications declare must be qualified with its
@@ -367,8 +364,7 @@ merge = (
     .add_transition(id="t1", source=["A", "B"], target=["C", "C"], rate="k * A * B")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.5, "B": 0.5, "C": 0.0},
+            bin_amounts={"A": 500, "B": 500, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -389,8 +385,7 @@ outflow = (
     .add_transition(id="outflow", source=["A", "B"], target=[], rate="mu * $compartment")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.5, "B": 0.5},
+            bin_amounts={"A": 500, "B": 500},
         ),
         engine="DifferenceEquations",
     )

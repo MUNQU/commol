@@ -180,15 +180,17 @@ sampler in `tests/reference_values.txt`), `py-commol/src/engine.rs`
 
 A stochastic engine moves whole units, so it starts from whole amounts.
 `check_model` (`crates/commol-model/src/builder.rs`, called by `build` and by
-every engine) rejects a total that is not whole, and initial amounts that are
-not whole unless the settings of the engine name a `Rounding`
-(`crates/commol-core/src/types/engine.rs`); the message lists both. There is no
-default:
+every engine) rejects a bin whose amount (the sum of its compartments) is not
+whole, and initial amounts that are not whole unless the settings of the
+engine name a `Rounding` (`crates/commol-core/src/types/engine.rs`); the
+message lists both. There is no default. A rounding makes the compartments of
+each bin whole and keeps the amount of the bin (`round_bins`), so a unit never
+moves to another bin, such as from a concentration to a count:
 
 | `rounding` | Start of each run (`Units::begin` in `crates/commol-stochastic/src/units.rs`) |
 |---|---|
-| `"largest_remainder"` | The same whole amounts: each amount rounded down, the units left over to the largest remainders, the first compartment first on a tie |
-| `"random"` | A multinomial draw of the total with the fractions of the model, from the generator of the run |
+| `"largest_remainder"` | The same whole amounts: in each bin, each amount rounded down, the units left over to the largest remainders, the first compartment first on a tie |
+| `"random"` | A multinomial draw of the amount of each bin with the fractions of the model, from the generator of the run |
 
 The engine rounds at the start of a run, not when it is built, so a value that
 calibration writes (`InitialConditionPlan`) goes through the same rounding, and
@@ -200,6 +202,9 @@ value that is not whole is an error.
 | Largest remainder by default | With small amounts the rounding is a modelling choice: half a unit in each of ten groups starts five groups with one unit and five with none, which decides which groups can start a process at all. The library would choose it without notice. |
 | Random rounding by default | The same objection, the other way. |
 | Reject every amount that is not whole | Most stratified models would fail, with no way out but to compute whole amounts by hand. |
+| Round over every compartment at once | It keeps only the sum of every bin: a unit left over in one bin can start in another bin, of another unit. |
+| Round each compartment on its own | No bin keeps its amount, and `"random"` changes it from one run to the next. |
+| Round the amount of a bin that is not whole too | It changes a declared amount without notice. |
 
 A per-step probability of `StochasticSteps` outside `[0, 1]`, or proportional
 rates out of one compartment that sum to more than 1, are an error that names
@@ -209,10 +214,13 @@ the model without notice.
 
 **Guards:** `crates/commol-stochastic/tests/oracles.rs`
 (`amounts_that_are_not_whole_need_a_rounding`,
+`whole_amounts_need_no_rounding_and_each_bin_must_be_whole`,
 `the_largest_remainder_starts_every_run_from_the_same_whole_amounts`,
 `a_random_rounding_starts_on_average_from_the_amounts_of_the_model`,
 `calibrated_initial_conditions_go_through_the_rounding`,
 `a_negative_rate_or_probabilities_above_one_fail_at_their_step`),
+`crates/commol-stochastic/src/units.rs` (`each_bin_keeps_its_amount_when_rounded`),
+`builder.rs` (`a_bin_that_is_not_whole_is_a_build_error_of_a_stochastic_engine`),
 `tests/stochastic/test_whole_units.py`.
 
 ## The solver is `diffsol`
