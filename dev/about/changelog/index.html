@@ -2773,6 +2773,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2802,7 +2813,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed" class="md-nav__link">
+  <a href="#changed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -2863,7 +2874,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_1" class="md-nav__link">
+  <a href="#changed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -2924,7 +2935,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_2" class="md-nav__link">
+  <a href="#changed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -2996,7 +3007,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_3" class="md-nav__link">
+  <a href="#changed_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3176,6 +3187,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3205,7 +3227,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed" class="md-nav__link">
+  <a href="#changed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3266,7 +3288,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_1" class="md-nav__link">
+  <a href="#changed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3327,7 +3349,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_2" class="md-nav__link">
+  <a href="#changed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3399,7 +3421,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_3" class="md-nav__link">
+  <a href="#changed_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3584,6 +3606,79 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><code>SimulationPlotter.plot_series(prediction_intervals=...)</code> draws the band of
   conformal intervals, and <code>simulation_report(..., prediction_intervals=...)</code>
   reports them.</li>
+<li>A model can hold bins of different units, such as people and the
+  concentration of bacteria in water: each bin starts at an amount in its own
+  unit, a model whose bins all start at <code>0</code> builds and runs, and the
+  <code>Calibrator</code> rejects an initial-condition remainder whose unit is not the
+  unit of a calibrated amount. See
+  <a href="../../guide/building-models/#bins-of-different-units">Bins of different units</a>.</li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Breaking:</strong> an <code>Aggregate</code> states the initial amount of each bin in the
+  unit of the bin, not fractions of one total. A structure that states
+  <code>total</code>, <code>bin_fractions</code> or <code>compartment_fractions</code> is rejected with the
+  fields to use.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Before</th>
+<th>Now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Aggregate(total=1000, bin_fractions={"S": 0.99, "I": 0.01})</code></td>
+<td><code>Aggregate(bin_amounts={"S": 990, "I": 10})</code></td>
+</tr>
+<tr>
+<td><code>compartment_fractions={"I_g1": 0.005}</code> (of the total)</td>
+<td><code>compartment_amounts={"I_g1": 5}</code> (in the unit of its bin)</td>
+</tr>
+<tr>
+<td><code>model.structure.total</code></td>
+<td>No declared total: <code>sum(model.structure.bin_amounts.values())</code> for bins of one unit</td>
+</tr>
+<tr>
+<td><code>update_bin_fractions({...})</code>, which kept the sum at 1</td>
+<td><code>update_bin_amounts({...})</code>; the other bins keep their amounts</td>
+</tr>
+<tr>
+<td><code>update_compartment_fractions(process, {...})</code></td>
+<td><code>update_compartment_amounts(process, {...})</code></td>
+</tr>
+<tr>
+<td><code>stratification_fractions</code></td>
+<td>Unchanged: the split of the amount of every bin a stratification applies to</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Breaking:</strong> a calibrated initial condition of a bin, a bin prefix or a
+  compartment is an amount in the unit of its bin, not a fraction of the
+  total; its bounds are amounts too. A category value is still a split. The
+  remainder takes the sum of the amounts the model states less every other
+  compartment, so a bin that no value covers keeps its amount; with a bin left
+  <code>None</code>, the remainder holds the sum (<code>{"S": 1000, "I": None}</code>). Without a
+  remainder no initial state is infeasible. A remainder below zero is measured
+  as a share of the amounts the values set. The write-back updates the amount
+  of a bin only when the values and the remainder set every compartment of it.</li>
+<li><strong>Breaking:</strong> <code>applied_parameters_report</code> gives an aggregate model the
+  sections <code>initial_amounts</code> (<code>amount</code>, <code>unit</code>, <code>calibrated</code>) and
+  <code>category_splits</code> (<code>group</code>, a list of categories, <code>fraction</code>, <code>calibrated</code>)
+  in place of <code>initial_conditions</code>, with no <code>total</code> row. A category split is
+  reported as the fraction of its group, with no rescaling of its interval.</li>
+<li><strong>Breaking:</strong> a stochastic engine needs a whole amount in each bin, not a
+  whole total, and <code>largest_remainder</code> and <code>random</code> round within each bin, so
+  a unit never moves to another bin.</li>
+<li><strong>Breaking:</strong> the description of an aggregate model shows the bin amounts and
+  their units, and the initial state with the unit of each compartment.</li>
+<li><strong>Breaking (Rust):</strong> <code>InitialConditions</code> has <code>bin_amounts</code> and
+  <code>compartment_amounts</code> in place of <code>total</code>, <code>bin_fractions</code> and
+  <code>compartment_fractions</code>; <code>CompartmentalEngine::total</code> is the sum of the
+  amounts the model states; <code>check_model_values</code> returns the plan it resolves,
+  and <code>InitialConditionPlan::coverage</code> gives the compartments each value sets.</li>
 </ul>
 <h2 id="050-2026-10-19">[0.5.0] - 2026-10-19<a class="headerlink" href="#050-2026-10-19" title="Permanent link">&para;</a></h2>
 <p>This release replaces the ensemble calibration with uncertainty methods that
@@ -3659,7 +3754,7 @@ place), and every interval uses one quantile, so the intervals of
 <li><code>CalibrationProblem::with_data</code> (Rust): a copy of a problem with other
   observed values and weights.</li>
 </ul>
-<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>The <code>latest</code> version of the documentation site is the documentation of the
   last release, published from its tag; the <code>dev</code> version follows <code>main</code>.</li>
@@ -3820,7 +3915,7 @@ place), and every interval uses one quantile, so the intervals of
   the change of one event and its propensity or its draw; the <code>schedule</code>
   section lists the settings of the engine.</li>
 </ul>
-<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
+<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Breaking:</strong> a model is built from a process and a structure.
   <code>ModelBuilder</code> writes the process, and <code>build(structure, engine,
@@ -3962,7 +4057,7 @@ place), and every interval uses one quantile, so the intervals of
   accepts <code>initial_condition</code>. A type the kind does not accept raises an error
   that names the kind.</li>
 </ul>
-<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
+<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Breaking:</strong> a <code>DifferenceEquations</code> step that leaves a compartment below
   zero (by more than <code>10⁻¹²</code> of the total) raises <code>InfeasibleStateError</code>, a
@@ -4556,7 +4651,7 @@ place), and every interval uses one quantile, so the intervals of
   calibration objective, the calibrated predictions and the model write-back
   share one implementation of how calibration values reach the engine.</li>
 </ul>
-<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
+<h3 id="changed_4">Changed<a class="headerlink" href="#changed_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Breaking:</strong> calibrated initial conditions no longer auto-calculate the
   last population-fraction value as the remainder of the population. The new

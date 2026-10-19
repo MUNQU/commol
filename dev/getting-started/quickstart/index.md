@@ -24,8 +24,7 @@ model = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -46,11 +45,11 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | Call                                                   | What it does                                                                                                                                                                                                                                                                                      |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ModelBuilder(name=..., version=...)`                  | Starts a model definition. Every method returns the builder, so calls chain.                                                                                                                                                                                                                      |
-| `.add_bin(id="A", name="State A")`                     | Adds a compartment (a *bin*): a state that holds an amount: a part of the total.                                                                                                                                                                                                                  |
+| `.add_bin(id="A", name="State A")`                     | Adds a compartment (a *bin*): a state that holds an amount, in the unit of the bin.                                                                                                                                                                                                               |
 | `.add_parameter(id="k1", value=0.3)`                   | Adds a named constant for rate formulas. `value=None` marks it for calibration.                                                                                                                                                                                                                   |
 | `.add_transition(..., rate="k1 * A * B / total")`      | Moves an amount from `source` to `target` along the axis. This rate names compartments, so it is the flow itself (*absolute*). A `DifferenceEquations` model moves the flow once per step; see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means). |
 | `.add_transition(..., rate="k2")`                      | This rate names no compartment, so it is *proportional*: the flow is `k2 × B`.                                                                                                                                                                                                                    |
-| `.build(Aggregate(...), engine="DifferenceEquations")` | Joins what you wrote, the *process*, with a *structure* and an engine, validates it and returns a `Model`. `Aggregate` holds an amount per compartment: `total` and the fraction of it that starts in each bin. The fractions must sum to 1.                                                      |
+| `.build(Aggregate(...), engine="DifferenceEquations")` | Joins what you wrote, the *process*, with a *structure* and an engine, validates it and returns a `Model`. `Aggregate` holds an amount per compartment: `bin_amounts` gives the amount each bin starts with.                                                                                      |
 | `Simulation(model).run(num_steps=100)`                 | Runs the Rust engine and returns the results.                                                                                                                                                                                                                                                     |
 
 See [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md) for bins, transitions and the two kinds of rate.
@@ -71,8 +70,7 @@ model_with_units = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -107,8 +105,7 @@ calibration_model = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )

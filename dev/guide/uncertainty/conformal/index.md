@@ -30,7 +30,7 @@ def ab_model(k: float | None):
         .add_parameter(id="k", value=k)
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
         .build(
-            Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}),
+            Aggregate(bin_amounts={"A": 1000, "B": 0}),
             engine="DifferenceEquations",
         )
     )

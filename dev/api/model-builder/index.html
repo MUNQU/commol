@@ -4822,8 +4822,8 @@ parameters: the process, which is the same for every kind of model.
 </span><span id="__span-0-792"><a id="__codelineno-0-792" name="__codelineno-0-792"></a><span class="sd">        The process is written once; the structure lays it out and sets the</span>
 </span><span id="__span-0-793"><a id="__codelineno-0-793" name="__codelineno-0-793"></a><span class="sd">        kind of the model, so one builder builds every kind its process fits:</span>
 </span><span id="__span-0-794"><a id="__codelineno-0-794" name="__codelineno-0-794"></a>
-</span><span id="__span-0-795"><a id="__codelineno-0-795" name="__codelineno-0-795"></a><span class="sd">        ``builder.build(Aggregate(total=1000, bin_fractions={&quot;A&quot;: 0.99,</span>
-</span><span id="__span-0-796"><a id="__codelineno-0-796" name="__codelineno-0-796"></a><span class="sd">        &quot;B&quot;: 0.01, &quot;C&quot;: 0.0}), engine=&quot;DifferentialEquations&quot;)``</span>
+</span><span id="__span-0-795"><a id="__codelineno-0-795" name="__codelineno-0-795"></a><span class="sd">        ``builder.build(Aggregate(bin_amounts={&quot;A&quot;: 990, &quot;B&quot;: 10, &quot;C&quot;: 0}),</span>
+</span><span id="__span-0-796"><a id="__codelineno-0-796" name="__codelineno-0-796"></a><span class="sd">        engine=&quot;DifferentialEquations&quot;)``</span>
 </span><span id="__span-0-797"><a id="__codelineno-0-797" name="__codelineno-0-797"></a>
 </span><span id="__span-0-798"><a id="__codelineno-0-798" name="__codelineno-0-798"></a><span class="sd">        Parameters</span>
 </span><span id="__span-0-799"><a id="__codelineno-0-799" name="__codelineno-0-799"></a><span class="sd">        ----------</span>
@@ -6974,8 +6974,8 @@ the process does not have.</p>
         <p>Join the process with a structure and an engine into a model.</p>
 <p>The process is written once; the structure lays it out and sets the
 kind of the model, so one builder builds every kind its process fits:</p>
-<p><code>builder.build(Aggregate(total=1000, bin_fractions={"A": 0.99,
-"B": 0.01, "C": 0.0}), engine="DifferentialEquations")</code></p>
+<p><code>builder.build(Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0}),
+engine="DifferentialEquations")</code></p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -7166,8 +7166,8 @@ unknown compartment or makes the initial amounts exceed the total.</p>
 </span><span id="__span-0-792"><a id="__codelineno-0-792" name="__codelineno-0-792"></a><span class="sd">    The process is written once; the structure lays it out and sets the</span>
 </span><span id="__span-0-793"><a id="__codelineno-0-793" name="__codelineno-0-793"></a><span class="sd">    kind of the model, so one builder builds every kind its process fits:</span>
 </span><span id="__span-0-794"><a id="__codelineno-0-794" name="__codelineno-0-794"></a>
-</span><span id="__span-0-795"><a id="__codelineno-0-795" name="__codelineno-0-795"></a><span class="sd">    ``builder.build(Aggregate(total=1000, bin_fractions={&quot;A&quot;: 0.99,</span>
-</span><span id="__span-0-796"><a id="__codelineno-0-796" name="__codelineno-0-796"></a><span class="sd">    &quot;B&quot;: 0.01, &quot;C&quot;: 0.0}), engine=&quot;DifferentialEquations&quot;)``</span>
+</span><span id="__span-0-795"><a id="__codelineno-0-795" name="__codelineno-0-795"></a><span class="sd">    ``builder.build(Aggregate(bin_amounts={&quot;A&quot;: 990, &quot;B&quot;: 10, &quot;C&quot;: 0}),</span>
+</span><span id="__span-0-796"><a id="__codelineno-0-796" name="__codelineno-0-796"></a><span class="sd">    engine=&quot;DifferentialEquations&quot;)``</span>
 </span><span id="__span-0-797"><a id="__codelineno-0-797" name="__codelineno-0-797"></a>
 </span><span id="__span-0-798"><a id="__codelineno-0-798" name="__codelineno-0-798"></a><span class="sd">    Parameters</span>
 </span><span id="__span-0-799"><a id="__codelineno-0-799" name="__codelineno-0-799"></a><span class="sd">    ----------</span>

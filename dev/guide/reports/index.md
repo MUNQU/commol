@@ -38,8 +38,7 @@ def model(k1: float | None):
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+                bin_amounts={"A": 990, "B": 10, "C": 0},
             ),
             engine="DifferenceEquations",
         )
@@ -82,7 +81,7 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 
 ## `applied_parameters_report`
 
-`applied_parameters_report(model, result, problem=None, parameter_statistics=None, confidence_level=None)` lists every number the calibrated model holds, and whether calibration set it. The `parameters` section is the same for every kind of model; the structure of the model adds the sections of its kind (`ModelStructure.report_sections`). An aggregate model adds `initial_conditions`:
+`applied_parameters_report(model, result, problem=None, parameter_statistics=None, confidence_level=None)` lists every number the calibrated model holds, and whether calibration set it. The `parameters` section is the same for every kind of model; the structure of the model adds the sections of its kind (`ModelStructure.report_sections`). An aggregate model adds `initial_amounts` and `category_splits`:
 
 ```json
 {
@@ -90,11 +89,14 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
     "k1": {"value": 0.4, "calibrated": true},
     "k2": {"value": 0.1, "calibrated": false}
   },
-  "initial_conditions": {
-    "total": {"group": "total", "fraction": 1.0, "value": 1000.0, "calibrated": false},
-    "A": {"group": "total", "fraction": 0.99, "value": 990.0, "calibrated": false},
-    "B": {"group": "total", "fraction": 0.01, "value": 10.0, "calibrated": false},
-    "C": {"group": "total", "fraction": 0.0, "value": 0.0, "calibrated": false}
+  "initial_amounts": {
+    "A": {"amount": 990.0, "unit": "item", "calibrated": false},
+    "B": {"amount": 10.0, "unit": "item", "calibrated": true},
+    "C": {"amount": 100000.0, "unit": "mg/l", "calibrated": false}
+  },
+  "category_splits": {
+    "g1": {"group": [], "fraction": 0.5, "calibrated": false},
+    "g2": {"group": [], "fraction": 0.5, "calibrated": false}
   }
 }
 ```
@@ -106,17 +108,16 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 | `problem`                    | Optional. Adds the `factor` parameters, which the model does not hold.                                                                  |
 | `sample`, `confidence_level` | Optional. A `ParameterSample`: each entry gains its weighted statistics (`ParameterSample.summary`). A sample needs a confidence level. |
 
-| Entry                                 | Rule                                                                                                                                                               |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Parameters                            | Only numeric parameters: formulas and series are inputs, not fitted values.                                                                                        |
-| `total`                               | The declared `total`, with fraction 1.0.                                                                                                                           |
-| Initial-condition `value`             | The amount the engine builds, overrides included.                                                                                                                  |
-| Initial-condition `fraction`          | That amount over `total`, so every row shares one denominator.                                                                                                     |
-| `group`                               | `"total"`, or the conditioning categories for a conditional stratification.                                                                                        |
-| An uncalibrated bin (`None` fraction) | `fraction` and `value` are `null`.                                                                                                                                 |
-| A `sample`                            | Each entry gains an `interval` block (`mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max`, `std`, all weighted), and the report starts with `confidence_level`. |
+| Entry                               | Rule                                                                                                                                                                                                      |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Parameters                          | Only numeric parameters: formulas and series are inputs, not fitted values.                                                                                                                               |
+| `initial_amounts`                   | One row per bin and per overridden compartment: the `amount` the engine builds, overrides included, and the `unit` of its bin. No row is a share of a total, so bins of different units sit side by side. |
+| `category_splits`                   | One row per category: its `fraction` of the group it splits. A category has no amount, because it can split bins of different units.                                                                      |
+| `group`                             | The conditioning categories of a conditional stratification, or `[]` when it splits every bin.                                                                                                            |
+| An uncalibrated bin (`None` amount) | `amount` is `null`.                                                                                                                                                                                       |
+| A `sample`                          | Each entry gains an `interval` block (`mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max`, `std`, all weighted), and the report starts with `confidence_level`.                                        |
 
-The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `group`, `fraction`, `value`, `calibrated`, then `interval`), so saved JSON files stay comparable.
+The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `amount`, `unit`, `calibrated`, then `interval`; `group`, `fraction`, `calibrated`, then `interval`), so saved JSON files stay comparable. An interval is in the unit of its entry: an amount in the unit of its bin, a split as a fraction of its group.
 
 ## `simulation_report`
 

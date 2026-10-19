@@ -458,6 +458,7 @@ class Calibrator:
             self.problem.parameters,
             self.problem.initial_condition_remainder,
         )
+        model.structure.check_calibration_values(model, self._engine, self.problem)
 
     def _validate_observed_data(self) -> None:
         """Validate that observed data compartments exist and have valid steps.

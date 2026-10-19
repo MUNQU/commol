@@ -19,7 +19,7 @@ builder = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
 )
-structure = Aggregate(total=1000, bin_fractions={"A": 0.999, "B": 0.001, "C": 0.0})
+structure = Aggregate(bin_amounts={"A": 999, "B": 1, "C": 0})
 
 model = builder.build(structure, engine="StochasticEvents")
 simulation = Simulation(model)
@@ -100,18 +100,20 @@ print(model.describe().render("markdown").split("### Events")[1].split("\n\n")[1
 
 A stochastic engine moves whole units, so it starts from whole amounts (`check_model` in `crates/commol-model/src/builder.rs`):
 
-| Initial amounts                 | What happens                                                                                             |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| The total is not a whole number | `build` raises `ValueError` and names the engine                                                         |
-| Every amount is whole           | Nothing more is needed                                                                                   |
-| An amount is not whole          | `build` raises `ValueError`, unless the settings of the engine name a `rounding`; the message lists both |
+| Initial amounts                           | What happens                                                                                             |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| The amount of a bin is not a whole number | `build` raises `ValueError` and names the engine and the bin                                             |
+| Every amount is whole                     | Nothing more is needed                                                                                   |
+| An amount is not whole                    | `build` raises `ValueError`, unless the settings of the engine name a `rounding`; the message lists both |
 
 There is no default rounding: with small amounts the rounding decides which compartments start with a unit, so it is a modelling choice. Half a unit in each of ten groups starts five groups with one unit and five with none.
 
-| `rounding`            | Start of each run                                                                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `"largest_remainder"` | The same whole amounts in every run: each amount rounded down, and the units left over to the largest remainders, so they sum to the total |
-| `"random"`            | A multinomial draw of the total with the fractions of the model, in each run, so the mean start equals the amounts of the model            |
+| `rounding`            | Start of each run                                                                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"largest_remainder"` | The same whole amounts in every run: in each bin, each amount rounded down, and the units left over to the largest remainders, so they sum to the amount of the bin |
+| `"random"`            | A multinomial draw of the amount of each bin with the fractions of the model, in each run, so the mean start equals the amounts of the model                        |
+
+Both round each bin on its own, so a unit never moves to another bin, such as from a bin of a concentration to a bin of a count.
 
 ```python
 from commol import StochasticEventsSettings
@@ -125,8 +127,7 @@ groups = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * B / total")
 )
 seeded = Aggregate(
-    total=1000,
-    bin_fractions={"A": 0.995, "B": 0.005},
+    bin_amounts={"A": 995, "B": 5},
     stratification_fractions={"group": {f"g{i}": 0.1 for i in range(10)}},
 )
 try:
@@ -221,7 +222,7 @@ print(0.05 < result.best_parameters["k2"] < 0.2)  # True: near 0.1
 ## Checklist
 
 - [ ] The engine is `StochasticEvents` (continuous time) or `StochasticSteps` (per-step probabilities), as the rates of the model mean.
-- [ ] The total is whole, and the settings name a `rounding` when an amount is not.
+- [ ] The amount of each bin is whole, and the settings name a `rounding` when the amount of a compartment is not.
 - [ ] Every run has a seed, or keeps the one commol drew (`results.seed`).
 - [ ] A large total uses `"tau_leaping"` or a deterministic engine.
 - [ ] A calibration sets `replicates`, `replicate_summary` and `seed`.

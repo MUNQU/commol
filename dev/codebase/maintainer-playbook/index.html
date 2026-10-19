@@ -3375,8 +3375,9 @@ it reads derivatives only through <code>SensitivitySource</code>, adds its secti
 <li>[ ] Write a <code>ModelStructure</code> subclass in <code>py-commol/commol/context/</code>, with
       <code>kind</code> as a <code>Literal</code> default. Implement <code>check_model</code> and
       <code>outputs_by_source</code>; override <code>series_label</code>, <code>uncalibrated_values</code>,
-      <code>with_calibrated_values</code>, <code>report_sections</code>, <code>describe</code> and
-      <code>check_unit_consistency</code> when the kind has them. Reject in
+      <code>check_calibration_values</code>, <code>with_calibrated_values</code>,
+      <code>report_sections</code>, <code>describe</code> and <code>check_unit_consistency</code> when the
+      kind has them. Reject in
       <code>check_model</code> a feature of the process the kind cannot run, and name
       the form that carries over. Import the module in <code>context/__init__.py</code>,
       so <code>Model.from_json</code> reads the kind.</li>

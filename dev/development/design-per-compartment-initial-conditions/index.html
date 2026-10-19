@@ -3083,7 +3083,11 @@
   is <code>InitialConditions.total</code> (a real number), the initial population is the
   initial state, a head count is an amount, and <code>calibrated_initial_population</code>
   is <code>calibrated_initial_state</code>; see
-  <a href="../../codebase/decisions/model-structure/#state-amount-total-and-subgroup-total">State, amount, total and subgroup total</a>.</li>
+  <a href="../../codebase/decisions/model-structure/#state-amount-total-and-subgroup-total">State, amount, total and subgroup total</a>.
+  Today there is no declared total either: <code>compartment_fractions</code> is
+  <code>compartment_amounts</code> and <code>bin_fractions</code> is <code>bin_amounts</code>, amounts in the
+  unit of each bin; see
+  <a href="../../codebase/decisions/model-structure/#the-initial-state-is-an-amount-per-bin">The initial state is an amount per bin</a>.</li>
 </ul>
 <h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
 <p>Model authors cannot express initial conditions for a specific expanded

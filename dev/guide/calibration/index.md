@@ -40,8 +40,7 @@ def basic_model(k1: float | None, k2: float | None, engine="DifferenceEquations"
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+                bin_amounts={"A": 990, "B": 10, "C": 0},
             ),
             engine=engine,
         )
@@ -116,11 +115,11 @@ A `Simulation` follows its model: after `apply_calibration_parameters` or `updat
 | `min_bound`, `max_bound`     | `float`         | required | The search interval.                                              |
 | `initial_guess`              | `float \| None` | `None`   | Where the optimizer starts; the midpoint of the bounds if `None`. |
 
-| `parameter_type`      | `id` names                                            | The value is                                                                                                                                       |
-| --------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"parameter"`         | A model parameter, usually declared with `value=None` | The parameter value                                                                                                                                |
-| `"initial_condition"` | A bin, a category, or an expanded compartment         | A fraction of the total; see [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
-| `"factor"`            | Any new id, used by observations through `factor_id`  | A factor on the predictions; not part of the model                                                                                                 |
+| `parameter_type`      | `id` names                                            | The value is                                                                                                                                                                            |
+| --------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"parameter"`         | A model parameter, usually declared with `value=None` | The parameter value                                                                                                                                                                     |
+| `"initial_condition"` | A bin, a category, or an expanded compartment         | An amount in the unit of its bin, or the split of a category; see [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
+| `"factor"`            | Any new id, used by observations through `factor_id`  | A factor on the predictions; not part of the model                                                                                                                                      |
 
 `"parameter"` and `"factor"` work with every kind of model. The other types are values of the model kind, and the kind declares which it accepts (`model.structure.calibration_value_types()`): an aggregate model accepts `"initial_condition"`. A type the kind does not accept raises a `ValueError` that names the kind when you create the `Calibrator`.
 

@@ -23,8 +23,7 @@ model = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+            bin_amounts={"A": 900, "B": 100, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -132,7 +131,7 @@ stochastic = Simulation(
     .add_bin(id="B", name="State B")
     .add_parameter(id="k", value=0.1)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
-    .build(Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}), engine="StochasticEvents")
+    .build(Aggregate(bin_amounts={"A": 1000, "B": 0}), engine="StochasticEvents")
 )
 replicates = stochastic.replicates(200, seed=42).run(num_steps=50)
 mean = replicates.mean()
@@ -175,8 +174,7 @@ stratified = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k", accumulators=["cum_ab"])
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 1000, "B": 0},
             stratification_fractions={
                 "group": {"g1": 0.5, "g2": 0.5},
                 "type": {"t1": 0.5, "t2": 0.5},
@@ -225,7 +223,7 @@ total_g1 = [
     sum(stratified_results[name][step] for name in in_g1)
     for step in range(len(stratified_results[in_g1[0]]))
 ]
-print(round(total_g1[-1]))  # 500: g1 started with half of the total
+print(round(total_g1[-1]))  # 500: g1 started with half of every bin
 ```
 
 ## Windowed totals
@@ -282,8 +280,7 @@ ode_model = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1", accumulators=["moved"])
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 1000, "B": 0},
         ),
         engine="DifferentialEquations",
         settings=OdeSolver(method="tsit45", rtol=1e-8, atol=1e-8),
@@ -327,7 +324,7 @@ pulse_model = (
     .add_bin(id="B", name="B")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate=AxisPattern.pulse(at=2, value=0.2))
 )
-all_in_a = Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0})
+all_in_a = Aggregate(bin_amounts={"A": 1000, "B": 0})
 ode_pulse = Simulation(
     pulse_model.build(all_in_a, engine="DifferentialEquations")
 ).run(num_steps=3)

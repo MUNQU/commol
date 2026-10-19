@@ -2205,6 +2205,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-initial-state-is-an-amount-per-bin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The initial state is an amount per bin
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#stratification-order-is-part-of-the-model" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2881,6 +2892,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-initial-state-is-an-amount-per-bin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The initial state is an amount per bin
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#stratification-order-is-part-of-the-model" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2965,13 +2987,13 @@ queries return in Python.</p>
 </tr>
 <tr>
 <td><strong>Amount</strong></td>
-<td>The value of one compartment</td>
-<td><code>InitialCompartment.amount</code></td>
+<td>The value of one compartment, in the unit of its bin</td>
+<td><code>InitialCompartment.amount</code>, <code>InitialConditions.bin_amounts</code></td>
 </tr>
 <tr>
 <td><strong>Total</strong></td>
-<td>The sum of every compartment, accumulators excluded; the initial fractions are taken of it</td>
-<td><code>InitialConditions.total</code>, the rate variable <code>total</code> (<code>SPECIAL_VAR_TOTAL</code>)</td>
+<td>The sum of every compartment, accumulators excluded</td>
+<td>the rate variable <code>total</code> (<code>SPECIAL_VAR_TOTAL</code>)</td>
 </tr>
 <tr>
 <td><strong>Subgroup total</strong></td>
@@ -2980,10 +3002,6 @@ queries return in Python.</p>
 </tr>
 </tbody>
 </table>
-<p>The total is a real number, finite and greater than 0, so a model of a count, a
-mass or a concentration can be stated. <code>0</code> is rejected: every fraction of it is
-zero, and the report divides by it (<code>initial_state</code> in
-<code>crates/commol-model/src/builder.rs</code>, <code>InitialConditions.validate_total</code>).</p>
 <p><strong>Rule:</strong> use these four terms in code, docs and tests. <code>AxisPattern</code> takes a
 <code>value</code>, so "amount" means only the value of a compartment.</p>
 <p><strong>Why, against the alternatives:</strong></p>
@@ -3021,11 +3039,49 @@ zero, and the report divides by it (<code>initial_state</code> in
 </tr>
 </tbody>
 </table>
-<p><strong>Guards:</strong> <code>builder.rs</code> tests
-<code>a_real_total_starts_with_amounts_that_sum_to_it</code> and
-<code>a_total_that_is_not_finite_and_positive_is_a_build_error</code>;
-<code>tests/building/test_reserved_names.py::test_a_bin_named_n_builds_and_runs</code>;
-<code>tests/initial_conditions/test_bin_fractions.py::TestTotal</code>.</p>
+<p><strong>Guards:</strong> <code>tests/building/test_reserved_names.py::test_a_bin_named_n_builds_and_runs</code>.</p>
+<h2 id="the-initial-state-is-an-amount-per-bin">The initial state is an amount per bin<a class="headerlink" href="#the-initial-state-is-an-amount-per-bin" title="Permanent link">&para;</a></h2>
+<p>An aggregate structure states the initial amount of each bin in the unit of
+that bin (<code>bin_amounts</code>), the split of each bin among the categories
+(<code>stratification_fractions</code>) and the amount of single compartments
+(<code>compartment_amounts</code>). There is no declared total: a model of a count and of
+a concentration has none, because a total over bins of different units has
+no unit, and the <a href="../../../guide/units-and-equations/">unit check</a> rejects a
+rate that reads one. An amount is a real number, finite and not negative, so a
+model of a count, a mass or a concentration can be stated, and a model whose
+bins all start at <code>0</code> builds and runs (<code>initial_state</code> in
+<code>crates/commol-model/src/builder.rs</code>, <code>InitialConditions.validate_bin_amounts</code>).
+A structure that states <code>total</code>, <code>bin_fractions</code> or <code>compartment_fractions</code> is
+rejected with the fields to use (<code>InitialConditions.reject_fractions_of_a_total</code>).</p>
+<p><strong>Why, against the alternatives:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fractions of one total when every bin shares a unit, amounts otherwise</td>
+<td>Two forms of one thing and two paths in the engine, the write-back and the report; a calibrated value would be a fraction in one model and an amount in another.</td>
+</tr>
+<tr>
+<td>A total per unit and fractions within it</td>
+<td>The unit of a bin is optional free text, and Rust has no units, so the engine could not group the bins.</td>
+</tr>
+<tr>
+<td>Fractions of one total</td>
+<td>It has no meaning over bins of different units, and a total of 0 makes every fraction 0.</td>
+</tr>
+</tbody>
+</table>
+<p>The cost: a model of one unit writes <code>{"A": 990, "B": 10}</code> where it wrote
+<code>total=1000</code> and <code>{"A": 0.99, "B": 0.01}</code>.</p>
+<p><strong>Guards:</strong> <code>tests/initial_conditions/test_bin_amounts.py</code>,
+<code>tests/reference_models/test_quadratic_decay.py::test_zero_is_the_solution_from_zero</code>,
+<code>builder.rs</code> tests <code>bins_that_all_start_at_zero_build</code> and
+<code>a_bin_amount_that_is_not_finite_or_is_negative_is_a_build_error</code>.</p>
 <h2 id="stratification-order-is-part-of-the-model">Stratification order is part of the model<a class="headerlink" href="#stratification-order-is-part-of-the-model" title="Permanent link">&para;</a></h2>
 <p><code>expand</code> in <code>crates/commol-model/src/builder.rs</code> applies the
 stratifications in declaration order. A stratification with <code>conditions</code> only

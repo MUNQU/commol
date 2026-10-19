@@ -60,8 +60,7 @@ model = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -180,8 +179,7 @@ model = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -202,11 +200,11 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | Call                                                   | What it does                                                                                                                                                                                                                                                                                      |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ModelBuilder(name=..., version=...)`                  | Starts a model definition. Every method returns the builder, so calls chain.                                                                                                                                                                                                                      |
-| `.add_bin(id="A", name="State A")`                     | Adds a compartment (a *bin*): a state that holds an amount: a part of the total.                                                                                                                                                                                                                  |
+| `.add_bin(id="A", name="State A")`                     | Adds a compartment (a *bin*): a state that holds an amount, in the unit of the bin.                                                                                                                                                                                                               |
 | `.add_parameter(id="k1", value=0.3)`                   | Adds a named constant for rate formulas. `value=None` marks it for calibration.                                                                                                                                                                                                                   |
 | `.add_transition(..., rate="k1 * A * B / total")`      | Moves an amount from `source` to `target` along the axis. This rate names compartments, so it is the flow itself (*absolute*). A `DifferenceEquations` model moves the flow once per step; see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means). |
 | `.add_transition(..., rate="k2")`                      | This rate names no compartment, so it is *proportional*: the flow is `k2 × B`.                                                                                                                                                                                                                    |
-| `.build(Aggregate(...), engine="DifferenceEquations")` | Joins what you wrote, the *process*, with a *structure* and an engine, validates it and returns a `Model`. `Aggregate` holds an amount per compartment: `total` and the fraction of it that starts in each bin. The fractions must sum to 1.                                                      |
+| `.build(Aggregate(...), engine="DifferenceEquations")` | Joins what you wrote, the *process*, with a *structure* and an engine, validates it and returns a `Model`. `Aggregate` holds an amount per compartment: `bin_amounts` gives the amount each bin starts with.                                                                                      |
 | `Simulation(model).run(num_steps=100)`                 | Runs the Rust engine and returns the results.                                                                                                                                                                                                                                                     |
 
 See [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md) for bins, transitions and the two kinds of rate.
@@ -227,8 +225,7 @@ model_with_units = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -263,8 +260,7 @@ calibration_model = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -355,7 +351,7 @@ A Commol model is a set of **compartments** that each hold an **amount**, and **
 
 ## Compartments
 
-A compartment (a *bin*) holds an amount: a part of the total. A model can have any number of them, with any ids.
+A compartment (a *bin*) holds an amount, in the unit of the bin. A model can have any number of them, with any ids.
 
 ```python
 from commol import Aggregate, ModelBuilder, Simulation
@@ -418,20 +414,19 @@ With stratifications, an accumulator expands like a bin (`cum_ab_g1`, `cum_ab_g2
 
 ## Initial conditions: the structure
 
-The calls above write the **process**: what changes and how. The **structure** lays the process out. `Aggregate` holds an amount per compartment, and gives the total and the fraction of it that starts in each bin. The total is a real number, finite and greater than 0:
+The calls above write the **process**: what changes and how. The **structure** lays the process out. `Aggregate` holds an amount per compartment, and gives the amount that each bin starts with, in the unit of the bin. An amount is a real number, finite and not negative:
 
 ```python
-structure = Aggregate(total=1000, bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0})
+structure = Aggregate(bin_amounts={"A": 900, "B": 100, "C": 0})
 ```
 
 | Rule                                                    | Checked when       |
 | ------------------------------------------------------- | ------------------ |
-| `total` is finite and greater than 0                    | `Aggregate(...)`   |
-| The bin fractions sum to 1.0                            | `Aggregate(...)`   |
-| Every bin has a fraction                                | The model is built |
+| Every amount is finite and not negative                 | `Aggregate(...)`   |
+| Every bin has an amount                                 | The model is built |
 | Every stratification has fractions, and they sum to 1.0 | The model is built |
 
-A fraction may be `None` when calibration will find it; see [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md).
+An amount may be `None` when calibration will find it; see [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md).
 
 ## Build and run
 
@@ -452,7 +447,7 @@ A `Model` has a header (its name, parameters and step unit), the `process` (bins
 print(model.engine.type)                    # DifferenceEquations
 print(model.structure.kind)                 # aggregate
 print([b.id for b in model.process.bins])   # ['A', 'B', 'C']
-print(model.structure.total)                # 1000.0
+print(model.structure.bin_amounts)          # {'A': 900.0, 'B': 100.0, 'C': 0.0}
 ```
 
 Four engines run an aggregate model, with the same process and structure:
@@ -498,7 +493,7 @@ Stratifications group = [g1, g2] and type = [t1, t2]
 A -> A_g1_t1, A_g1_t2, A_g2_t1, A_g2_t2      8 compartments for 2 bins
 ```
 
-The initial amount of each compartment is the total times the product of its fractions:
+The initial amount of each compartment is the amount of its bin times the product of the fractions of its categories:
 
 ```python
 stratified = (
@@ -510,8 +505,7 @@ stratified = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
     .build(
         Aggregate(
-            total=10000,
-            bin_fractions={"A": 0.9, "B": 0.1},
+            bin_amounts={"A": 9000, "B": 1000},
             stratification_fractions={"group": {"g1": 0.6, "g2": 0.4}},
         ),
         engine="DifferenceEquations",
@@ -558,8 +552,7 @@ conditional = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
     .build(
         Aggregate(
-            total=10000,
-            bin_fractions={"A": 0.9, "B": 0.1},
+            bin_amounts={"A": 9000, "B": 1000},
             stratification_fractions={
                 "group": {"g1": 0.6, "g2": 0.4},
                 "subtype": {"s1": 0.5, "s2": 0.5},
@@ -573,7 +566,7 @@ print([c.name for c in conditional.structure.initial_state(conditional.process)]
 # ['A_g1', 'A_g2_s1', 'A_g2_s2', 'B_g1', 'B_g2_s1', 'B_g2_s2']
 ```
 
-The fractions of a conditional stratification are fractions of the subgroup it splits, not of the total. `subgroup_total` multiplies along the chain to give the total of a subgroup, and `get_conditioning_categories` names the subgroup:
+The fractions of a conditional stratification are fractions of the subgroup it splits, not of the whole bin, so they multiply along the chain. `subgroup_total` sums the initial state over the compartments of a subgroup, and `get_conditioning_categories` names the subgroup:
 
 ```python
 aggregate, process = conditional.structure, conditional.process
@@ -587,7 +580,7 @@ See [Conditional Stratifications](https://munqu.github.io/commol/latest/guide/bu
 
 ### Per-compartment overrides
 
-When the product of fractions cannot express the starting state, for example a state that is empty in only one category, `compartment_fractions` overrides single expanded compartments. Each fraction is a fraction of the **total** and replaces the product for that compartment only:
+When the product of fractions cannot express the starting state, for example a state that is empty in only one category, `compartment_amounts` overrides single expanded compartments. Each amount is in the unit of the bin of its compartment and replaces the product for that compartment only:
 
 ```python
 overridden = (
@@ -599,10 +592,9 @@ overridden = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
     .build(
         Aggregate(
-            total=10000,
-            bin_fractions={"A": 0.9, "B": 0.1},
+            bin_amounts={"A": 9000, "B": 1000},
             stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
-            compartment_fractions={"B_g1": 0.0},
+            compartment_amounts={"B_g1": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -612,24 +604,23 @@ print({c.name: c.amount for c in overridden.structure.initial_state(overridden.p
 # B_g1 starts empty; the other compartments keep their product
 ```
 
-| Rule                                                | Checked when       |
-| --------------------------------------------------- | ------------------ |
-| Each fraction is between 0.0 and 1.0                | `Aggregate(...)`   |
-| Each name is an expanded compartment                | The model is built |
-| The initial amounts do not sum to more than `total` | The model is built |
+| Rule                                   | Checked when       |
+| -------------------------------------- | ------------------ |
+| Each amount is finite and not negative | `Aggregate(...)`   |
+| Each name is an expanded compartment   | The model is built |
 
-`model.structure.update_compartment_fractions(model.process, {"B_g1": 0.05})` changes or adds overrides on a built model; the engine checks them against the expansion of the process before they are stored.
+An override may hold more than the product gave its compartment: the bins keep no sum. `model.structure.update_compartment_amounts(model.process, {"B_g1": 50})` changes or adds overrides on a built model; the engine checks them against the expansion of the process before they are stored.
 
-### Updating fractions after building
+### Updating the initial state after building
 
 ```python
-overridden.structure.update_bin_fractions({"A": 0.85, "B": 0.15})
+overridden.structure.update_bin_amounts({"A": 8500, "B": 1500})
 overridden.structure.update_stratification_fractions({"g1": 0.7})  # g2 becomes 0.3
 ```
 
 | Method                            | Rule                                                                                                        |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `update_bin_fractions`            | After the update, the bin fractions sum to 1.0. Move an amount between bins in one call.                    |
+| `update_bin_amounts`              | Each amount is finite and not negative, or `None` for calibration. The other bins keep their amounts.       |
 | `update_stratification_fractions` | Within each stratification you may omit one category; it receives what remains of 1.0. Omitting two raises. |
 
 A category name that two stratifications declare must be qualified with its stratification, as in `{"group:g1": 0.5}`. Calibration writes its results back through these same methods.
@@ -648,8 +639,7 @@ merge = (
     .add_transition(id="t1", source=["A", "B"], target=["C", "C"], rate="k * A * B")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.5, "B": 0.5, "C": 0.0},
+            bin_amounts={"A": 500, "B": 500, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -668,8 +658,7 @@ outflow = (
     .add_transition(id="outflow", source=["A", "B"], target=[], rate="mu * $compartment")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.5, "B": 0.5},
+            bin_amounts={"A": 500, "B": 500},
         ),
         engine="DifferenceEquations",
     )
@@ -768,10 +757,7 @@ model = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .add_transition(id="t_cd", source=["C"], target=["D"], rate="k3")
     .build(
-        Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0, "D": 0.0},
-        ),
+        Aggregate(bin_amounts={"A": 900, "B": 100, "C": 0, "D": 0}),
         engine="DifferenceEquations",
     )
 )
@@ -781,7 +767,7 @@ results = Simulation(model).run(num_steps=200)
 
 1. Create a builder.
 1. Add bins, parameters and transitions, and optionally stratifications and accumulators: the process.
-1. Call `build` with a structure, such as `Aggregate` with the total and the fraction of it in each bin, and an engine.
+1. Call `build` with a structure, such as `Aggregate` with the initial amount of each bin, and an engine.
 
 ## The builder
 
@@ -906,8 +892,7 @@ def inflow_per_step(mode: str) -> list[float]:
         .add_transition(id="inflow", source=[], target=["A"], rate="k_in")
         .build(
             Aggregate(
-                total=100,
-                bin_fractions={"A": 1.0},
+                bin_amounts={"A": 100},
             ),
             engine="DifferenceEquations",
         )
@@ -976,8 +961,7 @@ counted = (
     .add_transition(id="t_ac", source=["A"], target=["C"], rate="k2", accumulators=["total_out"])
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0, "C": 0.0},
+            bin_amounts={"A": 1000, "B": 0, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -996,37 +980,65 @@ A transition adds its flow to every accumulator in its `accumulators` list, and 
 
 ## The structure: `Aggregate`
 
-`Aggregate` lays the process out as amounts per compartment: the bins expand over the stratifications into compartments, and each compartment holds an amount. It says how much starts where and who the neighbors of a unit are.
+`Aggregate` lays the process out as amounts per compartment: the bins expand over the stratifications into compartments, and each compartment holds an amount. It says how much starts where and who the neighbors of a unit are. Each bin starts at an amount in its own unit, so there is no total over bins of different units.
 
 ```python
 structure = Aggregate(
-    total=10000,
-    bin_fractions={"A": 0.9, "B": 0.1},
+    bin_amounts={"A": 9000, "B": 1000},
     stratification_fractions={
         "group": {"g1": 0.3, "g2": 0.7},
         "subtype": {"s1": 0.8, "s2": 0.2},
     },
-    compartment_fractions={"B_g1": 0.0},
+    compartment_amounts={"B_g1": 0},
 )
 ```
 
-| Argument                   | Type                          | Default  | Meaning                                                                                                                        |
-| -------------------------- | ----------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `total`                    | `float`                       | required | The sum of every compartment at the start: a count, a mass or a concentration. It must be finite and greater than 0.           |
-| `bin_fractions`            | `dict[str, float \| None]`    | required | The fraction of the total in each bin. A fraction may be `None` when calibration finds it.                                     |
-| `stratification_fractions` | `dict[str, dict[str, float]]` | `{}`     | For each stratification, the fraction in each category. For a conditional stratification, fractions of the subgroup it splits. |
-| `compartment_fractions`    | `dict[str, float]`            | `{}`     | Overrides single expanded compartments with a fraction of the total.                                                           |
-| `neighbors`                | `Complete \| Groups \| None`  | `None`   | Who the [neighbors](#neighbors) of a unit are. Required when a rate reads them.                                                |
+| Argument                   | Type                          | Default  | Meaning                                                                                                                                                                            |
+| -------------------------- | ----------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bin_amounts`              | `dict[str, float \| None]`    | required | The amount of each bin at the start, in the unit of the bin: a count, a mass or a concentration. An amount may be `None` when calibration finds it.                                |
+| `stratification_fractions` | `dict[str, dict[str, float]]` | `{}`     | For each stratification, the fraction in each category: the split of the amount of every bin it applies to. For a conditional stratification, the split of the subgroup it splits. |
+| `compartment_amounts`      | `dict[str, float]`            | `{}`     | Overrides single expanded compartments with an amount in the unit of their bin.                                                                                                    |
+| `neighbors`                | `Complete \| Groups \| None`  | `None`   | Who the [neighbors](#neighbors) of a unit are. Required when a rate reads them.                                                                                                    |
 
-| Rule                                                                                          | Checked when     |
-| --------------------------------------------------------------------------------------------- | ---------------- |
-| `total` finite and `> 0`; each compartment fraction in `[0.0, 1.0]`                           | `Aggregate(...)` |
-| The bin fractions sum to 1.0; with `None` fractions, the given ones sum to less than 1.0      | `Aggregate(...)` |
-| Every bin has a fraction, and no other id                                                     | `build`          |
-| Every stratification has fractions for its categories that sum to 1.0                         | `build`          |
-| Override names are expanded compartments; the initial amounts do not sum to more than `total` | `build`          |
+| Rule                                                                  | Checked when     |
+| --------------------------------------------------------------------- | ---------------- |
+| Every amount is finite and not negative; `0` is an amount             | `Aggregate(...)` |
+| Every bin has an amount, and no other id                              | `build`          |
+| Every stratification has fractions for its categories that sum to 1.0 | `build`          |
+| Override names are expanded compartments                              | `build`          |
+| With a stochastic engine, the amount of each bin is a whole number    | `build`          |
 
-The initial amount of a compartment is `total × bin fraction × the fraction of each of its categories`, unless an override names it. `model.structure.initial_state(model.process)` shows the result. To change fractions on a built model, see [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#updating-fractions-after-building).
+The initial amount of a compartment is `bin amount × the fraction of each of its categories`, unless an override names it. `model.structure.initial_state(model.process)` shows the result. To change amounts or fractions on a built model, see [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#updating-the-initial-state-after-building).
+
+A structure that states `total`, `bin_fractions` or `compartment_fractions` is rejected, and the message names `bin_amounts` and `compartment_amounts`.
+
+### Bins of different units
+
+A bin may hold a count while another holds a concentration. Each bin states its amount in its own unit:
+
+```python
+mixed = (
+    ModelBuilder(name="Mixed units", step_unit="day")
+    .add_bin(id="A", name="State A", unit="item")
+    .add_bin(id="B", name="State B", unit="item")
+    .add_bin(id="C", name="State C", unit="mg/l")
+    .add_parameter(id="k1", value=0.5, unit="1/day")
+    .add_parameter(id="k2", value=1e6, unit="mg/l")
+    .add_transition(
+        id="t_ab", source=["A"], target=["B"], rate="k1 * A * C / (C + k2)"
+    )
+    .build(
+        Aggregate(bin_amounts={"A": 990, "B": 10, "C": 1e5}),
+        engine="DifferenceEquations",
+    )
+)
+
+print({c.name: c.amount for c in mixed.structure.initial_state(mixed.process)})
+# {'A': 990.0, 'B': 10.0, 'C': 100000.0}
+mixed.check_unit_consistency()
+```
+
+A rate that reads `total`, a subgroup total or `neighbors` adds bins of different units here, so the [unit check](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md) rejects it. A model whose bins all start at `0` builds and runs: its state stays at `0` when nothing flows in.
 
 ### Neighbors
 
@@ -1056,10 +1068,9 @@ def into_b_g2(neighbors: Complete | Groups) -> list[float]:
         )
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.99, "B": 0.01},
+                bin_amounts={"A": 990, "B": 10},
                 stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
-                compartment_fractions={"B_g2": 0.0},
+                compartment_amounts={"B_g2": 0},
                 neighbors=neighbors,
             ),
             engine="DifferenceEquations",
@@ -1095,7 +1106,7 @@ print([c.name for c in stratified_model.structure.initial_state(stratified_model
 | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
 | The engine runs the kind of the structure                                            | An `Aggregate` with an engine of another kind; the message lists the engines of `Aggregate`      |
 | At least one bin and one transition                                                  | A model with no transition                                                                       |
-| The structure follows the rules above                                                | Bin fractions that sum to 0.9                                                                    |
+| The structure follows the rules above                                                | A bin with no amount in `bin_amounts`                                                            |
 | Parameter ids are unique and are not [names the engine sets](#names-the-engine-sets) | A parameter named `A`, `total` or `A_g1`                                                         |
 | Every `total_…` variable names a subgroup total                                      | `total_t1_g1` when `group` is declared before `type`                                             |
 | A rate that reads the neighbors has them                                             | `k1 * neighbors_B` with no `neighbors=`                                                          |
@@ -1147,8 +1158,7 @@ model = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+            bin_amounts={"A": 900, "B": 100, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -1213,8 +1223,7 @@ periodic = (
     )
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01},
+            bin_amounts={"A": 990, "B": 10},
         ),
         engine="DifferenceEquations",
     )
@@ -1237,8 +1246,7 @@ merge = (
     .add_transition(id="t1", source=["A", "B"], target=["C", "C"], rate="k * A * B")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.5, "B": 0.5, "C": 0.0},
+            bin_amounts={"A": 500, "B": 500, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -1266,8 +1274,7 @@ outflow = (
     )
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.4, "B": 0.3, "C": 0.3},
+            bin_amounts={"A": 400, "B": 300, "C": 300},
         ),
         engine="DifferenceEquations",
     )
@@ -1302,8 +1309,7 @@ moving = (
     .add_transition(id="move", source=["g1"], target=["g2"], rate="k")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.5, "B": 0.5},
+            bin_amounts={"A": 500, "B": 500},
             stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
         ),
         engine="DifferenceEquations",
@@ -1334,8 +1340,7 @@ own_compartment = (
     .add_transition(id="t", source=["A"], target=["B"], rate="k * A", per_compartment=True)
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.5, "B": 0.5},
+            bin_amounts={"A": 500, "B": 500},
             stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
         ),
         engine="DifferenceEquations",
@@ -1372,8 +1377,7 @@ group_rates = (
     )
     .build(
         Aggregate(
-            total=900,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 900, "B": 0},
             stratification_fractions={"group": {"g1": 0.3, "g2": 0.3, "g3": 0.4}},
         ),
         engine="DifferenceEquations",
@@ -1427,8 +1431,7 @@ redirect = (
     )
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.5, "B": 0.5},
+            bin_amounts={"A": 500, "B": 500},
             stratification_fractions={
                 "group": {"g1": 0.5, "g2": 0.5},
                 "subtype": {"s1": 0.5, "s2": 0.5},
@@ -1463,8 +1466,7 @@ impulse_model = (
     .add_transition(id="flow", source=["A"], target=["B"], rate="k")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 1000, "B": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -1500,8 +1502,7 @@ too_fast = (
     .add_transition(id="t", source=["A"], target=["B"], rate="k")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 1000, "B": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -1569,8 +1570,7 @@ model = (
     .add_transition(id="t_ba", source=["B"], target=["A"], rate="if(step > 30, 0.05, 0)")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01},
+            bin_amounts={"A": 990, "B": 10},
         ),
         engine="DifferenceEquations",
     )
@@ -1650,8 +1650,7 @@ def value_of(expression: str) -> float:
         .add_transition(id="probe_flow", source=[], target=["B"], rate="probe")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.6, "B": 0.4},
+                bin_amounts={"A": 600, "B": 400},
                 stratification_fractions={
                     "group": {"g1": 0.25, "g2": 0.75},
                     "type": {"t1": 0.5, "t2": 0.5},
@@ -1761,8 +1760,7 @@ def flow_per_step(rate: AxisPattern, num_steps: int = 10) -> list[float]:
         .add_transition(id="inflow", source=[], target=["B"], rate=rate)
         .build(
             Aggregate(
-                total=100,
-                bin_fractions={"A": 1.0, "B": 0.0},
+                bin_amounts={"A": 100, "B": 0},
             ),
             engine="DifferenceEquations",
         )
@@ -1860,8 +1858,7 @@ def stratified_flows(rate: AxisPattern, num_steps: int = 7) -> dict[str, list[fl
         .add_transition(id="flow", source=["A"], target=["B"], rate=rate)
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 1.0, "B": 0.0},
+                bin_amounts={"A": 1000, "B": 0},
                 stratification_fractions={"group": {"cat1": 0.5, "cat2": 0.5}},
             ),
             engine="DifferenceEquations",
@@ -1962,8 +1959,7 @@ routing = (
     )
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0},
+            bin_amounts={"A": 1000},
             stratification_fractions={"status": {"s0": 0.5, "s1": 0.5}},
         ),
         engine="DifferenceEquations",
@@ -1993,8 +1989,7 @@ def remaining_a(rate: AxisPattern, at: float) -> float:
         .add_transition(id="flow", source=["A"], target=["B"], rate=rate)
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 1.0, "B": 0.0},
+                bin_amounts={"A": 1000, "B": 0},
             ),
             engine="DifferentialEquations",
         )
@@ -2049,8 +2044,7 @@ model = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+            bin_amounts={"A": 900, "B": 100, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -2106,8 +2100,7 @@ along_a_line = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 1000, "B": 0},
         ),
         engine="DifferentialEquations",
     )
@@ -2142,8 +2135,7 @@ wrong_units = (
     .add_transition(id="t_ba", source=["B"], target=["A"], rate="k2 * sin(B) * B")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.9, "B": 0.1},
+            bin_amounts={"A": 900, "B": 100},
         ),
         engine="DifferenceEquations",
     )
@@ -2195,7 +2187,7 @@ model = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
     .build(
-        Aggregate(total=1000, bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0}),
+        Aggregate(bin_amounts={"A": 900, "B": 100, "C": 0}),
         engine="DifferenceEquations",
     )
 )
@@ -2308,7 +2300,7 @@ odd.save("model_odd.tex")
 | Entities, state variables and scales | Bins, accumulators, stratifications, compartments; the step unit and how the engine advances                                                                                                                       |
 | Process overview and scheduling      | Each transition, where it moves, whether it is an impulse; the schedule of the engine and its settings                                                                                                             |
 | Design concepts                      | Interaction (when the structure has [neighbors](https://munqu.github.io/commol/latest/guide/building-models/#neighbors)), stochasticity (from the engine) and observation (the outputs); the marker for the others |
-| Initialization                       | The fractions, the overrides and the initial state                                                                                                                                                                 |
+| Initialization                       | The bin amounts and their units, the category fractions, the overrides and the initial state                                                                                                                       |
 | Input data                           | The series parameters, or "None"                                                                                                                                                                                   |
 | Submodels                            | The state graphs and equations, the parameters and the outputs                                                                                                                                                     |
 
@@ -2359,8 +2351,7 @@ model = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+            bin_amounts={"A": 900, "B": 100, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -2468,7 +2459,7 @@ stochastic = Simulation(
     .add_bin(id="B", name="State B")
     .add_parameter(id="k", value=0.1)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
-    .build(Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}), engine="StochasticEvents")
+    .build(Aggregate(bin_amounts={"A": 1000, "B": 0}), engine="StochasticEvents")
 )
 replicates = stochastic.replicates(200, seed=42).run(num_steps=50)
 mean = replicates.mean()
@@ -2511,8 +2502,7 @@ stratified = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k", accumulators=["cum_ab"])
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 1000, "B": 0},
             stratification_fractions={
                 "group": {"g1": 0.5, "g2": 0.5},
                 "type": {"t1": 0.5, "t2": 0.5},
@@ -2561,7 +2551,7 @@ total_g1 = [
     sum(stratified_results[name][step] for name in in_g1)
     for step in range(len(stratified_results[in_g1[0]]))
 ]
-print(round(total_g1[-1]))  # 500: g1 started with half of the total
+print(round(total_g1[-1]))  # 500: g1 started with half of every bin
 ```
 
 ## Windowed totals
@@ -2618,8 +2608,7 @@ ode_model = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1", accumulators=["moved"])
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 1000, "B": 0},
         ),
         engine="DifferentialEquations",
         settings=OdeSolver(method="tsit45", rtol=1e-8, atol=1e-8),
@@ -2663,7 +2652,7 @@ pulse_model = (
     .add_bin(id="B", name="B")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate=AxisPattern.pulse(at=2, value=0.2))
 )
-all_in_a = Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0})
+all_in_a = Aggregate(bin_amounts={"A": 1000, "B": 0})
 ode_pulse = Simulation(
     pulse_model.build(all_in_a, engine="DifferentialEquations")
 ).run(num_steps=3)
@@ -2768,7 +2757,7 @@ builder = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
 )
-structure = Aggregate(total=1000, bin_fractions={"A": 0.999, "B": 0.001, "C": 0.0})
+structure = Aggregate(bin_amounts={"A": 999, "B": 1, "C": 0})
 
 model = builder.build(structure, engine="StochasticEvents")
 simulation = Simulation(model)
@@ -2849,18 +2838,20 @@ print(model.describe().render("markdown").split("### Events")[1].split("\n\n")[1
 
 A stochastic engine moves whole units, so it starts from whole amounts (`check_model` in `crates/commol-model/src/builder.rs`):
 
-| Initial amounts                 | What happens                                                                                             |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| The total is not a whole number | `build` raises `ValueError` and names the engine                                                         |
-| Every amount is whole           | Nothing more is needed                                                                                   |
-| An amount is not whole          | `build` raises `ValueError`, unless the settings of the engine name a `rounding`; the message lists both |
+| Initial amounts                           | What happens                                                                                             |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| The amount of a bin is not a whole number | `build` raises `ValueError` and names the engine and the bin                                             |
+| Every amount is whole                     | Nothing more is needed                                                                                   |
+| An amount is not whole                    | `build` raises `ValueError`, unless the settings of the engine name a `rounding`; the message lists both |
 
 There is no default rounding: with small amounts the rounding decides which compartments start with a unit, so it is a modelling choice. Half a unit in each of ten groups starts five groups with one unit and five with none.
 
-| `rounding`            | Start of each run                                                                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `"largest_remainder"` | The same whole amounts in every run: each amount rounded down, and the units left over to the largest remainders, so they sum to the total |
-| `"random"`            | A multinomial draw of the total with the fractions of the model, in each run, so the mean start equals the amounts of the model            |
+| `rounding`            | Start of each run                                                                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"largest_remainder"` | The same whole amounts in every run: in each bin, each amount rounded down, and the units left over to the largest remainders, so they sum to the amount of the bin |
+| `"random"`            | A multinomial draw of the amount of each bin with the fractions of the model, in each run, so the mean start equals the amounts of the model                        |
+
+Both round each bin on its own, so a unit never moves to another bin, such as from a bin of a concentration to a bin of a count.
 
 ```python
 from commol import StochasticEventsSettings
@@ -2874,8 +2865,7 @@ groups = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * B / total")
 )
 seeded = Aggregate(
-    total=1000,
-    bin_fractions={"A": 0.995, "B": 0.005},
+    bin_amounts={"A": 995, "B": 5},
     stratification_fractions={"group": {f"g{i}": 0.1 for i in range(10)}},
 )
 try:
@@ -2970,7 +2960,7 @@ print(0.05 < result.best_parameters["k2"] < 0.2)  # True: near 0.1
 ## Checklist
 
 - [ ] The engine is `StochasticEvents` (continuous time) or `StochasticSteps` (per-step probabilities), as the rates of the model mean.
-- [ ] The total is whole, and the settings name a `rounding` when an amount is not.
+- [ ] The amount of each bin is whole, and the settings name a `rounding` when the amount of a compartment is not.
 - [ ] Every run has a seed, or keeps the one commol drew (`results.seed`).
 - [ ] A large total uses `"tau_leaping"` or a deterministic engine.
 - [ ] A calibration sets `replicates`, `replicate_summary` and `seed`.
@@ -3025,8 +3015,7 @@ def basic_model(k1: float | None, k2: float | None, engine="DifferenceEquations"
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+                bin_amounts={"A": 990, "B": 10, "C": 0},
             ),
             engine=engine,
         )
@@ -3101,11 +3090,11 @@ A `Simulation` follows its model: after `apply_calibration_parameters` or `updat
 | `min_bound`, `max_bound`     | `float`         | required | The search interval.                                              |
 | `initial_guess`              | `float \| None` | `None`   | Where the optimizer starts; the midpoint of the bounds if `None`. |
 
-| `parameter_type`      | `id` names                                            | The value is                                                                                                                                       |
-| --------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"parameter"`         | A model parameter, usually declared with `value=None` | The parameter value                                                                                                                                |
-| `"initial_condition"` | A bin, a category, or an expanded compartment         | A fraction of the total; see [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
-| `"factor"`            | Any new id, used by observations through `factor_id`  | A factor on the predictions; not part of the model                                                                                                 |
+| `parameter_type`      | `id` names                                            | The value is                                                                                                                                                                            |
+| --------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"parameter"`         | A model parameter, usually declared with `value=None` | The parameter value                                                                                                                                                                     |
+| `"initial_condition"` | A bin, a category, or an expanded compartment         | An amount in the unit of its bin, or the split of a category; see [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
+| `"factor"`            | Any new id, used by observations through `factor_id`  | A factor on the predictions; not part of the model                                                                                                                                      |
 
 `"parameter"` and `"factor"` work with every kind of model. The other types are values of the model kind, and the kind declares which it accepts (`model.structure.calibration_value_types()`): an aggregate model accepts `"initial_condition"`. A type the kind does not accept raises a `ValueError` that names the kind when you create the `Calibrator`.
 
@@ -3224,7 +3213,7 @@ It accepts a `CalibrationResult` or a plain `{id: value}` mapping, such as one o
 
 [Back to Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)
 
-An `initial_condition` unknown fits how the state starts: the share of a bin, the split of a category, or the amount of one expanded compartment. The Rust engine applies the values in a fixed order, and a **remainder** compartment keeps the sum of the amounts at `total`.
+An `initial_condition` unknown fits how the state starts: the amount of a bin in its unit, the split of a category, or the amount of one expanded compartment. The Rust engine applies the values in a fixed order, and a **remainder** compartment keeps the sum of the amounts the model states.
 
 ## Quick path
 
@@ -3240,8 +3229,9 @@ from commol import (
     Simulation,
 )
 
-def model_with_b(b_fraction: float | None):
-    a_fraction = None if b_fraction is None else 1.0 - b_fraction
+def model_with_b(b_amount: float | None):
+    # A holds what B does not, so A and B keep 1000 between them.
+    a_amount = 1000 if b_amount is None else 1000 - b_amount
     return (
         ModelBuilder(name="Initial B")
         .add_bin(id="A", name="State A")
@@ -3252,15 +3242,12 @@ def model_with_b(b_fraction: float | None):
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
-            Aggregate(
-                total=1000,
-                bin_fractions={"A": a_fraction, "B": b_fraction, "C": 0.0},
-            ),
+            Aggregate(bin_amounts={"A": a_amount, "B": b_amount, "C": 0}),
             engine="DifferenceEquations",
         )
     )
 
-truth = Simulation(model_with_b(0.02)).run(num_steps=40)
+truth = Simulation(model_with_b(20)).run(num_steps=40)
 observed_data = [
     ObservedDataPoint(at=step, output="B", value=truth["B"][step])
     for step in range(5, 41, 5)
@@ -3271,7 +3258,7 @@ problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=[
         CalibrationParameter(
-            id="B", parameter_type="initial_condition", min_bound=0.0, max_bound=0.1
+            id="B", parameter_type="initial_condition", min_bound=0.0, max_bound=100.0
         )
     ],
     initial_condition_remainder="A",
@@ -3279,23 +3266,23 @@ problem = CalibrationProblem(
 )
 
 result = Calibrator(Simulation(model), problem).run()
-print(round(result.best_parameters["B"], 4))  # 0.02
+print(round(result.best_parameters["B"], 2))  # 20.0
 
 model.apply_calibration_parameters(result, problem)
 print({c.name: round(c.amount, 1) for c in model.structure.initial_state(model.process)})
 # {'A': 980.0, 'B': 20.0, 'C': 0.0}
 ```
 
-Here `B` is calibrated, and `A`, the remainder, takes what is left of the total.
+Here `B` is calibrated, and `A`, the remainder, takes what `B` leaves of the 1000 that the model states for `A` and `B`.
 
 ## What an id can name
 
-| `id`                                      | Example                | The value is                                                                                                                         |
-| ----------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| A bin                                     | `"B"`                  | The fraction of the total in the bin. Its compartments share it in their current proportions.                                        |
-| A bin prefix (a bin and some categories)  | `"B_g1"`               | The fraction in those compartments, shared in the same way. Compartments are matched by label, so `B_g1` never covers a bin `B_g1x`. |
-| An expanded compartment                   | `"B_g1_t2"`            | The fraction of the total in that compartment alone.                                                                                 |
-| A category of a **binary** stratification | `"g1"` or `"group:g1"` | The split: every `(g1, g2)` pair of compartments keeps its total and gives `g1` this fraction.                                       |
+| `id`                                      | Example                | The value is                                                                                                                       |
+| ----------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| A bin                                     | `"B"`                  | The amount of the bin, in its unit. Its compartments share it in their current proportions.                                        |
+| A bin prefix (a bin and some categories)  | `"B_g1"`               | The amount in those compartments, shared in the same way. Compartments are matched by label, so `B_g1` never covers a bin `B_g1x`. |
+| An expanded compartment                   | `"B_g1_t2"`            | The amount of that compartment alone, in the unit of its bin.                                                                      |
+| A category of a **binary** stratification | `"g1"` or `"group:g1"` | The split: every `(g1, g2)` pair of compartments keeps its total and gives `g1` this fraction.                                     |
 
 A category name that two stratifications declare must be qualified with its stratification, as in `"group:g1"`; a bare name is rejected as ambiguous.
 
@@ -3309,16 +3296,18 @@ The engine resolves every id when you create the `Calibrator` (`InitialCondition
 
 ## The remainder
 
-Without help, calibrated values change the sum of the amounts. Name a compartment or bin in `initial_condition_remainder`, and it absorbs the difference:
+Without help, calibrated values change the sum of the amounts. Name a compartment or bin in `initial_condition_remainder`, and it takes what the values leave of the amounts the model states:
 
-| Rule                                             | Detail                                                                                      |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| It is not calibrated                             | It takes `total` minus everything else.                                                     |
-| It keeps its own split                           | A bin remainder shares the difference across its compartments in their current proportions. |
-| It must not overlap a calibrated id              | Building the problem rejects it otherwise.                                                  |
-| A value that would make it negative is penalized | The optimizer moves away from it.                                                           |
+| Rule                                             | Detail                                                                                                                                                                                                         |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| It is not calibrated                             | It takes the sum of the amounts the model states, less every other compartment.                                                                                                                                |
+| It keeps the sum of what the values and it cover | A compartment that no value covers keeps its amount, so it does not change the remainder. A bin left `None` for calibration counts as 0, so the remainder states the sum: `A` holds 1000 while `B` is unknown. |
+| It has the unit of every amount it gives         | The `Calibrator` rejects a calibrated bin, prefix or compartment whose unit is not the unit of the remainder, and names both. A category split has no unit.                                                    |
+| It keeps its own split                           | A bin remainder shares what it takes across its compartments in their current proportions.                                                                                                                     |
+| It must not overlap a calibrated id              | Building the problem rejects it otherwise.                                                                                                                                                                     |
+| A value that would make it negative is penalized | The optimizer moves away from it.                                                                                                                                                                              |
 
-Without a remainder, values are applied as given, and only a sum of the initial amounts above `total` is penalized.
+Without a remainder, values are applied as given, and the other compartments keep their amounts. So a model of a count in `A` and `B` and of a concentration in `C` can fit the amount of `C` alone, or fit `B` with `A` as the remainder.
 
 ## Order of application
 
@@ -3346,18 +3335,17 @@ def stratified(b_g1: float | None):
         .add_transition(id="t_ba", source=["B"], target=["A"], rate="k1")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.9, "B": 0.1},
+                bin_amounts={"A": 900, "B": 100},
                 stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
-                compartment_fractions={}
+                compartment_amounts={}
                 if b_g1 is None
-                else {"B_g1": b_g1, "A_g1": 0.5 - b_g1},
+                else {"B_g1": b_g1, "A_g1": 500 - b_g1},
             ),
             engine="DifferenceEquations",
         )
     )
 
-truth = Simulation(stratified(0.01)).run(num_steps=20)
+truth = Simulation(stratified(10)).run(num_steps=20)
 problem = CalibrationProblem(
     observed_data=[
         ObservedDataPoint(at=step, output="A_g1", value=truth["A_g1"][step])
@@ -3368,8 +3356,8 @@ problem = CalibrationProblem(
             id="B_g1",
             parameter_type="initial_condition",
             min_bound=0.0,
-            max_bound=0.1,
-            initial_guess=0.03,  # Nelder-Mead is local: start near the answer
+            max_bound=100.0,
+            initial_guess=30.0,  # Nelder-Mead is local: start near the answer
         )
     ],
     initial_condition_remainder="A_g1",
@@ -3378,7 +3366,7 @@ problem = CalibrationProblem(
 
 composite = stratified(None)
 result = Calibrator(Simulation(composite), problem).run()
-print(round(result.best_parameters["B_g1"], 4))  # 0.01
+print(round(result.best_parameters["B_g1"], 2))  # 10.0
 
 composite.apply_calibration_parameters(result, problem)
 print({c.name: round(c.amount, 1) for c in composite.structure.initial_state(composite.process)})
@@ -3389,15 +3377,16 @@ print({c.name: round(c.amount, 1) for c in composite.structure.initial_state(com
 
 `apply_calibration_parameters` writes the values so that the model rebuilds the state the optimizer scored:
 
-1. Each bin and each category gets the fraction the engine applied, so the definition stays readable.
-1. Every compartment whose amount still differs from the scored one is pinned as a `compartment_fractions` override.
+1. Each bin whose every compartment a value or the remainder sets gets the amount the engine gave it, in the unit of the bin, and each category gets the split the engine applied, so the definition stays readable.
+1. Every compartment whose amount still differs from the scored one is pinned as a `compartment_amounts` override.
 
-So an expanded-compartment id always becomes an override, and so does a bin or category value that overlaps an existing override. Reloading the saved model gives the scored state exactly. A calibrated category split is written with `update_stratification_fractions`: the named category gets the value and its complement the rest.
+So an expanded-compartment id always becomes an override, and so does a bin or category value that overlaps an existing override. A bin of which a value sets only some compartments keeps its amount. Reloading the saved model gives the scored state exactly. A calibrated category split is written with `update_stratification_fractions`: the named category gets the value and its complement the rest.
 
 ## Checklist
 
-- [ ] Each unknown fraction is `None` in the model.
-- [ ] A remainder is named when the calibrated values should keep the total.
+- [ ] Each unknown amount is `None` in the model, and the bounds are amounts in the unit of its bin (a category split is in `[0, 1]`).
+- [ ] A remainder is named when the calibrated values should keep a sum, and it holds that sum in the model.
+- [ ] The remainder has the unit of every amount it gives.
 - [ ] The remainder is not also calibrated.
 - [ ] Category ids name a binary stratification, qualified when the name is shared.
 
@@ -3444,8 +3433,7 @@ def model(k1: float | None):
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+                bin_amounts={"A": 990, "B": 10, "C": 0},
             ),
             engine="DifferenceEquations",
         )
@@ -3597,8 +3585,7 @@ def ode_model(k1: float | None):
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 1.0, "B": 0.0},
+                bin_amounts={"A": 1000, "B": 0},
             ),
             engine="DifferentialEquations",
         )
@@ -3677,8 +3664,7 @@ def model(k1: float | None, k2: float | None):
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+                bin_amounts={"A": 990, "B": 10, "C": 0},
             ),
             engine="DifferenceEquations",
         )
@@ -3863,8 +3849,7 @@ def model(k1: float | None, k2: float | None):
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+                bin_amounts={"A": 990, "B": 10, "C": 0},
             ),
             engine="DifferenceEquations",
         )
@@ -4036,7 +4021,7 @@ def basic_model(k1: float | None, k2: float | None):
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
-            Aggregate(total=1000, bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0}),
+            Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0}),
             engine="DifferenceEquations",
         )
     )
@@ -4233,7 +4218,7 @@ def basic_model(k1: float | None, alpha: float | None, k2: float | None):
         )
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
-            Aggregate(total=1000, bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0}),
+            Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0}),
             engine="DifferenceEquations",
         )
     )
@@ -4453,7 +4438,7 @@ def ab_model(k: float | None):
         .add_parameter(id="k", value=k)
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
         .build(
-            Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}),
+            Aggregate(bin_amounts={"A": 1000, "B": 0}),
             engine="DifferenceEquations",
         )
     )
@@ -4679,7 +4664,7 @@ def flow_model(engine: str):
         .add_parameter(id="c", value=None)
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="c * A / A")
         .build(
-            Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}),
+            Aggregate(bin_amounts={"A": 1000, "B": 0}),
             engine=engine,
         )
     )
@@ -4891,7 +4876,7 @@ def ab_model(k: float | None):
         .add_parameter(id="k", value=k)
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
         .build(
-            Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}),
+            Aggregate(bin_amounts={"A": 1000, "B": 0}),
             engine="DifferenceEquations",
         )
     )
@@ -5162,8 +5147,7 @@ def model(k1: float | None):
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+                bin_amounts={"A": 990, "B": 10, "C": 0},
             ),
             engine="DifferenceEquations",
         )
@@ -5206,7 +5190,7 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 
 ## `applied_parameters_report`
 
-`applied_parameters_report(model, result, problem=None, parameter_statistics=None, confidence_level=None)` lists every number the calibrated model holds, and whether calibration set it. The `parameters` section is the same for every kind of model; the structure of the model adds the sections of its kind (`ModelStructure.report_sections`). An aggregate model adds `initial_conditions`:
+`applied_parameters_report(model, result, problem=None, parameter_statistics=None, confidence_level=None)` lists every number the calibrated model holds, and whether calibration set it. The `parameters` section is the same for every kind of model; the structure of the model adds the sections of its kind (`ModelStructure.report_sections`). An aggregate model adds `initial_amounts` and `category_splits`:
 
 ```json
 {
@@ -5214,11 +5198,14 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
     "k1": {"value": 0.4, "calibrated": true},
     "k2": {"value": 0.1, "calibrated": false}
   },
-  "initial_conditions": {
-    "total": {"group": "total", "fraction": 1.0, "value": 1000.0, "calibrated": false},
-    "A": {"group": "total", "fraction": 0.99, "value": 990.0, "calibrated": false},
-    "B": {"group": "total", "fraction": 0.01, "value": 10.0, "calibrated": false},
-    "C": {"group": "total", "fraction": 0.0, "value": 0.0, "calibrated": false}
+  "initial_amounts": {
+    "A": {"amount": 990.0, "unit": "item", "calibrated": false},
+    "B": {"amount": 10.0, "unit": "item", "calibrated": true},
+    "C": {"amount": 100000.0, "unit": "mg/l", "calibrated": false}
+  },
+  "category_splits": {
+    "g1": {"group": [], "fraction": 0.5, "calibrated": false},
+    "g2": {"group": [], "fraction": 0.5, "calibrated": false}
   }
 }
 ```
@@ -5230,17 +5217,16 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 | `problem`                    | Optional. Adds the `factor` parameters, which the model does not hold.                                                                  |
 | `sample`, `confidence_level` | Optional. A `ParameterSample`: each entry gains its weighted statistics (`ParameterSample.summary`). A sample needs a confidence level. |
 
-| Entry                                 | Rule                                                                                                                                                               |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Parameters                            | Only numeric parameters: formulas and series are inputs, not fitted values.                                                                                        |
-| `total`                               | The declared `total`, with fraction 1.0.                                                                                                                           |
-| Initial-condition `value`             | The amount the engine builds, overrides included.                                                                                                                  |
-| Initial-condition `fraction`          | That amount over `total`, so every row shares one denominator.                                                                                                     |
-| `group`                               | `"total"`, or the conditioning categories for a conditional stratification.                                                                                        |
-| An uncalibrated bin (`None` fraction) | `fraction` and `value` are `null`.                                                                                                                                 |
-| A `sample`                            | Each entry gains an `interval` block (`mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max`, `std`, all weighted), and the report starts with `confidence_level`. |
+| Entry                               | Rule                                                                                                                                                                                                      |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Parameters                          | Only numeric parameters: formulas and series are inputs, not fitted values.                                                                                                                               |
+| `initial_amounts`                   | One row per bin and per overridden compartment: the `amount` the engine builds, overrides included, and the `unit` of its bin. No row is a share of a total, so bins of different units sit side by side. |
+| `category_splits`                   | One row per category: its `fraction` of the group it splits. A category has no amount, because it can split bins of different units.                                                                      |
+| `group`                             | The conditioning categories of a conditional stratification, or `[]` when it splits every bin.                                                                                                            |
+| An uncalibrated bin (`None` amount) | `amount` is `null`.                                                                                                                                                                                       |
+| A `sample`                          | Each entry gains an `interval` block (`mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max`, `std`, all weighted), and the report starts with `confidence_level`.                                        |
 
-The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `group`, `fraction`, `value`, `calibrated`, then `interval`), so saved JSON files stay comparable.
+The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `amount`, `unit`, `calibrated`, then `interval`; `group`, `fraction`, `calibrated`, then `interval`), so saved JSON files stay comparable. An interval is in the unit of its entry: an amount in the unit of its bin, a split as a fraction of its group.
 
 ## `simulation_report`
 
@@ -5325,8 +5311,7 @@ model = (
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -5355,8 +5340,7 @@ model = (
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k3")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.999, "M": 0.0, "B": 0.001, "C": 0.0},
+            bin_amounts={"A": 999, "M": 0, "B": 1, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -5388,8 +5372,7 @@ model = (
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -5441,8 +5424,7 @@ model = (
     )
     .build(
         Aggregate(
-            total=10000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 9900, "B": 100, "C": 0},
             stratification_fractions={"group": {"g1": 0.25, "g2": 0.55, "g3": 0.2}},
         ),
         engine="DifferenceEquations",
@@ -5475,8 +5457,7 @@ model = (
     .add_transition(id="return_CA", source=["C"], target=["A"], rate="k3")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -5508,8 +5489,7 @@ model = (
     )
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.95, "B": 0.05, "C": 0.0},
+            bin_amounts={"A": 950, "B": 50, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -5550,8 +5530,7 @@ model = (
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
             stratification_fractions={
                 "group": {"g1": 0.6, "g2": 0.4},
                 "type": {"t1": 0.8, "t2": 0.2},
@@ -5594,8 +5573,7 @@ model = (
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
             stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
         ),
         engine="DifferenceEquations",
@@ -5653,8 +5631,7 @@ model = (
     )
     .build(
         Aggregate(
-            total=10000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 9900, "B": 100, "C": 0},
             stratification_fractions={
                 "group": {"g1": 0.6, "g2": 0.4},
                 "subtype": {"s1": 0.7, "s2": 0.3},
@@ -5713,8 +5690,7 @@ model = (
     )
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -5794,8 +5770,7 @@ model = (
     .add_transition("flow", ["A"], ["B"], rate=rate)
     .build(
         Aggregate(
-            total=10000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 10000, "B": 0},
         ),
         "DifferenceEquations",
     )
@@ -5830,8 +5805,7 @@ model = (
     .add_transition("flow", ["A"], ["B"], rate=rate)
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 1000, "B": 0},
             stratification_fractions={"group": {"cat1": 0.5, "cat2": 0.5}},
         ),
         "DifferenceEquations",
@@ -7534,6 +7508,7 @@ class Calibrator:
             self.problem.parameters,
             self.problem.initial_condition_remainder,
         )
+        model.structure.check_calibration_values(model, self._engine, self.problem)
 
     def _validate_observed_data(self) -> None:
         """Validate that observed data compartments exist and have valid steps.
@@ -11624,8 +11599,8 @@ class ModelBuilder:
         The process is written once; the structure lays it out and sets the
         kind of the model, so one builder builds every kind its process fits:
 
-        ``builder.build(Aggregate(total=1000, bin_fractions={"A": 0.99,
-        "B": 0.01, "C": 0.0}), engine="DifferentialEquations")``
+        ``builder.build(Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0}),
+        engine="DifferentialEquations")``
 
         Parameters
         ----------
@@ -12451,7 +12426,7 @@ Join the process with a structure and an engine into a model.
 
 The process is written once; the structure lays it out and sets the kind of the model, so one builder builds every kind its process fits:
 
-`builder.build(Aggregate(total=1000, bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0}), engine="DifferentialEquations")`
+`builder.build(Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0}), engine="DifferentialEquations")`
 
 Parameters:
 
@@ -12488,8 +12463,8 @@ def build(
     The process is written once; the structure lays it out and sets the
     kind of the model, so one builder builds every kind its process fits:
 
-    ``builder.build(Aggregate(total=1000, bin_fractions={"A": 0.99,
-    "B": 0.01, "C": 0.0}), engine="DifferentialEquations")``
+    ``builder.build(Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0}),
+    engine="DifferentialEquations")``
 
     Parameters
     ----------
@@ -14037,6 +14012,29 @@ class ModelStructure(BaseModel, ABC):
         """
         return []
 
+    def check_calibration_values(
+        self,
+        model: "Model[Self]",  # noqa: ARG002
+        engine: "EngineProtocol",  # noqa: ARG002
+        problem: "CalibrationProblem",  # noqa: ARG002
+    ) -> None:
+        """
+        Check the values of this kind that a calibration sets.
+
+        The engine has resolved each value and the remainder when this runs;
+        a kind checks here what only the Python definition knows, such as the
+        units of the bins. The default checks nothing.
+
+        Parameters
+        ----------
+        model : Model
+            The model the calibration runs on.
+        engine : EngineProtocol
+            The engine built from it.
+        problem : CalibrationProblem
+            The problem, for its parameters and remainder.
+        """
+
     def with_calibrated_values(
         self,
         model: "Model[Self]",  # noqa: ARG002
@@ -14430,6 +14428,51 @@ def uncalibrated_values(self) -> list[str]:
     return []
 ```
 
+#### check_calibration_values
+
+```python
+check_calibration_values(model: Model[Self], engine: EngineProtocol, problem: CalibrationProblem) -> None
+```
+
+Check the values of this kind that a calibration sets.
+
+The engine has resolved each value and the remainder when this runs; a kind checks here what only the Python definition knows, such as the units of the bins. The default checks nothing.
+
+Parameters:
+
+| Name      | Type                 | Description                                    | Default    |
+| --------- | -------------------- | ---------------------------------------------- | ---------- |
+| `model`   | `Model`              | The model the calibration runs on.             | *required* |
+| `engine`  | `EngineProtocol`     | The engine built from it.                      | *required* |
+| `problem` | `CalibrationProblem` | The problem, for its parameters and remainder. | *required* |
+
+Source code in `commol/context/structure.py`
+
+```python
+def check_calibration_values(
+    self,
+    model: "Model[Self]",  # noqa: ARG002
+    engine: "EngineProtocol",  # noqa: ARG002
+    problem: "CalibrationProblem",  # noqa: ARG002
+) -> None:
+    """
+    Check the values of this kind that a calibration sets.
+
+    The engine has resolved each value and the remainder when this runs;
+    a kind checks here what only the Python definition knows, such as the
+    units of the bins. The default checks nothing.
+
+    Parameters
+    ----------
+    model : Model
+        The model the calibration runs on.
+    engine : EngineProtocol
+        The engine built from it.
+    problem : CalibrationProblem
+        The problem, for its parameters and remainder.
+    """
+```
+
 #### with_calibrated_values
 
 ```python
@@ -14619,19 +14662,18 @@ Bases: `ModelStructure`, `InitialConditions`
 
 Amounts per compartment: how much starts where, and who the neighbors of a unit are.
 
-The bins of the process expand over its stratifications into compartments. `total` is the sum of every compartment at the start; `bin_fractions` splits it among the bins, `stratification_fractions` splits each group among its categories, and `compartment_fractions` overrides single compartments.
+The bins of the process expand over its stratifications into compartments. `bin_amounts` gives the amount of each bin at the start, in the unit of the bin, `stratification_fractions` splits it among the categories, and `compartment_amounts` overrides single compartments. Bins of different units, such as people and a concentration, need no total over them.
 
 Attributes:
 
-| Name                       | Type                          | Description                                                                                                                                                                                              |
-| -------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `kind`                     | `Literal['aggregate']`        | The model kind.                                                                                                                                                                                          |
-| `variant`                  | \`str                         | None\`                                                                                                                                                                                                   |
-| `total`                    | `float`                       | The sum of every compartment at the start, finite and greater than 0. It can be a count, a mass or a concentration.                                                                                      |
-| `bin_fractions`            | \`dict\[str, float            | None\]\`                                                                                                                                                                                                 |
-| `stratification_fractions` | `dict[str, dict[str, float]]` | The fraction of each category, by stratification id, such as {"group": {"g1": 0.3, "g2": 0.7}}. A conditional stratification splits only the group its conditions select.                                |
-| `compartment_fractions`    | `dict[str, float]`            | Fractions of the total in single expanded compartments, such as {"A_g1": 0.0}, applied after the expansion. The names and the sum of the amounts are checked against the engine when the model is built. |
-| `neighbors`                | \`Complete                    | Groups                                                                                                                                                                                                   |
+| Name                       | Type                          | Description                                                                                                                                                                                                                   |
+| -------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind`                     | `Literal['aggregate']`        | The model kind.                                                                                                                                                                                                               |
+| `variant`                  | \`str                         | None\`                                                                                                                                                                                                                        |
+| `bin_amounts`              | \`dict\[str, float            | None\]\`                                                                                                                                                                                                                      |
+| `stratification_fractions` | `dict[str, dict[str, float]]` | The fraction of each category, by stratification id, such as {"group": {"g1": 0.3, "g2": 0.7}}: the split of the amount of every bin it applies to. A conditional stratification splits only the group its conditions select. |
+| `compartment_amounts`      | `dict[str, float]`            | Amounts of single expanded compartments, such as {"A_g1": 0.0}, applied after the expansion. The names are checked against the engine when the model is built.                                                                |
+| `neighbors`                | \`Complete                    | Groups                                                                                                                                                                                                                        |
 
 Source code in `commol/context/aggregate.py`
 
@@ -14642,10 +14684,11 @@ class Aggregate(ModelStructure, InitialConditions):
     a unit are.
 
     The bins of the process expand over its stratifications into
-    compartments. ``total`` is the sum of every compartment at the start;
-    ``bin_fractions`` splits it among the bins, ``stratification_fractions``
-    splits each group among its categories, and ``compartment_fractions``
-    overrides single compartments.
+    compartments. ``bin_amounts`` gives the amount of each bin at the start,
+    in the unit of the bin, ``stratification_fractions`` splits it among the
+    categories, and ``compartment_amounts`` overrides single compartments.
+    Bins of different units, such as people and a concentration, need no
+    total over them.
 
     Attributes
     ----------
@@ -14654,22 +14697,19 @@ class Aggregate(ModelStructure, InitialConditions):
     variant : str | None
         The variant of the structure (see `ModelStructure`), None for
         `Aggregate` itself.
-    total : float
-        The sum of every compartment at the start, finite and greater than 0.
-        It can be a count, a mass or a concentration.
-    bin_fractions : dict[str, float | None]
-        The fraction of the total in each bin, by bin id, such as
-        ``{"A": 0.99, "B": 0.01, "C": 0.0}``. None leaves a fraction for
-        calibration.
+    bin_amounts : dict[str, float | None]
+        The amount of each bin at the start, by bin id, in the unit of the
+        bin, such as ``{"A": 990, "B": 10, "C": 1e5}``; finite and not
+        negative. None leaves an amount for calibration.
     stratification_fractions : dict[str, dict[str, float]]
         The fraction of each category, by stratification id, such as
-        ``{"group": {"g1": 0.3, "g2": 0.7}}``. A conditional stratification
-        splits only the group its conditions select.
-    compartment_fractions : dict[str, float]
-        Fractions of the total in single expanded compartments, such as
-        ``{"A_g1": 0.0}``, applied after the expansion. The names and the sum
-        of the amounts are checked against the engine when the model is
-        built.
+        ``{"group": {"g1": 0.3, "g2": 0.7}}``: the split of the amount of
+        every bin it applies to. A conditional stratification splits only the
+        group its conditions select.
+    compartment_amounts : dict[str, float]
+        Amounts of single expanded compartments, such as ``{"A_g1": 0.0}``,
+        applied after the expansion. The names are checked against the engine
+        when the model is built.
     neighbors : Complete | Groups | None
         Who the neighbors of a unit are, for the rate variables
         ``neighbors_<bin>`` and ``neighbors``. Required, with no default, when
@@ -14690,10 +14730,10 @@ class Aggregate(ModelStructure, InitialConditions):
         """
         Check the structure against the process and the parameters.
 
-        The process needs a bin and a transition, the fractions must name
-        every bin and every category of the process, parameter ids must not
-        be engine variables or bin ids, every variable of a rate must be
-        defined, and the engine must plan every transition, resolve the
+        The process needs a bin and a transition, the amounts must name every
+        bin and the fractions every category of the process, parameter ids
+        must not be engine variables or bin ids, every variable of a rate must
+        be defined, and the engine must plan every transition, resolve the
         neighbors and build the initial state.
 
         Parameters
@@ -14711,12 +14751,12 @@ class Aggregate(ModelStructure, InitialConditions):
             raise ValueError("At least one bin must be defined.")
         if not process.transitions:
             raise ValueError("At least one transition must be defined.")
-        self._check_bin_fractions(process)
+        self._check_bin_amounts(process)
         self._check_stratification_fractions(process)
         self._check_parameter_names(model)
         engine_state.transition_flows(process, self)
         engine_state.check_model(model)
-        if self.compartment_fractions:
+        if self.compartment_amounts:
             engine_state.initial_state(process, self)
         self._check_formula_variables(model)
 
@@ -14775,14 +14815,71 @@ class Aggregate(ModelStructure, InitialConditions):
 
     def uncalibrated_values(self) -> list[str]:
         """
-        Ids of the bins whose initial fraction needs calibration.
+        Ids of the bins whose initial amount needs calibration.
 
         Returns
         -------
         list[str]
-            Bin ids with a None fraction.
+            Bin ids with a None amount.
         """
         return self.get_uncalibrated_bins()
+
+    def check_calibration_values(
+        self,
+        model: "Model[Self]",
+        engine: "EngineProtocol",
+        problem: "CalibrationProblem",
+    ) -> None:
+        """
+        Check that the remainder has the unit of every amount it gives.
+
+        The remainder takes what the calibrated amounts leave of the sum it
+        keeps, so a bin, prefix or compartment value must be in the unit of
+        the remainder; a category split has no unit.
+
+        Parameters
+        ----------
+        model : Model
+            The model the calibration runs on.
+        engine : EngineProtocol
+            The engine built from it.
+        problem : CalibrationProblem
+            The problem, for its parameters and remainder.
+
+        Raises
+        ------
+        ValueError
+            If a calibrated amount is in another unit than the remainder.
+        """
+        remainder = problem.initial_condition_remainder
+        if remainder is None:
+            return
+        parameters = [
+            param
+            for param in problem.parameters
+            if param.parameter_type == CalibrationParameterType.INITIAL_CONDITION
+        ]
+        covered, kept = engine_state.initial_condition_coverage(
+            engine, parameters, remainder
+        )
+        bin_of = {c.name: c.bin for c in self.initial_state(model.process)}
+
+        def unit(compartment: str) -> str | None:
+            bin_item = model.process.bin(bin_of[compartment])
+            return None if bin_item is None else bin_item.unit
+
+        remainder_unit = unit(kept[0])
+        for param, compartments in zip(parameters, covered, strict=True):
+            for compartment in compartments:
+                if unit(compartment) != remainder_unit:
+                    raise ValueError(
+                        f"The initial-condition remainder '{remainder}' is in "
+                        f"{_unit_name(remainder_unit)}, but the calibrated "
+                        f"initial condition '{param.id}' sets '{compartment}', "
+                        f"in {_unit_name(unit(compartment))}. The remainder "
+                        f"keeps a sum of amounts of one unit: name a remainder "
+                        f"of the unit of '{param.id}'."
+                    )
 
     def with_calibrated_values(
         self,
@@ -14794,10 +14891,11 @@ class Aggregate(ModelStructure, InitialConditions):
         The structure with calibrated initial conditions written back.
 
         The written structure rebuilds the initial state the engine
-        scored. Bin and category values update the fractions they declare.
-        Every compartment those fractions do not reproduce, such as an exact
-        compartment value or a value that overlaps a per-compartment override,
-        is written as a per-compartment override.
+        scored. Bin values update the amounts they declare, in the unit of
+        the bin, and category values the splits. Every compartment those do
+        not reproduce, such as an exact compartment value or a value that
+        overlaps a per-compartment override, is written as a per-compartment
+        override.
 
         Parameters
         ----------
@@ -14817,7 +14915,7 @@ class Aggregate(ModelStructure, InitialConditions):
         ------
         ValueError
             If the engine cannot resolve an initial-condition id or the
-            remainder, or the initial amounts exceed the total.
+            remainder, or the values leave the remainder below zero.
         """
         from commol.context._model.calibration_write_back import (
             calibrated_structure,
@@ -14832,7 +14930,7 @@ class Aggregate(ModelStructure, InitialConditions):
         parameter_statistics: "Mapping[str, ParameterSummary] | None",
     ) -> ReportSections:
         """
-        The ``initial_conditions`` section of a report of applied values.
+        The ``initial_amounts`` and ``category_splits`` sections of a report.
 
         See :func:`commol.applied_parameters_report`.
 
@@ -14848,14 +14946,20 @@ class Aggregate(ModelStructure, InitialConditions):
         Returns
         -------
         ReportSections
-            ``{"initial_conditions": ...}``.
+            ``{"initial_amounts": ..., "category_splits": ...}``.
         """
-        from commol.context._model.report import initial_conditions_report
+        from commol.context._model.report import (
+            category_splits_report,
+            initial_amounts_report,
+        )
 
         return {
-            "initial_conditions": initial_conditions_report(
+            "initial_amounts": initial_amounts_report(
                 model.process, self, calibrated_ids, parameter_statistics
-            )
+            ),
+            "category_splits": category_splits_report(
+                model.process, self, calibrated_ids, parameter_statistics
+            ),
         }
 
     def describe(self, model: "Model[Self]") -> "list[Section]":
@@ -14865,8 +14969,8 @@ class Aggregate(ModelStructure, InitialConditions):
         ``entities``: the bins, accumulators, stratifications and expanded
         compartments. ``dynamics``: the state graphs, the compact and expanded
         forms of the equations the engine simulates, the impulses and the
-        neighbors. ``initialization``: the total, the fractions, the overrides
-        and the initial state the engine builds. ``design_concepts``: the
+        neighbors. ``initialization``: the bin amounts, the category splits,
+        the overrides and the initial state the engine builds. ``design_concepts``: the
         interaction of the units, when the structure says who their neighbors
         are.
 
@@ -14894,13 +14998,13 @@ class Aggregate(ModelStructure, InitialConditions):
     # Initial conditions
     # ------------------------------------------------------------------
 
-    def update_compartment_fractions(
-        self, process: Process, fractions: Mapping[str, float]
+    def update_compartment_amounts(
+        self, process: Process, amounts: Mapping[str, float]
     ) -> None:
         """
         Upsert per-compartment initial condition overrides.
 
-        A compartment already declared has its fraction replaced; a new one is
+        A compartment already declared has its amount replaced; a new one is
         appended. The engine validates the result against the expansion of
         the process before it is stored, so a rejected call leaves the
         structure unchanged.
@@ -14909,27 +15013,26 @@ class Aggregate(ModelStructure, InitialConditions):
         ----------
         process : Process
             The process of the model, such as ``model.process``.
-        fractions : Mapping[str, float]
-            Dictionary mapping expanded compartment names to their new fraction
-            of the total.
+        amounts : Mapping[str, float]
+            Dictionary mapping expanded compartment names to their new
+            amount, in the unit of their bin.
 
         Raises
         ------
         ValueError
-            If a name is not an expanded compartment of the model, a value lies
-            outside ``[0.0, 1.0]``, or the resulting overrides make the initial
-            amounts exceed the total.
+            If a name is not an expanded compartment of the model, or an
+            amount is not finite or is negative.
         """
         candidate = self.model_copy(deep=True)
-        candidate._upsert_compartment_fractions(fractions)
+        candidate._upsert_compartment_amounts(amounts)
         engine_state.initial_state(process, candidate)
-        self.compartment_fractions = candidate.compartment_fractions
+        self.compartment_amounts = candidate.compartment_amounts
 
     def initial_state(self, process: Process) -> list[InitialCompartment]:
         """
         Expanded compartments and the amount each one starts with.
 
-        The engine builds this state from the bin fractions, the stratification
+        The engine builds this state from the bin amounts, the stratification
         fractions and the per-compartment overrides; it is the state a
         simulation starts from.
 
@@ -14946,7 +15049,8 @@ class Aggregate(ModelStructure, InitialConditions):
         Raises
         ------
         ValueError
-            If the per-compartment overrides are not valid for the structure.
+            If an amount is not valid or an override names no compartment of
+            the structure.
         """
         return engine_state.initial_state(process, self)
 
@@ -14995,22 +15099,19 @@ class Aggregate(ModelStructure, InitialConditions):
 
     def subgroup_total(self, process: Process, categories: Iterable[str] = ()) -> float:
         """
-        Get the initial total of a subgroup.
+        Get the initial sum of the compartments of a subgroup.
 
-        Category fractions are relative to the group their stratification
-        applies to, so the fractions of a nested chain of categories multiply:
-        ``total × fraction(g1) × fraction(t1)``. Passing no categories gives
-        the total. Per-compartment overrides are folded into the sum for every
-        compartment the category chain selects, so the result matches the
-        state the engine builds.
+        The sum is taken of the state the engine builds, overrides included,
+        over every compartment that has each of the categories. Passing no
+        categories gives the sum of every compartment. It adds every bin it
+        covers, so over bins of different units it has no unit.
 
         Parameters
         ----------
         process : Process
             The process of the model, such as ``model.process``.
         categories : Iterable[str], optional
-            Category ids, bare or qualified (``group:g1``), forming a chain
-            from the whole model down to the subgroup, outermost first.
+            Category ids, bare or qualified (``group:g1``).
 
         Returns
         -------
@@ -15022,10 +15123,7 @@ class Aggregate(ModelStructure, InitialConditions):
         ValueError
             If a category is not found or a bare name is ambiguous.
         """
-        selected = tuple(categories)
-        if not self.compartment_fractions:
-            return self._fraction_subgroup_total(selected)
-        resolved = [self.resolve_category(c) for c in selected]
+        resolved = [self.resolve_category(c) for c in categories]
         return sum(
             compartment.amount
             for compartment in self.initial_state(process)
@@ -15039,13 +15137,13 @@ class Aggregate(ModelStructure, InitialConditions):
     # Checks against the model
     # ------------------------------------------------------------------
 
-    def _check_bin_fractions(self, process: Process) -> None:
-        """Check that the bin fractions name every bin of the process."""
-        actual_bins = set(self.bin_fractions)
+    def _check_bin_amounts(self, process: Process) -> None:
+        """Check that the bin amounts name every bin of the process."""
+        actual_bins = set(self.bin_amounts)
         expected_bins = {bin_item.id for bin_item in process.bins}
         if actual_bins != expected_bins:
             raise ValueError(
-                f"Initial bin fractions keys must exactly match bin ids. "
+                f"Initial bin amounts keys must exactly match bin ids. "
                 f"Missing ids: {sorted(expected_bins - actual_bins)}, "
                 f"Extra ids: {sorted(actual_bins - expected_bins)}."
             )
@@ -15192,7 +15290,7 @@ check_model(model: Model[Self]) -> None
 
 Check the structure against the process and the parameters.
 
-The process needs a bin and a transition, the fractions must name every bin and every category of the process, parameter ids must not be engine variables or bin ids, every variable of a rate must be defined, and the engine must plan every transition, resolve the neighbors and build the initial state.
+The process needs a bin and a transition, the amounts must name every bin and the fractions every category of the process, parameter ids must not be engine variables or bin ids, every variable of a rate must be defined, and the engine must plan every transition, resolve the neighbors and build the initial state.
 
 Parameters:
 
@@ -15213,10 +15311,10 @@ def check_model(self, model: "Model[Self]") -> None:
     """
     Check the structure against the process and the parameters.
 
-    The process needs a bin and a transition, the fractions must name
-    every bin and every category of the process, parameter ids must not
-    be engine variables or bin ids, every variable of a rate must be
-    defined, and the engine must plan every transition, resolve the
+    The process needs a bin and a transition, the amounts must name every
+    bin and the fractions every category of the process, parameter ids
+    must not be engine variables or bin ids, every variable of a rate must
+    be defined, and the engine must plan every transition, resolve the
     neighbors and build the initial state.
 
     Parameters
@@ -15234,12 +15332,12 @@ def check_model(self, model: "Model[Self]") -> None:
         raise ValueError("At least one bin must be defined.")
     if not process.transitions:
         raise ValueError("At least one transition must be defined.")
-    self._check_bin_fractions(process)
+    self._check_bin_amounts(process)
     self._check_stratification_fractions(process)
     self._check_parameter_names(model)
     engine_state.transition_flows(process, self)
     engine_state.check_model(model)
-    if self.compartment_fractions:
+    if self.compartment_amounts:
         engine_state.initial_state(process, self)
     self._check_formula_variables(model)
 ```
@@ -15354,27 +15452,112 @@ def series_label(self, model: "Model[Self]", series_id: str) -> SeriesLabel:
 uncalibrated_values() -> list[str]
 ```
 
-Ids of the bins whose initial fraction needs calibration.
+Ids of the bins whose initial amount needs calibration.
 
 Returns:
 
-| Type        | Description                   |
-| ----------- | ----------------------------- |
-| `list[str]` | Bin ids with a None fraction. |
+| Type        | Description                 |
+| ----------- | --------------------------- |
+| `list[str]` | Bin ids with a None amount. |
 
 Source code in `commol/context/aggregate.py`
 
 ```python
 def uncalibrated_values(self) -> list[str]:
     """
-    Ids of the bins whose initial fraction needs calibration.
+    Ids of the bins whose initial amount needs calibration.
 
     Returns
     -------
     list[str]
-        Bin ids with a None fraction.
+        Bin ids with a None amount.
     """
     return self.get_uncalibrated_bins()
+```
+
+#### check_calibration_values
+
+```python
+check_calibration_values(model: Model[Self], engine: EngineProtocol, problem: CalibrationProblem) -> None
+```
+
+Check that the remainder has the unit of every amount it gives.
+
+The remainder takes what the calibrated amounts leave of the sum it keeps, so a bin, prefix or compartment value must be in the unit of the remainder; a category split has no unit.
+
+Parameters:
+
+| Name      | Type                 | Description                                    | Default    |
+| --------- | -------------------- | ---------------------------------------------- | ---------- |
+| `model`   | `Model`              | The model the calibration runs on.             | *required* |
+| `engine`  | `EngineProtocol`     | The engine built from it.                      | *required* |
+| `problem` | `CalibrationProblem` | The problem, for its parameters and remainder. | *required* |
+
+Raises:
+
+| Type         | Description                                                   |
+| ------------ | ------------------------------------------------------------- |
+| `ValueError` | If a calibrated amount is in another unit than the remainder. |
+
+Source code in `commol/context/aggregate.py`
+
+```python
+def check_calibration_values(
+    self,
+    model: "Model[Self]",
+    engine: "EngineProtocol",
+    problem: "CalibrationProblem",
+) -> None:
+    """
+    Check that the remainder has the unit of every amount it gives.
+
+    The remainder takes what the calibrated amounts leave of the sum it
+    keeps, so a bin, prefix or compartment value must be in the unit of
+    the remainder; a category split has no unit.
+
+    Parameters
+    ----------
+    model : Model
+        The model the calibration runs on.
+    engine : EngineProtocol
+        The engine built from it.
+    problem : CalibrationProblem
+        The problem, for its parameters and remainder.
+
+    Raises
+    ------
+    ValueError
+        If a calibrated amount is in another unit than the remainder.
+    """
+    remainder = problem.initial_condition_remainder
+    if remainder is None:
+        return
+    parameters = [
+        param
+        for param in problem.parameters
+        if param.parameter_type == CalibrationParameterType.INITIAL_CONDITION
+    ]
+    covered, kept = engine_state.initial_condition_coverage(
+        engine, parameters, remainder
+    )
+    bin_of = {c.name: c.bin for c in self.initial_state(model.process)}
+
+    def unit(compartment: str) -> str | None:
+        bin_item = model.process.bin(bin_of[compartment])
+        return None if bin_item is None else bin_item.unit
+
+    remainder_unit = unit(kept[0])
+    for param, compartments in zip(parameters, covered, strict=True):
+        for compartment in compartments:
+            if unit(compartment) != remainder_unit:
+                raise ValueError(
+                    f"The initial-condition remainder '{remainder}' is in "
+                    f"{_unit_name(remainder_unit)}, but the calibrated "
+                    f"initial condition '{param.id}' sets '{compartment}', "
+                    f"in {_unit_name(unit(compartment))}. The remainder "
+                    f"keeps a sum of amounts of one unit: name a remainder "
+                    f"of the unit of '{param.id}'."
+                )
 ```
 
 #### with_calibrated_values
@@ -15385,7 +15568,7 @@ with_calibrated_values(model: Model[Self], problem: CalibrationProblem, values: 
 
 The structure with calibrated initial conditions written back.
 
-The written structure rebuilds the initial state the engine scored. Bin and category values update the fractions they declare. Every compartment those fractions do not reproduce, such as an exact compartment value or a value that overlaps a per-compartment override, is written as a per-compartment override.
+The written structure rebuilds the initial state the engine scored. Bin values update the amounts they declare, in the unit of the bin, and category values the splits. Every compartment those do not reproduce, such as an exact compartment value or a value that overlaps a per-compartment override, is written as a per-compartment override.
 
 Parameters:
 
@@ -15403,9 +15586,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                     |
-| ------------ | --------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If the engine cannot resolve an initial-condition id or the remainder, or the initial amounts exceed the total. |
+| Type         | Description                                                                                                          |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If the engine cannot resolve an initial-condition id or the remainder, or the values leave the remainder below zero. |
 
 Source code in `commol/context/aggregate.py`
 
@@ -15420,10 +15603,11 @@ def with_calibrated_values(
     The structure with calibrated initial conditions written back.
 
     The written structure rebuilds the initial state the engine
-    scored. Bin and category values update the fractions they declare.
-    Every compartment those fractions do not reproduce, such as an exact
-    compartment value or a value that overlaps a per-compartment override,
-    is written as a per-compartment override.
+    scored. Bin values update the amounts they declare, in the unit of
+    the bin, and category values the splits. Every compartment those do
+    not reproduce, such as an exact compartment value or a value that
+    overlaps a per-compartment override, is written as a per-compartment
+    override.
 
     Parameters
     ----------
@@ -15443,7 +15627,7 @@ def with_calibrated_values(
     ------
     ValueError
         If the engine cannot resolve an initial-condition id or the
-        remainder, or the initial amounts exceed the total.
+        remainder, or the values leave the remainder below zero.
     """
     from commol.context._model.calibration_write_back import (
         calibrated_structure,
@@ -15458,7 +15642,7 @@ def with_calibrated_values(
 report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statistics: Mapping[str, ParameterSummary] | None) -> ReportSections
 ```
 
-The `initial_conditions` section of a report of applied values.
+The `initial_amounts` and `category_splits` sections of a report.
 
 See :func:`commol.applied_parameters_report`.
 
@@ -15472,9 +15656,9 @@ Parameters:
 
 Returns:
 
-| Type             | Description                  |
-| ---------------- | ---------------------------- |
-| `ReportSections` | {"initial_conditions": ...}. |
+| Type             | Description                                       |
+| ---------------- | ------------------------------------------------- |
+| `ReportSections` | {"initial_amounts": ..., "category_splits": ...}. |
 
 Source code in `commol/context/aggregate.py`
 
@@ -15486,7 +15670,7 @@ def report_sections(
     parameter_statistics: "Mapping[str, ParameterSummary] | None",
 ) -> ReportSections:
     """
-    The ``initial_conditions`` section of a report of applied values.
+    The ``initial_amounts`` and ``category_splits`` sections of a report.
 
     See :func:`commol.applied_parameters_report`.
 
@@ -15502,14 +15686,20 @@ def report_sections(
     Returns
     -------
     ReportSections
-        ``{"initial_conditions": ...}``.
+        ``{"initial_amounts": ..., "category_splits": ...}``.
     """
-    from commol.context._model.report import initial_conditions_report
+    from commol.context._model.report import (
+        category_splits_report,
+        initial_amounts_report,
+    )
 
     return {
-        "initial_conditions": initial_conditions_report(
+        "initial_amounts": initial_amounts_report(
             model.process, self, calibrated_ids, parameter_statistics
-        )
+        ),
+        "category_splits": category_splits_report(
+            model.process, self, calibrated_ids, parameter_statistics
+        ),
     }
 ```
 
@@ -15521,7 +15711,7 @@ describe(model: Model[Self]) -> list[Section]
 
 The entities, dynamics, initialization and design concepts.
 
-`entities`: the bins, accumulators, stratifications and expanded compartments. `dynamics`: the state graphs, the compact and expanded forms of the equations the engine simulates, the impulses and the neighbors. `initialization`: the total, the fractions, the overrides and the initial state the engine builds. `design_concepts`: the interaction of the units, when the structure says who their neighbors are.
+`entities`: the bins, accumulators, stratifications and expanded compartments. `dynamics`: the state graphs, the compact and expanded forms of the equations the engine simulates, the impulses and the neighbors. `initialization`: the bin amounts, the category splits, the overrides and the initial state the engine builds. `design_concepts`: the interaction of the units, when the structure says who their neighbors are.
 
 Parameters:
 
@@ -15545,8 +15735,8 @@ def describe(self, model: "Model[Self]") -> "list[Section]":
     ``entities``: the bins, accumulators, stratifications and expanded
     compartments. ``dynamics``: the state graphs, the compact and expanded
     forms of the equations the engine simulates, the impulses and the
-    neighbors. ``initialization``: the total, the fractions, the overrides
-    and the initial state the engine builds. ``design_concepts``: the
+    neighbors. ``initialization``: the bin amounts, the category splits,
+    the overrides and the initial state the engine builds. ``design_concepts``: the
     interaction of the units, when the structure says who their neighbors
     are.
 
@@ -15583,39 +15773,39 @@ def check_unit_consistency(self, model: "Model[Self]", verbose: bool) -> None:
     UnitChecker(model).check_unit_consistency(verbose)
 ```
 
-#### update_compartment_fractions
+#### update_compartment_amounts
 
 ```python
-update_compartment_fractions(process: Process, fractions: Mapping[str, float]) -> None
+update_compartment_amounts(process: Process, amounts: Mapping[str, float]) -> None
 ```
 
 Upsert per-compartment initial condition overrides.
 
-A compartment already declared has its fraction replaced; a new one is appended. The engine validates the result against the expansion of the process before it is stored, so a rejected call leaves the structure unchanged.
+A compartment already declared has its amount replaced; a new one is appended. The engine validates the result against the expansion of the process before it is stored, so a rejected call leaves the structure unchanged.
 
 Parameters:
 
-| Name        | Type                  | Description                                                                       | Default    |
-| ----------- | --------------------- | --------------------------------------------------------------------------------- | ---------- |
-| `process`   | `Process`             | The process of the model, such as model.process.                                  | *required* |
-| `fractions` | `Mapping[str, float]` | Dictionary mapping expanded compartment names to their new fraction of the total. | *required* |
+| Name      | Type                  | Description                                                                                  | Default    |
+| --------- | --------------------- | -------------------------------------------------------------------------------------------- | ---------- |
+| `process` | `Process`             | The process of the model, such as model.process.                                             | *required* |
+| `amounts` | `Mapping[str, float]` | Dictionary mapping expanded compartment names to their new amount, in the unit of their bin. | *required* |
 
 Raises:
 
-| Type         | Description                                                                                                                                                   |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If a name is not an expanded compartment of the model, a value lies outside [0.0, 1.0], or the resulting overrides make the initial amounts exceed the total. |
+| Type         | Description                                                                                       |
+| ------------ | ------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a name is not an expanded compartment of the model, or an amount is not finite or is negative. |
 
 Source code in `commol/context/aggregate.py`
 
 ```python
-def update_compartment_fractions(
-    self, process: Process, fractions: Mapping[str, float]
+def update_compartment_amounts(
+    self, process: Process, amounts: Mapping[str, float]
 ) -> None:
     """
     Upsert per-compartment initial condition overrides.
 
-    A compartment already declared has its fraction replaced; a new one is
+    A compartment already declared has its amount replaced; a new one is
     appended. The engine validates the result against the expansion of
     the process before it is stored, so a rejected call leaves the
     structure unchanged.
@@ -15624,21 +15814,20 @@ def update_compartment_fractions(
     ----------
     process : Process
         The process of the model, such as ``model.process``.
-    fractions : Mapping[str, float]
-        Dictionary mapping expanded compartment names to their new fraction
-        of the total.
+    amounts : Mapping[str, float]
+        Dictionary mapping expanded compartment names to their new
+        amount, in the unit of their bin.
 
     Raises
     ------
     ValueError
-        If a name is not an expanded compartment of the model, a value lies
-        outside ``[0.0, 1.0]``, or the resulting overrides make the initial
-        amounts exceed the total.
+        If a name is not an expanded compartment of the model, or an
+        amount is not finite or is negative.
     """
     candidate = self.model_copy(deep=True)
-    candidate._upsert_compartment_fractions(fractions)
+    candidate._upsert_compartment_amounts(amounts)
     engine_state.initial_state(process, candidate)
-    self.compartment_fractions = candidate.compartment_fractions
+    self.compartment_amounts = candidate.compartment_amounts
 ```
 
 #### initial_state
@@ -15649,7 +15838,7 @@ initial_state(process: Process) -> list[InitialCompartment]
 
 Expanded compartments and the amount each one starts with.
 
-The engine builds this state from the bin fractions, the stratification fractions and the per-compartment overrides; it is the state a simulation starts from.
+The engine builds this state from the bin amounts, the stratification fractions and the per-compartment overrides; it is the state a simulation starts from.
 
 Parameters:
 
@@ -15665,9 +15854,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                       |
-| ------------ | ----------------------------------------------------------------- |
-| `ValueError` | If the per-compartment overrides are not valid for the structure. |
+| Type         | Description                                                                     |
+| ------------ | ------------------------------------------------------------------------------- |
+| `ValueError` | If an amount is not valid or an override names no compartment of the structure. |
 
 Source code in `commol/context/aggregate.py`
 
@@ -15676,7 +15865,7 @@ def initial_state(self, process: Process) -> list[InitialCompartment]:
     """
     Expanded compartments and the amount each one starts with.
 
-    The engine builds this state from the bin fractions, the stratification
+    The engine builds this state from the bin amounts, the stratification
     fractions and the per-compartment overrides; it is the state a
     simulation starts from.
 
@@ -15693,7 +15882,8 @@ def initial_state(self, process: Process) -> list[InitialCompartment]:
     Raises
     ------
     ValueError
-        If the per-compartment overrides are not valid for the structure.
+        If an amount is not valid or an override names no compartment of
+        the structure.
     """
     return engine_state.initial_state(process, self)
 ```
@@ -15780,16 +15970,16 @@ def get_conditioning_categories(
 subgroup_total(process: Process, categories: Iterable[str] = ()) -> float
 ```
 
-Get the initial total of a subgroup.
+Get the initial sum of the compartments of a subgroup.
 
-Category fractions are relative to the group their stratification applies to, so the fractions of a nested chain of categories multiply: `total × fraction(g1) × fraction(t1)`. Passing no categories gives the total. Per-compartment overrides are folded into the sum for every compartment the category chain selects, so the result matches the state the engine builds.
+The sum is taken of the state the engine builds, overrides included, over every compartment that has each of the categories. Passing no categories gives the sum of every compartment. It adds every bin it covers, so over bins of different units it has no unit.
 
 Parameters:
 
-| Name         | Type            | Description                                                                                                             | Default    |
-| ------------ | --------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `process`    | `Process`       | The process of the model, such as model.process.                                                                        | *required* |
-| `categories` | `Iterable[str]` | Category ids, bare or qualified (group:g1), forming a chain from the whole model down to the subgroup, outermost first. | `()`       |
+| Name         | Type            | Description                                      | Default    |
+| ------------ | --------------- | ------------------------------------------------ | ---------- |
+| `process`    | `Process`       | The process of the model, such as model.process. | *required* |
+| `categories` | `Iterable[str]` | Category ids, bare or qualified (group:g1).      | `()`       |
 
 Returns:
 
@@ -15808,22 +15998,19 @@ Source code in `commol/context/aggregate.py`
 ```python
 def subgroup_total(self, process: Process, categories: Iterable[str] = ()) -> float:
     """
-    Get the initial total of a subgroup.
+    Get the initial sum of the compartments of a subgroup.
 
-    Category fractions are relative to the group their stratification
-    applies to, so the fractions of a nested chain of categories multiply:
-    ``total × fraction(g1) × fraction(t1)``. Passing no categories gives
-    the total. Per-compartment overrides are folded into the sum for every
-    compartment the category chain selects, so the result matches the
-    state the engine builds.
+    The sum is taken of the state the engine builds, overrides included,
+    over every compartment that has each of the categories. Passing no
+    categories gives the sum of every compartment. It adds every bin it
+    covers, so over bins of different units it has no unit.
 
     Parameters
     ----------
     process : Process
         The process of the model, such as ``model.process``.
     categories : Iterable[str], optional
-        Category ids, bare or qualified (``group:g1``), forming a chain
-        from the whole model down to the subgroup, outermost first.
+        Category ids, bare or qualified (``group:g1``).
 
     Returns
     -------
@@ -15835,10 +16022,7 @@ def subgroup_total(self, process: Process, categories: Iterable[str] = ()) -> fl
     ValueError
         If a category is not found or a bare name is ambiguous.
     """
-    selected = tuple(categories)
-    if not self.compartment_fractions:
-        return self._fraction_subgroup_total(selected)
-    resolved = [self.resolve_category(c) for c in selected]
+    resolved = [self.resolve_category(c) for c in categories]
     return sum(
         compartment.amount
         for compartment in self.initial_state(process)
@@ -18513,13 +18697,13 @@ applied_parameters_report(model: Model, result: CalibrationResult | Mapping[str,
 
 Report every parameter of a calibrated model, and the values of its kind.
 
-Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); an aggregate model adds `initial_conditions`.
+Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); an aggregate model adds `initial_amounts` and `category_splits`.
 
 Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` parameters have no place in the model, so they are reported from `problem` when it is given.
 
-Initial conditions of an aggregate model carry the effective `value` the engine builds from the uniform expansion plus the declared compartment overrides, its `fraction` as that value over the declared total, and the `group` it belongs to: `total` for bins and unconditional stratifications, and the conditioning categories for a conditional one. The `total` row is the declared total, with fraction 1.0. A bin left uncalibrated keeps a `None` fraction and `None` value as its "needs calibration" marker even when overrides touch some of its compartments.
+`initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin.
 
-With a `sample` each entry gains an `interval` holding the weighted statistics of its draws (`ParameterSample.summary`). A parameter is in the unit it was calibrated in. An initial-condition entry is in the fraction the row reports: a conditional stratification's category is calibrated as a group fraction but reported over the total, so its interval is rescaled by the group's share of the total and brackets the reported fraction.
+With a `sample` each entry gains an `interval` holding the weighted statistics of its draws (`ParameterSample.summary`). Every entry is in the unit it was calibrated in: a parameter in its own, an amount in the unit of its bin, and a category split as a fraction of its group.
 
 Parameters:
 
@@ -18533,9 +18717,9 @@ Parameters:
 
 Returns:
 
-| Type                      | Description                                                                                                                              |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `AppliedParametersReport` | Key parameters and the sections of the kind (initial_conditions for an aggregate model), preceded by confidence_level when there is one. |
+| Type                      | Description                                                                                                                                               |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AppliedParametersReport` | Key parameters and the sections of the kind (initial_amounts and category_splits for an aggregate model), preceded by confidence_level when there is one. |
 
 Raises:
 
@@ -18560,30 +18744,26 @@ def applied_parameters_report(
     it, so entries the calibration left alone appear alongside the fitted ones.
     The structure of the model adds the sections of its kind
     (`ModelStructure.report_sections`); an aggregate model adds
-    ``initial_conditions``.
+    ``initial_amounts`` and ``category_splits``.
 
     Parameters that are not a single number, such as a formula or a
     series, are omitted: they are inputs rather than fitted values.
     ``factor`` parameters have no place in the model, so they are reported from
     `problem` when it is given.
 
-    Initial conditions of an aggregate model carry the effective
-    ``value`` the engine builds
-    from the uniform expansion plus the declared compartment overrides, its
-    ``fraction`` as that value over the declared total, and the
-    ``group`` it belongs to: ``total`` for bins and unconditional
-    stratifications, and the conditioning categories for a conditional one.
-    The ``total`` row is the declared total, with fraction 1.0. A bin left
-    uncalibrated keeps a ``None`` fraction and ``None`` value as its "needs
-    calibration" marker even when overrides touch some of its compartments.
+    ``initial_amounts`` gives each bin and each overridden compartment of an
+    aggregate model its ``amount`` the engine builds and the ``unit`` of its
+    bin, so bins of different units are reported side by side; no row is a
+    share of a total. A bin left uncalibrated keeps a ``None`` amount as its
+    "needs calibration" marker even when overrides touch some of its
+    compartments. ``category_splits`` gives each category its ``fraction`` of
+    the group it splits, and that ``group``: the categories a conditional
+    stratification is conditioned on, empty when it splits every bin.
 
     With a `sample` each entry gains an ``interval`` holding the weighted
-    statistics of its draws (`ParameterSample.summary`). A parameter is in
-    the unit it was calibrated in. An
-    initial-condition entry is in the fraction the row reports: a conditional
-    stratification's category is calibrated as a group fraction but reported
-    over the total, so its interval is rescaled by the group's share of the
-    total and brackets the reported fraction.
+    statistics of its draws (`ParameterSample.summary`). Every entry is in
+    the unit it was calibrated in: a parameter in its own, an amount in the
+    unit of its bin, and a category split as a fraction of its group.
 
     Parameters
     ----------
@@ -18602,9 +18782,9 @@ def applied_parameters_report(
     Returns
     -------
     AppliedParametersReport
-        Key ``parameters`` and the sections of the kind (``initial_conditions``
-        for an aggregate model), preceded by ``confidence_level`` when there
-        is one.
+        Key ``parameters`` and the sections of the kind (``initial_amounts``
+        and ``category_splits`` for an aggregate model), preceded by
+        ``confidence_level`` when there is one.
 
     Raises
     ------
@@ -26149,10 +26329,9 @@ Model                      name, description, version, step_unit
 │       └── stratified_rates: [StratifiedRate]
 │           └── conditions: [StratificationCondition]
 └── structure: Aggregate                   (kind: "aggregate", variant: None)
-    ├── total: float
-    ├── bin_fractions: {bin: fraction | None}
+    ├── bin_amounts: {bin: amount | None}          (in the unit of the bin)
     ├── stratification_fractions: {stratification: {category: fraction}}
-    ├── compartment_fractions: {compartment: fraction}
+    ├── compartment_amounts: {compartment: amount}
     └── neighbors: Complete | Groups | None
 ```
 
@@ -26167,10 +26346,9 @@ In JSON the structure is an object with its `kind`, its `variant` and the fields
   "structure": {
     "kind": "aggregate",
     "variant": null,
-    "total": 1000.0,
-    "bin_fractions": {"A": 0.99, "B": 0.01},
+    "bin_amounts": {"A": 990.0, "B": 10.0},
     "stratification_fractions": {},
-    "compartment_fractions": {},
+    "compartment_amounts": {},
     "neighbors": null
   },
   "step_unit": null
@@ -27262,164 +27440,117 @@ def check_settings(self) -> Self:
 
 Bases: `BaseModel`
 
-How much starts where: the total and the fractions of it.
+How much starts where: the amount of each bin and the split of it.
 
-`Aggregate` holds these fields and their methods; the checks against the bins and the stratifications of the process are in `Aggregate.check_model`.
+Every amount is in the unit of its bin, so bins of different units, such as people and a concentration, start without a total over them. `Aggregate` holds these fields and their methods; the checks against the bins and the stratifications of the process are in `Aggregate.check_model`.
 
 Attributes:
 
-| Name                       | Type                          | Description                                                                                                                                 |
-| -------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `total`                    | `float`                       | The sum of every compartment at the start, finite and greater than 0. It can be a count, a mass or a concentration.                         |
-| `bin_fractions`            | \`dict\[str, float            | None\]\`                                                                                                                                    |
-| `stratification_fractions` | `dict[str, dict[str, float]]` | The fraction of each category, by stratification id and category. A conditional stratification splits only the group its conditions select. |
-| `compartment_fractions`    | `dict[str, float]`            | Fractions of the total in single expanded compartments, by compartment name, applied after the expansion.                                   |
+| Name                       | Type                          | Description                                                                                                                                                                                                     |
+| -------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bin_amounts`              | \`dict\[str, float            | None\]\`                                                                                                                                                                                                        |
+| `stratification_fractions` | `dict[str, dict[str, float]]` | The fraction of each category, by stratification id and category: the split of the amount of every bin the stratification applies to. A conditional stratification splits only the group its conditions select. |
+| `compartment_amounts`      | `dict[str, float]`            | Amounts of single expanded compartments, by compartment name, applied after the expansion.                                                                                                                      |
 
 Source code in `commol/context/initial_conditions.py`
 
 ```python
 class InitialConditions(BaseModel):
     """
-    How much starts where: the total and the fractions of it.
+    How much starts where: the amount of each bin and the split of it.
 
+    Every amount is in the unit of its bin, so bins of different units, such
+    as people and a concentration, start without a total over them.
     `Aggregate` holds these fields and their methods; the checks against the
     bins and the stratifications of the process are in
     `Aggregate.check_model`.
 
     Attributes
     ----------
-    total : float
-        The sum of every compartment at the start, finite and greater than 0.
-        It can be a count, a mass or a concentration.
-    bin_fractions : dict[str, float | None]
-        The fraction of the total in each bin, by bin id. None leaves a
-        fraction for calibration.
+    bin_amounts : dict[str, float | None]
+        The amount of each bin at the start, by bin id, in the unit of the
+        bin; finite and not negative. None leaves an amount for calibration.
     stratification_fractions : dict[str, dict[str, float]]
-        The fraction of each category, by stratification id and category.
-        A conditional stratification splits only the group its conditions
+        The fraction of each category, by stratification id and category: the
+        split of the amount of every bin the stratification applies to. A
+        conditional stratification splits only the group its conditions
         select.
-    compartment_fractions : dict[str, float]
-        Fractions of the total in single expanded compartments, by compartment
-        name, applied after the expansion.
+    compartment_amounts : dict[str, float]
+        Amounts of single expanded compartments, by compartment name, applied
+        after the expansion.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    total: float = Field(
-        ...,
-        description="The sum of every compartment at the start, finite and > 0.",
-    )
-    bin_fractions: dict[str, float | None] = Field(
+    bin_amounts: dict[str, float | None] = Field(
         ...,
         description=(
-            "The fraction of the total in each bin, by bin id. None leaves a "
-            "fraction for calibration."
+            "The amount of each bin, by bin id, in the unit of the bin. None "
+            "leaves an amount for calibration."
         ),
     )
     stratification_fractions: dict[str, dict[str, float]] = Field(
         default_factory=dict,
         description="The fraction of each category, by stratification id.",
     )
-    compartment_fractions: dict[str, float] = Field(
+    compartment_amounts: dict[str, float] = Field(
         default_factory=dict,
         description=(
-            "Fractions of the total in single expanded compartments, applied "
-            "after the expansion."
+            "Amounts of single expanded compartments, applied after the expansion."
         ),
     )
 
-    @field_validator("total")
+    @model_validator(mode="before")
     @classmethod
-    def validate_total(cls, value: float) -> float:
-        """Enforce a finite total greater than 0.
+    def reject_fractions_of_a_total(cls, data: Any) -> Any:
+        """Name the field of amounts that replaces a field of fractions.
 
-        Every fraction of a zero total is zero, and the report divides by the
-        total, so a zero, negative or non-finite total is rejected as a domain
-        error.
+        A total over bins of different units has no meaning, so the initial
+        state is stated as amounts, and a structure with ``total``,
+        ``bin_fractions`` or ``compartment_fractions`` is rejected with the
+        field to use.
         """
-        if not math.isfinite(value) or value <= 0:
-            raise ValueError(f"total must be finite and greater than 0, got {value}.")
-        return value
-
-    @field_validator("compartment_fractions")
-    @classmethod
-    def validate_compartment_fraction_range(
-        cls, value: dict[str, float]
-    ) -> dict[str, float]:
-        """Enforce that every compartment fraction lies within ``[0.0, 1.0]``."""
-        for compartment, fraction in value.items():
-            _check_fraction(f"compartment '{compartment}'", fraction)
-        return value
-
-    @staticmethod
-    def _validate_bin_fraction_total(candidate: Mapping[str, float | None]) -> None:
-        """
-        Enforce the bin-fraction conservation rule on a complete mapping.
-
-        Uncalibrated (``None``) fractions floor the calibrated total strictly
-        below 1.0 so they can be filled later. When every bin is calibrated,
-        the fractions must sum to 1.0, because they are shares of a single
-        total. Construction and updates apply the same rule, so an update
-        never produces a definition that cannot be loaded again.
-
-        Parameters
-        ----------
-        candidate : Mapping[str, float | None]
-            Fraction of every bin.
-
-        Raises
-        ------
-        ValueError
-            If the fractions break the rule.
-        """
-        calibrated = [value for value in candidate.values() if value is not None]
-        if not calibrated:
-            return
-        total = sum(calibrated)
-        uncalibrated = sum(1 for value in candidate.values() if value is None)
-
-        if uncalibrated > 0:
-            if total >= 1.0:
+        if isinstance(data, Mapping):
+            stated = [field for field in _FRACTION_FIELDS if field in data]
+            if stated:
+                replacements = sorted({_FRACTION_FIELDS[field] for field in stated})
                 raise ValueError(
-                    f"Calibrated bin fractions sum to {total:.4f}, but must be "
-                    f"LESS than 1.0 to leave room for {uncalibrated} "
-                    f"uncalibrated fraction(s). Calibrated fractions: "
-                    f"{[item for item in candidate.items() if item[1] is not None]}"
+                    f"An aggregate structure states the amount of each bin in "
+                    f"the unit of the bin, not fractions of a total: replace "
+                    f"{', '.join(stated)} with {' and '.join(replacements)}, "
+                    f'such as bin_amounts={{"A": 990, "B": 10, "C": 0}}.'
                 )
-        elif not math.isclose(total, 1.0, abs_tol=1e-4):
-            raise ValueError(
-                f"Bin fractions must sum to 1.0, got {total:.4f}. "
-                f"Fractions: {list(candidate.values())}"
-            )
+        return data
 
-    @model_validator(mode="after")
-    def validate_calibrated_fractions_sum_to_one(self) -> Self:
-        """
-        Validate that bin fractions sum appropriately.
+    @field_validator("bin_amounts")
+    @classmethod
+    def validate_bin_amounts(
+        cls, value: dict[str, float | None]
+    ) -> dict[str, float | None]:
+        """Enforce that every bin amount is finite and not negative."""
+        for bin_id, amount in value.items():
+            if amount is not None:
+                _check_amount(f"bin '{bin_id}'", amount)
+        return value
 
-        Rules:
-        - If some fractions are None (uncalibrated): calibrated ones must sum to LESS
-            than 1.0
-        - If all fractions are calibrated (no None): must sum to exactly 1.0
-        - If all fractions are None: skip validation (will be set before simulation)
-        """
-        self._validate_bin_fraction_total(self.bin_fractions)
-        return self
+    @field_validator("compartment_amounts")
+    @classmethod
+    def validate_compartment_amounts(cls, value: dict[str, float]) -> dict[str, float]:
+        """Enforce that every compartment amount is finite and not negative."""
+        for compartment, amount in value.items():
+            _check_amount(f"compartment '{compartment}'", amount)
+        return value
 
     def get_uncalibrated_bins(self) -> list[str]:
         """
-        Get list of bin IDs that have uncalibrated fractions (value = None).
+        Get list of bin IDs that have uncalibrated amounts (value = None).
 
         Returns
         -------
         list[str]
             List of bin IDs with uncalibrated initial conditions.
         """
-        return [
-            bin_id
-            for bin_id, fraction in self.bin_fractions.items()
-            if fraction is None
-        ]
+        return [bin_id for bin_id, amount in self.bin_amounts.items() if amount is None]
 
     def get_categories_with_fractions(self) -> set[str]:
         """
@@ -27530,20 +27661,6 @@ class InitialConditions(BaseModel):
         stratification, name = self.resolve_category(category)
         return self.stratification_fractions[stratification][name]
 
-    def _fraction_subgroup_total(self, categories: Iterable[str] = ()) -> float:
-        """
-        Get the initial total of a subgroup from the fractions alone.
-
-        Category fractions are relative to the group their stratification
-        applies to, so the fractions of a nested chain of categories multiply.
-        Passing no categories gives the total. Per-compartment overrides are
-        not included; `Aggregate.subgroup_total` includes them.
-        """
-        total = self.total
-        for category in categories:
-            total *= self.get_category_fraction(category)
-        return total
-
     def _apply_stratification_update(
         self, stratification: str, named: Mapping[str, float]
     ) -> None:
@@ -27612,141 +27729,136 @@ class InitialConditions(BaseModel):
         for stratification, named in by_stratification.items():
             self._apply_stratification_update(stratification, named)
 
-    def _upsert_compartment_fractions(self, fractions: Mapping[str, float]) -> None:
+    def _upsert_compartment_amounts(self, amounts: Mapping[str, float]) -> None:
         """
         Upsert per-compartment overrides by expanded compartment name.
 
-        A compartment already present in ``compartment_fractions`` has its
-        fraction replaced; a new one is appended. Compartment names and the
-        sum of the amounts depend on the expansion of the process, so
-        :meth:`~commol.context.aggregate.Aggregate.update_compartment_fractions`
+        A compartment already present in ``compartment_amounts`` has its
+        amount replaced; a new one is appended. Compartment names depend on
+        the expansion of the process, so
+        :meth:`~commol.context.aggregate.Aggregate.update_compartment_amounts`
         validates them against the engine, not here.
 
         Raises
         ------
         ValueError
-            If a value lies outside ``[0.0, 1.0]``.
+            If an amount is not finite or is negative.
         """
-        for compartment, value in fractions.items():
-            _check_fraction(f"compartment '{compartment}'", value)
-        self.compartment_fractions.update(fractions)
+        for compartment, amount in amounts.items():
+            _check_amount(f"compartment '{compartment}'", amount)
+        self.compartment_amounts.update(amounts)
 
-    def update_bin_fractions(self, fractions: Mapping[str, float | None]) -> None:
+    def update_bin_amounts(self, amounts: Mapping[str, float | None]) -> None:
         """
-        Update bin fractions by bin ID.
+        Update bin amounts by bin ID.
 
-        The candidate fractions are validated before any bin is mutated, so a
-        rejected call leaves the initial conditions unchanged. The conservation
-        rule of :meth:`validate_calibrated_fractions_sum_to_one` is re-applied
-        to the resulting mapping: the bin fractions must sum to 1.0, while
-        uncalibrated (``None``) bins reserve the remainder. To move an amount
-        between bins, update every bin involved in one call.
+        Every amount is checked before any bin changes, so a rejected call
+        leaves the initial conditions unchanged. The bins of one unit keep no
+        sum: to move an amount between bins, update every bin involved.
 
         Parameters
         ----------
-        fractions : Mapping[str, float | None]
-            Dictionary mapping bin IDs to their new fraction values.
-            None values indicate bins that need calibration.
+        amounts : Mapping[str, float | None]
+            Dictionary mapping bin IDs to their new amount, in the unit of the
+            bin. None marks a bin that needs calibration.
 
         Raises
         ------
         ValueError
-            If a bin ID is not found in the initial conditions, or the
-            resulting fractions violate the conservation rule.
+            If a bin ID is not found in the initial conditions, or an amount
+            is not finite or is negative.
         """
-        unknown = sorted(set(fractions) - set(self.bin_fractions))
+        unknown = sorted(set(amounts) - set(self.bin_amounts))
         if unknown:
             raise ValueError(
                 f"Bin(s) {unknown} not found in initial conditions. "
-                f"Available bins: {list(self.bin_fractions)}"
+                f"Available bins: {list(self.bin_amounts)}"
             )
-
-        candidate = {**self.bin_fractions, **fractions}
-        self._validate_bin_fraction_total(candidate)
-        self.bin_fractions.update(fractions)
+        for bin_id, amount in amounts.items():
+            if amount is not None:
+                _check_amount(f"bin '{bin_id}'", amount)
+        self.bin_amounts.update(amounts)
 ```
 
 ### Methods:
 
-#### validate_total
+#### reject_fractions_of_a_total
 
 ```python
-validate_total(value: float) -> float
+reject_fractions_of_a_total(data: Any) -> Any
 ```
 
-Enforce a finite total greater than 0.
+Name the field of amounts that replaces a field of fractions.
 
-Every fraction of a zero total is zero, and the report divides by the total, so a zero, negative or non-finite total is rejected as a domain error.
+A total over bins of different units has no meaning, so the initial state is stated as amounts, and a structure with `total`, `bin_fractions` or `compartment_fractions` is rejected with the field to use.
 
 Source code in `commol/context/initial_conditions.py`
 
 ```python
-@field_validator("total")
+@model_validator(mode="before")
 @classmethod
-def validate_total(cls, value: float) -> float:
-    """Enforce a finite total greater than 0.
+def reject_fractions_of_a_total(cls, data: Any) -> Any:
+    """Name the field of amounts that replaces a field of fractions.
 
-    Every fraction of a zero total is zero, and the report divides by the
-    total, so a zero, negative or non-finite total is rejected as a domain
-    error.
+    A total over bins of different units has no meaning, so the initial
+    state is stated as amounts, and a structure with ``total``,
+    ``bin_fractions`` or ``compartment_fractions`` is rejected with the
+    field to use.
     """
-    if not math.isfinite(value) or value <= 0:
-        raise ValueError(f"total must be finite and greater than 0, got {value}.")
+    if isinstance(data, Mapping):
+        stated = [field for field in _FRACTION_FIELDS if field in data]
+        if stated:
+            replacements = sorted({_FRACTION_FIELDS[field] for field in stated})
+            raise ValueError(
+                f"An aggregate structure states the amount of each bin in "
+                f"the unit of the bin, not fractions of a total: replace "
+                f"{', '.join(stated)} with {' and '.join(replacements)}, "
+                f'such as bin_amounts={{"A": 990, "B": 10, "C": 0}}.'
+            )
+    return data
+```
+
+#### validate_bin_amounts
+
+```python
+validate_bin_amounts(value: dict[str, float | None]) -> dict[str, float | None]
+```
+
+Enforce that every bin amount is finite and not negative.
+
+Source code in `commol/context/initial_conditions.py`
+
+```python
+@field_validator("bin_amounts")
+@classmethod
+def validate_bin_amounts(
+    cls, value: dict[str, float | None]
+) -> dict[str, float | None]:
+    """Enforce that every bin amount is finite and not negative."""
+    for bin_id, amount in value.items():
+        if amount is not None:
+            _check_amount(f"bin '{bin_id}'", amount)
     return value
 ```
 
-#### validate_compartment_fraction_range
+#### validate_compartment_amounts
 
 ```python
-validate_compartment_fraction_range(value: dict[str, float]) -> dict[str, float]
+validate_compartment_amounts(value: dict[str, float]) -> dict[str, float]
 ```
 
-Enforce that every compartment fraction lies within `[0.0, 1.0]`.
+Enforce that every compartment amount is finite and not negative.
 
 Source code in `commol/context/initial_conditions.py`
 
 ```python
-@field_validator("compartment_fractions")
+@field_validator("compartment_amounts")
 @classmethod
-def validate_compartment_fraction_range(
-    cls, value: dict[str, float]
-) -> dict[str, float]:
-    """Enforce that every compartment fraction lies within ``[0.0, 1.0]``."""
-    for compartment, fraction in value.items():
-        _check_fraction(f"compartment '{compartment}'", fraction)
+def validate_compartment_amounts(cls, value: dict[str, float]) -> dict[str, float]:
+    """Enforce that every compartment amount is finite and not negative."""
+    for compartment, amount in value.items():
+        _check_amount(f"compartment '{compartment}'", amount)
     return value
-```
-
-#### validate_calibrated_fractions_sum_to_one
-
-```python
-validate_calibrated_fractions_sum_to_one() -> Self
-```
-
-Validate that bin fractions sum appropriately.
-
-Rules:
-
-- If some fractions are None (uncalibrated): calibrated ones must sum to LESS than 1.0
-- If all fractions are calibrated (no None): must sum to exactly 1.0
-- If all fractions are None: skip validation (will be set before simulation)
-
-Source code in `commol/context/initial_conditions.py`
-
-```python
-@model_validator(mode="after")
-def validate_calibrated_fractions_sum_to_one(self) -> Self:
-    """
-    Validate that bin fractions sum appropriately.
-
-    Rules:
-    - If some fractions are None (uncalibrated): calibrated ones must sum to LESS
-        than 1.0
-    - If all fractions are calibrated (no None): must sum to exactly 1.0
-    - If all fractions are None: skip validation (will be set before simulation)
-    """
-    self._validate_bin_fraction_total(self.bin_fractions)
-    return self
 ```
 
 #### get_uncalibrated_bins
@@ -27755,7 +27867,7 @@ def validate_calibrated_fractions_sum_to_one(self) -> Self:
 get_uncalibrated_bins() -> list[str]
 ```
 
-Get list of bin IDs that have uncalibrated fractions (value = None).
+Get list of bin IDs that have uncalibrated amounts (value = None).
 
 Returns:
 
@@ -27768,18 +27880,14 @@ Source code in `commol/context/initial_conditions.py`
 ```python
 def get_uncalibrated_bins(self) -> list[str]:
     """
-    Get list of bin IDs that have uncalibrated fractions (value = None).
+    Get list of bin IDs that have uncalibrated amounts (value = None).
 
     Returns
     -------
     list[str]
         List of bin IDs with uncalibrated initial conditions.
     """
-    return [
-        bin_id
-        for bin_id, fraction in self.bin_fractions.items()
-        if fraction is None
-    ]
+    return [bin_id for bin_id, amount in self.bin_amounts.items() if amount is None]
 ```
 
 #### get_categories_with_fractions
@@ -28059,64 +28167,61 @@ def update_stratification_fractions(self, fractions: Mapping[str, float]) -> Non
         self._apply_stratification_update(stratification, named)
 ```
 
-#### update_bin_fractions
+#### update_bin_amounts
 
 ```python
-update_bin_fractions(fractions: Mapping[str, float | None]) -> None
+update_bin_amounts(amounts: Mapping[str, float | None]) -> None
 ```
 
-Update bin fractions by bin ID.
+Update bin amounts by bin ID.
 
-The candidate fractions are validated before any bin is mutated, so a rejected call leaves the initial conditions unchanged. The conservation rule of :meth:`validate_calibrated_fractions_sum_to_one` is re-applied to the resulting mapping: the bin fractions must sum to 1.0, while uncalibrated (`None`) bins reserve the remainder. To move an amount between bins, update every bin involved in one call.
+Every amount is checked before any bin changes, so a rejected call leaves the initial conditions unchanged. The bins of one unit keep no sum: to move an amount between bins, update every bin involved.
 
 Parameters:
 
-| Name        | Type                  | Description | Default                                                                                                   |
-| ----------- | --------------------- | ----------- | --------------------------------------------------------------------------------------------------------- |
-| `fractions` | \`Mapping\[str, float | None\]\`    | Dictionary mapping bin IDs to their new fraction values. None values indicate bins that need calibration. |
+| Name      | Type                  | Description | Default                                                                                                          |
+| --------- | --------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------- |
+| `amounts` | \`Mapping\[str, float | None\]\`    | Dictionary mapping bin IDs to their new amount, in the unit of the bin. None marks a bin that needs calibration. |
 
 Raises:
 
-| Type         | Description                                                                                                   |
-| ------------ | ------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If a bin ID is not found in the initial conditions, or the resulting fractions violate the conservation rule. |
+| Type         | Description                                                                                    |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| `ValueError` | If a bin ID is not found in the initial conditions, or an amount is not finite or is negative. |
 
 Source code in `commol/context/initial_conditions.py`
 
 ```python
-def update_bin_fractions(self, fractions: Mapping[str, float | None]) -> None:
+def update_bin_amounts(self, amounts: Mapping[str, float | None]) -> None:
     """
-    Update bin fractions by bin ID.
+    Update bin amounts by bin ID.
 
-    The candidate fractions are validated before any bin is mutated, so a
-    rejected call leaves the initial conditions unchanged. The conservation
-    rule of :meth:`validate_calibrated_fractions_sum_to_one` is re-applied
-    to the resulting mapping: the bin fractions must sum to 1.0, while
-    uncalibrated (``None``) bins reserve the remainder. To move an amount
-    between bins, update every bin involved in one call.
+    Every amount is checked before any bin changes, so a rejected call
+    leaves the initial conditions unchanged. The bins of one unit keep no
+    sum: to move an amount between bins, update every bin involved.
 
     Parameters
     ----------
-    fractions : Mapping[str, float | None]
-        Dictionary mapping bin IDs to their new fraction values.
-        None values indicate bins that need calibration.
+    amounts : Mapping[str, float | None]
+        Dictionary mapping bin IDs to their new amount, in the unit of the
+        bin. None marks a bin that needs calibration.
 
     Raises
     ------
     ValueError
-        If a bin ID is not found in the initial conditions, or the
-        resulting fractions violate the conservation rule.
+        If a bin ID is not found in the initial conditions, or an amount
+        is not finite or is negative.
     """
-    unknown = sorted(set(fractions) - set(self.bin_fractions))
+    unknown = sorted(set(amounts) - set(self.bin_amounts))
     if unknown:
         raise ValueError(
             f"Bin(s) {unknown} not found in initial conditions. "
-            f"Available bins: {list(self.bin_fractions)}"
+            f"Available bins: {list(self.bin_amounts)}"
         )
-
-    candidate = {**self.bin_fractions, **fractions}
-    self._validate_bin_fraction_total(candidate)
-    self.bin_fractions.update(fractions)
+    for bin_id, amount in amounts.items():
+        if amount is not None:
+            _check_amount(f"bin '{bin_id}'", amount)
+    self.bin_amounts.update(amounts)
 ```
 # Changelog
 
@@ -28139,6 +28244,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `SampleIdentifiability(reference="prior", priors=...)`: the contraction of each parameter against its prior. See [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample).
 - Conformal prediction intervals through `Calibrator.uncertainty`: intervals for observations with a coverage guarantee that needs no noise model, no prior and no correct model. `SplitConformal` scores held-out observations; `RollingConformal` gives intervals ahead of the data, one quantile per horizon (the `k`-th observation after an origin); `JackknifePlus` refits once per block left out, with the CV+ bound for blocks of more than one observation; `EnbPI` draws its own replicates of blocks for series with dependent errors; `AdaptiveConformal` walks a stream of new observations with a working level that moves with each miss. Each takes a required `score` (`"absolute"`, `"normalized"` or `"spread"`), `by` (`"series"` or `"all"`) and `level`, and returns a `ConformalResult` (`PredictionIntervals`, the scores and the guarantee). See [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md).
 - `SimulationPlotter.plot_series(prediction_intervals=...)` draws the band of conformal intervals, and `simulation_report(..., prediction_intervals=...)` reports them.
+- A model can hold bins of different units, such as people and the concentration of bacteria in water: each bin starts at an amount in its own unit, a model whose bins all start at `0` builds and runs, and the `Calibrator` rejects an initial-condition remainder whose unit is not the unit of a calibrated amount. See [Bins of different units](https://munqu.github.io/commol/latest/guide/building-models/#bins-of-different-units).
+
+### Changed
+
+- **Breaking:** an `Aggregate` states the initial amount of each bin in the unit of the bin, not fractions of one total. A structure that states `total`, `bin_fractions` or `compartment_fractions` is rejected with the fields to use.
+
+| Before                                                        | Now                                                                                 |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `Aggregate(total=1000, bin_fractions={"S": 0.99, "I": 0.01})` | `Aggregate(bin_amounts={"S": 990, "I": 10})`                                        |
+| `compartment_fractions={"I_g1": 0.005}` (of the total)        | `compartment_amounts={"I_g1": 5}` (in the unit of its bin)                          |
+| `model.structure.total`                                       | No declared total: `sum(model.structure.bin_amounts.values())` for bins of one unit |
+| `update_bin_fractions({...})`, which kept the sum at 1        | `update_bin_amounts({...})`; the other bins keep their amounts                      |
+| `update_compartment_fractions(process, {...})`                | `update_compartment_amounts(process, {...})`                                        |
+| `stratification_fractions`                                    | Unchanged: the split of the amount of every bin a stratification applies to         |
+
+- **Breaking:** a calibrated initial condition of a bin, a bin prefix or a compartment is an amount in the unit of its bin, not a fraction of the total; its bounds are amounts too. A category value is still a split. The remainder takes the sum of the amounts the model states less every other compartment, so a bin that no value covers keeps its amount; with a bin left `None`, the remainder holds the sum (`{"S": 1000, "I": None}`). Without a remainder no initial state is infeasible. A remainder below zero is measured as a share of the amounts the values set. The write-back updates the amount of a bin only when the values and the remainder set every compartment of it.
+- **Breaking:** `applied_parameters_report` gives an aggregate model the sections `initial_amounts` (`amount`, `unit`, `calibrated`) and `category_splits` (`group`, a list of categories, `fraction`, `calibrated`) in place of `initial_conditions`, with no `total` row. A category split is reported as the fraction of its group, with no rescaling of its interval.
+- **Breaking:** a stochastic engine needs a whole amount in each bin, not a whole total, and `largest_remainder` and `random` round within each bin, so a unit never moves to another bin.
+- **Breaking:** the description of an aggregate model shows the bin amounts and their units, and the initial state with the unit of each compartment.
+- **Breaking (Rust):** `InitialConditions` has `bin_amounts` and `compartment_amounts` in place of `total`, `bin_fractions` and `compartment_fractions`; `CompartmentalEngine::total` is the sum of the amounts the model states; `check_model_values` returns the plan it resolves, and `InitialConditionPlan::coverage` gives the compartments each value sets.
 
 ## [0.5.0] - 2026-10-19
 

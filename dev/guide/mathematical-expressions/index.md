@@ -19,8 +19,7 @@ model = (
     .add_transition(id="t_ba", source=["B"], target=["A"], rate="if(step > 30, 0.05, 0)")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01},
+            bin_amounts={"A": 990, "B": 10},
         ),
         engine="DifferenceEquations",
     )
@@ -100,8 +99,7 @@ def value_of(expression: str) -> float:
         .add_transition(id="probe_flow", source=[], target=["B"], rate="probe")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.6, "B": 0.4},
+                bin_amounts={"A": 600, "B": 400},
                 stratification_fractions={
                     "group": {"g1": 0.25, "g2": 0.75},
                     "type": {"t1": 0.5, "t2": 0.5},

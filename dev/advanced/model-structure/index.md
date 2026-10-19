@@ -23,10 +23,9 @@ Model                      name, description, version, step_unit
 │       └── stratified_rates: [StratifiedRate]
 │           └── conditions: [StratificationCondition]
 └── structure: Aggregate                   (kind: "aggregate", variant: None)
-    ├── total: float
-    ├── bin_fractions: {bin: fraction | None}
+    ├── bin_amounts: {bin: amount | None}          (in the unit of the bin)
     ├── stratification_fractions: {stratification: {category: fraction}}
-    ├── compartment_fractions: {compartment: fraction}
+    ├── compartment_amounts: {compartment: amount}
     └── neighbors: Complete | Groups | None
 ```
 
@@ -41,10 +40,9 @@ In JSON the structure is an object with its `kind`, its `variant` and the fields
   "structure": {
     "kind": "aggregate",
     "variant": null,
-    "total": 1000.0,
-    "bin_fractions": {"A": 0.99, "B": 0.01},
+    "bin_amounts": {"A": 990.0, "B": 10.0},
     "stratification_fractions": {},
-    "compartment_fractions": {},
+    "compartment_amounts": {},
     "neighbors": null
   },
   "step_unit": null
@@ -1136,164 +1134,117 @@ def check_settings(self) -> Self:
 
 Bases: `BaseModel`
 
-How much starts where: the total and the fractions of it.
+How much starts where: the amount of each bin and the split of it.
 
-`Aggregate` holds these fields and their methods; the checks against the bins and the stratifications of the process are in `Aggregate.check_model`.
+Every amount is in the unit of its bin, so bins of different units, such as people and a concentration, start without a total over them. `Aggregate` holds these fields and their methods; the checks against the bins and the stratifications of the process are in `Aggregate.check_model`.
 
 Attributes:
 
-| Name                       | Type                          | Description                                                                                                                                 |
-| -------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `total`                    | `float`                       | The sum of every compartment at the start, finite and greater than 0. It can be a count, a mass or a concentration.                         |
-| `bin_fractions`            | \`dict\[str, float            | None\]\`                                                                                                                                    |
-| `stratification_fractions` | `dict[str, dict[str, float]]` | The fraction of each category, by stratification id and category. A conditional stratification splits only the group its conditions select. |
-| `compartment_fractions`    | `dict[str, float]`            | Fractions of the total in single expanded compartments, by compartment name, applied after the expansion.                                   |
+| Name                       | Type                          | Description                                                                                                                                                                                                     |
+| -------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bin_amounts`              | \`dict\[str, float            | None\]\`                                                                                                                                                                                                        |
+| `stratification_fractions` | `dict[str, dict[str, float]]` | The fraction of each category, by stratification id and category: the split of the amount of every bin the stratification applies to. A conditional stratification splits only the group its conditions select. |
+| `compartment_amounts`      | `dict[str, float]`            | Amounts of single expanded compartments, by compartment name, applied after the expansion.                                                                                                                      |
 
 Source code in `commol/context/initial_conditions.py`
 
 ```python
 class InitialConditions(BaseModel):
     """
-    How much starts where: the total and the fractions of it.
+    How much starts where: the amount of each bin and the split of it.
 
+    Every amount is in the unit of its bin, so bins of different units, such
+    as people and a concentration, start without a total over them.
     `Aggregate` holds these fields and their methods; the checks against the
     bins and the stratifications of the process are in
     `Aggregate.check_model`.
 
     Attributes
     ----------
-    total : float
-        The sum of every compartment at the start, finite and greater than 0.
-        It can be a count, a mass or a concentration.
-    bin_fractions : dict[str, float | None]
-        The fraction of the total in each bin, by bin id. None leaves a
-        fraction for calibration.
+    bin_amounts : dict[str, float | None]
+        The amount of each bin at the start, by bin id, in the unit of the
+        bin; finite and not negative. None leaves an amount for calibration.
     stratification_fractions : dict[str, dict[str, float]]
-        The fraction of each category, by stratification id and category.
-        A conditional stratification splits only the group its conditions
+        The fraction of each category, by stratification id and category: the
+        split of the amount of every bin the stratification applies to. A
+        conditional stratification splits only the group its conditions
         select.
-    compartment_fractions : dict[str, float]
-        Fractions of the total in single expanded compartments, by compartment
-        name, applied after the expansion.
+    compartment_amounts : dict[str, float]
+        Amounts of single expanded compartments, by compartment name, applied
+        after the expansion.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    total: float = Field(
-        ...,
-        description="The sum of every compartment at the start, finite and > 0.",
-    )
-    bin_fractions: dict[str, float | None] = Field(
+    bin_amounts: dict[str, float | None] = Field(
         ...,
         description=(
-            "The fraction of the total in each bin, by bin id. None leaves a "
-            "fraction for calibration."
+            "The amount of each bin, by bin id, in the unit of the bin. None "
+            "leaves an amount for calibration."
         ),
     )
     stratification_fractions: dict[str, dict[str, float]] = Field(
         default_factory=dict,
         description="The fraction of each category, by stratification id.",
     )
-    compartment_fractions: dict[str, float] = Field(
+    compartment_amounts: dict[str, float] = Field(
         default_factory=dict,
         description=(
-            "Fractions of the total in single expanded compartments, applied "
-            "after the expansion."
+            "Amounts of single expanded compartments, applied after the expansion."
         ),
     )
 
-    @field_validator("total")
+    @model_validator(mode="before")
     @classmethod
-    def validate_total(cls, value: float) -> float:
-        """Enforce a finite total greater than 0.
+    def reject_fractions_of_a_total(cls, data: Any) -> Any:
+        """Name the field of amounts that replaces a field of fractions.
 
-        Every fraction of a zero total is zero, and the report divides by the
-        total, so a zero, negative or non-finite total is rejected as a domain
-        error.
+        A total over bins of different units has no meaning, so the initial
+        state is stated as amounts, and a structure with ``total``,
+        ``bin_fractions`` or ``compartment_fractions`` is rejected with the
+        field to use.
         """
-        if not math.isfinite(value) or value <= 0:
-            raise ValueError(f"total must be finite and greater than 0, got {value}.")
-        return value
-
-    @field_validator("compartment_fractions")
-    @classmethod
-    def validate_compartment_fraction_range(
-        cls, value: dict[str, float]
-    ) -> dict[str, float]:
-        """Enforce that every compartment fraction lies within ``[0.0, 1.0]``."""
-        for compartment, fraction in value.items():
-            _check_fraction(f"compartment '{compartment}'", fraction)
-        return value
-
-    @staticmethod
-    def _validate_bin_fraction_total(candidate: Mapping[str, float | None]) -> None:
-        """
-        Enforce the bin-fraction conservation rule on a complete mapping.
-
-        Uncalibrated (``None``) fractions floor the calibrated total strictly
-        below 1.0 so they can be filled later. When every bin is calibrated,
-        the fractions must sum to 1.0, because they are shares of a single
-        total. Construction and updates apply the same rule, so an update
-        never produces a definition that cannot be loaded again.
-
-        Parameters
-        ----------
-        candidate : Mapping[str, float | None]
-            Fraction of every bin.
-
-        Raises
-        ------
-        ValueError
-            If the fractions break the rule.
-        """
-        calibrated = [value for value in candidate.values() if value is not None]
-        if not calibrated:
-            return
-        total = sum(calibrated)
-        uncalibrated = sum(1 for value in candidate.values() if value is None)
-
-        if uncalibrated > 0:
-            if total >= 1.0:
+        if isinstance(data, Mapping):
+            stated = [field for field in _FRACTION_FIELDS if field in data]
+            if stated:
+                replacements = sorted({_FRACTION_FIELDS[field] for field in stated})
                 raise ValueError(
-                    f"Calibrated bin fractions sum to {total:.4f}, but must be "
-                    f"LESS than 1.0 to leave room for {uncalibrated} "
-                    f"uncalibrated fraction(s). Calibrated fractions: "
-                    f"{[item for item in candidate.items() if item[1] is not None]}"
+                    f"An aggregate structure states the amount of each bin in "
+                    f"the unit of the bin, not fractions of a total: replace "
+                    f"{', '.join(stated)} with {' and '.join(replacements)}, "
+                    f'such as bin_amounts={{"A": 990, "B": 10, "C": 0}}.'
                 )
-        elif not math.isclose(total, 1.0, abs_tol=1e-4):
-            raise ValueError(
-                f"Bin fractions must sum to 1.0, got {total:.4f}. "
-                f"Fractions: {list(candidate.values())}"
-            )
+        return data
 
-    @model_validator(mode="after")
-    def validate_calibrated_fractions_sum_to_one(self) -> Self:
-        """
-        Validate that bin fractions sum appropriately.
+    @field_validator("bin_amounts")
+    @classmethod
+    def validate_bin_amounts(
+        cls, value: dict[str, float | None]
+    ) -> dict[str, float | None]:
+        """Enforce that every bin amount is finite and not negative."""
+        for bin_id, amount in value.items():
+            if amount is not None:
+                _check_amount(f"bin '{bin_id}'", amount)
+        return value
 
-        Rules:
-        - If some fractions are None (uncalibrated): calibrated ones must sum to LESS
-            than 1.0
-        - If all fractions are calibrated (no None): must sum to exactly 1.0
-        - If all fractions are None: skip validation (will be set before simulation)
-        """
-        self._validate_bin_fraction_total(self.bin_fractions)
-        return self
+    @field_validator("compartment_amounts")
+    @classmethod
+    def validate_compartment_amounts(cls, value: dict[str, float]) -> dict[str, float]:
+        """Enforce that every compartment amount is finite and not negative."""
+        for compartment, amount in value.items():
+            _check_amount(f"compartment '{compartment}'", amount)
+        return value
 
     def get_uncalibrated_bins(self) -> list[str]:
         """
-        Get list of bin IDs that have uncalibrated fractions (value = None).
+        Get list of bin IDs that have uncalibrated amounts (value = None).
 
         Returns
         -------
         list[str]
             List of bin IDs with uncalibrated initial conditions.
         """
-        return [
-            bin_id
-            for bin_id, fraction in self.bin_fractions.items()
-            if fraction is None
-        ]
+        return [bin_id for bin_id, amount in self.bin_amounts.items() if amount is None]
 
     def get_categories_with_fractions(self) -> set[str]:
         """
@@ -1404,20 +1355,6 @@ class InitialConditions(BaseModel):
         stratification, name = self.resolve_category(category)
         return self.stratification_fractions[stratification][name]
 
-    def _fraction_subgroup_total(self, categories: Iterable[str] = ()) -> float:
-        """
-        Get the initial total of a subgroup from the fractions alone.
-
-        Category fractions are relative to the group their stratification
-        applies to, so the fractions of a nested chain of categories multiply.
-        Passing no categories gives the total. Per-compartment overrides are
-        not included; `Aggregate.subgroup_total` includes them.
-        """
-        total = self.total
-        for category in categories:
-            total *= self.get_category_fraction(category)
-        return total
-
     def _apply_stratification_update(
         self, stratification: str, named: Mapping[str, float]
     ) -> None:
@@ -1486,141 +1423,136 @@ class InitialConditions(BaseModel):
         for stratification, named in by_stratification.items():
             self._apply_stratification_update(stratification, named)
 
-    def _upsert_compartment_fractions(self, fractions: Mapping[str, float]) -> None:
+    def _upsert_compartment_amounts(self, amounts: Mapping[str, float]) -> None:
         """
         Upsert per-compartment overrides by expanded compartment name.
 
-        A compartment already present in ``compartment_fractions`` has its
-        fraction replaced; a new one is appended. Compartment names and the
-        sum of the amounts depend on the expansion of the process, so
-        :meth:`~commol.context.aggregate.Aggregate.update_compartment_fractions`
+        A compartment already present in ``compartment_amounts`` has its
+        amount replaced; a new one is appended. Compartment names depend on
+        the expansion of the process, so
+        :meth:`~commol.context.aggregate.Aggregate.update_compartment_amounts`
         validates them against the engine, not here.
 
         Raises
         ------
         ValueError
-            If a value lies outside ``[0.0, 1.0]``.
+            If an amount is not finite or is negative.
         """
-        for compartment, value in fractions.items():
-            _check_fraction(f"compartment '{compartment}'", value)
-        self.compartment_fractions.update(fractions)
+        for compartment, amount in amounts.items():
+            _check_amount(f"compartment '{compartment}'", amount)
+        self.compartment_amounts.update(amounts)
 
-    def update_bin_fractions(self, fractions: Mapping[str, float | None]) -> None:
+    def update_bin_amounts(self, amounts: Mapping[str, float | None]) -> None:
         """
-        Update bin fractions by bin ID.
+        Update bin amounts by bin ID.
 
-        The candidate fractions are validated before any bin is mutated, so a
-        rejected call leaves the initial conditions unchanged. The conservation
-        rule of :meth:`validate_calibrated_fractions_sum_to_one` is re-applied
-        to the resulting mapping: the bin fractions must sum to 1.0, while
-        uncalibrated (``None``) bins reserve the remainder. To move an amount
-        between bins, update every bin involved in one call.
+        Every amount is checked before any bin changes, so a rejected call
+        leaves the initial conditions unchanged. The bins of one unit keep no
+        sum: to move an amount between bins, update every bin involved.
 
         Parameters
         ----------
-        fractions : Mapping[str, float | None]
-            Dictionary mapping bin IDs to their new fraction values.
-            None values indicate bins that need calibration.
+        amounts : Mapping[str, float | None]
+            Dictionary mapping bin IDs to their new amount, in the unit of the
+            bin. None marks a bin that needs calibration.
 
         Raises
         ------
         ValueError
-            If a bin ID is not found in the initial conditions, or the
-            resulting fractions violate the conservation rule.
+            If a bin ID is not found in the initial conditions, or an amount
+            is not finite or is negative.
         """
-        unknown = sorted(set(fractions) - set(self.bin_fractions))
+        unknown = sorted(set(amounts) - set(self.bin_amounts))
         if unknown:
             raise ValueError(
                 f"Bin(s) {unknown} not found in initial conditions. "
-                f"Available bins: {list(self.bin_fractions)}"
+                f"Available bins: {list(self.bin_amounts)}"
             )
-
-        candidate = {**self.bin_fractions, **fractions}
-        self._validate_bin_fraction_total(candidate)
-        self.bin_fractions.update(fractions)
+        for bin_id, amount in amounts.items():
+            if amount is not None:
+                _check_amount(f"bin '{bin_id}'", amount)
+        self.bin_amounts.update(amounts)
 ```
 
 ### Methods:
 
-#### validate_total
+#### reject_fractions_of_a_total
 
 ```python
-validate_total(value: float) -> float
+reject_fractions_of_a_total(data: Any) -> Any
 ```
 
-Enforce a finite total greater than 0.
+Name the field of amounts that replaces a field of fractions.
 
-Every fraction of a zero total is zero, and the report divides by the total, so a zero, negative or non-finite total is rejected as a domain error.
+A total over bins of different units has no meaning, so the initial state is stated as amounts, and a structure with `total`, `bin_fractions` or `compartment_fractions` is rejected with the field to use.
 
 Source code in `commol/context/initial_conditions.py`
 
 ```python
-@field_validator("total")
+@model_validator(mode="before")
 @classmethod
-def validate_total(cls, value: float) -> float:
-    """Enforce a finite total greater than 0.
+def reject_fractions_of_a_total(cls, data: Any) -> Any:
+    """Name the field of amounts that replaces a field of fractions.
 
-    Every fraction of a zero total is zero, and the report divides by the
-    total, so a zero, negative or non-finite total is rejected as a domain
-    error.
+    A total over bins of different units has no meaning, so the initial
+    state is stated as amounts, and a structure with ``total``,
+    ``bin_fractions`` or ``compartment_fractions`` is rejected with the
+    field to use.
     """
-    if not math.isfinite(value) or value <= 0:
-        raise ValueError(f"total must be finite and greater than 0, got {value}.")
+    if isinstance(data, Mapping):
+        stated = [field for field in _FRACTION_FIELDS if field in data]
+        if stated:
+            replacements = sorted({_FRACTION_FIELDS[field] for field in stated})
+            raise ValueError(
+                f"An aggregate structure states the amount of each bin in "
+                f"the unit of the bin, not fractions of a total: replace "
+                f"{', '.join(stated)} with {' and '.join(replacements)}, "
+                f'such as bin_amounts={{"A": 990, "B": 10, "C": 0}}.'
+            )
+    return data
+```
+
+#### validate_bin_amounts
+
+```python
+validate_bin_amounts(value: dict[str, float | None]) -> dict[str, float | None]
+```
+
+Enforce that every bin amount is finite and not negative.
+
+Source code in `commol/context/initial_conditions.py`
+
+```python
+@field_validator("bin_amounts")
+@classmethod
+def validate_bin_amounts(
+    cls, value: dict[str, float | None]
+) -> dict[str, float | None]:
+    """Enforce that every bin amount is finite and not negative."""
+    for bin_id, amount in value.items():
+        if amount is not None:
+            _check_amount(f"bin '{bin_id}'", amount)
     return value
 ```
 
-#### validate_compartment_fraction_range
+#### validate_compartment_amounts
 
 ```python
-validate_compartment_fraction_range(value: dict[str, float]) -> dict[str, float]
+validate_compartment_amounts(value: dict[str, float]) -> dict[str, float]
 ```
 
-Enforce that every compartment fraction lies within `[0.0, 1.0]`.
+Enforce that every compartment amount is finite and not negative.
 
 Source code in `commol/context/initial_conditions.py`
 
 ```python
-@field_validator("compartment_fractions")
+@field_validator("compartment_amounts")
 @classmethod
-def validate_compartment_fraction_range(
-    cls, value: dict[str, float]
-) -> dict[str, float]:
-    """Enforce that every compartment fraction lies within ``[0.0, 1.0]``."""
-    for compartment, fraction in value.items():
-        _check_fraction(f"compartment '{compartment}'", fraction)
+def validate_compartment_amounts(cls, value: dict[str, float]) -> dict[str, float]:
+    """Enforce that every compartment amount is finite and not negative."""
+    for compartment, amount in value.items():
+        _check_amount(f"compartment '{compartment}'", amount)
     return value
-```
-
-#### validate_calibrated_fractions_sum_to_one
-
-```python
-validate_calibrated_fractions_sum_to_one() -> Self
-```
-
-Validate that bin fractions sum appropriately.
-
-Rules:
-
-- If some fractions are None (uncalibrated): calibrated ones must sum to LESS than 1.0
-- If all fractions are calibrated (no None): must sum to exactly 1.0
-- If all fractions are None: skip validation (will be set before simulation)
-
-Source code in `commol/context/initial_conditions.py`
-
-```python
-@model_validator(mode="after")
-def validate_calibrated_fractions_sum_to_one(self) -> Self:
-    """
-    Validate that bin fractions sum appropriately.
-
-    Rules:
-    - If some fractions are None (uncalibrated): calibrated ones must sum to LESS
-        than 1.0
-    - If all fractions are calibrated (no None): must sum to exactly 1.0
-    - If all fractions are None: skip validation (will be set before simulation)
-    """
-    self._validate_bin_fraction_total(self.bin_fractions)
-    return self
 ```
 
 #### get_uncalibrated_bins
@@ -1629,7 +1561,7 @@ def validate_calibrated_fractions_sum_to_one(self) -> Self:
 get_uncalibrated_bins() -> list[str]
 ```
 
-Get list of bin IDs that have uncalibrated fractions (value = None).
+Get list of bin IDs that have uncalibrated amounts (value = None).
 
 Returns:
 
@@ -1642,18 +1574,14 @@ Source code in `commol/context/initial_conditions.py`
 ```python
 def get_uncalibrated_bins(self) -> list[str]:
     """
-    Get list of bin IDs that have uncalibrated fractions (value = None).
+    Get list of bin IDs that have uncalibrated amounts (value = None).
 
     Returns
     -------
     list[str]
         List of bin IDs with uncalibrated initial conditions.
     """
-    return [
-        bin_id
-        for bin_id, fraction in self.bin_fractions.items()
-        if fraction is None
-    ]
+    return [bin_id for bin_id, amount in self.bin_amounts.items() if amount is None]
 ```
 
 #### get_categories_with_fractions
@@ -1933,62 +1861,59 @@ def update_stratification_fractions(self, fractions: Mapping[str, float]) -> Non
         self._apply_stratification_update(stratification, named)
 ```
 
-#### update_bin_fractions
+#### update_bin_amounts
 
 ```python
-update_bin_fractions(fractions: Mapping[str, float | None]) -> None
+update_bin_amounts(amounts: Mapping[str, float | None]) -> None
 ```
 
-Update bin fractions by bin ID.
+Update bin amounts by bin ID.
 
-The candidate fractions are validated before any bin is mutated, so a rejected call leaves the initial conditions unchanged. The conservation rule of :meth:`validate_calibrated_fractions_sum_to_one` is re-applied to the resulting mapping: the bin fractions must sum to 1.0, while uncalibrated (`None`) bins reserve the remainder. To move an amount between bins, update every bin involved in one call.
+Every amount is checked before any bin changes, so a rejected call leaves the initial conditions unchanged. The bins of one unit keep no sum: to move an amount between bins, update every bin involved.
 
 Parameters:
 
-| Name        | Type                  | Description | Default                                                                                                   |
-| ----------- | --------------------- | ----------- | --------------------------------------------------------------------------------------------------------- |
-| `fractions` | \`Mapping\[str, float | None\]\`    | Dictionary mapping bin IDs to their new fraction values. None values indicate bins that need calibration. |
+| Name      | Type                  | Description | Default                                                                                                          |
+| --------- | --------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------- |
+| `amounts` | \`Mapping\[str, float | None\]\`    | Dictionary mapping bin IDs to their new amount, in the unit of the bin. None marks a bin that needs calibration. |
 
 Raises:
 
-| Type         | Description                                                                                                   |
-| ------------ | ------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If a bin ID is not found in the initial conditions, or the resulting fractions violate the conservation rule. |
+| Type         | Description                                                                                    |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| `ValueError` | If a bin ID is not found in the initial conditions, or an amount is not finite or is negative. |
 
 Source code in `commol/context/initial_conditions.py`
 
 ```python
-def update_bin_fractions(self, fractions: Mapping[str, float | None]) -> None:
+def update_bin_amounts(self, amounts: Mapping[str, float | None]) -> None:
     """
-    Update bin fractions by bin ID.
+    Update bin amounts by bin ID.
 
-    The candidate fractions are validated before any bin is mutated, so a
-    rejected call leaves the initial conditions unchanged. The conservation
-    rule of :meth:`validate_calibrated_fractions_sum_to_one` is re-applied
-    to the resulting mapping: the bin fractions must sum to 1.0, while
-    uncalibrated (``None``) bins reserve the remainder. To move an amount
-    between bins, update every bin involved in one call.
+    Every amount is checked before any bin changes, so a rejected call
+    leaves the initial conditions unchanged. The bins of one unit keep no
+    sum: to move an amount between bins, update every bin involved.
 
     Parameters
     ----------
-    fractions : Mapping[str, float | None]
-        Dictionary mapping bin IDs to their new fraction values.
-        None values indicate bins that need calibration.
+    amounts : Mapping[str, float | None]
+        Dictionary mapping bin IDs to their new amount, in the unit of the
+        bin. None marks a bin that needs calibration.
 
     Raises
     ------
     ValueError
-        If a bin ID is not found in the initial conditions, or the
-        resulting fractions violate the conservation rule.
+        If a bin ID is not found in the initial conditions, or an amount
+        is not finite or is negative.
     """
-    unknown = sorted(set(fractions) - set(self.bin_fractions))
+    unknown = sorted(set(amounts) - set(self.bin_amounts))
     if unknown:
         raise ValueError(
             f"Bin(s) {unknown} not found in initial conditions. "
-            f"Available bins: {list(self.bin_fractions)}"
+            f"Available bins: {list(self.bin_amounts)}"
         )
-
-    candidate = {**self.bin_fractions, **fractions}
-    self._validate_bin_fraction_total(candidate)
-    self.bin_fractions.update(fractions)
+    for bin_id, amount in amounts.items():
+        if amount is not None:
+            _check_amount(f"bin '{bin_id}'", amount)
+    self.bin_amounts.update(amounts)
 ```

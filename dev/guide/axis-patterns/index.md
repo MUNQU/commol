@@ -18,8 +18,7 @@ def flow_per_step(rate: AxisPattern, num_steps: int = 10) -> list[float]:
         .add_transition(id="inflow", source=[], target=["B"], rate=rate)
         .build(
             Aggregate(
-                total=100,
-                bin_fractions={"A": 1.0, "B": 0.0},
+                bin_amounts={"A": 100, "B": 0},
             ),
             engine="DifferenceEquations",
         )
@@ -117,8 +116,7 @@ def stratified_flows(rate: AxisPattern, num_steps: int = 7) -> dict[str, list[fl
         .add_transition(id="flow", source=["A"], target=["B"], rate=rate)
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 1.0, "B": 0.0},
+                bin_amounts={"A": 1000, "B": 0},
                 stratification_fractions={"group": {"cat1": 0.5, "cat2": 0.5}},
             ),
             engine="DifferenceEquations",
@@ -219,8 +217,7 @@ routing = (
     )
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0},
+            bin_amounts={"A": 1000},
             stratification_fractions={"status": {"s0": 0.5, "s1": 0.5}},
         ),
         engine="DifferenceEquations",
@@ -250,8 +247,7 @@ def remaining_a(rate: AxisPattern, at: float) -> float:
         .add_transition(id="flow", source=["A"], target=["B"], rate=rate)
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 1.0, "B": 0.0},
+                bin_amounts={"A": 1000, "B": 0},
             ),
             engine="DifferentialEquations",
         )

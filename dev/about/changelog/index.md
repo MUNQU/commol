@@ -17,6 +17,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `SampleIdentifiability(reference="prior", priors=...)`: the contraction of each parameter against its prior. See [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample).
 - Conformal prediction intervals through `Calibrator.uncertainty`: intervals for observations with a coverage guarantee that needs no noise model, no prior and no correct model. `SplitConformal` scores held-out observations; `RollingConformal` gives intervals ahead of the data, one quantile per horizon (the `k`-th observation after an origin); `JackknifePlus` refits once per block left out, with the CV+ bound for blocks of more than one observation; `EnbPI` draws its own replicates of blocks for series with dependent errors; `AdaptiveConformal` walks a stream of new observations with a working level that moves with each miss. Each takes a required `score` (`"absolute"`, `"normalized"` or `"spread"`), `by` (`"series"` or `"all"`) and `level`, and returns a `ConformalResult` (`PredictionIntervals`, the scores and the guarantee). See [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md).
 - `SimulationPlotter.plot_series(prediction_intervals=...)` draws the band of conformal intervals, and `simulation_report(..., prediction_intervals=...)` reports them.
+- A model can hold bins of different units, such as people and the concentration of bacteria in water: each bin starts at an amount in its own unit, a model whose bins all start at `0` builds and runs, and the `Calibrator` rejects an initial-condition remainder whose unit is not the unit of a calibrated amount. See [Bins of different units](https://munqu.github.io/commol/latest/guide/building-models/#bins-of-different-units).
+
+### Changed
+
+- **Breaking:** an `Aggregate` states the initial amount of each bin in the unit of the bin, not fractions of one total. A structure that states `total`, `bin_fractions` or `compartment_fractions` is rejected with the fields to use.
+
+| Before                                                        | Now                                                                                 |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `Aggregate(total=1000, bin_fractions={"S": 0.99, "I": 0.01})` | `Aggregate(bin_amounts={"S": 990, "I": 10})`                                        |
+| `compartment_fractions={"I_g1": 0.005}` (of the total)        | `compartment_amounts={"I_g1": 5}` (in the unit of its bin)                          |
+| `model.structure.total`                                       | No declared total: `sum(model.structure.bin_amounts.values())` for bins of one unit |
+| `update_bin_fractions({...})`, which kept the sum at 1        | `update_bin_amounts({...})`; the other bins keep their amounts                      |
+| `update_compartment_fractions(process, {...})`                | `update_compartment_amounts(process, {...})`                                        |
+| `stratification_fractions`                                    | Unchanged: the split of the amount of every bin a stratification applies to         |
+
+- **Breaking:** a calibrated initial condition of a bin, a bin prefix or a compartment is an amount in the unit of its bin, not a fraction of the total; its bounds are amounts too. A category value is still a split. The remainder takes the sum of the amounts the model states less every other compartment, so a bin that no value covers keeps its amount; with a bin left `None`, the remainder holds the sum (`{"S": 1000, "I": None}`). Without a remainder no initial state is infeasible. A remainder below zero is measured as a share of the amounts the values set. The write-back updates the amount of a bin only when the values and the remainder set every compartment of it.
+- **Breaking:** `applied_parameters_report` gives an aggregate model the sections `initial_amounts` (`amount`, `unit`, `calibrated`) and `category_splits` (`group`, a list of categories, `fraction`, `calibrated`) in place of `initial_conditions`, with no `total` row. A category split is reported as the fraction of its group, with no rescaling of its interval.
+- **Breaking:** a stochastic engine needs a whole amount in each bin, not a whole total, and `largest_remainder` and `random` round within each bin, so a unit never moves to another bin.
+- **Breaking:** the description of an aggregate model shows the bin amounts and their units, and the initial state with the unit of each compartment.
+- **Breaking (Rust):** `InitialConditions` has `bin_amounts` and `compartment_amounts` in place of `total`, `bin_fractions` and `compartment_fractions`; `CompartmentalEngine::total` is the sum of the amounts the model states; `check_model_values` returns the plan it resolves, and `InitialConditionPlan::coverage` gives the compartments each value sets.
 
 ## [0.5.0] - 2026-10-19
 
