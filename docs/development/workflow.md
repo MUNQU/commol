@@ -94,7 +94,9 @@ view "By precedence" groups the open issues by `Level`, so each group can
 start when the groups above it close. GitHub Projects cannot group by
 "blocked by" links, and its hierarchy view follows sub-issues only, so the
 script writes the field. It writes only the levels that change, through REST,
-with your own `gh` login: no workflow and no stored token. `start.sh` writes
+with your own `gh` login: no workflow and no stored token. If it cannot write
+them (no write access to the project, a rate limit), it says so in one line
+and lists the next issues all the same. `start.sh` writes
 them too, and so does, at any time:
 
 ```bash

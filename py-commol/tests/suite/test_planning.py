@@ -310,6 +310,39 @@ def test_an_open_issue_outside_the_project_gets_no_level() -> None:
     assert parallel.level_changes({1: 0}, {}) == []
 
 
+def run_main(*arguments: str) -> dict[str, list[tuple]]:
+    """Run ``parallel.main`` with ``arguments``; the writes of the levels fail.
+
+    Returns the calls of ``show_next`` and ``show_parallel``.
+    """
+    calls: dict[str, list[tuple]] = {"next": [], "parallel": []}
+    failure = SystemExit("GitHub: PATCH orgs/o/projectsV2/1/items/10: HTTP 403")
+    with (
+        patch.object(sys, "argv", ["parallel.py", *arguments]),
+        patch.object(parallel, "load", return_value={}),
+        patch.object(parallel, "write_levels", side_effect=failure),
+        patch.object(parallel, "show_next", lambda *a: calls["next"].append(a)),
+        patch.object(parallel, "show_parallel", lambda *a: calls["parallel"].append(a)),
+    ):
+        parallel.main()
+    return calls
+
+
+def test_a_failed_level_write_still_lists_the_next_issues(capsys) -> None:
+    calls = run_main("--levels", "--next", "2")
+
+    assert calls["next"] == [({}, 2)]
+    assert "Level: not written: GitHub: PATCH" in capsys.readouterr().err
+
+
+def test_levels_and_write_also_write_what_can_run_in_parallel() -> None:
+    assert run_main("--levels", "--write")["parallel"] == [({}, True)]
+
+
+def test_levels_alone_print_nothing_else() -> None:
+    assert run_main("--levels") == {"next": [], "parallel": []}
+
+
 def test_the_milestone_of_an_issue_is_its_due_date_and_number() -> None:
     due = {"milestone": {"number": 2, "due_on": "2026-11-01T00:00:00Z"}}
 

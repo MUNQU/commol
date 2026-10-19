@@ -44,6 +44,7 @@ both are given (``next.sh`` and ``start.sh`` run it).
 
 import argparse
 import re
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import cache
@@ -641,7 +642,8 @@ def main() -> None:
     """Print what can run in parallel, or with --next the next issues to take.
 
     With --levels it first writes the precedence levels into the project, and
-    alone it does only that.
+    alone it does only that. A failure to write them prints one line and the
+    rest goes on: the next issues, or what can run in parallel with --write.
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--write", action="store_true", help="write it under Delivery")
@@ -652,10 +654,13 @@ def main() -> None:
     arguments = parser.parse_args()
     issues = load()
     if arguments.levels:
-        write_levels(issues)
+        try:
+            write_levels(issues)
+        except SystemExit as error:
+            print(f"Level: not written: {error}", file=sys.stderr)
     if arguments.next is not None:
         show_next(issues, arguments.next)
-    elif not arguments.levels:
+    elif arguments.write or not arguments.levels:
         show_parallel(issues, arguments.write)
 
 
