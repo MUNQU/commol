@@ -8,7 +8,9 @@ These methods give a posterior of the parameters with no noise model. The
 to the data. Use them when you can state priors but not how the observations
 scatter around the model. One sequential Monte Carlo (SMC) sampler runs both,
 in parallel in Rust (`crates/commol-inference/src/smc/`), through
-`Calibrator.uncertainty`.
+`Calibrator.uncertainty`. The same sampler runs `BayesianPosterior`, the
+posterior of [observation models](observation-models.md), when you can state
+how the observations scatter.
 
 ## Quick path
 
@@ -200,6 +202,13 @@ With a stochastic engine the loss reads the problem's `replicates` with
 common random numbers, as the optimizers do, so it is a function of the
 parameters.
 
+With [observation models](observation-models.md) the loss is the negative
+log-likelihood, so the Gibbs posterior is the fractional posterior
+`prior(θ) · L(θ)^η`, and `η = 1` is the posterior of `BayesianPosterior`.
+`η` is a number or `EtaCalibration.bootstrap_coverage(...)`;
+`EtaCalibration.information_matching()` needs a loss and raises a
+`ValueError`.
+
 ## ABC
 
 `AbcSmc` keeps a particle when the distance between its run and the data is
@@ -215,7 +224,7 @@ numbers that tie. `diagnostics.stop_reason` says which.
 
 | `distance` | Value |
 |---|---|
-| `LossDistance()` | The problem's `loss_function`, with its weights and `normalize_observations` |
+| `LossDistance()` | The problem's `loss_function`, with its weights and `normalize_observations`; a problem with observation models has none, so it raises a `ValueError` |
 | `SeriesDistance(metric="rmse")` or `"mae"` | `metric` of each series on its residuals divided by the root mean square of its observed values, then the largest over the series |
 
 `SeriesDistance` compares series in different units on one scale: scaling a
@@ -281,6 +290,7 @@ Monte Carlo error.
 | To learn | Read |
 |---|---|
 | What every method returns and reads | [Uncertainty](index.md) |
+| The posterior of observation models | [Observation Models](observation-models.md) |
 | Uncertainty with no prior: bootstraps and the jackknife | [Resampling](resampling.md) |
 | How far a sample contracts each prior | [Identifiability](identifiability.md#a-sample) |
 | The stochastic engines and their replicates | [Stochastic engines](../stochastic.md) |

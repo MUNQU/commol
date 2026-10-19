@@ -54,4 +54,19 @@ class ResidualNoise(BaseModel):
     )
 
 
-type ObservationNoise = NoNoise | ResidualNoise
+class DistributionNoise(BaseModel):
+    """
+    Observation noise of the problem's observation models.
+
+    Each draw draws every observation from the model of its series around
+    the draw's prediction, with the draw's noise parameters, so the band is a
+    prediction interval of the posterior or bootstrap predictive. It needs a
+    problem with ``observation_models``, and serves the series they name. A
+    prediction outside the means a model allows, such as a negative count,
+    draws at the nearest allowed one.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+type ObservationNoise = NoNoise | ResidualNoise | DistributionNoise

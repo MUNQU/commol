@@ -70,6 +70,7 @@ def _calibrator(
             )
             for parameter_id, (low, high) in parameters.items()
         ],
+        loss_function="sse",
         optimization_config=NelderMeadConfig(max_iterations=200),
         seed=3,
     )
@@ -629,6 +630,7 @@ class TestEntryPoint:
         problem = CalibrationProblem(
             observed_data=[ObservedDataPoint(at=10, output="B", value=50.0)],
             parameters=[bounded("k1", 0.1, 0.6)],
+            loss_function="sse",
             optimization_config=NelderMeadConfig(),
             replicates=4,
             replicate_summary="mean",

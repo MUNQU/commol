@@ -6,7 +6,7 @@ overrides apply, and how calibrated values reach the initial state.
 This module only asks the engine; it does not reproduce any of those rules.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, NamedTuple
 
 from commol.commol_rs import _commol_rs as commol_rs
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         CalibrationParameterTypeProtocol,
         EngineProtocol,
         LossConfigProtocol,
+        ObservationModelProtocol,
         ObservedDataPointProtocol,
         RustAggregateProtocol,
         RustModelProtocol,
@@ -33,6 +34,7 @@ if TYPE_CHECKING:
     )
     from commol.context.aggregate import Aggregate
     from commol.context.model import Model
+    from commol.context.observation_models import ObservationModel
     from commol.context.process import Process
 
 
@@ -256,6 +258,7 @@ def _rust_parameter_type(parameter_type: str) -> "CalibrationParameterTypeProtoc
         CalibrationParameterType.PARAMETER: rust_types.Parameter,
         CalibrationParameterType.INITIAL_CONDITION: rust_types.InitialCondition,
         CalibrationParameterType.FACTOR: rust_types.Factor,
+        CalibrationParameterType.NOISE: rust_types.Noise,
     }[CalibrationParameterType(parameter_type)]
 
 
@@ -288,9 +291,43 @@ def rust_observed_data(
             weight=point.weight,
             factor_id=point.factor_id,
             window=point.window,
+            trials=point.trials,
         )
         for point in points
     ]
+
+
+def rust_observation_models(
+    models: Mapping[str, "ObservationModel"],
+) -> list[tuple[str, "ObservationModelProtocol"]]:
+    """The observation models of a calibration problem, as the engine takes them."""
+    from commol.context.observation_models import (
+        BinomialObservations,
+        LogNormalObservations,
+        NegativeBinomialObservations,
+        NormalObservations,
+        PoissonObservations,
+        StudentTObservations,
+    )
+
+    rust = commol_rs.calibration.ObservationModel
+
+    def convert(model: "ObservationModel") -> "ObservationModelProtocol":
+        match model:
+            case NormalObservations():
+                return rust.normal(model.sd)
+            case LogNormalObservations():
+                return rust.log_normal(model.sigma, model.center == "median")
+            case StudentTObservations():
+                return rust.student_t(model.df, model.scale)
+            case PoissonObservations():
+                return rust.poisson()
+            case NegativeBinomialObservations():
+                return rust.negative_binomial(model.overdispersion)
+            case BinomialObservations():
+                return rust.binomial(model.trials)
+
+    return [(label, convert(model)) for label, model in models.items()]
 
 
 def rust_constraints(
@@ -347,7 +384,8 @@ def check_model_values(
     """
     Check the values of the model kind that a calibration sets.
 
-    ``parameter`` and ``factor`` values are not checked here. Every other type
+    ``parameter``, ``factor`` and ``noise`` values are not checked here: they
+    belong to no model kind. Every other type
     must be one the kind of the model accepts
     (`ModelStructure.calibration_value_types`), and the engine must resolve
     each value and the remainder as the calibration objective does, so its
@@ -373,7 +411,11 @@ def check_model_values(
         remainder cannot be resolved.
     """
     accepted = model.structure.calibration_value_types()
-    generic = {CalibrationParameterType.PARAMETER, CalibrationParameterType.FACTOR}
+    generic = {
+        CalibrationParameterType.PARAMETER,
+        CalibrationParameterType.FACTOR,
+        CalibrationParameterType.NOISE,
+    }
     for param in parameters:
         if param.parameter_type not in generic and param.parameter_type not in accepted:
             raise ValueError(
@@ -547,7 +589,7 @@ REPLICATE_SUMMARIES = ('"mean"', '"median"', "Quantile(level)", '"crps"')
 
 
 def rust_loss_config(
-    problem: "CalibrationProblem", engine_type: str
+    problem: "CalibrationProblem", loss_function: str, engine_type: str
 ) -> "LossConfigProtocol":
     """
     The Rust loss of a problem, with the replicates of a stochastic engine.
@@ -556,6 +598,8 @@ def rust_loss_config(
     ----------
     problem : CalibrationProblem
         The calibration problem.
+    loss_function : str
+        The problem's loss.
     engine_type : str
         The engine of the model. A stochastic engine runs
         ``problem.replicates`` replicates at each evaluation; a deterministic
@@ -580,7 +624,7 @@ def rust_loss_config(
         LossFunction.RMSE: commol_rs.calibration.LossConfig.rmse,
         LossFunction.MAE: commol_rs.calibration.LossConfig.mae,
     }
-    builder = builders[LossFunction(problem.loss_function)]
+    builder = builders[LossFunction(loss_function)]
     # Per-series normalization is orthogonal to the chosen metric.
     loss_config = builder().normalized(problem.normalize_observations)
     if not commol_rs.engine.EngineType(engine_type).is_stochastic:

@@ -228,8 +228,13 @@ fn reason(violation: &Violation) -> String {
         }
         Violation::InfeasibleRun => "the run leaves the values the model allows".to_string(),
         Violation::NonFinite => "a value of the run is not finite".to_string(),
-        Violation::OutOfBounds { .. } | Violation::Constraint { .. } => {
-            unreachable!("a run of the forward model checks no bounds and no constraint")
+        Violation::OutOfBounds { .. }
+        | Violation::Constraint { .. }
+        | Violation::MeanOutsideModel { .. } => {
+            unreachable!(
+                "a run of the forward model checks no bounds, no constraint and no observation \
+                 model"
+            )
         }
     }
 }

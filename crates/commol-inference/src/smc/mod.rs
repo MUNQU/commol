@@ -1,5 +1,6 @@
 //! Sequential Monte Carlo: one sampler of a sequence of distributions, from
-//! the prior to a target, and the targets that need no noise model.
+//! the prior to a target, the targets that need no noise model, and the
+//! posterior of observation models.
 //!
 //! | Module | Holds |
 //! |---|---|
@@ -7,6 +8,7 @@
 //! | [`kernel`] | The [`Kernel`] port and [`RandomWalk`], random-walk Metropolis on the unbounded scale |
 //! | [`gibbs`] | [`GibbsTarget`]: the Gibbs posterior of the loss, and the calibrations of `η` |
 //! | [`abc`] | [`AbcTarget`]: approximate Bayesian computation on a distance |
+//! | [`likelihood`] | [`LikelihoodTarget`]: the posterior of observation models, and its evidence |
 //!
 //! A target is a [`TemperedTarget`]: a prior, a model run that gives the
 //! value a particle keeps, and a kernel that is a pure function of that
@@ -16,6 +18,7 @@
 pub mod abc;
 pub mod gibbs;
 pub mod kernel;
+pub mod likelihood;
 pub mod sampler;
 
 use commol_calibration::Workspace;
@@ -27,6 +30,7 @@ pub use gibbs::{
     information_matching_eta,
 };
 pub use kernel::{Kernel, RandomWalk};
+pub use likelihood::{LikelihoodTarget, bayesian_posterior};
 pub use sampler::{SmcRun, SmcSampler, SmcState, SmcStep, Stop, abc_rejection, next_level};
 
 /// The port of a target of the sampler: the distribution at each level is

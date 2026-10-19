@@ -647,7 +647,7 @@ fn a_gibbs_target_needs_a_finite_eta_above_zero() {
 #[test]
 fn abc_keeps_no_distance_outside_the_support_and_stops_on_a_failure() {
     let (problem, priors) = brittle_problem(false);
-    let target = AbcTarget::new(&problem, &priors, Distance::Loss);
+    let target = AbcTarget::new(&problem, &priors, Distance::Loss).unwrap();
     let mut stream = Generator::from_seed(1);
     let mut workspace = Workspace::default();
     let mut evaluate = |k: f64| target.evaluate(&[k], &mut stream, &mut workspace);

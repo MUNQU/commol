@@ -5,19 +5,28 @@
 //! weights. With observation noise ([`ObservationNoise`]) the values of
 //! observations are draws of what an observation would show, so their
 //! interval is a prediction interval; without noise ([`NoNoise`]) it is a
-//! band of the model. A stochastic engine runs every replicate of each draw;
+//! band of the model. [`DistributionNoise`] draws from the observation
+//! models of the problem. A stochastic engine runs every replicate of each draw;
 //! each replicate is a draw of the predictive with an equal share of the
 //! draw's weight.
 
+use commol_calibration::likelihood::log_location;
 use commol_calibration::{
-    CalibrationProblem, EvaluationError, ObservationOperator, ObservedDataPoint,
+    CalibrationProblem, EvaluationError, Likelihood, Noise, ObservationOperator, ObservedDataPoint,
 };
 use commol_core::SimulationEngine;
 use commol_random::Generator;
+use commol_random::sample::{binomial, poisson};
 use rayon::prelude::*;
 
+use crate::distribution::{Distribution, Family, open_uniform};
 use crate::sample::ParameterSample;
+use crate::special::normal_quantile;
 use crate::statistics;
+
+/// Below this share of extra variance, `φμ`, a negative binomial draw is a
+/// Poisson draw.
+const POISSON_LIMIT: f64 = 1e-6;
 
 /// What observations show for the values a draw predicts: the port through
 /// which a method adds observation noise to the draws of a predictive.
@@ -66,6 +75,114 @@ impl ObservationNoise for NoNoise {
     }
 }
 
+/// Observation noise of the observation models of a problem: each draw
+/// draws every observation from the model of its series around the draw's
+/// predicted mean, with the noise parameters of the draw's values.
+///
+/// A mean outside the means a model allows draws at the nearest allowed one
+/// ([`Noise::nearest_mean`]).
+#[derive(Debug, Clone)]
+pub struct DistributionNoise {
+    likelihood: Likelihood,
+}
+
+impl DistributionNoise {
+    /// The noise of the observation models of `problem`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when the problem has a loss instead of observation
+    /// models.
+    pub fn new<E: SimulationEngine>(problem: &CalibrationProblem<E>) -> Result<Self, String> {
+        problem
+            .discrepancy()
+            .likelihood()
+            .cloned()
+            .map(|likelihood| Self { likelihood })
+            .ok_or_else(|| {
+                "DistributionNoise() needs observation models; the problem has a loss. Use \
+                 ResidualNoise(...) for the residuals of a fit"
+                    .to_string()
+            })
+    }
+
+    /// The likelihood of the models.
+    pub fn likelihood(&self) -> &Likelihood {
+        &self.likelihood
+    }
+}
+
+impl ObservationNoise for DistributionNoise {
+    fn check(&self, observations: &[ObservedDataPoint]) -> Result<(), String> {
+        self.likelihood.terms(observations).map(|_| ())
+    }
+
+    fn observe(
+        &self,
+        observations: &[ObservedDataPoint],
+        values: &[f64],
+        predicted: &[f64],
+        generator: &mut Generator,
+        out: &mut [f64],
+    ) {
+        let terms = self
+            .likelihood
+            .terms(observations)
+            .expect("checked before the draws");
+        for ((&term, &mean), shown) in terms.iter().zip(predicted).zip(out.iter_mut()) {
+            *shown = draw_observation(self.likelihood.noise(term, values), mean, generator);
+        }
+    }
+}
+
+/// One observed value drawn from `noise` around `mean`, at the nearest mean
+/// the model allows.
+///
+/// Continuous models invert their distribution function at a uniform number
+/// strictly between 0 and 1; a Student-t divides a normal draw by the root
+/// of a chi-square draw over its degrees of freedom; a negative binomial is
+/// a Poisson draw of a gamma mean, and a Poisson draw when `φμ` is below
+/// `1e-6`.
+pub(crate) fn draw_observation(noise: Noise, mean: f64, generator: &mut Generator) -> f64 {
+    let mean = noise.nearest_mean(mean);
+    match noise {
+        Noise::Normal { sd } => mean + sd * normal_quantile(open_uniform(generator)),
+        Noise::LogNormal { sigma, center } => libm::exp(
+            log_location(mean, sigma, center) + sigma * normal_quantile(open_uniform(generator)),
+        ),
+        Noise::StudentT { df, scale } => {
+            let z = normal_quantile(open_uniform(generator));
+            let chi_square = gamma(0.5 * df, 0.5, generator);
+            mean + scale * z / (chi_square / df).sqrt()
+        }
+        Noise::Poisson => poisson(generator, mean) as f64,
+        Noise::NegativeBinomial { overdispersion } => {
+            if overdispersion * mean < POISSON_LIMIT {
+                poisson(generator, mean) as f64
+            } else {
+                let shape = 1.0 / overdispersion;
+                let rate = shape / mean;
+                let rate_of_counts = gamma(shape, rate, generator);
+                poisson(generator, rate_of_counts) as f64
+            }
+        }
+        Noise::Binomial { trials } => {
+            if trials == 0 {
+                0.0
+            } else {
+                binomial(generator, trials, mean / trials as f64) as f64
+            }
+        }
+    }
+}
+
+/// A gamma draw of `shape` and `rate`, by inversion.
+fn gamma(shape: f64, rate: f64, generator: &mut Generator) -> f64 {
+    Distribution::new(Family::Gamma { shape, rate }, 0.0, f64::INFINITY)
+        .expect("a gamma of positive shape and rate has mass above 0")
+        .sample(generator)
+}
+
 /// Why a predictive could not be built.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PredictiveError {
@@ -89,7 +206,7 @@ impl std::fmt::Display for PredictiveError {
     }
 }
 
-fn check_names<E: SimulationEngine>(
+pub(crate) fn check_names<E: SimulationEngine>(
     problem: &CalibrationProblem<E>,
     sample: &ParameterSample,
 ) -> Result<(), PredictiveError> {

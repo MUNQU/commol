@@ -50,6 +50,7 @@ def calibrate_k1(observed_data, **problem_options) -> float:
         parameters=[
             CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0)
         ],
+        loss_function="sse",
         optimization_config=NelderMeadConfig(max_iterations=2000),
         **problem_options,
     )
@@ -109,7 +110,7 @@ and `window`. It must not be empty.
 
 | Option | Where | Effect |
 |---|---|---|
-| `weight=2.0` | `ObservedDataPoint` | The observation counts twice as much in every loss: its squared (or absolute) residual is multiplied by 2. See [Losses](calibration.md#losses). |
+| `weight=2.0` | `ObservedDataPoint` | The observation counts twice as much in every loss: its squared (or absolute) residual is multiplied by 2. With [observation models](uncertainty/observation-models.md#the-likelihood) its log density is. See [Losses](calibration.md#losses). |
 | `normalize_observations=True` | `CalibrationProblem` | Divides each residual by the RMS of its series, so a series of thousands does not drown a series of tens. |
 
 ```python
@@ -118,7 +119,7 @@ weighted = [
     ObservedDataPoint(at=30, output="B", value=truth["B"][30], weight=1.0),
     ObservedDataPoint(at=30, output="cum_ab", value=truth["cum_ab"][30], weight=1.0),
 ]
-print(calibrate_k1(weighted, loss_function="sse", normalize_observations=True))  # 0.4
+print(calibrate_k1(weighted, normalize_observations=True))  # 0.4
 ```
 
 ## Partial observations: factors
@@ -139,6 +140,7 @@ problem = CalibrationProblem(
     parameters=[
         CalibrationParameter(id="share_seen", parameter_type="factor", min_bound=0.01, max_bound=1.0),
     ],
+    loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=2000),
 )
 scaled_result = Calibrator(Simulation(model(0.4)), problem).run()
@@ -222,6 +224,7 @@ problem = CalibrationProblem(
         for at, value in zip(positions, observed_b)
     ],
     parameters=[CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0)],
+    loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=500),
 )
 print(round(Calibrator(Simulation(ode_model(None)), problem).run().best_parameters["k1"], 3))  # 0.2

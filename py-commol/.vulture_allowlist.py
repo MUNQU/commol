@@ -21,5 +21,6 @@ DistributionProtocol
 SmcRunProtocol
 ConformalRunProtocol
 LossConfigProtocol
+ObservationModelProtocol
 OptimizationConfigProtocol
 EngineTypeProtocol

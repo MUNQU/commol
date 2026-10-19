@@ -23,6 +23,7 @@ from commol.context.constants import (
     PSOMutationApplication,
     PSOMutationStrategy,
 )
+from commol.context.observation_models import ObservationModel
 from commol.utils.security import validate_expression_security
 
 
@@ -58,13 +59,18 @@ class ObservedDataPoint(BaseModel):
         How much this observation counts in the loss (default: 1.0). Every
         loss multiplies the squared or absolute residual by it: ``sse`` is
         ``Σ w·r²``, ``rmse`` is ``√(Σ w·r² / Σ w)``, ``mae`` is
-        ``Σ w·|r| / Σ w``.
+        ``Σ w·|r| / Σ w``. With observation models it is a power of the
+        observation's likelihood, ``w·log p``: a weight of 2 counts the
+        observation twice.
     factor_id : str | None
         Optional factor parameter ID that multiplies the model output before
         comparison
     window : float | None
         Optional window length for a cumulative output: the prediction is the
         output at `at` minus the output at ``at - window``.
+    trials : int | None
+        The trials of this observation, for a `BinomialObservations` model
+        with no ``trials`` of its own (default: None).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -101,6 +107,11 @@ class ObservedDataPoint(BaseModel):
             "Optional window length for cumulative-output observations. "
             "When set, prediction is value(at) - value(at - window)."
         ),
+    )
+    trials: int | None = Field(
+        default=None,
+        ge=0,
+        description="Trials of a binomial observation model that reads them here",
     )
 
     @model_validator(mode="after")
@@ -1070,12 +1081,22 @@ class CalibrationProblem(BaseModel):
         List of parameters to calibrate with their bounds
     constraints : list[CalibrationConstraint]
         List of constraints on calibration parameters (optional, default: empty list)
-    loss_function : str
-        Loss function to use for measuring fit quality: "sse" (default),
-        "rmse" or "mae". Every loss uses the observation weights.
+    loss_function : {"sse", "rmse", "mae"} | None
+        The loss that measures the fit, with the observation weights. A
+        problem has a loss or ``observation_models``, exactly one, with no
+        default: what to fit is a modelling choice.
+    observation_models : dict[str, ObservationModel] | None
+        One observation model per series label (`NormalObservations`,
+        `LogNormalObservations`, `StudentTObservations`,
+        `PoissonObservations`, `NegativeBinomialObservations`,
+        `BinomialObservations`): the problem fits by maximum likelihood, and
+        its loss is the negative log-likelihood. Every observed series needs
+        one, and every parameter of type ``"noise"`` must be an argument of
+        one. It needs a deterministic engine.
     normalize_observations : bool
         When True, divide each residual by the RMS of its observation series
-        before applying the loss metric (default: False).
+        before applying the loss metric (default: False). It needs a loss:
+        observation models set the scale of each series with their noise.
     optimization_config : OptimizationConfig
         Configuration for the optimization algorithm
     initial_condition_remainder : str | None
@@ -1118,9 +1139,13 @@ class CalibrationProblem(BaseModel):
         default_factory=list,
         description="Constraints on calibration parameters",
     )
-    loss_function: str = Field(
-        default=LossFunction.SSE,
+    loss_function: str | None = Field(
+        default=None,
         description="Loss function to use for measuring fit quality",
+    )
+    observation_models: dict[str, ObservationModel] | None = Field(
+        default=None,
+        description="One observation model per series label",
     )
     normalize_observations: bool = Field(
         default=False,
@@ -1160,12 +1185,33 @@ class CalibrationProblem(BaseModel):
 
     @field_validator("loss_function")
     @classmethod
-    def validate_loss_function(cls, v: str) -> str:
-        if v not in LossFunction:
+    def validate_loss_function(cls, v: str | None) -> str | None:
+        if v is not None and v not in LossFunction:
             raise ValueError(
                 f"Invalid loss_function: {v}. Must be one of {list(LossFunction)}"
             )
         return v
+
+    @model_validator(mode="after")
+    def validate_loss_or_models(self) -> Self:
+        """Require a loss or observation models, exactly one."""
+        if self.loss_function is not None and self.observation_models is not None:
+            raise ValueError(
+                "A problem has a loss_function or observation_models, not both: "
+                "the fit and the posterior would answer different questions."
+            )
+        if self.loss_function is None and self.observation_models is None:
+            raise ValueError(
+                "A problem needs a loss_function (one of "
+                f"{', '.join(LossFunction)}) or observation_models. There is no "
+                "default: what to fit is a modelling choice."
+            )
+        if self.observation_models is not None and self.normalize_observations:
+            raise ValueError(
+                "normalize_observations needs a loss_function: the observation "
+                "models set the scale of each series with their noise."
+            )
+        return self
 
     @model_validator(mode="after")
     def validate_unique_parameter_ids(self) -> Self:

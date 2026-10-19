@@ -95,8 +95,8 @@ def applied_parameters_report(
 
     Parameters that are not a single number, such as a formula or a
     series, are omitted: they are inputs rather than fitted values.
-    ``factor`` parameters have no place in the model, so they are reported from
-    `problem` when it is given.
+    ``factor`` and ``noise`` parameters have no place in the model, so they are
+    reported from `problem` when it is given.
 
     ``initial_amounts`` gives each bin and each overridden compartment of an
     aggregate model its ``amount`` the engine builds and the ``unit`` of its
@@ -120,7 +120,8 @@ def applied_parameters_report(
         The calibration result, or a mapping of parameter id to value such as
         one draw of a sample.
     problem : CalibrationProblem | None, optional
-        The problem the result came from, used to report factor parameters.
+        The problem the result came from, used to report factor and noise
+        parameters.
     sample : ParameterSample | None, optional
         Draws of the parameters, such as the sample of an uncertainty method.
     confidence_level : float | None, optional
@@ -149,10 +150,13 @@ def applied_parameters_report(
         for parameter in model.parameters
         if isinstance(parameter.value, (int, float))
     }
-    for factor_id in _factor_ids(problem):
-        if factor_id in calibrated:
-            parameters[factor_id] = _parameter_entry(
-                factor_id, calibrated[factor_id], calibrated_ids, parameter_statistics
+    for observation_id in _observation_parameter_ids(problem):
+        if observation_id in calibrated:
+            parameters[observation_id] = _parameter_entry(
+                observation_id,
+                calibrated[observation_id],
+                calibrated_ids,
+                parameter_statistics,
             )
 
     report: dict[str, object] = {}
@@ -166,14 +170,16 @@ def applied_parameters_report(
     return cast(AppliedParametersReport, report)
 
 
-def _factor_ids(problem: CalibrationProblem | None) -> list[str]:
-    """Ids of the problem's factor parameters, in declaration order."""
+def _observation_parameter_ids(problem: CalibrationProblem | None) -> list[str]:
+    """Ids of the problem's factor and noise parameters, which describe the
+    observations, in declaration order."""
     if problem is None:
         return []
     return [
         parameter.id
         for parameter in problem.parameters
-        if parameter.parameter_type == CalibrationParameterType.FACTOR
+        if parameter.parameter_type
+        in (CalibrationParameterType.FACTOR, CalibrationParameterType.NOISE)
     ]
 
 

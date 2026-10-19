@@ -1,17 +1,23 @@
 //! Scores of a predictive against observations: empirical coverage, the
 //! interval score, the weighted interval score, the CRPS of a weighted
-//! sample, and PIT values.
+//! sample, PIT values, and the log score of observation models.
 //!
-//! Every score takes the draws of a predictive at a set of observations
-//! ([`ObservationDraws`]) and the observed values, and returns one value per
-//! observation; [`by_series`] averages them per series. Which observations
-//! to score, for example the ones held out of a calibration, is the caller's
-//! choice.
+//! Every score but the log score takes the draws of a predictive at a set of
+//! observations ([`ObservationDraws`]) and the observed values; the log score
+//! reads the density of the observation models at each draw's predicted
+//! mean. Each returns one value per observation; [`by_series`] averages them
+//! per series. Which observations to score, for example the ones held out of
+//! a calibration, is the caller's choice.
 
-use commol_calibration::weighted_crps;
+use commol_calibration::{CalibrationProblem, ObservedDataPoint, weighted_crps};
+use commol_core::SimulationEngine;
 use commol_random::Generator;
 
-use crate::predictive::ObservationDraws;
+use crate::predictive::{
+    DistributionNoise, ObservationDraws, ObservationNoise, PredictiveError, check_names,
+    observe_sets,
+};
+use crate::sample::ParameterSample;
 use crate::statistics;
 
 fn column(draws: &ObservationDraws, observation: usize) -> Vec<f64> {
@@ -167,6 +173,70 @@ pub fn pit(draws: &ObservationDraws, observed: &[f64], seed: u64) -> Result<Vec<
         .collect())
 }
 
+/// The log score of each of `observations`: the log density of its
+/// observed value under the predictive, the mixture over the draws of
+/// `sample` of the observation models of `noise`,
+/// `log Σ_d w_d · p(y | μ_d, θ_d)`, where `μ_d` is the draw's predicted mean
+/// (the nearest the model allows) and `θ_d` its noise parameters. A
+/// replicate of a draw is a draw with an equal share of its weight. Higher
+/// is better; an observation the predictive gives no mass scores `−∞`.
+///
+/// # Errors
+///
+/// Returns an error when the sample's parameters are not the problem's, an
+/// observation names an unknown output or factor or a series with no model,
+/// or a draw has no run.
+pub fn log_score<E>(
+    problem: &CalibrationProblem<E>,
+    sample: &ParameterSample,
+    observations: &[ObservedDataPoint],
+    noise: &DistributionNoise,
+) -> Result<Vec<f64>, PredictiveError>
+where
+    E: SimulationEngine + Send + Sync,
+{
+    check_names(problem, sample)?;
+    noise
+        .check(observations)
+        .map_err(PredictiveError::Mismatch)?;
+    let likelihood = noise.likelihood();
+    let terms = likelihood
+        .terms(observations)
+        .expect("checked by the noise");
+    let runs = observe_sets(problem, sample.values(), observations)?;
+    let mut draws: Vec<(f64, &[f64], &[f64])> = Vec::new();
+    for ((replicates, &weight), values) in runs.iter().zip(sample.weights()).zip(sample.values()) {
+        let share = libm::log(weight / replicates.len() as f64);
+        for predicted in replicates {
+            draws.push((share, values, predicted));
+        }
+    }
+    Ok(observations
+        .iter()
+        .zip(&terms)
+        .enumerate()
+        .map(|(i, (obs, &term))| {
+            let logs: Vec<f64> = draws
+                .iter()
+                .map(|&(share, values, predicted)| {
+                    let model = likelihood.noise(term, values);
+                    share + model.log_density(obs.value, model.nearest_mean(predicted[i]))
+                })
+                .collect();
+            log_sum_exp(&logs)
+        })
+        .collect())
+}
+
+/// `log Σ exp(xᵢ)`, from the largest term; `−∞` when every term is.
+fn log_sum_exp(terms: &[f64]) -> f64 {
+    let largest = terms.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    if largest == f64::NEG_INFINITY {
+        return largest;
+    }
+    largest + libm::log(terms.iter().map(|&x| libm::exp(x - largest)).sum::<f64>())
+}
+
 /// The mean of `values` per series, named by `labels`, in the order each
 /// series first appears.
 ///
@@ -260,6 +330,13 @@ mod tests {
             weights: vec![],
         };
         assert!(crps(&empty, &[]).unwrap_err().contains("at least one draw"));
+    }
+
+    #[test]
+    fn the_log_sum_of_no_mass_is_minus_infinity() {
+        assert_eq!(log_sum_exp(&[f64::NEG_INFINITY; 2]), f64::NEG_INFINITY);
+        let value = log_sum_exp(&[libm::log(0.25), libm::log(0.5)]);
+        assert!((value - libm::log(0.75)).abs() < 1e-15);
     }
 
     #[test]

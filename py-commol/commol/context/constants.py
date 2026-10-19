@@ -16,11 +16,15 @@ class CalibrationParameterType(StrEnum):
         Initial amount of a compartment, bin or category
     FACTOR
         Factor that multiplies the model output of an observation
+    NOISE
+        Argument of an observation model, such as its standard deviation; it
+        never reaches the engine
     """
 
     PARAMETER = "parameter"
     INITIAL_CONDITION = "initial_condition"
     FACTOR = "factor"
+    NOISE = "noise"
 
 
 @unique

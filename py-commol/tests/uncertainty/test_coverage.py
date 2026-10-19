@@ -11,7 +11,9 @@ chain binomial from the units that moved in one step.
 
 A prediction interval holds a new observation, not a fixed value: a study of
 one shifts the interval by the observation, so it holds 0 when it holds the
-observation.
+observation. The posterior predictive of a normal observation model, with
+the priors ``c`` uniform and ``sd`` log-uniform, gives the Student-t
+prediction interval, which covers a new observation at its level.
 """
 
 import math
@@ -21,18 +23,24 @@ import pytest
 
 from commol import (
     AbcSmc,
+    BayesianPosterior,
     CalibrationProblem,
     Calibrator,
+    DistributionNoise,
     EnbPI,
     EtaCalibration,
     GibbsPosterior,
     JackknifePlus,
+    LogUniform,
     LossDistance,
     NelderMeadConfig,
+    NormalObservations,
     ObservedDataPoint,
+    Predictive,
     Priors,
     Simulation,
     SplitConformal,
+    Uniform,
     weighted_quantiles,
 )
 from commol.context.inference.smc import BootstrapCoverage, InformationMatching
@@ -277,6 +285,41 @@ class TestEnbPI:
             )
             series = result.intervals.series["B"]
             return _held(series.lower[0], series.upper[0], float(values[60]))
+
+        study = _conformal_study(make, level)
+
+        assert study.calibrated(), study
+
+
+@pytest.mark.coverage_study
+class TestPosteriorPredictive:
+    def test_posterior_predictive_with_noise_is_calibrated(self) -> None:
+        level = 0.9
+        method = BayesianPosterior(
+            priors=Priors(distributions={"c": Uniform(), "sd": LogUniform()}),
+            particles=400,
+            target_cess=0.5,
+            resample_threshold=0.5,
+            stay_probability=0.05,
+        )
+
+        def make(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+            values = FLOW + rng.normal(0.0, FLOW_NOISE, 16)
+            calibrator = flow_calibrator(
+                values[:15].tolist(),
+                windowed=True,
+                seed=index,
+                observation_models={"B": NormalObservations(sd="sd")},
+                noise=[bounded("sd", 0.05, 20.0, kind="noise")],
+            )
+            sample = calibrator.uncertainty(method).sample
+            held_out = flow_observations([float(values[15])], windowed=True, start=16)
+            band = (
+                Predictive(calibrator, sample, [0, 1])
+                .at_observations(held_out, DistributionNoise())
+                .band(level)
+            )
+            return _held(band.lower[0], band.upper[0], float(values[15]))
 
         study = _conformal_study(make, level)
 

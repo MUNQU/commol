@@ -29,6 +29,8 @@ Guide: [Uncertainty](../guide/uncertainty/index.md).
 
 ::: commol.context.inference.noise.ResidualNoise
 
+::: commol.context.inference.noise.DistributionNoise
+
 ## Resampling
 
 Guide: [Resampling](../guide/uncertainty/resampling.md).
@@ -40,6 +42,8 @@ Guide: [Resampling](../guide/uncertainty/resampling.md).
 ::: commol.context.inference.resampling.WildBootstrap
 
 ::: commol.context.inference.resampling.BlockJackknife
+
+::: commol.context.inference.resampling.ParametricBootstrap
 
 ::: commol.context.inference.resampling.BootstrapResult
 
@@ -68,6 +72,8 @@ Guide: [Sequential Monte Carlo](../guide/uncertainty/smc.md).
 ::: commol.context.inference.distributions.Gamma
 
 ::: commol.context.inference.smc.GibbsPosterior
+
+::: commol.context.inference.smc.BayesianPosterior
 
 ::: commol.context.inference.smc.EtaCalibration
 

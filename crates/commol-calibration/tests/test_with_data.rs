@@ -94,6 +94,7 @@ fn problem() -> CalibrationProblem<LineEngine> {
     )
     .unwrap()
     .with_observation_normalization(true)
+    .unwrap()
 }
 
 #[test]
@@ -113,7 +114,7 @@ fn with_data_of_the_same_data_is_the_same_problem() {
 
 #[test]
 fn with_data_compares_with_the_new_values_and_weights() {
-    let problem = problem().with_observation_normalization(false);
+    let problem = problem().with_observation_normalization(false).unwrap();
     let copy = problem
         .with_data(&[0.0, 1.0, 2.0, 3.0], &[1.0, 0.0, 1.0, 1.0])
         .unwrap();

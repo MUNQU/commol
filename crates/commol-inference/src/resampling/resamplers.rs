@@ -1,10 +1,12 @@
 //! The resamplers: each draws the data of one replicate, as new weights or
 //! new observed values.
 
-use commol_calibration::ObservedDataPoint;
+use commol_calibration::{CalibrationProblem, ObservedDataPoint, Workspace};
+use commol_core::SimulationEngine;
 use commol_random::Generator;
 use commol_random::sample::exponential;
 
+use crate::predictive::{DistributionNoise, ObservationNoise};
 use crate::resampling::blocks::BlockScheme;
 use crate::resampling::residuals::{ResidualBlocks, Residuals, SeriesResiduals, source_positions};
 
@@ -64,6 +66,60 @@ impl BayesianBootstrap {
 impl Resampler for BayesianBootstrap {
     fn replicate(&self, generator: &mut Generator) -> Perturbation {
         Perturbation::Weights(self.draw_weights(generator))
+    }
+}
+
+/// The parametric bootstrap: each replicate draws every observed value from
+/// the observation model of its series at the fit, around the fit's
+/// predicted mean and with the fit's noise parameters.
+#[derive(Debug, Clone)]
+pub struct ParametricResampler {
+    noise: DistributionNoise,
+    observations: Vec<ObservedDataPoint>,
+    fit: Vec<f64>,
+    predicted: Vec<f64>,
+}
+
+impl ParametricResampler {
+    /// The bootstrap of the observation models of `problem` at `fit`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when the problem has a loss instead of observation
+    /// models, or the fit is not feasible or has no run.
+    pub fn new<E: SimulationEngine>(
+        problem: &CalibrationProblem<E>,
+        fit: &[f64],
+    ) -> Result<Self, String> {
+        let noise = DistributionNoise::new(problem).map_err(|_| {
+            "ParametricBootstrap(...) needs observation models; the problem has a loss. Use \
+             ResidualBootstrap(...) or WildBootstrap(...)"
+                .to_string()
+        })?;
+        let mut workspace = Workspace::default();
+        problem
+            .evaluate(fit, &mut workspace)
+            .map_err(|error| format!("The fit has no likelihood: {error}"))?;
+        Ok(Self {
+            noise,
+            observations: problem.observed_data().to_vec(),
+            fit: fit.to_vec(),
+            predicted: workspace.predictions,
+        })
+    }
+}
+
+impl Resampler for ParametricResampler {
+    fn replicate(&self, generator: &mut Generator) -> Perturbation {
+        let mut values = vec![0.0; self.predicted.len()];
+        self.noise.observe(
+            &self.observations,
+            &self.fit,
+            &self.predicted,
+            generator,
+            &mut values,
+        );
+        Perturbation::Values(values)
     }
 }
 

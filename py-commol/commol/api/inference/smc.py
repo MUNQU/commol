@@ -18,6 +18,7 @@ from commol.context.inference.smc import (
     AbcDistance,
     AbcRejection,
     AbcSmc,
+    BayesianPosterior,
     BootstrapCoverage,
     GibbsPosterior,
     GibbsResult,
@@ -145,6 +146,48 @@ def run_gibbs_posterior(
     )
 
 
+def run_bayesian_posterior(
+    calibrator: "Calibrator", method: BayesianPosterior
+) -> SmcResult:
+    """
+    Sample the posterior of the problem's observation models.
+
+    Parameters
+    ----------
+    calibrator : Calibrator
+        The calibration problem, with observation models.
+    method : BayesianPosterior
+        The settings.
+
+    Returns
+    -------
+    SmcResult
+        The sample, the temperatures, the log evidence and the diagnostics.
+    """
+    run = rust.bayesian_posterior(
+        calibrator.rust_problem,
+        method.priors.rust_priors(),
+        method.particles,
+        method.resample_threshold,
+        method.target_cess,
+        method.stay_probability,
+        calibrator.seed,
+    )
+    return SmcResult(
+        sample=_sample(
+            calibrator,
+            run,
+            SampleMethod(
+                name="bayesian_posterior", settings=method.model_dump(mode="json")
+            ),
+        ),
+        levels=run.levels,
+        kept=run.kept,
+        log_evidence=run.log_evidence,
+        diagnostics=_diagnostics(run, []),
+    )
+
+
 def run_abc_smc(calibrator: "Calibrator", method: AbcSmc) -> SmcResult:
     """
     Sample ABC by sequential Monte Carlo.
@@ -222,5 +265,6 @@ def run_abc_rejection(calibrator: "Calibrator", method: AbcRejection) -> SmcResu
 
 
 register(GibbsPosterior, run_gibbs_posterior)
+register(BayesianPosterior, run_bayesian_posterior)
 register(AbcSmc, run_abc_smc)
 register(AbcRejection, run_abc_rejection)

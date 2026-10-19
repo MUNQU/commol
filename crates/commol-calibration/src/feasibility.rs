@@ -38,15 +38,23 @@ pub enum Violation {
     InfeasibleRun,
     /// The run or the discrepancy is not a finite number.
     NonFinite,
+    /// A predicted mean lies outside the means its observation model
+    /// allows; `amount` is the sum of the distances to them.
+    MeanOutsideModel {
+        /// Sum of the distances of the means to the means the models allow.
+        amount: f64,
+    },
 }
 
 impl Violation {
     /// The size of the violation on the scale of the objective's penalty:
-    /// the constraint or bound amount, 100 times the excess of an infeasible
-    /// start, and 0 for an infeasible or non-finite run.
+    /// the constraint, bound or mean amount, 100 times the excess of an
+    /// infeasible start, and 0 for an infeasible or non-finite run.
     pub fn amount(&self) -> f64 {
         match *self {
-            Self::OutOfBounds { amount } | Self::Constraint { amount } => amount,
+            Self::OutOfBounds { amount }
+            | Self::Constraint { amount }
+            | Self::MeanOutsideModel { amount } => amount,
             Self::InfeasibleStart { excess } => 100.0 * excess,
             Self::InfeasibleRun | Self::NonFinite => 0.0,
         }

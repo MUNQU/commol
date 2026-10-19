@@ -293,7 +293,8 @@ fn a_problem_of_replicates_has_no_finite_differences() {
         vec![ObservedDataPoint::new(1.0, "A".to_string(), 0.0)],
         vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
     )
-    .with_replicates(Some(Replicates::new(2, 1, ReplicateSummary::Mean).unwrap()));
+    .with_replicates(Some(Replicates::new(2, 1, ReplicateSummary::Mean).unwrap()))
+    .unwrap();
 
     let error = FiniteDifferences::new(&problem, Design::Observations).err();
 

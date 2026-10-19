@@ -61,6 +61,7 @@ problem = CalibrationProblem(
     parameters=[
         CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0)
     ],
+    loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=500),
 )
 

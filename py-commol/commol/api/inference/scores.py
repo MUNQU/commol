@@ -1,10 +1,11 @@
 """Scores of a predictive against observations.
 
-Every score is computed in Rust from each draw's value of the observations
-(`Predictive.at_observations`), per observation and per series. Which
-observations to score, for example the ones held out of the calibration, and
-the observation noise are arguments with no default: a band of the model
-(`NoNoise`) compared with data covers less than its level.
+Every score is computed in Rust, per observation and per series: from each
+draw's value of the observations (`Predictive.at_observations`), or, for the
+log score, from the density of the observation models at each draw's
+prediction. Which observations to score, for example the ones held out of the
+calibration, and the observation noise are arguments with no default: a band
+of the model (`NoNoise`) compared with data covers less than its level.
 """
 
 from collections.abc import Sequence
@@ -13,8 +14,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from commol.api.inference.predictive import ObservationDraws, Predictive
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context._model import engine_state
 from commol.context.calibration import ObservedDataPoint
-from commol.context.inference.noise import ObservationNoise
+from commol.context.inference.noise import DistributionNoise, ObservationNoise
 
 
 class Score(BaseModel):
@@ -40,7 +42,11 @@ class Score(BaseModel):
 
 
 def _score(draws: ObservationDraws, values: list[float]) -> Score:
-    labels = [point.label for point in draws.observations]
+    return _score_of(draws.observations, values)
+
+
+def _score_of(observations: Sequence[ObservedDataPoint], values: list[float]) -> Score:
+    labels = [point.label for point in observations]
     per_series = dict(commol_rs.inference.by_series(labels, values))
     overall = commol_rs.inference.by_series(["all"] * len(values), values)
     return Score(
@@ -65,7 +71,7 @@ def coverage(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
     confidence_level : float
         Strictly between 0 and 1.
@@ -95,7 +101,7 @@ def interval_score(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
     confidence_level : float
         The level ``c`` of the central interval; ``α = 1 − c``.
@@ -129,7 +135,7 @@ def weighted_interval_score(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
     confidence_levels : Sequence[float]
         The levels of the central intervals.
@@ -171,7 +177,7 @@ def crps(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
 
     Returns
@@ -202,7 +208,7 @@ def pit(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
     seed : int
         Seed of the randomization of ties.
@@ -214,3 +220,52 @@ def pit(
     """
     draws = predictive.at_observations(observations, noise)
     return _score(draws, draws.rust_draws.pit(draws.observed, seed))
+
+
+def log_score(
+    predictive: Predictive,
+    observations: Sequence[ObservedDataPoint],
+    noise: DistributionNoise,
+) -> Score:
+    """
+    The log score of each observation: the log density of its value under
+    the predictive.
+
+    The predictive density is the mixture over the draws of the observation
+    models, ``log Σ_d w_d · p(y | μ_d)``, with ``μ_d`` the prediction of draw
+    ``d`` and its noise parameters. It needs the densities of the models, so
+    only `DistributionNoise` has one. A proper scoring rule; higher is
+    better, and an observation the predictive gives no mass scores ``-inf``.
+
+    Parameters
+    ----------
+    predictive : Predictive
+        The predictive, of a problem with ``observation_models``.
+    observations : Sequence[ObservedDataPoint]
+        The observations to score.
+    noise : DistributionNoise
+        The observation models of the problem.
+
+    Returns
+    -------
+    Score
+        The log score of each observation.
+
+    Raises
+    ------
+    TypeError
+        If `noise` is not `DistributionNoise`.
+    ValueError
+        If the problem has a loss, or an observation names an unknown output
+        or factor or a series with no observation model.
+    """
+    if not isinstance(noise, DistributionNoise):
+        raise TypeError(
+            f"The log score needs the density of the observation models, so it "
+            f"takes DistributionNoise(); {type(noise).__name__} has no density."
+        )
+    values = predictive.calibrator.rust_problem.log_score(
+        predictive.sample.rust_sample,
+        engine_state.rust_observed_data(list(observations)),
+    )
+    return _score_of(observations, values)

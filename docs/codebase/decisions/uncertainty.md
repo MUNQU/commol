@@ -133,7 +133,9 @@ function of that value. Reweighting and the choice of the next level read the
 kept values, so they run no model: only a proposed move calls `evaluate`. The
 Gibbs posterior keeps the loss (`−level · η · loss`, temperatures from 0 to
 1); ABC keeps the distance (0 within the tolerance, `−∞` outside); the
-likelihood of an observation model will keep its log likelihood.
+posterior of observation models (`LikelihoodTarget`, `smc/likelihood.rs`)
+keeps the log-likelihood (`level · log L`), so its log evidence is the log
+marginal likelihood.
 
 The sampler owns the rest, the same for every target: the next level by
 bisection on the conditional effective sample size, to `target_cess`;
@@ -178,7 +180,10 @@ an order statistic whose expected coverage is below it.
 
 Every reader of observations of a sample (`Predictive.at_observations`, every
 function of `commol.scores`) takes the noise with no default: `NoNoise()` gives
-a band of the model, `ResidualNoise(...)` a prediction interval. The Rust port
+a band of the model, `ResidualNoise(...)` and `DistributionNoise()` (the
+observation models of the problem) a prediction interval. The log score needs
+a density, so it takes only `DistributionNoise`; the parametric bootstrap
+(`ParametricResampler`) draws its data sets with the same draws. The Rust port
 `ObservationNoise` (`crates/commol-inference/src/predictive.rs`) sees one
 draw's whole vector of observations with the draw's parameter values, so a
 noise can draw blocks of residuals across observations, and a noise model can
@@ -191,8 +196,12 @@ has residuals of.
 | A port per observation | It cannot draw one block for several observations, and sees no position or series. |
 | Residual noise on the band at positions | A series may sum outputs with a factor: a residual has no correct split among outputs, and none for an output nobody observed. |
 
+| A kernel density of the draws for the log score | A bandwidth to choose, and bias in the tails the log score weighs most. |
+
 **Guards:** `crates/commol-inference/tests/test_resampling.rs::residual_noise_rejects_a_series_with_no_residuals`,
-`tests/uncertainty/test_resampling.py::TestResidualNoise`.
+`tests/uncertainty/test_resampling.py::TestResidualNoise`,
+`crates/commol-inference/tests/test_likelihood_target.rs`,
+`tests/uncertainty/test_scores.py::TestLogScore`.
 
 ## Conformal variants share one score and one quantile
 

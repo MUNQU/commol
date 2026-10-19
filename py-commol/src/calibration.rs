@@ -11,6 +11,7 @@ pub enum PyCalibrationParameterType {
     Parameter,
     InitialCondition,
     Factor,
+    Noise,
 }
 
 impl From<PyCalibrationParameterType> for commol_calibration::CalibrationParameterType {
@@ -24,6 +25,9 @@ impl From<PyCalibrationParameterType> for commol_calibration::CalibrationParamet
             }
             PyCalibrationParameterType::Factor => {
                 commol_calibration::CalibrationParameterType::Factor
+            }
+            PyCalibrationParameterType::Noise => {
+                commol_calibration::CalibrationParameterType::Noise
             }
         }
     }
@@ -48,8 +52,11 @@ impl PyObservedDataPoint {
     ///     weight: Optional weight for this observation (default: 1.0)
     ///     factor_id: Optional factor parameter ID that multiplies the model output
     ///     window: Optional window length for a cumulative output
+    ///     trials: Optional trials of a binomial observation model that
+    ///         reads them from each observation
     #[new]
-    #[pyo3(signature = (at, label, outputs, value, weight=None, factor_id=None, window=None))]
+    #[pyo3(signature = (at, label, outputs, value, weight=None, factor_id=None, window=None, trials=None))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         at: f64,
         label: String,
@@ -58,12 +65,104 @@ impl PyObservedDataPoint {
         weight: Option<f64>,
         factor_id: Option<String>,
         window: Option<f64>,
+        trials: Option<u64>,
     ) -> Self {
         let mut inner = commol_calibration::ObservedDataPoint::of_sum(at, label, outputs, value);
         inner.weight = weight.unwrap_or(1.0);
         inner.factor_id = factor_id;
         inner.window = window;
+        inner.trials = trials;
         Self { inner }
+    }
+}
+
+/// A noise argument of an observation model: a number, or the id of a noise
+/// parameter.
+#[derive(FromPyObject)]
+pub enum PyArgument {
+    Value(f64),
+    Parameter(String),
+}
+
+impl From<PyArgument> for commol_calibration::Argument {
+    fn from(argument: PyArgument) -> Self {
+        match argument {
+            PyArgument::Value(value) => Self::Value(value),
+            PyArgument::Parameter(id) => Self::Parameter(id),
+        }
+    }
+}
+
+/// How the observed values of one series scatter around their predicted
+/// mean
+#[pyclass(name = "ObservationModel", frozen, from_py_object)]
+#[derive(Clone)]
+pub struct PyObservationModel {
+    pub inner: commol_calibration::ObservationModel,
+}
+
+#[pymethods]
+impl PyObservationModel {
+    /// Normal of mean the prediction and standard deviation `sd`
+    #[staticmethod]
+    fn normal(sd: PyArgument) -> Self {
+        Self {
+            inner: commol_calibration::ObservationModel::Normal { sd: sd.into() },
+        }
+    }
+
+    /// Log-normal whose median, with `median`, or mean is the prediction
+    #[staticmethod]
+    fn log_normal(sigma: PyArgument, median: bool) -> Self {
+        Self {
+            inner: commol_calibration::ObservationModel::LogNormal {
+                sigma: sigma.into(),
+                center: if median {
+                    commol_calibration::Center::Median
+                } else {
+                    commol_calibration::Center::Mean
+                },
+            },
+        }
+    }
+
+    /// Student-t of center the prediction
+    #[staticmethod]
+    fn student_t(df: PyArgument, scale: PyArgument) -> Self {
+        Self {
+            inner: commol_calibration::ObservationModel::StudentT {
+                df: df.into(),
+                scale: scale.into(),
+            },
+        }
+    }
+
+    /// Poisson of mean the prediction
+    #[staticmethod]
+    fn poisson() -> Self {
+        Self {
+            inner: commol_calibration::ObservationModel::Poisson,
+        }
+    }
+
+    /// Negative binomial of mean the prediction and variance `μ + φμ²`
+    #[staticmethod]
+    fn negative_binomial(overdispersion: PyArgument) -> Self {
+        Self {
+            inner: commol_calibration::ObservationModel::NegativeBinomial {
+                overdispersion: overdispersion.into(),
+            },
+        }
+    }
+
+    /// Binomial of mean the prediction: `trials` for the series, or None to
+    /// read the trials of each observation
+    #[staticmethod]
+    #[pyo3(signature = (trials=None))]
+    fn binomial(trials: Option<u64>) -> Self {
+        Self {
+            inner: commol_calibration::ObservationModel::Binomial { trials },
+        }
     }
 }
 
@@ -849,6 +948,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCalibrationParameter>()?;
     m.add_class::<PyCalibrationConstraint>()?;
     m.add_class::<PyLossConfig>()?;
+    m.add_class::<PyObservationModel>()?;
     m.add_class::<PyNelderMeadConfig>()?;
     m.add_class::<PyPSOInertiaConstant>()?;
     m.add_class::<PyPSOInertiaChaotic>()?;

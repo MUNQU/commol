@@ -12,6 +12,26 @@ Fits a model to observations. Guide: [Model Calibration](../guide/calibration.md
 
 ::: commol.context.calibration.ObservedDataPoint
 
+## Observation models
+
+Guide: [Observation Models](../guide/uncertainty/observation-models.md).
+
+::: commol.context.observation_models.ObservationModel
+
+::: commol.context.observation_models.NormalObservations
+
+::: commol.context.observation_models.LogNormalObservations
+
+::: commol.context.observation_models.StudentTObservations
+
+::: commol.context.observation_models.PoissonObservations
+
+::: commol.context.observation_models.NegativeBinomialObservations
+
+::: commol.context.observation_models.BinomialObservations
+
+## Unknowns, optimizers and results
+
 ::: commol.context.calibration.CalibrationParameter
 
 ::: commol.context.calibration.CalibrationConstraint

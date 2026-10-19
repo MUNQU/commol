@@ -7,24 +7,24 @@
 //! starts all run here.
 
 use commol_calibration::{
-    CalibrationProblem, EvaluationError, StartOutcome, Violation, Workspace, optimize_starts,
-    optimize_with_history,
+    CalibrationProblem, DiscrepancyConfig, EvaluationError, StartOutcome, Violation, Workspace,
+    optimize_starts, optimize_with_history,
 };
 use commol_inference::resampling::{
-    BayesianBootstrap, BlockDrawing, BlockScheme, Multipliers, ReplicateRunner, Resampler,
-    ResidualBlocks, ResidualBootstrap, ResidualNoise, ResidualScale, Residuals, WildBootstrap,
-    automatic_block_length, block_jackknife, bootstrap,
+    BayesianBootstrap, BlockDrawing, BlockScheme, Multipliers, ParametricResampler,
+    ReplicateRunner, Resampler, ResidualBlocks, ResidualBootstrap, ResidualNoise, ResidualScale,
+    Residuals, WildBootstrap, automatic_block_length, block_jackknife, bootstrap,
 };
 use commol_inference::{
-    NoNoise, ObservationDraws, ObservationNoise, ParameterSample, Predictive, PredictiveError,
-    observation_draws, scores, statistics,
+    DistributionNoise, NoNoise, ObservationDraws, ObservationNoise, ParameterSample, Predictive,
+    PredictiveError, observation_draws, scores, statistics,
 };
 use pyo3::prelude::*;
 use rayon::prelude::*;
 
 use crate::calibration::{
     PyCalibrationConstraint, PyCalibrationParameter, PyCalibrationResultWithHistory, PyLossConfig,
-    PyObservedDataPoint, PyOptimizationConfig, PyStartOutcome,
+    PyObservationModel, PyObservedDataPoint, PyOptimizationConfig, PyStartOutcome,
 };
 use crate::engine::{Engine, InfeasibleStateError, PyEngine};
 
@@ -55,7 +55,7 @@ fn prediction_error(index: usize, error: EvaluationError) -> PyErr {
 
 impl PyCalibrationProblem {
     /// Run `replicates` of the resampler that `resampler` makes from the fit,
-    /// and the block length it chose.
+    /// and the block length it chose, if it draws blocks.
     #[allow(clippy::too_many_arguments)]
     fn run_bootstrap(
         &self,
@@ -65,7 +65,7 @@ impl PyCalibrationProblem {
         replicates: usize,
         starts: usize,
         seed: u64,
-        resampler: impl FnOnce(&[f64]) -> PyResult<(Box<dyn Resampler>, BlockLength)>,
+        resampler: impl FnOnce(&[f64]) -> PyResult<(Box<dyn Resampler>, Option<BlockLength>)>,
     ) -> PyResult<PyBootstrapRun> {
         let runner = ReplicateRunner::new(&self.inner, &config.inner, fit, starts, seed)
             .map_err(value_error)?;
@@ -83,8 +83,8 @@ impl PyCalibrationProblem {
             failed: run.failed,
             not_converged: run.not_converged,
             negative_values: run.negative_values,
-            block_length: chosen.length,
-            block_length_estimates: chosen.estimates,
+            block_length: chosen.as_ref().map(|chosen| chosen.length),
+            block_length_estimates: chosen.and_then(|chosen| chosen.estimates),
         })
     }
 }
@@ -98,34 +98,67 @@ impl PyCalibrationProblem {
     ///     observed_data: Observations to fit
     ///     parameters: Parameters to calibrate, in problem order
     ///     constraints: Constraints on parameters and outputs
-    ///     loss_config: Loss, normalization and replicates
+    ///     loss_config: Loss, normalization and replicates; None with
+    ///         observation models
     ///     initial_condition_remainder: Compartment or bin that takes what
     ///         the other compartments leave of the amounts the model states,
     ///         if any
+    ///     observation_models: `(series label, model)` of each series; None
+    ///         with a loss
     ///
     /// Raises:
-    ///     ValueError: If the problem is not valid for the engine
+    ///     ValueError: If the problem is not valid for the engine, it has
+    ///         both or neither of a loss and observation models, or it has
+    ///         observation models and a stochastic engine
     #[new]
-    #[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, initial_condition_remainder=None))]
+    #[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config=None, initial_condition_remainder=None, observation_models=None))]
     fn new(
         engine: PyRef<'_, PyEngine>,
         observed_data: Vec<PyObservedDataPoint>,
         parameters: Vec<PyCalibrationParameter>,
         constraints: Vec<PyCalibrationConstraint>,
-        loss_config: &PyLossConfig,
+        loss_config: Option<PyRef<'_, PyLossConfig>>,
         initial_condition_remainder: Option<String>,
+        observation_models: Option<Vec<(String, PyObservationModel)>>,
     ) -> PyResult<Self> {
-        let value_error = PyErr::new::<pyo3::exceptions::PyValueError, _>;
+        let engine = engine.engine();
+        let discrepancy = match (&loss_config, observation_models) {
+            (Some(loss), None) => DiscrepancyConfig::Loss(loss.inner),
+            (None, Some(_)) if engine.engine_type().is_stochastic() => {
+                return Err(value_error(
+                    "A stochastic engine needs a loss: the likelihood of a stochastic model \
+                     integrates its hidden path, which observation models of one run do not \
+                     do; set loss_function instead of observation_models"
+                        .to_string(),
+                ));
+            }
+            (None, Some(models)) => DiscrepancyConfig::Likelihood(
+                models
+                    .into_iter()
+                    .map(|(label, model)| (label, model.inner))
+                    .collect(),
+            ),
+            _ => {
+                return Err(value_error(
+                    "A calibration problem has a loss or observation models: exactly one of them"
+                        .to_string(),
+                ));
+            }
+        };
         let mut problem = CalibrationProblem::new(
-            engine.engine(),
+            engine,
             observed_data.into_iter().map(|d| d.inner).collect(),
             parameters.into_iter().map(|p| p.inner).collect(),
             constraints.into_iter().map(|c| c.inner).collect(),
-            loss_config.inner,
+            discrepancy,
         )
-        .map_err(value_error)?
-        .with_observation_normalization(loss_config.normalize_observations)
-        .with_replicates(loss_config.replicates.clone());
+        .map_err(value_error)?;
+        if let Some(loss) = loss_config {
+            problem = problem
+                .with_observation_normalization(loss.normalize_observations)
+                .and_then(|problem| problem.with_replicates(loss.replicates.clone()))
+                .map_err(value_error)?;
+        }
         if let Some(remainder) = initial_condition_remainder {
             problem = problem
                 .with_initial_condition_remainder(&remainder)
@@ -256,14 +289,17 @@ impl PyCalibrationProblem {
     ///     observations: The observations, which need not be the problem's
     ///     seed: Seed of the noise
     ///     residual_noise: `(fit, block_length, residual_scale)` to add
-    ///         blocks of residuals of the fit at `fit`, or None for no noise
+    ///         blocks of residuals of the fit at `fit`, or None
+    ///     distribution_noise: Whether to draw from the observation models
+    ///         of the problem; with neither noise, no noise
     ///
     /// Raises:
     ///     ValueError: If the sample's parameters are not the problem's, an
-    ///         observation names an unknown output or factor or a series the
-    ///         fit has no residuals of, or the residual noise is not valid
+    ///         observation names an unknown output or factor, a series the
+    ///         fit has no residuals of or a series with no observation
+    ///         model, both noises are asked for, or the noise is not valid
     ///     InfeasibleStateError: If a draw leaves the values its model allows
-    #[pyo3(signature = (sample, observations, seed, residual_noise=None))]
+    #[pyo3(signature = (sample, observations, seed, residual_noise=None, distribution_noise=false))]
     fn observation_draws(
         &self,
         py: Python<'_>,
@@ -271,10 +307,19 @@ impl PyCalibrationProblem {
         observations: Vec<PyObservedDataPoint>,
         seed: u64,
         residual_noise: Option<(Vec<f64>, usize, String)>,
+        distribution_noise: bool,
     ) -> PyResult<PyObservationDraws> {
         let observations: Vec<_> = observations.into_iter().map(|o| o.inner).collect();
         let noise: Box<dyn ObservationNoise> = match residual_noise {
+            None if distribution_noise => {
+                Box::new(DistributionNoise::new(&self.inner).map_err(value_error)?)
+            }
             None => Box::new(NoNoise),
+            Some(_) if distribution_noise => {
+                return Err(value_error(
+                    "Observation draws take one noise: residual or distribution".to_string(),
+                ));
+            }
             Some((fit, length, scale)) => {
                 let scale = ResidualScale::from_name(&scale).map_err(value_error)?;
                 let residuals = Residuals::new(&self.inner, &fit, scale).map_err(value_error)?;
@@ -295,6 +340,65 @@ impl PyCalibrationProblem {
         })
         .map(|inner| PyObservationDraws { inner })
         .map_err(predictive_error)
+    }
+
+    /// The log score of each of `observations` under the predictive of
+    /// `sample` and the observation models of the problem
+    ///
+    /// Raises:
+    ///     ValueError: If the sample's parameters are not the problem's, the
+    ///         problem has a loss, or an observation names an unknown output
+    ///         or factor or a series with no observation model
+    ///     InfeasibleStateError: If a draw leaves the values its model allows
+    fn log_score(
+        &self,
+        py: Python<'_>,
+        sample: &PyParameterSample,
+        observations: Vec<PyObservedDataPoint>,
+    ) -> PyResult<Vec<f64>> {
+        let observations: Vec<_> = observations.into_iter().map(|o| o.inner).collect();
+        let noise = DistributionNoise::new(&self.inner).map_err(value_error)?;
+        py.detach(|| scores::log_score(&self.inner, &sample.inner, &observations, &noise))
+            .map_err(predictive_error)
+    }
+
+    /// The weighted log density of each observation at `values`
+    ///
+    /// Raises:
+    ///     ValueError: If the problem has a loss, or the values give no
+    ///         prediction
+    fn pointwise_log_likelihood(&self, values: Vec<f64>) -> PyResult<Vec<f64>> {
+        self.inner
+            .pointwise_log_likelihood(&values, &mut Workspace::default())
+            .map_err(|error| value_error(error.to_string()))
+    }
+
+    /// Fit replicates of the data drawn from the observation models at the
+    /// fit (parametric bootstrap), from the fit
+    ///
+    /// Args:
+    ///     config: The optimizer
+    ///     fit: The fitted values, in problem order
+    ///     replicates: Number of replicates
+    ///     starts: Starts per replicate, the fit first
+    ///     seed: Seed of the replicates
+    ///
+    /// Raises:
+    ///     ValueError: If the problem has a loss or the fit is not feasible
+    ///     RuntimeError: If every replicate fails
+    fn parametric_bootstrap(
+        &self,
+        py: Python<'_>,
+        config: &PyOptimizationConfig,
+        fit: Vec<f64>,
+        replicates: usize,
+        starts: usize,
+        seed: u64,
+    ) -> PyResult<PyBootstrapRun> {
+        self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
+            let resampler = ParametricResampler::new(&self.inner, fit).map_err(value_error)?;
+            Ok((Box::new(resampler), None))
+        })
     }
 
     /// Fit replicates of the data reweighted by blocks (Bayesian
@@ -334,7 +438,10 @@ impl PyCalibrationProblem {
                 BlockDrawing::NonOverlapping,
             );
             let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
-            Ok((Box::new(BayesianBootstrap::new(observed, &scheme)), chosen))
+            Ok((
+                Box::new(BayesianBootstrap::new(observed, &scheme)),
+                Some(chosen),
+            ))
         })
     }
 
@@ -387,7 +494,7 @@ impl PyCalibrationProblem {
                     &block_scheme,
                     blocks,
                 )),
-                chosen,
+                Some(chosen),
             ))
         })
     }
@@ -435,7 +542,7 @@ impl PyCalibrationProblem {
             let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
             Ok((
                 Box::new(WildBootstrap::new(residuals, &scheme, multipliers)),
-                chosen,
+                Some(chosen),
             ))
         })
     }
@@ -547,8 +654,8 @@ pub struct PyBootstrapRun {
     not_converged: usize,
     /// Synthetic observed values below zero, over every replicate
     negative_values: usize,
-    /// The block length used
-    block_length: usize,
+    /// The block length used, or None for a bootstrap with no blocks
+    block_length: Option<usize>,
     /// The estimate of each series, with the automatic length
     block_length_estimates: Option<Vec<(String, f64)>>,
 }
