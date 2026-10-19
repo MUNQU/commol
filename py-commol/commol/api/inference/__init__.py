@@ -1,8 +1,8 @@
 """Uncertainty and identifiability methods and what reads their samples:
 intervals, the predictive and the scores. Importing it registers the runners
-of the identifiability and resampling methods."""
+of the identifiability, resampling and conformal methods."""
 
-from commol.api.inference import identifiability, resampling, scores
+from commol.api.inference import conformal, identifiability, resampling, scores
 from commol.api.inference.intervals import (
     ci_percentiles,
     member_statistics,
@@ -21,6 +21,7 @@ __all__ = [
     "PredictiveBand",
     "SeriesBand",
     "ci_percentiles",
+    "conformal",
     "identifiability",
     "member_statistics",
     "resampling",

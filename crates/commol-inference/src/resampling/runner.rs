@@ -86,6 +86,12 @@ where
         &self.fit
     }
 
+    /// The seed of the replicates: replicate `b` draws from
+    /// `replicate_seed(seed, b)`.
+    pub fn seed(&self) -> u64 {
+        self.seed
+    }
+
     /// Fit replicate `index` with the data of `perturbation`.
     ///
     /// # Errors

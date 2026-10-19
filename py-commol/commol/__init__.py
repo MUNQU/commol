@@ -60,6 +60,7 @@ from commol.context.calibration import (
     StartSummary,
 )
 from commol.context.inference import (
+    AdaptiveConformal,
     BayesianBootstrap,
     BlockJackknife,
     BootstrapResult,
@@ -80,6 +81,13 @@ from commol.context.inference import (
     StartsIdentifiability,
     StructuralRank,
     UncertaintyMethod,
+    ConformalResult,
+    EnbPI,
+    JackknifePlus,
+    PredictionIntervals,
+    RollingConformal,
+    SeriesIntervals,
+    SplitConformal,
     WildBootstrap,
 )
 from commol.context.visualization import PlotConfig
@@ -105,6 +113,14 @@ def add_stderr_logger(level: int = logging.INFO) -> logging.StreamHandler[TextIO
 
 
 __all__ = [
+    "AdaptiveConformal",
+    "ConformalResult",
+    "EnbPI",
+    "JackknifePlus",
+    "PredictionIntervals",
+    "RollingConformal",
+    "SeriesIntervals",
+    "SplitConformal",
     "Collinearity",
     "IdentifiabilityMethod",
     "IdentifiabilityReport",

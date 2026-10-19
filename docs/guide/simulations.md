@@ -457,6 +457,7 @@ plotter.plot_series(
 | `series` | `None` (every output) | What to plot, one subplot each: an output name (`B_g1`) or a bin or accumulator id (`B`), which plots the sum of its outputs (`Simulation.outputs_for`). An exact output name wins. An unknown entry raises `ValueError`. |
 | `observed_data` | `None` | `ObservedDataPoint`s to draw on the subplot of their `label`, at their positions (a differential model may observe between integers). An observation with a `window` draws the windowed line, which reads the results at every window end and start (`ValueError` when the results do not hold one). |
 | `calibration_result` | `None` | A `CalibrationResult` gives the factor values that scale the model. A [`Predictive`](uncertainty/index.md#the-predictive) draws the weighted median of its draws and their band of `confidence_level`, each draw read through the observation operator (sums, windows, factors). |
+| `prediction_intervals` | `None` | `plot_series` only. The `PredictionIntervals` of a [conformal method](uncertainty/conformal.md): the subplot of each of their series, by label, shows the band from `lower` to `upper` and the point prediction, dashed. An unbounded interval is left out of the band. |
 | `config` | `PlotConfig()` | Figure size, dpi, layout and seaborn style. |
 | `show_legend` | `True` | `plot_series` only. |
 | `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot_series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`. |

@@ -4,7 +4,7 @@
 
 What every uncertainty method takes and returns: the configuration base, the
 weighted parameter sample, the predictive and its observation noise, the
-resampling methods, the scores and the one quantile.
+resampling and conformal methods, the scores and the one quantile.
 Guide: [Uncertainty](../guide/uncertainty/index.md).
 
 ::: commol.context.inference.method.InferenceMethod
@@ -48,6 +48,28 @@ Guide: [Resampling](../guide/uncertainty/resampling.md).
 ::: commol.context.inference.resampling.ResamplingDiagnostics
 
 ::: commol.context.inference.resampling.BoundError
+
+## Conformal prediction
+
+Guide: [Conformal Prediction Intervals](../guide/uncertainty/conformal.md).
+
+::: commol.context.inference.conformal.ConformalMethod
+
+::: commol.context.inference.conformal.SplitConformal
+
+::: commol.context.inference.conformal.RollingConformal
+
+::: commol.context.inference.conformal.JackknifePlus
+
+::: commol.context.inference.conformal.EnbPI
+
+::: commol.context.inference.conformal.AdaptiveConformal
+
+::: commol.context.inference.conformal.ConformalResult
+
+::: commol.context.inference.conformal.PredictionIntervals
+
+::: commol.context.inference.conformal.SeriesIntervals
 
 ## Scores and intervals
 

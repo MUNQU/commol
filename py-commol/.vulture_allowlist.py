@@ -17,6 +17,7 @@ ParameterSampleProtocol
 CalibrationResultProtocol
 ObservationDrawsProtocol
 BootstrapRunProtocol
+ConformalRunProtocol
 LossConfigProtocol
 OptimizationConfigProtocol
 EngineTypeProtocol
