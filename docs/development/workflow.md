@@ -86,7 +86,8 @@ come by:
 The dependencies set what must come first; `Priority` is set only to move an
 issue ahead of (`Now`) or behind (`Later`) its milestone.
 
-Before it lists them, `next.sh` writes the precedence level of each open
+Before it lists them, `next.sh` links each open issue to the release before
+its milestone ([Milestones](#milestones)), and then writes the precedence level of each open
 proposal, change and release into the number field `Level` of the project:
 0 when no open issue blocks it, else one more than the highest level of its
 open blockers (an open blocker of another repository counts as level 0). The
@@ -185,6 +186,24 @@ release checklist asks for it:
 - **At the close of a release**, every issue still open in its milestone moves
   to another milestone, with a comment that says why it did not ship. The
   milestone closes with no open issue.
+- **An issue waits for the release before its milestone.** Each open
+  proposal, change and release is "blocked by" the open release issue of the
+  nearest milestone before its own, by the versions that the titles of the
+  milestones name: an issue of 0.10.0 waits for release 0.9.0, and release
+  0.10.0 waits for it too. When a new milestone comes in between (0.9.1), its
+  release takes the place of the old blocker. `next.sh` and `start.sh` write
+  these links before they read the blockers, and so does, at any time:
+
+  ```bash
+  python .github/scripts/parallel.py --releases
+  ```
+
+  The script owns the links from a release to an issue whose milestone names
+  a version: it adds the one that is missing and removes the others. It
+  refuses a link that closes a cycle, such as an issue of 0.10.0 that release
+  0.9.0 waits for, and names it: move that issue to the earlier milestone, or
+  remove the link. A failure to write the links stops `next.sh` and
+  `start.sh`, since the blockers they read would be wrong.
 
 An experiment, such as a benchmark, is not a bug and may have no milestone.
 

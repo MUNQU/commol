@@ -2,8 +2,11 @@
 # Start a proposal or a change, in one step, so that taking an issue always
 # marks it:
 #
-#   1. checks that the issue is open, blocked by no open issue and taken by
-#      nobody else;
+#   1. links each open issue to the release before its milestone
+#      (parallel.py --releases), so that the check below sees those links; a
+#      failure there stops the start;
+#      then checks that the issue is open, blocked by no open issue and taken
+#      by nobody else;
 #   2. assigns it to you, which takes it;
 #   3. sets it to `In Progress` in the project (and adds it to the project if
 #      it is not there);
@@ -53,8 +56,12 @@ run() {
 }
 
 me=$(gh api user --jq .login)
+root=$(git rev-parse --show-toplevel)
 
-# The issue: its state, blockers, assignees and project items.
+# 1. The links to the release before each milestone, then the issue: its
+# state, blockers, assignees and project items.
+run uv run --project "$root/py-commol" --locked python \
+    "$root/.github/scripts/parallel.py" --releases
 read -r state blocked assignees item <<<"$(gh api graphql \
     -F number="$number" -f query='
 query($number: Int!) {
@@ -117,7 +124,6 @@ if $here; then
     run gh issue develop "$number" --repo "$REPO" --base main --name "$branch" --checkout
     where="this checkout"
 else
-    root=$(git rev-parse --show-toplevel)
     worktree="$(dirname "$root")/$(basename "$root")-worktrees/${branch#*/}"
     run gh issue develop "$number" --repo "$REPO" --base main --name "$branch" \
         --checkout --worktree "$worktree"
@@ -125,7 +131,6 @@ else
 fi
 
 # 5. The precedence levels.
-root=$(git rev-parse --show-toplevel)
 run uv run --project "$root/py-commol" --locked python \
     "$root/.github/scripts/parallel.py" --levels ||
     echo "The levels were not written: run .github/scripts/parallel.py --levels." >&2
