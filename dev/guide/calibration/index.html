@@ -1498,6 +1498,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../uncertainty/conformal/" class="md-nav__link">
         
   
@@ -3076,6 +3104,10 @@ describe the observations and the unknowns in a <code>CalibrationProblem</code>,
 <td>This page</td>
 </tr>
 <tr>
+<td>Maximum likelihood with a model of the noise of each series</td>
+<td><a href="../uncertainty/observation-models/">Observation Models</a></td>
+</tr>
+<tr>
 <td>Calibrating initial conditions</td>
 <td><a href="../calibration-initial-conditions/">Calibrating Initial Conditions</a></td>
 </tr>
@@ -3191,9 +3223,15 @@ also when it was created while a parameter was <code>None</code>. See
 </tr>
 <tr>
 <td><code>loss_function</code></td>
-<td><code>str</code></td>
-<td><code>"sse"</code></td>
-<td>How the misfit is measured; see <a href="#losses">Losses</a>.</td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>How the misfit is measured; see <a href="#losses">Losses</a>. A problem has <code>loss_function</code> or <code>observation_models</code>, exactly one.</td>
+</tr>
+<tr>
+<td><code>observation_models</code></td>
+<td><code>dict[str, ObservationModel] \| None</code></td>
+<td><code>None</code></td>
+<td>One observation model per series label: the fit maximizes their likelihood. See <a href="../uncertainty/observation-models/">Observation Models</a>.</td>
 </tr>
 <tr>
 <td><code>optimization_config</code></td>
@@ -3211,7 +3249,7 @@ also when it was created while a parameter was <code>None</code>. See
 <td><code>normalize_observations</code></td>
 <td><code>bool</code></td>
 <td><code>False</code></td>
-<td>Divides each residual by the RMS of its observation series, so series of very different size weigh the same.</td>
+<td>Divides each residual by the RMS of its observation series, so series of very different size weigh the same. Needs a loss.</td>
 </tr>
 <tr>
 <td><code>initial_condition_remainder</code></td>
@@ -3272,7 +3310,7 @@ also when it was created while a parameter was <code>None</code>. See
 <td><code>weight</code></td>
 <td><code>float</code></td>
 <td><code>1.0</code></td>
-<td>How much the observation counts in every loss; see <a href="#losses">Losses</a>.</td>
+<td>How much the observation counts in every loss, and the power of its term of a likelihood; see <a href="#losses">Losses</a>.</td>
 </tr>
 <tr>
 <td><code>factor_id</code></td>
@@ -3285,6 +3323,12 @@ also when it was created while a parameter was <code>None</code>. See
 <td><code>float \| None</code></td>
 <td><code>None</code></td>
 <td>Compares with the gain over <code>(at − window, at]</code> instead of the value.</td>
+</tr>
+<tr>
+<td><code>trials</code></td>
+<td><code>int \| None</code></td>
+<td><code>None</code></td>
+<td>The trials of the observation, for a <code>BinomialObservations()</code> model that reads them from each observation.</td>
 </tr>
 </tbody>
 </table>
@@ -3309,7 +3353,7 @@ also when it was created while a parameter was <code>None</code>. See
 <td><code>parameter_type</code></td>
 <td><code>str</code></td>
 <td>required</td>
-<td><code>"parameter"</code>, <code>"initial_condition"</code> or <code>"factor"</code>.</td>
+<td><code>"parameter"</code>, <code>"initial_condition"</code>, <code>"factor"</code> or <code>"noise"</code>.</td>
 </tr>
 <tr>
 <td><code>min_bound</code>, <code>max_bound</code></td>
@@ -3349,14 +3393,24 @@ also when it was created while a parameter was <code>None</code>. See
 <td>Any new id, used by observations through <code>factor_id</code></td>
 <td>A factor on the predictions; not part of the model</td>
 </tr>
+<tr>
+<td><code>"noise"</code></td>
+<td>Any new id, named by an <a href="../uncertainty/observation-models/#noise-parameters">observation model</a></td>
+<td>An argument of the model, such as its standard deviation; not part of the model</td>
+</tr>
 </tbody>
 </table>
-<p><code>"parameter"</code> and <code>"factor"</code> work with every kind of model. The other types are
+<p><code>"parameter"</code>, <code>"factor"</code> and <code>"noise"</code> work with every kind of model. The other types are
 values of the model kind, and the kind declares which it accepts
 (<code>model.structure.calibration_value_types()</code>): an aggregate model accepts
 <code>"initial_condition"</code>. A type the kind does not accept raises a <code>ValueError</code>
 that names the kind when you create the <code>Calibrator</code>.</p>
 <h2 id="losses">Losses<a class="headerlink" href="#losses" title="Permanent link">&para;</a></h2>
+<p>A problem has a loss or observation models, exactly one, and neither has a
+default: what to fit is a modelling choice. A loss measures the residuals;
+<a href="../uncertainty/observation-models/">observation models</a> say how each series
+scatters, and the fit maximizes their likelihood, so its loss is <code>−log L</code>.
+<code>CalibrationProblem</code> raises a <code>ValueError</code> with both or neither.</p>
 <table>
 <thead>
 <tr>
@@ -3367,7 +3421,7 @@ that names the kind when you create the <code>Calibrator</code>.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>"sse"</code> (default)</td>
+<td><code>"sse"</code></td>
 <td><code>Σ w·r²</code></td>
 <td>The usual choice</td>
 </tr>
@@ -3479,6 +3533,10 @@ because what to fit is a modelling choice:</p>
 <td>The same</td>
 </tr>
 <tr>
+<td>A stochastic engine needs a loss: with <code>observation_models</code>, <code>Calibrator</code> raises a <code>ValueError</code></td>
+<td><code>PyCalibrationProblem::new</code> in <code>py-commol/src/inference.rs</code>; <code>Discrepancy::set_summary</code></td>
+</tr>
+<tr>
 <td>The summaries and the CRPS are computed in <code>LossConfig</code>, and the observation weights apply to every option</td>
 <td><code>LossConfig::replicate_loss</code> in <code>crates/commol-calibration/src/types.rs</code></td>
 </tr>
@@ -3508,7 +3566,7 @@ replicate of each draw.</p>
 </tr>
 <tr>
 <td><code>final_loss</code></td>
-<td>The loss at <code>best_parameters</code></td>
+<td>The loss at <code>best_parameters</code>; with observation models, the negative log-likelihood</td>
 </tr>
 <tr>
 <td><code>iterations</code></td>
@@ -3577,8 +3635,8 @@ value into the model, routed by its <code>parameter_type</code>:</p>
 <td>The initial conditions, so the model rebuilds exactly the state the optimizer scored</td>
 </tr>
 <tr>
-<td><code>"factor"</code></td>
-<td>Nothing: it describes the observations, not the model</td>
+<td><code>"factor"</code>, <code>"noise"</code></td>
+<td>Nothing: they describe the observations, not the model</td>
 </tr>
 </tbody>
 </table>

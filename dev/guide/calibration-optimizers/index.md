@@ -59,6 +59,7 @@ def calibrate(optimization_config) -> dict[str, float]:
             CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
             CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
         ],
+        loss_function="sse",
         optimization_config=optimization_config,
         seed=7,
     )
@@ -150,6 +151,7 @@ problem = CalibrationProblem(
         CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
         CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
     ],
+    loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=2000),
     seed=7,
 )

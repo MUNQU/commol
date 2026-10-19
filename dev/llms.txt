@@ -31,6 +31,7 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 - [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md): Structural against practical identifiability, the structural rank, collinearity, a sample, starts, combinations and the report
 - [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md): The Bayesian, residual and wild block bootstraps, the block jackknife, block lengths and prediction intervals from residuals
 - [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md): Priors, the sequential Monte Carlo sampler, the Gibbs posterior and its scale eta, ABC and its distances, and the diagnostics
+- [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md): Observation models of each series, noise parameters, maximum likelihood, the Bayesian posterior and its evidence, prediction intervals with noise, the log score and the parametric bootstrap
 - [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md): Conformal prediction intervals, the guarantee, scores and pooling, split, rolling origins, jackknife+ and CV+, EnbPI, adaptive conformal, plots and reports
 - [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md): applied_parameters_report and simulation_report
 - [Examples](https://munqu.github.io/commol/latest/guide/examples/index.md): Complete models

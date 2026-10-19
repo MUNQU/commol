@@ -14,7 +14,7 @@ Report every parameter of a calibrated model, and the values of its kind.
 
 Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); an aggregate model adds `initial_amounts` and `category_splits`.
 
-Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` parameters have no place in the model, so they are reported from `problem` when it is given.
+Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` and `noise` parameters have no place in the model, so they are reported from `problem` when it is given.
 
 `initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin.
 
@@ -26,7 +26,7 @@ Parameters:
 | ------------------ | -------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `model`            | `Model`              | The model carrying the applied values. | *required*                                                                                  |
 | `result`           | \`CalibrationResult  | Mapping\`                              | The calibration result, or a mapping of parameter id to value such as one draw of a sample. |
-| `problem`          | \`CalibrationProblem | None\`                                 | The problem the result came from, used to report factor parameters.                         |
+| `problem`          | \`CalibrationProblem | None\`                                 | The problem the result came from, used to report factor and noise parameters.               |
 | `sample`           | \`ParameterSample    | None\`                                 | Draws of the parameters, such as the sample of an uncertainty method.                       |
 | `confidence_level` | \`float              | None\`                                 | Confidence level of the intervals; required with a sample.                                  |
 
@@ -63,8 +63,8 @@ def applied_parameters_report(
 
     Parameters that are not a single number, such as a formula or a
     series, are omitted: they are inputs rather than fitted values.
-    ``factor`` parameters have no place in the model, so they are reported from
-    `problem` when it is given.
+    ``factor`` and ``noise`` parameters have no place in the model, so they are
+    reported from `problem` when it is given.
 
     ``initial_amounts`` gives each bin and each overridden compartment of an
     aggregate model its ``amount`` the engine builds and the ``unit`` of its
@@ -88,7 +88,8 @@ def applied_parameters_report(
         The calibration result, or a mapping of parameter id to value such as
         one draw of a sample.
     problem : CalibrationProblem | None, optional
-        The problem the result came from, used to report factor parameters.
+        The problem the result came from, used to report factor and noise
+        parameters.
     sample : ParameterSample | None, optional
         Draws of the parameters, such as the sample of an uncertainty method.
     confidence_level : float | None, optional
@@ -117,10 +118,13 @@ def applied_parameters_report(
         for parameter in model.parameters
         if isinstance(parameter.value, (int, float))
     }
-    for factor_id in _factor_ids(problem):
-        if factor_id in calibrated:
-            parameters[factor_id] = _parameter_entry(
-                factor_id, calibrated[factor_id], calibrated_ids, parameter_statistics
+    for observation_id in _observation_parameter_ids(problem):
+        if observation_id in calibrated:
+            parameters[observation_id] = _parameter_entry(
+                observation_id,
+                calibrated[observation_id],
+                calibrated_ids,
+                parameter_statistics,
             )
 
     report: dict[str, object] = {}

@@ -1321,6 +1321,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/uncertainty/conformal/" class="md-nav__link">
         
   
@@ -3115,8 +3143,13 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/discrepancy.rs</code></td>
-<td><code>Discrepancy</code>: the loss of predictions against the data, with weights, per-series normalization and the summary of the replicates; the loss of one run (<code>of_run</code>).</td>
+<td><code>Discrepancy</code> and <code>DiscrepancyConfig</code>: the loss, or the negative log-likelihood of observation models, of predictions against the data, with weights, per-series normalization of a loss and the summary of the replicates; the discrepancy of one run (<code>of_run</code>); the base of the penalty (<code>penalty_base</code>).</td>
 <td>Running engines.</td>
+</tr>
+<tr>
+<td><code>crates/commol-calibration/src/likelihood/</code></td>
+<td>The observation models: <code>ObservationModel</code> and <code>Argument</code> (<code>likelihood/mod.rs</code>), <code>Likelihood</code> (the model and trials of each observation, the checks of models, noise parameters and observed values, the pointwise log-likelihood), <code>Noise</code> (<code>density.rs</code>: a model with numbers for its noise, its log density, the means it allows).</td>
+<td>Draws; running engines.</td>
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/objective.rs</code></td>
@@ -3155,12 +3188,12 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/predictive.rs</code></td>
-<td><code>Predictive</code> (the run of every draw, its bands), <code>observation_draws</code> through the observation operator, the <code>ObservationNoise</code> port (one draw's whole vector) and <code>NoNoise</code>.</td>
+<td><code>Predictive</code> (the run of every draw, its bands), <code>observation_draws</code> through the observation operator, the <code>ObservationNoise</code> port (one draw's whole vector), <code>NoNoise</code>, and <code>DistributionNoise</code> with the draw of each observation model.</td>
 <td>Noise models of one method.</td>
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/resampling/</code></td>
-<td>Fits to reweighted or resampled data: <code>blocks.rs</code> (<code>BlockScheme</code>, the automatic block length), <code>residuals.rs</code> (<code>Residuals</code> on a scale, residuals by series and position), <code>resamplers.rs</code> (the <code>Resampler</code> port, <code>Perturbation</code>, the Bayesian, residual and wild bootstraps), <code>runner.rs</code> (<code>ReplicateRunner</code>, <code>bootstrap</code>), <code>jackknife.rs</code> (<code>block_jackknife</code>), <code>noise.rs</code> (<code>ResidualNoise</code>).</td>
+<td>Fits to reweighted or resampled data: <code>blocks.rs</code> (<code>BlockScheme</code>, the automatic block length), <code>residuals.rs</code> (<code>Residuals</code> on a scale, residuals by series and position), <code>resamplers.rs</code> (the <code>Resampler</code> port, <code>Perturbation</code>, the Bayesian, residual and wild bootstraps, <code>ParametricResampler</code>), <code>runner.rs</code> (<code>ReplicateRunner</code>, <code>bootstrap</code>), <code>jackknife.rs</code> (<code>block_jackknife</code>), <code>noise.rs</code> (<code>ResidualNoise</code>).</td>
 <td>Changes to the problem other than through <code>with_data</code>.</td>
 </tr>
 <tr>
@@ -3170,7 +3203,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/scores.rs</code></td>
-<td>Coverage, interval score, weighted interval score, sample CRPS, PIT, and their means per series.</td>
+<td>Coverage, interval score, weighted interval score, sample CRPS, PIT, the log score of observation models, and their means per series.</td>
 <td>—</td>
 </tr>
 <tr>
@@ -3205,7 +3238,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/smc/</code></td>
-<td>Sequential Monte Carlo: the <code>TemperedTarget</code> port (<code>smc/mod.rs</code>), <code>SmcSampler</code>, <code>next_level</code> and <code>abc_rejection</code> (<code>sampler.rs</code>), the <code>Kernel</code> port and <code>RandomWalk</code> (<code>kernel.rs</code>), <code>GibbsTarget</code> with the calibrations of <code>η</code> (<code>gibbs.rs</code>), <code>AbcTarget</code> with its distances (<code>abc.rs</code>).</td>
+<td>Sequential Monte Carlo: the <code>TemperedTarget</code> port (<code>smc/mod.rs</code>), <code>SmcSampler</code>, <code>next_level</code> and <code>abc_rejection</code> (<code>sampler.rs</code>), the <code>Kernel</code> port and <code>RandomWalk</code> (<code>kernel.rs</code>), <code>GibbsTarget</code> with the calibrations of <code>η</code> (<code>gibbs.rs</code>), <code>AbcTarget</code> with its distances (<code>abc.rs</code>), <code>LikelihoodTarget</code> and <code>bayesian_posterior</code> (<code>likelihood.rs</code>).</td>
 <td>Anything of one target in the sampler.</td>
 </tr>
 </tbody>
@@ -3252,7 +3285,7 @@
 </tr>
 <tr>
 <td><code>py-commol/src/smc.rs</code></td>
-<td><code>commol_rs.inference</code>: <code>Distribution</code>, the priors as Python passes them, the runners of the sequential Monte Carlo methods (<code>gibbs_posterior</code>, <code>information_matching_eta</code>, <code>bootstrap_coverage_eta</code>, <code>abc_smc</code>, <code>abc_rejection</code>) and <code>SmcRun</code>, <code>EtaCoverage</code>.</td>
+<td><code>commol_rs.inference</code>: <code>Distribution</code>, the priors as Python passes them, the runners of the sequential Monte Carlo methods (<code>gibbs_posterior</code>, <code>bayesian_posterior</code>, <code>information_matching_eta</code>, <code>bootstrap_coverage_eta</code>, <code>abc_smc</code>, <code>abc_rejection</code>) and <code>SmcRun</code>, <code>EtaCoverage</code>.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
@@ -3262,7 +3295,7 @@
 </tr>
 <tr>
 <td><code>py-commol/src/inference.rs</code></td>
-<td><code>commol_rs.inference</code>: <code>CalibrationProblem</code> (built once from a <code>Calibrator</code>: starts, history, predictions, the predictive), <code>ParameterSample</code>, <code>Predictive</code>, <code>ObservationDraws</code>, <code>BootstrapRun</code>, <code>JackknifeRun</code>, <code>weighted_quantiles</code>, <code>weighted_mean</code>, <code>by_series</code>, <code>quantile_error</code>; the runners of methods (<code>bootstrap</code>, <code>jackknife</code>).</td>
+<td><code>commol_rs.inference</code>: <code>CalibrationProblem</code> (built once from a <code>Calibrator</code>, with a loss or observation models: starts, history, predictions, the predictive, the log score, the pointwise log-likelihood), <code>ParameterSample</code>, <code>Predictive</code>, <code>ObservationDraws</code>, <code>BootstrapRun</code>, <code>JackknifeRun</code>, <code>weighted_quantiles</code>, <code>weighted_mean</code>, <code>by_series</code>, <code>quantile_error</code>; the runners of methods (the bootstraps, <code>parametric_bootstrap</code>, <code>jackknife</code>).</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
@@ -3329,7 +3362,7 @@
 </tr>
 <tr>
 <td><code>context/inference/</code></td>
-<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code> and <code>IdentifiabilityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>), the distributions and <code>Priors</code> (<code>distributions.py</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>context/inference/smc.py</code>: <code>GibbsPosterior</code>, <code>EtaCalibration</code>, <code>AbcSmc</code>, <code>AbcRejection</code>, the distances, <code>SmcResult</code>, <code>GibbsResult</code>), and of the conformal methods (<code>context/inference/conformal.py</code>).</td>
+<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code> and <code>IdentifiabilityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>, <code>DistributionNoise</code>), the distributions and <code>Priors</code> (<code>distributions.py</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>context/inference/smc.py</code>: <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, <code>EtaCalibration</code>, <code>AbcSmc</code>, <code>AbcRejection</code>, the distances, <code>SmcResult</code>, <code>GibbsResult</code>), and of the conformal methods (<code>context/inference/conformal.py</code>).</td>
 <td>Runners.</td>
 </tr>
 <tr>
@@ -3381,6 +3414,11 @@
 <td><code>context/transition.py</code></td>
 <td><code>Transition</code> and <code>StratifiedRate</code>.</td>
 <td>—</td>
+</tr>
+<tr>
+<td><code>context/observation_models.py</code></td>
+<td>The observation models of a calibration problem (<code>NormalObservations</code>, …, <code>BinomialObservations</code>, the union <code>ObservationModel</code>), as settings.</td>
+<td>Densities and checks (the engine's).</td>
 </tr>
 <tr>
 <td><code>context/axis_units.py</code></td>
@@ -3563,6 +3601,11 @@
 <td>Change calibration</td>
 <td><code>crates/commol-calibration/src/calibration_problem.rs</code> and its layers (<code>forward.rs</code>, <code>observation.rs</code>, <code>feasibility.rs</code>, <code>discrepancy.rs</code>, <code>objective.rs</code>); <code>crates/commol-calibration/src/starts.rs</code></td>
 <td><code>values.rs</code>, <code>crates/commol-model/src/initial_conditions.rs</code>, <code>py-commol/commol/api/calibrator.py</code>, <code>py-commol/src/inference.rs</code> (<code>CalibrationProblem</code>)</td>
+</tr>
+<tr>
+<td>Add or change an observation model or the likelihood</td>
+<td><code>crates/commol-calibration/src/likelihood/</code> (<code>likelihood/mod.rs</code>, <code>density.rs</code>)</td>
+<td><code>crates/commol-inference/src/predictive.rs</code> (<code>draw_observation</code>), <code>py-commol/src/calibration.rs</code> (<code>ObservationModel</code>), <code>py-commol/commol/context/observation_models.py</code>, <code>context/_model/engine_state.py</code> (<code>rust_observation_models</code>), <code>docs/guide/uncertainty/observation-models.md</code></td>
 </tr>
 <tr>
 <td>Add an uncertainty method</td>

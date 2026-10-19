@@ -2,7 +2,7 @@
 
 [Back to Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)
 
-These methods give a posterior of the parameters with no noise model. The **Gibbs posterior** turns the loss of the calibration into a posterior; **ABC** (approximate Bayesian computation) keeps the parameters whose runs come close to the data. Use them when you can state priors but not how the observations scatter around the model. One sequential Monte Carlo (SMC) sampler runs both, in parallel in Rust (`crates/commol-inference/src/smc/`), through `Calibrator.uncertainty`.
+These methods give a posterior of the parameters with no noise model. The **Gibbs posterior** turns the loss of the calibration into a posterior; **ABC** (approximate Bayesian computation) keeps the parameters whose runs come close to the data. Use them when you can state priors but not how the observations scatter around the model. One sequential Monte Carlo (SMC) sampler runs both, in parallel in Rust (`crates/commol-inference/src/smc/`), through `Calibrator.uncertainty`. The same sampler runs `BayesianPosterior`, the posterior of [observation models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md), when you can state how the observations scatter.
 
 ## Quick path
 
@@ -151,14 +151,16 @@ Information matching is cheap and local; it needs a sum of smooth terms, so `"rm
 
 With a stochastic engine the loss reads the problem's `replicates` with common random numbers, as the optimizers do, so it is a function of the parameters.
 
+With [observation models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md) the loss is the negative log-likelihood, so the Gibbs posterior is the fractional posterior `prior(θ) · L(θ)^η`, and `η = 1` is the posterior of `BayesianPosterior`. `η` is a number or `EtaCalibration.bootstrap_coverage(...)`; `EtaCalibration.information_matching()` needs a loss and raises a `ValueError`.
+
 ## ABC
 
 `AbcSmc` keeps a particle when the distance between its run and the data is at most a tolerance `ε`, and lowers `ε` step by step (Del Moral, Doucet and Jasra 2012). With weights of 0 or 1, the share of the particles that a tolerance keeps is its conditional effective sample size, so each next tolerance is the weighted quantile of the current distances at `target_cess`: the smallest distance whose share of the weight at or below it reaches it. The run stops when the first move of a step accepts less than `min_acceptance`, and keeps the sample of the tolerance before; it also stops when no lower tolerance keeps `target_cess` of the particles, as with whole numbers that tie. `diagnostics.stop_reason` says which.
 
-| `distance`                                 | Value                                                                                                                             |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `LossDistance()`                           | The problem's `loss_function`, with its weights and `normalize_observations`                                                      |
-| `SeriesDistance(metric="rmse")` or `"mae"` | `metric` of each series on its residuals divided by the root mean square of its observed values, then the largest over the series |
+| `distance`                                 | Value                                                                                                                                                 |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LossDistance()`                           | The problem's `loss_function`, with its weights and `normalize_observations`; a problem with observation models has none, so it raises a `ValueError` |
+| `SeriesDistance(metric="rmse")` or `"mae"` | `metric` of each series on its residuals divided by the root mean square of its observed values, then the largest over the series                     |
 
 `SeriesDistance` compares series in different units on one scale: scaling a series and its prediction by a constant leaves its distance unchanged, so the series of large values does not decide alone.
 
@@ -208,9 +210,10 @@ A step whose acceptance rate is small moves each particle many times, and the ru
 
 ## Next steps
 
-| To learn                                                | Read                                                                                                 |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| What every method returns and reads                     | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                      |
-| Uncertainty with no prior: bootstraps and the jackknife | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md)            |
-| How far a sample contracts each prior                   | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample) |
-| The stochastic engines and their replicates             | [Stochastic engines](https://munqu.github.io/commol/latest/guide/stochastic/index.md)                |
+| To learn                                                | Read                                                                                                      |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| What every method returns and reads                     | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                           |
+| The posterior of observation models                     | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md) |
+| Uncertainty with no prior: bootstraps and the jackknife | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md)                 |
+| How far a sample contracts each prior                   | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)      |
+| The stochastic engines and their replicates             | [Stochastic engines](https://munqu.github.io/commol/latest/guide/stochastic/index.md)                     |

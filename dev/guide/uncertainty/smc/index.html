@@ -18,7 +18,7 @@
         <link rel="prev" href="../resampling/">
       
       
-        <link rel="next" href="../conformal/">
+        <link rel="next" href="../observation-models/">
       
       
         
@@ -1475,6 +1475,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3043,7 +3071,9 @@
 to the data. Use them when you can state priors but not how the observations
 scatter around the model. One sequential Monte Carlo (SMC) sampler runs both,
 in parallel in Rust (<code>crates/commol-inference/src/smc/</code>), through
-<code>Calibrator.uncertainty</code>.</p>
+<code>Calibrator.uncertainty</code>. The same sampler runs <code>BayesianPosterior</code>, the
+posterior of <a href="../observation-models/">observation models</a>, when you can state
+how the observations scatter.</p>
 <h2 id="quick-path">Quick path<a class="headerlink" href="#quick-path" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -3297,6 +3327,12 @@ times parameters.</p>
 <p>With a stochastic engine the loss reads the problem's <code>replicates</code> with
 common random numbers, as the optimizers do, so it is a function of the
 parameters.</p>
+<p>With <a href="../observation-models/">observation models</a> the loss is the negative
+log-likelihood, so the Gibbs posterior is the fractional posterior
+<code>prior(θ) · L(θ)^η</code>, and <code>η = 1</code> is the posterior of <code>BayesianPosterior</code>.
+<code>η</code> is a number or <code>EtaCalibration.bootstrap_coverage(...)</code>;
+<code>EtaCalibration.information_matching()</code> needs a loss and raises a
+<code>ValueError</code>.</p>
 <h2 id="abc">ABC<a class="headerlink" href="#abc" title="Permanent link">&para;</a></h2>
 <p><code>AbcSmc</code> keeps a particle when the distance between its run and the data is
 at most a tolerance <code>ε</code>, and lowers <code>ε</code> step by step (Del Moral, Doucet and
@@ -3318,7 +3354,7 @@ numbers that tie. <code>diagnostics.stop_reason</code> says which.</p>
 <tbody>
 <tr>
 <td><code>LossDistance()</code></td>
-<td>The problem's <code>loss_function</code>, with its weights and <code>normalize_observations</code></td>
+<td>The problem's <code>loss_function</code>, with its weights and <code>normalize_observations</code>; a problem with observation models has none, so it raises a <code>ValueError</code></td>
 </tr>
 <tr>
 <td><code>SeriesDistance(metric="rmse")</code> or <code>"mae"</code></td>
@@ -3431,6 +3467,10 @@ Monte Carlo error.</p>
 <tr>
 <td>What every method returns and reads</td>
 <td><a href="../">Uncertainty</a></td>
+</tr>
+<tr>
+<td>The posterior of observation models</td>
+<td><a href="../observation-models/">Observation Models</a></td>
 </tr>
 <tr>
 <td>Uncertainty with no prior: bootstraps and the jackknife</td>

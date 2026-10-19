@@ -223,8 +223,8 @@ class Model(BaseModel, Generic[StructureT]):
 
         Each value is routed by the ``parameter_type`` declared for it in
         ``problem``: ``parameter`` values update model parameters, ``factor``
-        values are ignored because they apply to observations rather than to
-        the model, and the structure writes back the values of its kind
+        and ``noise`` values are ignored because they apply to observations
+        rather than to the model, and the structure writes back the values of its kind
         (`ModelStructure.with_calibrated_values`). An aggregate structure
         writes ``initial_condition`` values so that the model rebuilds the
         initial state the engine scored for them.
@@ -657,7 +657,7 @@ apply_calibration_parameters(result: CalibrationResult | Mapping[str, float], pr
 
 Write calibrated values back onto the model.
 
-Each value is routed by the `parameter_type` declared for it in `problem`: `parameter` values update model parameters, `factor` values are ignored because they apply to observations rather than to the model, and the structure writes back the values of its kind (`ModelStructure.with_calibrated_values`). An aggregate structure writes `initial_condition` values so that the model rebuilds the initial state the engine scored for them.
+Each value is routed by the `parameter_type` declared for it in `problem`: `parameter` values update model parameters, `factor` and `noise` values are ignored because they apply to observations rather than to the model, and the structure writes back the values of its kind (`ModelStructure.with_calibrated_values`). An aggregate structure writes `initial_condition` values so that the model rebuilds the initial state the engine scored for them.
 
 Parameters:
 
@@ -686,8 +686,8 @@ def apply_calibration_parameters(
 
     Each value is routed by the ``parameter_type`` declared for it in
     ``problem``: ``parameter`` values update model parameters, ``factor``
-    values are ignored because they apply to observations rather than to
-    the model, and the structure writes back the values of its kind
+    and ``noise`` values are ignored because they apply to observations
+    rather than to the model, and the structure writes back the values of its kind
     (`ModelStructure.with_calibrated_values`). An aggregate structure
     writes ``initial_condition`` values so that the model rebuilds the
     initial state the engine scored for them.

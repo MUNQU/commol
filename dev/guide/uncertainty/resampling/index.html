@@ -1525,6 +1525,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../conformal/" class="md-nav__link">
         
   
@@ -3227,7 +3255,10 @@ runs through <code>Calibrator.uncertainty</code>, in parallel in Rust
 </table>
 <p>None of them needs a noise model. The Bayesian bootstrap never changes the
 observed values, so it also works when the model is wrong; the residual and
-wild bootstraps make new data from the model and its residuals.</p>
+wild bootstraps make new data from the model and its residuals. With
+<a href="../observation-models/">observation models</a>, <code>ParametricBootstrap(replicates)</code>
+draws new data from the models at the fit; it draws no blocks, so its
+<code>diagnostics.block_length</code> is <code>None</code>.</p>
 <h2 id="blocks-and-their-length">Blocks and their length<a class="headerlink" href="#blocks-and-their-length" title="Permanent link">&para;</a></h2>
 <p>A block holds every observation, of every series, whose position falls in one
 window of <code>block_length</code> consecutive distinct positions

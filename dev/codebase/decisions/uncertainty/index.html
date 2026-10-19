@@ -1321,6 +1321,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../guide/uncertainty/conformal/" class="md-nav__link">
         
   
@@ -3198,7 +3226,9 @@ function of that value. Reweighting and the choice of the next level read the
 kept values, so they run no model: only a proposed move calls <code>evaluate</code>. The
 Gibbs posterior keeps the loss (<code>−level · η · loss</code>, temperatures from 0 to
 1); ABC keeps the distance (0 within the tolerance, <code>−∞</code> outside); the
-likelihood of an observation model will keep its log likelihood.</p>
+posterior of observation models (<code>LikelihoodTarget</code>, <code>smc/likelihood.rs</code>)
+keeps the log-likelihood (<code>level · log L</code>), so its log evidence is the log
+marginal likelihood.</p>
 <p>The sampler owns the rest, the same for every target: the next level by
 bisection on the conditional effective sample size, to <code>target_cess</code>;
 systematic resampling under <code>resample_threshold</code>; random-walk Metropolis on
@@ -3266,7 +3296,10 @@ an order statistic whose expected coverage is below it.</p>
 <h2 id="observation-noise-is-an-argument">Observation noise is an argument<a class="headerlink" href="#observation-noise-is-an-argument" title="Permanent link">&para;</a></h2>
 <p>Every reader of observations of a sample (<code>Predictive.at_observations</code>, every
 function of <code>commol.scores</code>) takes the noise with no default: <code>NoNoise()</code> gives
-a band of the model, <code>ResidualNoise(...)</code> a prediction interval. The Rust port
+a band of the model, <code>ResidualNoise(...)</code> and <code>DistributionNoise()</code> (the
+observation models of the problem) a prediction interval. The log score needs
+a density, so it takes only <code>DistributionNoise</code>; the parametric bootstrap
+(<code>ParametricResampler</code>) draws its data sets with the same draws. The Rust port
 <code>ObservationNoise</code> (<code>crates/commol-inference/src/predictive.rs</code>) sees one
 draw's whole vector of observations with the draw's parameter values, so a
 noise can draw blocks of residuals across observations, and a noise model can
@@ -3294,8 +3327,11 @@ has residuals of.</p>
 </tr>
 </tbody>
 </table>
+<p>| A kernel density of the draws for the log score | A bandwidth to choose, and bias in the tails the log score weighs most. |</p>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_resampling.rs::residual_noise_rejects_a_series_with_no_residuals</code>,
-<code>tests/uncertainty/test_resampling.py::TestResidualNoise</code>.</p>
+<code>tests/uncertainty/test_resampling.py::TestResidualNoise</code>,
+<code>crates/commol-inference/tests/test_likelihood_target.rs</code>,
+<code>tests/uncertainty/test_scores.py::TestLogScore</code>.</p>
 <h2 id="conformal-variants-share-one-score-and-one-quantile">Conformal variants share one score and one quantile<a class="headerlink" href="#conformal-variants-share-one-score-and-one-quantile" title="Permanent link">&para;</a></h2>
 <p>A conformal variant only chooses which predictions and which held-out values
 feed a <code>NonconformityScore</code>; the score, its scale and the quantile

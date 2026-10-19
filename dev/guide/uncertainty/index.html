@@ -1509,6 +1509,34 @@
   
   
     <li class="md-nav__item">
+      <a href="observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="conformal/" class="md-nav__link">
         
   
@@ -3117,9 +3145,10 @@ observation will fall: an observation also carries measurement noise. A
 <strong>prediction interval</strong> adds that noise to every draw before it reduces them
 (the <code>ObservationNoise</code> port of <code>commol-inference</code>). Every reader of
 observations takes the noise as an argument with no default: <code>NoNoise()</code> gives
-a band of the model, and <code>ResidualNoise(...)</code> adds residuals of a fit, which
+a band of the model, <code>ResidualNoise(...)</code> adds residuals of a fit, which
 gives a prediction interval with no noise model
-(<a href="resampling/#prediction-intervals">Resampling</a>). Comparing a band of the
+(<a href="resampling/#prediction-intervals">Resampling</a>), and <code>DistributionNoise()</code>
+draws from the <a href="observation-models/">observation models</a> of the problem. Comparing a band of the
 model with data underestimates the spread, so its coverage of the data is below
 its level. A <a href="conformal/">conformal</a> interval is a prediction interval with a
 coverage guarantee, from the scores of observations the fit did not use.</p>
@@ -3241,6 +3270,30 @@ coverage guarantee, from the scores of observations the fit did not use.</p>
 <td>Intervals for observations as they arrive, whose share of misses tends to its level</td>
 <td>No</td>
 <td><a href="conformal/#adaptive-conformal-inference">Conformal</a></td>
+</tr>
+<tr>
+<td><code>observation_models</code> with <code>Calibrator.run()</code></td>
+<td>The maximum-likelihood fit of the parameters and the noise</td>
+<td>Yes</td>
+<td><a href="observation-models/#maximum-likelihood-against-the-posterior">Observation Models</a></td>
+</tr>
+<tr>
+<td><code>BayesianPosterior</code></td>
+<td>The posterior of the parameters from the likelihood and priors, with its evidence</td>
+<td>Yes</td>
+<td><a href="observation-models/#maximum-likelihood-against-the-posterior">Observation Models</a></td>
+</tr>
+<tr>
+<td><code>ParametricBootstrap</code></td>
+<td>How far the parameters move in data sets drawn from the models at the fit</td>
+<td>Yes</td>
+<td><a href="observation-models/#maximum-likelihood-against-the-posterior">Observation Models</a></td>
+</tr>
+<tr>
+<td><code>DistributionNoise</code></td>
+<td>Where the next observations fall: a prediction interval of the models</td>
+<td>Yes</td>
+<td><a href="observation-models/#prediction-with-noise">Observation Models</a></td>
 </tr>
 </tbody>
 </table>
@@ -3436,7 +3489,7 @@ of the predictive, with an equal share of its weight.</p>
 </tr>
 <tr>
 <td><code>at_observations(observed_data, noise)</code></td>
-<td>Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with <code>noise</code> drawn from the calibrator's seed: <code>NoNoise()</code> or <code>ResidualNoise(...)</code> (<code>ObservationDraws</code>)</td>
+<td>Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with <code>noise</code> drawn from the calibrator's seed: <code>NoNoise()</code>, <code>ResidualNoise(...)</code> or <code>DistributionNoise()</code> (<code>ObservationDraws</code>)</td>
 </tr>
 <tr>
 <td><code>runs()</code>, <code>weights</code></td>
@@ -3455,7 +3508,8 @@ return a <code>Score</code>: the value of each observation, the mean of each ser
 the overall mean. Which observations to score and the observation noise are
 arguments with no default: score data the method did not see, such as the
 held-out positions above, and say whether you score a band of the model
-(<code>NoNoise()</code>) or a prediction interval (<code>ResidualNoise(...)</code>).</p>
+(<code>NoNoise()</code>) or a prediction interval (<code>ResidualNoise(...)</code>,
+<code>DistributionNoise()</code>).</p>
 <table>
 <thead>
 <tr>
@@ -3489,6 +3543,11 @@ held-out positions above, and say whether you score a band of the model
 <td><code>pit(predictive, observations, noise, seed)</code></td>
 <td><code>F(y)</code>, randomized where draws tie with <code>y</code></td>
 <td>Uniform</td>
+</tr>
+<tr>
+<td><code>log_score(predictive, observations, DistributionNoise())</code></td>
+<td><code>log Σ_d w_d · p(y | μ_d)</code>, the log density of <code>y</code> under the mixture of the observation models over the draws; another noise raises a <code>TypeError</code></td>
+<td>Higher</td>
 </tr>
 </tbody>
 </table>
@@ -3531,6 +3590,10 @@ other kind with a <code>TypeError</code> that names the right one.</p>
 <tr>
 <td>Posteriors with no noise model: the Gibbs posterior and ABC</td>
 <td><a href="smc/">Sequential Monte Carlo</a></td>
+</tr>
+<tr>
+<td>Maximum likelihood, the posterior and prediction intervals of observation models</td>
+<td><a href="observation-models/">Observation Models</a></td>
 </tr>
 <tr>
 <td>Prediction intervals with a coverage guarantee</td>

@@ -1213,10 +1213,11 @@ class Predictive:
         ----------
         observed_data : Sequence[ObservedDataPoint]
             The observations.
-        noise : NoNoise | ResidualNoise
+        noise : NoNoise | ResidualNoise | DistributionNoise
             What an observation shows around a draw's prediction, with no
             default: ``NoNoise()`` gives a band of the model,
-            ``ResidualNoise(...)`` a prediction interval.
+            ``ResidualNoise(...)`` and ``DistributionNoise()`` a prediction
+            interval.
 
         Returns
         -------
@@ -1226,8 +1227,10 @@ class Predictive:
         Raises
         ------
         ValueError
-            If an observation names an unknown output or factor, or a series
-            the residual noise has no residuals of.
+            If an observation names an unknown output or factor, a series the
+            residual noise has no residuals of, or a series with no
+            observation model; or `DistributionNoise` comes with a problem
+            that has a loss.
         InfeasibleStateError
             If a draw leaves the values its model allows.
         """
@@ -1246,6 +1249,7 @@ class Predictive:
             engine_state.rust_observed_data(list(observed_data)),
             self.calibrator.seed,
             residual_noise=residual_noise,
+            distribution_noise=isinstance(noise, DistributionNoise),
         )
         return ObservationDraws(observed_data, draws)
 ```
@@ -1516,10 +1520,10 @@ The observations need not be the ones the problem was fitted to: held out data a
 
 Parameters:
 
-| Name            | Type                          | Description       | Default                                                                                                                                               |
-| --------------- | ----------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `observed_data` | `Sequence[ObservedDataPoint]` | The observations. | *required*                                                                                                                                            |
-| `noise`         | \`NoNoise                     | ResidualNoise\`   | What an observation shows around a draw's prediction, with no default: NoNoise() gives a band of the model, ResidualNoise(...) a prediction interval. |
+| Name            | Type                          | Description       | Default             |
+| --------------- | ----------------------------- | ----------------- | ------------------- |
+| `observed_data` | `Sequence[ObservedDataPoint]` | The observations. | *required*          |
+| `noise`         | \`NoNoise                     | ResidualNoise     | DistributionNoise\` |
 
 Returns:
 
@@ -1529,10 +1533,10 @@ Returns:
 
 Raises:
 
-| Type                   | Description                                                                                              |
-| ---------------------- | -------------------------------------------------------------------------------------------------------- |
-| `ValueError`           | If an observation names an unknown output or factor, or a series the residual noise has no residuals of. |
-| `InfeasibleStateError` | If a draw leaves the values its model allows.                                                            |
+| Type                   | Description                                                                                                                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`           | If an observation names an unknown output or factor, a series the residual noise has no residuals of, or a series with no observation model; or DistributionNoise comes with a problem that has a loss. |
+| `InfeasibleStateError` | If a draw leaves the values its model allows.                                                                                                                                                           |
 
 Source code in `commol/api/inference/predictive.py`
 
@@ -1553,10 +1557,11 @@ def at_observations(
     ----------
     observed_data : Sequence[ObservedDataPoint]
         The observations.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         What an observation shows around a draw's prediction, with no
         default: ``NoNoise()`` gives a band of the model,
-        ``ResidualNoise(...)`` a prediction interval.
+        ``ResidualNoise(...)`` and ``DistributionNoise()`` a prediction
+        interval.
 
     Returns
     -------
@@ -1566,8 +1571,10 @@ def at_observations(
     Raises
     ------
     ValueError
-        If an observation names an unknown output or factor, or a series
-        the residual noise has no residuals of.
+        If an observation names an unknown output or factor, a series the
+        residual noise has no residuals of, or a series with no
+        observation model; or `DistributionNoise` comes with a problem
+        that has a loss.
     InfeasibleStateError
         If a draw leaves the values its model allows.
     """
@@ -1586,6 +1593,7 @@ def at_observations(
         engine_state.rust_observed_data(list(observed_data)),
         self.calibrator.seed,
         residual_noise=residual_noise,
+        distribution_noise=isinstance(noise, DistributionNoise),
     )
     return ObservationDraws(observed_data, draws)
 ```
@@ -1964,6 +1972,32 @@ class ResidualNoise(BaseModel):
     )
 ```
 
+## DistributionNoise
+
+Bases: `BaseModel`
+
+Observation noise of the problem's observation models.
+
+Each draw draws every observation from the model of its series around the draw's prediction, with the draw's noise parameters, so the band is a prediction interval of the posterior or bootstrap predictive. It needs a problem with `observation_models`, and serves the series they name. A prediction outside the means a model allows, such as a negative count, draws at the nearest allowed one.
+
+Source code in `commol/context/inference/noise.py`
+
+```python
+class DistributionNoise(BaseModel):
+    """
+    Observation noise of the problem's observation models.
+
+    Each draw draws every observation from the model of its series around
+    the draw's prediction, with the draw's noise parameters, so the band is a
+    prediction interval of the posterior or bootstrap predictive. It needs a
+    problem with ``observation_models``, and serves the series they name. A
+    prediction outside the means a model allows, such as a negative count,
+    draws at the nearest allowed one.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+```
+
 ## Resampling
 
 Guide: [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md).
@@ -2158,6 +2192,47 @@ class BlockJackknife(UncertaintyMethod[JackknifeResult]):
     """
 
     block_length: BlockLength = Field(description="Positions per block.")
+    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+```
+
+## ParametricBootstrap
+
+Bases: `UncertaintyMethod[BootstrapResult]`
+
+The parametric bootstrap of the problem's observation models.
+
+Each replicate draws every observed value from the model of its series at the fit, around the fitted prediction and with the fitted noise parameters, and fits the new data. It needs a problem with `observation_models`; the observations of a replicate are independent given the fit, so it assumes the models hold.
+
+Attributes:
+
+| Name         | Type  | Description                                                                                                   |
+| ------------ | ----- | ------------------------------------------------------------------------------------------------------------- |
+| `replicates` | `int` | Number of replicates, at least 1.                                                                             |
+| `starts`     | `int` | Starts of the fit and of each replicate (default 1): the fit, then rows of a Latin hypercube over the bounds. |
+
+Source code in `commol/context/inference/resampling.py`
+
+```python
+class ParametricBootstrap(UncertaintyMethod[BootstrapResult]):
+    """
+    The parametric bootstrap of the problem's observation models.
+
+    Each replicate draws every observed value from the model of its series
+    at the fit, around the fitted prediction and with the fitted noise
+    parameters, and fits the new data. It needs a problem with
+    ``observation_models``; the observations of a replicate are independent
+    given the fit, so it assumes the models hold.
+
+    Attributes
+    ----------
+    replicates : int
+        Number of replicates, at least 1.
+    starts : int
+        Starts of the fit and of each replicate (default 1): the fit, then
+        rows of a Latin hypercube over the bounds.
+    """
+
+    replicates: int = Field(ge=1, description="Number of replicates.")
     starts: int = Field(default=1, ge=1, description="Starts per fit.")
 ```
 
@@ -2388,7 +2463,7 @@ Attributes:
 
 | Name                     | Type               | Description                                                                                                                       |
 | ------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `block_length`           | `int`              | The block length the method ran with.                                                                                             |
+| `block_length`           | \`int              | None\`                                                                                                                            |
 | `block_length_estimates` | \`dict[str, float] | None\`                                                                                                                            |
 | `failed`                 | `list[str]`        | Each replicate that failed, with its reason. A failed replicate is not in the sample.                                             |
 | `not_converged`          | `int`              | Replicates kept although their optimizer did not converge.                                                                        |
@@ -2403,8 +2478,9 @@ class ResamplingDiagnostics(BaseModel):
 
     Attributes
     ----------
-    block_length : int
-        The block length the method ran with.
+    block_length : int | None
+        The block length the method ran with; None for the parametric
+        bootstrap, which draws no blocks.
     block_length_estimates : dict[str, float] | None
         With ``block_length="auto"``, the estimate of each series, by label;
         otherwise None.
@@ -2420,7 +2496,7 @@ class ResamplingDiagnostics(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    block_length: int = Field(description="The block length used.")
+    block_length: int | None = Field(description="The block length used.")
     block_length_estimates: dict[str, float] | None = Field(
         description="The estimate of each series with the automatic length."
     )
@@ -2953,6 +3029,67 @@ def require_eta(cls, data: object) -> object:
     return data
 ```
 
+## BayesianPosterior
+
+Bases: `WithPriors`, `UncertaintyMethod[SmcResult]`
+
+The posterior `π(θ) ∝ prior(θ) · L(θ)` of the problem's observation models, sampled by sequential Monte Carlo from the priors (temperature 0) to the posterior (temperature 1), with its log evidence.
+
+It needs a problem with `observation_models`: their likelihood sets the weight of the data, so it has no `η`. The noise parameters are sampled with the others, so each needs a prior.
+
+Attributes:
+
+| Name                 | Type     | Description                                                                                                                                                   |
+| -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `priors`             | \`Priors | dict[str, Distribution]\`                                                                                                                                     |
+| `particles`          | `int`    | Number of particles, at least 2.                                                                                                                              |
+| `target_cess`        | `float`  | The conditional effective sample size of each step, as a share of the particles, strictly between 0 and 1: the next temperature is the highest that keeps it. |
+| `resample_threshold` | `float`  | Resample when the effective size falls below this share of the particles, in (0, 1\].                                                                         |
+| `stay_probability`   | `float`  | The probability that a particle does not move in a step, strictly between 0 and 1: each step moves every particle ⌈log c / log(1 − a)⌉ times.                 |
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+class BayesianPosterior(WithPriors, UncertaintyMethod[SmcResult]):
+    """
+    The posterior ``π(θ) ∝ prior(θ) · L(θ)`` of the problem's observation
+    models, sampled by sequential Monte Carlo from the priors (temperature
+    0) to the posterior (temperature 1), with its log evidence.
+
+    It needs a problem with ``observation_models``: their likelihood sets the
+    weight of the data, so it has no `η`. The noise parameters are sampled
+    with the others, so each needs a prior.
+
+    Attributes
+    ----------
+    priors : Priors | dict[str, Distribution]
+        The prior of each calibrated parameter, or
+        ``Priors.uniform_on_bounds()``.
+    particles : int
+        Number of particles, at least 2.
+    target_cess : float
+        The conditional effective sample size of each step, as a share of
+        the particles, strictly between 0 and 1: the next temperature is the
+        highest that keeps it.
+    resample_threshold : float
+        Resample when the effective size falls below this share of the
+        particles, in ``(0, 1]``.
+    stay_probability : float
+        The probability that a particle does not move in a step, strictly
+        between 0 and 1: each step moves every particle
+        ``⌈log c / log(1 − a)⌉`` times.
+    """
+
+    particles: int = Field(ge=2, description="Number of particles.")
+    target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
+    resample_threshold: float = Field(
+        gt=0.0, le=1.0, description="Resample below this share."
+    )
+    stay_probability: float = Field(
+        gt=0.0, lt=1.0, description="Probability a particle does not move."
+    )
+```
+
 ## EtaCalibration
 
 Bases: `BaseModel`
@@ -3353,13 +3490,13 @@ The result of a sequential Monte Carlo method.
 
 Attributes:
 
-| Name           | Type              | Description                                                                                                                                                                               |
-| -------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sample`       | `ParameterSample` | The weighted particles at the last level.                                                                                                                                                 |
-| `levels`       | `list[float]`     | The level of each step: the temperature of a Gibbs posterior, from above 0 to 1, or the tolerance of ABC, falling.                                                                        |
-| `kept`         | \`list\[float     | None\]\`                                                                                                                                                                                  |
-| `log_evidence` | `float`           | The log of the product of the mean incremental weights: for a Gibbs posterior, the log of ∫ prior(θ) exp(−η loss(θ)) dθ; for ABC, the log of the prior probability of the last tolerance. |
-| `diagnostics`  | `SmcDiagnostics`  | The effective sizes, acceptance rates and move counts of each step.                                                                                                                       |
+| Name           | Type              | Description                                                                                                                                                                                                                                                             |
+| -------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sample`       | `ParameterSample` | The weighted particles at the last level.                                                                                                                                                                                                                               |
+| `levels`       | `list[float]`     | The level of each step: the temperature of a Gibbs posterior, from above 0 to 1, or the tolerance of ABC, falling.                                                                                                                                                      |
+| `kept`         | \`list\[float     | None\]\`                                                                                                                                                                                                                                                                |
+| `log_evidence` | `float`           | The log of the product of the mean incremental weights: for a Gibbs posterior, the log of ∫ prior(θ) exp(−η loss(θ)) dθ; for a Bayesian posterior, the log marginal likelihood log ∫ prior(θ) L(θ) dθ; for ABC, the log of the prior probability of the last tolerance. |
+| `diagnostics`  | `SmcDiagnostics`  | The effective sizes, acceptance rates and move counts of each step.                                                                                                                                                                                                     |
 
 Source code in `commol/context/inference/smc.py`
 
@@ -3377,12 +3514,14 @@ class SmcResult(BaseModel):
         above 0 to 1, or the tolerance of ABC, falling.
     kept : list[float | None]
         The value each particle of the sample keeps, in its order: the loss
-        of a Gibbs posterior, or the distance of ABC; None for a particle
-        outside the support.
+        of a Gibbs posterior, the log-likelihood of a Bayesian posterior, or
+        the distance of ABC; None for a particle outside the support.
     log_evidence : float
         The log of the product of the mean incremental weights: for a Gibbs
-        posterior, the log of ``∫ prior(θ) exp(−η loss(θ)) dθ``; for ABC, the
-        log of the prior probability of the last tolerance.
+        posterior, the log of ``∫ prior(θ) exp(−η loss(θ)) dθ``; for a
+        Bayesian posterior, the log marginal likelihood
+        ``log ∫ prior(θ) L(θ) dθ``; for ABC, the log of the prior probability
+        of the last tolerance.
     diagnostics : SmcDiagnostics
         The effective sizes, acceptance rates and move counts of each step.
     """
@@ -4027,7 +4166,7 @@ class SeriesIntervals(BaseModel):
 
 Scores of a predictive against observations.
 
-Every score is computed in Rust from each draw's value of the observations (`Predictive.at_observations`), per observation and per series. Which observations to score, for example the ones held out of the calibration, and the observation noise are arguments with no default: a band of the model (`NoNoise`) compared with data covers less than its level.
+Every score is computed in Rust, per observation and per series: from each draw's value of the observations (`Predictive.at_observations`), or, for the log score, from the density of the observation models at each draw's prediction. Which observations to score, for example the ones held out of the calibration, and the observation noise are arguments with no default: a band of the model (`NoNoise`) compared with data covers less than its level.
 
 ### Classes
 
@@ -4082,12 +4221,12 @@ The empirical coverage of the central interval of `confidence_level`.
 
 Parameters:
 
-| Name               | Type                          | Description                | Default                                                          |
-| ------------------ | ----------------------------- | -------------------------- | ---------------------------------------------------------------- |
-| `predictive`       | `Predictive`                  | The predictive.            | *required*                                                       |
-| `observations`     | `Sequence[ObservedDataPoint]` | The observations to score. | *required*                                                       |
-| `noise`            | \`NoNoise                     | ResidualNoise\`            | The observation noise of the draws (Predictive.at_observations). |
-| `confidence_level` | `float`                       | Strictly between 0 and 1.  | *required*                                                       |
+| Name               | Type                          | Description                | Default             |
+| ------------------ | ----------------------------- | -------------------------- | ------------------- |
+| `predictive`       | `Predictive`                  | The predictive.            | *required*          |
+| `observations`     | `Sequence[ObservedDataPoint]` | The observations to score. | *required*          |
+| `noise`            | \`NoNoise                     | ResidualNoise              | DistributionNoise\` |
+| `confidence_level` | `float`                       | Strictly between 0 and 1.  | *required*          |
 
 Returns:
 
@@ -4113,7 +4252,7 @@ def coverage(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
     confidence_level : float
         Strictly between 0 and 1.
@@ -4138,12 +4277,12 @@ The interval score: `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`.
 
 Parameters:
 
-| Name               | Type                          | Description                                     | Default                                                          |
-| ------------------ | ----------------------------- | ----------------------------------------------- | ---------------------------------------------------------------- |
-| `predictive`       | `Predictive`                  | The predictive.                                 | *required*                                                       |
-| `observations`     | `Sequence[ObservedDataPoint]` | The observations to score.                      | *required*                                                       |
-| `noise`            | \`NoNoise                     | ResidualNoise\`                                 | The observation noise of the draws (Predictive.at_observations). |
-| `confidence_level` | `float`                       | The level c of the central interval; α = 1 − c. | *required*                                                       |
+| Name               | Type                          | Description                                     | Default             |
+| ------------------ | ----------------------------- | ----------------------------------------------- | ------------------- |
+| `predictive`       | `Predictive`                  | The predictive.                                 | *required*          |
+| `observations`     | `Sequence[ObservedDataPoint]` | The observations to score.                      | *required*          |
+| `noise`            | \`NoNoise                     | ResidualNoise                                   | DistributionNoise\` |
+| `confidence_level` | `float`                       | The level c of the central interval; α = 1 − c. | *required*          |
 
 Returns:
 
@@ -4169,7 +4308,7 @@ def interval_score(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
     confidence_level : float
         The level ``c`` of the central interval; ``α = 1 − c``.
@@ -4197,12 +4336,12 @@ The weighted interval score of Bracher et al. (2021).
 
 Parameters:
 
-| Name                | Type                          | Description                          | Default                                                          |
-| ------------------- | ----------------------------- | ------------------------------------ | ---------------------------------------------------------------- |
-| `predictive`        | `Predictive`                  | The predictive.                      | *required*                                                       |
-| `observations`      | `Sequence[ObservedDataPoint]` | The observations to score.           | *required*                                                       |
-| `noise`             | \`NoNoise                     | ResidualNoise\`                      | The observation noise of the draws (Predictive.at_observations). |
-| `confidence_levels` | `Sequence[float]`             | The levels of the central intervals. | *required*                                                       |
+| Name                | Type                          | Description                          | Default             |
+| ------------------- | ----------------------------- | ------------------------------------ | ------------------- |
+| `predictive`        | `Predictive`                  | The predictive.                      | *required*          |
+| `observations`      | `Sequence[ObservedDataPoint]` | The observations to score.           | *required*          |
+| `noise`             | \`NoNoise                     | ResidualNoise                        | DistributionNoise\` |
+| `confidence_levels` | `Sequence[float]`             | The levels of the central intervals. | *required*          |
 
 Returns:
 
@@ -4235,7 +4374,7 @@ def weighted_interval_score(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
     confidence_levels : Sequence[float]
         The levels of the central intervals.
@@ -4272,11 +4411,11 @@ The continuous ranked probability score of the weighted draws.
 
 Parameters:
 
-| Name           | Type                          | Description                | Default                                                          |
-| -------------- | ----------------------------- | -------------------------- | ---------------------------------------------------------------- |
-| `predictive`   | `Predictive`                  | The predictive.            | *required*                                                       |
-| `observations` | `Sequence[ObservedDataPoint]` | The observations to score. | *required*                                                       |
-| `noise`        | \`NoNoise                     | ResidualNoise\`            | The observation noise of the draws (Predictive.at_observations). |
+| Name           | Type                          | Description                | Default             |
+| -------------- | ----------------------------- | -------------------------- | ------------------- |
+| `predictive`   | `Predictive`                  | The predictive.            | *required*          |
+| `observations` | `Sequence[ObservedDataPoint]` | The observations to score. | *required*          |
+| `noise`        | \`NoNoise                     | ResidualNoise              | DistributionNoise\` |
 
 Returns:
 
@@ -4304,7 +4443,7 @@ def crps(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
 
     Returns
@@ -4328,12 +4467,12 @@ The probability integral transform of each observation.
 
 Parameters:
 
-| Name           | Type                          | Description                        | Default                                                          |
-| -------------- | ----------------------------- | ---------------------------------- | ---------------------------------------------------------------- |
-| `predictive`   | `Predictive`                  | The predictive.                    | *required*                                                       |
-| `observations` | `Sequence[ObservedDataPoint]` | The observations to score.         | *required*                                                       |
-| `noise`        | \`NoNoise                     | ResidualNoise\`                    | The observation noise of the draws (Predictive.at_observations). |
-| `seed`         | `int`                         | Seed of the randomization of ties. | *required*                                                       |
+| Name           | Type                          | Description                        | Default             |
+| -------------- | ----------------------------- | ---------------------------------- | ------------------- |
+| `predictive`   | `Predictive`                  | The predictive.                    | *required*          |
+| `observations` | `Sequence[ObservedDataPoint]` | The observations to score.         | *required*          |
+| `noise`        | \`NoNoise                     | ResidualNoise                      | DistributionNoise\` |
+| `seed`         | `int`                         | Seed of the randomization of ties. | *required*          |
 
 Returns:
 
@@ -4363,7 +4502,7 @@ def pit(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
     seed : int
         Seed of the randomization of ties.
@@ -4375,6 +4514,89 @@ def pit(
     """
     draws = predictive.at_observations(observations, noise)
     return _score(draws, draws.rust_draws.pit(draws.observed, seed))
+```
+
+#### log_score
+
+```python
+log_score(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: DistributionNoise) -> Score
+```
+
+The log score of each observation: the log density of its value under the predictive.
+
+The predictive density is the mixture over the draws of the observation models, `log Σ_d w_d · p(y | μ_d)`, with `μ_d` the prediction of draw `d` and its noise parameters. It needs the densities of the models, so only `DistributionNoise` has one. A proper scoring rule; higher is better, and an observation the predictive gives no mass scores `-inf`.
+
+Parameters:
+
+| Name           | Type                          | Description                                           | Default    |
+| -------------- | ----------------------------- | ----------------------------------------------------- | ---------- |
+| `predictive`   | `Predictive`                  | The predictive, of a problem with observation_models. | *required* |
+| `observations` | `Sequence[ObservedDataPoint]` | The observations to score.                            | *required* |
+| `noise`        | `DistributionNoise`           | The observation models of the problem.                | *required* |
+
+Returns:
+
+| Type    | Description                        |
+| ------- | ---------------------------------- |
+| `Score` | The log score of each observation. |
+
+Raises:
+
+| Type         | Description                                                                                                           |
+| ------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`  | If noise is not DistributionNoise.                                                                                    |
+| `ValueError` | If the problem has a loss, or an observation names an unknown output or factor or a series with no observation model. |
+
+Source code in `commol/api/inference/scores.py`
+
+```python
+def log_score(
+    predictive: Predictive,
+    observations: Sequence[ObservedDataPoint],
+    noise: DistributionNoise,
+) -> Score:
+    """
+    The log score of each observation: the log density of its value under
+    the predictive.
+
+    The predictive density is the mixture over the draws of the observation
+    models, ``log Σ_d w_d · p(y | μ_d)``, with ``μ_d`` the prediction of draw
+    ``d`` and its noise parameters. It needs the densities of the models, so
+    only `DistributionNoise` has one. A proper scoring rule; higher is
+    better, and an observation the predictive gives no mass scores ``-inf``.
+
+    Parameters
+    ----------
+    predictive : Predictive
+        The predictive, of a problem with ``observation_models``.
+    observations : Sequence[ObservedDataPoint]
+        The observations to score.
+    noise : DistributionNoise
+        The observation models of the problem.
+
+    Returns
+    -------
+    Score
+        The log score of each observation.
+
+    Raises
+    ------
+    TypeError
+        If `noise` is not `DistributionNoise`.
+    ValueError
+        If the problem has a loss, or an observation names an unknown output
+        or factor or a series with no observation model.
+    """
+    if not isinstance(noise, DistributionNoise):
+        raise TypeError(
+            f"The log score needs the density of the observation models, so it "
+            f"takes DistributionNoise(); {type(noise).__name__} has no density."
+        )
+    values = predictive.calibrator.rust_problem.log_score(
+        predictive.sample.rust_sample,
+        engine_state.rust_observed_data(list(observations)),
+    )
+    return _score_of(observations, values)
 ```
 
 ## weighted_quantiles

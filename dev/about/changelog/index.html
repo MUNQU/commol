@@ -1317,6 +1317,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/uncertainty/conformal/" class="md-nav__link">
         
   
@@ -3606,6 +3634,27 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><code>SimulationPlotter.plot_series(prediction_intervals=...)</code> draws the band of
   conformal intervals, and <code>simulation_report(..., prediction_intervals=...)</code>
   reports them.</li>
+<li>Observation models: <code>CalibrationProblem(observation_models={series: model})</code>
+  takes one model per series label, <code>NormalObservations(sd)</code>,
+  <code>LogNormalObservations(sigma, center)</code> (<code>center="mean"</code> or <code>"median"</code>, no
+  default), <code>StudentTObservations(df, scale)</code>, <code>PoissonObservations()</code>,
+  <code>NegativeBinomialObservations(overdispersion)</code> (variance <code>μ + φμ²</code>) or
+  <code>BinomialObservations(trials)</code> (or the new <code>ObservedDataPoint.trials</code> of each
+  observation), and the problem fits by maximum likelihood. A noise argument
+  is a number or a calibration parameter of the new type <code>"noise"</code>, which never
+  reaches the engine. Observed values outside a model's support raise a
+  <code>ValueError</code> that names the observation. A stochastic engine and
+  <code>normalize_observations</code> need a loss. See
+  <a href="../../guide/uncertainty/observation-models/">Observation Models</a>.</li>
+<li><code>BayesianPosterior</code>: the posterior of the observation models and its log
+  evidence, on the sequential Monte Carlo sampler. <code>GibbsPosterior</code> on
+  observation models is the fractional posterior <code>prior · L^η</code>.</li>
+<li><code>DistributionNoise()</code>: prediction intervals that draw from the observation
+  models; <code>commol.scores.log_score</code>, the log density of held-out observations
+  under the predictive, which needs <code>DistributionNoise()</code>.</li>
+<li><code>ParametricBootstrap(replicates)</code>: fits to data sets drawn from the
+  observation models at the fit. <code>ResamplingDiagnostics.block_length</code> is <code>None</code>
+  for it.</li>
 <li>A model can hold bins of different units, such as people and the
   concentration of bacteria in water: each bin starts at an amount in its own
   unit, a model whose bins all start at <code>0</code> builds and runs, and the
@@ -3679,6 +3728,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>compartment_fractions</code>; <code>CompartmentalEngine::total</code> is the sum of the
   amounts the model states; <code>check_model_values</code> returns the plan it resolves,
   and <code>InitialConditionPlan::coverage</code> gives the compartments each value sets.</li>
+<li><strong>Breaking:</strong> <code>CalibrationProblem.loss_function</code> has no default: a problem needs
+  <code>loss_function</code> or <code>observation_models</code>, exactly one, and raises a
+  <code>ValueError</code> with both or neither. Write <code>loss_function="sse"</code> where a
+  problem relied on the default.</li>
 </ul>
 <h2 id="050-2026-10-19">[0.5.0] - 2026-10-19<a class="headerlink" href="#050-2026-10-19" title="Permanent link">&para;</a></h2>
 <p>This release replaces the ensemble calibration with uncertainty methods that

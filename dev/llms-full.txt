@@ -2982,6 +2982,7 @@ Calibration finds the parameter values (and, if you want, initial conditions and
 | Topic                                                              | Page                                                                                                                  |
 | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
 | The workflow, the problem, losses and results                      | This page                                                                                                             |
+| Maximum likelihood with a model of the noise of each series        | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md)             |
 | Calibrating initial conditions                                     | [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
 | Several outputs, aggregates, weights, scale factors, windowed data | [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)                         |
 | Nelder-Mead and particle swarm settings                            | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md)                             |
@@ -3061,50 +3062,55 @@ A `Simulation` follows its model: after `apply_calibration_parameters` or `updat
 | ----------------------------- | ------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `observed_data`               | `list[ObservedDataPoint]`                   | required | What the model must reproduce. See [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md).                                                                                     |
 | `parameters`                  | `list[CalibrationParameter]`                | required | The unknowns and their bounds.                                                                                                                                                                                        |
-| `loss_function`               | `str`                                       | `"sse"`  | How the misfit is measured; see [Losses](#losses).                                                                                                                                                                    |
+| `loss_function`               | `str \| None`                               | `None`   | How the misfit is measured; see [Losses](#losses). A problem has `loss_function` or `observation_models`, exactly one.                                                                                                |
+| `observation_models`          | `dict[str, ObservationModel] \| None`       | `None`   | One observation model per series label: the fit maximizes their likelihood. See [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md).                            |
 | `optimization_config`         | `NelderMeadConfig` or `ParticleSwarmConfig` | required | The optimizer and its settings. See [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md).                                                                                        |
 | `constraints`                 | `list[CalibrationConstraint]`               | `[]`     | Relations the result must respect. See [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md).                                                                                   |
-| `normalize_observations`      | `bool`                                      | `False`  | Divides each residual by the RMS of its observation series, so series of very different size weigh the same.                                                                                                          |
+| `normalize_observations`      | `bool`                                      | `False`  | Divides each residual by the RMS of its observation series, so series of very different size weigh the same. Needs a loss.                                                                                            |
 | `initial_condition_remainder` | `str \| None`                               | `None`   | The compartment or bin that absorbs the difference when initial conditions are calibrated. See [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md). |
 | `seed`                        | `int \| None`                               | `None`   | Makes every random choice reproducible.                                                                                                                                                                               |
 
 ### Observations
 
-| `ObservedDataPoint` field | Type                | Default  | Meaning                                                                                                       |
-| ------------------------- | ------------------- | -------- | ------------------------------------------------------------------------------------------------------------- |
-| `at`                      | `float`             | required | The position of the observation on the axis. A difference model accepts integer steps only.                   |
-| `output`                  | `str \| None`       | `None`   | The output it observes: a compartment or accumulator name, such as `B` or `B_g1`. Give `output` or `outputs`. |
-| `outputs`                 | `list[str] \| None` | `None`   | Outputs to sum before the comparison; needs a `label`.                                                        |
-| `label`                   | `str`               | `output` | The name of the observed series in reports, plots and the normalization.                                      |
-| `value`                   | `float`             | required | The observed value.                                                                                           |
-| `weight`                  | `float`             | `1.0`    | How much the observation counts in every loss; see [Losses](#losses).                                         |
-| `factor_id`               | `str \| None`       | `None`   | A `factor` parameter that multiplies the prediction.                                                          |
-| `window`                  | `float \| None`     | `None`   | Compares with the gain over `(at − window, at]` instead of the value.                                         |
+| `ObservedDataPoint` field | Type                | Default  | Meaning                                                                                                          |
+| ------------------------- | ------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| `at`                      | `float`             | required | The position of the observation on the axis. A difference model accepts integer steps only.                      |
+| `output`                  | `str \| None`       | `None`   | The output it observes: a compartment or accumulator name, such as `B` or `B_g1`. Give `output` or `outputs`.    |
+| `outputs`                 | `list[str] \| None` | `None`   | Outputs to sum before the comparison; needs a `label`.                                                           |
+| `label`                   | `str`               | `output` | The name of the observed series in reports, plots and the normalization.                                         |
+| `value`                   | `float`             | required | The observed value.                                                                                              |
+| `weight`                  | `float`             | `1.0`    | How much the observation counts in every loss, and the power of its term of a likelihood; see [Losses](#losses). |
+| `factor_id`               | `str \| None`       | `None`   | A `factor` parameter that multiplies the prediction.                                                             |
+| `window`                  | `float \| None`     | `None`   | Compares with the gain over `(at − window, at]` instead of the value.                                            |
+| `trials`                  | `int \| None`       | `None`   | The trials of the observation, for a `BinomialObservations()` model that reads them from each observation.       |
 
 ### Unknowns
 
 | `CalibrationParameter` field | Type            | Default  | Meaning                                                           |
 | ---------------------------- | --------------- | -------- | ----------------------------------------------------------------- |
 | `id`                         | `str`           | required | What to calibrate; depends on `parameter_type`.                   |
-| `parameter_type`             | `str`           | required | `"parameter"`, `"initial_condition"` or `"factor"`.               |
+| `parameter_type`             | `str`           | required | `"parameter"`, `"initial_condition"`, `"factor"` or `"noise"`.    |
 | `min_bound`, `max_bound`     | `float`         | required | The search interval.                                              |
 | `initial_guess`              | `float \| None` | `None`   | Where the optimizer starts; the midpoint of the bounds if `None`. |
 
-| `parameter_type`      | `id` names                                            | The value is                                                                                                                                                                            |
-| --------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"parameter"`         | A model parameter, usually declared with `value=None` | The parameter value                                                                                                                                                                     |
-| `"initial_condition"` | A bin, a category, or an expanded compartment         | An amount in the unit of its bin, or the split of a category; see [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
-| `"factor"`            | Any new id, used by observations through `factor_id`  | A factor on the predictions; not part of the model                                                                                                                                      |
+| `parameter_type`      | `id` names                                                                                                                                | The value is                                                                                                                                                                            |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"parameter"`         | A model parameter, usually declared with `value=None`                                                                                     | The parameter value                                                                                                                                                                     |
+| `"initial_condition"` | A bin, a category, or an expanded compartment                                                                                             | An amount in the unit of its bin, or the split of a category; see [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
+| `"factor"`            | Any new id, used by observations through `factor_id`                                                                                      | A factor on the predictions; not part of the model                                                                                                                                      |
+| `"noise"`             | Any new id, named by an [observation model](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#noise-parameters) | An argument of the model, such as its standard deviation; not part of the model                                                                                                         |
 
-`"parameter"` and `"factor"` work with every kind of model. The other types are values of the model kind, and the kind declares which it accepts (`model.structure.calibration_value_types()`): an aggregate model accepts `"initial_condition"`. A type the kind does not accept raises a `ValueError` that names the kind when you create the `Calibrator`.
+`"parameter"`, `"factor"` and `"noise"` work with every kind of model. The other types are values of the model kind, and the kind declares which it accepts (`model.structure.calibration_value_types()`): an aggregate model accepts `"initial_condition"`. A type the kind does not accept raises a `ValueError` that names the kind when you create the `Calibrator`.
 
 ## Losses
 
-| `loss_function`   | Formula (residual `r = observed − predicted`, weight `w`) | Use when                              |
-| ----------------- | --------------------------------------------------------- | ------------------------------------- |
-| `"sse"` (default) | `Σ w·r²`                                                  | The usual choice                      |
-| `"rmse"`          | `√(Σ w·r² / Σ w)`                                         | You want the error in the data's unit |
-| `"mae"`           | \`Σ w·                                                    | r                                     |
+A problem has a loss or observation models, exactly one, and neither has a default: what to fit is a modelling choice. A loss measures the residuals; [observation models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md) say how each series scatters, and the fit maximizes their likelihood, so its loss is `−log L`. `CalibrationProblem` raises a `ValueError` with both or neither.
+
+| `loss_function` | Formula (residual `r = observed − predicted`, weight `w`) | Use when                              |
+| --------------- | --------------------------------------------------------- | ------------------------------------- |
+| `"sse"`         | `Σ w·r²`                                                  | The usual choice                      |
+| `"rmse"`        | `√(Σ w·r² / Σ w)`                                         | You want the error in the data's unit |
+| `"mae"`         | \`Σ w·                                                    | r                                     |
 
 How weights count
 
@@ -3146,12 +3152,13 @@ result = Calibrator(Simulation(stochastic), problem).run()
 print(round(result.best_parameters["k1"], 1))  # 0.4
 ```
 
-| Rule                                                                                                                                         | Where                                                                    |
-| -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| A stochastic engine needs `replicates`, `replicate_summary` and `seed`; without one, `Calibrator` raises and the message lists the summaries | `rust_loss_config` in `py-commol/commol/context/_model/engine_state.py`  |
-| A deterministic engine does not use `replicates` and `replicate_summary`                                                                     | The same                                                                 |
-| The summaries and the CRPS are computed in `LossConfig`, and the observation weights apply to every option                                   | `LossConfig::replicate_loss` in `crates/commol-calibration/src/types.rs` |
-| A constraint at positions is checked on every replicate                                                                                      | `CalibrationProblem::evaluate`                                           |
+| Rule                                                                                                                                         | Where                                                                                   |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| A stochastic engine needs `replicates`, `replicate_summary` and `seed`; without one, `Calibrator` raises and the message lists the summaries | `rust_loss_config` in `py-commol/commol/context/_model/engine_state.py`                 |
+| A deterministic engine does not use `replicates` and `replicate_summary`                                                                     | The same                                                                                |
+| A stochastic engine needs a loss: with `observation_models`, `Calibrator` raises a `ValueError`                                              | `PyCalibrationProblem::new` in `py-commol/src/inference.rs`; `Discrepancy::set_summary` |
+| The summaries and the CRPS are computed in `LossConfig`, and the observation weights apply to every option                                   | `LossConfig::replicate_loss` in `crates/commol-calibration/src/types.rs`                |
+| A constraint at positions is checked on every replicate                                                                                      | `CalibrationProblem::evaluate`                                                          |
 
 With one replicate the CRPS is the absolute error. The [predictive](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive) of a sample runs every replicate of each draw.
 
@@ -3162,7 +3169,7 @@ With one replicate the CRPS is the absolute error. The [predictive](https://munq
 | `CalibrationResult` field | Meaning                                                                                                                                                                                                                                            |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `best_parameters`         | `dict[str, float]`: the best value of every unknown, in the order of `problem.parameters`                                                                                                                                                          |
-| `final_loss`              | The loss at `best_parameters`                                                                                                                                                                                                                      |
+| `final_loss`              | The loss at `best_parameters`; with observation models, the negative log-likelihood                                                                                                                                                                |
 | `iterations`              | The optimizer iterations performed                                                                                                                                                                                                                 |
 | `converged`               | `True` only when the optimizer met its convergence test or `target_cost`; a run that used all `max_iterations` is `False`. See [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#converged-and-termination_reason). |
 | `termination_reason`      | Why it stopped                                                                                                                                                                                                                                     |
@@ -3188,7 +3195,7 @@ print(f"loss = {result.final_loss:.3g} after {result.iterations} iterations")
 | --------------------- | ------------------------------------------------------------------------------------ |
 | `"parameter"`         | The model parameter with that id                                                     |
 | `"initial_condition"` | The initial conditions, so the model rebuilds exactly the state the optimizer scored |
-| `"factor"`            | Nothing: it describes the observations, not the model                                |
+| `"factor"`, `"noise"` | Nothing: they describe the observations, not the model                               |
 
 It accepts a `CalibrationResult` or a plain `{id: value}` mapping, such as one of `sample.draws()`; a `ParameterSample` has no single set of values and raises `TypeError`. It computes the new definition first, so a rejected value leaves the model unchanged. To set values by hand, use `Model.update_parameters({...})`.
 
@@ -3262,6 +3269,7 @@ problem = CalibrationProblem(
         )
     ],
     initial_condition_remainder="A",
+    loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=1000),
 )
 
@@ -3361,6 +3369,7 @@ problem = CalibrationProblem(
         )
     ],
     initial_condition_remainder="A_g1",
+    loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=1000),
 )
 
@@ -3447,6 +3456,7 @@ def calibrate_k1(observed_data, **problem_options) -> float:
         parameters=[
             CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0)
         ],
+        loss_function="sse",
         optimization_config=NelderMeadConfig(max_iterations=2000),
         **problem_options,
     )
@@ -3498,10 +3508,10 @@ print(calibrate_k1(b_and_c))  # 0.4
 
 ## Weights and normalization
 
-| Option                        | Where                | Effect                                                                                                                                                                                    |
-| ----------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `weight=2.0`                  | `ObservedDataPoint`  | The observation counts twice as much in every loss: its squared (or absolute) residual is multiplied by 2. See [Losses](https://munqu.github.io/commol/latest/guide/calibration/#losses). |
-| `normalize_observations=True` | `CalibrationProblem` | Divides each residual by the RMS of its series, so a series of thousands does not drown a series of tens.                                                                                 |
+| Option                        | Where                | Effect                                                                                                                                                                                                                                                                                                                              |
+| ----------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `weight=2.0`                  | `ObservedDataPoint`  | The observation counts twice as much in every loss: its squared (or absolute) residual is multiplied by 2. With [observation models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#the-likelihood) its log density is. See [Losses](https://munqu.github.io/commol/latest/guide/calibration/#losses). |
+| `normalize_observations=True` | `CalibrationProblem` | Divides each residual by the RMS of its series, so a series of thousands does not drown a series of tens.                                                                                                                                                                                                                           |
 
 ```python
 weighted = [
@@ -3509,7 +3519,7 @@ weighted = [
     ObservedDataPoint(at=30, output="B", value=truth["B"][30], weight=1.0),
     ObservedDataPoint(at=30, output="cum_ab", value=truth["cum_ab"][30], weight=1.0),
 ]
-print(calibrate_k1(weighted, loss_function="sse", normalize_observations=True))  # 0.4
+print(calibrate_k1(weighted, normalize_observations=True))  # 0.4
 ```
 
 ## Partial observations: factors
@@ -3528,6 +3538,7 @@ problem = CalibrationProblem(
     parameters=[
         CalibrationParameter(id="share_seen", parameter_type="factor", min_bound=0.01, max_bound=1.0),
     ],
+    loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=2000),
 )
 scaled_result = Calibrator(Simulation(model(0.4)), problem).run()
@@ -3599,6 +3610,7 @@ problem = CalibrationProblem(
         for at, value in zip(positions, observed_b)
     ],
     parameters=[CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0)],
+    loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=500),
 )
 print(round(Calibrator(Simulation(ode_model(None)), problem).run().best_parameters["k1"], 3))  # 0.2
@@ -3683,6 +3695,7 @@ def calibrate(optimization_config) -> dict[str, float]:
             CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
             CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
         ],
+        loss_function="sse",
         optimization_config=optimization_config,
         seed=7,
     )
@@ -3774,6 +3787,7 @@ problem = CalibrationProblem(
         CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
         CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
     ],
+    loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=2000),
     seed=7,
 )
@@ -3870,6 +3884,7 @@ def calibrate(constraints: list[CalibrationConstraint]) -> dict[str, float]:
             CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.01, max_bound=1.0),
         ],
         constraints=constraints,
+        loss_function="sse",
         optimization_config=ParticleSwarmConfig(num_particles=30, max_iterations=300),
         seed=3,
     )
@@ -3963,30 +3978,34 @@ A calibration gives one set of parameters. This section shows how far you can tr
 
 ## A band of the model, or a prediction interval
 
-A **band of the model** is the spread of the model's output across the draws of the parameters. It says where the model curve lies, not where the next observation will fall: an observation also carries measurement noise. A **prediction interval** adds that noise to every draw before it reduces them (the `ObservationNoise` port of `commol-inference`). Every reader of observations takes the noise as an argument with no default: `NoNoise()` gives a band of the model, and `ResidualNoise(...)` adds residuals of a fit, which gives a prediction interval with no noise model ([Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)). Comparing a band of the model with data underestimates the spread, so its coverage of the data is below its level. A [conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) interval is a prediction interval with a coverage guarantee, from the scores of observations the fit did not use.
+A **band of the model** is the spread of the model's output across the draws of the parameters. It says where the model curve lies, not where the next observation will fall: an observation also carries measurement noise. A **prediction interval** adds that noise to every draw before it reduces them (the `ObservationNoise` port of `commol-inference`). Every reader of observations takes the noise as an argument with no default: `NoNoise()` gives a band of the model, `ResidualNoise(...)` adds residuals of a fit, which gives a prediction interval with no noise model ([Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)), and `DistributionNoise()` draws from the [observation models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md) of the problem. Comparing a band of the model with data underestimates the spread, so its coverage of the data is below its level. A [conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) interval is a prediction interval with a coverage guarantee, from the scores of observations the fit did not use.
 
 ## Which method answers which question
 
-| Method                                     | Question                                                                                  | Needs a noise model | Page                                                                                                         |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Several starts, `Calibrator.run(starts=n)` | Which parameters fit the data: distinct ends with equal losses                            | No                  | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)             |
-| `StructuralRank`                           | Which parameters any data of this design can determine, and which combinations            | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#structural-rank)  |
-| `Collinearity`                             | Which parameters can be fitted together                                                   | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#collinearity)     |
-| `SampleIdentifiability`                    | Which parameters a sample determines: contraction, correlations, modes                    | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)         |
-| `StartsIdentifiability`                    | Which parameters differ between starts of equal loss                                      | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)           |
-| `BayesianBootstrap`                        | How far the parameters move when the data are reweighted by blocks                        | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#bayesian-bootstrap)         |
-| `ResidualBootstrap`                        | How far the parameters move when the residuals of the fit are resampled by blocks         | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#residual-block-bootstrap)   |
-| `WildBootstrap`                            | The same, when the size of the noise changes along the series                             | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#wild-block-bootstrap)       |
-| `BlockJackknife`                           | The standard error and bias of each parameter, and which block of data moves it most      | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#block-jackknife)            |
-| `ResidualNoise`                            | Where the next observations fall: a prediction interval                                   | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)       |
-| `GibbsPosterior`                           | A posterior of the parameters from the loss and priors, with a scale `η` of the loss      | No                  | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#gibbs-posterior)       |
-| `AbcSmc`                                   | A posterior of the parameters whose runs come within a tolerance of the data, with priors | No                  | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                   |
-| `AbcRejection`                             | The same, from the closest draws of the priors                                            | No                  | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                   |
-| `SplitConformal`                           | Where new observations fall, with a guaranteed coverage, from held-out observations       | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#split-conformal)              |
-| `RollingConformal`                         | Where the next observations fall at each horizon ahead of the data                        | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#rolling-origins)              |
-| `JackknifePlus`                            | Where new observations fall, with a guaranteed coverage and no held-out data              | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#jackknife)                    |
-| `EnbPI`                                    | Where the next observations of a series with dependent errors fall                        | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#enbpi)                        |
-| `AdaptiveConformal`                        | Intervals for observations as they arrive, whose share of misses tends to its level       | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#adaptive-conformal-inference) |
+| Method                                       | Question                                                                                  | Needs a noise model | Page                                                                                                                                       |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Several starts, `Calibrator.run(starts=n)`   | Which parameters fit the data: distinct ends with equal losses                            | No                  | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)                                           |
+| `StructuralRank`                             | Which parameters any data of this design can determine, and which combinations            | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#structural-rank)                                |
+| `Collinearity`                               | Which parameters can be fitted together                                                   | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#collinearity)                                   |
+| `SampleIdentifiability`                      | Which parameters a sample determines: contraction, correlations, modes                    | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)                                       |
+| `StartsIdentifiability`                      | Which parameters differ between starts of equal loss                                      | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)                                         |
+| `BayesianBootstrap`                          | How far the parameters move when the data are reweighted by blocks                        | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#bayesian-bootstrap)                                       |
+| `ResidualBootstrap`                          | How far the parameters move when the residuals of the fit are resampled by blocks         | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#residual-block-bootstrap)                                 |
+| `WildBootstrap`                              | The same, when the size of the noise changes along the series                             | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#wild-block-bootstrap)                                     |
+| `BlockJackknife`                             | The standard error and bias of each parameter, and which block of data moves it most      | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#block-jackknife)                                          |
+| `ResidualNoise`                              | Where the next observations fall: a prediction interval                                   | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)                                     |
+| `GibbsPosterior`                             | A posterior of the parameters from the loss and priors, with a scale `η` of the loss      | No                  | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#gibbs-posterior)                                     |
+| `AbcSmc`                                     | A posterior of the parameters whose runs come within a tolerance of the data, with priors | No                  | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                                                 |
+| `AbcRejection`                               | The same, from the closest draws of the priors                                            | No                  | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                                                 |
+| `SplitConformal`                             | Where new observations fall, with a guaranteed coverage, from held-out observations       | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#split-conformal)                                            |
+| `RollingConformal`                           | Where the next observations fall at each horizon ahead of the data                        | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#rolling-origins)                                            |
+| `JackknifePlus`                              | Where new observations fall, with a guaranteed coverage and no held-out data              | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#jackknife)                                                  |
+| `EnbPI`                                      | Where the next observations of a series with dependent errors fall                        | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#enbpi)                                                      |
+| `AdaptiveConformal`                          | Intervals for observations as they arrive, whose share of misses tends to its level       | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#adaptive-conformal-inference)                               |
+| `observation_models` with `Calibrator.run()` | The maximum-likelihood fit of the parameters and the noise                                | Yes                 | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) |
+| `BayesianPosterior`                          | The posterior of the parameters from the likelihood and priors, with its evidence         | Yes                 | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) |
+| `ParametricBootstrap`                        | How far the parameters move in data sets drawn from the models at the fit                 | Yes                 | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) |
+| `DistributionNoise`                          | Where the next observations fall: a prediction interval of the models                     | Yes                 | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#prediction-with-noise)                    |
 
 Each uncertainty method adds its row here when it lands.
 
@@ -4113,26 +4132,27 @@ print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75
 
 `Predictive(calibrator, sample, positions)` runs every draw at `positions`, in parallel in Rust. With a stochastic engine every replicate of a draw is a draw of the predictive, with an equal share of its weight.
 
-| Member                                                     | Returns                                                                                                                                                                                                                          |
-| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `band(confidence_level)`                                   | The weighted mean, median and central interval of every output at every position (`PredictiveBand`)                                                                                                                              |
-| `series_band(outputs, confidence_level, cumulative=False)` | The band of the sum of some outputs, or of its running total; each draw is reduced first                                                                                                                                         |
-| `at_observations(observed_data, noise)`                    | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with `noise` drawn from the calibrator's seed: `NoNoise()` or `ResidualNoise(...)` (`ObservationDraws`) |
-| `runs()`, `weights`                                        | The trajectory and weight of every draw                                                                                                                                                                                          |
+| Member                                                     | Returns                                                                                                                                                                                                                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `band(confidence_level)`                                   | The weighted mean, median and central interval of every output at every position (`PredictiveBand`)                                                                                                                                                     |
+| `series_band(outputs, confidence_level, cumulative=False)` | The band of the sum of some outputs, or of its running total; each draw is reduced first                                                                                                                                                                |
+| `at_observations(observed_data, noise)`                    | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with `noise` drawn from the calibrator's seed: `NoNoise()`, `ResidualNoise(...)` or `DistributionNoise()` (`ObservationDraws`) |
+| `runs()`, `weights`                                        | The trajectory and weight of every draw                                                                                                                                                                                                                 |
 
 `SimulationPlotter.plot_series` and `plot_cumulative` draw the band of a predictive when it is the `calibration_result`, and `simulation_report` reduces its draws with their weights when it is the `ensemble_runs`. `applied_parameters_report` takes the sample itself (`sample=`, with a `confidence_level`).
 
 ## Scores
 
-The functions of `commol.scores` compare a predictive with observations, and return a `Score`: the value of each observation, the mean of each series and the overall mean. Which observations to score and the observation noise are arguments with no default: score data the method did not see, such as the held-out positions above, and say whether you score a band of the model (`NoNoise()`) or a prediction interval (`ResidualNoise(...)`).
+The functions of `commol.scores` compare a predictive with observations, and return a `Score`: the value of each observation, the mean of each series and the overall mean. Which observations to score and the observation noise are arguments with no default: score data the method did not see, such as the held-out positions above, and say whether you score a band of the model (`NoNoise()`) or a prediction interval (`ResidualNoise(...)`, `DistributionNoise()`).
 
-| Function                                                                      | Score                                                                        | Better             |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------ |
-| `coverage(predictive, observations, noise, confidence_level)`                 | 1 inside the central interval, 0 outside; the mean is the empirical coverage | Close to the level |
-| `interval_score(predictive, observations, noise, confidence_level)`           | `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`, `α = 1 − c`                       | Lower              |
-| `weighted_interval_score(predictive, observations, noise, confidence_levels)` | The weighted interval score of Bracher et al. (2021)                         | Lower              |
-| `crps(predictive, observations, noise)`                                       | \`Σ wᵢ                                                                       | xᵢ − y             |
-| `pit(predictive, observations, noise, seed)`                                  | `F(y)`, randomized where draws tie with `y`                                  | Uniform            |
+| Function                                                                      | Score                                                                        | Better                                                                                                                      |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `coverage(predictive, observations, noise, confidence_level)`                 | 1 inside the central interval, 0 outside; the mean is the empirical coverage | Close to the level                                                                                                          |
+| `interval_score(predictive, observations, noise, confidence_level)`           | `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`, `α = 1 − c`                       | Lower                                                                                                                       |
+| `weighted_interval_score(predictive, observations, noise, confidence_levels)` | The weighted interval score of Bracher et al. (2021)                         | Lower                                                                                                                       |
+| `crps(predictive, observations, noise)`                                       | \`Σ wᵢ                                                                       | xᵢ − y                                                                                                                      |
+| `pit(predictive, observations, noise, seed)`                                  | `F(y)`, randomized where draws tie with `y`                                  | Uniform                                                                                                                     |
+| `log_score(predictive, observations, DistributionNoise())`                    | \`log Σ_d w_d · p(y                                                          | μ_d)`, the log density of `y`under the mixture of the observation models over the draws; another noise raises a`TypeError\` |
 
 ## The entry point
 
@@ -4155,15 +4175,16 @@ print(type(result).__name__, len(result.sample))  # BootstrapResult 20
 
 ## Next steps
 
-| To learn                                                               | Read                                                                                                         |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Bootstraps, the jackknife and prediction intervals with no noise model | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md)                    |
-| Posteriors with no noise model: the Gibbs posterior and ABC            | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md)               |
-| Prediction intervals with a coverage guarantee                         | [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) |
-| Several starts of an optimizer                                         | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)             |
-| Which parameters the data determine                                    | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md)          |
-| Reports of a sample                                                    | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                      |
-| Plots of a predictive                                                  | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/#plotting)                     |
+| To learn                                                                         | Read                                                                                                         |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Bootstraps, the jackknife and prediction intervals with no noise model           | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md)                    |
+| Posteriors with no noise model: the Gibbs posterior and ABC                      | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md)               |
+| Maximum likelihood, the posterior and prediction intervals of observation models | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md)    |
+| Prediction intervals with a coverage guarantee                                   | [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) |
+| Several starts of an optimizer                                                   | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)             |
+| Which parameters the data determine                                              | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md)          |
+| Reports of a sample                                                              | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                      |
+| Plots of a predictive                                                            | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/#plotting)                     |
 
 # Identifiability
 
@@ -4486,7 +4507,7 @@ print(result.diagnostics.block_length)  # 1
 | `WildBootstrap`     | The observed values: each residual times a random sign or Mammen multiplier, one per block | The model is right; the noise has mean zero at each position                      | The same, when the size of the noise changes along the series          |
 | `BlockJackknife`    | One block left out (weight 0) per fit                                                      | The blocks are exchangeable                                                       | A standard error and a bias, and which block moves each parameter most |
 
-None of them needs a noise model. The Bayesian bootstrap never changes the observed values, so it also works when the model is wrong; the residual and wild bootstraps make new data from the model and its residuals.
+None of them needs a noise model. The Bayesian bootstrap never changes the observed values, so it also works when the model is wrong; the residual and wild bootstraps make new data from the model and its residuals. With [observation models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md), `ParametricBootstrap(replicates)` draws new data from the models at the fit; it draws no blocks, so its `diagnostics.block_length` is `None`.
 
 ## Blocks and their length
 
@@ -4631,7 +4652,7 @@ A block bootstrap reads the dependence of the noise from few blocks. On a short 
 
 [Back to Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)
 
-These methods give a posterior of the parameters with no noise model. The **Gibbs posterior** turns the loss of the calibration into a posterior; **ABC** (approximate Bayesian computation) keeps the parameters whose runs come close to the data. Use them when you can state priors but not how the observations scatter around the model. One sequential Monte Carlo (SMC) sampler runs both, in parallel in Rust (`crates/commol-inference/src/smc/`), through `Calibrator.uncertainty`.
+These methods give a posterior of the parameters with no noise model. The **Gibbs posterior** turns the loss of the calibration into a posterior; **ABC** (approximate Bayesian computation) keeps the parameters whose runs come close to the data. Use them when you can state priors but not how the observations scatter around the model. One sequential Monte Carlo (SMC) sampler runs both, in parallel in Rust (`crates/commol-inference/src/smc/`), through `Calibrator.uncertainty`. The same sampler runs `BayesianPosterior`, the posterior of [observation models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md), when you can state how the observations scatter.
 
 ## Quick path
 
@@ -4780,14 +4801,16 @@ Information matching is cheap and local; it needs a sum of smooth terms, so `"rm
 
 With a stochastic engine the loss reads the problem's `replicates` with common random numbers, as the optimizers do, so it is a function of the parameters.
 
+With [observation models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md) the loss is the negative log-likelihood, so the Gibbs posterior is the fractional posterior `prior(θ) · L(θ)^η`, and `η = 1` is the posterior of `BayesianPosterior`. `η` is a number or `EtaCalibration.bootstrap_coverage(...)`; `EtaCalibration.information_matching()` needs a loss and raises a `ValueError`.
+
 ## ABC
 
 `AbcSmc` keeps a particle when the distance between its run and the data is at most a tolerance `ε`, and lowers `ε` step by step (Del Moral, Doucet and Jasra 2012). With weights of 0 or 1, the share of the particles that a tolerance keeps is its conditional effective sample size, so each next tolerance is the weighted quantile of the current distances at `target_cess`: the smallest distance whose share of the weight at or below it reaches it. The run stops when the first move of a step accepts less than `min_acceptance`, and keeps the sample of the tolerance before; it also stops when no lower tolerance keeps `target_cess` of the particles, as with whole numbers that tie. `diagnostics.stop_reason` says which.
 
-| `distance`                                 | Value                                                                                                                             |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `LossDistance()`                           | The problem's `loss_function`, with its weights and `normalize_observations`                                                      |
-| `SeriesDistance(metric="rmse")` or `"mae"` | `metric` of each series on its residuals divided by the root mean square of its observed values, then the largest over the series |
+| `distance`                                 | Value                                                                                                                                                 |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LossDistance()`                           | The problem's `loss_function`, with its weights and `normalize_observations`; a problem with observation models has none, so it raises a `ValueError` |
+| `SeriesDistance(metric="rmse")` or `"mae"` | `metric` of each series on its residuals divided by the root mean square of its observed values, then the largest over the series                     |
 
 `SeriesDistance` compares series in different units on one scale: scaling a series and its prediction by a constant leaves its distance unchanged, so the series of large values does not decide alone.
 
@@ -4837,12 +4860,190 @@ A step whose acceptance rate is small moves each particle many times, and the ru
 
 ## Next steps
 
-| To learn                                                | Read                                                                                                 |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| What every method returns and reads                     | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                      |
-| Uncertainty with no prior: bootstraps and the jackknife | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md)            |
-| How far a sample contracts each prior                   | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample) |
-| The stochastic engines and their replicates             | [Stochastic engines](https://munqu.github.io/commol/latest/guide/stochastic/index.md)                |
+| To learn                                                | Read                                                                                                      |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| What every method returns and reads                     | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                           |
+| The posterior of observation models                     | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md) |
+| Uncertainty with no prior: bootstraps and the jackknife | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md)                 |
+| How far a sample contracts each prior                   | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)      |
+| The stochastic engines and their replicates             | [Stochastic engines](https://munqu.github.io/commol/latest/guide/stochastic/index.md)                     |
+
+# Observation Models
+
+[Back to Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)
+
+An observation model says how an observed value scatters around the model: a normal error, a count, a proportion, an outlier. With one model per series, a calibration fits by maximum likelihood instead of a loss, and the same likelihood gives a Bayesian posterior with its evidence, prediction intervals that hold the noise, the log score and the parametric bootstrap. This page is for you when you know how your data were measured and want methods that use it; the methods of [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md), [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md) and [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) need no noise model.
+
+## Quick path
+
+```python
+import numpy as np
+
+from commol import (
+    Aggregate,
+    BayesianPosterior,
+    CalibrationParameter,
+    CalibrationProblem,
+    Calibrator,
+    DistributionNoise,
+    ModelBuilder,
+    NegativeBinomialObservations,
+    NelderMeadConfig,
+    ObservedDataPoint,
+    ParametricBootstrap,
+    Predictive,
+    Priors,
+    Simulation,
+    scores,
+)
+
+
+def decay_model(k1: float | None):
+    return (
+        ModelBuilder(name="Decay")
+        .add_bin(id="A", name="State A")
+        .add_bin(id="B", name="State B")
+        .add_parameter(id="k1", value=k1)
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A")
+        .build(
+            Aggregate(bin_amounts={"A": 1000, "B": 0}),
+            engine="DifferenceEquations",
+        )
+    )
+
+
+# Counts of the units that reach B in each step, scattered more than a
+# Poisson: a negative binomial with overdispersion 0.1 around the model.
+truth = Simulation(decay_model(0.05)).run(num_steps=40)
+rng = np.random.default_rng(3)
+counts = []
+for step in range(1, 41):
+    mean = truth["B"][step] - truth["B"][step - 1]
+    size = 1 / 0.1
+    counts.append(float(rng.negative_binomial(size, size / (size + mean))))
+observations = [
+    ObservedDataPoint(at=step, output="B", value=value, window=1)
+    for step, value in zip(range(1, 41), counts)
+]
+fitted, held_out = observations[:30], observations[30:]
+
+problem = CalibrationProblem(
+    observed_data=fitted,
+    parameters=[
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=0.5),
+        CalibrationParameter(id="phi", parameter_type="noise", min_bound=0.0, max_bound=2.0),
+    ],
+    observation_models={"B": NegativeBinomialObservations(overdispersion="phi")},
+    optimization_config=NelderMeadConfig(max_iterations=2000),
+    seed=42,
+)
+calibrator = Calibrator(Simulation(decay_model(None)), problem)
+
+# Maximum likelihood: the loss is the negative log-likelihood.
+fit = calibrator.run()
+print({name: round(value, 2) for name, value in fit.best_parameters.items()})
+# {'k1': 0.05, 'phi': 0.11}
+
+# The Bayesian posterior and its log evidence.
+posterior = calibrator.uncertainty(
+    BayesianPosterior(
+        priors=Priors.uniform_on_bounds(),
+        particles=500,
+        target_cess=0.5,
+        resample_threshold=0.5,
+        stay_probability=0.05,
+    )
+)
+print([round(bound, 3) for bound in posterior.sample.interval(0.9)["k1"]])
+# [0.044, 0.072]
+print(round(posterior.log_evidence, 1))  # -113.2
+
+# Prediction intervals of the held-out counts, with the noise of the model.
+predictive = Predictive(calibrator, posterior.sample, positions=list(range(41)))
+print(scores.coverage(predictive, held_out, DistributionNoise(), confidence_level=0.9).mean)
+# 1.0
+print(round(scores.log_score(predictive, held_out, DistributionNoise()).mean, 2))
+# -2.83
+```
+
+## Choosing a model
+
+The mean of every model is the prediction of the observation (its sums, window and factor), except the median of a `LogNormalObservations` with `center="median"`. A model only adds the scatter around it.
+
+| Your data                                            | Model                                          | Variance                               | Notes                                                                                             |
+| ---------------------------------------------------- | ---------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Continuous values with errors of one size            | `NormalObservations(sd)`                       | `sd²`                                  | With a known `sd` the fit is the least-squares fit                                                |
+| Positive values with errors that grow with the value | `LogNormalObservations(sigma, center)`         | `(e^{σ²} − 1)·μ²` with `center="mean"` | `center` is required: `"mean"` makes `E[y] = μ`; `"median"` is the proportional error `y = μ·e^ε` |
+| Continuous values with outliers                      | `StudentTObservations(df, scale)`              | `scale²·df/(df − 2)` when `df > 2`     | Heavier tails: an outlier pulls the fit less                                                      |
+| Counts                                               | `PoissonObservations()`                        | `μ`                                    |                                                                                                   |
+| Counts that scatter more than a Poisson              | `NegativeBinomialObservations(overdispersion)` | `μ + φμ²`                              | `φ = 0` is the Poisson; the dispersion `k` of epidemiology (`size` in R) is `1/φ`                 |
+| Successes out of known trials                        | `BinomialObservations(trials)`                 | `μ(1 − μ/n)`                           | The prediction is the expected count `n·p`, not a proportion                                      |
+
+A `BinomialObservations` takes its trials from `trials=n`, for every observation of the series, or with no argument from `ObservedDataPoint.trials` of each observation, for trials that change from one observation to the next. A series has one source; both or neither raise a `ValueError` that names the observation.
+
+## Noise parameters
+
+A noise argument is a number, or the id of a calibration parameter of type `"noise"`. A noise parameter is fitted, sampled and reported with the others, and never reaches the engine; `Model.apply_calibration_parameters` skips it, as it skips a factor. Its bounds must lie in the domain of the argument: above 0 for `sd`, `sigma`, `scale` and `df`, at least 0 for `overdispersion`.
+
+| Rule                                                                                                        | Error                                                |
+| ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| A problem has `loss_function` or `observation_models`, exactly one, with no default                         | `ValueError` from `CalibrationProblem`               |
+| Every observed series has a model, and every model names an observed series                                 | `ValueError` from `Calibrator` that names the series |
+| Every noise parameter is an argument of a model                                                             | `ValueError` that names the parameter                |
+| Counts are whole numbers, at least 0; a binomial count is at most its trials; a log-normal value is above 0 | `ValueError` that names the observation              |
+| A stochastic engine needs a loss                                                                            | `ValueError` from `Calibrator`                       |
+| `normalize_observations` needs a loss: the models set the scale of each series                              | `ValueError` from `CalibrationProblem`               |
+
+`Likelihood::new` in `crates/commol-calibration/src/likelihood/mod.rs` checks the models and values; `CalibrationProblem.validate_loss_or_models` checks the first and the last rules.
+
+A stochastic engine is refused because the likelihood of a stochastic model integrates its hidden path, which the observations of one run do not do. Fit a stochastic model with a loss and its replicates ([Stochastic engines](https://munqu.github.io/commol/latest/guide/calibration/#stochastic-engines)).
+
+## The likelihood
+
+The log-likelihood is `Σᵢ wᵢ · log p(yᵢ | μᵢ)`, where `μᵢ` is the prediction and `wᵢ` the observation weight: a weight is a power of its term, so a weight of 2 counts the observation twice, as in every loss. The log densities are written in commol (`Noise::log_density` in `crates/commol-calibration/src/likelihood/density.rs`), and `crates/commol-calibration/tests/test_likelihood.rs` checks them against reference values of SciPy.
+
+A prediction outside the means a model allows, such as a negative count or a binomial mean above its trials, leaves the point outside the support: the optimizer gets a penalty, and a sampler a density of 0.
+
+## Maximum likelihood against the posterior
+
+| Method                            | Gives                                                                                                                                                               | Needs                                                                                              |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `Calibrator.run()`                | The maximum-likelihood fit; `final_loss` is `−log L`                                                                                                                | Nothing more                                                                                       |
+| `BayesianPosterior(priors, …)`    | The posterior `prior(θ) · L(θ)` and its log evidence, on the core of [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md) | A prior for every parameter, the noise parameters too                                              |
+| `GibbsPosterior(eta=…)`           | The fractional posterior `prior(θ) · L(θ)^η`; `η = 1` is the posterior                                                                                              | `η` as a number or `EtaCalibration.bootstrap_coverage(...)`; `information_matching()` needs a loss |
+| `ParametricBootstrap(replicates)` | Fits to data sets drawn from the models at the fit                                                                                                                  | Models that hold: the observations of a replicate are independent given the fit                    |
+
+A posterior answers "what do the data and the priors say about the parameters"; the fit and the parametric bootstrap answer "what would another data set of this design give". With little data or a parameter near a bound, they differ; with much data and flat priors they agree.
+
+```python
+bootstrap = calibrator.uncertainty(ParametricBootstrap(replicates=40))
+low, high = bootstrap.sample.interval(0.9)["k1"]
+print(low < 0.05 < high)  # True
+```
+
+`LossDistance()` of ABC needs a loss; `SeriesDistance(...)` works with models.
+
+## Prediction with noise
+
+`DistributionNoise()` draws every observation from the model of its series around each draw's prediction, with the draw's noise parameters, so `Predictive.at_observations(observations, DistributionNoise())` gives a prediction interval and every score of `commol.scores` scores one. It needs a problem with `observation_models`, and serves the series they name, at any position.
+
+`scores.log_score(predictive, observations, DistributionNoise())` is the log density of each observed value under the predictive, the mixture of the models over the draws, `log Σ_d w_d · p(y | μ_d)`. It needs the densities of the models, so another noise raises a `TypeError`. Higher is better.
+
+## Checklist
+
+- [ ] Every observed series has a model that fits how its data were measured.
+- [ ] Every noise parameter has bounds in its domain, and a prior for a posterior.
+- [ ] You use `DistributionNoise()` for prediction intervals of these models.
+- [ ] You score observations the fit did not see.
+
+## Next steps
+
+| To learn                                       | Read                                                                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| The sampler, its settings and its diagnostics  | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md)               |
+| Bootstraps with no noise model                 | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md)                    |
+| Prediction intervals with a coverage guarantee | [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) |
+| The problem, its observations and weights      | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                        |
 
 # Conformal Prediction Intervals
 
@@ -5164,6 +5365,7 @@ problem = CalibrationProblem(
     parameters=[
         CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0)
     ],
+    loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=500),
 )
 
@@ -7111,14 +7313,20 @@ class Calibrator:
         self._validate_calibration_parameters()
         self._validate_observed_data()
         self._warn_constraint_positions_beyond_observations()
+        models = problem.observation_models
         self._rust_problem: "CalibrationProblemProtocol" = (
             commol_rs.inference.CalibrationProblem(
                 self._engine,
                 engine_state.rust_observed_data(problem.observed_data),
                 engine_state.rust_parameters(problem.parameters),
                 engine_state.rust_constraints(problem.constraints),
-                loss_config,
+                loss_config=loss_config,
                 initial_condition_remainder=problem.initial_condition_remainder,
+                observation_models=(
+                    None
+                    if models is None
+                    else engine_state.rust_observation_models(models)
+                ),
             )
         )
 
@@ -7204,9 +7412,14 @@ class Calibrator:
             if isinstance(self.problem.optimization_config, NelderMeadConfig)
             else OptimizationAlgorithm.PARTICLE_SWARM
         )
+        measure = (
+            f"{self.problem.loss_function} loss function"
+            if self.problem.loss_function is not None
+            else "the negative log-likelihood of its observation models"
+        )
         logger.info(
             f"Starting calibration with {algorithm_name} algorithm, "
-            f"{self.problem.loss_function} loss function and {starts} start(s)."
+            f"{measure} and {starts} start(s)."
         )
         if starts < 1:
             raise ValueError(f"A calibration needs at least one start, got {starts}.")
@@ -7362,10 +7575,15 @@ class Calibrator:
 
         return run_method(self, method, IdentifiabilityMethod)
 
-    def _build_loss_config(self) -> "LossConfigProtocol":
-        """The Rust loss, with the replicates of a stochastic engine."""
+    def _build_loss_config(self) -> "LossConfigProtocol | None":
+        """The Rust loss, with the replicates of a stochastic engine; None with
+        observation models."""
+        if self.problem.loss_function is None:
+            return None
         return engine_state.rust_loss_config(
-            self.problem, self.simulation.model_definition.engine.type
+            self.problem,
+            self.problem.loss_function,
+            self.simulation.model_definition.engine.type,
         )
 
     def _build_optimization_config(self) -> "OptimizationConfigProtocol":
@@ -7684,14 +7902,20 @@ def __init__(
     self._validate_calibration_parameters()
     self._validate_observed_data()
     self._warn_constraint_positions_beyond_observations()
+    models = problem.observation_models
     self._rust_problem: "CalibrationProblemProtocol" = (
         commol_rs.inference.CalibrationProblem(
             self._engine,
             engine_state.rust_observed_data(problem.observed_data),
             engine_state.rust_parameters(problem.parameters),
             engine_state.rust_constraints(problem.constraints),
-            loss_config,
+            loss_config=loss_config,
             initial_condition_remainder=problem.initial_condition_remainder,
+            observation_models=(
+                None
+                if models is None
+                else engine_state.rust_observation_models(models)
+            ),
         )
     )
 ```
@@ -7765,9 +7989,14 @@ def run(self, starts: int = 1) -> CalibrationResult:
         if isinstance(self.problem.optimization_config, NelderMeadConfig)
         else OptimizationAlgorithm.PARTICLE_SWARM
     )
+    measure = (
+        f"{self.problem.loss_function} loss function"
+        if self.problem.loss_function is not None
+        else "the negative log-likelihood of its observation models"
+    )
     logger.info(
         f"Starting calibration with {algorithm_name} algorithm, "
-        f"{self.problem.loss_function} loss function and {starts} start(s)."
+        f"{measure} and {starts} start(s)."
     )
     if starts < 1:
         raise ValueError(f"A calibration needs at least one start, got {starts}.")
@@ -8024,18 +8253,19 @@ This class encapsulates all the information needed to calibrate model parameters
 
 Attributes:
 
-| Name                          | Type                          | Description                                                                                                                |
-| ----------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `observed_data`               | `list[ObservedDataPoint]`     | List of observed data points to fit against                                                                                |
-| `parameters`                  | `list[CalibrationParameter]`  | List of parameters to calibrate with their bounds                                                                          |
-| `constraints`                 | `list[CalibrationConstraint]` | List of constraints on calibration parameters (optional, default: empty list)                                              |
-| `loss_function`               | `str`                         | Loss function to use for measuring fit quality: "sse" (default), "rmse" or "mae". Every loss uses the observation weights. |
-| `normalize_observations`      | `bool`                        | When True, divide each residual by the RMS of its observation series before applying the loss metric (default: False).     |
-| `optimization_config`         | `OptimizationConfig`          | Configuration for the optimization algorithm                                                                               |
-| `initial_condition_remainder` | \`str                         | None\`                                                                                                                     |
-| `replicates`                  | \`int                         | None\`                                                                                                                     |
-| `replicate_summary`           | \`{mean, median, crps}        | Quantile                                                                                                                   |
-| `seed`                        | \`int                         | None\`                                                                                                                     |
+| Name                          | Type                          | Description                                                                                                                                                                                               |
+| ----------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `observed_data`               | `list[ObservedDataPoint]`     | List of observed data points to fit against                                                                                                                                                               |
+| `parameters`                  | `list[CalibrationParameter]`  | List of parameters to calibrate with their bounds                                                                                                                                                         |
+| `constraints`                 | `list[CalibrationConstraint]` | List of constraints on calibration parameters (optional, default: empty list)                                                                                                                             |
+| `loss_function`               | \`{sse, rmse, mae}            | None\`                                                                                                                                                                                                    |
+| `observation_models`          | \`dict[str, ObservationModel] | None\`                                                                                                                                                                                                    |
+| `normalize_observations`      | `bool`                        | When True, divide each residual by the RMS of its observation series before applying the loss metric (default: False). It needs a loss: observation models set the scale of each series with their noise. |
+| `optimization_config`         | `OptimizationConfig`          | Configuration for the optimization algorithm                                                                                                                                                              |
+| `initial_condition_remainder` | \`str                         | None\`                                                                                                                                                                                                    |
+| `replicates`                  | \`int                         | None\`                                                                                                                                                                                                    |
+| `replicate_summary`           | \`{mean, median, crps}        | Quantile                                                                                                                                                                                                  |
+| `seed`                        | \`int                         | None\`                                                                                                                                                                                                    |
 
 Source code in `commol/context/calibration.py`
 
@@ -8056,12 +8286,22 @@ class CalibrationProblem(BaseModel):
         List of parameters to calibrate with their bounds
     constraints : list[CalibrationConstraint]
         List of constraints on calibration parameters (optional, default: empty list)
-    loss_function : str
-        Loss function to use for measuring fit quality: "sse" (default),
-        "rmse" or "mae". Every loss uses the observation weights.
+    loss_function : {"sse", "rmse", "mae"} | None
+        The loss that measures the fit, with the observation weights. A
+        problem has a loss or ``observation_models``, exactly one, with no
+        default: what to fit is a modelling choice.
+    observation_models : dict[str, ObservationModel] | None
+        One observation model per series label (`NormalObservations`,
+        `LogNormalObservations`, `StudentTObservations`,
+        `PoissonObservations`, `NegativeBinomialObservations`,
+        `BinomialObservations`): the problem fits by maximum likelihood, and
+        its loss is the negative log-likelihood. Every observed series needs
+        one, and every parameter of type ``"noise"`` must be an argument of
+        one. It needs a deterministic engine.
     normalize_observations : bool
         When True, divide each residual by the RMS of its observation series
-        before applying the loss metric (default: False).
+        before applying the loss metric (default: False). It needs a loss:
+        observation models set the scale of each series with their noise.
     optimization_config : OptimizationConfig
         Configuration for the optimization algorithm
     initial_condition_remainder : str | None
@@ -8104,9 +8344,13 @@ class CalibrationProblem(BaseModel):
         default_factory=list,
         description="Constraints on calibration parameters",
     )
-    loss_function: str = Field(
-        default=LossFunction.SSE,
+    loss_function: str | None = Field(
+        default=None,
         description="Loss function to use for measuring fit quality",
+    )
+    observation_models: dict[str, ObservationModel] | None = Field(
+        default=None,
+        description="One observation model per series label",
     )
     normalize_observations: bool = Field(
         default=False,
@@ -8146,12 +8390,33 @@ class CalibrationProblem(BaseModel):
 
     @field_validator("loss_function")
     @classmethod
-    def validate_loss_function(cls, v: str) -> str:
-        if v not in LossFunction:
+    def validate_loss_function(cls, v: str | None) -> str | None:
+        if v is not None and v not in LossFunction:
             raise ValueError(
                 f"Invalid loss_function: {v}. Must be one of {list(LossFunction)}"
             )
         return v
+
+    @model_validator(mode="after")
+    def validate_loss_or_models(self) -> Self:
+        """Require a loss or observation models, exactly one."""
+        if self.loss_function is not None and self.observation_models is not None:
+            raise ValueError(
+                "A problem has a loss_function or observation_models, not both: "
+                "the fit and the posterior would answer different questions."
+            )
+        if self.loss_function is None and self.observation_models is None:
+            raise ValueError(
+                "A problem needs a loss_function (one of "
+                f"{', '.join(LossFunction)}) or observation_models. There is no "
+                "default: what to fit is a modelling choice."
+            )
+        if self.observation_models is not None and self.normalize_observations:
+            raise ValueError(
+                "normalize_observations needs a loss_function: the observation "
+                "models set the scale of each series with their noise."
+            )
+        return self
 
     @model_validator(mode="after")
     def validate_unique_parameter_ids(self) -> Self:
@@ -8164,6 +8429,39 @@ class CalibrationProblem(BaseModel):
 ```
 
 ### Methods:
+
+#### validate_loss_or_models
+
+```python
+validate_loss_or_models() -> Self
+```
+
+Require a loss or observation models, exactly one.
+
+Source code in `commol/context/calibration.py`
+
+```python
+@model_validator(mode="after")
+def validate_loss_or_models(self) -> Self:
+    """Require a loss or observation models, exactly one."""
+    if self.loss_function is not None and self.observation_models is not None:
+        raise ValueError(
+            "A problem has a loss_function or observation_models, not both: "
+            "the fit and the posterior would answer different questions."
+        )
+    if self.loss_function is None and self.observation_models is None:
+        raise ValueError(
+            "A problem needs a loss_function (one of "
+            f"{', '.join(LossFunction)}) or observation_models. There is no "
+            "default: what to fit is a modelling choice."
+        )
+    if self.observation_models is not None and self.normalize_observations:
+        raise ValueError(
+            "normalize_observations needs a loss_function: the observation "
+            "models set the scale of each series with their noise."
+        )
+    return self
+```
 
 #### validate_unique_parameter_ids
 
@@ -8284,6 +8582,7 @@ Attributes:
 | `weight`    | `float`     | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w·                                 |
 | `factor_id` | \`str       | None\`                                                                                                                                                                                                         |
 | `window`    | \`float     | None\`                                                                                                                                                                                                         |
+| `trials`    | \`int       | None\`                                                                                                                                                                                                         |
 
 Source code in `commol/context/calibration.py`
 
@@ -8316,13 +8615,18 @@ class ObservedDataPoint(BaseModel):
         How much this observation counts in the loss (default: 1.0). Every
         loss multiplies the squared or absolute residual by it: ``sse`` is
         ``Σ w·r²``, ``rmse`` is ``√(Σ w·r² / Σ w)``, ``mae`` is
-        ``Σ w·|r| / Σ w``.
+        ``Σ w·|r| / Σ w``. With observation models it is a power of the
+        observation's likelihood, ``w·log p``: a weight of 2 counts the
+        observation twice.
     factor_id : str | None
         Optional factor parameter ID that multiplies the model output before
         comparison
     window : float | None
         Optional window length for a cumulative output: the prediction is the
         output at `at` minus the output at ``at - window``.
+    trials : int | None
+        The trials of this observation, for a `BinomialObservations` model
+        with no ``trials`` of its own (default: None).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -8359,6 +8663,11 @@ class ObservedDataPoint(BaseModel):
             "Optional window length for cumulative-output observations. "
             "When set, prediction is value(at) - value(at - window)."
         ),
+    )
+    trials: int | None = Field(
+        default=None,
+        ge=0,
+        description="Trials of a binomial observation model that reads them here",
     )
 
     @model_validator(mode="after")
@@ -8450,6 +8759,228 @@ def validate_window(self) -> Self:
         raise ValueError(f"window ({self.window}) must be <= at ({self.at})")
     return self
 ```
+
+## Observation models
+
+Guide: [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md).
+
+## ObservationModel
+
+```python
+ObservationModel = Annotated[NormalObservations | LogNormalObservations | StudentTObservations | PoissonObservations | NegativeBinomialObservations | BinomialObservations, Field(discriminator=kind)]
+```
+
+One observation model of a series.
+
+## NormalObservations
+
+Bases: `_ObservationModel`
+
+Normal noise: `y ~ N(μ, sd²)`, with `μ` the prediction.
+
+For continuous values with errors of the same size everywhere. With a known `sd` the maximum-likelihood fit is the least-squares fit.
+
+Attributes:
+
+| Name | Type    | Description |
+| ---- | ------- | ----------- |
+| `sd` | \`float | str\`       |
+
+Source code in `commol/context/observation_models.py`
+
+```python
+class NormalObservations(_ObservationModel):
+    """
+    Normal noise: ``y ~ N(μ, sd²)``, with ``μ`` the prediction.
+
+    For continuous values with errors of the same size everywhere. With a
+    known ``sd`` the maximum-likelihood fit is the least-squares fit.
+
+    Attributes
+    ----------
+    sd : float | str
+        The standard deviation, above 0, or the id of a noise parameter.
+    """
+
+    kind: Literal["normal"] = "normal"
+    sd: NoiseArgument = Field(description="The standard deviation.")
+```
+
+## LogNormalObservations
+
+Bases: `_ObservationModel`
+
+Log-normal noise: `log y` is normal with standard deviation `sigma`.
+
+For positive values with errors that grow with the value. `center` says what the prediction `μ` is, and has no default: `"mean"` makes `E[y] = μ` (`log y ~ N(log μ − σ²/2, σ²)`), `"median"` makes the median `μ` (`log y ~ N(log μ, σ²)`, the proportional error `y = μ·e^ε`). Every observed value must be above 0.
+
+Attributes:
+
+| Name     | Type             | Description             |
+| -------- | ---------------- | ----------------------- |
+| `sigma`  | \`float          | str\`                   |
+| `center` | `{mean, median}` | What the prediction is. |
+
+Source code in `commol/context/observation_models.py`
+
+```python
+class LogNormalObservations(_ObservationModel):
+    """
+    Log-normal noise: ``log y`` is normal with standard deviation ``sigma``.
+
+    For positive values with errors that grow with the value. ``center``
+    says what the prediction ``μ`` is, and has no default: ``"mean"`` makes
+    ``E[y] = μ`` (``log y ~ N(log μ − σ²/2, σ²)``), ``"median"`` makes the
+    median ``μ`` (``log y ~ N(log μ, σ²)``, the proportional error
+    ``y = μ·e^ε``). Every observed value must be above 0.
+
+    Attributes
+    ----------
+    sigma : float | str
+        The standard deviation of ``log y``, above 0, or the id of a noise
+        parameter.
+    center : {"mean", "median"}
+        What the prediction is.
+    """
+
+    kind: Literal["log_normal"] = "log_normal"
+    sigma: NoiseArgument = Field(description="The standard deviation of log y.")
+    center: Literal["mean", "median"] = Field(description="What the prediction is.")
+```
+
+## StudentTObservations
+
+Bases: `_ObservationModel`
+
+Student-t noise of center `μ`, the prediction: normal noise with heavier tails, so an outlier pulls the fit less.
+
+Attributes:
+
+| Name    | Type    | Description |
+| ------- | ------- | ----------- |
+| `df`    | \`float | str\`       |
+| `scale` | \`float | str\`       |
+
+Source code in `commol/context/observation_models.py`
+
+```python
+class StudentTObservations(_ObservationModel):
+    """
+    Student-t noise of center ``μ``, the prediction: normal noise with heavier
+    tails, so an outlier pulls the fit less.
+
+    Attributes
+    ----------
+    df : float | str
+        The degrees of freedom, above 0, or the id of a noise parameter. The
+        noise has a mean when ``df > 1`` and a variance when ``df > 2``.
+    scale : float | str
+        The scale, above 0, or the id of a noise parameter.
+    """
+
+    kind: Literal["student_t"] = "student_t"
+    df: NoiseArgument = Field(description="The degrees of freedom.")
+    scale: NoiseArgument = Field(description="The scale.")
+```
+
+## PoissonObservations
+
+Bases: `_ObservationModel`
+
+Poisson counts of mean `μ`, the prediction: variance equal to the mean.
+
+Every observed value must be a whole number, at least 0.
+
+Source code in `commol/context/observation_models.py`
+
+```python
+class PoissonObservations(_ObservationModel):
+    """
+    Poisson counts of mean ``μ``, the prediction: variance equal to the mean.
+
+    Every observed value must be a whole number, at least 0.
+    """
+
+    kind: Literal["poisson"] = "poisson"
+```
+
+## NegativeBinomialObservations
+
+Bases: `_ObservationModel`
+
+Negative binomial counts of mean `μ`, the prediction, and variance `μ + φμ²`: counts that scatter more than a Poisson.
+
+`φ = 0` is the Poisson, so bounds `[0, …]` of a noise parameter hold it. The dispersion `k` of epidemiology (`size` in R) is `1/φ`. Every observed value must be a whole number, at least 0.
+
+Attributes:
+
+| Name             | Type    | Description |
+| ---------------- | ------- | ----------- |
+| `overdispersion` | \`float | str\`       |
+
+Source code in `commol/context/observation_models.py`
+
+```python
+class NegativeBinomialObservations(_ObservationModel):
+    """
+    Negative binomial counts of mean ``μ``, the prediction, and variance
+    ``μ + φμ²``: counts that scatter more than a Poisson.
+
+    ``φ = 0`` is the Poisson, so bounds ``[0, …]`` of a noise parameter hold
+    it. The dispersion ``k`` of epidemiology (``size`` in R) is ``1/φ``.
+    Every observed value must be a whole number, at least 0.
+
+    Attributes
+    ----------
+    overdispersion : float | str
+        ``φ``, at least 0, or the id of a noise parameter.
+    """
+
+    kind: Literal["negative_binomial"] = "negative_binomial"
+    overdispersion: NoiseArgument = Field(description="The overdispersion φ.")
+```
+
+## BinomialObservations
+
+Bases: `_ObservationModel`
+
+Binomial counts of `n` trials and mean `μ`, the prediction: the probability is `μ / n`, so the prediction is an expected count, not a proportion.
+
+`trials` gives `n` for every observation of the series; without it, each observation of the series gives its own (`ObservedDataPoint.trials`), for trials that change from one observation to the next. One source per series. Every observed value must be a whole number between 0 and its trials.
+
+Attributes:
+
+| Name     | Type  | Description |
+| -------- | ----- | ----------- |
+| `trials` | \`int | None\`      |
+
+Source code in `commol/context/observation_models.py`
+
+```python
+class BinomialObservations(_ObservationModel):
+    """
+    Binomial counts of ``n`` trials and mean ``μ``, the prediction: the
+    probability is ``μ / n``, so the prediction is an expected count, not a
+    proportion.
+
+    ``trials`` gives ``n`` for every observation of the series; without it,
+    each observation of the series gives its own (``ObservedDataPoint.trials``),
+    for trials that change from one observation to the next. One source per
+    series. Every observed value must be a whole number between 0 and its
+    trials.
+
+    Attributes
+    ----------
+    trials : int | None
+        The trials of every observation, or None (default) to read the
+        trials of each observation.
+    """
+
+    kind: Literal["binomial"] = "binomial"
+    trials: int | None = Field(default=None, ge=0, description="The trials.")
+```
+
+## Unknowns, optimizers and results
 
 ## CalibrationParameter
 
@@ -12735,8 +13266,8 @@ class Model(BaseModel, Generic[StructureT]):
 
         Each value is routed by the ``parameter_type`` declared for it in
         ``problem``: ``parameter`` values update model parameters, ``factor``
-        values are ignored because they apply to observations rather than to
-        the model, and the structure writes back the values of its kind
+        and ``noise`` values are ignored because they apply to observations
+        rather than to the model, and the structure writes back the values of its kind
         (`ModelStructure.with_calibrated_values`). An aggregate structure
         writes ``initial_condition`` values so that the model rebuilds the
         initial state the engine scored for them.
@@ -13169,7 +13700,7 @@ apply_calibration_parameters(result: CalibrationResult | Mapping[str, float], pr
 
 Write calibrated values back onto the model.
 
-Each value is routed by the `parameter_type` declared for it in `problem`: `parameter` values update model parameters, `factor` values are ignored because they apply to observations rather than to the model, and the structure writes back the values of its kind (`ModelStructure.with_calibrated_values`). An aggregate structure writes `initial_condition` values so that the model rebuilds the initial state the engine scored for them.
+Each value is routed by the `parameter_type` declared for it in `problem`: `parameter` values update model parameters, `factor` and `noise` values are ignored because they apply to observations rather than to the model, and the structure writes back the values of its kind (`ModelStructure.with_calibrated_values`). An aggregate structure writes `initial_condition` values so that the model rebuilds the initial state the engine scored for them.
 
 Parameters:
 
@@ -13198,8 +13729,8 @@ def apply_calibration_parameters(
 
     Each value is routed by the ``parameter_type`` declared for it in
     ``problem``: ``parameter`` values update model parameters, ``factor``
-    values are ignored because they apply to observations rather than to
-    the model, and the structure writes back the values of its kind
+    and ``noise`` values are ignored because they apply to observations
+    rather than to the model, and the structure writes back the values of its kind
     (`ModelStructure.with_calibrated_values`). An aggregate structure
     writes ``initial_condition`` values so that the model rebuilds the
     initial state the engine scored for them.
@@ -18699,7 +19230,7 @@ Report every parameter of a calibrated model, and the values of its kind.
 
 Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); an aggregate model adds `initial_amounts` and `category_splits`.
 
-Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` parameters have no place in the model, so they are reported from `problem` when it is given.
+Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` and `noise` parameters have no place in the model, so they are reported from `problem` when it is given.
 
 `initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin.
 
@@ -18711,7 +19242,7 @@ Parameters:
 | ------------------ | -------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `model`            | `Model`              | The model carrying the applied values. | *required*                                                                                  |
 | `result`           | \`CalibrationResult  | Mapping\`                              | The calibration result, or a mapping of parameter id to value such as one draw of a sample. |
-| `problem`          | \`CalibrationProblem | None\`                                 | The problem the result came from, used to report factor parameters.                         |
+| `problem`          | \`CalibrationProblem | None\`                                 | The problem the result came from, used to report factor and noise parameters.               |
 | `sample`           | \`ParameterSample    | None\`                                 | Draws of the parameters, such as the sample of an uncertainty method.                       |
 | `confidence_level` | \`float              | None\`                                 | Confidence level of the intervals; required with a sample.                                  |
 
@@ -18748,8 +19279,8 @@ def applied_parameters_report(
 
     Parameters that are not a single number, such as a formula or a
     series, are omitted: they are inputs rather than fitted values.
-    ``factor`` parameters have no place in the model, so they are reported from
-    `problem` when it is given.
+    ``factor`` and ``noise`` parameters have no place in the model, so they are
+    reported from `problem` when it is given.
 
     ``initial_amounts`` gives each bin and each overridden compartment of an
     aggregate model its ``amount`` the engine builds and the ``unit`` of its
@@ -18773,7 +19304,8 @@ def applied_parameters_report(
         The calibration result, or a mapping of parameter id to value such as
         one draw of a sample.
     problem : CalibrationProblem | None, optional
-        The problem the result came from, used to report factor parameters.
+        The problem the result came from, used to report factor and noise
+        parameters.
     sample : ParameterSample | None, optional
         Draws of the parameters, such as the sample of an uncertainty method.
     confidence_level : float | None, optional
@@ -18802,10 +19334,13 @@ def applied_parameters_report(
         for parameter in model.parameters
         if isinstance(parameter.value, (int, float))
     }
-    for factor_id in _factor_ids(problem):
-        if factor_id in calibrated:
-            parameters[factor_id] = _parameter_entry(
-                factor_id, calibrated[factor_id], calibrated_ids, parameter_statistics
+    for observation_id in _observation_parameter_ids(problem):
+        if observation_id in calibrated:
+            parameters[observation_id] = _parameter_entry(
+                observation_id,
+                calibrated[observation_id],
+                calibrated_ids,
+                parameter_statistics,
             )
 
     report: dict[str, object] = {}
@@ -22715,10 +23250,11 @@ class Predictive:
         ----------
         observed_data : Sequence[ObservedDataPoint]
             The observations.
-        noise : NoNoise | ResidualNoise
+        noise : NoNoise | ResidualNoise | DistributionNoise
             What an observation shows around a draw's prediction, with no
             default: ``NoNoise()`` gives a band of the model,
-            ``ResidualNoise(...)`` a prediction interval.
+            ``ResidualNoise(...)`` and ``DistributionNoise()`` a prediction
+            interval.
 
         Returns
         -------
@@ -22728,8 +23264,10 @@ class Predictive:
         Raises
         ------
         ValueError
-            If an observation names an unknown output or factor, or a series
-            the residual noise has no residuals of.
+            If an observation names an unknown output or factor, a series the
+            residual noise has no residuals of, or a series with no
+            observation model; or `DistributionNoise` comes with a problem
+            that has a loss.
         InfeasibleStateError
             If a draw leaves the values its model allows.
         """
@@ -22748,6 +23286,7 @@ class Predictive:
             engine_state.rust_observed_data(list(observed_data)),
             self.calibrator.seed,
             residual_noise=residual_noise,
+            distribution_noise=isinstance(noise, DistributionNoise),
         )
         return ObservationDraws(observed_data, draws)
 ```
@@ -23018,10 +23557,10 @@ The observations need not be the ones the problem was fitted to: held out data a
 
 Parameters:
 
-| Name            | Type                          | Description       | Default                                                                                                                                               |
-| --------------- | ----------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `observed_data` | `Sequence[ObservedDataPoint]` | The observations. | *required*                                                                                                                                            |
-| `noise`         | \`NoNoise                     | ResidualNoise\`   | What an observation shows around a draw's prediction, with no default: NoNoise() gives a band of the model, ResidualNoise(...) a prediction interval. |
+| Name            | Type                          | Description       | Default             |
+| --------------- | ----------------------------- | ----------------- | ------------------- |
+| `observed_data` | `Sequence[ObservedDataPoint]` | The observations. | *required*          |
+| `noise`         | \`NoNoise                     | ResidualNoise     | DistributionNoise\` |
 
 Returns:
 
@@ -23031,10 +23570,10 @@ Returns:
 
 Raises:
 
-| Type                   | Description                                                                                              |
-| ---------------------- | -------------------------------------------------------------------------------------------------------- |
-| `ValueError`           | If an observation names an unknown output or factor, or a series the residual noise has no residuals of. |
-| `InfeasibleStateError` | If a draw leaves the values its model allows.                                                            |
+| Type                   | Description                                                                                                                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`           | If an observation names an unknown output or factor, a series the residual noise has no residuals of, or a series with no observation model; or DistributionNoise comes with a problem that has a loss. |
+| `InfeasibleStateError` | If a draw leaves the values its model allows.                                                                                                                                                           |
 
 Source code in `commol/api/inference/predictive.py`
 
@@ -23055,10 +23594,11 @@ def at_observations(
     ----------
     observed_data : Sequence[ObservedDataPoint]
         The observations.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         What an observation shows around a draw's prediction, with no
         default: ``NoNoise()`` gives a band of the model,
-        ``ResidualNoise(...)`` a prediction interval.
+        ``ResidualNoise(...)`` and ``DistributionNoise()`` a prediction
+        interval.
 
     Returns
     -------
@@ -23068,8 +23608,10 @@ def at_observations(
     Raises
     ------
     ValueError
-        If an observation names an unknown output or factor, or a series
-        the residual noise has no residuals of.
+        If an observation names an unknown output or factor, a series the
+        residual noise has no residuals of, or a series with no
+        observation model; or `DistributionNoise` comes with a problem
+        that has a loss.
     InfeasibleStateError
         If a draw leaves the values its model allows.
     """
@@ -23088,6 +23630,7 @@ def at_observations(
         engine_state.rust_observed_data(list(observed_data)),
         self.calibrator.seed,
         residual_noise=residual_noise,
+        distribution_noise=isinstance(noise, DistributionNoise),
     )
     return ObservationDraws(observed_data, draws)
 ```
@@ -23466,6 +24009,32 @@ class ResidualNoise(BaseModel):
     )
 ```
 
+## DistributionNoise
+
+Bases: `BaseModel`
+
+Observation noise of the problem's observation models.
+
+Each draw draws every observation from the model of its series around the draw's prediction, with the draw's noise parameters, so the band is a prediction interval of the posterior or bootstrap predictive. It needs a problem with `observation_models`, and serves the series they name. A prediction outside the means a model allows, such as a negative count, draws at the nearest allowed one.
+
+Source code in `commol/context/inference/noise.py`
+
+```python
+class DistributionNoise(BaseModel):
+    """
+    Observation noise of the problem's observation models.
+
+    Each draw draws every observation from the model of its series around
+    the draw's prediction, with the draw's noise parameters, so the band is a
+    prediction interval of the posterior or bootstrap predictive. It needs a
+    problem with ``observation_models``, and serves the series they name. A
+    prediction outside the means a model allows, such as a negative count,
+    draws at the nearest allowed one.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+```
+
 ## Resampling
 
 Guide: [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md).
@@ -23660,6 +24229,47 @@ class BlockJackknife(UncertaintyMethod[JackknifeResult]):
     """
 
     block_length: BlockLength = Field(description="Positions per block.")
+    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+```
+
+## ParametricBootstrap
+
+Bases: `UncertaintyMethod[BootstrapResult]`
+
+The parametric bootstrap of the problem's observation models.
+
+Each replicate draws every observed value from the model of its series at the fit, around the fitted prediction and with the fitted noise parameters, and fits the new data. It needs a problem with `observation_models`; the observations of a replicate are independent given the fit, so it assumes the models hold.
+
+Attributes:
+
+| Name         | Type  | Description                                                                                                   |
+| ------------ | ----- | ------------------------------------------------------------------------------------------------------------- |
+| `replicates` | `int` | Number of replicates, at least 1.                                                                             |
+| `starts`     | `int` | Starts of the fit and of each replicate (default 1): the fit, then rows of a Latin hypercube over the bounds. |
+
+Source code in `commol/context/inference/resampling.py`
+
+```python
+class ParametricBootstrap(UncertaintyMethod[BootstrapResult]):
+    """
+    The parametric bootstrap of the problem's observation models.
+
+    Each replicate draws every observed value from the model of its series
+    at the fit, around the fitted prediction and with the fitted noise
+    parameters, and fits the new data. It needs a problem with
+    ``observation_models``; the observations of a replicate are independent
+    given the fit, so it assumes the models hold.
+
+    Attributes
+    ----------
+    replicates : int
+        Number of replicates, at least 1.
+    starts : int
+        Starts of the fit and of each replicate (default 1): the fit, then
+        rows of a Latin hypercube over the bounds.
+    """
+
+    replicates: int = Field(ge=1, description="Number of replicates.")
     starts: int = Field(default=1, ge=1, description="Starts per fit.")
 ```
 
@@ -23890,7 +24500,7 @@ Attributes:
 
 | Name                     | Type               | Description                                                                                                                       |
 | ------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `block_length`           | `int`              | The block length the method ran with.                                                                                             |
+| `block_length`           | \`int              | None\`                                                                                                                            |
 | `block_length_estimates` | \`dict[str, float] | None\`                                                                                                                            |
 | `failed`                 | `list[str]`        | Each replicate that failed, with its reason. A failed replicate is not in the sample.                                             |
 | `not_converged`          | `int`              | Replicates kept although their optimizer did not converge.                                                                        |
@@ -23905,8 +24515,9 @@ class ResamplingDiagnostics(BaseModel):
 
     Attributes
     ----------
-    block_length : int
-        The block length the method ran with.
+    block_length : int | None
+        The block length the method ran with; None for the parametric
+        bootstrap, which draws no blocks.
     block_length_estimates : dict[str, float] | None
         With ``block_length="auto"``, the estimate of each series, by label;
         otherwise None.
@@ -23922,7 +24533,7 @@ class ResamplingDiagnostics(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    block_length: int = Field(description="The block length used.")
+    block_length: int | None = Field(description="The block length used.")
     block_length_estimates: dict[str, float] | None = Field(
         description="The estimate of each series with the automatic length."
     )
@@ -24455,6 +25066,67 @@ def require_eta(cls, data: object) -> object:
     return data
 ```
 
+## BayesianPosterior
+
+Bases: `WithPriors`, `UncertaintyMethod[SmcResult]`
+
+The posterior `π(θ) ∝ prior(θ) · L(θ)` of the problem's observation models, sampled by sequential Monte Carlo from the priors (temperature 0) to the posterior (temperature 1), with its log evidence.
+
+It needs a problem with `observation_models`: their likelihood sets the weight of the data, so it has no `η`. The noise parameters are sampled with the others, so each needs a prior.
+
+Attributes:
+
+| Name                 | Type     | Description                                                                                                                                                   |
+| -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `priors`             | \`Priors | dict[str, Distribution]\`                                                                                                                                     |
+| `particles`          | `int`    | Number of particles, at least 2.                                                                                                                              |
+| `target_cess`        | `float`  | The conditional effective sample size of each step, as a share of the particles, strictly between 0 and 1: the next temperature is the highest that keeps it. |
+| `resample_threshold` | `float`  | Resample when the effective size falls below this share of the particles, in (0, 1\].                                                                         |
+| `stay_probability`   | `float`  | The probability that a particle does not move in a step, strictly between 0 and 1: each step moves every particle ⌈log c / log(1 − a)⌉ times.                 |
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+class BayesianPosterior(WithPriors, UncertaintyMethod[SmcResult]):
+    """
+    The posterior ``π(θ) ∝ prior(θ) · L(θ)`` of the problem's observation
+    models, sampled by sequential Monte Carlo from the priors (temperature
+    0) to the posterior (temperature 1), with its log evidence.
+
+    It needs a problem with ``observation_models``: their likelihood sets the
+    weight of the data, so it has no `η`. The noise parameters are sampled
+    with the others, so each needs a prior.
+
+    Attributes
+    ----------
+    priors : Priors | dict[str, Distribution]
+        The prior of each calibrated parameter, or
+        ``Priors.uniform_on_bounds()``.
+    particles : int
+        Number of particles, at least 2.
+    target_cess : float
+        The conditional effective sample size of each step, as a share of
+        the particles, strictly between 0 and 1: the next temperature is the
+        highest that keeps it.
+    resample_threshold : float
+        Resample when the effective size falls below this share of the
+        particles, in ``(0, 1]``.
+    stay_probability : float
+        The probability that a particle does not move in a step, strictly
+        between 0 and 1: each step moves every particle
+        ``⌈log c / log(1 − a)⌉`` times.
+    """
+
+    particles: int = Field(ge=2, description="Number of particles.")
+    target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
+    resample_threshold: float = Field(
+        gt=0.0, le=1.0, description="Resample below this share."
+    )
+    stay_probability: float = Field(
+        gt=0.0, lt=1.0, description="Probability a particle does not move."
+    )
+```
+
 ## EtaCalibration
 
 Bases: `BaseModel`
@@ -24855,13 +25527,13 @@ The result of a sequential Monte Carlo method.
 
 Attributes:
 
-| Name           | Type              | Description                                                                                                                                                                               |
-| -------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sample`       | `ParameterSample` | The weighted particles at the last level.                                                                                                                                                 |
-| `levels`       | `list[float]`     | The level of each step: the temperature of a Gibbs posterior, from above 0 to 1, or the tolerance of ABC, falling.                                                                        |
-| `kept`         | \`list\[float     | None\]\`                                                                                                                                                                                  |
-| `log_evidence` | `float`           | The log of the product of the mean incremental weights: for a Gibbs posterior, the log of ∫ prior(θ) exp(−η loss(θ)) dθ; for ABC, the log of the prior probability of the last tolerance. |
-| `diagnostics`  | `SmcDiagnostics`  | The effective sizes, acceptance rates and move counts of each step.                                                                                                                       |
+| Name           | Type              | Description                                                                                                                                                                                                                                                             |
+| -------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sample`       | `ParameterSample` | The weighted particles at the last level.                                                                                                                                                                                                                               |
+| `levels`       | `list[float]`     | The level of each step: the temperature of a Gibbs posterior, from above 0 to 1, or the tolerance of ABC, falling.                                                                                                                                                      |
+| `kept`         | \`list\[float     | None\]\`                                                                                                                                                                                                                                                                |
+| `log_evidence` | `float`           | The log of the product of the mean incremental weights: for a Gibbs posterior, the log of ∫ prior(θ) exp(−η loss(θ)) dθ; for a Bayesian posterior, the log marginal likelihood log ∫ prior(θ) L(θ) dθ; for ABC, the log of the prior probability of the last tolerance. |
+| `diagnostics`  | `SmcDiagnostics`  | The effective sizes, acceptance rates and move counts of each step.                                                                                                                                                                                                     |
 
 Source code in `commol/context/inference/smc.py`
 
@@ -24879,12 +25551,14 @@ class SmcResult(BaseModel):
         above 0 to 1, or the tolerance of ABC, falling.
     kept : list[float | None]
         The value each particle of the sample keeps, in its order: the loss
-        of a Gibbs posterior, or the distance of ABC; None for a particle
-        outside the support.
+        of a Gibbs posterior, the log-likelihood of a Bayesian posterior, or
+        the distance of ABC; None for a particle outside the support.
     log_evidence : float
         The log of the product of the mean incremental weights: for a Gibbs
-        posterior, the log of ``∫ prior(θ) exp(−η loss(θ)) dθ``; for ABC, the
-        log of the prior probability of the last tolerance.
+        posterior, the log of ``∫ prior(θ) exp(−η loss(θ)) dθ``; for a
+        Bayesian posterior, the log marginal likelihood
+        ``log ∫ prior(θ) L(θ) dθ``; for ABC, the log of the prior probability
+        of the last tolerance.
     diagnostics : SmcDiagnostics
         The effective sizes, acceptance rates and move counts of each step.
     """
@@ -25529,7 +26203,7 @@ class SeriesIntervals(BaseModel):
 
 Scores of a predictive against observations.
 
-Every score is computed in Rust from each draw's value of the observations (`Predictive.at_observations`), per observation and per series. Which observations to score, for example the ones held out of the calibration, and the observation noise are arguments with no default: a band of the model (`NoNoise`) compared with data covers less than its level.
+Every score is computed in Rust, per observation and per series: from each draw's value of the observations (`Predictive.at_observations`), or, for the log score, from the density of the observation models at each draw's prediction. Which observations to score, for example the ones held out of the calibration, and the observation noise are arguments with no default: a band of the model (`NoNoise`) compared with data covers less than its level.
 
 ### Classes
 
@@ -25584,12 +26258,12 @@ The empirical coverage of the central interval of `confidence_level`.
 
 Parameters:
 
-| Name               | Type                          | Description                | Default                                                          |
-| ------------------ | ----------------------------- | -------------------------- | ---------------------------------------------------------------- |
-| `predictive`       | `Predictive`                  | The predictive.            | *required*                                                       |
-| `observations`     | `Sequence[ObservedDataPoint]` | The observations to score. | *required*                                                       |
-| `noise`            | \`NoNoise                     | ResidualNoise\`            | The observation noise of the draws (Predictive.at_observations). |
-| `confidence_level` | `float`                       | Strictly between 0 and 1.  | *required*                                                       |
+| Name               | Type                          | Description                | Default             |
+| ------------------ | ----------------------------- | -------------------------- | ------------------- |
+| `predictive`       | `Predictive`                  | The predictive.            | *required*          |
+| `observations`     | `Sequence[ObservedDataPoint]` | The observations to score. | *required*          |
+| `noise`            | \`NoNoise                     | ResidualNoise              | DistributionNoise\` |
+| `confidence_level` | `float`                       | Strictly between 0 and 1.  | *required*          |
 
 Returns:
 
@@ -25615,7 +26289,7 @@ def coverage(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
     confidence_level : float
         Strictly between 0 and 1.
@@ -25640,12 +26314,12 @@ The interval score: `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`.
 
 Parameters:
 
-| Name               | Type                          | Description                                     | Default                                                          |
-| ------------------ | ----------------------------- | ----------------------------------------------- | ---------------------------------------------------------------- |
-| `predictive`       | `Predictive`                  | The predictive.                                 | *required*                                                       |
-| `observations`     | `Sequence[ObservedDataPoint]` | The observations to score.                      | *required*                                                       |
-| `noise`            | \`NoNoise                     | ResidualNoise\`                                 | The observation noise of the draws (Predictive.at_observations). |
-| `confidence_level` | `float`                       | The level c of the central interval; α = 1 − c. | *required*                                                       |
+| Name               | Type                          | Description                                     | Default             |
+| ------------------ | ----------------------------- | ----------------------------------------------- | ------------------- |
+| `predictive`       | `Predictive`                  | The predictive.                                 | *required*          |
+| `observations`     | `Sequence[ObservedDataPoint]` | The observations to score.                      | *required*          |
+| `noise`            | \`NoNoise                     | ResidualNoise                                   | DistributionNoise\` |
+| `confidence_level` | `float`                       | The level c of the central interval; α = 1 − c. | *required*          |
 
 Returns:
 
@@ -25671,7 +26345,7 @@ def interval_score(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
     confidence_level : float
         The level ``c`` of the central interval; ``α = 1 − c``.
@@ -25699,12 +26373,12 @@ The weighted interval score of Bracher et al. (2021).
 
 Parameters:
 
-| Name                | Type                          | Description                          | Default                                                          |
-| ------------------- | ----------------------------- | ------------------------------------ | ---------------------------------------------------------------- |
-| `predictive`        | `Predictive`                  | The predictive.                      | *required*                                                       |
-| `observations`      | `Sequence[ObservedDataPoint]` | The observations to score.           | *required*                                                       |
-| `noise`             | \`NoNoise                     | ResidualNoise\`                      | The observation noise of the draws (Predictive.at_observations). |
-| `confidence_levels` | `Sequence[float]`             | The levels of the central intervals. | *required*                                                       |
+| Name                | Type                          | Description                          | Default             |
+| ------------------- | ----------------------------- | ------------------------------------ | ------------------- |
+| `predictive`        | `Predictive`                  | The predictive.                      | *required*          |
+| `observations`      | `Sequence[ObservedDataPoint]` | The observations to score.           | *required*          |
+| `noise`             | \`NoNoise                     | ResidualNoise                        | DistributionNoise\` |
+| `confidence_levels` | `Sequence[float]`             | The levels of the central intervals. | *required*          |
 
 Returns:
 
@@ -25737,7 +26411,7 @@ def weighted_interval_score(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
     confidence_levels : Sequence[float]
         The levels of the central intervals.
@@ -25774,11 +26448,11 @@ The continuous ranked probability score of the weighted draws.
 
 Parameters:
 
-| Name           | Type                          | Description                | Default                                                          |
-| -------------- | ----------------------------- | -------------------------- | ---------------------------------------------------------------- |
-| `predictive`   | `Predictive`                  | The predictive.            | *required*                                                       |
-| `observations` | `Sequence[ObservedDataPoint]` | The observations to score. | *required*                                                       |
-| `noise`        | \`NoNoise                     | ResidualNoise\`            | The observation noise of the draws (Predictive.at_observations). |
+| Name           | Type                          | Description                | Default             |
+| -------------- | ----------------------------- | -------------------------- | ------------------- |
+| `predictive`   | `Predictive`                  | The predictive.            | *required*          |
+| `observations` | `Sequence[ObservedDataPoint]` | The observations to score. | *required*          |
+| `noise`        | \`NoNoise                     | ResidualNoise              | DistributionNoise\` |
 
 Returns:
 
@@ -25806,7 +26480,7 @@ def crps(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
 
     Returns
@@ -25830,12 +26504,12 @@ The probability integral transform of each observation.
 
 Parameters:
 
-| Name           | Type                          | Description                        | Default                                                          |
-| -------------- | ----------------------------- | ---------------------------------- | ---------------------------------------------------------------- |
-| `predictive`   | `Predictive`                  | The predictive.                    | *required*                                                       |
-| `observations` | `Sequence[ObservedDataPoint]` | The observations to score.         | *required*                                                       |
-| `noise`        | \`NoNoise                     | ResidualNoise\`                    | The observation noise of the draws (Predictive.at_observations). |
-| `seed`         | `int`                         | Seed of the randomization of ties. | *required*                                                       |
+| Name           | Type                          | Description                        | Default             |
+| -------------- | ----------------------------- | ---------------------------------- | ------------------- |
+| `predictive`   | `Predictive`                  | The predictive.                    | *required*          |
+| `observations` | `Sequence[ObservedDataPoint]` | The observations to score.         | *required*          |
+| `noise`        | \`NoNoise                     | ResidualNoise                      | DistributionNoise\` |
+| `seed`         | `int`                         | Seed of the randomization of ties. | *required*          |
 
 Returns:
 
@@ -25865,7 +26539,7 @@ def pit(
         The predictive.
     observations : Sequence[ObservedDataPoint]
         The observations to score.
-    noise : NoNoise | ResidualNoise
+    noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
     seed : int
         Seed of the randomization of ties.
@@ -25877,6 +26551,89 @@ def pit(
     """
     draws = predictive.at_observations(observations, noise)
     return _score(draws, draws.rust_draws.pit(draws.observed, seed))
+```
+
+#### log_score
+
+```python
+log_score(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: DistributionNoise) -> Score
+```
+
+The log score of each observation: the log density of its value under the predictive.
+
+The predictive density is the mixture over the draws of the observation models, `log Σ_d w_d · p(y | μ_d)`, with `μ_d` the prediction of draw `d` and its noise parameters. It needs the densities of the models, so only `DistributionNoise` has one. A proper scoring rule; higher is better, and an observation the predictive gives no mass scores `-inf`.
+
+Parameters:
+
+| Name           | Type                          | Description                                           | Default    |
+| -------------- | ----------------------------- | ----------------------------------------------------- | ---------- |
+| `predictive`   | `Predictive`                  | The predictive, of a problem with observation_models. | *required* |
+| `observations` | `Sequence[ObservedDataPoint]` | The observations to score.                            | *required* |
+| `noise`        | `DistributionNoise`           | The observation models of the problem.                | *required* |
+
+Returns:
+
+| Type    | Description                        |
+| ------- | ---------------------------------- |
+| `Score` | The log score of each observation. |
+
+Raises:
+
+| Type         | Description                                                                                                           |
+| ------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`  | If noise is not DistributionNoise.                                                                                    |
+| `ValueError` | If the problem has a loss, or an observation names an unknown output or factor or a series with no observation model. |
+
+Source code in `commol/api/inference/scores.py`
+
+```python
+def log_score(
+    predictive: Predictive,
+    observations: Sequence[ObservedDataPoint],
+    noise: DistributionNoise,
+) -> Score:
+    """
+    The log score of each observation: the log density of its value under
+    the predictive.
+
+    The predictive density is the mixture over the draws of the observation
+    models, ``log Σ_d w_d · p(y | μ_d)``, with ``μ_d`` the prediction of draw
+    ``d`` and its noise parameters. It needs the densities of the models, so
+    only `DistributionNoise` has one. A proper scoring rule; higher is
+    better, and an observation the predictive gives no mass scores ``-inf``.
+
+    Parameters
+    ----------
+    predictive : Predictive
+        The predictive, of a problem with ``observation_models``.
+    observations : Sequence[ObservedDataPoint]
+        The observations to score.
+    noise : DistributionNoise
+        The observation models of the problem.
+
+    Returns
+    -------
+    Score
+        The log score of each observation.
+
+    Raises
+    ------
+    TypeError
+        If `noise` is not `DistributionNoise`.
+    ValueError
+        If the problem has a loss, or an observation names an unknown output
+        or factor or a series with no observation model.
+    """
+    if not isinstance(noise, DistributionNoise):
+        raise TypeError(
+            f"The log score needs the density of the observation models, so it "
+            f"takes DistributionNoise(); {type(noise).__name__} has no density."
+        )
+    values = predictive.calibrator.rust_problem.log_score(
+        predictive.sample.rust_sample,
+        engine_state.rust_observed_data(list(observations)),
+    )
+    return _score_of(observations, values)
 ```
 
 ## weighted_quantiles
@@ -28244,6 +29001,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `SampleIdentifiability(reference="prior", priors=...)`: the contraction of each parameter against its prior. See [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample).
 - Conformal prediction intervals through `Calibrator.uncertainty`: intervals for observations with a coverage guarantee that needs no noise model, no prior and no correct model. `SplitConformal` scores held-out observations; `RollingConformal` gives intervals ahead of the data, one quantile per horizon (the `k`-th observation after an origin); `JackknifePlus` refits once per block left out, with the CV+ bound for blocks of more than one observation; `EnbPI` draws its own replicates of blocks for series with dependent errors; `AdaptiveConformal` walks a stream of new observations with a working level that moves with each miss. Each takes a required `score` (`"absolute"`, `"normalized"` or `"spread"`), `by` (`"series"` or `"all"`) and `level`, and returns a `ConformalResult` (`PredictionIntervals`, the scores and the guarantee). See [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md).
 - `SimulationPlotter.plot_series(prediction_intervals=...)` draws the band of conformal intervals, and `simulation_report(..., prediction_intervals=...)` reports them.
+- Observation models: `CalibrationProblem(observation_models={series: model})` takes one model per series label, `NormalObservations(sd)`, `LogNormalObservations(sigma, center)` (`center="mean"` or `"median"`, no default), `StudentTObservations(df, scale)`, `PoissonObservations()`, `NegativeBinomialObservations(overdispersion)` (variance `μ + φμ²`) or `BinomialObservations(trials)` (or the new `ObservedDataPoint.trials` of each observation), and the problem fits by maximum likelihood. A noise argument is a number or a calibration parameter of the new type `"noise"`, which never reaches the engine. Observed values outside a model's support raise a `ValueError` that names the observation. A stochastic engine and `normalize_observations` need a loss. See [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md).
+- `BayesianPosterior`: the posterior of the observation models and its log evidence, on the sequential Monte Carlo sampler. `GibbsPosterior` on observation models is the fractional posterior `prior · L^η`.
+- `DistributionNoise()`: prediction intervals that draw from the observation models; `commol.scores.log_score`, the log density of held-out observations under the predictive, which needs `DistributionNoise()`.
+- `ParametricBootstrap(replicates)`: fits to data sets drawn from the observation models at the fit. `ResamplingDiagnostics.block_length` is `None` for it.
 - A model can hold bins of different units, such as people and the concentration of bacteria in water: each bin starts at an amount in its own unit, a model whose bins all start at `0` builds and runs, and the `Calibrator` rejects an initial-condition remainder whose unit is not the unit of a calibrated amount. See [Bins of different units](https://munqu.github.io/commol/latest/guide/building-models/#bins-of-different-units).
 
 ### Changed
@@ -28264,6 +29025,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Breaking:** a stochastic engine needs a whole amount in each bin, not a whole total, and `largest_remainder` and `random` round within each bin, so a unit never moves to another bin.
 - **Breaking:** the description of an aggregate model shows the bin amounts and their units, and the initial state with the unit of each compartment.
 - **Breaking (Rust):** `InitialConditions` has `bin_amounts` and `compartment_amounts` in place of `total`, `bin_fractions` and `compartment_fractions`; `CompartmentalEngine::total` is the sum of the amounts the model states; `check_model_values` returns the plan it resolves, and `InitialConditionPlan::coverage` gives the compartments each value sets.
+- **Breaking:** `CalibrationProblem.loss_function` has no default: a problem needs `loss_function` or `observation_models`, exactly one, and raises a `ValueError` with both or neither. Write `loss_function="sse"` where a problem relied on the default.
 
 ## [0.5.0] - 2026-10-19
 
