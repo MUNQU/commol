@@ -141,7 +141,7 @@ def applied_parameters_report(
 ## simulation_report
 
 ```python
-simulation_report(simulation: Simulation, results: SimulationResults, at: Sequence[float], window: float, num_windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), ensemble_runs: Sequence[SimulationResults] | Predictive | None = None, confidence_level: float | None = None) -> SimulationReport
+simulation_report(simulation: Simulation, results: SimulationResults, at: Sequence[float], window: float, num_windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), ensemble_runs: Sequence[SimulationResults] | Predictive | None = None, confidence_level: float | None = None, prediction_intervals: PredictionIntervals | None = None) -> SimulationReport
 ```
 
 Report the observed data, compartment series and accumulators of a run.
@@ -152,23 +152,24 @@ Callers add whatever envelope they need around these blocks, such as a run label
 
 Parameters:
 
-| Name               | Type                          | Description                                                      | Default                                     |
-| ------------------ | ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------- |
-| `simulation`       | `Simulation`                  | The simulation the results came from.                            | *required*                                  |
-| `results`          | `SimulationResults`           | Results of a run, with their positions.                          | *required*                                  |
-| `at`               | `Sequence[float]`             | Positions the series and cumulative accumulators are sampled at. | *required*                                  |
-| `window`           | `float`                       | Length of one window on the axis.                                | *required*                                  |
-| `num_windows`      | `int`                         | Number of windows on the observed and windowed axes.             | *required*                                  |
-| `observed_data`    | `Iterable[ObservedDataPoint]` | The calibration targets to report alongside the run.             | `()`                                        |
-| `accumulators`     | `Iterable[str]`               | Accumulator ids to report.                                       | `()`                                        |
-| `ensemble_runs`    | \`Sequence[SimulationResults] | Predictive                                                       | None\`                                      |
-| `confidence_level` | \`float                       | None\`                                                           | Confidence level of the reported intervals. |
+| Name                   | Type                          | Description                                                      | Default                                                                                       |
+| ---------------------- | ----------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `simulation`           | `Simulation`                  | The simulation the results came from.                            | *required*                                                                                    |
+| `results`              | `SimulationResults`           | Results of a run, with their positions.                          | *required*                                                                                    |
+| `at`                   | `Sequence[float]`             | Positions the series and cumulative accumulators are sampled at. | *required*                                                                                    |
+| `window`               | `float`                       | Length of one window on the axis.                                | *required*                                                                                    |
+| `num_windows`          | `int`                         | Number of windows on the observed and windowed axes.             | *required*                                                                                    |
+| `observed_data`        | `Iterable[ObservedDataPoint]` | The calibration targets to report alongside the run.             | `()`                                                                                          |
+| `accumulators`         | `Iterable[str]`               | Accumulator ids to report.                                       | `()`                                                                                          |
+| `ensemble_runs`        | \`Sequence[SimulationResults] | Predictive                                                       | None\`                                                                                        |
+| `confidence_level`     | \`float                       | None\`                                                           | Confidence level of the reported intervals.                                                   |
+| `prediction_intervals` | \`PredictionIntervals         | None\`                                                           | Prediction intervals of a conformal method (ConformalResult.intervals), reported as they are. |
 
 Returns:
 
-| Type               | Description                             |
-| ------------------ | --------------------------------------- |
-| `SimulationReport` | Keys observed, series and accumulators. |
+| Type               | Description                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| `SimulationReport` | Keys observed, series and accumulators, then prediction_intervals when they are given. |
 
 Raises:
 
@@ -189,6 +190,7 @@ def simulation_report(
     accumulators: Iterable[str] = (),
     ensemble_runs: "Sequence[SimulationResults] | Predictive | None" = None,
     confidence_level: float | None = None,
+    prediction_intervals: PredictionIntervals | None = None,
 ) -> SimulationReport:
     """
     Report the observed data, compartment series and accumulators of a run.
@@ -223,11 +225,15 @@ def simulation_report(
         engine, or a `Predictive`, whose draws carry their weights.
     confidence_level : float | None, optional
         Confidence level of the reported intervals.
+    prediction_intervals : PredictionIntervals | None, optional
+        Prediction intervals of a conformal method
+        (``ConformalResult.intervals``), reported as they are.
 
     Returns
     -------
     SimulationReport
-        Keys ``observed``, ``series`` and ``accumulators``.
+        Keys ``observed``, ``series`` and ``accumulators``, then
+        ``prediction_intervals`` when they are given.
 
     Raises
     ------
@@ -235,7 +241,7 @@ def simulation_report(
         If the results have no value at a position the report reads.
     """
     accumulator_ids = list(accumulators)
-    return {
+    report: SimulationReport = {
         "observed": observed_report(observed_data, window, num_windows),
         "series": series_report(
             simulation,
@@ -256,6 +262,11 @@ def simulation_report(
             confidence_level,
         ),
     }
+    if prediction_intervals is not None:
+        report["prediction_intervals"] = cast(
+            "PredictionIntervalsReport", prediction_intervals.model_dump()
+        )
+    return report
 ```
 
 ## identifiability_report

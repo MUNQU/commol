@@ -1286,6 +1286,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2360,6 +2388,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#conformal-variants-share-one-score-and-one-quantile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conformal variants share one score and one quantile
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2879,6 +2918,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#conformal-variants-share-one-score-and-one-quantile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conformal variants share one score and one quantile
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3120,6 +3170,53 @@ has residuals of.</p>
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_resampling.rs::residual_noise_rejects_a_series_with_no_residuals</code>,
 <code>tests/uncertainty/test_resampling.py::TestResidualNoise</code>.</p>
+<h2 id="conformal-variants-share-one-score-and-one-quantile">Conformal variants share one score and one quantile<a class="headerlink" href="#conformal-variants-share-one-score-and-one-quantile" title="Permanent link">&para;</a></h2>
+<p>A conformal variant only chooses which predictions and which held-out values
+feed a <code>NonconformityScore</code>; the score, its scale and the quantile
+<code>⌈(n + 1)(1 − α)⌉</code> live once (<code>crates/commol-inference/src/conformal/score.rs</code>,
+<code>quantile.rs</code>). <code>score</code>, <code>by</code> and <code>level</code> are required in every variant, and
+<code>check_conformal_settings</code> rejects in Rust <code>"normalized"</code> per series. A horizon
+of <code>RollingConformal</code> is a count of observations after the origin. <code>EnbPI</code>
+draws its own block counts through <code>ReplicateRunner::fit_one</code>, and
+<code>AdaptiveConformal</code> keeps its state in Rust (<code>AdaptiveLevel</code>) and returns the
+same <code>ConformalResult</code> as every variant.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A default score or pooling</td>
+<td>The choice sets the pattern of the widths, a modelling choice.</td>
+</tr>
+<tr>
+<td><code>"normalized"</code> per series</td>
+<td>Its factor is one constant per series, so its intervals equal those of <code>"absolute"</code>.</td>
+</tr>
+<tr>
+<td>A horizon as a distance on the axis</td>
+<td>Positions are <code>f64</code> and can be irregular, so each point would have its own horizon and an unbounded interval.</td>
+</tr>
+<tr>
+<td>A <code>CVPlus</code> class</td>
+<td>Blocks of consecutive positions make the folds of CV+, so it is jackknife+ with a longer <code>block_length</code>.</td>
+</tr>
+<tr>
+<td>EnbPI on a <code>BootstrapResult</code></td>
+<td>No bootstrap leaves a block out, so no replicate gives a leave-one-out prediction.</td>
+</tr>
+<tr>
+<td>A mutable Python <code>AdaptiveConformal</code></td>
+<td>Configurations are frozen, and every variant returns one result type.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_conformal.rs</code>,
+<code>tests/uncertainty/test_conformal.py</code>, the studies of
+<code>tests/uncertainty/test_coverage.py</code>.</p>
 
 
 

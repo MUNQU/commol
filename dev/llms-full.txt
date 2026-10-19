@@ -2706,16 +2706,17 @@ plotter.plot_series(
 )
 ```
 
-| Argument                                  | Default                                        | Meaning                                                                                                                                                                                                                                                                                                              |
-| ----------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `output_file`                             | `None`                                         | Where to save the figure. `None` only returns it.                                                                                                                                                                                                                                                                    |
-| `series`                                  | `None` (every output)                          | What to plot, one subplot each: an output name (`B_g1`) or a bin or accumulator id (`B`), which plots the sum of its outputs (`Simulation.outputs_for`). An exact output name wins. An unknown entry raises `ValueError`.                                                                                            |
-| `observed_data`                           | `None`                                         | `ObservedDataPoint`s to draw on the subplot of their `label`, at their positions (a differential model may observe between integers). An observation with a `window` draws the windowed line, which reads the results at every window end and start (`ValueError` when the results do not hold one).                 |
-| `calibration_result`                      | `None`                                         | A `CalibrationResult` gives the factor values that scale the model. A [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive) draws the weighted median of its draws and their band of `confidence_level`, each draw read through the observation operator (sums, windows, factors). |
-| `config`                                  | `PlotConfig()`                                 | Figure size, dpi, layout and seaborn style.                                                                                                                                                                                                                                                                          |
-| `show_legend`                             | `True`                                         | `plot_series` only.                                                                                                                                                                                                                                                                                                  |
-| `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot_series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`.                                                                                                                                                                                                                    |
-| other keyword arguments                   | —                                              | Passed to `seaborn.lineplot`, such as `linewidth` or `alpha`.                                                                                                                                                                                                                                                        |
+| Argument                                  | Default                                        | Meaning                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`                             | `None`                                         | Where to save the figure. `None` only returns it.                                                                                                                                                                                                                                                                         |
+| `series`                                  | `None` (every output)                          | What to plot, one subplot each: an output name (`B_g1`) or a bin or accumulator id (`B`), which plots the sum of its outputs (`Simulation.outputs_for`). An exact output name wins. An unknown entry raises `ValueError`.                                                                                                 |
+| `observed_data`                           | `None`                                         | `ObservedDataPoint`s to draw on the subplot of their `label`, at their positions (a differential model may observe between integers). An observation with a `window` draws the windowed line, which reads the results at every window end and start (`ValueError` when the results do not hold one).                      |
+| `calibration_result`                      | `None`                                         | A `CalibrationResult` gives the factor values that scale the model. A [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive) draws the weighted median of its draws and their band of `confidence_level`, each draw read through the observation operator (sums, windows, factors).      |
+| `prediction_intervals`                    | `None`                                         | `plot_series` only. The `PredictionIntervals` of a [conformal method](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md): the subplot of each of their series, by label, shows the band from `lower` to `upper` and the point prediction, dashed. An unbounded interval is left out of the band. |
+| `config`                                  | `PlotConfig()`                                 | Figure size, dpi, layout and seaborn style.                                                                                                                                                                                                                                                                               |
+| `show_legend`                             | `True`                                         | `plot_series` only.                                                                                                                                                                                                                                                                                                       |
+| `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot_series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`.                                                                                                                                                                                                                         |
+| other keyword arguments                   | —                                              | Passed to `seaborn.lineplot`, such as `linewidth` or `alpha`.                                                                                                                                                                                                                                                             |
 
 | `PlotConfig` field | Default            | Values                                                      |
 | ------------------ | ------------------ | ----------------------------------------------------------- |
@@ -3977,22 +3978,27 @@ A calibration gives one set of parameters. This section shows how far you can tr
 
 ## A band of the model, or a prediction interval
 
-A **band of the model** is the spread of the model's output across the draws of the parameters. It says where the model curve lies, not where the next observation will fall: an observation also carries measurement noise. A **prediction interval** adds that noise to every draw before it reduces them (the `ObservationNoise` port of `commol-inference`). Every reader of observations takes the noise as an argument with no default: `NoNoise()` gives a band of the model, and `ResidualNoise(...)` adds residuals of a fit, which gives a prediction interval with no noise model ([Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)). Comparing a band of the model with data underestimates the spread, so its coverage of the data is below its level.
+A **band of the model** is the spread of the model's output across the draws of the parameters. It says where the model curve lies, not where the next observation will fall: an observation also carries measurement noise. A **prediction interval** adds that noise to every draw before it reduces them (the `ObservationNoise` port of `commol-inference`). Every reader of observations takes the noise as an argument with no default: `NoNoise()` gives a band of the model, and `ResidualNoise(...)` adds residuals of a fit, which gives a prediction interval with no noise model ([Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)). Comparing a band of the model with data underestimates the spread, so its coverage of the data is below its level. A [conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) interval is a prediction interval with a coverage guarantee, from the scores of observations the fit did not use.
 
 ## Which method answers which question
 
-| Method                                     | Question                                                                             | Needs a noise model | Page                                                                                                        |
-| ------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Several starts, `Calibrator.run(starts=n)` | Which parameters fit the data: distinct ends with equal losses                       | No                  | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)            |
-| `StructuralRank`                           | Which parameters any data of this design can determine, and which combinations       | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#structural-rank) |
-| `Collinearity`                             | Which parameters can be fitted together                                              | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#collinearity)    |
-| `SampleIdentifiability`                    | Which parameters a sample determines: contraction, correlations, modes               | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)        |
-| `StartsIdentifiability`                    | Which parameters differ between starts of equal loss                                 | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)          |
-| `BayesianBootstrap`                        | How far the parameters move when the data are reweighted by blocks                   | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#bayesian-bootstrap)        |
-| `ResidualBootstrap`                        | How far the parameters move when the residuals of the fit are resampled by blocks    | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#residual-block-bootstrap)  |
-| `WildBootstrap`                            | The same, when the size of the noise changes along the series                        | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#wild-block-bootstrap)      |
-| `BlockJackknife`                           | The standard error and bias of each parameter, and which block of data moves it most | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#block-jackknife)           |
-| `ResidualNoise`                            | Where the next observations fall: a prediction interval                              | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)      |
+| Method                                     | Question                                                                             | Needs a noise model | Page                                                                                                         |
+| ------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Several starts, `Calibrator.run(starts=n)` | Which parameters fit the data: distinct ends with equal losses                       | No                  | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)             |
+| `StructuralRank`                           | Which parameters any data of this design can determine, and which combinations       | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#structural-rank)  |
+| `Collinearity`                             | Which parameters can be fitted together                                              | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#collinearity)     |
+| `SampleIdentifiability`                    | Which parameters a sample determines: contraction, correlations, modes               | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)         |
+| `StartsIdentifiability`                    | Which parameters differ between starts of equal loss                                 | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)           |
+| `BayesianBootstrap`                        | How far the parameters move when the data are reweighted by blocks                   | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#bayesian-bootstrap)         |
+| `ResidualBootstrap`                        | How far the parameters move when the residuals of the fit are resampled by blocks    | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#residual-block-bootstrap)   |
+| `WildBootstrap`                            | The same, when the size of the noise changes along the series                        | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#wild-block-bootstrap)       |
+| `BlockJackknife`                           | The standard error and bias of each parameter, and which block of data moves it most | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#block-jackknife)            |
+| `ResidualNoise`                            | Where the next observations fall: a prediction interval                              | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)       |
+| `SplitConformal`                           | Where new observations fall, with a guaranteed coverage, from held-out observations  | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#split-conformal)              |
+| `RollingConformal`                         | Where the next observations fall at each horizon ahead of the data                   | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#rolling-origins)              |
+| `JackknifePlus`                            | Where new observations fall, with a guaranteed coverage and no held-out data         | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#jackknife)                    |
+| `EnbPI`                                    | Where the next observations of a series with dependent errors fall                   | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#enbpi)                        |
+| `AdaptiveConformal`                        | Intervals for observations as they arrive, whose share of misses tends to its level  | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#adaptive-conformal-inference) |
 
 Each uncertainty method adds its row here when it lands.
 
@@ -4161,13 +4167,14 @@ print(type(result).__name__, len(result.sample))  # BootstrapResult 20
 
 ## Next steps
 
-| To learn                                                               | Read                                                                                                |
-| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Bootstraps, the jackknife and prediction intervals with no noise model | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md)           |
-| Several starts of an optimizer                                         | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)    |
-| Which parameters the data determine                                    | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) |
-| Reports of a sample                                                    | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                             |
-| Plots of a predictive                                                  | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/#plotting)            |
+| To learn                                                               | Read                                                                                                         |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Bootstraps, the jackknife and prediction intervals with no noise model | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md)                    |
+| Prediction intervals with a coverage guarantee                         | [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) |
+| Several starts of an optimizer                                         | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)             |
+| Which parameters the data determine                                    | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md)          |
+| Reports of a sample                                                    | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                      |
+| Plots of a predictive                                                  | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/#plotting)                     |
 
 # Identifiability
 
@@ -4614,6 +4621,269 @@ A block bootstrap reads the dependence of the noise from few blocks. On a short 
 | The parameter sample, the predictive and the scores | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)           |
 | The settings of the optimizer each replicate runs   | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md) |
 
+# Conformal Prediction Intervals
+
+[Back to Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)
+
+Conformal prediction gives intervals for observations, with a coverage guarantee that needs no noise model, no prior and no correct model. It answers "will the next observations fall inside?", not "which parameters fit?". Each variant scores how far observations the fit did not use fall from their predictions, and a quantile of those scores sets the width of every interval. Use it when you must state how often new data fall inside an interval, and you cannot or will not say how the data scatter around the model. Every variant runs through `Calibrator.uncertainty`, in Rust (`crates/commol-inference/src/conformal/`).
+
+## Quick path
+
+```python
+import numpy as np
+
+from commol import (
+    Aggregate,
+    CalibrationParameter,
+    CalibrationProblem,
+    Calibrator,
+    ModelBuilder,
+    NelderMeadConfig,
+    ObservedDataPoint,
+    Simulation,
+    SplitConformal,
+)
+
+
+def ab_model(k: float | None):
+    return (
+        ModelBuilder(name="AB")
+        .add_bin(id="A", name="A")
+        .add_bin(id="B", name="B")
+        .add_parameter(id="k", value=k)
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
+        .build(
+            Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}),
+            engine="DifferenceEquations",
+        )
+    )
+
+
+# Noisy data of B at steps 1 to 80: fit steps 1 to 40, hold out 41 to 80.
+truth = Simulation(ab_model(0.05)).run(num_steps=90)
+rng = np.random.default_rng(1)
+observations = [
+    ObservedDataPoint(at=step, output="B", value=truth["B"][step] + rng.normal(0.0, 5.0))
+    for step in range(1, 81)
+]
+fitted = [point for point in observations if point.at <= 40]
+held_out = [point for point in observations if point.at > 40]
+
+problem = CalibrationProblem(
+    observed_data=fitted,
+    parameters=[
+        CalibrationParameter(id="k", parameter_type="parameter", min_bound=0.0, max_bound=0.5)
+    ],
+    loss_function="sse",
+    optimization_config=NelderMeadConfig(max_iterations=500),
+    seed=42,
+)
+calibrator = Calibrator(Simulation(ab_model(None)), problem)
+
+result = calibrator.uncertainty(
+    SplitConformal(
+        calibration_data=held_out,
+        score="absolute",
+        by="series",
+        level=0.9,
+        positions=[85.0, 90.0],
+    )
+)
+intervals = result.intervals.series["B"]
+print([round(value, 1) for value in intervals.lower])  # [981.0, 983.9]
+print([round(value, 1) for value in intervals.upper])  # [993.4, 996.3]
+print(result.guarantee)
+```
+
+`result.intervals` holds the intervals of each series at `positions`, `result.scores` the scores they came from, and `result.guarantee` what the coverage claim assumes.
+
+## What the guarantee means
+
+A conformal interval of level `1 − α` covers a **new observation** with probability at least `1 − α`, averaged over the data and the new observation.
+
+| It says                                                                      | It does not say                                                                 |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Of many new observations, at least a share `1 − α` falls inside its interval | That one interval holds its observation with probability `1 − α` given the data |
+| The claim holds whatever the noise, and even when the model is wrong         | That the interval contains the model curve or the true parameters               |
+| A wrong model gives wide intervals, not wrong ones                           | That the intervals are narrow                                                   |
+
+The claim holds when the scores are **exchangeable**: any order of the scores of the held-out and the new observations is as likely as any other. Noise that is independent and of one distribution along the series is exchangeable; a trend in the errors, a change of regime, or errors that depend on each other are not. Each variant names its assumption in `result.guarantee`.
+
+The quantile of `n` scores at level `1 − α` is the `⌈(n + 1)(1 − α)⌉`-th smallest (`conformal_quantile` in `crates/commol-inference/src/conformal/quantile.rs`). With fewer than `1/α − 1` scores that rank is above `n`, so the interval is unbounded: `-inf` to `inf`. `result.intervals.unbounded` names the positions of each series where that happens. At level 0.9 a quantile needs 9 scores.
+
+## Scores and pooling
+
+Every variant takes a `score`, a `by` and a `level`, none with a default: they change the width of the intervals, which is a modelling choice.
+
+| `score`        | Score of `y` against `ŷ` | Interval | Use it when                                                                              |
+| -------------- | ------------------------ | -------- | ---------------------------------------------------------------------------------------- |
+| `"absolute"`   | \`                       | y − ŷ    | \`                                                                                       |
+| `"normalized"` | \`                       | y − ŷ    | / s`, with `s\` the root mean square of the observed values of the series in the problem |
+| `"spread"`     | \`                       | y − ŷ    | / σ̂`, with `σ̂\` the spread of the predictions at that point                              |
+
+`by="series"` gives each series (observation label) its own quantile; `by="all"` gives every series one quantile. Per series is the safer first choice: a small series does not borrow the errors of a large one, but it needs `1/α − 1` scores of its own.
+
+- `score="normalized"` with `by="series"` raises a `ValueError`: its factor is one constant per series, so its intervals equal those of `"absolute"`.
+- `score="spread"` needs predictions with a spread. `SplitConformal` and `AdaptiveConformal` take it from a `sample`, whose predictive gives the prediction (its weighted median) and the spread (its weighted standard deviation); without one they raise a `ValueError`. `JackknifePlus` and `EnbPI` take it from their own refits. `RollingConformal` fits once per origin, so it rejects `"spread"`.
+
+```python
+from commol import ParameterSample, SampleMethod
+
+sample = ParameterSample.equally_weighted(
+    names=["k"],
+    bounds=[(0.0, 0.5)],
+    values=[[0.048], [0.05], [0.052]],
+    method=SampleMethod(name="by hand"),
+)
+spread = calibrator.uncertainty(
+    SplitConformal(
+        calibration_data=held_out,
+        score="spread",
+        by="series",
+        level=0.9,
+        positions=[85.0, 90.0],
+        sample=sample,
+    )
+)
+widths = [
+    round(upper - lower, 1)
+    for lower, upper in zip(spread.intervals.series["B"].lower, spread.intervals.series["B"].upper)
+]
+print(widths)  # [6.3, 5.2]
+```
+
+## Which variant to use
+
+| Variant             | Held-out data                               | Fits           | Guarantee                                                                                               | Use it for                                                         |
+| ------------------- | ------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `SplitConformal`    | `calibration_data`                          | One            | At least `1 − α`, exchangeable scores                                                                   | Many observations, some of which you can leave out of the fit      |
+| `RollingConformal`  | None: each origin holds out what follows it | One per origin | At least `1 − α` per horizon, scores of a horizon exchangeable across origins                           | Forecasts: intervals ahead of the data that widen with the horizon |
+| `JackknifePlus`     | None                                        | One per block  | At least `1 − 2α` with one observation per block; the CV+ bound with longer blocks; exchangeable blocks | Short series, where no data can be spared                          |
+| `EnbPI`             | None                                        | `replicates`   | Near `1 − α`, approximately, under stationary and strongly mixing errors                                | Time series with dependent errors                                  |
+| `AdaptiveConformal` | The `stream` of new observations            | One            | The long-run share of misses tends to `α`, with no assumption                                           | Data that arrive one by one and can change regime                  |
+
+## How to hold data out
+
+| Variant                  | What to hold out                                                                                                                                                                                                                               |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SplitConformal`         | Pass the problem the observations to fit, and `calibration_data` the rest. For a forecast, hold out the latest positions, as in the quick path, so the scores measure errors ahead of the fit. The held-out points must not be in the problem. |
+| `RollingConformal`       | Nothing: give `origins`. Each fits the observations at or before it and scores the later ones, so the problem holds every observation.                                                                                                         |
+| `JackknifePlus`, `EnbPI` | Nothing: they leave blocks out of their own refits. A block holds every observation of every series at `block_length` consecutive positions, so dependence stays inside a block.                                                               |
+| `AdaptiveConformal`      | The observations that arrive after the fit, in `stream`.                                                                                                                                                                                       |
+
+## Split conformal
+
+`SplitConformal(calibration_data, score, by, level, positions, sample=None, starts=1)` fits the problem's observations (`Calibrator.run(starts)`), or reads a `sample`, scores `calibration_data` and gives intervals at `positions` for each series of `calibration_data`. A series of `calibration_data` is read as its observations define it: its outputs, factor and window.
+
+## Rolling origins
+
+`RollingConformal(origins, score, by, level, positions, starts=1)` gives intervals ahead of the data, with one quantile per horizon. Horizon `k` is the `k`-th observation of a series after an origin: a count, not a distance on the axis, because positions can be irregular. Each origin fits the observations at or before it (one refit per origin, from the fit of every observation) and scores the later ones. The intervals are around the fit of every observation, at `positions`, which must all be after the data; the `k`-th position is horizon `k`, so give positions spaced as the observations. A horizon with fewer than `1/α − 1` origins that reach it has an unbounded interval.
+
+```python
+from commol import RollingConformal
+
+every_point = CalibrationProblem(
+    observed_data=observations,
+    parameters=problem.parameters,
+    loss_function="sse",
+    optimization_config=NelderMeadConfig(max_iterations=500),
+    seed=42,
+)
+calibrator_all = Calibrator(Simulation(ab_model(None)), every_point)
+rolling = calibrator_all.uncertainty(
+    RollingConformal(
+        origins=[float(step) for step in range(30, 71)],
+        score="absolute",
+        by="series",
+        level=0.8,
+        positions=[81.0, 82.0, 83.0],
+    )
+)
+print(rolling.intervals.unbounded)  # {}
+```
+
+## Jackknife+
+
+`JackknifePlus(block_length, score, by, level, positions, starts=1)` refits once per block left out (Barber et al. 2021). Observation `i` of block `b` has the residual `Rᵢ` of the fit `μ̂₋ᵦ` that left its block out, and the interval at a point `x` is
+
+```text
+[ q⁻_α { μ̂₋ᵦ₍ᵢ₎(x) − Rᵢ } ,  q⁺_{1−α} { μ̂₋ᵦ₍ᵢ₎(x) + Rᵢ } ]
+```
+
+where `q⁺` is the `⌈(1 − α)(n + 1)⌉`-th smallest value and `q⁻` the `⌊α(n + 1)⌋`-th smallest. The guarantee holds with no held-out set, under exchangeable blocks. With `n` scored observations in `K` blocks it is the bound of K-fold CV+ (Theorem 4):
+
+```text
+1 − 2α − min{ 2(1 − 1/K) / (n/K + 1),  (1 − K/n) / (K + 1) }
+```
+
+With one observation per block, `K = n` and the bound is `1 − 2α`. With longer blocks, jackknife+ is CV+ with the blocks as folds, so CV+ has no class of its own. The theorem assumes blocks of `n/K` observations each. `cv_plus_bound` in `crates/commol-inference/src/conformal/jackknife_plus.rs` computes it, and `result.guarantee` states it.
+
+```python
+from commol import JackknifePlus
+
+jackknife = calibrator.uncertainty(
+    JackknifePlus(block_length=4, score="absolute", by="series", level=0.9, positions=[45.0])
+)
+print(jackknife.guarantee)  # ... at least 0.7318 ... with K = 10 blocks of 4 positions ...
+```
+
+## EnbPI
+
+`EnbPI(replicates, block_length, score, by, level, positions, starts=1)` draws its own replicates (Xu and Xie 2021): each draws as many blocks as there are, with replacement, and fits with each observation's weight multiplied by the count of its block, so the blocks it did not draw get weight 0. The leave-one-out prediction of an observation is the mean of the replicates that left its block out; the point prediction at a position is the mean of the leave-one-out predictions there. No fit beyond the replicates is needed. A block left out by no replicate raises a `ValueError` that asks for more replicates: a block is left out by a replicate with probability about `1/e ≈ 0.37`.
+
+## Adaptive conformal inference
+
+`AdaptiveConformal(level, step, score, by, stream, sample=None, starts=1)` walks the observations of `stream` in order of position (Gibbs and Candès 2021). The interval of each point is the quantile, at the working level `1 − α_t`, of the scores of the earlier points of the stream; then the point is scored and the working level moves:
+
+```text
+α_{t+1} = α_t + γ (α − err_t),   err_t = 1 for a miss, 0 for a cover
+```
+
+So a miss widens the next interval and a cover narrows it. The long-run share of misses tends to `α` whatever the data. `by="series"` keeps one working level per series, `by="all"` one for all. The first points have few earlier scores, so their intervals are unbounded. `result.intervals` holds the interval given at each point before it was seen.
+
+```python
+from commol import AdaptiveConformal
+
+adaptive = calibrator.uncertainty(
+    AdaptiveConformal(level=0.9, step=0.05, score="absolute", by="series", stream=held_out)
+)
+series = adaptive.intervals.series["B"]
+misses = [
+    not lower <= point.value <= upper
+    for lower, upper, point in zip(series.lower, series.upper, held_out)
+]
+print(len(adaptive.intervals.unbounded["B"]))  # 7
+print(round(sum(misses) / len(misses), 3))  # 0.125
+```
+
+## Results, plots and reports
+
+Every variant returns a `ConformalResult(intervals, scores, guarantee)`. `intervals` is a `PredictionIntervals`: its `level`, a `SeriesIntervals` per series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`. `SimulationPlotter.plot_series(prediction_intervals=...)` draws the band of each series on its subplot, and `simulation_report(..., prediction_intervals=...)` adds it under the key `prediction_intervals`.
+
+```python
+from commol.api.plotter import SimulationPlotter
+
+run = Simulation(ab_model(0.05)).run(num_steps=90)
+figure = SimulationPlotter(Simulation(ab_model(0.05)), run).plot_series(
+    observed_data=observations, prediction_intervals=result.intervals, series=["B"]
+)
+```
+
+## Checklist
+
+- [ ] The held-out observations are not in the problem, and come from where the new observations will.
+- [ ] Each quantile has at least `1/α − 1` scores; `result.intervals.unbounded` is empty.
+- [ ] The assumption in `result.guarantee` fits your data: exchangeable scores, mixing errors, or none.
+- [ ] For a forecast, you use `RollingConformal`, `EnbPI` or `AdaptiveConformal`, not one split of errors one step ahead.
+
+## Next steps
+
+| To learn                                                                         | Read                                                                                                                                                                                   |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prediction intervals from the residuals of a fit, and the scores of a predictive | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals), [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/#scores) |
+| Bootstraps and the jackknife of the parameters                                   | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md)                                                                                              |
+| Plots                                                                            | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/#plotting)                                                                                               |
+
 # Reports
 
 [Back to Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)
@@ -4752,8 +5022,9 @@ The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `g
 | `observed_data`                     | The observations to report next to the run.                                                                                                                                                                                                                                                                                                                               |
 | `accumulators`                      | The accumulator ids to report.                                                                                                                                                                                                                                                                                                                                            |
 | `ensemble_runs`, `confidence_level` | The `SimulationReplicates` of a stochastic engine, one `SimulationResults` per member, or a [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive), whose draws carry their weights. Every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block, reduced member by member with the weights; the layout does not change. |
+| `prediction_intervals`              | The `PredictionIntervals` of a [conformal method](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) (`ConformalResult.intervals`). The report gains a last block, `prediction_intervals`: its `level`, `series` (by label: `positions`, `prediction`, `lower`, `upper`) and `unbounded`.                                                        |
 
-The report holds only these blocks. Add your own envelope around them, such as a run label or summary figures in your domain's terms:
+The report holds only these blocks, and `prediction_intervals` when it is given. Add your own envelope around them, such as a run label or summary figures in your domain's terms:
 
 ```python
 document = {"kind": "calibration", "at": ends, **run_report}
@@ -16420,6 +16691,7 @@ class SimulationPlotter:
         position_label: Callable[[float], str] | None = None,
         tick_every: float | None = None,
         x_label: str = "Step",
+        prediction_intervals: PredictionIntervals | None = None,
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
         """
@@ -16466,6 +16738,12 @@ class SimulationPlotter:
             plotted position.
         x_label : str
             The x-axis label. Default "Step".
+        prediction_intervals : PredictionIntervals | None
+            Prediction intervals of a conformal method
+            (``ConformalResult.intervals``). The subplot of each of their
+            series, by label, shows the band between their lower and upper
+            ends and their point prediction; an unbounded interval is left
+            out of the band.
         **kwargs : str | int | float | bool | None
             Additional keyword arguments passed to seaborn.lineplot().
             Common parameters: linewidth, alpha, linestyle, marker, etc.
@@ -16504,6 +16782,11 @@ class SimulationPlotter:
             tick_every,
             x_label,
         )
+        if prediction_intervals is not None:
+            for ax, bin_id in zip(axes, bins_to_plot, strict=False):
+                self._plot_prediction_intervals(
+                    ax, bin_id, prediction_intervals, show_legend
+                )
         self._finalize_plot(axes, bins_to_plot, output_file, config, "Series")
 
         return fig
@@ -16860,6 +17143,38 @@ class SimulationPlotter:
                     tick_every,
                     x_label,
                 )
+
+    @staticmethod
+    def _plot_prediction_intervals(
+        ax: "Axes",
+        series_id: str,
+        intervals: PredictionIntervals,
+        show_legend: bool,
+    ) -> None:
+        """
+        The band of the prediction intervals of one series and its point
+        prediction, when the intervals have the series.
+        """
+        series = intervals.series.get(series_id)
+        if series is None:
+            return
+        bounded = [
+            (at, lower, upper)
+            for at, lower, upper in zip(
+                series.positions, series.lower, series.upper, strict=True
+            )
+            if math.isfinite(lower) and math.isfinite(upper)
+        ]
+        ax.fill_between(
+            [at for at, _, _ in bounded],
+            [lower for _, lower, _ in bounded],
+            [upper for _, _, upper in bounded],
+            alpha=0.3,
+            label=f"{intervals.level:.0%} prediction interval",
+        )
+        ax.plot(series.positions, series.prediction, linestyle="--", label="Prediction")
+        if show_legend:
+            ax.legend()
 
     @staticmethod
     def _finalize_plot(
@@ -17331,7 +17646,7 @@ def __init__(
 #### plot_series
 
 ```python
-plot_series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | Predictive | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', **kwargs: str | int | float | bool | None) -> Figure
+plot_series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | Predictive | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', prediction_intervals: PredictionIntervals | None = None, **kwargs: str | int | float | bool | None) -> Figure
 ```
 
 Plot simulation results with one subplot per series.
@@ -17340,18 +17655,19 @@ Creates a figure with subplots arranged in a grid, where each subplot shows the 
 
 Parameters:
 
-| Name                 | Type                       | Description                                               | Default                                                                                                                                                                                                                                              |
-| -------------------- | -------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `output_file`        | \`str                      | None\`                                                    | Path to save the figure. If None, figure is not saved (only returned).                                                                                                                                                                               |
-| `observed_data`      | \`list[ObservedDataPoint]  | None\`                                                    | Optional observed data points to overlay on corresponding bin subplots. Model predictions with a factor_id will be scaled for plotting using factor values from the calibration_result, so observed values remain in their original units.           |
-| `calibration_result` | \`CalibrationResult        | Predictive                                                | None\`                                                                                                                                                                                                                                               |
-| `config`             | \`PlotConfig               | None\`                                                    | Configuration for plot layout and styling (figsize, dpi, layout, style, palette, context). If None, uses defaults.                                                                                                                                   |
-| `series`             | \`list[str]                | None\`                                                    | What to plot, one subplot each. An entry is an output name (an expanded compartment or accumulator, such as A_g1) or a bin or accumulator id, which plots the sum of its outputs. An exact output name wins over an id. If None, plots every output. |
-| `show_legend`        | `bool`                     | Whether to show the legend on each subplot. Default True. | `True`                                                                                                                                                                                                                                               |
-| `position_label`     | \`Callable\[[float], str\] | None\`                                                    | Turns a position on the axis into an x-axis tick label, such as a date. If None, the ticks show the position.                                                                                                                                        |
-| `tick_every`         | \`float                    | None\`                                                    | Labels the plotted positions tick_every apart on the axis, counted from the first plotted position. If None, labels every plotted position.                                                                                                          |
-| `x_label`            | `str`                      | The x-axis label. Default "Step".                         | `'Step'`                                                                                                                                                                                                                                             |
-| `**kwargs`           | \`str                      | int                                                       | float                                                                                                                                                                                                                                                |
+| Name                   | Type                       | Description                                               | Default                                                                                                                                                                                                                                              |
+| ---------------------- | -------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`          | \`str                      | None\`                                                    | Path to save the figure. If None, figure is not saved (only returned).                                                                                                                                                                               |
+| `observed_data`        | \`list[ObservedDataPoint]  | None\`                                                    | Optional observed data points to overlay on corresponding bin subplots. Model predictions with a factor_id will be scaled for plotting using factor values from the calibration_result, so observed values remain in their original units.           |
+| `calibration_result`   | \`CalibrationResult        | Predictive                                                | None\`                                                                                                                                                                                                                                               |
+| `config`               | \`PlotConfig               | None\`                                                    | Configuration for plot layout and styling (figsize, dpi, layout, style, palette, context). If None, uses defaults.                                                                                                                                   |
+| `series`               | \`list[str]                | None\`                                                    | What to plot, one subplot each. An entry is an output name (an expanded compartment or accumulator, such as A_g1) or a bin or accumulator id, which plots the sum of its outputs. An exact output name wins over an id. If None, plots every output. |
+| `show_legend`          | `bool`                     | Whether to show the legend on each subplot. Default True. | `True`                                                                                                                                                                                                                                               |
+| `position_label`       | \`Callable\[[float], str\] | None\`                                                    | Turns a position on the axis into an x-axis tick label, such as a date. If None, the ticks show the position.                                                                                                                                        |
+| `tick_every`           | \`float                    | None\`                                                    | Labels the plotted positions tick_every apart on the axis, counted from the first plotted position. If None, labels every plotted position.                                                                                                          |
+| `x_label`              | `str`                      | The x-axis label. Default "Step".                         | `'Step'`                                                                                                                                                                                                                                             |
+| `prediction_intervals` | \`PredictionIntervals      | None\`                                                    | Prediction intervals of a conformal method (ConformalResult.intervals). The subplot of each of their series, by label, shows the band between their lower and upper ends and their point prediction; an unbounded interval is left out of the band.  |
+| `**kwargs`             | \`str                      | int                                                       | float                                                                                                                                                                                                                                                |
 
 Returns:
 
@@ -17379,6 +17695,7 @@ def plot_series(
     position_label: Callable[[float], str] | None = None,
     tick_every: float | None = None,
     x_label: str = "Step",
+    prediction_intervals: PredictionIntervals | None = None,
     **kwargs: str | int | float | bool | None,
 ) -> "Figure":
     """
@@ -17425,6 +17742,12 @@ def plot_series(
         plotted position.
     x_label : str
         The x-axis label. Default "Step".
+    prediction_intervals : PredictionIntervals | None
+        Prediction intervals of a conformal method
+        (``ConformalResult.intervals``). The subplot of each of their
+        series, by label, shows the band between their lower and upper
+        ends and their point prediction; an unbounded interval is left
+        out of the band.
     **kwargs : str | int | float | bool | None
         Additional keyword arguments passed to seaborn.lineplot().
         Common parameters: linewidth, alpha, linestyle, marker, etc.
@@ -17463,6 +17786,11 @@ def plot_series(
         tick_every,
         x_label,
     )
+    if prediction_intervals is not None:
+        for ax, bin_id in zip(axes, bins_to_plot, strict=False):
+            self._plot_prediction_intervals(
+                ax, bin_id, prediction_intervals, show_legend
+            )
     self._finalize_plot(axes, bins_to_plot, output_file, config, "Series")
 
     return fig
@@ -18000,7 +18328,7 @@ def applied_parameters_report(
 ## simulation_report
 
 ```python
-simulation_report(simulation: Simulation, results: SimulationResults, at: Sequence[float], window: float, num_windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), ensemble_runs: Sequence[SimulationResults] | Predictive | None = None, confidence_level: float | None = None) -> SimulationReport
+simulation_report(simulation: Simulation, results: SimulationResults, at: Sequence[float], window: float, num_windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), ensemble_runs: Sequence[SimulationResults] | Predictive | None = None, confidence_level: float | None = None, prediction_intervals: PredictionIntervals | None = None) -> SimulationReport
 ```
 
 Report the observed data, compartment series and accumulators of a run.
@@ -18011,23 +18339,24 @@ Callers add whatever envelope they need around these blocks, such as a run label
 
 Parameters:
 
-| Name               | Type                          | Description                                                      | Default                                     |
-| ------------------ | ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------- |
-| `simulation`       | `Simulation`                  | The simulation the results came from.                            | *required*                                  |
-| `results`          | `SimulationResults`           | Results of a run, with their positions.                          | *required*                                  |
-| `at`               | `Sequence[float]`             | Positions the series and cumulative accumulators are sampled at. | *required*                                  |
-| `window`           | `float`                       | Length of one window on the axis.                                | *required*                                  |
-| `num_windows`      | `int`                         | Number of windows on the observed and windowed axes.             | *required*                                  |
-| `observed_data`    | `Iterable[ObservedDataPoint]` | The calibration targets to report alongside the run.             | `()`                                        |
-| `accumulators`     | `Iterable[str]`               | Accumulator ids to report.                                       | `()`                                        |
-| `ensemble_runs`    | \`Sequence[SimulationResults] | Predictive                                                       | None\`                                      |
-| `confidence_level` | \`float                       | None\`                                                           | Confidence level of the reported intervals. |
+| Name                   | Type                          | Description                                                      | Default                                                                                       |
+| ---------------------- | ----------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `simulation`           | `Simulation`                  | The simulation the results came from.                            | *required*                                                                                    |
+| `results`              | `SimulationResults`           | Results of a run, with their positions.                          | *required*                                                                                    |
+| `at`                   | `Sequence[float]`             | Positions the series and cumulative accumulators are sampled at. | *required*                                                                                    |
+| `window`               | `float`                       | Length of one window on the axis.                                | *required*                                                                                    |
+| `num_windows`          | `int`                         | Number of windows on the observed and windowed axes.             | *required*                                                                                    |
+| `observed_data`        | `Iterable[ObservedDataPoint]` | The calibration targets to report alongside the run.             | `()`                                                                                          |
+| `accumulators`         | `Iterable[str]`               | Accumulator ids to report.                                       | `()`                                                                                          |
+| `ensemble_runs`        | \`Sequence[SimulationResults] | Predictive                                                       | None\`                                                                                        |
+| `confidence_level`     | \`float                       | None\`                                                           | Confidence level of the reported intervals.                                                   |
+| `prediction_intervals` | \`PredictionIntervals         | None\`                                                           | Prediction intervals of a conformal method (ConformalResult.intervals), reported as they are. |
 
 Returns:
 
-| Type               | Description                             |
-| ------------------ | --------------------------------------- |
-| `SimulationReport` | Keys observed, series and accumulators. |
+| Type               | Description                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| `SimulationReport` | Keys observed, series and accumulators, then prediction_intervals when they are given. |
 
 Raises:
 
@@ -18048,6 +18377,7 @@ def simulation_report(
     accumulators: Iterable[str] = (),
     ensemble_runs: "Sequence[SimulationResults] | Predictive | None" = None,
     confidence_level: float | None = None,
+    prediction_intervals: PredictionIntervals | None = None,
 ) -> SimulationReport:
     """
     Report the observed data, compartment series and accumulators of a run.
@@ -18082,11 +18412,15 @@ def simulation_report(
         engine, or a `Predictive`, whose draws carry their weights.
     confidence_level : float | None, optional
         Confidence level of the reported intervals.
+    prediction_intervals : PredictionIntervals | None, optional
+        Prediction intervals of a conformal method
+        (``ConformalResult.intervals``), reported as they are.
 
     Returns
     -------
     SimulationReport
-        Keys ``observed``, ``series`` and ``accumulators``.
+        Keys ``observed``, ``series`` and ``accumulators``, then
+        ``prediction_intervals`` when they are given.
 
     Raises
     ------
@@ -18094,7 +18428,7 @@ def simulation_report(
         If the results have no value at a position the report reads.
     """
     accumulator_ids = list(accumulators)
-    return {
+    report: SimulationReport = {
         "observed": observed_report(observed_data, window, num_windows),
         "series": series_report(
             simulation,
@@ -18115,6 +18449,11 @@ def simulation_report(
             confidence_level,
         ),
     }
+    if prediction_intervals is not None:
+        report["prediction_intervals"] = cast(
+            "PredictionIntervalsReport", prediction_intervals.model_dump()
+        )
+    return report
 ```
 
 ## identifiability_report
@@ -20671,7 +21010,7 @@ def windowed_totals(
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-What every uncertainty method takes and returns: the configuration base, the weighted parameter sample, the predictive and its observation noise, the resampling methods, the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
+What every uncertainty method takes and returns: the configuration base, the weighted parameter sample, the predictive and its observation noise, the resampling and conformal methods, the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
 
 ## InferenceMethod
 
@@ -23132,6 +23471,535 @@ class BoundError(BaseModel):
 
     lower: tuple[float, float]
     upper: tuple[float, float]
+```
+
+## Conformal prediction
+
+Guide: [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md).
+
+## ConformalMethod
+
+Bases: `UncertaintyMethod[ConformalResult]`
+
+What every conformal method takes: a score, the pooling of its quantiles, and a level, none of them with a default.
+
+Attributes:
+
+| Name    | Type                             | Description                                                                                                                                    |
+| ------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `score` | `{absolute, normalized, spread}` | The nonconformity score. "normalized" needs by="all": per series its factor is one constant, so its intervals would equal those of "absolute". |
+| `by`    | `{series, all}`                  | Whether each series gets its own quantile, or all series share one.                                                                            |
+| `level` | `float`                          | The level of the intervals, strictly between 0 and 1.                                                                                          |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class ConformalMethod(UncertaintyMethod[ConformalResult]):
+    """
+    What every conformal method takes: a score, the pooling of its
+    quantiles, and a level, none of them with a default.
+
+    Attributes
+    ----------
+    score : {"absolute", "normalized", "spread"}
+        The nonconformity score. ``"normalized"`` needs ``by="all"``: per
+        series its factor is one constant, so its intervals would equal those
+        of ``"absolute"``.
+    by : {"series", "all"}
+        Whether each series gets its own quantile, or all series share one.
+    level : float
+        The level of the intervals, strictly between 0 and 1.
+    """
+
+    score: ConformalScore = Field(description="The nonconformity score.")
+    by: Pooling = Field(description="Which scores each quantile reads.")
+    level: float = Field(gt=0.0, lt=1.0, description="The level of the intervals.")
+
+    @model_validator(mode="before")
+    @classmethod
+    def check_score_and_by(cls, data: object) -> object:
+        """Check, in Rust, that `score` and `by` are given and fit together."""
+        if isinstance(data, Mapping):
+
+            def name(key: str) -> str | None:
+                value = data.get(key)
+                return None if value is None else str(value)
+
+            commol_rs.inference.check_conformal_settings(name("score"), name("by"))
+        return data
+```
+
+### Methods:
+
+#### check_score_and_by
+
+```python
+check_score_and_by(data: object) -> object
+```
+
+Check, in Rust, that `score` and `by` are given and fit together.
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+@model_validator(mode="before")
+@classmethod
+def check_score_and_by(cls, data: object) -> object:
+    """Check, in Rust, that `score` and `by` are given and fit together."""
+    if isinstance(data, Mapping):
+
+        def name(key: str) -> str | None:
+            value = data.get(key)
+            return None if value is None else str(value)
+
+        commol_rs.inference.check_conformal_settings(name("score"), name("by"))
+    return data
+```
+
+## SplitConformal
+
+Bases: `ConformalMethod`
+
+Split conformal prediction.
+
+It fits the problem's observations and scores `calibration_data`, observations held out of the fit. When the scores of the held-out and of new observations are exchangeable, each interval covers a new observation with probability at least `level`.
+
+Attributes:
+
+| Name               | Type                      | Description                                                   |
+| ------------------ | ------------------------- | ------------------------------------------------------------- |
+| `calibration_data` | `list[ObservedDataPoint]` | Held-out observations; each of their series gets intervals.   |
+| `positions`        | `list[float]`             | Where the intervals are, for each series of calibration_data. |
+| `sample`           | \`ParameterSample         | None\`                                                        |
+| `starts`           | `int`                     | Starts of the fit (default 1).                                |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class SplitConformal(ConformalMethod):
+    """
+    Split conformal prediction.
+
+    It fits the problem's observations and scores `calibration_data`,
+    observations held out of the fit. When the scores of the held-out and of
+    new observations are exchangeable, each interval covers a new
+    observation with probability at least `level`.
+
+    Attributes
+    ----------
+    calibration_data : list[ObservedDataPoint]
+        Held-out observations; each of their series gets intervals.
+    positions : list[float]
+        Where the intervals are, for each series of `calibration_data`.
+    sample : ParameterSample | None
+        None: the prediction is the fit. A sample: the prediction is the
+        weighted median of its predictive, and its weighted standard
+        deviation is the spread of ``score="spread"``.
+    starts : int
+        Starts of the fit (default 1).
+    """
+
+    calibration_data: list[ObservedDataPoint] = Field(
+        min_length=1, description="Held-out observations."
+    )
+    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    sample: ParameterSample | None = Field(
+        default=None, description="The sample whose predictive predicts."
+    )
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+
+    @model_validator(mode="after")
+    def check_spread(self) -> Self:
+        """Reject ``score="spread"`` without a sample."""
+        _no_spread_without_sample(self)
+        return self
+```
+
+### Methods:
+
+#### check_spread
+
+```python
+check_spread() -> Self
+```
+
+Reject `score="spread"` without a sample.
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+@model_validator(mode="after")
+def check_spread(self) -> Self:
+    """Reject ``score="spread"`` without a sample."""
+    _no_spread_without_sample(self)
+    return self
+```
+
+## RollingConformal
+
+Bases: `ConformalMethod`
+
+Rolling-origin conformal prediction: intervals ahead of the data, one quantile per horizon.
+
+Each origin fits the observations at or before it and scores the later ones. Horizon `k` is the `k`-th observation of a series after the origin: a count, not a distance on the axis.
+
+Attributes:
+
+| Name        | Type          | Description                                                                  |
+| ----------- | ------------- | ---------------------------------------------------------------------------- |
+| `origins`   | `list[float]` | The positions of the origins.                                                |
+| `positions` | `list[float]` | Where the intervals are, all after the data; the k-th position is horizon k. |
+| `starts`    | `int`         | Starts of each fit (default 1).                                              |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class RollingConformal(ConformalMethod):
+    """
+    Rolling-origin conformal prediction: intervals ahead of the data, one
+    quantile per horizon.
+
+    Each origin fits the observations at or before it and scores the later
+    ones. Horizon ``k`` is the ``k``-th observation of a series after the
+    origin: a count, not a distance on the axis.
+
+    Attributes
+    ----------
+    origins : list[float]
+        The positions of the origins.
+    positions : list[float]
+        Where the intervals are, all after the data; the ``k``-th position
+        is horizon ``k``.
+    starts : int
+        Starts of each fit (default 1).
+    """
+
+    origins: list[float] = Field(min_length=1, description="The origins.")
+    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    starts: int = Field(default=1, ge=1, description="Starts of each fit.")
+
+    @model_validator(mode="after")
+    def check_spread(self) -> Self:
+        """Reject ``score="spread"``: one fit per origin has no spread."""
+        if self.score == "spread":
+            raise ValueError(
+                "RollingConformal fits once per origin, so its predictions have no "
+                'spread for score="spread"; use "absolute" or "normalized"'
+            )
+        return self
+```
+
+### Methods:
+
+#### check_spread
+
+```python
+check_spread() -> Self
+```
+
+Reject `score="spread"`: one fit per origin has no spread.
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+@model_validator(mode="after")
+def check_spread(self) -> Self:
+    """Reject ``score="spread"``: one fit per origin has no spread."""
+    if self.score == "spread":
+        raise ValueError(
+            "RollingConformal fits once per origin, so its predictions have no "
+            'spread for score="spread"; use "absolute" or "normalized"'
+        )
+    return self
+```
+
+## JackknifePlus
+
+Bases: `ConformalMethod`
+
+Jackknife+ (Barber et al. 2021) with blocks: one refit per block left out, and intervals from the left-out residuals and predictions.
+
+With exchangeable blocks it covers at least `1 − 2α` when each block holds one observation, and the CV+ bound with `K` blocks otherwise.
+
+Attributes:
+
+| Name           | Type          | Description                                              |
+| -------------- | ------------- | -------------------------------------------------------- |
+| `block_length` | \`int         | auto\`                                                   |
+| `positions`    | `list[float]` | Where the intervals are, for each series of the problem. |
+| `starts`       | `int`         | Starts of the fit and of each refit (default 1).         |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class JackknifePlus(ConformalMethod):
+    """
+    Jackknife+ (Barber et al. 2021) with blocks: one refit per block left
+    out, and intervals from the left-out residuals and predictions.
+
+    With exchangeable blocks it covers at least ``1 − 2α`` when each block
+    holds one observation, and the CV+ bound with ``K`` blocks otherwise.
+
+    Attributes
+    ----------
+    block_length : int | "auto"
+        Positions per block; it must leave at least two blocks.
+    positions : list[float]
+        Where the intervals are, for each series of the problem.
+    starts : int
+        Starts of the fit and of each refit (default 1).
+    """
+
+    block_length: BlockLength = Field(description="Positions per block.")
+    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+```
+
+## EnbPI
+
+Bases: `ConformalMethod`
+
+Ensemble batch prediction intervals (Xu and Xie 2021).
+
+Each replicate draws blocks with replacement and fits. The replicates that left out the block of an observation give its leave-one-out prediction and score; their mean over every observation is the point prediction.
+
+Attributes:
+
+| Name           | Type          | Description                                              |
+| -------------- | ------------- | -------------------------------------------------------- |
+| `replicates`   | `int`         | Number of replicates, at least 2.                        |
+| `block_length` | \`int         | auto\`                                                   |
+| `positions`    | `list[float]` | Where the intervals are, for each series of the problem. |
+| `starts`       | `int`         | Starts of the fit and of each replicate (default 1).     |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class EnbPI(ConformalMethod):
+    """
+    Ensemble batch prediction intervals (Xu and Xie 2021).
+
+    Each replicate draws blocks with replacement and fits. The replicates
+    that left out the block of an observation give its leave-one-out
+    prediction and score; their mean over every observation is the point
+    prediction.
+
+    Attributes
+    ----------
+    replicates : int
+        Number of replicates, at least 2.
+    block_length : int | "auto"
+        Positions per block.
+    positions : list[float]
+        Where the intervals are, for each series of the problem.
+    starts : int
+        Starts of the fit and of each replicate (default 1).
+    """
+
+    replicates: int = Field(ge=2, description="Number of replicates.")
+    block_length: BlockLength = Field(description="Positions per block.")
+    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+```
+
+## AdaptiveConformal
+
+Bases: `ConformalMethod`
+
+Adaptive conformal inference (Gibbs and Candès 2021).
+
+It fits the problem's observations and walks `stream` in order of position. The interval of each point is the quantile, at the working level `1 − α_t`, of the scores of the earlier points of the stream; then the working level moves by `α_{t+1} = α_t + γ (α − err_t)`. The long-run share of misses tends to `α`, with no assumption on the data.
+
+Attributes:
+
+| Name     | Type                      | Description                                  |
+| -------- | ------------------------- | -------------------------------------------- |
+| `step`   | `float`                   | The step γ of the working level, positive.   |
+| `stream` | `list[ObservedDataPoint]` | The observations that arrive after the data. |
+| `sample` | \`ParameterSample         | None\`                                       |
+| `starts` | `int`                     | Starts of the fit (default 1).               |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class AdaptiveConformal(ConformalMethod):
+    """
+    Adaptive conformal inference (Gibbs and Candès 2021).
+
+    It fits the problem's observations and walks `stream` in order of
+    position. The interval of each point is the quantile, at the working
+    level ``1 − α_t``, of the scores of the earlier points of the stream;
+    then the working level moves by ``α_{t+1} = α_t + γ (α − err_t)``. The
+    long-run share of misses tends to ``α``, with no assumption on the data.
+
+    Attributes
+    ----------
+    step : float
+        The step ``γ`` of the working level, positive.
+    stream : list[ObservedDataPoint]
+        The observations that arrive after the data.
+    sample : ParameterSample | None
+        As in `SplitConformal`.
+    starts : int
+        Starts of the fit (default 1).
+    """
+
+    step: float = Field(gt=0.0, description="The step of the working level.")
+    stream: list[ObservedDataPoint] = Field(
+        min_length=1, description="The observations that arrive."
+    )
+    sample: ParameterSample | None = Field(
+        default=None, description="The sample whose predictive predicts."
+    )
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+
+    @model_validator(mode="after")
+    def check_spread(self) -> Self:
+        """Reject ``score="spread"`` without a sample."""
+        _no_spread_without_sample(self)
+        return self
+```
+
+### Methods:
+
+#### check_spread
+
+```python
+check_spread() -> Self
+```
+
+Reject `score="spread"` without a sample.
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+@model_validator(mode="after")
+def check_spread(self) -> Self:
+    """Reject ``score="spread"`` without a sample."""
+    _no_spread_without_sample(self)
+    return self
+```
+
+## ConformalResult
+
+Bases: `BaseModel`
+
+The result of a conformal method.
+
+Attributes:
+
+| Name        | Type                     | Description                                                             |
+| ----------- | ------------------------ | ----------------------------------------------------------------------- |
+| `intervals` | `PredictionIntervals`    | The intervals at the positions the method was given.                    |
+| `scores`    | `dict[str, list[float]]` | The scores of each series, by label, in the order the method took them. |
+| `guarantee` | `str`                    | The coverage the method guarantees, and what the guarantee assumes.     |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class ConformalResult(BaseModel):
+    """
+    The result of a conformal method.
+
+    Attributes
+    ----------
+    intervals : PredictionIntervals
+        The intervals at the positions the method was given.
+    scores : dict[str, list[float]]
+        The scores of each series, by label, in the order the method took
+        them.
+    guarantee : str
+        The coverage the method guarantees, and what the guarantee assumes.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+
+    intervals: PredictionIntervals
+    scores: dict[str, list[float]]
+    guarantee: str
+```
+
+## PredictionIntervals
+
+Bases: `BaseModel`
+
+Prediction intervals for observations: where new observations of each series fall, at a level.
+
+Attributes:
+
+| Name        | Type                         | Description                                                                                                                                    |
+| ----------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `level`     | `float`                      | The level of the intervals, 1 − α.                                                                                                             |
+| `series`    | `dict[str, SeriesIntervals]` | The intervals of each series, by label.                                                                                                        |
+| `unbounded` | `dict[str, list[float]]`     | The positions of each series whose interval is unbounded, because its quantile had fewer than 1/α − 1 scores. A series with none is not a key. |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class PredictionIntervals(BaseModel):
+    """
+    Prediction intervals for observations: where new observations of each
+    series fall, at a level.
+
+    Attributes
+    ----------
+    level : float
+        The level of the intervals, ``1 − α``.
+    series : dict[str, SeriesIntervals]
+        The intervals of each series, by label.
+    unbounded : dict[str, list[float]]
+        The positions of each series whose interval is unbounded, because
+        its quantile had fewer than ``1/α − 1`` scores. A series with none
+        is not a key.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+
+    level: float
+    series: dict[str, SeriesIntervals]
+    unbounded: dict[str, list[float]]
+```
+
+## SeriesIntervals
+
+Bases: `BaseModel`
+
+The prediction intervals of one series.
+
+Attributes:
+
+| Name         | Type          | Description                                          |
+| ------------ | ------------- | ---------------------------------------------------- |
+| `positions`  | `list[float]` | Where the intervals are.                             |
+| `prediction` | `list[float]` | The point prediction at each position.               |
+| `lower`      | `list[float]` | The lower end of each interval; -inf when unbounded. |
+| `upper`      | `list[float]` | The upper end of each interval; inf when unbounded.  |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class SeriesIntervals(BaseModel):
+    """
+    The prediction intervals of one series.
+
+    Attributes
+    ----------
+    positions : list[float]
+        Where the intervals are.
+    prediction : list[float]
+        The point prediction at each position.
+    lower : list[float]
+        The lower end of each interval; ``-inf`` when unbounded.
+    upper : list[float]
+        The upper end of each interval; ``inf`` when unbounded.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+
+    positions: list[float]
+    prediction: list[float]
+    lower: list[float]
+    upper: list[float]
 ```
 
 ## Scores and intervals
@@ -25920,6 +26788,11 @@ All notable changes to Commol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+
+- Conformal prediction intervals through `Calibrator.uncertainty`: intervals for observations with a coverage guarantee that needs no noise model, no prior and no correct model. `SplitConformal` scores held-out observations; `RollingConformal` gives intervals ahead of the data, one quantile per horizon (the `k`-th observation after an origin); `JackknifePlus` refits once per block left out, with the CV+ bound for blocks of more than one observation; `EnbPI` draws its own replicates of blocks for series with dependent errors; `AdaptiveConformal` walks a stream of new observations with a working level that moves with each miss. Each takes a required `score` (`"absolute"`, `"normalized"` or `"spread"`), `by` (`"series"` or `"all"`) and `level`, and returns a `ConformalResult` (`PredictionIntervals`, the scores and the guarantee). See [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md).
+- `SimulationPlotter.plot_series(prediction_intervals=...)` draws the band of conformal intervals, and `simulation_report(..., prediction_intervals=...)` reports them.
 
 ## [0.5.0] - 2026-10-19
 

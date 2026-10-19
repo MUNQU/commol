@@ -136,8 +136,9 @@ The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `g
 | `observed_data`                     | The observations to report next to the run.                                                                                                                                                                                                                                                                                                                               |
 | `accumulators`                      | The accumulator ids to report.                                                                                                                                                                                                                                                                                                                                            |
 | `ensemble_runs`, `confidence_level` | The `SimulationReplicates` of a stochastic engine, one `SimulationResults` per member, or a [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive), whose draws carry their weights. Every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block, reduced member by member with the weights; the layout does not change. |
+| `prediction_intervals`              | The `PredictionIntervals` of a [conformal method](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) (`ConformalResult.intervals`). The report gains a last block, `prediction_intervals`: its `level`, `series` (by label: `positions`, `prediction`, `lower`, `upper`) and `unbounded`.                                                        |
 
-The report holds only these blocks. Add your own envelope around them, such as a run label or summary figures in your domain's terms:
+The report holds only these blocks, and `prediction_intervals` when it is given. Add your own envelope around them, such as a run label or summary figures in your domain's terms:
 
 ```python
 document = {"kind": "calibration", "at": ends, **run_report}

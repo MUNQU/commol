@@ -92,6 +92,7 @@ class SimulationPlotter:
         position_label: Callable[[float], str] | None = None,
         tick_every: float | None = None,
         x_label: str = "Step",
+        prediction_intervals: PredictionIntervals | None = None,
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
         """
@@ -138,6 +139,12 @@ class SimulationPlotter:
             plotted position.
         x_label : str
             The x-axis label. Default "Step".
+        prediction_intervals : PredictionIntervals | None
+            Prediction intervals of a conformal method
+            (``ConformalResult.intervals``). The subplot of each of their
+            series, by label, shows the band between their lower and upper
+            ends and their point prediction; an unbounded interval is left
+            out of the band.
         **kwargs : str | int | float | bool | None
             Additional keyword arguments passed to seaborn.lineplot().
             Common parameters: linewidth, alpha, linestyle, marker, etc.
@@ -176,6 +183,11 @@ class SimulationPlotter:
             tick_every,
             x_label,
         )
+        if prediction_intervals is not None:
+            for ax, bin_id in zip(axes, bins_to_plot, strict=False):
+                self._plot_prediction_intervals(
+                    ax, bin_id, prediction_intervals, show_legend
+                )
         self._finalize_plot(axes, bins_to_plot, output_file, config, "Series")
 
         return fig
@@ -532,6 +544,38 @@ class SimulationPlotter:
                     tick_every,
                     x_label,
                 )
+
+    @staticmethod
+    def _plot_prediction_intervals(
+        ax: "Axes",
+        series_id: str,
+        intervals: PredictionIntervals,
+        show_legend: bool,
+    ) -> None:
+        """
+        The band of the prediction intervals of one series and its point
+        prediction, when the intervals have the series.
+        """
+        series = intervals.series.get(series_id)
+        if series is None:
+            return
+        bounded = [
+            (at, lower, upper)
+            for at, lower, upper in zip(
+                series.positions, series.lower, series.upper, strict=True
+            )
+            if math.isfinite(lower) and math.isfinite(upper)
+        ]
+        ax.fill_between(
+            [at for at, _, _ in bounded],
+            [lower for _, lower, _ in bounded],
+            [upper for _, _, upper in bounded],
+            alpha=0.3,
+            label=f"{intervals.level:.0%} prediction interval",
+        )
+        ax.plot(series.positions, series.prediction, linestyle="--", label="Prediction")
+        if show_legend:
+            ax.legend()
 
     @staticmethod
     def _finalize_plot(
@@ -1003,7 +1047,7 @@ def __init__(
 #### plot_series
 
 ```python
-plot_series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | Predictive | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', **kwargs: str | int | float | bool | None) -> Figure
+plot_series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | Predictive | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', prediction_intervals: PredictionIntervals | None = None, **kwargs: str | int | float | bool | None) -> Figure
 ```
 
 Plot simulation results with one subplot per series.
@@ -1012,18 +1056,19 @@ Creates a figure with subplots arranged in a grid, where each subplot shows the 
 
 Parameters:
 
-| Name                 | Type                       | Description                                               | Default                                                                                                                                                                                                                                              |
-| -------------------- | -------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `output_file`        | \`str                      | None\`                                                    | Path to save the figure. If None, figure is not saved (only returned).                                                                                                                                                                               |
-| `observed_data`      | \`list[ObservedDataPoint]  | None\`                                                    | Optional observed data points to overlay on corresponding bin subplots. Model predictions with a factor_id will be scaled for plotting using factor values from the calibration_result, so observed values remain in their original units.           |
-| `calibration_result` | \`CalibrationResult        | Predictive                                                | None\`                                                                                                                                                                                                                                               |
-| `config`             | \`PlotConfig               | None\`                                                    | Configuration for plot layout and styling (figsize, dpi, layout, style, palette, context). If None, uses defaults.                                                                                                                                   |
-| `series`             | \`list[str]                | None\`                                                    | What to plot, one subplot each. An entry is an output name (an expanded compartment or accumulator, such as A_g1) or a bin or accumulator id, which plots the sum of its outputs. An exact output name wins over an id. If None, plots every output. |
-| `show_legend`        | `bool`                     | Whether to show the legend on each subplot. Default True. | `True`                                                                                                                                                                                                                                               |
-| `position_label`     | \`Callable\[[float], str\] | None\`                                                    | Turns a position on the axis into an x-axis tick label, such as a date. If None, the ticks show the position.                                                                                                                                        |
-| `tick_every`         | \`float                    | None\`                                                    | Labels the plotted positions tick_every apart on the axis, counted from the first plotted position. If None, labels every plotted position.                                                                                                          |
-| `x_label`            | `str`                      | The x-axis label. Default "Step".                         | `'Step'`                                                                                                                                                                                                                                             |
-| `**kwargs`           | \`str                      | int                                                       | float                                                                                                                                                                                                                                                |
+| Name                   | Type                       | Description                                               | Default                                                                                                                                                                                                                                              |
+| ---------------------- | -------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`          | \`str                      | None\`                                                    | Path to save the figure. If None, figure is not saved (only returned).                                                                                                                                                                               |
+| `observed_data`        | \`list[ObservedDataPoint]  | None\`                                                    | Optional observed data points to overlay on corresponding bin subplots. Model predictions with a factor_id will be scaled for plotting using factor values from the calibration_result, so observed values remain in their original units.           |
+| `calibration_result`   | \`CalibrationResult        | Predictive                                                | None\`                                                                                                                                                                                                                                               |
+| `config`               | \`PlotConfig               | None\`                                                    | Configuration for plot layout and styling (figsize, dpi, layout, style, palette, context). If None, uses defaults.                                                                                                                                   |
+| `series`               | \`list[str]                | None\`                                                    | What to plot, one subplot each. An entry is an output name (an expanded compartment or accumulator, such as A_g1) or a bin or accumulator id, which plots the sum of its outputs. An exact output name wins over an id. If None, plots every output. |
+| `show_legend`          | `bool`                     | Whether to show the legend on each subplot. Default True. | `True`                                                                                                                                                                                                                                               |
+| `position_label`       | \`Callable\[[float], str\] | None\`                                                    | Turns a position on the axis into an x-axis tick label, such as a date. If None, the ticks show the position.                                                                                                                                        |
+| `tick_every`           | \`float                    | None\`                                                    | Labels the plotted positions tick_every apart on the axis, counted from the first plotted position. If None, labels every plotted position.                                                                                                          |
+| `x_label`              | `str`                      | The x-axis label. Default "Step".                         | `'Step'`                                                                                                                                                                                                                                             |
+| `prediction_intervals` | \`PredictionIntervals      | None\`                                                    | Prediction intervals of a conformal method (ConformalResult.intervals). The subplot of each of their series, by label, shows the band between their lower and upper ends and their point prediction; an unbounded interval is left out of the band.  |
+| `**kwargs`             | \`str                      | int                                                       | float                                                                                                                                                                                                                                                |
 
 Returns:
 
@@ -1051,6 +1096,7 @@ def plot_series(
     position_label: Callable[[float], str] | None = None,
     tick_every: float | None = None,
     x_label: str = "Step",
+    prediction_intervals: PredictionIntervals | None = None,
     **kwargs: str | int | float | bool | None,
 ) -> "Figure":
     """
@@ -1097,6 +1143,12 @@ def plot_series(
         plotted position.
     x_label : str
         The x-axis label. Default "Step".
+    prediction_intervals : PredictionIntervals | None
+        Prediction intervals of a conformal method
+        (``ConformalResult.intervals``). The subplot of each of their
+        series, by label, shows the band between their lower and upper
+        ends and their point prediction; an unbounded interval is left
+        out of the band.
     **kwargs : str | int | float | bool | None
         Additional keyword arguments passed to seaborn.lineplot().
         Common parameters: linewidth, alpha, linestyle, marker, etc.
@@ -1135,6 +1187,11 @@ def plot_series(
         tick_every,
         x_label,
     )
+    if prediction_intervals is not None:
+        for ax, bin_id in zip(axes, bins_to_plot, strict=False):
+            self._plot_prediction_intervals(
+                ax, bin_id, prediction_intervals, show_legend
+            )
     self._finalize_plot(axes, bins_to_plot, output_file, config, "Series")
 
     return fig

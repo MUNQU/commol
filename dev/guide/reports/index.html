@@ -1413,6 +1413,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -3131,9 +3159,13 @@ model reports at non-integer positions once the results hold them
 <td><code>ensemble_runs</code>, <code>confidence_level</code></td>
 <td>The <code>SimulationReplicates</code> of a stochastic engine, one <code>SimulationResults</code> per member, or a <a href="../uncertainty/#the-predictive"><code>Predictive</code></a>, whose draws carry their weights. Every number becomes a <code>{mean, median, ci_lower, ci_upper, min, max}</code> block, reduced member by member with the weights; the layout does not change.</td>
 </tr>
+<tr>
+<td><code>prediction_intervals</code></td>
+<td>The <code>PredictionIntervals</code> of a <a href="../uncertainty/conformal/">conformal method</a> (<code>ConformalResult.intervals</code>). The report gains a last block, <code>prediction_intervals</code>: its <code>level</code>, <code>series</code> (by label: <code>positions</code>, <code>prediction</code>, <code>lower</code>, <code>upper</code>) and <code>unbounded</code>.</td>
+</tr>
 </tbody>
 </table>
-<p>The report holds only these blocks. Add your own envelope around them, such as
+<p>The report holds only these blocks, and <code>prediction_intervals</code> when it is given. Add your own envelope around them, such as
 a run label or summary figures in your domain's terms:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">document</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;calibration&quot;</span><span class="p">,</span> <span class="s2">&quot;at&quot;</span><span class="p">:</span> <span class="n">ends</span><span class="p">,</span> <span class="o">**</span><span class="n">run_report</span><span class="p">}</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">document</span><span class="p">)[:</span><span class="mi">30</span><span class="p">])</span>

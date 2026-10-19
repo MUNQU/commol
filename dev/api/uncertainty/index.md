@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-What every uncertainty method takes and returns: the configuration base, the weighted parameter sample, the predictive and its observation noise, the resampling methods, the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
+What every uncertainty method takes and returns: the configuration base, the weighted parameter sample, the predictive and its observation noise, the resampling and conformal methods, the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
 
 ## InferenceMethod
 
@@ -2463,6 +2463,535 @@ class BoundError(BaseModel):
 
     lower: tuple[float, float]
     upper: tuple[float, float]
+```
+
+## Conformal prediction
+
+Guide: [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md).
+
+## ConformalMethod
+
+Bases: `UncertaintyMethod[ConformalResult]`
+
+What every conformal method takes: a score, the pooling of its quantiles, and a level, none of them with a default.
+
+Attributes:
+
+| Name    | Type                             | Description                                                                                                                                    |
+| ------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `score` | `{absolute, normalized, spread}` | The nonconformity score. "normalized" needs by="all": per series its factor is one constant, so its intervals would equal those of "absolute". |
+| `by`    | `{series, all}`                  | Whether each series gets its own quantile, or all series share one.                                                                            |
+| `level` | `float`                          | The level of the intervals, strictly between 0 and 1.                                                                                          |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class ConformalMethod(UncertaintyMethod[ConformalResult]):
+    """
+    What every conformal method takes: a score, the pooling of its
+    quantiles, and a level, none of them with a default.
+
+    Attributes
+    ----------
+    score : {"absolute", "normalized", "spread"}
+        The nonconformity score. ``"normalized"`` needs ``by="all"``: per
+        series its factor is one constant, so its intervals would equal those
+        of ``"absolute"``.
+    by : {"series", "all"}
+        Whether each series gets its own quantile, or all series share one.
+    level : float
+        The level of the intervals, strictly between 0 and 1.
+    """
+
+    score: ConformalScore = Field(description="The nonconformity score.")
+    by: Pooling = Field(description="Which scores each quantile reads.")
+    level: float = Field(gt=0.0, lt=1.0, description="The level of the intervals.")
+
+    @model_validator(mode="before")
+    @classmethod
+    def check_score_and_by(cls, data: object) -> object:
+        """Check, in Rust, that `score` and `by` are given and fit together."""
+        if isinstance(data, Mapping):
+
+            def name(key: str) -> str | None:
+                value = data.get(key)
+                return None if value is None else str(value)
+
+            commol_rs.inference.check_conformal_settings(name("score"), name("by"))
+        return data
+```
+
+### Methods:
+
+#### check_score_and_by
+
+```python
+check_score_and_by(data: object) -> object
+```
+
+Check, in Rust, that `score` and `by` are given and fit together.
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+@model_validator(mode="before")
+@classmethod
+def check_score_and_by(cls, data: object) -> object:
+    """Check, in Rust, that `score` and `by` are given and fit together."""
+    if isinstance(data, Mapping):
+
+        def name(key: str) -> str | None:
+            value = data.get(key)
+            return None if value is None else str(value)
+
+        commol_rs.inference.check_conformal_settings(name("score"), name("by"))
+    return data
+```
+
+## SplitConformal
+
+Bases: `ConformalMethod`
+
+Split conformal prediction.
+
+It fits the problem's observations and scores `calibration_data`, observations held out of the fit. When the scores of the held-out and of new observations are exchangeable, each interval covers a new observation with probability at least `level`.
+
+Attributes:
+
+| Name               | Type                      | Description                                                   |
+| ------------------ | ------------------------- | ------------------------------------------------------------- |
+| `calibration_data` | `list[ObservedDataPoint]` | Held-out observations; each of their series gets intervals.   |
+| `positions`        | `list[float]`             | Where the intervals are, for each series of calibration_data. |
+| `sample`           | \`ParameterSample         | None\`                                                        |
+| `starts`           | `int`                     | Starts of the fit (default 1).                                |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class SplitConformal(ConformalMethod):
+    """
+    Split conformal prediction.
+
+    It fits the problem's observations and scores `calibration_data`,
+    observations held out of the fit. When the scores of the held-out and of
+    new observations are exchangeable, each interval covers a new
+    observation with probability at least `level`.
+
+    Attributes
+    ----------
+    calibration_data : list[ObservedDataPoint]
+        Held-out observations; each of their series gets intervals.
+    positions : list[float]
+        Where the intervals are, for each series of `calibration_data`.
+    sample : ParameterSample | None
+        None: the prediction is the fit. A sample: the prediction is the
+        weighted median of its predictive, and its weighted standard
+        deviation is the spread of ``score="spread"``.
+    starts : int
+        Starts of the fit (default 1).
+    """
+
+    calibration_data: list[ObservedDataPoint] = Field(
+        min_length=1, description="Held-out observations."
+    )
+    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    sample: ParameterSample | None = Field(
+        default=None, description="The sample whose predictive predicts."
+    )
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+
+    @model_validator(mode="after")
+    def check_spread(self) -> Self:
+        """Reject ``score="spread"`` without a sample."""
+        _no_spread_without_sample(self)
+        return self
+```
+
+### Methods:
+
+#### check_spread
+
+```python
+check_spread() -> Self
+```
+
+Reject `score="spread"` without a sample.
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+@model_validator(mode="after")
+def check_spread(self) -> Self:
+    """Reject ``score="spread"`` without a sample."""
+    _no_spread_without_sample(self)
+    return self
+```
+
+## RollingConformal
+
+Bases: `ConformalMethod`
+
+Rolling-origin conformal prediction: intervals ahead of the data, one quantile per horizon.
+
+Each origin fits the observations at or before it and scores the later ones. Horizon `k` is the `k`-th observation of a series after the origin: a count, not a distance on the axis.
+
+Attributes:
+
+| Name        | Type          | Description                                                                  |
+| ----------- | ------------- | ---------------------------------------------------------------------------- |
+| `origins`   | `list[float]` | The positions of the origins.                                                |
+| `positions` | `list[float]` | Where the intervals are, all after the data; the k-th position is horizon k. |
+| `starts`    | `int`         | Starts of each fit (default 1).                                              |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class RollingConformal(ConformalMethod):
+    """
+    Rolling-origin conformal prediction: intervals ahead of the data, one
+    quantile per horizon.
+
+    Each origin fits the observations at or before it and scores the later
+    ones. Horizon ``k`` is the ``k``-th observation of a series after the
+    origin: a count, not a distance on the axis.
+
+    Attributes
+    ----------
+    origins : list[float]
+        The positions of the origins.
+    positions : list[float]
+        Where the intervals are, all after the data; the ``k``-th position
+        is horizon ``k``.
+    starts : int
+        Starts of each fit (default 1).
+    """
+
+    origins: list[float] = Field(min_length=1, description="The origins.")
+    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    starts: int = Field(default=1, ge=1, description="Starts of each fit.")
+
+    @model_validator(mode="after")
+    def check_spread(self) -> Self:
+        """Reject ``score="spread"``: one fit per origin has no spread."""
+        if self.score == "spread":
+            raise ValueError(
+                "RollingConformal fits once per origin, so its predictions have no "
+                'spread for score="spread"; use "absolute" or "normalized"'
+            )
+        return self
+```
+
+### Methods:
+
+#### check_spread
+
+```python
+check_spread() -> Self
+```
+
+Reject `score="spread"`: one fit per origin has no spread.
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+@model_validator(mode="after")
+def check_spread(self) -> Self:
+    """Reject ``score="spread"``: one fit per origin has no spread."""
+    if self.score == "spread":
+        raise ValueError(
+            "RollingConformal fits once per origin, so its predictions have no "
+            'spread for score="spread"; use "absolute" or "normalized"'
+        )
+    return self
+```
+
+## JackknifePlus
+
+Bases: `ConformalMethod`
+
+Jackknife+ (Barber et al. 2021) with blocks: one refit per block left out, and intervals from the left-out residuals and predictions.
+
+With exchangeable blocks it covers at least `1 − 2α` when each block holds one observation, and the CV+ bound with `K` blocks otherwise.
+
+Attributes:
+
+| Name           | Type          | Description                                              |
+| -------------- | ------------- | -------------------------------------------------------- |
+| `block_length` | \`int         | auto\`                                                   |
+| `positions`    | `list[float]` | Where the intervals are, for each series of the problem. |
+| `starts`       | `int`         | Starts of the fit and of each refit (default 1).         |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class JackknifePlus(ConformalMethod):
+    """
+    Jackknife+ (Barber et al. 2021) with blocks: one refit per block left
+    out, and intervals from the left-out residuals and predictions.
+
+    With exchangeable blocks it covers at least ``1 − 2α`` when each block
+    holds one observation, and the CV+ bound with ``K`` blocks otherwise.
+
+    Attributes
+    ----------
+    block_length : int | "auto"
+        Positions per block; it must leave at least two blocks.
+    positions : list[float]
+        Where the intervals are, for each series of the problem.
+    starts : int
+        Starts of the fit and of each refit (default 1).
+    """
+
+    block_length: BlockLength = Field(description="Positions per block.")
+    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+```
+
+## EnbPI
+
+Bases: `ConformalMethod`
+
+Ensemble batch prediction intervals (Xu and Xie 2021).
+
+Each replicate draws blocks with replacement and fits. The replicates that left out the block of an observation give its leave-one-out prediction and score; their mean over every observation is the point prediction.
+
+Attributes:
+
+| Name           | Type          | Description                                              |
+| -------------- | ------------- | -------------------------------------------------------- |
+| `replicates`   | `int`         | Number of replicates, at least 2.                        |
+| `block_length` | \`int         | auto\`                                                   |
+| `positions`    | `list[float]` | Where the intervals are, for each series of the problem. |
+| `starts`       | `int`         | Starts of the fit and of each replicate (default 1).     |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class EnbPI(ConformalMethod):
+    """
+    Ensemble batch prediction intervals (Xu and Xie 2021).
+
+    Each replicate draws blocks with replacement and fits. The replicates
+    that left out the block of an observation give its leave-one-out
+    prediction and score; their mean over every observation is the point
+    prediction.
+
+    Attributes
+    ----------
+    replicates : int
+        Number of replicates, at least 2.
+    block_length : int | "auto"
+        Positions per block.
+    positions : list[float]
+        Where the intervals are, for each series of the problem.
+    starts : int
+        Starts of the fit and of each replicate (default 1).
+    """
+
+    replicates: int = Field(ge=2, description="Number of replicates.")
+    block_length: BlockLength = Field(description="Positions per block.")
+    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+```
+
+## AdaptiveConformal
+
+Bases: `ConformalMethod`
+
+Adaptive conformal inference (Gibbs and Candès 2021).
+
+It fits the problem's observations and walks `stream` in order of position. The interval of each point is the quantile, at the working level `1 − α_t`, of the scores of the earlier points of the stream; then the working level moves by `α_{t+1} = α_t + γ (α − err_t)`. The long-run share of misses tends to `α`, with no assumption on the data.
+
+Attributes:
+
+| Name     | Type                      | Description                                  |
+| -------- | ------------------------- | -------------------------------------------- |
+| `step`   | `float`                   | The step γ of the working level, positive.   |
+| `stream` | `list[ObservedDataPoint]` | The observations that arrive after the data. |
+| `sample` | \`ParameterSample         | None\`                                       |
+| `starts` | `int`                     | Starts of the fit (default 1).               |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class AdaptiveConformal(ConformalMethod):
+    """
+    Adaptive conformal inference (Gibbs and Candès 2021).
+
+    It fits the problem's observations and walks `stream` in order of
+    position. The interval of each point is the quantile, at the working
+    level ``1 − α_t``, of the scores of the earlier points of the stream;
+    then the working level moves by ``α_{t+1} = α_t + γ (α − err_t)``. The
+    long-run share of misses tends to ``α``, with no assumption on the data.
+
+    Attributes
+    ----------
+    step : float
+        The step ``γ`` of the working level, positive.
+    stream : list[ObservedDataPoint]
+        The observations that arrive after the data.
+    sample : ParameterSample | None
+        As in `SplitConformal`.
+    starts : int
+        Starts of the fit (default 1).
+    """
+
+    step: float = Field(gt=0.0, description="The step of the working level.")
+    stream: list[ObservedDataPoint] = Field(
+        min_length=1, description="The observations that arrive."
+    )
+    sample: ParameterSample | None = Field(
+        default=None, description="The sample whose predictive predicts."
+    )
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+
+    @model_validator(mode="after")
+    def check_spread(self) -> Self:
+        """Reject ``score="spread"`` without a sample."""
+        _no_spread_without_sample(self)
+        return self
+```
+
+### Methods:
+
+#### check_spread
+
+```python
+check_spread() -> Self
+```
+
+Reject `score="spread"` without a sample.
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+@model_validator(mode="after")
+def check_spread(self) -> Self:
+    """Reject ``score="spread"`` without a sample."""
+    _no_spread_without_sample(self)
+    return self
+```
+
+## ConformalResult
+
+Bases: `BaseModel`
+
+The result of a conformal method.
+
+Attributes:
+
+| Name        | Type                     | Description                                                             |
+| ----------- | ------------------------ | ----------------------------------------------------------------------- |
+| `intervals` | `PredictionIntervals`    | The intervals at the positions the method was given.                    |
+| `scores`    | `dict[str, list[float]]` | The scores of each series, by label, in the order the method took them. |
+| `guarantee` | `str`                    | The coverage the method guarantees, and what the guarantee assumes.     |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class ConformalResult(BaseModel):
+    """
+    The result of a conformal method.
+
+    Attributes
+    ----------
+    intervals : PredictionIntervals
+        The intervals at the positions the method was given.
+    scores : dict[str, list[float]]
+        The scores of each series, by label, in the order the method took
+        them.
+    guarantee : str
+        The coverage the method guarantees, and what the guarantee assumes.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+
+    intervals: PredictionIntervals
+    scores: dict[str, list[float]]
+    guarantee: str
+```
+
+## PredictionIntervals
+
+Bases: `BaseModel`
+
+Prediction intervals for observations: where new observations of each series fall, at a level.
+
+Attributes:
+
+| Name        | Type                         | Description                                                                                                                                    |
+| ----------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `level`     | `float`                      | The level of the intervals, 1 − α.                                                                                                             |
+| `series`    | `dict[str, SeriesIntervals]` | The intervals of each series, by label.                                                                                                        |
+| `unbounded` | `dict[str, list[float]]`     | The positions of each series whose interval is unbounded, because its quantile had fewer than 1/α − 1 scores. A series with none is not a key. |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class PredictionIntervals(BaseModel):
+    """
+    Prediction intervals for observations: where new observations of each
+    series fall, at a level.
+
+    Attributes
+    ----------
+    level : float
+        The level of the intervals, ``1 − α``.
+    series : dict[str, SeriesIntervals]
+        The intervals of each series, by label.
+    unbounded : dict[str, list[float]]
+        The positions of each series whose interval is unbounded, because
+        its quantile had fewer than ``1/α − 1`` scores. A series with none
+        is not a key.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+
+    level: float
+    series: dict[str, SeriesIntervals]
+    unbounded: dict[str, list[float]]
+```
+
+## SeriesIntervals
+
+Bases: `BaseModel`
+
+The prediction intervals of one series.
+
+Attributes:
+
+| Name         | Type          | Description                                          |
+| ------------ | ------------- | ---------------------------------------------------- |
+| `positions`  | `list[float]` | Where the intervals are.                             |
+| `prediction` | `list[float]` | The point prediction at each position.               |
+| `lower`      | `list[float]` | The lower end of each interval; -inf when unbounded. |
+| `upper`      | `list[float]` | The upper end of each interval; inf when unbounded.  |
+
+Source code in `commol/context/inference/conformal.py`
+
+```python
+class SeriesIntervals(BaseModel):
+    """
+    The prediction intervals of one series.
+
+    Attributes
+    ----------
+    positions : list[float]
+        Where the intervals are.
+    prediction : list[float]
+        The point prediction at each position.
+    lower : list[float]
+        The lower end of each interval; ``-inf`` when unbounded.
+    upper : list[float]
+        The upper end of each interval; ``inf`` when unbounded.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+
+    positions: list[float]
+    prediction: list[float]
+    lower: list[float]
+    upper: list[float]
 ```
 
 ## Scores and intervals

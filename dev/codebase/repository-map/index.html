@@ -1286,6 +1286,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -3108,6 +3136,11 @@
 <td>Changes to the problem other than through <code>with_data</code>.</td>
 </tr>
 <tr>
+<td><code>crates/commol-inference/src/conformal/</code></td>
+<td>Conformal prediction intervals: <code>score.rs</code> (<code>NonconformityScore</code>, <code>Pooling</code>, <code>ConformalSettings</code>, the scale of a score), <code>quantile.rs</code> (the conformal quantile, the order statistics of jackknife+), <code>intervals.rs</code> (<code>PredictionIntervals</code>, <code>ConformalRun</code>), <code>predict.rs</code> (predictions and spread at any observations, the target points), and one file per variant: <code>split.rs</code>, <code>rolling.rs</code>, <code>jackknife_plus.rs</code> (with <code>cv_plus_bound</code>), <code>enbpi.rs</code>, <code>adaptive.rs</code> (<code>AdaptiveLevel</code>).</td>
+<td>A second quantile or score of one variant.</td>
+</tr>
+<tr>
 <td><code>crates/commol-inference/src/scores.rs</code></td>
 <td>Coverage, interval score, weighted interval score, sample CRPS, PIT, and their means per series.</td>
 <td>—</td>
@@ -3170,6 +3203,11 @@
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
+<td><code>py-commol/src/conformal.rs</code></td>
+<td><code>commol_rs.inference</code>: <code>check_conformal_settings</code>, the runners of the conformal methods (<code>split_conformal</code>, <code>rolling_conformal</code>, <code>jackknife_plus</code>, <code>enbpi</code>, <code>adaptive_conformal</code>) and <code>ConformalRun</code>.</td>
+<td>Logic beyond type conversion.</td>
+</tr>
+<tr>
 <td><code>py-commol/src/inference.rs</code></td>
 <td><code>commol_rs.inference</code>: <code>CalibrationProblem</code> (built once from a <code>Calibrator</code>: starts, history, predictions, the predictive), <code>ParameterSample</code>, <code>Predictive</code>, <code>ObservationDraws</code>, <code>BootstrapRun</code>, <code>JackknifeRun</code>, <code>weighted_quantiles</code>, <code>weighted_mean</code>, <code>by_series</code>, <code>quantile_error</code>; the runners of methods (<code>bootstrap</code>, <code>jackknife</code>).</td>
 <td>Logic beyond type conversion.</td>
@@ -3218,7 +3256,7 @@
 </tr>
 <tr>
 <td><code>api/inference/</code></td>
-<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), the scores (<code>api/inference/scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), the runners of the identifiability methods (<code>api/inference/identifiability.py</code>), which build the report, and the runners of the resampling methods (<code>api/inference/resampling.py</code>).</td>
+<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), the scores (<code>api/inference/scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), the runners of the identifiability methods (<code>api/inference/identifiability.py</code>), which build the report, the runners of the resampling methods (<code>api/inference/resampling.py</code>), and the runners of the conformal methods (<code>api/inference/conformal.py</code>), which build <code>ConformalResult</code>.</td>
 <td>Transforms of predictions; quantile formulas.</td>
 </tr>
 <tr>
@@ -3238,7 +3276,7 @@
 </tr>
 <tr>
 <td><code>context/inference/</code></td>
-<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code> and <code>IdentifiabilityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>).</td>
+<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code> and <code>IdentifiabilityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>), the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), and those of the conformal methods (<code>context/inference/conformal.py</code>).</td>
 <td>Runners.</td>
 </tr>
 <tr>
@@ -3487,6 +3525,11 @@
 <td>Change a bootstrap, the jackknife, blocks or residual noise</td>
 <td><code>crates/commol-inference/src/resampling/</code></td>
 <td><code>crates/commol-calibration/src/calibration_problem.rs</code> (<code>with_data</code>), <code>py-commol/src/inference.rs</code> (<code>bootstrap</code>, <code>jackknife</code>), <code>py-commol/commol/context/inference/resampling.py</code>, <code>api/inference/resampling.py</code>, <code>docs/guide/uncertainty/resampling.md</code></td>
+</tr>
+<tr>
+<td>Change a conformal method, its scores or its quantile</td>
+<td><code>crates/commol-inference/src/conformal/</code></td>
+<td><code>py-commol/src/conformal.rs</code>, <code>py-commol/commol/context/inference/conformal.py</code>, <code>api/inference/conformal.py</code>, <code>docs/guide/uncertainty/conformal.md</code></td>
 </tr>
 <tr>
 <td>Change the parameter sample, the predictive, the scores or the quantile</td>

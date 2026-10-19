@@ -1522,6 +1522,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -3714,6 +3742,11 @@ series first:</p>
 <td><code>calibration_result</code></td>
 <td><code>None</code></td>
 <td>A <code>CalibrationResult</code> gives the factor values that scale the model. A <a href="../uncertainty/#the-predictive"><code>Predictive</code></a> draws the weighted median of its draws and their band of <code>confidence_level</code>, each draw read through the observation operator (sums, windows, factors).</td>
+</tr>
+<tr>
+<td><code>prediction_intervals</code></td>
+<td><code>None</code></td>
+<td><code>plot_series</code> only. The <code>PredictionIntervals</code> of a <a href="../uncertainty/conformal/">conformal method</a>: the subplot of each of their series, by label, shows the band from <code>lower</code> to <code>upper</code> and the point prediction, dashed. An unbounded interval is left out of the band.</td>
 </tr>
 <tr>
 <td><code>config</code></td>

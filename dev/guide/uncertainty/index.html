@@ -1474,6 +1474,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -3065,7 +3093,8 @@ a band of the model, and <code>ResidualNoise(...)</code> adds residuals of a fit
 gives a prediction interval with no noise model
 (<a href="resampling/#prediction-intervals">Resampling</a>). Comparing a band of the
 model with data underestimates the spread, so its coverage of the data is below
-its level.</p>
+its level. A <a href="conformal/">conformal</a> interval is a prediction interval with a
+coverage guarantee, from the scores of observations the fit did not use.</p>
 <h2 id="which-method-answers-which-question">Which method answers which question<a class="headerlink" href="#which-method-answers-which-question" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3136,6 +3165,36 @@ its level.</p>
 <td>Where the next observations fall: a prediction interval</td>
 <td>No</td>
 <td><a href="resampling/#prediction-intervals">Resampling</a></td>
+</tr>
+<tr>
+<td><code>SplitConformal</code></td>
+<td>Where new observations fall, with a guaranteed coverage, from held-out observations</td>
+<td>No</td>
+<td><a href="conformal/#split-conformal">Conformal</a></td>
+</tr>
+<tr>
+<td><code>RollingConformal</code></td>
+<td>Where the next observations fall at each horizon ahead of the data</td>
+<td>No</td>
+<td><a href="conformal/#rolling-origins">Conformal</a></td>
+</tr>
+<tr>
+<td><code>JackknifePlus</code></td>
+<td>Where new observations fall, with a guaranteed coverage and no held-out data</td>
+<td>No</td>
+<td><a href="conformal/#jackknife">Conformal</a></td>
+</tr>
+<tr>
+<td><code>EnbPI</code></td>
+<td>Where the next observations of a series with dependent errors fall</td>
+<td>No</td>
+<td><a href="conformal/#enbpi">Conformal</a></td>
+</tr>
+<tr>
+<td><code>AdaptiveConformal</code></td>
+<td>Intervals for observations as they arrive, whose share of misses tends to its level</td>
+<td>No</td>
+<td><a href="conformal/#adaptive-conformal-inference">Conformal</a></td>
 </tr>
 </tbody>
 </table>
@@ -3422,6 +3481,10 @@ other kind with a <code>TypeError</code> that names the right one.</p>
 <tr>
 <td>Bootstraps, the jackknife and prediction intervals with no noise model</td>
 <td><a href="resampling/">Resampling</a></td>
+</tr>
+<tr>
+<td>Prediction intervals with a coverage guarantee</td>
+<td><a href="conformal/">Conformal Prediction Intervals</a></td>
 </tr>
 <tr>
 <td>Several starts of an optimizer</td>
