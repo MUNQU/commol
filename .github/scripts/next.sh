@@ -6,10 +6,11 @@
 # each one blocks in any repository; no value is Next), then milestone, then
 # number. It prints the priority and where an inherited one comes from, and
 # names each issue it skips and the issue it would touch
-# (.github/scripts/parallel.py).
+# (.github/scripts/parallel.py). First it writes the precedence level of each
+# open issue into the field Level of the project (--levels).
 #
 # Usage, from anywhere in the repository: .github/scripts/next.sh [count]   (default 1)
 set -euo pipefail
 root=$(git rev-parse --show-toplevel)
 exec uv run --project "$root/py-commol" --locked python \
-    "$root/.github/scripts/parallel.py" --next "${1:-1}"
+    "$root/.github/scripts/parallel.py" --levels --next "${1:-1}"
