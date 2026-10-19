@@ -26,6 +26,18 @@ pub fn replicate_seed(seed: u64, index: u64) -> u64 {
     splitmix64(&mut state)
 }
 
+/// The seed of stream `stream` of a run seeded with `seed`: one seed per
+/// purpose of a method (its design, its replicates, its bootstrap), so that
+/// no two purposes draw from one sequence.
+///
+/// It mixes `stream` into `seed` with a multiplier other than the increment
+/// of [`replicate_seed`], then takes the SplitMix64 of the result; the
+/// replicates of one stream come from [`replicate_seed`] of its seed.
+pub fn stream_seed(seed: u64, stream: u64) -> u64 {
+    let mut state = seed ^ stream.wrapping_mul(0xD1B5_4A32_D192_ED03);
+    splitmix64(&mut state)
+}
+
 /// A `Xoshiro256PlusPlus` generator (Blackman and Vigna 2021).
 ///
 /// Its four words of state are the first four SplitMix64 numbers of the
@@ -67,6 +79,21 @@ impl Generator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn each_stream_has_its_own_seed() {
+        let seeds: Vec<u64> = (1..=4).map(|stream| stream_seed(7, stream)).collect();
+        for (i, a) in seeds.iter().enumerate() {
+            for b in &seeds[i + 1..] {
+                assert_ne!(a, b);
+            }
+            for index in 0..100 {
+                assert_ne!(*a, replicate_seed(7, index));
+            }
+        }
+        assert_eq!(stream_seed(7, 2), stream_seed(7, 2));
+        assert_ne!(stream_seed(7, 2), stream_seed(8, 2));
+    }
 
     #[test]
     fn splitmix64_matches_its_reference_sequence() {

@@ -1,7 +1,7 @@
 //! # Commol Inference
 //!
-//! Uncertainty and identifiability methods on top of a calibration problem
-//! of `commol-calibration`, and what every method returns or reads.
+//! Uncertainty, identifiability and sensitivity methods on top of the forward
+//! model of `commol-calibration`, and what every method returns or reads.
 //!
 //! | Module | Holds |
 //! |---|---|
@@ -18,20 +18,29 @@
 //! | [`smc`] | Sequential Monte Carlo: the sampler, its kernels, the Gibbs posterior and ABC |
 //! | [`transform`] | The unbounded scale of the moves: logit, log or identity by the bounds |
 //! | [`conformal`] | Conformal prediction intervals: split, rolling, jackknife+, EnbPI and adaptive |
+//! | [`design`] | [`design::InputSpace`]: independent distributions or a sample, and the designs on it |
+//! | [`quantity`] | [`quantity::Quantity`]: the scalars a method reads from each run |
+//! | [`batch`] | [`batch::BatchRunner`]: every point of a design through a forward model, reduced to its quantities |
+//! | [`global_sensitivity`] | The estimators of global sensitivity: PRCC, Morris, Sobol and polynomial chaos |
 //!
 //! Rules: this crate depends on `commol-calibration`, never the reverse; a
-//! method touches an engine only through the problem's
-//! [`commol_calibration::ForwardModel`], reads observations only through its
+//! method touches an engine only through a
+//! [`commol_calibration::ForwardModel`] (a problem's, or one with no
+//! observations), reads observations and quantities only through a
 //! [`commol_calibration::ObservationOperator`], and draws every random number
 //! from a [`commol_random::Generator`].
 
 #![warn(missing_docs)]
 
+pub mod batch;
 pub mod conformal;
+pub mod design;
 pub mod distribution;
+pub mod global_sensitivity;
 pub mod identifiability;
 pub mod predictive;
 pub mod priors;
+pub mod quantity;
 pub mod resampling;
 pub mod sample;
 pub mod scores;

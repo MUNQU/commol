@@ -52,7 +52,7 @@ where
             })
         }
         Predictor::Sample(sample) => {
-            let draws = observation_draws(problem, sample, points, &NoNoise, 0)?;
+            let draws = observation_draws(problem.forward(), sample, points, &NoNoise, 0)?;
             let mut centre = Vec::with_capacity(points.len());
             let mut spread = Vec::with_capacity(points.len());
             for i in 0..points.len() {
@@ -82,7 +82,7 @@ pub fn set_predictions<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
-    let runs = observe_sets(problem, sets, points)?;
+    let runs = observe_sets(problem.forward(), sets, points, None)?;
     Ok(runs
         .into_iter()
         .map(|replicates| {

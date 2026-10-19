@@ -1,23 +1,57 @@
 """The predictive of a parameter sample: the run of every draw and its bands."""
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from commol.api.results import SimulationResults
-from commol.context._model import engine_state
 from commol.context.calibration import ObservedDataPoint
-from commol.context.inference.noise import (
-    DistributionNoise,
-    ObservationNoise,
-    ResidualNoise,
-)
+from commol.context.inference.noise import ObservationNoise
 from commol.context.inference.sample import ParameterSample
 
 if TYPE_CHECKING:
-    from commol.api.calibrator import Calibrator
-    from commol.commol_rs._commol_rs import ObservationDrawsProtocol
+    from commol.api.simulation import Simulation
+    from commol.commol_rs._commol_rs import (
+        ObservationDrawsProtocol,
+        PredictiveProtocol,
+    )
+
+
+class PredictiveSource(Protocol):
+    """
+    What a `Predictive` runs its draws through: a `Calibrator`, or a
+    `SensitivityAnalysis` of the inputs of the sample.
+
+    A source runs the draws and reads observations in Rust; a `Predictive`
+    knows no source.
+    """
+
+    @property
+    def simulation(self) -> "Simulation":
+        """The simulation of the source."""
+        ...
+
+    def rust_predictive(
+        self, sample: ParameterSample, positions: list[float]
+    ) -> "PredictiveProtocol":
+        """The run of every draw of `sample` at `positions`."""
+        ...
+
+    def rust_observation_draws(
+        self,
+        sample: ParameterSample,
+        observed_data: list[ObservedDataPoint],
+        noise: ObservationNoise,
+    ) -> "ObservationDrawsProtocol":
+        """Every draw's value of `observed_data` with `noise`."""
+        ...
+
+    def rust_log_score(
+        self, sample: ParameterSample, observed_data: list[ObservedDataPoint]
+    ) -> list[float]:
+        """The log score of each observation under the predictive."""
+        ...
 
 
 class SeriesBand(BaseModel):
@@ -152,16 +186,17 @@ class Predictive:
     """
     The run of every draw of a parameter sample.
 
-    The draws run in parallel in Rust, through the forward model of the
-    calibration problem: with a stochastic engine every replicate of a draw is
-    a draw of the predictive, with an equal share of its weight. A band
+    The draws run in parallel in Rust, through the forward model of a
+    calibration problem or of a sensitivity analysis: with a stochastic engine
+    every replicate of a draw is a draw of the predictive, with an equal share
+    of its weight. A band
     reduces the draws position by position with their weights; without
     observation noise it is a band of the model, not a prediction interval.
     """
 
     def __init__(
         self,
-        calibrator: "Calibrator",
+        source: PredictiveSource,
         sample: ParameterSample,
         positions: Sequence[float],
     ):
@@ -170,27 +205,26 @@ class Predictive:
 
         Parameters
         ----------
-        calibrator : Calibrator
-            The calibration problem the sample is a sample of.
+        source : PredictiveSource
+            The calibration problem the sample is a sample of (`Calibrator`),
+            or the sensitivity analysis of its inputs (`SensitivityAnalysis`).
         sample : ParameterSample
-            Its parameters, in the problem's order.
+            Its parameters, in the order of the problem or the analysis.
         positions : Sequence[float]
             Positions to report at, ascending.
 
         Raises
         ------
         ValueError
-            If the sample's parameters are not the problem's.
+            If the sample's parameters are not the source's.
         InfeasibleStateError
             If a draw leaves the values its model allows.
         """
-        self.calibrator: "Calibrator" = calibrator
+        self.source: PredictiveSource = source
         self.sample: ParameterSample = sample
         self.positions: list[float] = [float(position) for position in positions]
-        self.output_names: list[str] = list(calibrator.simulation.engine.output_names)
-        self._rust = calibrator.rust_problem.predictive(
-            sample.rust_sample, self.positions
-        )
+        self.output_names: list[str] = list(source.simulation.engine.output_names)
+        self._rust = source.rust_predictive(sample, self.positions)
 
     @property
     def weights(self) -> list[float]:
@@ -306,8 +340,9 @@ class Predictive:
         Every draw's value of each observation, with observation noise.
 
         The observations need not be the ones the problem was fitted to: held
-        out data are read the same way, through the observation operator.
-        The noise is drawn from the calibrator's seed.
+        out data are read the same way, through the observation operator,
+        and so are the observations of the model of an analysis. The noise
+        is drawn from the calibrator's seed.
 
         Parameters
         ----------
@@ -317,7 +352,8 @@ class Predictive:
             What an observation shows around a draw's prediction, with no
             default: ``NoNoise()`` gives a band of the model,
             ``ResidualNoise(...)`` and ``DistributionNoise()`` a prediction
-            interval.
+            interval. Both need a calibrator: residuals come from a fit, and
+            observation models from a problem.
 
         Returns
         -------
@@ -329,26 +365,13 @@ class Predictive:
         ValueError
             If an observation names an unknown output or factor, a series the
             residual noise has no residuals of, or a series with no
-            observation model; or `DistributionNoise` comes with a problem
-            that has a loss.
+            observation model; `DistributionNoise` comes with a problem that
+            has a loss; or the noise is not `NoNoise()` and the source is an
+            analysis.
         InfeasibleStateError
             If a draw leaves the values its model allows.
         """
-        residual_noise = None
-        if isinstance(noise, ResidualNoise):
-            residual_noise = (
-                [
-                    noise.fit.best_parameters[name]
-                    for name in self.calibrator.parameter_names
-                ],
-                noise.block_length,
-                noise.residual_scale,
-            )
-        draws = self.calibrator.rust_problem.observation_draws(
-            self.sample.rust_sample,
-            engine_state.rust_observed_data(list(observed_data)),
-            self.calibrator.seed,
-            residual_noise=residual_noise,
-            distribution_noise=isinstance(noise, DistributionNoise),
+        draws = self.source.rust_observation_draws(
+            self.sample, list(observed_data), noise
         )
         return ObservationDraws(observed_data, draws)

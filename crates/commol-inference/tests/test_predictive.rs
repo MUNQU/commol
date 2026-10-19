@@ -49,7 +49,8 @@ fn sample(values: Vec<Vec<f64>>) -> ParameterSample {
 #[test]
 fn the_band_of_one_draw_is_that_draw() {
     let problem = problem();
-    let predictive = Predictive::new(&problem, &sample(vec![vec![0.2]]), &[1.0, 2.0]).unwrap();
+    let predictive =
+        Predictive::new(problem.forward(), &sample(vec![vec![0.2]]), &[1.0, 2.0], 0).unwrap();
     let band = predictive.band(0.9).unwrap();
 
     // A = 1000 · 0.8ᵗ.
@@ -62,7 +63,14 @@ fn the_band_of_one_draw_is_that_draw() {
 fn observation_draws_are_the_predictions_the_loss_compares() {
     let problem = problem();
     let sample = sample(vec![vec![0.2], vec![0.5]]);
-    let draws = observation_draws(&problem, &sample, problem.observed_data(), &NoNoise, 1).unwrap();
+    let draws = observation_draws(
+        problem.forward(),
+        &sample,
+        problem.observed_data(),
+        &NoNoise,
+        1,
+    )
+    .unwrap();
 
     for (draw, values) in draws.values.iter().zip(sample.values()) {
         let mut workspace = Workspace::default();
@@ -87,11 +95,14 @@ fn a_sample_of_other_parameters_is_named_in_the_error() {
     )
     .unwrap();
 
-    let error = Predictive::new(&problem(), &other, &[1.0])
+    let error = Predictive::new(problem().forward(), &other, &[1.0], 0)
         .expect_err("the sample does not match the problem")
         .to_string();
 
-    assert!(error.contains(r#"["r"]; the problem has ["k"]"#), "{error}");
+    assert!(
+        error.contains(r#"["r"]; the forward model has ["k"]"#),
+        "{error}"
+    );
 }
 
 #[test]
@@ -140,7 +151,8 @@ fn a_forward_model_observed_again_at_its_observations_predicts_the_same() {
 #[test]
 fn a_band_of_an_output_the_rows_lack_is_an_error() {
     let problem = problem();
-    let predictive = Predictive::new(&problem, &sample(vec![vec![0.2]]), &[1.0, 2.0]).unwrap();
+    let predictive =
+        Predictive::new(problem.forward(), &sample(vec![vec![0.2]]), &[1.0, 2.0], 0).unwrap();
 
     let error = predictive.series_band(&[9], false, 0.9).err();
 
@@ -148,4 +160,63 @@ fn a_band_of_an_output_the_rows_lack_is_an_error() {
         error.as_deref(),
         Some("Output 9 is out of range; a row has 2 outputs")
     );
+}
+
+/// A → B at `k`, from A = 1000, with the chain binomial, two replicates per
+/// evaluation.
+fn stochastic_problem() -> CalibrationProblem<commol_stochastic::StochasticSteps> {
+    let json = r#"{"name":"m","parameters":[{"id":"k","value":0.1}],
+        "engine":{"type":"StochasticSteps","settings":null},
+        "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
+        "accumulators":[],"stratifications":[],
+        "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"k"}]},
+        "structure":{"kind":"aggregate","bin_amounts":{"A":1000.0,"B":0.0}}}"#;
+    let model: Model = serde_json::from_str(json).expect("valid model JSON");
+    CalibrationProblem::new(
+        commol_stochastic::StochasticSteps::try_from_model(&model).unwrap(),
+        vec![ObservedDataPoint::new(5.0, "A".to_string(), 0.0)],
+        vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .unwrap()
+    .with_replicates(Some(
+        commol_calibration::Replicates::new(2, 3, commol_calibration::ReplicateSummary::Mean)
+            .unwrap(),
+    ))
+    .unwrap()
+}
+
+#[test]
+fn every_draw_of_a_stochastic_predictive_draws_its_own_noise() {
+    let problem = stochastic_problem();
+    // Three draws of one parameter value: with the replicates of the
+    // problem they would run the same two paths.
+    let draws = sample(vec![vec![0.2]; 3]);
+
+    let predictive = Predictive::new(problem.forward(), &draws, &[5.0], 11).unwrap();
+    let again = Predictive::new(problem.forward(), &draws, &[5.0], 11).unwrap();
+    let other = Predictive::new(problem.forward(), &draws, &[5.0], 12).unwrap();
+
+    let a_at_5: Vec<f64> = predictive
+        .trajectories()
+        .iter()
+        .map(|rows| rows[0][0])
+        .collect();
+    assert_eq!(a_at_5.len(), 6);
+    let distinct: std::collections::BTreeSet<u64> = a_at_5.iter().map(|v| v.to_bits()).collect();
+    assert!(distinct.len() > 2, "{a_at_5:?}");
+    assert_eq!(predictive, again);
+    assert_ne!(predictive, other);
+    // The draws of observations run the same paths as the predictive.
+    let observed = observation_draws(
+        problem.forward(),
+        &draws,
+        problem.observed_data(),
+        &NoNoise,
+        11,
+    )
+    .unwrap();
+    let observed_a: Vec<f64> = observed.values.iter().map(|row| row[0]).collect();
+    assert_eq!(observed_a, a_at_5);
 }

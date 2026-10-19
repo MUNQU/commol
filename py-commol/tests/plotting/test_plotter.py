@@ -431,7 +431,7 @@ class TestPredictiveSeries:
             ObservedDataPoint(at=at, output="events", value=1.0, window=self.window)
             for at in (10, 25, 40)
         ]
-        plotter = SimulationPlotter(predictive.calibrator.simulation, run)
+        plotter = SimulationPlotter(predictive.source.simulation, run)
 
         figure = plotter.plot_series(
             observed_data=observed, calibration_result=predictive, series=["events"]
@@ -447,7 +447,7 @@ class TestPredictiveSeries:
     def test_the_band_of_two_draws_spans_their_runs(self) -> None:
         predictive = self._predictive([0.02, 0.1])
         low, high = predictive.runs()
-        plotter = SimulationPlotter(predictive.calibrator.simulation, low)
+        plotter = SimulationPlotter(predictive.source.simulation, low)
 
         figure = plotter.plot_series(calibration_result=predictive, series=["B"])
 
@@ -462,9 +462,7 @@ class TestPredictiveSeries:
             ObservedDataPoint(at=at, output="B", value=1.0, factor_id=factor_id)
             for at, factor_id in ((10, "f1"), (20, "f2"))
         ]
-        plotter = SimulationPlotter(
-            predictive.calibrator.simulation, predictive.runs()[0]
-        )
+        plotter = SimulationPlotter(predictive.source.simulation, predictive.runs()[0])
 
         with pytest.raises(ValueError, match=r"several factors \['f1', 'f2'\]"):
             plotter.plot_series(
@@ -473,9 +471,7 @@ class TestPredictiveSeries:
 
     def test_a_band_labels_its_positions(self) -> None:
         predictive = self._predictive([0.05])
-        plotter = SimulationPlotter(
-            predictive.calibrator.simulation, predictive.runs()[0]
-        )
+        plotter = SimulationPlotter(predictive.source.simulation, predictive.runs()[0])
 
         figure = plotter.plot_series(
             calibration_result=predictive,
@@ -490,7 +486,7 @@ class TestPredictiveSeries:
     def test_a_cumulative_band_spans_the_running_totals_of_its_draws(self) -> None:
         predictive = self._predictive([0.02, 0.1])
         low, high = predictive.runs()
-        plotter = SimulationPlotter(predictive.calibrator.simulation, low)
+        plotter = SimulationPlotter(predictive.source.simulation, low)
         observed = [ObservedDataPoint(at=at, output="B", value=1.0) for at in (5, 9)]
 
         figure = plotter.plot_cumulative(

@@ -21,6 +21,12 @@ from commol.api.simulation import Simulation
 from commol.api.windows import window_ends, windowed_totals
 from commol.context.calibration import CalibrationResult, ObservedDataPoint
 from commol.context.inference.conformal import PredictionIntervals
+from commol.context.inference.global_sensitivity import (
+    ChaosResult,
+    MorrisResult,
+    PRCCResult,
+    SobolResult,
+)
 from commol.context.inference.noise import NoNoise
 from commol.context.visualization import PlotConfig
 
@@ -269,7 +275,193 @@ class SimulationPlotter:
 
         return fig
 
-    def _apply_seaborn_style(self, config: PlotConfig) -> None:
+    @staticmethod
+    def plot_prcc(
+        result: PRCCResult,
+        output_file: str | None = None,
+        config: PlotConfig | None = None,
+        x_label: str = "Step",
+    ) -> "Figure":
+        """
+        Plot the PRCC of each input: one subplot per series.
+
+        A series of a `Trajectory` draws one line per input over its
+        positions; any other quantity draws one bar per input.
+
+        Parameters
+        ----------
+        result : PRCCResult
+            The result of `PRCC`.
+        output_file : str | None
+            Path to save the figure. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        x_label : str
+            The x-axis label of a series over positions. Default "Step".
+
+        Returns
+        -------
+        Figure
+            The matplotlib Figure object.
+        """
+        config = config or PlotConfig()
+        SimulationPlotter._apply_seaborn_style(config)
+        groups: dict[str, list[int]] = defaultdict(list)
+        for index, series in enumerate(result.series):
+            groups[series].append(index)
+        names = list(groups)
+        fig, axes = SimulationPlotter._create_grid(config, len(names))
+        for ax, name in zip(axes, names, strict=False):
+            indices = groups[name]
+            positions = [
+                position
+                for position in (result.positions[i] for i in indices)
+                if position is not None
+            ]
+            if len(positions) == len(indices):
+                for j, input_name in enumerate(result.inputs):
+                    ax.plot(
+                        positions,
+                        [result.coefficients[i][j] for i in indices],
+                        marker="o",
+                        label=input_name,
+                    )
+                ax.set_xlabel(x_label)
+                ax.legend()
+            else:
+                ax.bar(result.inputs, result.coefficients[indices[0]])
+            ax.axhline(0.0, color="grey", linewidth=0.8)
+            ax.set_ylim(-1.05, 1.05)
+            ax.set_ylabel("PRCC")
+            ax.set_title(name)
+        SimulationPlotter._finalize_plot(axes, names, output_file, config, "PRCC")
+        return fig
+
+    @staticmethod
+    def plot_morris(
+        result: MorrisResult,
+        output_file: str | None = None,
+        config: PlotConfig | None = None,
+    ) -> "Figure":
+        """
+        Plot ``σ`` against ``μ*`` of each input: one subplot per quantity,
+        one labelled point per input.
+
+        An input far to the right matters; one high up acts through
+        interactions or a non-linear effect.
+
+        Parameters
+        ----------
+        result : MorrisResult
+            The result of `Morris`.
+        output_file : str | None
+            Path to save the figure. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+
+        Returns
+        -------
+        Figure
+            The matplotlib Figure object.
+        """
+        config = config or PlotConfig()
+        SimulationPlotter._apply_seaborn_style(config)
+        fig, axes = SimulationPlotter._create_grid(config, len(result.labels))
+        for ax, q in zip(axes, range(len(result.labels)), strict=False):
+            for j, input_name in enumerate(result.inputs):
+                mu_star, sigma = result.mu_star[q][j], result.sigma[q][j]
+                ax.scatter([mu_star], [sigma], label=input_name)
+                ax.annotate(input_name, (mu_star, sigma))
+            ax.set_xlabel("μ*")
+            ax.set_ylabel("σ")
+            ax.set_title(result.labels[q])
+            ax.legend()
+        SimulationPlotter._finalize_plot(
+            axes, result.labels, output_file, config, "Morris"
+        )
+        return fig
+
+    @staticmethod
+    def plot_sobol(
+        result: SobolResult | ChaosResult,
+        output_file: str | None = None,
+        config: PlotConfig | None = None,
+    ) -> "Figure":
+        """
+        Plot the first-order and total Sobol indices: one subplot per
+        quantity, one pair of bars per input, with the intervals of a
+        `SobolResult`.
+
+        Parameters
+        ----------
+        result : SobolResult | ChaosResult
+            The result of `Sobol` or `PolynomialChaos`.
+        output_file : str | None
+            Path to save the figure. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+
+        Returns
+        -------
+        Figure
+            The matplotlib Figure object.
+        """
+        config = config or PlotConfig()
+        SimulationPlotter._apply_seaborn_style(config)
+        inputs = result.inputs
+        fig, axes = SimulationPlotter._create_grid(config, len(result.labels))
+        width = 0.4
+        for ax, q in zip(axes, range(len(result.labels)), strict=False):
+            places = list(range(len(inputs)))
+            for offset, name, values in (
+                (-width / 2, "First order", result.first[q]),
+                (width / 2, "Total", result.total[q]),
+            ):
+                errors = None
+                if isinstance(result, SobolResult):
+                    lower, upper = (
+                        (result.first_lower[q], result.first_upper[q])
+                        if name == "First order"
+                        else (result.total_lower[q], result.total_upper[q])
+                    )
+                    errors = [
+                        [
+                            max(v - low, 0.0)
+                            for v, low in zip(values, lower, strict=True)
+                        ],
+                        [
+                            max(high - v, 0.0)
+                            for v, high in zip(values, upper, strict=True)
+                        ],
+                    ]
+                ax.bar(
+                    [place + offset for place in places],
+                    values,
+                    width,
+                    yerr=errors,
+                    capsize=3,
+                    label=name,
+                )
+            ax.set_xticks(places)
+            ax.set_xticklabels(inputs)
+            ax.set_ylabel("Sobol index")
+            ax.set_title(result.labels[q])
+            ax.legend()
+        SimulationPlotter._finalize_plot(
+            axes, result.labels, output_file, config, "Sobol"
+        )
+        return fig
+
+    @staticmethod
+    def _create_grid(config: PlotConfig, count: int) -> tuple["Figure", list["Axes"]]:
+        """A figure of `count` subplots in the layout of `config`."""
+        rows, cols = config.layout or SimulationPlotter._calculate_layout(count)
+        return SimulationPlotter._create_figure(
+            rows, cols, (cols * 4.5, rows * 3.5 + 1.0), config.dpi
+        )
+
+    @staticmethod
+    def _apply_seaborn_style(config: PlotConfig) -> None:
         """Apply Seaborn styling configuration from PlotConfig."""
         if config.style:
             sns.set_style(config.style)
@@ -316,7 +508,8 @@ class SimulationPlotter:
             [position_label(position) for position in ticks], rotation=45, ha="right"
         )
 
-    def _calculate_layout(self, num_bins: int) -> tuple[int, int]:
+    @staticmethod
+    def _calculate_layout(num_bins: int) -> tuple[int, int]:
         """
         Calculate optimal subplot layout (rows, cols) for given number of bins.
         """

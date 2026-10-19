@@ -1,40 +1,47 @@
 """The runners of inference methods, looked up by configuration type.
 
-A method registers its runner with `register`; ``Calibrator.uncertainty``
-and ``Calibrator.identifiability`` find it with `run_method`. The entry points
-know no method.
+A method registers its runner with `register`; ``Calibrator.uncertainty``,
+``Calibrator.identifiability`` and ``SensitivityAnalysis.run`` find it with
+`run_method`, and pass the runner themselves. The entry points know no method.
 """
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from pydantic import BaseModel
 
 from commol.context.inference.method import (
     IdentifiabilityMethod,
     InferenceMethod,
+    SensitivityMethod,
     UncertaintyMethod,
 )
 
 if TYPE_CHECKING:
     from commol.api.calibrator import Calibrator
+    from commol.api.sensitivity import SensitivityAnalysis
 
 MethodT = TypeVar("MethodT", bound=InferenceMethod[BaseModel])
 ResultT = TypeVar("ResultT", bound=BaseModel)
 
-type Runner = Callable[["Calibrator", InferenceMethod[BaseModel]], BaseModel]
+type EntryPoint = Calibrator | SensitivityAnalysis
+"""What a runner runs on: the calibrator of an uncertainty or identifiability
+method, or the analysis of a sensitivity method."""
+
+type Runner = Callable[[EntryPoint, InferenceMethod[BaseModel]], BaseModel]
 
 _RUNNERS: dict[type[InferenceMethod[BaseModel]], Runner] = {}
 
 _ENTRY_POINTS: dict[type[InferenceMethod[BaseModel]], str] = {
     UncertaintyMethod: "Calibrator.uncertainty",
     IdentifiabilityMethod: "Calibrator.identifiability",
+    SensitivityMethod: "SensitivityAnalysis.run",
 }
 
 
 def register(
     method_type: type[MethodT],
-    runner: Callable[["Calibrator", MethodT], BaseModel],
+    runner: Callable[[Any, MethodT], BaseModel],
 ) -> None:
     """
     Register the runner of an inference method.
@@ -43,8 +50,10 @@ def register(
     ----------
     method_type : type[InferenceMethod]
         The configuration type of the method.
-    runner : Callable[[Calibrator, InferenceMethod], BaseModel]
-        Runs the method on a calibrator and returns its result.
+    runner : Callable[[Calibrator | SensitivityAnalysis, InferenceMethod], BaseModel]
+        Runs the method on the object of its entry point (a `Calibrator`,
+        or a `SensitivityAnalysis` for a sensitivity method) and returns its
+        result.
 
     Raises
     ------
@@ -69,22 +78,22 @@ def registered() -> list[str]:
 
 
 def run_method(
-    calibrator: "Calibrator",
+    entry_point: EntryPoint,
     method: InferenceMethod[ResultT],
     kind: type[InferenceMethod[BaseModel]],
 ) -> ResultT:
     """
-    Run `method` on `calibrator` with the runner of its type.
+    Run `method` on `entry_point` with the runner of its type.
 
     Parameters
     ----------
-    calibrator : Calibrator
-        The calibration problem.
+    entry_point : Calibrator | SensitivityAnalysis
+        The calibration problem, or the sensitivity analysis.
     method : InferenceMethod[ResultT]
         The configuration of the method.
     kind : type[InferenceMethod]
-        The kind of method the entry point takes: `UncertaintyMethod` or
-        `IdentifiabilityMethod`.
+        The kind of method the entry point takes: `UncertaintyMethod`,
+        `IdentifiabilityMethod` or `SensitivityMethod`.
 
     Returns
     -------
@@ -115,4 +124,4 @@ def run_method(
             f"No method is registered for {type(method).__name__}. "
             f"Registered: {registered()}."
         )
-    return cast("ResultT", runner(calibrator, method))
+    return cast("ResultT", runner(entry_point, method))

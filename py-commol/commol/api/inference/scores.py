@@ -14,7 +14,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from commol.api.inference.predictive import ObservationDraws, Predictive
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context._model import engine_state
 from commol.context.calibration import ObservedDataPoint
 from commol.context.inference.noise import DistributionNoise, ObservationNoise
 
@@ -256,16 +255,14 @@ def log_score(
     TypeError
         If `noise` is not `DistributionNoise`.
     ValueError
-        If the problem has a loss, or an observation names an unknown output
-        or factor or a series with no observation model.
+        If the problem has a loss, an observation names an unknown output or
+        factor or a series with no observation model, or the predictive is of
+        a sensitivity analysis, which has no observation models.
     """
     if not isinstance(noise, DistributionNoise):
         raise TypeError(
             f"The log score needs the density of the observation models, so it "
             f"takes DistributionNoise(); {type(noise).__name__} has no density."
         )
-    values = predictive.calibrator.rust_problem.log_score(
-        predictive.sample.rust_sample,
-        engine_state.rust_observed_data(list(observations)),
-    )
+    values = predictive.source.rust_log_score(predictive.sample, list(observations))
     return _score_of(observations, values)

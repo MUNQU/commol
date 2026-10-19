@@ -12,6 +12,8 @@ CalibrationParameterProtocol
 CalibrationParameterTypeProtocol
 CalibrationConstraintProtocol
 ObservedDataPointProtocol
+ForwardAnalysisProtocol
+PredictiveProtocol
 CalibrationProblemProtocol
 ParameterSampleProtocol
 CalibrationResultProtocol

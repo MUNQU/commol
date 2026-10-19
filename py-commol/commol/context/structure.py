@@ -14,7 +14,7 @@ Its ``variant`` is a ``Literal`` default; the registry holds one class per
 
 import inspect
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, ClassVar, NamedTuple, Self
 
 from pydantic import BaseModel, ConfigDict
@@ -25,7 +25,7 @@ from commol.context.constants import CalibrationParameterType
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import EngineProtocol
-    from commol.context.calibration import CalibrationProblem
+    from commol.context.calibration import CalibrationParameter, CalibrationProblem
     from commol.context.description import Section
     from commol.context.model import Model
     from commol.context.inference.sample import ParameterSummary
@@ -225,10 +225,12 @@ class ModelStructure(BaseModel, ABC):
         self,
         model: "Model[Self]",  # noqa: ARG002
         engine: "EngineProtocol",  # noqa: ARG002
-        problem: "CalibrationProblem",  # noqa: ARG002
+        parameters: Sequence["CalibrationParameter"],  # noqa: ARG002
+        remainder: str | None,  # noqa: ARG002
     ) -> None:
         """
-        Check the values of this kind that a calibration sets.
+        Check the values of this kind that a calibration or a sensitivity
+        analysis sets.
 
         The engine has resolved each value and the remainder when this runs;
         a kind checks here what only the Python definition knows, such as the
@@ -237,11 +239,14 @@ class ModelStructure(BaseModel, ABC):
         Parameters
         ----------
         model : Model
-            The model the calibration runs on.
+            The model the values are set on.
         engine : EngineProtocol
             The engine built from it.
-        problem : CalibrationProblem
-            The problem, for its parameters and remainder.
+        parameters : Sequence[CalibrationParameter]
+            The values set, with their types and bounds.
+        remainder : str | None
+            The id that takes what the initial conditions leave of the sum
+            the kind keeps, if any.
         """
 
     def with_calibrated_values(

@@ -417,7 +417,7 @@ impl Replicates {
     /// `[0, 1]`.
     pub fn new(count: usize, seed: u64, summary: ReplicateSummary) -> Result<Self, String> {
         if count == 0 {
-            return Err("A stochastic calibration needs at least one replicate".to_string());
+            return Err("A stochastic engine needs at least one replicate".to_string());
         }
         if let ReplicateSummary::Quantile(level) = summary {
             if !(0.0..=1.0).contains(&level) {

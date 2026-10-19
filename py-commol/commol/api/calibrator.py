@@ -1,6 +1,7 @@
 """Calibration of a model against observed data."""
 
 import logging
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, TypeVar
 
 from pydantic import BaseModel
@@ -11,18 +12,23 @@ if TYPE_CHECKING:
         CalibrationResultProtocol,
         EngineProtocol,
         LossConfigProtocol,
+        ObservationDrawsProtocol,
         OptimizationConfigProtocol,
+        PredictiveProtocol,
     )
+    from commol.context.model import Model
 
 from commol.api.simulation import Simulation, check_seed, draw_seed
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context._model import engine_state
 from commol.context.calibration import (
     CalibrationEvaluation,
+    CalibrationParameter,
     CalibrationHistory,
     CalibrationProblem,
     CalibrationResult,
     NelderMeadConfig,
+    ObservedDataPoint,
     ParticleSwarmConfig,
     PSOChaoticInertia,
     PSOConstantAcceleration,
@@ -35,6 +41,12 @@ from commol.context.constants import (
     OptimizationAlgorithm,
 )
 from commol.context.inference.method import IdentifiabilityMethod, UncertaintyMethod
+from commol.context.inference.noise import (
+    DistributionNoise,
+    ObservationNoise,
+    ResidualNoise,
+)
+from commol.context.inference.sample import ParameterSample
 
 rust_calibration = commol_rs.calibration
 
@@ -119,6 +131,91 @@ class Calibrator:
             The problem every optimization, prediction and method reads.
         """
         return self._rust_problem
+
+    def rust_predictive(
+        self, sample: ParameterSample, positions: list[float]
+    ) -> "PredictiveProtocol":
+        """
+        The run of every draw of `sample` at `positions`, for a `Predictive`:
+        each replicate of a stochastic engine has a seed of its own, derived
+        from the calibrator's seed.
+
+        Parameters
+        ----------
+        sample : ParameterSample
+            The draws, in the problem's order.
+        positions : list[float]
+            Positions to report at, ascending.
+
+        Returns
+        -------
+        PredictiveProtocol
+            The runs, computed in Rust.
+        """
+        return self._rust_problem.predictive(sample.rust_sample, positions, self.seed)
+
+    def rust_observation_draws(
+        self,
+        sample: ParameterSample,
+        observed_data: list[ObservedDataPoint],
+        noise: ObservationNoise,
+    ) -> "ObservationDrawsProtocol":
+        """
+        Every draw's value of `observed_data` with `noise`, for a `Predictive`.
+
+        Parameters
+        ----------
+        sample : ParameterSample
+            The draws, in the problem's order.
+        observed_data : list[ObservedDataPoint]
+            The observations.
+        noise : NoNoise | ResidualNoise | DistributionNoise
+            The observation noise, drawn from the calibrator's seed.
+
+        Returns
+        -------
+        ObservationDrawsProtocol
+            The draws, computed in Rust.
+        """
+        residual_noise = None
+        if isinstance(noise, ResidualNoise):
+            residual_noise = (
+                [noise.fit.best_parameters[name] for name in self.parameter_names],
+                noise.block_length,
+                noise.residual_scale,
+            )
+        return self._rust_problem.observation_draws(
+            sample.rust_sample,
+            engine_state.rust_observed_data(observed_data),
+            self.seed,
+            residual_noise=residual_noise,
+            distribution_noise=isinstance(noise, DistributionNoise),
+        )
+
+    def rust_log_score(
+        self, sample: ParameterSample, observed_data: list[ObservedDataPoint]
+    ) -> list[float]:
+        """
+        The log score of each observation under the predictive of `sample`,
+        for `commol.scores.log_score`.
+
+        Parameters
+        ----------
+        sample : ParameterSample
+            The draws, in the problem's order.
+        observed_data : list[ObservedDataPoint]
+            The observations.
+
+        Returns
+        -------
+        list[float]
+            One log score per observation, computed in Rust.
+        """
+        return self._rust_problem.log_score(
+            sample.rust_sample,
+            engine_state.rust_observed_data(observed_data),
+            self.seed,
+        )
 
     @property
     def rust_optimizer(self) -> "OptimizationConfigProtocol":
@@ -478,33 +575,12 @@ class Calibrator:
         ValueError
             If a parameter ID doesn't exist in the model or if a bin ID is invalid.
         """
-        model = self.simulation.model_definition
-        model_param_ids = {p.id for p in model.parameters}
-
-        for param in self.problem.parameters:
-            if param.parameter_type == CalibrationParameterType.PARAMETER:
-                if param.id not in model_param_ids:
-                    raise ValueError(
-                        f"Calibration parameter '{param.id}' not found in model "
-                        f"parameters. Available parameters: "
-                        f"{sorted(model_param_ids)}"
-                    )
-            elif param.parameter_type == CalibrationParameterType.FACTOR:
-                if param.min_bound <= 0 or param.max_bound <= 0:
-                    raise ValueError(
-                        f"Factor parameter '{param.id}' must have positive bounds "
-                        f"(got min={param.min_bound}, max={param.max_bound})"
-                    )
-
-        # The structure and the engine check the values of the model kind,
-        # such as initial conditions.
-        engine_state.check_model_values(
-            model,
+        check_values(
+            self.simulation.model_definition,
             self._engine,
             self.problem.parameters,
             self.problem.initial_condition_remainder,
         )
-        model.structure.check_calibration_values(model, self._engine, self.problem)
 
     def _validate_observed_data(self) -> None:
         """Validate that observed data compartments exist and have valid steps.
@@ -545,3 +621,52 @@ class Calibrator:
                     constraint.id,
                     max_observed_position,
                 )
+
+
+def check_values(
+    model: "Model",
+    engine: "EngineProtocol",
+    parameters: Sequence[CalibrationParameter],
+    remainder: str | None,
+) -> None:
+    """
+    Check that a model has every value a calibration or an analysis sets.
+
+    A parameter must be one of the model's, a factor must have positive
+    bounds, and the structure and the engine check the values of the model
+    kind, such as initial conditions, and the remainder.
+
+    Parameters
+    ----------
+    model : Model
+        The model the values are set on.
+    engine : EngineProtocol
+        The engine built from it.
+    parameters : Sequence[CalibrationParameter]
+        The values set, with their types and bounds.
+    remainder : str | None
+        The id that takes what the initial conditions leave, if any.
+
+    Raises
+    ------
+    ValueError
+        If a parameter is not one of the model's, a factor has a bound at or
+        below 0, or the structure or the engine rejects a value.
+    """
+    model_param_ids = {p.id for p in model.parameters}
+    for param in parameters:
+        if param.parameter_type == CalibrationParameterType.PARAMETER:
+            if param.id not in model_param_ids:
+                raise ValueError(
+                    f"Calibration parameter '{param.id}' not found in model "
+                    f"parameters. Available parameters: "
+                    f"{sorted(model_param_ids)}"
+                )
+        elif param.parameter_type == CalibrationParameterType.FACTOR:
+            if param.min_bound <= 0 or param.max_bound <= 0:
+                raise ValueError(
+                    f"Factor parameter '{param.id}' must have positive bounds "
+                    f"(got min={param.min_bound}, max={param.max_bound})"
+                )
+    engine_state.check_model_values(model, engine, parameters, remainder)
+    model.structure.check_calibration_values(model, engine, parameters, remainder)

@@ -14,7 +14,7 @@ Each method has its own page, listed in the table below.
 | Question | What answers it |
 |---|---|
 | Which parameters fit the data? | The [identifiability](identifiability.md) methods; a sample of the parameters, or a profile of the loss; several starts that end apart with equal losses show that the data do not identify the parameters |
-| How do the inputs move the outputs? | The predictive of a sample: the run of every draw, and its band |
+| How do the inputs move the outputs? | The predictive of a sample: the run of every draw, and its band; with no data, a [sensitivity analysis](sensitivity.md), which propagates the inputs and ranks them |
 | Are the intervals calibrated? | Scores of the predictive against observations the method did not see, and coverage studies |
 
 ## A band of the model, or a prediction interval
@@ -59,6 +59,11 @@ coverage guarantee, from the scores of observations the fit did not use.
 | `BayesianPosterior` | The posterior of the parameters from the likelihood and priors, with its evidence | Yes | [Observation Models](observation-models.md#maximum-likelihood-against-the-posterior) |
 | `ParametricBootstrap` | How far the parameters move in data sets drawn from the models at the fit | Yes | [Observation Models](observation-models.md#maximum-likelihood-against-the-posterior) |
 | `DistributionNoise` | Where the next observations fall: a prediction interval of the models | Yes | [Observation Models](observation-models.md#prediction-with-noise) |
+| `Propagation` | How uncertainty in the inputs moves the outputs, with no data | No | [Sensitivity Analysis](sensitivity.md#propagation) |
+| `PRCC` | How steadily each output rises or falls with each input, of independent inputs or a sample | No | [Sensitivity Analysis](sensitivity.md#prcc) |
+| `Morris` | Which inputs matter, in few runs | No | [Sensitivity Analysis](sensitivity.md#morris-screening) |
+| `Sobol` | The share of the variance of an output each input explains, alone and with interactions | No | [Sensitivity Analysis](sensitivity.md#sobol-indices) |
+| `PolynomialChaos` | A polynomial surrogate of an output and its Sobol indices, in few runs | No | [Sensitivity Analysis](sensitivity.md#polynomial-chaos) |
 
 Each uncertainty method adds its row here when it lands.
 ## Quick path
@@ -192,9 +197,12 @@ print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75
 
 ## The predictive
 
-`Predictive(calibrator, sample, positions)` runs every draw at `positions`, in
-parallel in Rust. With a stochastic engine every replicate of a draw is a draw
-of the predictive, with an equal share of its weight.
+`Predictive(source, sample, positions)` runs every draw at `positions`, in
+parallel in Rust, through the forward model of its source: a `Calibrator`, or
+a `SensitivityAnalysis` of the inputs of the sample. With a stochastic engine
+every replicate of a draw is a draw of the predictive, with an equal share of
+its weight and a seed of its own, derived from the seed of the source, so
+every draw shows fresh noise and the predictive repeats from that seed.
 
 | Member | Returns |
 |---|---|
@@ -241,7 +249,10 @@ The identifiability methods run through their own entry point,
 `IdentifiabilityMethod[R]`: they answer another question
 ([Identifiability](identifiability.md)). Both kinds subclass
 `InferenceMethod[R]` and share one registry; each entry point refuses the
-other kind with a `TypeError` that names the right one.
+other kind with a `TypeError` that names the right one. The sensitivity
+methods, subclasses of `SensitivityMethod[R]`, run with no data through
+`SensitivityAnalysis(simulation, inputs).run(method)`, the third entry point
+of the registry ([Sensitivity Analysis](sensitivity.md)).
 
 ```python
 from commol import BayesianBootstrap
@@ -264,6 +275,7 @@ print(type(result).__name__, len(result.sample))  # BootstrapResult 20
 | Posteriors with no noise model: the Gibbs posterior and ABC | [Sequential Monte Carlo](smc.md) |
 | Maximum likelihood, the posterior and prediction intervals of observation models | [Observation Models](observation-models.md) |
 | Prediction intervals with a coverage guarantee | [Conformal Prediction Intervals](conformal.md) |
+| How the inputs move the outputs, with no data | [Sensitivity Analysis](sensitivity.md) |
 | Several starts of an optimizer | [Optimizers](../calibration-optimizers.md#several-starts) |
 | Which parameters the data determine | [Identifiability](identifiability.md) |
 | Reports of a sample | [Reports](../reports.md) |

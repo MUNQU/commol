@@ -178,7 +178,8 @@ pub fn pit(draws: &ObservationDraws, observed: &[f64], seed: u64) -> Result<Vec<
 /// `sample` of the observation models of `noise`,
 /// `log Σ_d w_d · p(y | μ_d, θ_d)`, where `μ_d` is the draw's predicted mean
 /// (the nearest the model allows) and `θ_d` its noise parameters. A
-/// replicate of a draw is a draw with an equal share of its weight. Higher
+/// replicate of a draw is a draw with an equal share of its weight, seeded
+/// from `seed` as in [`crate::Predictive::new`]. Higher
 /// is better; an observation the predictive gives no mass scores `−∞`.
 ///
 /// # Errors
@@ -191,11 +192,12 @@ pub fn log_score<E>(
     sample: &ParameterSample,
     observations: &[ObservedDataPoint],
     noise: &DistributionNoise,
+    seed: u64,
 ) -> Result<Vec<f64>, PredictiveError>
 where
     E: SimulationEngine + Send + Sync,
 {
-    check_names(problem, sample)?;
+    check_names(problem.forward(), sample)?;
     noise
         .check(observations)
         .map_err(PredictiveError::Mismatch)?;
@@ -203,7 +205,7 @@ where
     let terms = likelihood
         .terms(observations)
         .expect("checked by the noise");
-    let runs = observe_sets(problem, sample.values(), observations)?;
+    let runs = observe_sets(problem.forward(), sample.values(), observations, Some(seed))?;
     let mut draws: Vec<(f64, &[f64], &[f64])> = Vec::new();
     for ((replicates, &weight), values) in runs.iter().zip(sample.weights()).zip(sample.values()) {
         let share = libm::log(weight / replicates.len() as f64);

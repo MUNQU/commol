@@ -265,7 +265,8 @@ impl PyCalibrationProblem {
         .map_err(|(index, error)| prediction_error(index, error))
     }
 
-    /// The run of every draw of `sample` at `positions`, in parallel
+    /// The run of every draw of `sample` at `positions`, in parallel, each
+    /// replicate of a stochastic engine seeded from `seed`
     ///
     /// Raises:
     ///     ValueError: If the sample's parameters are not the problem's
@@ -275,8 +276,9 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         sample: &PyParameterSample,
         positions: Vec<f64>,
+        seed: u64,
     ) -> PyResult<PyPredictive> {
-        py.detach(|| Predictive::new(&self.inner, &sample.inner, &positions))
+        py.detach(|| Predictive::new(self.inner.forward(), &sample.inner, &positions, seed))
             .map(|inner| PyPredictive { inner })
             .map_err(predictive_error)
     }
@@ -331,7 +333,7 @@ impl PyCalibrationProblem {
         };
         py.detach(|| {
             observation_draws(
-                &self.inner,
+                self.inner.forward(),
                 &sample.inner,
                 &observations,
                 noise.as_ref(),
@@ -343,7 +345,8 @@ impl PyCalibrationProblem {
     }
 
     /// The log score of each of `observations` under the predictive of
-    /// `sample` and the observation models of the problem
+    /// `sample` and the observation models of the problem, each replicate of
+    /// a stochastic engine seeded from `seed`
     ///
     /// Raises:
     ///     ValueError: If the sample's parameters are not the problem's, the
@@ -355,10 +358,11 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         sample: &PyParameterSample,
         observations: Vec<PyObservedDataPoint>,
+        seed: u64,
     ) -> PyResult<Vec<f64>> {
         let observations: Vec<_> = observations.into_iter().map(|o| o.inner).collect();
         let noise = DistributionNoise::new(&self.inner).map_err(value_error)?;
-        py.detach(|| scores::log_score(&self.inner, &sample.inner, &observations, &noise))
+        py.detach(|| scores::log_score(&self.inner, &sample.inner, &observations, &noise, seed))
             .map_err(predictive_error)
     }
 
@@ -783,7 +787,7 @@ impl PyParameterSample {
 /// The run of every draw of a sample at a set of positions
 #[pyclass(name = "Predictive", frozen)]
 pub struct PyPredictive {
-    inner: Predictive,
+    pub(crate) inner: Predictive,
 }
 
 #[pymethods]
@@ -832,7 +836,7 @@ impl PyPredictive {
 /// Every draw's value of a set of observations
 #[pyclass(name = "ObservationDraws", frozen)]
 pub struct PyObservationDraws {
-    inner: ObservationDraws,
+    pub(crate) inner: ObservationDraws,
 }
 
 #[pymethods]
@@ -963,5 +967,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::identifiability::register(m)?;
     crate::smc::register(m)?;
     crate::conformal::register(m)?;
+    crate::sensitivity::register(m)?;
     Ok(())
 }
