@@ -57,7 +57,7 @@ Planned work lives in GitHub issues, written from the templates of
 | What a change does to other work | The bodies and comments of the open issues it affects; work it leaves undone, in an open issue |
 | Priority and dependencies | The field `Priority` of the project (`Now`, `Next`, `Later`); "Blocked by" links between issues; "Why here" in the Delivery of a proposal |
 | Releases | A milestone per release, and its release issue |
-| Status | The [commol project](https://github.com/orgs/MUNQU/projects/1): "Board" by status, "By release" by milestone |
+| Status | The [commol project](https://github.com/orgs/MUNQU/projects/1): "Board" by status, "By release" by milestone, "By precedence" by the field `Level` |
 | Evidence of the delivery | The body of the pull request: each requirement and the tests that pass |
 | What lasts after the delivery | The guide, [Design decisions](../codebase/design-decisions.md) and the changelog, as the [definition of done](../codebase/conventions.md#documentation-definition-of-done) requires |
 
@@ -84,8 +84,24 @@ come by:
 3. Number.
 
 The dependencies set what must come first; `Priority` is set only to move an
-issue ahead of (`Now`) or behind (`Later`) its milestone. To see the whole
-plan:
+issue ahead of (`Now`) or behind (`Later`) its milestone.
+
+Before it lists them, `next.sh` writes the precedence level of each open
+proposal, change and release into the number field `Level` of the project:
+0 when no open issue blocks it, else one more than the highest level of its
+open blockers (an open blocker of another repository counts as level 0). The
+view "By precedence" groups the open issues by `Level`, so each group can
+start when the groups above it close. GitHub Projects cannot group by
+"blocked by" links, and its hierarchy view follows sub-issues only, so the
+script writes the field. It writes only the levels that change, through REST,
+with your own `gh` login: no workflow and no stored token. `start.sh` writes
+them too, and so does, at any time:
+
+```bash
+python .github/scripts/parallel.py --levels
+```
+
+A level is as fresh as the last of these runs. To see the whole plan:
 
 ```bash
 gh issue list --label proposal --state open

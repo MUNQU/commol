@@ -246,6 +246,70 @@ def test_the_priorities_of_a_repository_are_read_from_the_items() -> None:
     assert parallel.priorities_of(items, "o/a") == {1: "Now"}
 
 
+# The precedence level
+
+
+def test_an_issue_is_one_level_above_its_highest_blocker() -> None:
+    issues = {
+        1: an_issue(1),
+        2: an_issue(2, blocked_by=frozenset({1})),
+        3: an_issue(3, blocked_by=frozenset({1, 2})),
+    }
+
+    assert parallel.levels(issues) == {1: 0, 2: 1, 3: 2}
+
+
+def test_a_blocker_of_another_repository_counts_as_level_zero() -> None:
+    elsewhere = an_issue(1)
+    elsewhere.blocked_elsewhere = 1
+
+    assert parallel.levels({1: elsewhere, 2: an_issue(2)}) == {1: 1, 2: 0}
+
+
+def test_a_cycle_of_blockers_ends() -> None:
+    issues = {
+        1: an_issue(1, blocked_by=frozenset({2})),
+        2: an_issue(2, blocked_by=frozenset({1})),
+    }
+
+    assert set(parallel.levels(issues)) == {1, 2}
+
+
+def test_the_levels_of_a_repository_are_read_from_the_items() -> None:
+    def item(item_id: int, number: int, repository: str, level: int | None) -> dict:
+        return {
+            "id": item_id,
+            "content_type": "Issue",
+            "content": {
+                "number": number,
+                "repository_url": f"https://api.github.com/repos/{repository}",
+            },
+            "fields": [{"name": "Level", "value": level}],
+        }
+
+    items = [
+        item(10, 1, "o/a", 2),
+        item(20, 2, "o/a", None),
+        item(30, 3, "o/b", 1),
+        {"id": 40, "content_type": "DraftIssue", "content": {}, "fields": []},
+    ]
+
+    assert parallel.levels_of(items, "o/a") == {1: (10, 2), 2: (20, None)}
+
+
+def test_only_the_levels_that_change_are_written() -> None:
+    current = {1: (10, 0), 2: (20, None), 3: (30, 1.0), 4: (40, 2), 5: (50, None)}
+
+    # 1 keeps its level, 2 gets one, 3 moves, 4 has closed, 5 is closed already.
+    written = parallel.level_changes({1: 0, 2: 1, 3: 2}, current)
+
+    assert written == [(20, 1), (30, 2), (40, None)]
+
+
+def test_an_open_issue_outside_the_project_gets_no_level() -> None:
+    assert parallel.level_changes({1: 0}, {}) == []
+
+
 def test_the_milestone_of_an_issue_is_its_due_date_and_number() -> None:
     due = {"milestone": {"number": 2, "due_on": "2026-11-01T00:00:00Z"}}
 

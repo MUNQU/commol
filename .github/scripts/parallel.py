@@ -26,12 +26,20 @@ issue that another issue needs inherits the priority of that issue. An open
 milestone comes before none; the nearest due date first, then the oldest
 milestone.
 
+The precedence level (``--levels``) of an open proposal, change or release is
+0 when no open issue blocks it, else one more than the highest level of its
+blockers; an open blocker of another repository counts as level 0. The
+script writes it into the number field ``Level`` of the project, only where
+it changes, and empties the field of an issue that is no longer open.
+
 The script reads the repository from the git remote, and the project is the
 one of the organization with the name of the repository. Usage, from the root
 of the repository:
 ``python .github/scripts/parallel.py`` prints what can run in parallel,
-``--write`` also writes it under the Delivery of each proposal, and
-``--next N`` prints the next N issues (``.github/scripts/next.sh`` runs it).
+``--write`` also writes it under the Delivery of each proposal,
+``--next N`` prints the next N issues (``.github/scripts/next.sh`` runs it),
+and ``--levels`` writes the precedence levels, before the next issues when
+both are given (``next.sh`` and ``start.sh`` run it).
 """
 
 import argparse
@@ -338,33 +346,139 @@ def priorities_of(items: JsonValue, repository_: str) -> dict[int, str]:
     return found
 
 
-@cache
-def project_priorities(repository_: str) -> dict[int, str]:
-    """Return the field Priority of the issues of a repository, read once per run.
+def project_field(repository_: str, name: str) -> tuple[str, int] | None:
+    """Return the path of the project of a repository and the id of one field.
 
-    The project of a repository is the project of its organization with the
-    same name; a repository without one, or without the field, has none.
+    The path is ``orgs/{owner}/projectsV2/{number}``. The project of a
+    repository is the project of its organization with the same name; None
+    when there is no such project or it has no field of that name.
     """
-    owner, name = repository_.split("/")
-    number = project_number(owner, name)
+    owner, repository_name = repository_.split("/")
+    number = project_number(owner, repository_name)
     if number is None:
-        return {}
-    fields = rest(f"orgs/{owner}/projectsV2/{number}/fields?per_page=100")
+        return None
+    path = f"orgs/{owner}/projectsV2/{number}"
+    fields = rest(f"{path}/fields?per_page=100")
     field_id = next(
         (
             f.get("id")
             for f in (fields if isinstance(fields, list) else [])
-            if isinstance(f, dict) and f.get("name") == "Priority"
+            if isinstance(f, dict) and f.get("name") == name
         ),
         None,
     )
-    if field_id is None:
+    return (path, field_id) if isinstance(field_id, int) else None
+
+
+@cache
+def project_priorities(repository_: str) -> dict[int, str]:
+    """Return the field Priority of the issues of a repository, read once per run.
+
+    A repository without a project, or a project without the field, has none.
+    """
+    found = project_field(repository_, "Priority")
+    if found is None:
         return {}
-    items = rest(
-        f"orgs/{owner}/projectsV2/{number}/items?per_page=100&fields={field_id}",
-        every_page=True,
-    )
+    path, field_id = found
+    items = rest(f"{path}/items?per_page=100&fields={field_id}", every_page=True)
     return priorities_of(items, repository_)
+
+
+def levels(issues: dict[int, Proposal]) -> dict[int, int]:
+    """Return the precedence level of each issue.
+
+    An issue that no open issue blocks is level 0; another is one level above
+    its highest blocker. An open blocker of another repository counts as
+    level 0. A cycle of links ends at the issue where it closes.
+    """
+    found: dict[int, int] = {}
+
+    def visit(number: int, path: frozenset[int]) -> int:
+        if number in found:
+            return found[number]
+        if number in path:
+            return 0
+        issue = issues[number]
+        below = [visit(b, path | {number}) for b in issue.blocked_by]
+        if issue.blocked_elsewhere:
+            below.append(0)
+        found[number] = 1 + max(below) if below else 0
+        return found[number]
+
+    for number in issues:
+        visit(number, frozenset())
+    return found
+
+
+type Level = int | float | None
+
+
+def levels_of(items: JsonValue, repository_: str) -> dict[int, tuple[int, Level]]:
+    """Return the item and the field Level of the issues of one repository.
+
+    ``items`` is the answer of ``GET /orgs/{org}/projectsV2/{number}/items``
+    with the field Level; an issue with no Level has None.
+    """
+    found: dict[int, tuple[int, Level]] = {}
+    prefix = "https://api.github.com/repos/"
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict) or item.get("content_type") != "Issue":
+            continue
+        content = item.get("content")
+        fields = item.get("fields")
+        item_id = item.get("id")
+        if not isinstance(content, dict) or not isinstance(fields, list):
+            continue
+        url = content.get("repository_url")
+        number = content.get("number")
+        if not isinstance(url, str) or url.removeprefix(prefix) != repository_:
+            continue
+        if not isinstance(number, int) or not isinstance(item_id, int):
+            continue
+        value = next(
+            (
+                f.get("value")
+                for f in fields
+                if isinstance(f, dict) and f.get("name") == "Level"
+            ),
+            None,
+        )
+        found[number] = (item_id, value if isinstance(value, int | float) else None)
+    return found
+
+
+def level_changes(
+    new: dict[int, int], current: dict[int, tuple[int, Level]]
+) -> list[tuple[int, int | None]]:
+    """Return the items whose Level changes, and the value each one gets.
+
+    An open issue gets its level; an issue with a Level that is no longer
+    open loses it. An open issue outside the project is left out.
+    """
+    changes: list[tuple[int, int | None]] = []
+    for number, (item_id, value) in sorted(current.items()):
+        level = new.get(number)
+        if value != level:
+            changes.append((item_id, level))
+    return changes
+
+
+def write_levels(issues: dict[int, Proposal]) -> None:
+    """Write the precedence level of each open issue into the field Level."""
+    found = project_field(repository(), "Level")
+    if found is None:
+        print("Level: the project has no number field Level; no level written")
+        return
+    path, field_id = found
+    items = rest(f"{path}/items?per_page=100&fields={field_id}", every_page=True)
+    changes = level_changes(levels(issues), levels_of(items, repository()))
+    for item_id, level in changes:
+        rest(
+            f"{path}/items/{item_id}",
+            method="PATCH",
+            data={"fields": [{"id": field_id, "value": level}]},
+        )
+    print(f"Level: {len(changes)} written")
 
 
 @cache
@@ -470,9 +584,8 @@ def next_issues(
     return chosen, skipped
 
 
-def show_next(count: int) -> None:
+def show_next(issues: dict[int, Proposal], count: int) -> None:
     """Print the next issues with their priority, then the ones skipped and why."""
-    issues = load()
     here = repository()
 
     def own(key: str) -> str | None:
@@ -498,9 +611,8 @@ def show_next(count: int) -> None:
         )
 
 
-def show_parallel(write: bool) -> None:
+def show_parallel(proposals: dict[int, Proposal], write: bool) -> None:
     """Print, and with ``write`` store, the issues each one can run with."""
-    proposals = load()
     before = ancestors(proposals)
     candidates = [
         p for p in proposals.values() if "## Touches" in p.body or p.kind == "change"
@@ -526,15 +638,25 @@ def show_parallel(write: bool) -> None:
 
 
 def main() -> None:
-    """Print what can run in parallel, or with --next the next issues to take."""
+    """Print what can run in parallel, or with --next the next issues to take.
+
+    With --levels it first writes the precedence levels into the project, and
+    alone it does only that.
+    """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--write", action="store_true", help="write it under Delivery")
     parser.add_argument("--next", type=int, metavar="N", help="the next N issues")
+    parser.add_argument(
+        "--levels", action="store_true", help="write the field Level of the project"
+    )
     arguments = parser.parse_args()
+    issues = load()
+    if arguments.levels:
+        write_levels(issues)
     if arguments.next is not None:
-        show_next(arguments.next)
-    else:
-        show_parallel(arguments.write)
+        show_next(issues, arguments.next)
+    elif not arguments.levels:
+        show_parallel(issues, arguments.write)
 
 
 if __name__ == "__main__":
