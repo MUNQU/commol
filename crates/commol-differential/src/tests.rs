@@ -19,14 +19,13 @@ fn model(
     transitions: &[String],
     settings: &str,
 ) -> Model {
-    let total: f64 = bins.iter().map(|(_, amount)| amount).sum();
     let bin_json: Vec<String> = bins
         .iter()
         .map(|(id, _)| format!(r#"{{"id":"{id}","name":"{id}"}}"#))
         .collect();
-    let fractions: Vec<String> = bins
+    let amounts: Vec<String> = bins
         .iter()
-        .map(|(id, amount)| format!(r#""{id}":{}"#, amount / total))
+        .map(|(id, amount)| format!(r#""{id}":{amount:?}"#))
         .collect();
     let parameter_json: Vec<String> = parameters
         .iter()
@@ -41,12 +40,12 @@ fn model(
         "engine":{{"type":"{engine_type}"{settings}}},
         "process":{{"bins":[{}],"accumulators":[{}],
         "stratifications":[],"transitions":[{}]}},
-        "structure":{{"kind":"aggregate","total":{total},"bin_fractions":{{{}}}}}}}"#,
+        "structure":{{"kind":"aggregate","bin_amounts":{{{}}}}}}}"#,
         parameter_json.join(","),
         bin_json.join(","),
         accumulator_json.join(","),
         transitions.join(","),
-        fractions.join(","),
+        amounts.join(","),
     );
     serde_json::from_str(&json).expect("valid model JSON")
 }
@@ -660,8 +659,8 @@ fn coupled_groups(groups: usize, method: &str) -> Model {
         "process":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}},
         {{"id":"C","name":"C"}}],"accumulators":[],
         "stratifications":[{{"id":"group","categories":[{}]}}],"transitions":[{},{}]}},
-        "structure":{{"kind":"aggregate","total":10000,
-        "bin_fractions":{{"A":0.99,"B":0.01,"C":0.0}},
+        "structure":{{"kind":"aggregate",
+        "bin_amounts":{{"A":9900.0,"B":100.0,"C":0.0}},
         "stratification_fractions":{{"group":{{{}}}}}}}}}"#,
         categories.join(","),
         transition("ab", &["A"], &["B"], "k1 * B / total", ""),
@@ -814,7 +813,7 @@ fn the_engine_writes_initial_conditions_and_its_state_excludes_accumulators() {
             Some("B"),
         )
         .unwrap();
-    assert_eq!(engine.apply_values(&plan, &[0.4]).unwrap(), 0.0);
+    assert_eq!(engine.apply_values(&plan, &[400.0]).unwrap(), 0.0);
     engine.reset();
 
     assert_eq!(CompartmentalEngine::state(&engine), vec![400.0, 600.0]);

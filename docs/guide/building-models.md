@@ -36,10 +36,7 @@ model = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .add_transition(id="t_cd", source=["C"], target=["D"], rate="k3")
     .build(
-        Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0, "D": 0.0},
-        ),
+        Aggregate(bin_amounts={"A": 900, "B": 100, "C": 0, "D": 0}),
         engine="DifferenceEquations",
     )
 )
@@ -50,8 +47,8 @@ results = Simulation(model).run(num_steps=200)
 1. Create a builder.
 2. Add bins, parameters and transitions, and optionally stratifications and
    accumulators: the process.
-3. Call `build` with a structure, such as `Aggregate` with the total and the
-   fraction of it in each bin, and an engine.
+3. Call `build` with a structure, such as `Aggregate` with the initial amount
+   of each bin, and an engine.
 
 ## The builder
 
@@ -189,8 +186,7 @@ def inflow_per_step(mode: str) -> list[float]:
         .add_transition(id="inflow", source=[], target=["A"], rate="k_in")
         .build(
             Aggregate(
-                total=100,
-                bin_fractions={"A": 1.0},
+                bin_amounts={"A": 100},
             ),
             engine="DifferenceEquations",
         )
@@ -264,8 +260,7 @@ counted = (
     .add_transition(id="t_ac", source=["A"], target=["C"], rate="k2", accumulators=["total_out"])
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0, "C": 0.0},
+            bin_amounts={"A": 1000, "B": 0, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -289,40 +284,75 @@ accumulator expands like a bin.
 `Aggregate` lays the process out as amounts per compartment: the bins expand
 over the stratifications into compartments, and each compartment holds an
 amount. It says how much starts where and who the neighbors of a unit are.
+Each bin starts at an amount in its own unit, so there is no total over bins
+of different units.
 
 ```python
 structure = Aggregate(
-    total=10000,
-    bin_fractions={"A": 0.9, "B": 0.1},
+    bin_amounts={"A": 9000, "B": 1000},
     stratification_fractions={
         "group": {"g1": 0.3, "g2": 0.7},
         "subtype": {"s1": 0.8, "s2": 0.2},
     },
-    compartment_fractions={"B_g1": 0.0},
+    compartment_amounts={"B_g1": 0},
 )
 ```
 
 | Argument | Type | Default | Meaning |
 |---|---|---|---|
-| `total` | `float` | required | The sum of every compartment at the start: a count, a mass or a concentration. It must be finite and greater than 0. |
-| `bin_fractions` | `dict[str, float \| None]` | required | The fraction of the total in each bin. A fraction may be `None` when calibration finds it. |
-| `stratification_fractions` | `dict[str, dict[str, float]]` | `{}` | For each stratification, the fraction in each category. For a conditional stratification, fractions of the subgroup it splits. |
-| `compartment_fractions` | `dict[str, float]` | `{}` | Overrides single expanded compartments with a fraction of the total. |
+| `bin_amounts` | `dict[str, float \| None]` | required | The amount of each bin at the start, in the unit of the bin: a count, a mass or a concentration. An amount may be `None` when calibration finds it. |
+| `stratification_fractions` | `dict[str, dict[str, float]]` | `{}` | For each stratification, the fraction in each category: the split of the amount of every bin it applies to. For a conditional stratification, the split of the subgroup it splits. |
+| `compartment_amounts` | `dict[str, float]` | `{}` | Overrides single expanded compartments with an amount in the unit of their bin. |
 | `neighbors` | `Complete \| Groups \| None` | `None` | Who the [neighbors](#neighbors) of a unit are. Required when a rate reads them. |
 
 | Rule | Checked when |
 |---|---|
-| `total` finite and `> 0`; each compartment fraction in `[0.0, 1.0]` | `Aggregate(...)` |
-| The bin fractions sum to 1.0; with `None` fractions, the given ones sum to less than 1.0 | `Aggregate(...)` |
-| Every bin has a fraction, and no other id | `build` |
+| Every amount is finite and not negative; `0` is an amount | `Aggregate(...)` |
+| Every bin has an amount, and no other id | `build` |
 | Every stratification has fractions for its categories that sum to 1.0 | `build` |
-| Override names are expanded compartments; the initial amounts do not sum to more than `total` | `build` |
+| Override names are expanded compartments | `build` |
+| With a stochastic engine, the amount of each bin is a whole number | `build` |
 
 The initial amount of a compartment is
-`total × bin fraction × the fraction of each of its categories`,
-unless an override names it. `model.structure.initial_state(model.process)`
-shows the result. To change fractions on a built model, see
-[Core Concepts](core-concepts.md#updating-fractions-after-building).
+`bin amount × the fraction of each of its categories`, unless an override
+names it. `model.structure.initial_state(model.process)` shows the result. To
+change amounts or fractions on a built model, see
+[Core Concepts](core-concepts.md#updating-the-initial-state-after-building).
+
+A structure that states `total`, `bin_fractions` or `compartment_fractions` is
+rejected, and the message names `bin_amounts` and `compartment_amounts`.
+
+### Bins of different units
+
+A bin may hold a count while another holds a concentration. Each bin states
+its amount in its own unit:
+
+```python
+mixed = (
+    ModelBuilder(name="Mixed units", step_unit="day")
+    .add_bin(id="A", name="State A", unit="item")
+    .add_bin(id="B", name="State B", unit="item")
+    .add_bin(id="C", name="State C", unit="mg/l")
+    .add_parameter(id="k1", value=0.5, unit="1/day")
+    .add_parameter(id="k2", value=1e6, unit="mg/l")
+    .add_transition(
+        id="t_ab", source=["A"], target=["B"], rate="k1 * A * C / (C + k2)"
+    )
+    .build(
+        Aggregate(bin_amounts={"A": 990, "B": 10, "C": 1e5}),
+        engine="DifferenceEquations",
+    )
+)
+
+print({c.name: c.amount for c in mixed.structure.initial_state(mixed.process)})
+# {'A': 990.0, 'B': 10.0, 'C': 100000.0}
+mixed.check_unit_consistency()
+```
+
+A rate that reads `total`, a subgroup total or `neighbors` adds bins of
+different units here, so the [unit check](units-and-equations.md) rejects it.
+A model whose bins all start at `0` builds and runs: its state stays at `0`
+when nothing flows in.
 
 ### Neighbors
 
@@ -361,10 +391,9 @@ def into_b_g2(neighbors: Complete | Groups) -> list[float]:
         )
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.99, "B": 0.01},
+                bin_amounts={"A": 990, "B": 10},
                 stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
-                compartment_fractions={"B_g2": 0.0},
+                compartment_amounts={"B_g2": 0},
                 neighbors=neighbors,
             ),
             engine="DifferenceEquations",
@@ -403,7 +432,7 @@ the definition is not valid:
 |---|---|
 | The engine runs the kind of the structure | An `Aggregate` with an engine of another kind; the message lists the engines of `Aggregate` |
 | At least one bin and one transition | A model with no transition |
-| The structure follows the rules above | Bin fractions that sum to 0.9 |
+| The structure follows the rules above | A bin with no amount in `bin_amounts` |
 | Parameter ids are unique and are not [names the engine sets](#names-the-engine-sets) | A parameter named `A`, `total` or `A_g1` |
 | Every `total_…` variable names a subgroup total | `total_t1_g1` when `group` is declared before `type` |
 | A rate that reads the neighbors has them | `k1 * neighbors_B` with no `neighbors=` |

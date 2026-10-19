@@ -108,22 +108,22 @@
  "blocks": [
   {
    "type": "table",
-   "heading": "Bin fractions",
+   "heading": "Bin amounts",
    "columns": [
     "Bin",
-    "Fraction",
-    "Amount"
+    "Amount",
+    "Unit"
    ],
    "rows": [
     [
      "A",
-     0.5,
-     50.0
+     50.0,
+     null
     ],
     [
      "B",
-     0.5,
-     50.0
+     50.0,
+     null
     ]
    ]
   },
@@ -141,13 +141,13 @@
      "group",
      "g1",
      0.5,
-     "total"
+     "each bin"
     ],
     [
      "group",
      "g2",
      0.5,
-     "total"
+     "each bin"
     ],
     [
      "tier",
@@ -177,43 +177,52 @@
   },
   {
    "type": "table",
-   "heading": "Initial state (total 100)",
+   "heading": "Initial state",
    "columns": [
     "Compartment",
-    "Amount"
+    "Amount",
+    "Unit"
    ],
    "rows": [
     [
      "A_g1_t1_d1",
-     6.25
+     6.25,
+     null
     ],
     [
      "A_g1_t1_d2",
-     6.25
+     6.25,
+     null
     ],
     [
      "A_g1_t2",
-     12.5
+     12.5,
+     null
     ],
     [
      "A_g2",
-     25.0
+     25.0,
+     null
     ],
     [
      "B_g1_t1_d1",
-     6.25
+     6.25,
+     null
     ],
     [
      "B_g1_t1_d2",
-     6.25
+     6.25,
+     null
     ],
     [
      "B_g1_t2",
-     12.5
+     12.5,
+     null
     ],
     [
      "B_g2",
-     25.0
+     25.0,
+     null
     ]
    ]
   }

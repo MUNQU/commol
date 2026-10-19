@@ -1,4 +1,4 @@
-"""The ``initial_conditions`` section of a report of an aggregate model."""
+"""The ``initial_amounts`` and ``category_splits`` sections of a report."""
 
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, NotRequired, TypedDict
@@ -12,43 +12,50 @@ if TYPE_CHECKING:
     from commol.context.inference.sample import ParameterSummary
     from commol.context.process import Process
 
-WHOLE_GROUP = "total"
 
+class InitialAmountEntry(TypedDict):
+    """Reported initial amount of one bin or one overridden compartment."""
 
-class InitialConditionEntry(TypedDict):
-    """Reported value of one initial condition."""
-
-    group: str
-    fraction: float | None
-    value: float | None
+    amount: float | None
+    unit: str | None
     calibrated: bool
     interval: NotRequired[Interval]
 
 
-def _group_label(group: tuple[str, ...]) -> str:
-    """Name of the subgroup a fraction is taken of."""
-    return "+".join(group) if group else WHOLE_GROUP
+class CategorySplitEntry(TypedDict):
+    """Reported split of one category within the group it splits."""
+
+    group: list[str]
+    fraction: float
+    calibrated: bool
+    interval: NotRequired[Interval]
 
 
-def _entry(
+def _interval(
+    entry: InitialAmountEntry | CategorySplitEntry,
     entry_id: str,
-    group: str,
-    fraction: float | None,
-    value: float | None,
-    calibrated_ids: set[str],
     statistics: "Mapping[str, ParameterSummary] | None",
-    interval_scale: float = 1.0,
-) -> InitialConditionEntry:
-    """One reported initial condition, with its interval when there is one."""
-    entry: InitialConditionEntry = {
-        "group": group,
-        "fraction": fraction,
-        "value": value,
-        "calibrated": entry_id in calibrated_ids,
-    }
-    interval = entry_interval(entry_id, statistics, interval_scale)
+) -> None:
+    """Add the interval of an entry, when the sample has one."""
+    interval = entry_interval(entry_id, statistics)
     if interval is not None:
         entry["interval"] = interval
+
+
+def _amount_entry(
+    entry_id: str,
+    amount: float | None,
+    unit: str | None,
+    calibrated: bool,
+    statistics: "Mapping[str, ParameterSummary] | None",
+) -> InitialAmountEntry:
+    """One reported amount, with its interval when there is one."""
+    entry: InitialAmountEntry = {
+        "amount": amount,
+        "unit": unit,
+        "calibrated": calibrated,
+    }
+    _interval(entry, entry_id, statistics)
     return entry
 
 
@@ -94,106 +101,93 @@ def _override_is_calibrated(
     )
 
 
-def initial_conditions_report(
+def _unit(process: "Process", bin_id: str) -> str | None:
+    """The unit of a bin."""
+    bin_item = process.bin(bin_id)
+    return None if bin_item is None else bin_item.unit
+
+
+def initial_amounts_report(
     process: "Process",
     structure: "Aggregate",
     calibrated_ids: set[str],
     parameter_statistics: "Mapping[str, ParameterSummary] | None",
-) -> dict[str, InitialConditionEntry]:
+) -> dict[str, InitialAmountEntry]:
     """
-    Every bin fraction, stratification category and compartment override.
+    The amount of every bin and of every overridden compartment.
 
-    The ``initial_conditions`` section of :func:`commol.applied_parameters_report`
-    for an aggregate model.
+    The ``initial_amounts`` section of :func:`commol.applied_parameters_report`
+    for an aggregate model. Each row gives its amount in the unit of its bin,
+    and no row is a share of a total, so bins of different units, such as
+    people and a concentration, are reported side by side.
 
-    Every row reports its effective amount the engine builds from the
-    uniform expansion plus the declared compartment overrides, and its fraction
-    as that amount over the declared ``total``. A single
-    denominator is used for bin, category and override rows, so the fractions
-    line up with one another and with the ``total`` row. An override row is reported
-    ``calibrated`` when its compartment carries a calibrated parameter id, or
-    when a calibrated bin or category parameter id covers it. A declared
-    override that no calibrated id covers reports ``calibrated`` false.
-
-    A bin whose declared fraction is ``None`` keeps the ``None`` fraction and
-    amount that mark it as needing calibration, even when overrides touch
-    some of its compartments; the override rows still carry their own numbers.
+    A bin row reports the amount the engine builds: its declared amount, or
+    the sum of its compartments when an override touches one of them. A bin
+    whose declared amount is ``None`` keeps the ``None`` that marks it as
+    needing calibration; the override rows still carry their own numbers. An
+    override row is reported ``calibrated`` when its compartment carries a
+    calibrated parameter id, or when a calibrated bin or category parameter id
+    covers it.
     """
-    total = structure.total
     state = structure.initial_state(process)
     by_name = {compartment.name: compartment for compartment in state}
-    override_names = set(structure.compartment_fractions)
+    override_names = set(structure.compartment_amounts)
 
-    report: dict[str, InitialConditionEntry] = {
-        "total": {
-            "group": WHOLE_GROUP,
-            "fraction": 1.0,
-            "value": total,
-            "calibrated": False,
-        }
-    }
-    for bin_id, declared in structure.bin_fractions.items():
+    report: dict[str, InitialAmountEntry] = {}
+    for bin_id, declared in structure.bin_amounts.items():
         compartments = [c for c in state if c.bin == bin_id]
-        fraction: float | None
-        value: float | None
-        if declared is None:
-            # A bin needing calibration keeps its marker even when overrides
-            # pin some of its compartments; the override rows carry the numbers.
-            fraction = None
-            value = None
-        elif override_names.isdisjoint(c.name for c in compartments):
-            # No override touches this row, so report the declared fraction
-            # verbatim rather than an expansion sum that drifts in the last
-            # float bits.
-            fraction = declared
-            value = fraction * total
-        else:
-            value = sum(c.amount for c in compartments)
-            fraction = value / total
-        report[bin_id] = _entry(
+        amount = declared
+        if declared is not None and not override_names.isdisjoint(
+            c.name for c in compartments
+        ):
+            amount = sum(c.amount for c in compartments)
+        report[bin_id] = _amount_entry(
             bin_id,
-            WHOLE_GROUP,
-            fraction,
-            value,
-            calibrated_ids,
+            amount,
+            _unit(process, bin_id),
+            bin_id in calibrated_ids,
             parameter_statistics,
         )
-    for stratification, categories in structure.stratification_fractions.items():
-        group = structure.get_conditioning_categories(process, stratification)
-        # A conditional stratification's category is calibrated as a fraction
-        # of its conditioning subgroup, but reported as a fraction of the
-        # total. The group's share of the total is the same factor that
-        # converts one unit into the other, so it rescales the interval.
-        interval_scale = (
-            structure.subgroup_total(process, group) / total if group else 1.0
+    for name, amount in structure.compartment_amounts.items():
+        compartment = by_name[name]
+        report[name] = _amount_entry(
+            name,
+            amount,
+            _unit(process, compartment.bin),
+            _override_is_calibrated(process, structure, compartment, calibrated_ids),
+            parameter_statistics,
         )
-        for category in categories:
-            row_value = sum(
-                c.amount for c in state if c.categories.get(stratification) == category
-            )
-            # A category name two stratifications declare is reported under
-            # its qualified id, so the rows do not overwrite each other.
+    return report
+
+
+def category_splits_report(
+    process: "Process",
+    structure: "Aggregate",
+    calibrated_ids: set[str],
+    parameter_statistics: "Mapping[str, ParameterSummary] | None",
+) -> dict[str, CategorySplitEntry]:
+    """
+    The split of every category within the group its stratification splits.
+
+    The ``category_splits`` section of :func:`commol.applied_parameters_report`
+    for an aggregate model. A category has no amount of its own, because it
+    can split bins of different units; its row gives the declared fraction
+    and ``group``, the categories that select the subgroup a conditional
+    stratification splits (empty when it splits every bin). A category name
+    two stratifications declare is reported under its qualified id, so the
+    rows do not overwrite each other.
+    """
+    report: dict[str, CategorySplitEntry] = {}
+    for stratification, categories in structure.stratification_fractions.items():
+        group = list(structure.get_conditioning_categories(process, stratification))
+        for category, fraction in categories.items():
             ids = _category_ids(structure, stratification, category)
             entry_id = next((i for i in ids if i in calibrated_ids), ids[0])
-            report[ids[0]] = _entry(
-                entry_id,
-                _group_label(group),
-                row_value / total,
-                row_value,
-                calibrated_ids,
-                parameter_statistics,
-                interval_scale,
-            )
-    for compartment, override in structure.compartment_fractions.items():
-        calibrated = _override_is_calibrated(
-            process, structure, by_name[compartment], calibrated_ids
-        )
-        report[compartment] = _entry(
-            compartment,
-            WHOLE_GROUP,
-            override,
-            override * total,
-            {compartment} if calibrated else set(),
-            parameter_statistics,
-        )
+            entry: CategorySplitEntry = {
+                "group": group,
+                "fraction": fraction,
+                "calibrated": entry_id in calibrated_ids,
+            }
+            _interval(entry, entry_id, parameter_statistics)
+            report[ids[0]] = entry
     return report

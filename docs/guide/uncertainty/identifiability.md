@@ -59,7 +59,7 @@ def basic_model(k1: float | None, alpha: float | None, k2: float | None):
         )
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
-            Aggregate(total=1000, bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0}),
+            Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0}),
             engine="DifferenceEquations",
         )
     )

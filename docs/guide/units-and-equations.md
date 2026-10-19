@@ -22,8 +22,7 @@ model = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+            bin_amounts={"A": 900, "B": 100, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -111,8 +110,7 @@ along_a_line = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 1000, "B": 0},
         ),
         engine="DifferentialEquations",
     )
@@ -158,8 +156,7 @@ wrong_units = (
     .add_transition(id="t_ba", source=["B"], target=["A"], rate="k2 * sin(B) * B")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.9, "B": 0.1},
+            bin_amounts={"A": 900, "B": 100},
         ),
         engine="DifferenceEquations",
     )

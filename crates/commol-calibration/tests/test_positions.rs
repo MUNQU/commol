@@ -17,7 +17,7 @@ fn decay_model(engine: &str) -> Model {
         "accumulators":[],"stratifications":[],
         "transitions":[{{"id":"ab","source":["A"],
         "target":["B"],"rate":"k","stratified_rates":null,"per_compartment":null}}]}},
-        "structure":{{"kind":"aggregate","total":1000,"bin_fractions":{{"A":1.0,"B":0.0}}}}}}"#
+        "structure":{{"kind":"aggregate","bin_amounts":{{"A":1000.0,"B":0.0}}}}}}"#
     );
     serde_json::from_str(&json).expect("valid model JSON")
 }

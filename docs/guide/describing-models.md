@@ -25,7 +25,7 @@ model = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
     .build(
-        Aggregate(total=1000, bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0}),
+        Aggregate(bin_amounts={"A": 900, "B": 100, "C": 0}),
         engine="DifferenceEquations",
     )
 )
@@ -157,7 +157,7 @@ odd.save("model_odd.tex")
 | Entities, state variables and scales | Bins, accumulators, stratifications, compartments; the step unit and how the engine advances |
 | Process overview and scheduling | Each transition, where it moves, whether it is an impulse; the schedule of the engine and its settings |
 | Design concepts | Interaction (when the structure has [neighbors](building-models.md#neighbors)), stochasticity (from the engine) and observation (the outputs); the marker for the others |
-| Initialization | The fractions, the overrides and the initial state |
+| Initialization | The bin amounts and their units, the category fractions, the overrides and the initial state |
 | Input data | The series parameters, or "None" |
 | Submodels | The state graphs and equations, the parameters and the outputs |
 

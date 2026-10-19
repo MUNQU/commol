@@ -92,7 +92,7 @@ class TestConditionalCompartments:
                     "k2_g2_t2": 0.8,
                 },
                 bc=None,
-                fractions={"A": 0.0, "B": 1.0, "C": 0.0},
+                amounts={"A": 0, "B": 1000, "C": 0},
                 stratifications={
                     "group": {"g1": 0.5, "g2": 0.5},
                     "type": {"t1": 0.5, "t2": 0.5},
@@ -163,8 +163,7 @@ class TestStratifiedRateValidation:
         )
         builder.set_structure(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 1.0},
+                bin_amounts={"A": 1000},
                 stratification_fractions=stratify(
                     builder,
                     {"group": {"g1": 0.5, "g2": 0.5}, "type": {"t1": 0.5, "t2": 0.5}},

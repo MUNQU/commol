@@ -12,15 +12,9 @@ from commol.context.parameter import SeriesValue
 from tests.support import a_to_b_builder, build, initial_state
 
 
-def _model(k: float | None = 0.1, fraction: float | None = 1.0) -> Model:
-    """Its parameter and bin fraction may be left for calibration."""
-    return build(
-        a_to_b_builder(
-            parameters={"k": k},
-            total=100,
-            fractions={"A": fraction, "B": 0.0},
-        )
-    )
+def _model(k: float | None = 0.1, amount: float | None = 100) -> Model:
+    """Its parameter and bin amount may be left for calibration."""
+    return build(a_to_b_builder(parameters={"k": k}, amounts={"A": amount, "B": 0}))
 
 
 class TestToJson:
@@ -45,7 +39,7 @@ class TestToJson:
         assert data["structure"]["kind"] == "aggregate"
         assert data["structure"]["variant"] is None
         assert len(data["process"]["transitions"]) == 1
-        assert data["structure"]["bin_fractions"] == {"A": 1.0, "B": 0.0}
+        assert data["structure"]["bin_amounts"] == {"A": 100, "B": 0}
 
     def test_a_file_of_the_compartmental_kind_lists_the_kinds(
         self, tmp_path: Path
@@ -77,18 +71,31 @@ class TestToJson:
 
     def test_a_file_with_population_size_names_it(self, tmp_path: Path) -> None:
         data = _model().model_dump(mode="json")
-        conditions = data["structure"]
-        conditions["population_size"] = conditions.pop("total")
+        data["structure"]["population_size"] = 100
         path = tmp_path / "old.json"
         path.write_text(json.dumps(data))
 
         with pytest.raises(ValidationError, match="population_size"):
             Model.from_json(path)
 
-    def test_a_real_total_reloads_with_the_same_initial_state(
+    def test_a_file_of_fractions_of_a_total_names_the_amounts(
         self, tmp_path: Path
     ) -> None:
-        model = build(a_to_b_builder(total=2.5, fractions={"A": 0.4, "B": 0.6}))
+        data = _model().model_dump(mode="json")
+        structure = data["structure"]
+        structure.pop("bin_amounts")
+        structure["total"] = 100
+        structure["bin_fractions"] = {"A": 1.0, "B": 0.0}
+        path = tmp_path / "old.json"
+        path.write_text(json.dumps(data))
+
+        with pytest.raises(ValidationError, match="replace total, bin_fractions"):
+            Model.from_json(path)
+
+    def test_real_amounts_reload_with_the_same_initial_state(
+        self, tmp_path: Path
+    ) -> None:
+        model = build(a_to_b_builder(amounts={"A": 1, "B": 1.5}))
         path = tmp_path / "model.json"
 
         model.to_json(path)
@@ -129,8 +136,8 @@ class TestToJson:
         assert restored == model
         assert restored.get_uncalibrated_parameters() == ["k"]
 
-    def test_an_uncalibrated_bin_fraction_round_trips(self, tmp_path: Path) -> None:
-        model = _model(fraction=None)
+    def test_an_uncalibrated_bin_amount_round_trips(self, tmp_path: Path) -> None:
+        model = _model(amount=None)
         path = tmp_path / "model.json"
 
         model.to_json(path)

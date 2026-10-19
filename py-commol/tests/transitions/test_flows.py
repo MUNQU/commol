@@ -60,8 +60,7 @@ class TestBinsSharingAPrefix:
             .add_transition(id="t", source=["A"], target=["B"], rate="k")
             .set_structure(
                 Aggregate(
-                    total=1000,
-                    bin_fractions={bin_id: 0.25 for bin_id in ("A", "AB", "B", "BB")},
+                    bin_amounts={bin_id: 250 for bin_id in ("A", "AB", "B", "BB")}
                 )
             )
         )
@@ -85,9 +84,7 @@ class TestSeveralSourcesAndTargets:
             .add_transition(
                 id="forward", source=["A", "B"], target=["C", "C"], rate="k * A * B"
             )
-            .set_structure(
-                Aggregate(total=100, bin_fractions={"A": 0.5, "B": 0.5, "C": 0.0})
-            )
+            .set_structure(Aggregate(bin_amounts={"A": 50, "B": 50, "C": 0}))
         )
 
         result = run(model, 1)

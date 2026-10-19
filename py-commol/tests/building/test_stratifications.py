@@ -66,7 +66,7 @@ class TestConditionalStratification:
 
     def test_two_conditional_stratifications_on_one_category(self) -> None:
         builder = abc_builder(
-            fractions={"A": 0.98, "B": 0.02, "C": 0.0},
+            amounts={"A": 980, "B": 20, "C": 0},
             stratifications={
                 "group": GROUP,
                 "status": STATUS,
@@ -95,7 +95,7 @@ class TestConditionalStratification:
             abc_builder(
                 ab="k1",
                 bc="k2",
-                fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+                amounts={"A": 900, "B": 100, "C": 0},
                 stratifications={"group": GROUP, "status": STATUS},
                 conditions={"status": {"group": "g2"}},
             )

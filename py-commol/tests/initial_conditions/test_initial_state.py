@@ -21,7 +21,7 @@ class TestExpansion:
         model = build(
             a_to_b_builder(
                 rate="k * A",
-                fractions={"A": 0.5, "B": 0.5},
+                amounts={"A": 500, "B": 500},
                 stratifications={"group": {"g1": 0.5, "g2": 0.5}},
             )
         )
@@ -36,7 +36,7 @@ class TestExpansion:
     def test_a_conditional_stratification_splits_only_its_category(self) -> None:
         model = build(
             abc_builder(
-                fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+                amounts={"A": 900, "B": 100, "C": 0},
                 stratifications={"group": GROUP, "status": STATUS},
                 conditions={"status": {"group": "g2"}},
             )
@@ -59,7 +59,7 @@ class TestExpansion:
     ) -> None:
         model = build(
             abc_builder(
-                fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+                amounts={"A": 900, "B": 100, "C": 0},
                 stratifications={
                     "group": GROUP,
                     "status": STATUS,

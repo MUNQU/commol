@@ -16,14 +16,13 @@ fn model(
     parameters: &[(&str, f64)],
     transitions: &[String],
 ) -> Model {
-    let total: f64 = bins.iter().map(|(_, amount)| amount).sum();
     let bin_json: Vec<String> = bins
         .iter()
         .map(|(id, _)| format!(r#"{{"id":"{id}","name":"{id}"}}"#))
         .collect();
-    let fractions: Vec<String> = bins
+    let amounts: Vec<String> = bins
         .iter()
-        .map(|(id, amount)| format!(r#""{id}":{}"#, amount / total))
+        .map(|(id, amount)| format!(r#""{id}":{amount:?}"#))
         .collect();
     let parameter_json: Vec<String> = parameters
         .iter()
@@ -34,11 +33,11 @@ fn model(
         "engine":{{"type":"{engine}","settings":{settings}}},
         "process":{{"bins":[{}],"accumulators":[],"stratifications":[],
         "transitions":[{}]}},
-        "structure":{{"kind":"aggregate","total":{total},"bin_fractions":{{{}}}}}}}"#,
+        "structure":{{"kind":"aggregate","bin_amounts":{{{}}}}}}}"#,
         parameter_json.join(","),
         bin_json.join(","),
         transitions.join(","),
-        fractions.join(","),
+        amounts.join(","),
     );
     serde_json::from_str(&json).expect("valid model JSON")
 }
@@ -522,8 +521,8 @@ fn seeded_groups(engine: &str, settings: &str) -> Model {
         "accumulators":[],
         "stratifications":[{{"id":"group","categories":[{}]}}],
         "transitions":[{}]}},
-        "structure":{{"kind":"aggregate","total":1000,
-        "bin_fractions":{{"A":0.995,"B":0.005}},
+        "structure":{{"kind":"aggregate",
+        "bin_amounts":{{"A":995.0,"B":5.0}},
         "stratification_fractions":{{"group":{{{}}}}}}}}}"#,
         groups.join(","),
         transition("ab", &["A"], &["B"], "k * B / total"),
@@ -568,13 +567,20 @@ fn a_rounding_error_names_five_amounts_and_counts_the_rest() {
 }
 
 #[test]
-fn whole_amounts_need_no_rounding_and_a_total_must_be_whole() {
+fn whole_amounts_need_no_rounding_and_each_bin_must_be_whole() {
     assert!(StochasticEvents::try_from_model(&chain("StochasticEvents", "null")).is_ok());
     let mut model = chain("StochasticSteps", r#"{"rounding":"random"}"#);
-    model.aggregate_mut().unwrap().initial_conditions.total = 1000.5;
+    let amounts = &mut model
+        .aggregate_mut()
+        .unwrap()
+        .initial_conditions
+        .bin_amounts;
+    let (bin, amount) = amounts.first_mut().unwrap();
+    let bin = bin.clone();
+    *amount = Some(1000.5);
     let error = StochasticSteps::try_from_model(&model).err().unwrap();
     assert!(error.contains("StochasticSteps"), "{error}");
-    assert!(error.contains("1000.5"), "{error}");
+    assert!(error.contains(&format!("'{bin}' (1000.5)")), "{error}");
 }
 
 #[test]
@@ -631,17 +637,18 @@ fn calibrated_initial_conditions_go_through_the_rounding() {
         value_type: ModelValueType::InitialCondition,
         id: "B".to_string(),
     }];
-    // 0.0123 of the total is 12.3 units of B; A takes the rest.
+    // B = 12.3 rounds to 12, and A takes the rest of 1000, 987.7, which
+    // rounds to 988.
     let rounded = chain("StochasticSteps", r#"{"rounding":"largest_remainder"}"#);
     let mut engine = steps(&rounded);
     let plan = engine.plan_values(&values, Some("A")).unwrap();
-    assert_eq!(engine.apply_values(&plan, &[0.0123]).unwrap(), 0.0);
+    assert_eq!(engine.apply_values(&plan, &[12.3]).unwrap(), 0.0);
     let start = &engine.run_at(&[0.0]).unwrap()[0];
     assert_eq!(start, &vec![988.0, 12.0, 0.0]);
 
     let mut whole_only = steps(&chain("StochasticSteps", "null"));
     let plan = whole_only.plan_values(&values, Some("A")).unwrap();
-    let error = whole_only.apply_values(&plan, &[0.0123]).unwrap_err();
+    let error = whole_only.apply_values(&plan, &[12.3]).unwrap_err();
     for part in ["StochasticSteps", "largest_remainder", "random"] {
         assert!(error.contains(part), "{part} in {error}");
     }

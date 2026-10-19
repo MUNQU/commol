@@ -23,7 +23,8 @@ pub trait CompartmentalEngine: SimulationEngine {
     /// Current amount of each compartment, in engine order.
     fn state(&self) -> Vec<f64>;
 
-    /// The total the initial fractions are taken of.
+    /// The sum of the initial amounts the model states, before any calibrated
+    /// value is written.
     fn total(&self) -> f64;
 
     /// Change the initial amount of one compartment, and the current one

@@ -71,7 +71,11 @@ def _gibbs(**settings: object) -> GibbsPosterior:
 
 def _unbounded_calibrator(low: float, high: float) -> Calibrator:
     """The flow model with the bounds ``[low, high]`` for ``c``."""
-    model = build(a_to_b_builder(parameters={"c": None}, rate="c * A / A", total=1e6))
+    model = build(
+        a_to_b_builder(
+            parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": 0}
+        )
+    )
     problem = CalibrationProblem(
         observed_data=flow_observations(_flow_data(5, 1), windowed=True),
         parameters=[
@@ -169,7 +173,11 @@ class TestPriors:
 
 def _flow(values: list[float], loss_function: str = "sse") -> Calibrator:
     """``flow_calibrator`` with windowed observations and `loss_function`."""
-    model = build(a_to_b_builder(parameters={"c": None}, rate="c * A / A", total=1e6))
+    model = build(
+        a_to_b_builder(
+            parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": 0}
+        )
+    )
     problem = CalibrationProblem(
         observed_data=flow_observations(values, windowed=True),
         parameters=[bounded("c", 0.0, 50.0, initial_guess=25.0)],
@@ -195,7 +203,8 @@ def _binomial(
     ``Beta(observed + 1, UNITS − observed + 1)``.
     """
     model = build_stochastic(
-        a_to_b_builder(parameters={"k": None}, total=UNITS), "StochasticSteps"
+        a_to_b_builder(parameters={"k": None}, amounts={"A": UNITS, "B": 0}),
+        "StochasticSteps",
     )
     problem = CalibrationProblem(
         observed_data=[ObservedDataPoint(at=1, output="B", value=float(observed))],
@@ -296,7 +305,9 @@ class TestGibbsPosterior:
         # No output reads d: its loss terms have no variance.
         model = build(
             a_to_b_builder(
-                parameters={"c": None, "d": None}, rate="c * A / A", total=1e6
+                parameters={"c": None, "d": None},
+                rate="c * A / A",
+                amounts={"A": 1e6, "B": 0},
             )
         )
         problem = CalibrationProblem(
@@ -317,7 +328,9 @@ class TestGibbsPosterior:
     def test_bootstrap_coverage_needs_a_loss_above_zero_at_the_fit(self) -> None:
         # With no flow and no flow observed, every c fits exactly.
         model = build(
-            a_to_b_builder(parameters={"c": None}, rate="0 * c * A / A", total=1e6)
+            a_to_b_builder(
+                parameters={"c": None}, rate="0 * c * A / A", amounts={"A": 1e6, "B": 0}
+            )
         )
         problem = CalibrationProblem(
             observed_data=flow_observations([0.0] * 5, windowed=True),
@@ -435,7 +448,9 @@ class TestAbc:
             flows = _flow_data(5, 8)
             amounts = [10.0 * t for t in range(1, 6)]
             model = build(
-                a_to_b_builder(parameters={"c": None}, rate="c * A / A", total=1e6)
+                a_to_b_builder(
+                    parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": 0}
+                )
             )
             observed = flow_observations(flows, windowed=True) + [
                 ObservedDataPoint(
@@ -476,7 +491,9 @@ class TestAbc:
 
     def test_a_run_that_breaks_a_constraint_is_outside_the_support(self) -> None:
         model = build(
-            a_to_b_builder(parameters={"c": None}, rate="c * A / A", total=1e6)
+            a_to_b_builder(
+                parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": 0}
+            )
         )
         problem = CalibrationProblem(
             observed_data=flow_observations(_flow_data(5, 9), windowed=True),

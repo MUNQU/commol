@@ -140,14 +140,14 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     }
 
     /// Name the id that takes what the calibrated initial conditions leave of
-    /// the total the model kind keeps; the engine resolves it.
+    /// the sum the model kind keeps; the engine resolves it.
     ///
-    /// For an aggregate model it is a compartment or bin that absorbs the
-    /// difference to the total. Without a remainder, calibrated initial
-    /// conditions are applied as given and only a sum above the total is
-    /// infeasible. With one, the sum of the initial amounts always equals the
-    /// total, and a combination that would leave the remainder negative is
-    /// infeasible.
+    /// For an aggregate model it is a compartment or bin that takes the sum
+    /// of the amounts the model states less every other compartment, so the
+    /// compartments the values and the remainder cover keep their declared
+    /// sum. Without a remainder, calibrated initial conditions are applied as
+    /// given. With one, a combination that would leave the remainder
+    /// negative is infeasible.
     ///
     /// # Errors
     ///

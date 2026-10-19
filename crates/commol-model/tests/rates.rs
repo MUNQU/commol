@@ -23,8 +23,8 @@ fn model(rate: &str, extra: usize) -> Model {
         "process":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}},
         {{"id":"C","name":"C"}}],"accumulators":[],"stratifications":[],
         "transitions":[{{"id":"ab","source":["A"],"target":["B"],"rate":"{rate}"}}]}},
-        "structure":{{"kind":"aggregate","total":1000,
-        "bin_fractions":{{"A":0.7,"B":0.2,"C":0.1}}}}}}"#,
+        "structure":{{"kind":"aggregate",
+        "bin_amounts":{{"A":700.0,"B":200.0,"C":100.0}}}}}}"#,
         parameters.join(",")
     );
     serde_json::from_str(&json).expect("valid model JSON")

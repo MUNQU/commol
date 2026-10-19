@@ -210,31 +210,31 @@ Each step applies every flow once, computed from the state at the start of the s
 
 ## Initialization
 
-### Bin fractions
+### Bin amounts
 
-| Bin | Fraction | Amount |
+| Bin | Amount | Unit |
 |---|---|---|
-| A | 0.5 | 500 |
-| B | 0.5 | 500 |
-| C | 0 | 0 |
+| A | 500 |  |
+| B | 500 |  |
+| C | 0 |  |
 
 ### Stratification fractions
 
 | Stratification | Category | Fraction | Of |
 |---|---|---|---|
-| group | g1 | 0.5 | total |
-| group | g2 | 0.5 | total |
+| group | g1 | 0.5 | each bin |
+| group | g2 | 0.5 | each bin |
 
-### Initial state (total 1000)
+### Initial state
 
-| Compartment | Amount |
-|---|---|
-| A_g1 | 250 |
-| A_g2 | 250 |
-| B_g1 | 250 |
-| B_g2 | 250 |
-| C_g1 | 0 |
-| C_g2 | 0 |
+| Compartment | Amount | Unit |
+|---|---|---|
+| A_g1 | 250 |  |
+| A_g2 | 250 |  |
+| B_g1 | 250 |  |
+| B_g2 | 250 |  |
+| C_g1 | 0 |  |
+| C_g2 | 0 |  |
 
 ## Parameters
 

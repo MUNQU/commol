@@ -3,8 +3,10 @@
 import pytest
 
 from commol import (
+    Aggregate,
     CalibrationProblem,
     Calibrator,
+    ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
     ParticleSwarmConfig,
@@ -28,7 +30,7 @@ def _model() -> Model:
     return build(
         a_to_b_builder(
             name="Ids",
-            fractions={"A": 0.9, "B": 0.1},
+            amounts={"A": 900, "B": 100},
             stratifications={
                 "group": {"g1": 0.5, "g2": 0.5},
                 "age": {"y": 1 / 3, "m": 1 / 3, "o": 1 / 3},
@@ -78,28 +80,28 @@ class TestIds:
             Calibrator(Simulation(build(abc_builder())), problem)
 
 
-def _sir(i_fraction: float | None, k1: float | None = 0.3) -> Model:
+def _sir(b_amount: float | None, k1: float | None = 0.3) -> Model:
     return build(
         abc_builder(
             parameters={"k1": k1, "k2": 0.1},
-            fractions={"A": 0.98, "B": i_fraction, "C": 0.0},
+            amounts={"A": 980, "B": b_amount, "C": 0},
         )
     )
 
 
 @pytest.fixture
 def b_every_5_steps() -> list[ObservedDataPoint]:
-    """B of ``abc_builder`` with 2 % in B at the start, at steps 0, 5, …, 45."""
-    return observed(Simulation(_sir(0.02)).run(50), "B", range(0, 50, 5))
+    """B of ``abc_builder`` with 20 in B at the start, at steps 0, 5, …, 45."""
+    return observed(Simulation(_sir(20)).run(50), "B", range(0, 50, 5))
 
 
 class TestFitting:
-    def test_an_initial_fraction_is_recovered(self, b_every_5_steps) -> None:
+    def test_an_initial_amount_is_recovered(self, b_every_5_steps) -> None:
         model = _sir(None)
         problem = CalibrationProblem(
             observed_data=b_every_5_steps,
             parameters=[
-                bounded("B", 0.0, 0.1, kind="initial_condition", initial_guess=0.01)
+                bounded("B", 0.0, 100.0, kind="initial_condition", initial_guess=10.0)
             ],
             loss_function="sse",
             optimization_config=NelderMeadConfig(
@@ -110,11 +112,9 @@ class TestFitting:
         result = Calibrator(Simulation(model), problem).run()
 
         assert result.converged
-        assert result.best_parameters["B"] == pytest.approx(0.02, rel=1e-9)
+        assert result.best_parameters["B"] == pytest.approx(20, rel=1e-9)
 
-    def test_a_parameter_and_an_initial_fraction_together(
-        self, b_every_5_steps
-    ) -> None:
+    def test_a_parameter_and_an_initial_amount_together(self, b_every_5_steps) -> None:
         config = (
             ParticleSwarmConfig(num_particles=40, max_iterations=1000, verbose=False)
             .acceleration(
@@ -133,7 +133,7 @@ class TestFitting:
             observed_data=b_every_5_steps,
             parameters=[
                 bounded("k1"),
-                bounded("B", 0.0, 0.1, kind="initial_condition"),
+                bounded("B", 0.0, 100.0, kind="initial_condition"),
             ],
             loss_function="sse",
             optimization_config=config,
@@ -142,6 +142,47 @@ class TestFitting:
 
         result = Calibrator(Simulation(_sir(None, k1=None)), problem).run()
 
-        assert result.best_parameters == pytest.approx(
-            {"k1": 0.3, "B": 0.02}, abs=0.001
+        assert result.best_parameters["k1"] == pytest.approx(0.3, abs=0.001)
+        assert result.best_parameters["B"] == pytest.approx(20, rel=0.05)
+
+
+def _mixed_units() -> Model:
+    """A count in A and B, and a concentration in C."""
+    return (
+        ModelBuilder(name="Mixed units")
+        .add_bin(id="A", name="State A", unit="item")
+        .add_bin(id="B", name="State B", unit="item")
+        .add_bin(id="C", name="State C", unit="mg/l")
+        .add_parameter(id="k", value=0.1)
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
+        .build(
+            Aggregate(bin_amounts={"A": 990, "B": 10, "C": 1e5}),
+            engine="DifferenceEquations",
         )
+    )
+
+
+def _remainder_problem(parameter_id: str) -> CalibrationProblem:
+    return CalibrationProblem(
+        observed_data=[ObservedDataPoint(at=1, output="B", value=20.0)],
+        parameters=[bounded(parameter_id, 0.0, 1e6, kind="initial_condition")],
+        initial_condition_remainder="A",
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=5),
+    )
+
+
+class TestRemainderUnits:
+    def test_a_remainder_of_another_unit_is_rejected(self) -> None:
+        with pytest.raises(ValueError) as error:
+            Calibrator(Simulation(_mixed_units()), _remainder_problem("C"))
+
+        assert str(error.value) == (
+            "The initial-condition remainder 'A' is in 'item', but the "
+            "calibrated initial condition 'C' sets 'C', in 'mg/l'. The "
+            "remainder keeps a sum of amounts of one unit: name a remainder of "
+            "the unit of 'C'."
+        )
+
+    def test_a_remainder_of_the_same_unit_is_accepted(self) -> None:
+        assert_accepted(Calibrator, Simulation(_mixed_units()), _remainder_problem("B"))

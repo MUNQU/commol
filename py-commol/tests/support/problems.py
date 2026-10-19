@@ -18,7 +18,8 @@ def initial_condition_problem(
     *ids: str, remainder: str | None = None
 ) -> CalibrationProblem:
     """
-    A problem that declares each id as an initial condition in ``[0, 1]``.
+    A problem that declares each id as an initial condition in ``[0, 10⁶]``,
+    wide enough for an amount and for a category split.
 
     It is meant for writing values back, not for a run: it has one placeholder
     observation and one Nelder-Mead iteration.
@@ -31,7 +32,7 @@ def initial_condition_problem(
                 id=entry_id,
                 parameter_type="initial_condition",
                 min_bound=0.0,
-                max_bound=1.0,
+                max_bound=1e6,
             )
             for entry_id in ids
         ],
@@ -105,7 +106,7 @@ def flow_calibrator(
 ) -> Calibrator:
     """
     Fit a constant flow ``c`` from A to B (``a_to_b_builder`` with the rate
-    ``c * A / A``, absolute because it names A, and a total of 10⁶) to
+    ``c * A / A``, absolute because it names A, and 10⁶ in A) to
     `values` at positions 1, 2, ….
 
     A model linear in its parameter: with `windowed`, each observation is the
@@ -113,7 +114,11 @@ def flow_calibrator(
     the values; otherwise each observation is the amount of B at ``t`` and
     its prediction is ``c·t``, a regression through the origin.
     """
-    model = build(a_to_b_builder(parameters={"c": None}, rate="c * A / A", total=1e6))
+    model = build(
+        a_to_b_builder(
+            parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": 0}
+        )
+    )
     problem = CalibrationProblem(
         observed_data=flow_observations(values, windowed=windowed),
         parameters=[bounded("c", *bounds, initial_guess=sum(bounds) / 2)],

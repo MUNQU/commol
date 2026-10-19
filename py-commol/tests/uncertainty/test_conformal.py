@@ -58,7 +58,11 @@ def _held_out(
 
 def _flow_calibrator(observations: list[ObservedDataPoint]) -> Calibrator:
     """The calibrator of ``flow_calibrator`` with other observations."""
-    model = build(a_to_b_builder(parameters={"c": None}, rate="c * A / A", total=1e6))
+    model = build(
+        a_to_b_builder(
+            parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": 0}
+        )
+    )
     problem = CalibrationProblem(
         observed_data=observations,
         parameters=[bounded("c", 0.0, 50.0, initial_guess=25.0)],

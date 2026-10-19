@@ -22,7 +22,6 @@ class Interval(TypedDict):
 def entry_interval(
     entry_id: str,
     statistics: "Mapping[str, ParameterSummary] | None",
-    scale: float = 1.0,
 ) -> Interval | None:
     """
     Weighted spread of one reported entry across the draws of a sample.
@@ -33,8 +32,6 @@ def entry_interval(
         Id of the entry.
     statistics : Mapping[str, ParameterSummary] | None
         Statistics of each id from a sample, or None without one.
-    scale : float, optional
-        Factor every statistic is multiplied by.
 
     Returns
     -------
@@ -45,11 +42,11 @@ def entry_interval(
     if stats is None:
         return None
     return {
-        "mean": stats.mean * scale,
-        "median": stats.median * scale,
-        "ci_lower": stats.lower * scale,
-        "ci_upper": stats.upper * scale,
-        "min": stats.min * scale,
-        "max": stats.max * scale,
-        "std": stats.std * scale,
+        "mean": stats.mean,
+        "median": stats.median,
+        "ci_lower": stats.lower,
+        "ci_upper": stats.upper,
+        "min": stats.min,
+        "max": stats.max,
+        "std": stats.std,
     }

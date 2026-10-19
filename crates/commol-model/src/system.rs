@@ -46,7 +46,8 @@ impl CompiledModel {
         &self.output_labels
     }
 
-    /// The total the initial fractions are taken of.
+    /// The sum of the initial amounts the model states, before any calibrated
+    /// value is written.
     pub fn total(&self) -> f64 {
         self.total
     }

@@ -180,6 +180,22 @@ pub fn compartmental_state(
     }
 }
 
+/// The compartments each initial-condition value of a plan sets, in the
+/// order of the values, and those of the remainder.
+///
+/// # Errors
+///
+/// Returns a message when the plan is not of an aggregate model.
+pub fn compartmental_coverage(
+    plan: &EngineValuePlan,
+) -> Result<(Vec<Vec<usize>>, Vec<usize>), String> {
+    match plan {
+        EngineValuePlan::Aggregate(plan) => Ok(plan.coverage()),
+        #[cfg(feature = "test-kind")]
+        EngineValuePlan::Test(_) => Err("The plan is not of an aggregate model".to_string()),
+    }
+}
+
 impl SimulationEngine for Engine {
     type ValuePlan = EngineValuePlan;
 
@@ -698,7 +714,7 @@ mod tests {
             "accumulators":[],"stratifications":[],
             "transitions":[{"id":"ab","source":["A"],"target":["B"],
             "rate":"0.1","stratified_rates":null,"per_compartment":null}]},
-            "structure":{"kind":"aggregate","total":1000,"bin_fractions":{"A":1.0,"B":0.0}}}"#,
+            "structure":{"kind":"aggregate","bin_amounts":{"A":1000.0,"B":0.0}}}"#,
         )
         .expect("valid model JSON");
         model.engine = ModelEngine::new(engine);

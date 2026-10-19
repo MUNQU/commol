@@ -107,22 +107,22 @@
  "blocks": [
   {
    "type": "table",
-   "heading": "Bin fractions",
+   "heading": "Bin amounts",
    "columns": [
     "Bin",
-    "Fraction",
-    "Amount"
+    "Amount",
+    "Unit"
    ],
    "rows": [
     [
      "A",
      "set by calibration",
-     null
+     "item"
     ],
     [
      "B",
-     0.4,
-     400.0
+     400.0,
+     "item"
     ]
    ]
   },
@@ -140,13 +140,13 @@
      "group",
      "g1",
      0.25,
-     "total"
+     "each bin"
     ],
     [
      "group",
      "g2",
      0.75,
-     "total"
+     "each bin"
     ],
     [
      "tier",
@@ -167,48 +167,55 @@
    "heading": "Compartment overrides",
    "columns": [
     "Compartment",
-    "Fraction of the total",
-    "Amount"
+    "Amount",
+    "Unit"
    ],
    "rows": [
     [
      "B_g2",
-     0.2,
-     200.0
+     200.0,
+     "item"
     ]
    ]
   },
   {
    "type": "table",
-   "heading": "Initial state (total 1000)",
+   "heading": "Initial state",
    "columns": [
     "Compartment",
-    "Amount"
+    "Amount",
+    "Unit"
    ],
    "rows": [
     [
      "A_g1_t1",
-     0.0
+     0.0,
+     "item"
     ],
     [
      "A_g1_t2",
-     0.0
+     0.0,
+     "item"
     ],
     [
      "A_g2",
-     0.0
+     0.0,
+     "item"
     ],
     [
      "B_g1_t1",
-     50.0
+     50.0,
+     "item"
     ],
     [
      "B_g1_t2",
-     50.0
+     50.0,
+     "item"
     ],
     [
      "B_g2",
-     200.0
+     200.0,
+     "item"
     ]
    ]
   }
