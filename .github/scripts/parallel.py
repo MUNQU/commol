@@ -32,14 +32,25 @@ blockers; an open blocker of another repository counts as level 0. The
 script writes it into the number field ``Level`` of the project, only where
 it changes, and empties the field of an issue that is no longer open.
 
+An open proposal, change or release waits for the release before its
+milestone (``--releases``): the open release issue of the nearest milestone
+before its own, by the version that the titles of the milestones name. The
+script writes that "blocked by" link, and removes the links from the issue to
+every other open release, so that a new milestone in between (0.9.1 before
+0.10.0) takes the place of the old blocker. It owns these links: an issue with
+no version in its milestone keeps its links. It refuses a link that closes a
+cycle, and names the issue to move.
+
 The script reads the repository from the git remote, and the project is the
 one of the organization with the name of the repository. Usage, from the root
 of the repository:
 ``python .github/scripts/parallel.py`` prints what can run in parallel,
 ``--write`` also writes it under the Delivery of each proposal,
 ``--next N`` prints the next N issues (``.github/scripts/next.sh`` runs it),
-and ``--levels`` writes the precedence levels, before the next issues when
-both are given (``next.sh`` and ``start.sh`` run it).
+``--releases`` writes the links to the release before each milestone, and
+``--levels`` writes the precedence levels. Given together, the links come
+first, then the levels, then the next issues (``next.sh`` and ``start.sh``
+run them).
 """
 
 import argparse
@@ -56,6 +67,7 @@ ITEM = re.compile(r"`([^`]+)`")
 PRIORITIES = ("Now", "Next", "Later")
 DEFAULT_PRIORITY = "Next"
 PARALLEL = re.compile(r"^- Parallel with:.*$", re.MULTILINE)
+VERSION = re.compile(r"v?(\d+(?:\.\d+)*)")
 
 
 @dataclass(frozen=True)
@@ -83,6 +95,8 @@ class Proposal:
     kind: str = "proposal"
     held: bool = False
     milestone: tuple[str, int] | None = None
+    issue_id: int = 0
+    version: tuple[int, ...] | None = None
 
 
 def text_field(item: dict[str, JsonValue], name: str) -> str:
@@ -240,6 +254,27 @@ def milestone_of(item: JsonValue) -> tuple[str, int] | None:
     return (due if isinstance(due, str) else "", number)
 
 
+def version_of(title: str) -> tuple[int, ...] | None:
+    """Return the version that a milestone title names (``0.9.1``), or None.
+
+    Trailing zeros do not count, so ``1.2`` and ``1.2.0`` are one version.
+    """
+    found = VERSION.fullmatch(title.strip())
+    if found is None:
+        return None
+    parts = [int(part) for part in found.group(1).split(".")]
+    while len(parts) > 1 and parts[-1] == 0:
+        parts.pop()
+    return tuple(parts)
+
+
+def milestone_version(item: JsonValue) -> tuple[int, ...] | None:
+    """Return the version of the milestone of an issue; None if it names none."""
+    milestone = item.get("milestone") if isinstance(item, dict) else None
+    title = milestone.get("title") if isinstance(milestone, dict) else None
+    return version_of(title) if isinstance(title, str) else None
+
+
 def load() -> dict[int, Proposal]:
     """Return the open proposals, changes and releases, with their open blockers."""
     found: dict[int, Proposal] = {}
@@ -248,6 +283,7 @@ def load() -> dict[int, Proposal]:
             continue
         issue = issue_of(item)
         kind, held = kind_and_holder(item)
+        issue_id = item.get("id") if isinstance(item, dict) else None
         found[issue.number] = Proposal(
             issue.number,
             issue.title,
@@ -255,6 +291,8 @@ def load() -> dict[int, Proposal]:
             kind=kind,
             held=held,
             milestone=milestone_of(item),
+            issue_id=issue_id if isinstance(issue_id, int) else 0,
+            version=milestone_version(item),
         )
     for proposal in found.values():
         url = f"repos/{repository()}/issues/{proposal.number}/dependencies/blocked_by"
@@ -285,6 +323,93 @@ def ancestors(proposals: dict[int, Proposal]) -> dict[int, set[int]]:
     for number in proposals:
         visit(number)
     return memo
+
+
+type Link = tuple[int, int]
+
+
+def release_before(issue: Proposal, releases: list[Proposal]) -> Proposal | None:
+    """Return the open release of the nearest milestone before the one of an issue."""
+    if issue.version is None:
+        return None
+    earlier = [r for r in releases if r.version and r.version < issue.version]
+    if not earlier:
+        return None
+    return max(earlier, key=lambda r: (r.version or (), r.number))
+
+
+def reaches(issues: dict[int, Proposal], start: int, target: int) -> bool:
+    """Tell whether a chain of "blocked by" links leads from one issue to another."""
+    seen: set[int] = set()
+    queue = [start]
+    while queue:
+        number = queue.pop()
+        if number == target:
+            return True
+        if number in seen or number not in issues:
+            continue
+        seen.add(number)
+        queue.extend(issues[number].blocked_by)
+    return False
+
+
+def release_links(
+    issues: dict[int, Proposal],
+) -> tuple[list[Link], list[Link], list[Link]]:
+    """Return the links to add and to remove, and the ones refused.
+
+    A link ``(issue, release)`` says that the release blocks the issue. Each
+    issue with a version in its milestone waits for ``release_before``, and
+    for no other open release. A link that would close a chain of links back
+    to its issue is refused. The ``blocked_by`` of the issues change to what
+    the links give.
+    """
+    releases = [issue for issue in issues.values() if issue.kind == "release"]
+    numbers = {release.number for release in releases}
+    wanted: dict[int, int] = {}
+    removed: list[Link] = []
+    for number, issue in sorted(issues.items()):
+        if issue.version is None:
+            continue
+        release = release_before(issue, releases)
+        keep = release.number if release is not None else None
+        if keep is not None:
+            wanted[number] = keep
+        for old in sorted(n for n in issue.blocked_by & numbers if n != keep):
+            issue.blocked_by.discard(old)
+            removed.append((number, old))
+    added: list[Link] = []
+    refused: list[Link] = []
+    for number, release in sorted(wanted.items()):
+        if release in issues[number].blocked_by:
+            continue
+        if reaches(issues, release, number):
+            refused.append((number, release))
+            continue
+        issues[number].blocked_by.add(release)
+        added.append((number, release))
+    return added, removed, refused
+
+
+def write_release_links(issues: dict[int, Proposal]) -> None:
+    """Write the links that make each issue wait for the release before it."""
+    added, removed, refused = release_links(issues)
+    path = f"repos/{repository()}/issues"
+    for number, release in removed:
+        blocker = issues[release].issue_id
+        rest(f"{path}/{number}/dependencies/blocked_by/{blocker}", method="DELETE")
+    for number, release in added:
+        rest(
+            f"{path}/{number}/dependencies/blocked_by",
+            method="POST",
+            data={"issue_id": issues[release].issue_id},
+        )
+    for number, release in refused:
+        print(
+            f"Releases: #{number} is in a later milestone than #{release}, which"
+            f" waits for it: move #{number} to that milestone, or remove the link"
+        )
+    print(f"Releases: {len(added)} links added, {len(removed)} removed")
 
 
 def write_line(proposal: Proposal, others: list[int]) -> None:
@@ -641,18 +766,28 @@ def show_parallel(proposals: dict[int, Proposal], write: bool) -> None:
 def main() -> None:
     """Print what can run in parallel, or with --next the next issues to take.
 
-    With --levels it first writes the precedence levels into the project, and
-    alone it does only that. A failure to write them prints one line and the
-    rest goes on: the next issues, or what can run in parallel with --write.
+    With --releases it first writes the links to the release before each
+    milestone; a failure there stops it, because the blockers it reads after
+    would be wrong. With --levels it then writes the precedence levels into
+    the project. Alone, each does only that. A failure to write the levels
+    prints one line and the rest goes on: the next issues, or what can run in
+    parallel with --write.
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--write", action="store_true", help="write it under Delivery")
     parser.add_argument("--next", type=int, metavar="N", help="the next N issues")
     parser.add_argument(
+        "--releases",
+        action="store_true",
+        help="link each issue to the release before its milestone",
+    )
+    parser.add_argument(
         "--levels", action="store_true", help="write the field Level of the project"
     )
     arguments = parser.parse_args()
     issues = load()
+    if arguments.releases:
+        write_release_links(issues)
     if arguments.levels:
         try:
             write_levels(issues)
@@ -660,7 +795,7 @@ def main() -> None:
             print(f"Level: not written: {error}", file=sys.stderr)
     if arguments.next is not None:
         show_next(issues, arguments.next)
-    elif arguments.write or not arguments.levels:
+    elif arguments.write or not (arguments.levels or arguments.releases):
         show_parallel(issues, arguments.write)
 
 

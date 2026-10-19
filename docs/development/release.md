@@ -56,6 +56,9 @@ A release is always made from `main`. Publishing a GitHub release starts the
 publishes to PyPI immediately: the `pypi` environment has no approval step.
 The release issue (label `release`) holds the checklist of this page, and the
 milestone of the release lists the issues it ships.
+The milestone has the version as its title (`0.9.1`): every issue of a later
+milestone waits for this release issue, through a "blocked by" link that
+`next.sh` and `start.sh` write ([Milestones](workflow.md#milestones)).
 
 !!! warning "A published version is final"
     PyPI never accepts the same version number twice, even after you delete

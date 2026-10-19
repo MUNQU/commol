@@ -51,14 +51,20 @@ def an_issue(
     blocked_by: frozenset[int] = frozenset(),
     milestone: tuple[str, int] | None = None,
     kind: str = "change",
+    version: str = "",
 ):
-    """An open issue of the planning script, with what it touches."""
+    """An open issue of the planning script, with what it touches.
+
+    Its id is ten times its number; ``version`` is the title of its milestone.
+    """
     issue = parallel.Proposal(number, f"issue {number}", "", kind=kind)
     issue.changes = list(changes)
     issue.adds = list(adds)
     issue.held = held
     issue.blocked_by = set(blocked_by)
     issue.milestone = milestone
+    issue.issue_id = 10 * number
+    issue.version = parallel.version_of(version)
     return issue
 
 
@@ -310,16 +316,146 @@ def test_an_open_issue_outside_the_project_gets_no_level() -> None:
     assert parallel.level_changes({1: 0}, {}) == []
 
 
+# The release before the milestone
+
+
+def test_the_versions_of_milestones_compare_as_numbers() -> None:
+    assert parallel.version_of("0.9.1") < parallel.version_of("0.10.0")
+    assert parallel.version_of("v1.2") == parallel.version_of("1.2.0")
+    assert parallel.version_of("Backlog") is None
+    assert parallel.version_of("") is None
+
+
+def test_an_issue_is_blocked_by_the_release_of_the_milestone_before() -> None:
+    issues = {
+        140: an_issue(140, kind="release", version="0.6.0"),
+        137: an_issue(137, version="0.6.0"),
+        186: an_issue(186, kind="release", version="0.8.0"),
+        187: an_issue(187, kind="release", version="0.9.0"),
+        190: an_issue(190, kind="proposal", version="0.10.0"),
+        191: an_issue(191, kind="release", version="0.10.0"),
+    }
+
+    added, removed, refused = parallel.release_links(issues)
+
+    assert added == [(186, 140), (187, 186), (190, 187), (191, 187)]
+    assert removed == []
+    assert refused == []
+    assert issues[190].blocked_by == {187}
+    assert issues[137].blocked_by == set()
+
+
+def test_a_new_release_in_between_takes_the_place_of_the_old_one() -> None:
+    issues = {
+        187: an_issue(187, kind="release", version="0.9.0"),
+        190: an_issue(190, version="0.10.0", blocked_by=frozenset({187})),
+        191: an_issue(191, kind="release", version="0.10.0"),
+        200: an_issue(200, kind="release", version="0.9.1"),
+    }
+    issues[191].blocked_by = {187, 190}
+
+    added, removed, refused = parallel.release_links(issues)
+
+    assert added == [(190, 200), (191, 200), (200, 187)]
+    assert removed == [(190, 187), (191, 187)]
+    assert refused == []
+    assert issues[191].blocked_by == {190, 200}
+
+
+def test_a_link_that_is_there_already_is_kept() -> None:
+    issues = {
+        187: an_issue(187, kind="release", version="0.9.0"),
+        190: an_issue(190, version="0.10.0", blocked_by=frozenset({187})),
+    }
+
+    assert parallel.release_links(issues) == ([], [], [])
+
+
+def test_an_issue_without_a_milestone_keeps_its_links_to_releases() -> None:
+    issues = {
+        187: an_issue(187, kind="release", version="0.9.0"),
+        5: an_issue(5, blocked_by=frozenset({187})),
+        6: an_issue(6, version="Backlog"),
+    }
+
+    assert parallel.release_links(issues) == ([], [], [])
+    assert issues[5].blocked_by == {187}
+
+
+def test_a_link_that_closes_a_cycle_is_refused() -> None:
+    # 145 is in 0.10.0, but release 0.9.0 waits for 150, which waits for 145.
+    issues = {
+        145: an_issue(145, version="0.10.0"),
+        150: an_issue(150, version="0.9.0", blocked_by=frozenset({145})),
+        187: an_issue(187, kind="release", version="0.9.0"),
+    }
+    issues[187].blocked_by = {150}
+
+    added, removed, refused = parallel.release_links(issues)
+
+    assert (added, removed, refused) == ([], [], [(145, 187)])
+    assert issues[145].blocked_by == set()
+
+
+def test_the_links_are_written_through_rest(capsys) -> None:
+    issues = {
+        187: an_issue(187, kind="release", version="0.9.0"),
+        190: an_issue(190, version="0.10.0", blocked_by=frozenset({187})),
+        200: an_issue(200, kind="release", version="0.9.1"),
+    }
+
+    with (
+        patch.object(parallel, "repository", return_value="o/a"),
+        patch.object(parallel, "rest") as rest,
+    ):
+        parallel.write_release_links(issues)
+
+    assert [call.args for call in rest.call_args_list] == [
+        ("repos/o/a/issues/190/dependencies/blocked_by/1870",),
+        ("repos/o/a/issues/190/dependencies/blocked_by",),
+        ("repos/o/a/issues/200/dependencies/blocked_by",),
+    ]
+    assert [call.kwargs for call in rest.call_args_list] == [
+        {"method": "DELETE"},
+        {"method": "POST", "data": {"issue_id": 2000}},
+        {"method": "POST", "data": {"issue_id": 1870}},
+    ]
+    assert "Releases: 2 links added, 1 removed" in capsys.readouterr().out
+
+
+def test_a_refused_link_names_the_issue_to_move(capsys) -> None:
+    issues = {
+        145: an_issue(145, version="0.10.0"),
+        187: an_issue(187, kind="release", version="0.9.0"),
+    }
+    issues[187].blocked_by = {145}
+
+    with (
+        patch.object(parallel, "repository", return_value="o/a"),
+        patch.object(parallel, "rest") as rest,
+    ):
+        parallel.write_release_links(issues)
+
+    assert rest.call_args_list == []
+    assert "#145 is in a later milestone than #187" in capsys.readouterr().out
+
+
 def run_main(*arguments: str) -> dict[str, list[tuple]]:
     """Run ``parallel.main`` with ``arguments``; the writes of the levels fail.
 
-    Returns the calls of ``show_next`` and ``show_parallel``.
+    Returns the calls of ``write_release_links``, ``show_next`` and
+    ``show_parallel``; the first is left out when it has none.
     """
     calls: dict[str, list[tuple]] = {"next": [], "parallel": []}
     failure = SystemExit("GitHub: PATCH orgs/o/projectsV2/1/items/10: HTTP 403")
+
+    def links(*a) -> None:
+        calls.setdefault("releases", []).append(a)
+
     with (
         patch.object(sys, "argv", ["parallel.py", *arguments]),
         patch.object(parallel, "load", return_value={}),
+        patch.object(parallel, "write_release_links", links),
         patch.object(parallel, "write_levels", side_effect=failure),
         patch.object(parallel, "show_next", lambda *a: calls["next"].append(a)),
         patch.object(parallel, "show_parallel", lambda *a: calls["parallel"].append(a)),
@@ -343,12 +479,30 @@ def test_levels_alone_print_nothing_else() -> None:
     assert run_main("--levels") == {"next": [], "parallel": []}
 
 
+def test_releases_alone_write_only_the_links() -> None:
+    assert run_main("--releases") == {"releases": [({},)], "next": [], "parallel": []}
+
+
+def test_the_links_come_before_the_next_issues() -> None:
+    assert run_main("--releases", "--next", "1") == {
+        "releases": [({},)],
+        "next": [({}, 1)],
+        "parallel": [],
+    }
+
+
 def test_the_milestone_of_an_issue_is_its_due_date_and_number() -> None:
     due = {"milestone": {"number": 2, "due_on": "2026-11-01T00:00:00Z"}}
 
     assert parallel.milestone_of(due) == ("2026-11-01T00:00:00Z", 2)
     assert parallel.milestone_of({"milestone": {"number": 4}}) == ("", 4)
     assert parallel.milestone_of({"milestone": None}) is None
+
+
+def test_the_version_of_an_issue_is_the_title_of_its_milestone() -> None:
+    assert parallel.milestone_version({"milestone": {"title": "0.9.1"}}) == (0, 9, 1)
+    assert parallel.milestone_version({"milestone": {"number": 4}}) is None
+    assert parallel.milestone_version({"milestone": None}) is None
 
 
 # The REST calls
