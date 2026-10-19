@@ -1,5 +1,6 @@
-"""The coverage harness, and the coverage studies of the sequential Monte
-Carlo methods.
+"""The coverage harness accepts calibrated intervals and rejects narrow ones,
+and the coverage studies of the sequential Monte Carlo methods and of the
+conformal prediction intervals.
 
 The harness's model is linear, ``y_j = θ x_j + ε_j`` with ``ε_j ~ N(0, σ²)``
 and a flat prior, so the posterior of ``θ`` is ``N(θ̂, σ²/Σx²)`` with
@@ -7,6 +8,10 @@ and a flat prior, so the posterior of ``θ`` is ``N(θ̂, σ²/Σx²)`` with
 covers ``θ`` in 90 % of the data sets. The Gibbs posterior fits a constant
 flow with Gaussian noise (``flow_calibrator``); ABC fits the probability of a
 chain binomial from the units that moved in one step.
+
+A prediction interval holds a new observation, not a fixed value: a study of
+one shifts the interval by the observation, so it holds 0 when it holds the
+observation.
 """
 
 import math
@@ -18,18 +23,27 @@ from commol import (
     AbcSmc,
     CalibrationProblem,
     Calibrator,
+    EnbPI,
     EtaCalibration,
     GibbsPosterior,
+    JackknifePlus,
     LossDistance,
     NelderMeadConfig,
     ObservedDataPoint,
     Priors,
     Simulation,
+    SplitConformal,
     weighted_quantiles,
 )
 from commol.context.inference.smc import BootstrapCoverage, InformationMatching
-from tests.support import a_to_b_builder, bounded, build_stochastic, flow_calibrator
-from tests.support.coverage import Interval, coverage_study
+from tests.support import (
+    a_to_b_builder,
+    bounded,
+    build_stochastic,
+    flow_calibrator,
+    flow_observations,
+)
+from tests.support.coverage import CoverageStudy, Interval, StudyMethod, coverage_study
 
 THETA, NOISE, LEVEL = 2.0, 0.5, 0.9
 X = np.arange(1.0, 11.0)
@@ -148,5 +162,121 @@ class TestAbcSmc:
         study = coverage_study(
             interval, {"k": PROBABILITY}, LEVEL, data_sets=200, seed=11
         )
+
+        assert study.calibrated(), study
+
+
+def _held(lower: float, upper: float, observed: float) -> dict[str, Interval]:
+    """The interval shifted by the observation it should hold."""
+    return {"observation": (lower - observed, upper - observed)}
+
+
+def _conformal_study(
+    make: StudyMethod, level: float, data_sets: int = 200
+) -> CoverageStudy:
+    return coverage_study(make, {"observation": 0.0}, level, data_sets, seed=11)
+
+
+@pytest.mark.coverage_study
+class TestSplitConformal:
+    def test_split_conformal_covers_exchangeable_data(self) -> None:
+        level = 0.9
+
+        def make(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+            # Flows of one step around c = 10: 30 fitted, 30 held out, 1 new.
+            values = 10.0 + rng.normal(0.0, 1.0, 61)
+            fitted = values[:30].tolist()
+            calibrator = flow_calibrator(fitted, windowed=True, seed=index)
+            result = calibrator.uncertainty(
+                SplitConformal(
+                    calibration_data=flow_observations(
+                        values[30:60].tolist(), windowed=True, start=31
+                    ),
+                    score="absolute",
+                    by="series",
+                    level=level,
+                    positions=[61.0],
+                )
+            )
+            series = result.intervals.series["B"]
+            return _held(series.lower[0], series.upper[0], float(values[60]))
+
+        study = _conformal_study(make, level)
+
+        assert study.coverage("observation") >= level - study.tolerance, study
+
+
+def _jackknife_plus_study(block_length: int, level: float) -> CoverageStudy:
+    def make(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+        # Flows of one step around c = 10: 30 fitted, 1 new.
+        values = 10.0 + rng.normal(0.0, 1.0, 31)
+        calibrator = flow_calibrator(values[:30].tolist(), windowed=True, seed=index)
+        result = calibrator.uncertainty(
+            JackknifePlus(
+                block_length=block_length,
+                score="absolute",
+                by="series",
+                level=level,
+                positions=[31.0],
+            )
+        )
+        series = result.intervals.series["B"]
+        return _held(series.lower[0], series.upper[0], float(values[30]))
+
+    return _conformal_study(make, level)
+
+
+@pytest.mark.coverage_study
+class TestJackknifePlus:
+    def test_jackknife_plus_is_calibrated(self) -> None:
+        study = _jackknife_plus_study(block_length=1, level=0.9)
+
+        bound = 1 - 2 * 0.1
+        assert study.coverage("observation") >= bound - study.tolerance, study
+
+    def test_jackknife_plus_with_long_blocks_is_calibrated(self) -> None:
+        study = _jackknife_plus_study(block_length=5, level=0.9)
+
+        # CV+ with K = 6 blocks of m = 5 of n = 30 observations (Barber et
+        # al. 2021, Theorem 4): 1 − 2α − min(2(1 − 1/K)/(m + 1), (1 − K/n)/(K + 1)).
+        n, k, alpha = 30, 6, 0.1
+        bound = (
+            1 - 2 * alpha - min(2 * (1 - 1 / k) / (n / k + 1), (1 - k / n) / (k + 1))
+        )
+        assert study.coverage("observation") >= bound - study.tolerance, study
+
+
+def _ar1(rng: np.random.Generator, phi: float, count: int) -> np.ndarray:
+    noise = rng.normal(0.0, 1.0, count + 50)
+    series = np.zeros_like(noise)
+    for i in range(1, noise.size):
+        series[i] = phi * series[i - 1] + noise[i]
+    return series[50:]
+
+
+@pytest.mark.coverage_study
+class TestEnbPI:
+    def test_enbpi_holds_under_autocorrelation(self) -> None:
+        level = 0.9
+
+        def make(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+            # Flows of one step around c = 10 with AR(1) noise: 60 fitted, 1 new.
+            values = 10.0 + _ar1(rng, 0.5, 61)
+            fitted = values[:60].tolist()
+            calibrator = flow_calibrator(fitted, windowed=True, seed=index)
+            result = calibrator.uncertainty(
+                EnbPI(
+                    replicates=40,
+                    block_length=5,
+                    score="absolute",
+                    by="series",
+                    level=level,
+                    positions=[61.0],
+                )
+            )
+            series = result.intervals.series["B"]
+            return _held(series.lower[0], series.upper[0], float(values[60]))
+
+        study = _conformal_study(make, level)
 
         assert study.calibrated(), study

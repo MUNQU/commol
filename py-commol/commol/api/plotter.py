@@ -1,4 +1,5 @@
-"""Plots of simulation results, observations and the bands of a predictive."""
+"""Plots of simulation results, observations, the bands of a predictive and
+prediction intervals."""
 
 import logging
 import math
@@ -19,6 +20,7 @@ from commol.api.results import SimulationReplicates, SimulationResults, same_pos
 from commol.api.simulation import Simulation
 from commol.api.windows import window_ends, windowed_totals
 from commol.context.calibration import CalibrationResult, ObservedDataPoint
+from commol.context.inference.conformal import PredictionIntervals
 from commol.context.inference.noise import NoNoise
 from commol.context.visualization import PlotConfig
 
@@ -95,6 +97,7 @@ class SimulationPlotter:
         position_label: Callable[[float], str] | None = None,
         tick_every: float | None = None,
         x_label: str = "Step",
+        prediction_intervals: PredictionIntervals | None = None,
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
         """
@@ -141,6 +144,12 @@ class SimulationPlotter:
             plotted position.
         x_label : str
             The x-axis label. Default "Step".
+        prediction_intervals : PredictionIntervals | None
+            Prediction intervals of a conformal method
+            (``ConformalResult.intervals``). The subplot of each of their
+            series, by label, shows the band between their lower and upper
+            ends and their point prediction; an unbounded interval is left
+            out of the band.
         **kwargs : str | int | float | bool | None
             Additional keyword arguments passed to seaborn.lineplot().
             Common parameters: linewidth, alpha, linestyle, marker, etc.
@@ -179,6 +188,11 @@ class SimulationPlotter:
             tick_every,
             x_label,
         )
+        if prediction_intervals is not None:
+            for ax, bin_id in zip(axes, bins_to_plot, strict=False):
+                self._plot_prediction_intervals(
+                    ax, bin_id, prediction_intervals, show_legend
+                )
         self._finalize_plot(axes, bins_to_plot, output_file, config, "Series")
 
         return fig
@@ -535,6 +549,38 @@ class SimulationPlotter:
                     tick_every,
                     x_label,
                 )
+
+    @staticmethod
+    def _plot_prediction_intervals(
+        ax: "Axes",
+        series_id: str,
+        intervals: PredictionIntervals,
+        show_legend: bool,
+    ) -> None:
+        """
+        The band of the prediction intervals of one series and its point
+        prediction, when the intervals have the series.
+        """
+        series = intervals.series.get(series_id)
+        if series is None:
+            return
+        bounded = [
+            (at, lower, upper)
+            for at, lower, upper in zip(
+                series.positions, series.lower, series.upper, strict=True
+            )
+            if math.isfinite(lower) and math.isfinite(upper)
+        ]
+        ax.fill_between(
+            [at for at, _, _ in bounded],
+            [lower for _, lower, _ in bounded],
+            [upper for _, _, upper in bounded],
+            alpha=0.3,
+            label=f"{intervals.level:.0%} prediction interval",
+        )
+        ax.plot(series.positions, series.prediction, linestyle="--", label="Prediction")
+        if show_legend:
+            ax.legend()
 
     @staticmethod
     def _finalize_plot(

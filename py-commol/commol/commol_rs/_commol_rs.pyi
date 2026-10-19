@@ -584,6 +584,30 @@ class EtaCoverageProtocol(Protocol):
 
 _Priors = list[tuple[str, str, list[float]]] | None
 
+class ConformalRunProtocol(Protocol):
+    @property
+    def labels(self) -> list[str]: ...
+    @property
+    def positions(self) -> list[float]: ...
+    @property
+    def prediction(self) -> list[float]: ...
+    @property
+    def lower(self) -> list[float]: ...
+    @property
+    def upper(self) -> list[float]: ...
+    @property
+    def scores(self) -> list[tuple[str, float]]: ...
+    @property
+    def failed(self) -> list[tuple[int, str]]: ...
+    @property
+    def bound(self) -> float | None: ...
+    @property
+    def blocks(self) -> int | None: ...
+    @property
+    def block_length(self) -> int | None: ...
+    @property
+    def block_length_estimates(self) -> list[tuple[str, float]] | None: ...
+
 class InferenceModule(Protocol):
     CalibrationProblem: type[CalibrationProblemProtocol]
     ParameterSample: type[ParameterSampleProtocol]
@@ -594,6 +618,7 @@ class InferenceModule(Protocol):
     Distribution: type[DistributionProtocol]
     SmcRun: type[SmcRunProtocol]
     EtaCoverage: type[EtaCoverageProtocol]
+    ConformalRun: type[ConformalRunProtocol]
     def quantile_error(
         self, values: list[float], level: float
     ) -> tuple[float, float]: ...
@@ -682,6 +707,69 @@ class InferenceModule(Protocol):
         parameter_tolerance: float,
         loss_tolerance: float,
     ) -> StartsAnalysisProtocol: ...
+    def check_conformal_settings(self, score: str | None, by: str | None) -> None: ...
+    def split_conformal(
+        self,
+        problem: CalibrationProblemProtocol,
+        fit: list[float] | None,
+        sample: ParameterSampleProtocol | None,
+        calibration: list[ObservedDataPointProtocol],
+        positions: list[float],
+        score: str,
+        by: str,
+        level: float,
+    ) -> ConformalRunProtocol: ...
+    def rolling_conformal(
+        self,
+        problem: CalibrationProblemProtocol,
+        config: OptimizationConfigProtocol,
+        fit: list[float],
+        origins: list[float],
+        positions: list[float],
+        score: str,
+        by: str,
+        level: float,
+        starts: int,
+        seed: int,
+    ) -> ConformalRunProtocol: ...
+    def jackknife_plus(
+        self,
+        problem: CalibrationProblemProtocol,
+        config: OptimizationConfigProtocol,
+        fit: list[float],
+        block_length: int | None,
+        positions: list[float],
+        score: str,
+        by: str,
+        level: float,
+        starts: int,
+        seed: int,
+    ) -> ConformalRunProtocol: ...
+    def enbpi(
+        self,
+        problem: CalibrationProblemProtocol,
+        config: OptimizationConfigProtocol,
+        fit: list[float],
+        replicates: int,
+        block_length: int | None,
+        positions: list[float],
+        score: str,
+        by: str,
+        level: float,
+        starts: int,
+        seed: int,
+    ) -> ConformalRunProtocol: ...
+    def adaptive_conformal(
+        self,
+        problem: CalibrationProblemProtocol,
+        fit: list[float] | None,
+        sample: ParameterSampleProtocol | None,
+        stream: list[ObservedDataPointProtocol],
+        step: float,
+        score: str,
+        by: str,
+        level: float,
+    ) -> ConformalRunProtocol: ...
 
 class MathExpressionProtocol(Protocol):
     def __init__(self, expression: str) -> None: ...

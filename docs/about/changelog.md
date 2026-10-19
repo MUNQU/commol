@@ -37,6 +37,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SampleIdentifiability(reference="prior", priors=...)`: the contraction of
   each parameter against its prior. See
   [Identifiability](../guide/uncertainty/identifiability.md#a-sample).
+- Conformal prediction intervals through `Calibrator.uncertainty`: intervals
+  for observations with a coverage guarantee that needs no noise model, no
+  prior and no correct model. `SplitConformal` scores held-out observations;
+  `RollingConformal` gives intervals ahead of the data, one quantile per
+  horizon (the `k`-th observation after an origin); `JackknifePlus` refits once
+  per block left out, with the CV+ bound for blocks of more than one
+  observation; `EnbPI` draws its own replicates of blocks for series with
+  dependent errors; `AdaptiveConformal` walks a stream of new observations
+  with a working level that moves with each miss. Each takes a required
+  `score` (`"absolute"`, `"normalized"` or `"spread"`), `by` (`"series"` or
+  `"all"`) and `level`, and returns a `ConformalResult` (`PredictionIntervals`,
+  the scores and the guarantee). See
+  [Conformal Prediction Intervals](../guide/uncertainty/conformal.md).
+- `SimulationPlotter.plot_series(prediction_intervals=...)` draws the band of
+  conformal intervals, and `simulation_report(..., prediction_intervals=...)`
+  reports them.
 
 ## [0.5.0] - 2026-10-19
 

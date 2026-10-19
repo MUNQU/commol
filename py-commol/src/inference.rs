@@ -505,13 +505,13 @@ impl PyCalibrationProblem {
 }
 
 /// The block length a method runs with, and the estimates of `"auto"`.
-struct BlockLength {
-    length: usize,
-    estimates: Option<Vec<(String, f64)>>,
+pub(crate) struct BlockLength {
+    pub(crate) length: usize,
+    pub(crate) estimates: Option<Vec<(String, f64)>>,
 }
 
 impl BlockLength {
-    fn resolve(
+    pub(crate) fn resolve(
         observed: &[commol_calibration::ObservedDataPoint],
         residuals: &Residuals,
         requested: Option<usize>,
@@ -581,7 +581,7 @@ fn value_error(message: String) -> PyErr {
     PyErr::new::<pyo3::exceptions::PyValueError, _>(message)
 }
 
-fn predictive_error(error: PredictiveError) -> PyErr {
+pub(crate) fn predictive_error(error: PredictiveError) -> PyErr {
     match error {
         PredictiveError::Mismatch(message) => value_error(message),
         PredictiveError::Draw { draw, error } => prediction_error(draw, error),
@@ -854,5 +854,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(weighted_mean, m)?)?;
     crate::identifiability::register(m)?;
     crate::smc::register(m)?;
+    crate::conformal::register(m)?;
     Ok(())
 }

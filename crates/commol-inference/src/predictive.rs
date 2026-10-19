@@ -352,41 +352,10 @@ where
     E: SimulationEngine + Send + Sync,
 {
     check_names(problem, sample)?;
-    let mut schedule: Vec<f64> = observations
-        .iter()
-        .flat_map(|obs| std::iter::once(obs.at).chain(obs.window.map(|w| obs.at - w)))
-        .collect();
-    schedule.sort_by(f64::total_cmp);
-    schedule.dedup();
-    let forward = problem.forward();
-    let operator = ObservationOperator::new(
-        observations,
-        forward.parameters(),
-        &forward.base_engine().output_names(),
-        &schedule,
-    )
-    .map_err(PredictiveError::Mismatch)?;
     noise
         .check(observations)
         .map_err(PredictiveError::Mismatch)?;
-    let runs = sample
-        .values()
-        .par_iter()
-        .enumerate()
-        .map(|(draw, values)| {
-            let replicates = forward
-                .run_at(values, &schedule)
-                .map_err(|error| PredictiveError::Draw { draw, error })?;
-            Ok(replicates
-                .iter()
-                .map(|rows| {
-                    let mut out = vec![0.0; operator.count()];
-                    operator.apply(rows, values, &mut out);
-                    out
-                })
-                .collect::<Vec<_>>())
-        })
-        .collect::<Result<Vec<_>, PredictiveError>>()?;
+    let runs = observe_sets(problem, sample.values(), observations)?;
     let mut generator = Generator::from_seed(seed);
     let mut draws = ObservationDraws {
         values: Vec::new(),
@@ -404,4 +373,51 @@ where
         }
     }
     Ok(draws)
+}
+
+/// The values of `observations` for each parameter set of `sets`, read
+/// through the observation operator, in parallel: `[set][replicate][observation]`.
+///
+/// # Errors
+///
+/// Returns an error when an observation names an unknown output or factor,
+/// or a set has no run; [`PredictiveError::Draw`] names the set's index.
+pub(crate) fn observe_sets<E>(
+    problem: &CalibrationProblem<E>,
+    sets: &[Vec<f64>],
+    observations: &[ObservedDataPoint],
+) -> Result<Vec<Vec<Vec<f64>>>, PredictiveError>
+where
+    E: SimulationEngine + Send + Sync,
+{
+    let mut schedule: Vec<f64> = observations
+        .iter()
+        .flat_map(|obs| std::iter::once(obs.at).chain(obs.window.map(|w| obs.at - w)))
+        .collect();
+    schedule.sort_by(f64::total_cmp);
+    schedule.dedup();
+    let forward = problem.forward();
+    let operator = ObservationOperator::new(
+        observations,
+        forward.parameters(),
+        &forward.base_engine().output_names(),
+        &schedule,
+    )
+    .map_err(PredictiveError::Mismatch)?;
+    sets.par_iter()
+        .enumerate()
+        .map(|(draw, values)| {
+            let replicates = forward
+                .run_at(values, &schedule)
+                .map_err(|error| PredictiveError::Draw { draw, error })?;
+            Ok(replicates
+                .iter()
+                .map(|rows| {
+                    let mut out = vec![0.0; operator.count()];
+                    operator.apply(rows, values, &mut out);
+                    out
+                })
+                .collect::<Vec<_>>())
+        })
+        .collect()
 }

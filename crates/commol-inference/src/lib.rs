@@ -17,6 +17,7 @@
 //! | [`priors`] | [`Priors`]: one distribution per parameter |
 //! | [`smc`] | Sequential Monte Carlo: the sampler, its kernels, the Gibbs posterior and ABC |
 //! | [`transform`] | The unbounded scale of the moves: logit, log or identity by the bounds |
+//! | [`conformal`] | Conformal prediction intervals: split, rolling, jackknife+, EnbPI and adaptive |
 //!
 //! Rules: this crate depends on `commol-calibration`, never the reverse; a
 //! method touches an engine only through the problem's
@@ -26,6 +27,7 @@
 
 #![warn(missing_docs)]
 
+pub mod conformal;
 pub mod distribution;
 pub mod identifiability;
 pub mod predictive;

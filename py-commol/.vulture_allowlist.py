@@ -19,6 +19,7 @@ ObservationDrawsProtocol
 BootstrapRunProtocol
 DistributionProtocol
 SmcRunProtocol
+ConformalRunProtocol
 LossConfigProtocol
 OptimizationConfigProtocol
 EngineTypeProtocol

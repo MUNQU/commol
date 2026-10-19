@@ -53,7 +53,7 @@ flowchart TB
     E3["Stochastic<br/>random events"]
     O[/one series per output/]
     C["Calibration<br/>the problem in layers, optimizers"]
-    I["Inference<br/>parameter sample, predictive, scores,<br/>resampling, sensitivities, identifiability,<br/>priors, sequential Monte Carlo"]
+    I["Inference<br/>parameter sample, predictive, scores,<br/>resampling, conformal, sensitivities, identifiability,<br/>priors, sequential Monte Carlo"]
     F["Base: commol-core, commol-random<br/>used by every box"]
     J --> M
     M --> E1 & E2 & E3
@@ -72,7 +72,7 @@ flowchart TB
 | Differential | `commol-differential` | Integrates the ODEs with `diffsol`. |
 | Stochastic | `commol-stochastic` | Moves whole units by random events. |
 | Calibration | `commol-calibration` | The calibration problem in layers (forward model, observation operator, feasibility, discrepancy, optimization objective), and the optimizers that find the values that make an engine match observations, from one or several starts. |
-| Inference | `commol-inference` | What every uncertainty method returns or reads: the weighted parameter sample, the one quantile, the predictive of a sample, its observation noise and its scores; the resampling methods, which fit copies of the problem with other data (`CalibrationProblem::with_data`); the port of sensitivities and the identifiability analyses; the distributions and priors, and the sequential Monte Carlo sampler with its targets (Gibbs posterior, ABC). It depends on calibration, never the reverse. |
+| Inference | `commol-inference` | What every uncertainty method returns or reads: the weighted parameter sample, the one quantile, the predictive of a sample, its observation noise and its scores; the resampling methods, which fit copies of the problem with other data (`CalibrationProblem::with_data`); the conformal prediction intervals; the port of sensitivities and the identifiability analyses; the distributions and priors, and the sequential Monte Carlo sampler with its targets (Gibbs posterior, ABC). It depends on calibration, never the reverse. |
 
 Every box uses `commol-core` (shared types, rate formulas, the
 `SimulationEngine` trait). The stochastic engines and calibration also use

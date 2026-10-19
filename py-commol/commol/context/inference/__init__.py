@@ -1,8 +1,19 @@
 """What every inference method takes and returns: the configuration bases,
 the weighted parameter sample, the observation noise, the distributions and
 priors, the identifiability methods and report, and the settings and results
-of the resampling and sequential Monte Carlo methods."""
+of the resampling, sequential Monte Carlo and conformal methods."""
 
+from commol.context.inference.conformal import (
+    AdaptiveConformal,
+    ConformalMethod,
+    ConformalResult,
+    EnbPI,
+    JackknifePlus,
+    PredictionIntervals,
+    RollingConformal,
+    SeriesIntervals,
+    SplitConformal,
+)
 from commol.context.inference.distributions import (
     Beta,
     Gamma,
@@ -58,6 +69,7 @@ from commol.context.inference.smc import (
 __all__ = [
     "AbcRejection",
     "AbcSmc",
+    "AdaptiveConformal",
     "BayesianBootstrap",
     "Beta",
     "BlockJackknife",
@@ -66,6 +78,9 @@ __all__ = [
     "BootstrapResult",
     "BoundError",
     "Collinearity",
+    "ConformalMethod",
+    "ConformalResult",
+    "EnbPI",
     "EtaCalibration",
     "Gamma",
     "GibbsPosterior",
@@ -74,6 +89,7 @@ __all__ = [
     "IdentifiabilityReport",
     "InferenceMethod",
     "InformationMatching",
+    "JackknifePlus",
     "JackknifeResult",
     "LogNormal",
     "LogUniform",
@@ -83,15 +99,19 @@ __all__ = [
     "ObservationNoise",
     "ParameterSample",
     "ParameterSummary",
+    "PredictionIntervals",
     "Priors",
     "ResamplingDiagnostics",
     "ResidualBootstrap",
     "ResidualNoise",
+    "RollingConformal",
     "SampleIdentifiability",
     "SampleMethod",
     "SeriesDistance",
+    "SeriesIntervals",
     "SmcDiagnostics",
     "SmcResult",
+    "SplitConformal",
     "StartsIdentifiability",
     "StructuralRank",
     "UncertaintyMethod",

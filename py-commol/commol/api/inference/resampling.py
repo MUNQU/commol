@@ -48,7 +48,20 @@ def fit_values(calibrator: "Calibrator", fit: CalibrationResult) -> list[float]:
     return [fit.best_parameters[name] for name in calibrator.parameter_names]
 
 
-def _rust_length(block_length: BlockLength) -> int | None:
+def rust_block_length(block_length: BlockLength) -> int | None:
+    """
+    A block length as the Rust runners take it.
+
+    Parameters
+    ----------
+    block_length : int | "auto"
+        Positions per block.
+
+    Returns
+    -------
+    int | None
+        The length, or None for ``"auto"``.
+    """
     return None if block_length == "auto" else block_length
 
 
@@ -119,7 +132,7 @@ def run_bayesian_bootstrap(
         calibrator.rust_optimizer,
         fit_values(calibrator, fit),
         method.replicates,
-        _rust_length(method.block_length),
+        rust_block_length(method.block_length),
         method.starts,
         calibrator.seed,
     )
@@ -156,7 +169,7 @@ def run_residual_bootstrap(
         calibrator.rust_optimizer,
         fit_values(calibrator, fit),
         method.replicates,
-        _rust_length(method.block_length),
+        rust_block_length(method.block_length),
         method.starts,
         calibrator.seed,
         method.residual_scale,
@@ -195,7 +208,7 @@ def run_wild_bootstrap(
         calibrator.rust_optimizer,
         fit_values(calibrator, fit),
         method.replicates,
-        _rust_length(method.block_length),
+        rust_block_length(method.block_length),
         method.starts,
         calibrator.seed,
         method.multipliers,
@@ -230,7 +243,7 @@ def run_block_jackknife(
     run = calibrator.rust_problem.jackknife(
         calibrator.rust_optimizer,
         fit_values(calibrator, fit),
-        _rust_length(method.block_length),
+        rust_block_length(method.block_length),
         method.starts,
         calibrator.seed,
     )

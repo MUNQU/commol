@@ -2,7 +2,13 @@
 
 import pytest
 
-from commol import ObservedDataPoint, Simulation, window_index
+from commol import (
+    ObservedDataPoint,
+    PredictionIntervals,
+    SeriesIntervals,
+    Simulation,
+    window_index,
+)
 from commol.api.reporting import observed_report, simulation_report
 from tests.support import a_to_b_builder, build, build_ode
 
@@ -266,3 +272,44 @@ def test_observed_report_places_each_observation_by_window_index(
     for i, at in enumerate(positions):
         expected[window_index(at, window)] = float(i)
     assert report["events"]["values"] == expected
+
+
+class TestPredictionIntervals:
+    def test_a_report_holds_prediction_intervals(self) -> None:
+        simulation = _accumulator_model()
+        results = simulation.run(WINDOW * WINDOWS)
+        intervals = PredictionIntervals(
+            level=0.8,
+            series={
+                "B": SeriesIntervals(
+                    positions=[41.0, 42.0],
+                    prediction=[1.0, 2.0],
+                    lower=[0.5, float("-inf")],
+                    upper=[1.5, float("inf")],
+                )
+            },
+            unbounded={"B": [42.0]},
+        )
+
+        report = simulation_report(
+            simulation, results, STEPS, WINDOW, WINDOWS, prediction_intervals=intervals
+        )
+
+        assert list(report) == [
+            "observed",
+            "series",
+            "accumulators",
+            "prediction_intervals",
+        ]
+        assert report["prediction_intervals"] == {
+            "level": 0.8,
+            "series": {
+                "B": {
+                    "positions": [41.0, 42.0],
+                    "prediction": [1.0, 2.0],
+                    "lower": [0.5, float("-inf")],
+                    "upper": [1.5, float("inf")],
+                }
+            },
+            "unbounded": {"B": [42.0]},
+        }
