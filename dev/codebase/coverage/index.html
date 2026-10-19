@@ -2985,6 +2985,11 @@ release extension. It puts the release extension back when it ends. It needs <co
 <code>llvm-tools-preview</code> (<code>rustup component add llvm-tools-preview</code>). Options
 after the script go to <code>cargo llvm-cov report</code>, such as <code>--summary-only</code> or
 <code>--lcov --output-path lcov.info</code>.</p>
+<p>An instrumented binary that runs while <code>LLVM_PROFILE_FILE</code> is not set writes
+<code>default_&lt;binary&gt;_&lt;pid&gt;.profraw</code> in the directory it runs in. Git ignores
+<code>*.profraw</code> and <code>*.profdata</code> (<code>.gitignore</code>), and
+<code>tests/suite/test_rules.py::test_no_coverage_profile_is_tracked</code> fails when
+one is tracked.</p>
 <p>A threshold is the coverage reached. It rises when coverage rises; a pull
 request that lowers it says why.</p>
 <h3 id="what-python-leaves-out">What Python leaves out<a class="headerlink" href="#what-python-leaves-out" title="Permanent link">&para;</a></h3>
