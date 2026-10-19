@@ -2,8 +2,8 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-How the uncertainty methods share one sample, one entry point, their ports and
-one sampler, and what a replicate may change.
+How the uncertainty methods share one sample, one registry, their ports and
+one sampler, what a replicate may change, and why an analysis needs no data.
 
 ## A sample carries its weights
 
@@ -26,11 +26,13 @@ weights give the unweighted statistic.
 ## Methods plug into one entry point
 
 `Calibrator.uncertainty(method: UncertaintyMethod[R]) -> R` runs every
-uncertainty method, and `Calibrator.identifiability(method:
-IdentifiabilityMethod[R]) -> R` every identifiability method. Both kinds
-subclass `InferenceMethod[R]` (`context/inference/method.py`) and share one
-registry; each entry point refuses the other kind with a `TypeError` that
-names the right one.
+uncertainty method, `Calibrator.identifiability(method:
+IdentifiabilityMethod[R]) -> R` every identifiability method, and
+`SensitivityAnalysis.run(method: SensitivityMethod[R]) -> R` every sensitivity
+method. The kinds subclass `InferenceMethod[R]` (`context/inference/method.py`)
+and share one registry, which hands each runner the object of its entry
+point; each entry point refuses another kind with a `TypeError` that names the
+right one.
 A method is three parts: a configuration that subclasses `UncertaintyMethod`
 with its result type (`context/inference/`), a runner in Rust bound in
 `py-commol/src/inference.rs`, and a result (`context/inference/`). It registers
@@ -227,3 +229,22 @@ same `ConformalResult` as every variant.
 **Guards:** `crates/commol-inference/tests/test_conformal.rs`,
 `tests/uncertainty/test_conformal.py`, the studies of
 `tests/uncertainty/test_coverage.py`.
+
+## An analysis needs no data
+
+`ForwardAnalysis` runs every method on `ForwardModel::unobserved` (values
+written as a calibration writes them). Quantities read the observation
+operator. A design point is the mean of its replicates on common seeds; a
+predictive or a propagation gives each replicate of each draw its own seed
+(`run_sets`), and each purpose has a stream (`stream_seed`). Morris, Sobol
+and chaos refuse a sample; PRCC reads its weights.
+
+| Alternative | Why not |
+|---|---|
+| A problem with fake observations | Invented data in a type that means a fit. |
+| Python callables as quantities | Every run would return to Python, one at a time. |
+| Resampling a sample to equal weights | Repeated draws that the test of PRCC counts as independent. |
+| Hermite polynomials for a normal input | Every distribution is truncated, so they are not orthogonal. |
+
+**Guards:** `crates/commol-inference/tests/test_global_sensitivity.rs`,
+`tests/uncertainty/test_sensitivity.py`.

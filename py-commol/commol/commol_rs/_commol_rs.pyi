@@ -365,7 +365,7 @@ class CalibrationProblemProtocol(Protocol):
         self, parameter_sets: list[list[float]]
     ) -> list[list[list[float]]]: ...
     def predictive(
-        self, sample: ParameterSampleProtocol, positions: list[float]
+        self, sample: ParameterSampleProtocol, positions: list[float], seed: int
     ) -> PredictiveProtocol: ...
     def observation_draws(
         self,
@@ -379,6 +379,7 @@ class CalibrationProblemProtocol(Protocol):
         self,
         sample: ParameterSampleProtocol,
         observations: list[ObservedDataPointProtocol],
+        seed: int,
     ) -> list[float]: ...
     def pointwise_log_likelihood(self, values: list[float]) -> list[float]: ...
     def parametric_bootstrap(
@@ -647,6 +648,83 @@ class ConformalRunProtocol(Protocol):
     @property
     def block_length_estimates(self) -> list[tuple[str, float]] | None: ...
 
+type _Quantity = tuple[str, list[str], list[float]]
+
+class SobolRunProtocol(Protocol):
+    @property
+    def first(self) -> list[list[float]]: ...
+    @property
+    def total(self) -> list[list[float]]: ...
+    @property
+    def first_lower(self) -> list[list[float]]: ...
+    @property
+    def first_upper(self) -> list[list[float]]: ...
+    @property
+    def total_lower(self) -> list[list[float]]: ...
+    @property
+    def total_upper(self) -> list[list[float]]: ...
+    @property
+    def runs(self) -> int: ...
+
+class ChaosRunProtocol(Protocol):
+    @property
+    def indices(self) -> list[list[int]]: ...
+    @property
+    def coefficients(self) -> list[list[float]]: ...
+    @property
+    def loo_error(self) -> list[float]: ...
+    @property
+    def mean(self) -> list[float]: ...
+    @property
+    def variance(self) -> list[float]: ...
+    @property
+    def first(self) -> list[list[float]]: ...
+    @property
+    def total(self) -> list[list[float]]: ...
+    @property
+    def runs(self) -> int: ...
+
+type _Draws = tuple[list[list[float]], list[float]]
+
+class ForwardAnalysisProtocol(Protocol):
+    def __init__(
+        self,
+        engine: EngineProtocol,
+        parameters: list[CalibrationParameterProtocol],
+        distributions: _Priors = None,
+        sample: ParameterSampleProtocol | None = None,
+        initial_condition_remainder: str | None = None,
+        replicates: int | None = None,
+        seed: int = 0,
+    ) -> None: ...
+    def propagate(
+        self, draws: int | None, quantities: list[_Quantity]
+    ) -> tuple[_Draws, list[list[float]], list[float]]: ...
+    def prcc(
+        self, draws: int | None, quantities: list[_Quantity]
+    ) -> tuple[_Draws, list[list[float]], list[list[float]], float]: ...
+    def morris(
+        self, trajectories: int, levels: int, quantities: list[_Quantity]
+    ) -> tuple[list[list[float]], list[list[float]], list[list[float]], int]: ...
+    def sobol(
+        self,
+        base: int,
+        bootstrap: int,
+        confidence_level: float,
+        quantities: list[_Quantity],
+    ) -> SobolRunProtocol: ...
+    def chaos(
+        self, degree: int, draws: int, quantities: list[_Quantity]
+    ) -> ChaosRunProtocol: ...
+    def predictive(
+        self, sample: ParameterSampleProtocol, positions: list[float]
+    ) -> PredictiveProtocol: ...
+    def observation_draws(
+        self,
+        sample: ParameterSampleProtocol,
+        observations: list[ObservedDataPointProtocol],
+    ) -> ObservationDrawsProtocol: ...
+
 class InferenceModule(Protocol):
     CalibrationProblem: type[CalibrationProblemProtocol]
     ParameterSample: type[ParameterSampleProtocol]
@@ -658,6 +736,17 @@ class InferenceModule(Protocol):
     SmcRun: type[SmcRunProtocol]
     EtaCoverage: type[EtaCoverageProtocol]
     ConformalRun: type[ConformalRunProtocol]
+    ForwardAnalysis: type[ForwardAnalysisProtocol]
+    SobolRun: type[SobolRunProtocol]
+    ChaosRun: type[ChaosRunProtocol]
+    def chaos_evaluate(
+        self,
+        parameters: list[CalibrationParameterProtocol],
+        distributions: list[tuple[str, str, list[float]]],
+        degree: int,
+        coefficients: list[list[float]],
+        points: list[list[float]],
+    ) -> list[list[float]]: ...
     def quantile_error(
         self, values: list[float], level: float
     ) -> tuple[float, float]: ...

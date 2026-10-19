@@ -692,8 +692,8 @@ fn residual_noise_adds_residuals_of_the_fit_to_held_out_positions() {
         .collect();
     let sample = draws_of(&problem, fit.to_vec());
 
-    let plain = observation_draws(&problem, &sample, &held_out, &NoNoise, 3).unwrap();
-    let noisy = observation_draws(&problem, &sample, &held_out, &noise, 3).unwrap();
+    let plain = observation_draws(problem.forward(), &sample, &held_out, &NoNoise, 3).unwrap();
+    let noisy = observation_draws(problem.forward(), &sample, &held_out, &noise, 3).unwrap();
 
     for (shown, predicted) in noisy.values[0].iter().zip(&plain.values[0]) {
         let added = shown - predicted;

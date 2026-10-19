@@ -28,7 +28,7 @@ kind that is not aggregate through every generic layer.
 | `units/` | Unit checks | [Units](../guide/units-and-equations.md) |
 | `description/` | `Model.describe`, its sections and blocks, the renderers and their snapshots (`description/snapshots/`), the equations of the dynamics (`equation_forms` in `support/description.py`) | [Describing a Model](../guide/describing-models.md) |
 | `calibration/` | One file per calibration page: `test_problem.py`, `test_optimizers.py`, `test_starts.py`, `test_constraints.py`, `test_observations.py`, `test_initial_conditions.py`, `test_write_back.py` | [Model Calibration](../guide/calibration.md) and its sub-pages |
-| `uncertainty/` | The parameter sample, the one quantile, the predictive, the scores, the entry point `Calibrator.uncertainty`, and the coverage harness (`test_coverage.py`, marker `coverage_study`) | [Uncertainty](../guide/uncertainty/index.md) |
+| `uncertainty/` | The parameter sample, the one quantile, the predictive, the scores, the entry points `Calibrator.uncertainty` and `SensitivityAnalysis.run`, and the coverage harness (`test_coverage.py`, marker `coverage_study`) | [Uncertainty](../guide/uncertainty/index.md) |
 | `reporting/` | Reports | [Reports](../guide/reports.md) |
 | `plotting/` | `SimulationPlotter` | [Running Simulations](../guide/simulations.md#plotting) |
 | `docs/` | The documentation examples and the API coverage (marker `docs`) | — |

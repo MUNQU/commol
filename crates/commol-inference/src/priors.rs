@@ -1,11 +1,11 @@
-//! The priors of a sampling method: one [`Distribution`] per parameter,
-//! truncated to its bounds.
+//! One [`Distribution`] per parameter, truncated to its bounds: the priors of
+//! a sampling method, or the inputs of a sensitivity analysis.
 
 use commol_random::Generator;
 
 use crate::distribution::{Distribution, Family, kinds_that_fit};
 
-/// One prior per parameter, in problem order.
+/// One distribution per parameter, in problem order.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Priors {
     names: Vec<String>,
@@ -13,13 +13,15 @@ pub struct Priors {
 }
 
 impl Priors {
-    /// The priors of the parameters `names` with `bounds`, from the family
-    /// given to each name.
+    /// The distributions of the parameters `names` with `bounds`, from the
+    /// family given to each name.
     ///
     /// # Errors
     ///
-    /// Returns a message that names the parameter when one has no prior, a
-    /// prior names no parameter, or a family does not fit the bounds of its
+    /// Returns a message that names the parameter when one has no
+    /// distribution, a distribution names no parameter (both in the words of
+    /// the priors of a sampling method: a sensitivity analysis checks them in
+    /// Python first), or a family does not fit the bounds of its
     /// parameter (the message lists the kinds that fit them).
     pub fn new(
         names: &[String],
@@ -49,14 +51,14 @@ impl Priors {
                     })?;
                 if let Some(problem) = family.bound_problem(lower, upper) {
                     return Err(format!(
-                        "The prior {}() of '{name}' {problem}, and '{name}' has the bounds \
+                        "The distribution {}() of '{name}' {problem}, and '{name}' has the bounds \
                          [{lower:?}, {upper:?}]; the distributions that fit them: {}",
                         family.kind(),
                         kinds_that_fit(lower, upper).join(", ")
                     ));
                 }
                 Distribution::new(family, lower, upper)
-                    .map_err(|error| format!("The prior of '{name}': {error}"))
+                    .map_err(|error| format!("The distribution of '{name}': {error}"))
             })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Self {
@@ -169,7 +171,7 @@ mod tests {
             )],
         )
         .unwrap_err();
-        assert!(error.starts_with("The prior of 'a': "), "{error}");
+        assert!(error.starts_with("The distribution of 'a': "), "{error}");
         assert!(error.contains("no mass"), "{error}");
     }
 
@@ -179,7 +181,7 @@ mod tests {
             Priors::uniform_on_bounds(&names(), &[(0.0, 1.0), (0.0, f64::INFINITY)]).unwrap_err();
         assert_eq!(
             error,
-            "The prior Uniform() of 'b' needs finite bounds, and 'b' has the bounds [0.0, inf]; \
+            "The distribution Uniform() of 'b' needs finite bounds, and 'b' has the bounds [0.0, inf]; \
              the distributions that fit them: Normal, LogNormal, Gamma"
         );
     }

@@ -239,6 +239,7 @@ dependencies = [
  "commol-difference",
  "commol-differential",
  "commol-random",
+ "commol-stochastic",
  "libm",
  "nalgebra",
  "rayon",

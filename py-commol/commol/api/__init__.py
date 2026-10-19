@@ -1,4 +1,5 @@
-"""User-facing workflows: building, simulating, calibrating, plotting and reporting."""
+"""User-facing workflows: building, simulating, calibrating, analysing,
+plotting and reporting."""
 
 from .calibrator import Calibrator
 from .model_builder import ModelBuilder
@@ -10,6 +11,7 @@ from .reporting import (
     simulation_report,
 )
 from .results import SimulationReplicates, SimulationResults
+from .sensitivity import SensitivityAnalysis
 from .simulation import ReplicateRuns, Simulation
 from .patterns import AxisPattern
 from .windows import (
@@ -22,6 +24,7 @@ from .windows import (
 
 __all__ = [
     "Calibrator",
+    "SensitivityAnalysis",
     "applied_parameters_report",
     "identifiability_report",
     "ModelBuilder",

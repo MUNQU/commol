@@ -10,7 +10,7 @@ validates the structure and asks the engine.
 """
 
 import math
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import Field
@@ -27,7 +27,7 @@ from commol.utils.security import get_expression_variables
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import EngineProtocol
-    from commol.context.calibration import CalibrationProblem
+    from commol.context.calibration import CalibrationParameter, CalibrationProblem
     from commol.context.description import Section
     from commol.context.model import Model
     from commol.context.inference.sample import ParameterSummary
@@ -183,39 +183,42 @@ class Aggregate(ModelStructure, InitialConditions):
         self,
         model: "Model[Self]",
         engine: "EngineProtocol",
-        problem: "CalibrationProblem",
+        parameters: Sequence["CalibrationParameter"],
+        remainder: str | None,
     ) -> None:
         """
         Check that the remainder has the unit of every amount it gives.
 
-        The remainder takes what the calibrated amounts leave of the sum it
-        keeps, so a bin, prefix or compartment value must be in the unit of
-        the remainder; a category split has no unit.
+        The remainder takes what the amounts set leave of the sum it keeps, so
+        a bin, prefix or compartment value must be in the unit of the
+        remainder; a category split has no unit.
 
         Parameters
         ----------
         model : Model
-            The model the calibration runs on.
+            The model the values are set on.
         engine : EngineProtocol
             The engine built from it.
-        problem : CalibrationProblem
-            The problem, for its parameters and remainder.
+        parameters : Sequence[CalibrationParameter]
+            The values set, with their types and bounds.
+        remainder : str | None
+            The bin or compartment that takes what the initial conditions
+            leave, if any.
 
         Raises
         ------
         ValueError
-            If a calibrated amount is in another unit than the remainder.
+            If an amount set is in another unit than the remainder.
         """
-        remainder = problem.initial_condition_remainder
         if remainder is None:
             return
-        parameters = [
+        initial_conditions = [
             param
-            for param in problem.parameters
+            for param in parameters
             if param.parameter_type == CalibrationParameterType.INITIAL_CONDITION
         ]
         covered, kept = engine_state.initial_condition_coverage(
-            engine, parameters, remainder
+            engine, initial_conditions, remainder
         )
         bin_of = {c.name: c.bin for c in self.initial_state(model.process)}
 
@@ -224,7 +227,7 @@ class Aggregate(ModelStructure, InitialConditions):
             return None if bin_item is None else bin_item.unit
 
         remainder_unit = unit(kept[0])
-        for param, compartments in zip(parameters, covered, strict=True):
+        for param, compartments in zip(initial_conditions, covered, strict=True):
             for compartment in compartments:
                 if unit(compartment) != remainder_unit:
                     raise ValueError(

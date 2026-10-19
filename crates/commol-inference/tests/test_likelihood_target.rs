@@ -399,7 +399,7 @@ fn the_log_score_of_one_draw_is_the_log_density() {
     )
     .unwrap();
 
-    let scores = log_score(&problem, &sample, problem.observed_data(), &noise).unwrap();
+    let scores = log_score(&problem, &sample, problem.observed_data(), &noise, 0).unwrap();
 
     let likelihood = noise.likelihood();
     for ((obs, &term), score) in problem
@@ -431,7 +431,7 @@ fn the_log_score_of_two_draws_is_their_mixture() {
     )
     .unwrap();
 
-    let score = log_score(&problem, &sample, problem.observed_data(), &noise).unwrap()[0];
+    let score = log_score(&problem, &sample, problem.observed_data(), &noise, 0).unwrap()[0];
 
     // Both draws are one away from the observation.
     let density = (-0.5f64).exp() / (2.0 * std::f64::consts::PI).sqrt();

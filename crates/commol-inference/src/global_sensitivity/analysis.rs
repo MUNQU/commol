@@ -1,0 +1,336 @@
+//! A forward analysis: a model with no observations, the inputs it varies
+//! and one seed, and every global sensitivity method on them.
+//!
+//! Each method builds its design from the [`InputSpace`], runs it with the
+//! [`BatchRunner`], and hands the quantities to its estimator, all here, so a
+//! caller of Rust or Python runs a method in one call. The seed of the
+//! analysis splits into one stream per purpose
+//! ([`commol_random::stream_seed`]): the designs, the replicates of a
+//! stochastic engine, the bootstrap of Sobol and the runs of a propagation
+//! never draw from one sequence.
+
+use commol_calibration::{CalibrationParameter, ForwardModel};
+use commol_core::SimulationEngine;
+use commol_random::stream_seed;
+
+use crate::batch::BatchRunner;
+use crate::design::InputSpace;
+use crate::global_sensitivity::{ChaosExpansion, Morris, Prcc, Sobol, morris, prcc, sobol};
+use crate::predictive::{PredictiveError, run_sets};
+use crate::quantity::{Quantities, Quantity};
+use crate::sample::ParameterSample;
+
+/// The stream of the designs.
+const DESIGN_STREAM: u64 = 1;
+/// The stream of the replicates of a stochastic engine at each point of a
+/// design (common random numbers).
+const REPLICATES_STREAM: u64 = 2;
+/// The stream of the bootstrap of Sobol.
+const BOOTSTRAP_STREAM: u64 = 3;
+// Stream 4 is the one of the runs of the draws of a predictive and of a
+// propagation (`crate::predictive::DRAWS_STREAM`).
+
+/// The draws of a propagation and what each run gives.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Propagation {
+    /// The draws of the inputs.
+    pub sample: ParameterSample,
+    /// The quantities of each run, `[run][quantity]`: one run per draw, or
+    /// with a stochastic engine one per replicate of each draw.
+    pub values: Vec<Vec<f64>>,
+    /// The weight of each run; a replicate has an equal share of its draw's
+    /// weight.
+    pub weights: Vec<f64>,
+}
+
+/// A forward model with no observations, the inputs it varies and the seed
+/// of every random number.
+#[derive(Debug, Clone)]
+pub struct ForwardAnalysis<E: SimulationEngine> {
+    forward: ForwardModel<E>,
+    inputs: InputSpace,
+    seed: u64,
+}
+
+impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
+    /// The analysis of `inputs`, the values `parameters` of `engine`, with
+    /// `remainder` for the initial conditions and, for a stochastic engine,
+    /// `replicates` replicates at each point of a design.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when the inputs are not the parameters, in order
+    /// and with their bounds, or as [`ForwardModel::unobserved`].
+    pub fn new(
+        engine: E,
+        parameters: Vec<CalibrationParameter>,
+        remainder: Option<&str>,
+        replicates: Option<usize>,
+        inputs: InputSpace,
+        seed: u64,
+    ) -> Result<Self, String> {
+        let names: Vec<String> = parameters.iter().map(|p| p.id.clone()).collect();
+        let bounds: Vec<(f64, f64)> = parameters
+            .iter()
+            .map(|p| (p.min_bound, p.max_bound))
+            .collect();
+        if inputs.names() != names.as_slice() || inputs.bounds() != bounds {
+            return Err(format!(
+                "The inputs are {:?} with the bounds {:?}; the parameters are {names:?} with \
+                 the bounds {bounds:?}, in this order",
+                inputs.names(),
+                inputs.bounds()
+            ));
+        }
+        let forward = ForwardModel::unobserved(
+            engine,
+            parameters,
+            remainder,
+            replicates,
+            stream_seed(seed, REPLICATES_STREAM),
+        )?;
+        Ok(Self {
+            forward,
+            inputs,
+            seed,
+        })
+    }
+
+    /// The forward model.
+    pub fn forward(&self) -> &ForwardModel<E> {
+        &self.forward
+    }
+
+    /// The inputs.
+    pub fn inputs(&self) -> &InputSpace {
+        &self.inputs
+    }
+
+    /// The seed of the analysis; a predictive of its draws runs from it.
+    pub fn seed(&self) -> u64 {
+        self.seed
+    }
+
+    /// The draws a method of independent inputs or of a sample runs: a
+    /// Latin hypercube of `draws` points of independent inputs, or the
+    /// sample of the inputs, whose weights it keeps.
+    ///
+    /// # Errors
+    ///
+    /// [`PredictiveError::Mismatch`] when independent inputs have no
+    /// `draws`, or inputs from a sample have `draws`.
+    pub fn draws(
+        &self,
+        method: &str,
+        draws: Option<usize>,
+    ) -> Result<ParameterSample, PredictiveError> {
+        let invalid = PredictiveError::Mismatch;
+        match (&self.inputs, draws) {
+            (InputSpace::Sample(sample), None) => Ok(sample.clone()),
+            (InputSpace::Sample(_), Some(_)) => Err(invalid(
+                "With inputs from a sample, the sample is the design: leave draws unset"
+                    .to_string(),
+            )),
+            (InputSpace::Independent(_), None) => Err(invalid(format!(
+                "{method} of independent inputs needs draws: the number of points of the \
+                 Latin hypercube to run"
+            ))),
+            (InputSpace::Independent(_), Some(count)) => {
+                let points = self
+                    .inputs
+                    .latin_hypercube(method, count, self.design_seed())
+                    .map_err(invalid)?;
+                ParameterSample::new(
+                    self.inputs.names().to_vec(),
+                    self.inputs.bounds(),
+                    points,
+                    &vec![0.0; count],
+                    None,
+                )
+                .map_err(invalid)
+            }
+        }
+    }
+
+    /// Monte Carlo propagation: the quantities of every run of the draws,
+    /// each replicate of a stochastic engine with a seed of its own, as a
+    /// predictive of the draws runs them ([`run_sets`]).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::draws`], when a quantity does not fit the model, or when a
+    /// draw has no run.
+    pub fn propagate(
+        &self,
+        draws: Option<usize>,
+        quantities: &[Quantity],
+    ) -> Result<Propagation, PredictiveError> {
+        let sample = self.draws("Propagation", draws)?;
+        let mut values = Vec::new();
+        let mut weights = Vec::new();
+        if !quantities.is_empty() {
+            let compiled = self.compile(quantities)?;
+            let runs = run_sets(
+                &self.forward,
+                sample.values(),
+                compiled.schedule(),
+                Some(self.seed),
+            )?;
+            for (replicates, &weight) in runs.iter().zip(sample.weights()) {
+                let share = weight / replicates.len() as f64;
+                for rows in replicates {
+                    values.push(compiled.evaluate(rows));
+                    weights.push(share);
+                }
+            }
+        }
+        Ok(Propagation {
+            sample,
+            values,
+            weights,
+        })
+    }
+
+    /// The PRCC of every input for every quantity, on a Latin hypercube of
+    /// `draws` points or on the sample of the inputs with its weights.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::draws`], when a quantity does not fit the model, a point
+    /// has no run, or as [`prcc()`].
+    pub fn prcc(
+        &self,
+        draws: Option<usize>,
+        quantities: &[Quantity],
+    ) -> Result<(ParameterSample, Prcc), PredictiveError> {
+        let sample = self.draws("PRCC", draws)?;
+        let outputs = self.means(sample.values(), quantities)?;
+        let result =
+            prcc(sample.values(), &outputs, sample.weights()).map_err(PredictiveError::Mismatch)?;
+        Ok((sample, result))
+    }
+
+    /// Morris screening on `trajectories` trajectories of `levels` levels,
+    /// and the number of points run.
+    ///
+    /// # Errors
+    ///
+    /// As [`InputSpace::morris`], when a quantity does not fit the model, or
+    /// a point has no run.
+    pub fn morris(
+        &self,
+        trajectories: usize,
+        levels: usize,
+        quantities: &[Quantity],
+    ) -> Result<(Morris, usize), PredictiveError> {
+        let design = self
+            .inputs
+            .morris("Morris", trajectories, levels, self.design_seed())
+            .map_err(PredictiveError::Mismatch)?;
+        let outputs = self.means(&design.points, quantities)?;
+        let result = morris(&design, &outputs).map_err(PredictiveError::Mismatch)?;
+        Ok((result, design.points.len()))
+    }
+
+    /// Sobol indices on the design of Saltelli with `base` rows, with
+    /// `bootstrap` replicates for intervals at `confidence_level`, and the
+    /// number of points run.
+    ///
+    /// # Errors
+    ///
+    /// As [`InputSpace::saltelli`] and [`sobol()`], when a quantity does not
+    /// fit the model, or a point has no run.
+    pub fn sobol(
+        &self,
+        base: usize,
+        bootstrap: usize,
+        confidence_level: f64,
+        quantities: &[Quantity],
+    ) -> Result<(Sobol, usize), PredictiveError> {
+        if bootstrap < 2 {
+            return Err(PredictiveError::Mismatch(format!(
+                "Sobol needs at least 2 bootstrap replicates, got {bootstrap}"
+            )));
+        }
+        crate::statistics::interval_levels(confidence_level).map_err(PredictiveError::Mismatch)?;
+        let design = self
+            .inputs
+            .saltelli("Sobol", base, self.design_seed())
+            .map_err(PredictiveError::Mismatch)?;
+        let outputs = self.means(&design.points, quantities)?;
+        let result = sobol(
+            &design,
+            &outputs,
+            bootstrap,
+            confidence_level,
+            stream_seed(self.seed, BOOTSTRAP_STREAM),
+        )
+        .map_err(PredictiveError::Mismatch)?;
+        Ok((result, design.points.len()))
+    }
+
+    /// A polynomial chaos expansion of `degree` fitted on a Latin hypercube
+    /// of `draws` points, and the number of points run. The number of terms
+    /// is checked before any run.
+    ///
+    /// # Errors
+    ///
+    /// As [`InputSpace::independent`], when `draws` is not above the number
+    /// of terms, a quantity does not fit the model, a point has no run, or as
+    /// [`ChaosExpansion::fit`].
+    pub fn chaos(
+        &self,
+        degree: usize,
+        draws: usize,
+        quantities: &[Quantity],
+    ) -> Result<(ChaosExpansion, usize), PredictiveError> {
+        let method = "PolynomialChaos";
+        self.inputs
+            .independent(method)
+            .map_err(PredictiveError::Mismatch)?;
+        let inputs = self.inputs.names().len();
+        let terms = ChaosExpansion::terms(inputs, degree);
+        if draws <= terms {
+            return Err(PredictiveError::Mismatch(format!(
+                "Polynomial chaos of degree {degree} in {inputs} inputs has {terms} terms and \
+                 needs more points than terms, got {draws}"
+            )));
+        }
+        let points = self
+            .inputs
+            .latin_hypercube(method, draws, self.design_seed())
+            .map_err(PredictiveError::Mismatch)?;
+        let unit = self
+            .inputs
+            .to_unit(method, &points)
+            .map_err(PredictiveError::Mismatch)?;
+        let outputs = self.means(&points, quantities)?;
+        let expansion =
+            ChaosExpansion::fit(&unit, &outputs, degree).map_err(PredictiveError::Mismatch)?;
+        Ok((expansion, points.len()))
+    }
+
+    /// The quantities, compiled for the engine and checked against its
+    /// positions.
+    fn compile(&self, quantities: &[Quantity]) -> Result<Quantities, PredictiveError> {
+        let compiled = Quantities::new(quantities, &self.forward.base_engine().output_names())
+            .map_err(PredictiveError::Mismatch)?;
+        BatchRunner::new(&self.forward, &compiled)?;
+        Ok(compiled)
+    }
+
+    /// The quantities of every point, the mean of its replicates on common
+    /// seeds.
+    fn means(
+        &self,
+        points: &[Vec<f64>],
+        quantities: &[Quantity],
+    ) -> Result<Vec<Vec<f64>>, PredictiveError> {
+        let compiled = self.compile(quantities)?;
+        BatchRunner::new(&self.forward, &compiled)?.means(points)
+    }
+
+    fn design_seed(&self) -> u64 {
+        stream_seed(self.seed, DESIGN_STREAM)
+    }
+}

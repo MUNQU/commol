@@ -119,6 +119,15 @@ An identifiability method follows the same steps with
 it reads derivatives only through `SensitivitySource`, adds its section to
 `IdentifiabilityReport`, and needs no coverage study.
 
+A sensitivity method subclasses `SensitivityMethod[YourResult]` and runs
+through `SensitivityAnalysis.run`. Its Rust side is a method of
+`ForwardAnalysis` (`crates/commol-inference/src/global_sensitivity/`), which
+builds the design from `InputSpace` (`design.rs`), runs it with
+`BatchRunner` and calls the estimator; the binding and the Python runner only
+convert. A method of independent inputs refuses a sample through
+`InputSpace::independent`, and a random number comes from a stream of the
+seed of the analysis (`stream_seed`).
+
 ### Model type (engine)
 
 To add an engine to the list:

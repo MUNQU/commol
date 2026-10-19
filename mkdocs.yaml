@@ -87,6 +87,7 @@ plugins:
           - guide/uncertainty/smc.md: Priors, the sequential Monte Carlo sampler, the Gibbs posterior and its scale eta, ABC and its distances, and the diagnostics
           - guide/uncertainty/observation-models.md: Observation models of each series, noise parameters, maximum likelihood, the Bayesian posterior and its evidence, prediction intervals with noise, the log score and the parametric bootstrap
           - guide/uncertainty/conformal.md: Conformal prediction intervals, the guarantee, scores and pooling, split, rolling origins, jackknife+ and CV+, EnbPI, adaptive conformal, plots and reports
+          - guide/uncertainty/sensitivity.md: Forward questions with no data, input spaces, quantities of interest, propagation, PRCC, Morris screening, Sobol indices, polynomial chaos and their plots
           - guide/reports.md: applied_parameters_report and simulation_report
           - guide/examples.md: Complete models
         API reference:
@@ -158,6 +159,7 @@ nav:
           - Sequential Monte Carlo: guide/uncertainty/smc.md
           - Observation Models: guide/uncertainty/observation-models.md
           - Conformal: guide/uncertainty/conformal.md
+          - Sensitivity Analysis: guide/uncertainty/sensitivity.md
       - Examples: guide/examples.md
   - API Reference:
       - API Overview: api/index.md
@@ -170,6 +172,7 @@ nav:
       - Calibration: api/calibrator.md
       - Uncertainty: api/uncertainty.md
       - Identifiability: api/identifiability.md
+      - Sensitivity: api/sensitivity.md
       - Reports: api/reports.md
       - Model Structure: advanced/model-structure.md
   - Development:

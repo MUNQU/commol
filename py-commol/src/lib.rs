@@ -42,6 +42,7 @@ mod identifiability;
 mod inference;
 mod model;
 pub(crate) mod python_observer;
+mod sensitivity;
 mod smc;
 #[cfg(feature = "test-kind")]
 mod test_kind;

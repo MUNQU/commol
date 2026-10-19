@@ -8,15 +8,18 @@
 //! band of the model. [`DistributionNoise`] draws from the observation
 //! models of the problem. A stochastic engine runs every replicate of each draw;
 //! each replicate is a draw of the predictive with an equal share of the
-//! draw's weight.
+//! draw's weight, and has a seed of its own ([`run_sets`]): replicate `r` of
+//! draw `d` is seeded from the seed of the caller, so the predictive draws
+//! fresh noise for every draw instead of the same replicates for all.
 
 use commol_calibration::likelihood::log_location;
 use commol_calibration::{
-    CalibrationProblem, EvaluationError, Likelihood, Noise, ObservationOperator, ObservedDataPoint,
+    CalibrationProblem, EvaluationError, ForwardModel, Likelihood, Noise, ObservationOperator,
+    ObservedDataPoint,
 };
 use commol_core::SimulationEngine;
-use commol_random::Generator;
 use commol_random::sample::{binomial, poisson};
+use commol_random::{Generator, replicate_seed, stream_seed};
 use rayon::prelude::*;
 
 use crate::distribution::{Distribution, Family, open_uniform};
@@ -186,7 +189,7 @@ fn gamma(shape: f64, rate: f64, generator: &mut Generator) -> f64 {
 /// Why a predictive could not be built.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PredictiveError {
-    /// The sample is not a sample of this problem's parameters.
+    /// The sample is not a sample of the forward model's parameters.
     Mismatch(String),
     /// A draw has no run; `draw` is its index in the sample.
     Draw {
@@ -207,15 +210,20 @@ impl std::fmt::Display for PredictiveError {
 }
 
 pub(crate) fn check_names<E: SimulationEngine>(
-    problem: &CalibrationProblem<E>,
+    forward: &ForwardModel<E>,
     sample: &ParameterSample,
 ) -> Result<(), PredictiveError> {
-    let names = problem.parameter_names();
-    if names.as_slice() == sample.names() {
+    let names: Vec<&str> = forward.parameters().iter().map(|p| p.id.as_str()).collect();
+    if sample
+        .names()
+        .iter()
+        .map(String::as_str)
+        .eq(names.iter().copied())
+    {
         Ok(())
     } else {
         Err(PredictiveError::Mismatch(format!(
-            "The sample has the parameters {:?}; the problem has {:?}, in this order",
+            "The sample has the parameters {:?}; the forward model has {:?}, in this order",
             sample.names(),
             names
         )))
@@ -245,32 +253,26 @@ pub struct Band {
 }
 
 impl Predictive {
-    /// Run every draw of `sample` at `positions`, in parallel.
+    /// Run every draw of `sample` at `positions` through `forward`, the
+    /// forward model of a calibration problem or of an analysis, in
+    /// parallel; the replicates of a stochastic engine are seeded from
+    /// `seed` ([`run_sets`]).
     ///
     /// # Errors
     ///
-    /// Returns an error when the sample's parameters are not the problem's,
-    /// or a draw has no run.
+    /// Returns an error when the sample's parameters are not the forward
+    /// model's, or a draw has no run.
     pub fn new<E>(
-        problem: &CalibrationProblem<E>,
+        forward: &ForwardModel<E>,
         sample: &ParameterSample,
         positions: &[f64],
+        seed: u64,
     ) -> Result<Self, PredictiveError>
     where
         E: SimulationEngine + Send + Sync,
     {
-        check_names(problem, sample)?;
-        let runs = sample
-            .values()
-            .par_iter()
-            .enumerate()
-            .map(|(draw, values)| {
-                problem
-                    .forward()
-                    .run_at(values, positions)
-                    .map_err(|error| PredictiveError::Draw { draw, error })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        check_names(forward, sample)?;
+        let runs = run_sets(forward, sample.values(), positions, Some(seed))?;
         let mut trajectories = Vec::new();
         let mut weights = Vec::new();
         for (replicates, &weight) in runs.into_iter().zip(sample.weights()) {
@@ -447,19 +449,22 @@ impl ObservationDraws {
     }
 }
 
-/// Every draw's value of `observations`, read through the observation
-/// operator, with `noise` drawn from the generator seeded with `seed`.
+/// Every draw's value of `observations`, run through `forward` and read
+/// through the observation operator, with `noise` drawn from the generator
+/// seeded with `seed`; the replicates of a stochastic engine are seeded from
+/// `seed` as those of [`Predictive::new`].
 ///
 /// The observations need not be the problem's: held-out data are read the
-/// same way.
+/// same way, and a forward model with no observations reads them too.
 ///
 /// # Errors
 ///
-/// Returns an error when the sample's parameters are not the problem's, an
+/// Returns an error when the sample's parameters are not the forward
+/// model's, an
 /// observation names an unknown output or factor or is one `noise` cannot
 /// serve, or a draw has no run.
 pub fn observation_draws<E>(
-    problem: &CalibrationProblem<E>,
+    forward: &ForwardModel<E>,
     sample: &ParameterSample,
     observations: &[ObservedDataPoint],
     noise: &dyn ObservationNoise,
@@ -468,11 +473,11 @@ pub fn observation_draws<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
-    check_names(problem, sample)?;
+    check_names(forward, sample)?;
     noise
         .check(observations)
         .map_err(PredictiveError::Mismatch)?;
-    let runs = observe_sets(problem, sample.values(), observations)?;
+    let runs = observe_sets(forward, sample.values(), observations, Some(seed))?;
     let mut generator = Generator::from_seed(seed);
     let mut draws = ObservationDraws {
         values: Vec::new(),
@@ -494,15 +499,17 @@ where
 
 /// The values of `observations` for each parameter set of `sets`, read
 /// through the observation operator, in parallel: `[set][replicate][observation]`.
+/// `seed` seeds the replicates as [`run_sets`] does.
 ///
 /// # Errors
 ///
 /// Returns an error when an observation names an unknown output or factor,
 /// or a set has no run; [`PredictiveError::Draw`] names the set's index.
 pub(crate) fn observe_sets<E>(
-    problem: &CalibrationProblem<E>,
+    forward: &ForwardModel<E>,
     sets: &[Vec<f64>],
     observations: &[ObservedDataPoint],
+    seed: Option<u64>,
 ) -> Result<Vec<Vec<Vec<f64>>>, PredictiveError>
 where
     E: SimulationEngine + Send + Sync,
@@ -513,7 +520,6 @@ where
         .collect();
     schedule.sort_by(f64::total_cmp);
     schedule.dedup();
-    let forward = problem.forward();
     let operator = ObservationOperator::new(
         observations,
         forward.parameters(),
@@ -521,20 +527,65 @@ where
         &schedule,
     )
     .map_err(PredictiveError::Mismatch)?;
-    sets.par_iter()
-        .enumerate()
-        .map(|(draw, values)| {
-            let replicates = forward
-                .run_at(values, &schedule)
-                .map_err(|error| PredictiveError::Draw { draw, error })?;
-            Ok(replicates
+    Ok(run_sets(forward, sets, &schedule, seed)?
+        .into_iter()
+        .zip(sets)
+        .map(|(replicates, values)| {
+            replicates
                 .iter()
                 .map(|rows| {
                     let mut out = vec![0.0; operator.count()];
                     operator.apply(rows, values, &mut out);
                     out
                 })
-                .collect::<Vec<_>>())
+                .collect()
+        })
+        .collect())
+}
+
+/// The stream of the seeds of the replicates of a set of draws
+/// ([`commol_random::stream_seed`]); the streams 1 to 3 belong to the
+/// designs, the replicates and the bootstrap of a sensitivity analysis.
+pub const DRAWS_STREAM: u64 = 4;
+
+/// The runs of each parameter set of `sets` at `positions`, in parallel,
+/// `[set][replicate][position][output]`.
+///
+/// With `seed`, replicate `r` of set `d` of a stochastic engine runs with
+/// its own seed, the replicate `d · R + r` of the stream of draws of `seed`,
+/// so every set draws fresh noise and the runs repeat from `seed`. Without,
+/// every set runs the replicates of the forward model, the same seeds for
+/// all (common random numbers), as a method that compares sets needs. A
+/// deterministic engine runs once either way.
+///
+/// # Errors
+///
+/// [`PredictiveError::Draw`] with the index of the first set that has no
+/// run.
+pub fn run_sets<E>(
+    forward: &ForwardModel<E>,
+    sets: &[Vec<f64>],
+    positions: &[f64],
+    seed: Option<u64>,
+) -> Result<Vec<Vec<Vec<Vec<f64>>>>, PredictiveError>
+where
+    E: SimulationEngine + Send + Sync,
+{
+    let replicates = forward.replicates().map(|r| r.seeds.len());
+    let base = seed.map(|seed| stream_seed(seed, DRAWS_STREAM));
+    sets.par_iter()
+        .enumerate()
+        .map(|(draw, values)| {
+            let runs = match (replicates, base) {
+                (Some(count), Some(base)) => (0..count)
+                    .map(|r| {
+                        let index = (draw * count + r) as u64;
+                        forward.run_once_at(values, positions, Some(replicate_seed(base, index)))
+                    })
+                    .collect::<Result<Vec<_>, _>>(),
+                _ => forward.run_at(values, positions),
+            };
+            runs.map_err(|error| PredictiveError::Draw { draw, error })
         })
         .collect()
 }

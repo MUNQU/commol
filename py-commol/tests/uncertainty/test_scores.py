@@ -167,7 +167,8 @@ class TestSeries:
         self, normal: tuple[Predictive, NormalDist]
     ) -> None:
         predictive, dist = normal
-        calibrator = predictive.calibrator
+        calibrator = predictive.source
+        assert isinstance(calibrator, Calibrator)
         values = [0.5, 2.0, 1.0, 4.0]
         sample = ParameterSample.equally_weighted(
             ["f"], [(0.01, 10.0)], [[v] for v in values], SampleMethod(name="four")
@@ -210,11 +211,13 @@ class TestLogScore:
         self, normal: tuple[Predictive, NormalDist], noise: str
     ) -> None:
         predictive, _ = normal
+        calibrator = predictive.source
+        assert isinstance(calibrator, Calibrator)
         other = (
             NoNoise()
             if noise == "none"
             else ResidualNoise(
-                fit=predictive.calibrator.run(),
+                fit=calibrator.run(),
                 block_length=1,
                 residual_scale="additive",
             )

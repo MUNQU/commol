@@ -7,7 +7,7 @@
 //! moves around the guess put every start in the same basin.
 
 use commol_core::SimulationEngine;
-use commol_random::{replicate_seed, Generator};
+use commol_random::{latin_hypercube, replicate_seed, Generator};
 use rayon::prelude::*;
 
 use crate::calibration_problem::CalibrationProblem;
@@ -25,28 +25,16 @@ pub fn start_points(parameters: &[CalibrationParameter], count: usize, seed: u64
     if rows == 0 {
         return points;
     }
-    let mut generator = Generator::from_seed(seed);
-    // One permutation of the strata per parameter, then one uniform draw
-    // inside each stratum.
-    let columns: Vec<Vec<f64>> = parameters
-        .iter()
-        .map(|parameter| {
-            let mut strata: Vec<usize> = (0..rows).collect();
-            for i in (1..rows).rev() {
-                let j = (generator.uniform() * (i + 1) as f64) as usize;
-                strata.swap(i, j.min(i));
-            }
-            let width = parameter.max_bound - parameter.min_bound;
-            strata
-                .into_iter()
-                .map(|stratum| {
-                    let fraction = (stratum as f64 + generator.uniform()) / rows as f64;
-                    parameter.min_bound + fraction * width
-                })
-                .collect()
-        })
-        .collect();
-    points.extend((0..rows).map(|row| columns.iter().map(|column| column[row]).collect()));
+    let unit = latin_hypercube(&mut Generator::from_seed(seed), rows, parameters.len());
+    points.extend(unit.into_iter().map(|point| {
+        point
+            .into_iter()
+            .zip(parameters)
+            .map(|(fraction, parameter)| {
+                parameter.min_bound + fraction * (parameter.max_bound - parameter.min_bound)
+            })
+            .collect()
+    }));
     points
 }
 
@@ -142,6 +130,21 @@ mod tests {
                 .collect::<Vec<_>>()
         };
         assert_ne!(strata(0, (0.0, 1.0)), strata(1, (-2.0, 2.0)));
+    }
+
+    #[test]
+    fn a_seed_gives_the_starts_it_always_gave() {
+        // The starts of seed 11, drawn before the Latin hypercube moved to
+        // commol-random.
+        assert_eq!(
+            start_points(&parameters(), 4, 11),
+            vec![
+                vec![0.3, 0.0],
+                vec![0.32140129672335693, -0.6392004253419341],
+                vec![0.5344058815793623, -0.9480498987687109],
+                vec![0.7541233761814915, 1.1916370017242173],
+            ]
+        );
     }
 
     #[test]

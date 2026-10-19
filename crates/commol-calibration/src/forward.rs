@@ -9,7 +9,9 @@ use commol_core::{SimulationEngine, SimulationError, ValuePlan};
 
 use crate::feasibility::{EvaluationError, Violation};
 use crate::observation::ObservationOperator;
-use crate::types::{CalibrationParameter, ObservedDataPoint, Replicates};
+use crate::types::{
+    CalibrationParameter, CalibrationParameterType, ObservedDataPoint, ReplicateSummary, Replicates,
+};
 use crate::values::ValueWriter;
 
 /// The buffers of one thread's evaluations, reused from one to the next.
@@ -51,6 +53,55 @@ impl<E: SimulationEngine> ForwardModel<E> {
             observation,
             replicates: None,
         }
+    }
+
+    /// A forward model with no observations, for a method that asks what a
+    /// model does rather than how it fits data: the values of `parameters`
+    /// reach the engine as a calibration writes them, with `remainder` for
+    /// the initial conditions, and with a stochastic engine each run is
+    /// `replicates` replicates seeded from `seed`, the same seeds at every
+    /// run. Its schedule is empty: it runs at the positions it is given
+    /// ([`Self::run_at`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when there is no parameter, a parameter is a factor
+    /// or a noise parameter (both belong to observations), `replicates` is 0,
+    /// or the engine
+    /// does not resolve a value of its model kind or the remainder.
+    pub fn unobserved(
+        base_engine: E,
+        parameters: Vec<CalibrationParameter>,
+        remainder: Option<&str>,
+        replicates: Option<usize>,
+        seed: u64,
+    ) -> Result<Self, String> {
+        if parameters.is_empty() {
+            return Err("No parameters provided".to_string());
+        }
+        for parameter in &parameters {
+            let what = match parameter.parameter_type {
+                CalibrationParameterType::Factor => "a factor, which multiplies an observation",
+                CalibrationParameterType::Noise => {
+                    "a noise parameter, which belongs to an observation model"
+                }
+                CalibrationParameterType::Parameter
+                | CalibrationParameterType::InitialCondition => continue,
+            };
+            return Err(format!(
+                "'{}' is {what}; a model with no observations has none",
+                parameter.id
+            ));
+        }
+        let replicates = replicates
+            .map(|count| Replicates::new(count, seed, ReplicateSummary::Mean))
+            .transpose()?;
+        let values = ValueWriter::new(&base_engine, &parameters, remainder)?;
+        let observation =
+            ObservationOperator::new(&[], &parameters, &base_engine.output_names(), &[])?;
+        let mut model = Self::new(base_engine, parameters, values, Vec::new(), observation);
+        model.replicates = replicates;
+        Ok(model)
     }
 
     pub(crate) fn set_replicates(&mut self, replicates: Option<Replicates>) {
@@ -214,19 +265,44 @@ impl<E: SimulationEngine> ForwardModel<E> {
         seed: Option<u64>,
         workspace: &mut Workspace,
     ) -> Result<(), EvaluationError> {
+        workspace.rows.resize_with(1, Vec::new);
+        self.run_once_into(values, &self.schedule, seed, &mut workspace.rows[0])
+    }
+
+    /// The rows of one run at `positions`, whatever the replicates: with
+    /// `seed`, as one replicate of a stochastic engine seeded with it;
+    /// without, as the engine is.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::run_schedule`].
+    pub fn run_once_at(
+        &self,
+        values: &[f64],
+        positions: &[f64],
+        seed: Option<u64>,
+    ) -> Result<Vec<Vec<f64>>, EvaluationError> {
+        let mut rows = Vec::new();
+        self.run_once_into(values, positions, seed, &mut rows)?;
+        Ok(rows)
+    }
+
+    fn run_once_into(
+        &self,
+        values: &[f64],
+        positions: &[f64],
+        seed: Option<u64>,
+        rows: &mut Vec<Vec<f64>>,
+    ) -> Result<(), EvaluationError> {
         let mut engine = self.configure(values)?;
         if let Some(seed) = seed {
             engine.set_seed(seed);
             engine.reset();
         }
-        workspace.rows.resize_with(1, Vec::new);
         engine
-            .run_at_positions_into_buffer(&self.schedule, &mut workspace.rows[0])
+            .run_at_positions_into_buffer(positions, rows)
             .map_err(simulation_error)?;
-        if workspace.rows[0]
-            .iter()
-            .all(|row| row.iter().all(|v| v.is_finite()))
-        {
+        if rows.iter().all(|row| row.iter().all(|v| v.is_finite())) {
             Ok(())
         } else {
             Err(Violation::NonFinite.into())

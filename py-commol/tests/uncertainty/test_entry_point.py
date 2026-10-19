@@ -5,13 +5,24 @@ from typing import assert_type
 
 import pytest
 
-from commol import Calibrator, StructuralRank, UncertaintyMethod
+from commol import (
+    Calibrator,
+    InputSpace,
+    SensitivityAnalysis,
+    SensitivityMethod,
+    StructuralRank,
+    UncertaintyMethod,
+)
 from commol.api.inference.registry import register, registered
 from tests.support.methods import StartsResult, StartsSample, run_starts_sample
 
 
 class Unregistered(UncertaintyMethod[StartsResult]):
     """A method with no runner."""
+
+
+class UnregisteredSensitivity(SensitivityMethod[StartsResult]):
+    """A sensitivity method with no runner."""
 
 
 class TestEntryPoint:
@@ -39,12 +50,23 @@ class TestEntryPoint:
     def test_the_registry_lists_its_types(self) -> None:
         assert "StartsSample" in registered()
 
-    def test_each_entry_point_refuses_the_other_kind(
+    def test_each_entry_point_refuses_the_other_kinds(
         self, calibrator: Calibrator
     ) -> None:
+        analysis = SensitivityAnalysis(
+            calibrator.simulation,
+            InputSpace.uniform_on_bounds(calibrator.problem.parameters),
+            seed=1,
+        )
         with pytest.raises(TypeError, match=r"Calibrator\.uncertainty"):
             calibrator.identifiability(StartsSample(starts=2))  # ty: ignore[invalid-argument-type]
         with pytest.raises(TypeError, match=r"Calibrator\.identifiability"):
             calibrator.uncertainty(
                 StructuralRank(points=2, design="observations")  # ty: ignore[invalid-argument-type]
             )
+        with pytest.raises(TypeError, match=r"SensitivityAnalysis\.run"):
+            calibrator.uncertainty(UnregisteredSensitivity())  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError, match=r"Calibrator\.uncertainty"):
+            analysis.run(StartsSample(starts=2))  # ty: ignore[invalid-argument-type]
+        with pytest.raises(ValueError, match=r"No method is registered"):
+            analysis.run(UnregisteredSensitivity())
