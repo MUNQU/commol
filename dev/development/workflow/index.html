@@ -3584,7 +3584,9 @@ view "By precedence" groups the open issues by <code>Level</code>, so each group
 start when the groups above it close. GitHub Projects cannot group by
 "blocked by" links, and its hierarchy view follows sub-issues only, so the
 script writes the field. It writes only the levels that change, through REST,
-with your own <code>gh</code> login: no workflow and no stored token. <code>start.sh</code> writes
+with your own <code>gh</code> login: no workflow and no stored token. If it cannot write
+them (no write access to the project, a rate limit), it says so in one line
+and lists the next issues all the same. <code>start.sh</code> writes
 them too, and so does, at any time:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python<span class="w"> </span>.github/scripts/parallel.py<span class="w"> </span>--levels
 </span></code></pre></div>
