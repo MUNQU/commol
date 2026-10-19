@@ -11,7 +11,7 @@
 //! | [`ForwardModel`] | Writes values into the engine and runs it, one run per replicate of a stochastic engine |
 //! | [`ObservationOperator`] | Turns the rows of a run into one prediction per observation |
 //! | [`Feasibility`] | Bounds, constraints, infeasible starts and runs, as a [`Violation`] |
-//! | [`Discrepancy`] | Compares predictions with the observations |
+//! | [`Discrepancy`] | Compares predictions with the observations: a loss, or the likelihood of an observation model per series ([`Likelihood`]) |
 //! | [`OptimizationObjective`] | The argmin cost function: the only place that turns a violation into a penalty |
 //!
 //! [`optimize`] minimizes the objective with Nelder-Mead or a particle
@@ -43,6 +43,7 @@ pub mod calibration_problem;
 pub mod discrepancy;
 pub mod feasibility;
 pub mod forward;
+pub mod likelihood;
 pub mod objective;
 pub mod observation;
 pub mod optimization;
@@ -51,9 +52,10 @@ pub mod types;
 pub mod values;
 
 pub use calibration_problem::{check_positions, CalibrationProblem};
-pub use discrepancy::Discrepancy;
+pub use discrepancy::{Discrepancy, DiscrepancyConfig};
 pub use feasibility::{EvaluationError, Feasibility, Violation};
 pub use forward::{ForwardModel, Workspace};
+pub use likelihood::{Argument, Center, Likelihood, Noise, ObservationModel, Term};
 pub use objective::{OptimizationObjective, Score};
 pub use observation::ObservationOperator;
 pub use optimization::{

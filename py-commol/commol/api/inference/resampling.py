@@ -16,6 +16,7 @@ from commol.context.inference.resampling import (
     BlockLength,
     BootstrapResult,
     JackknifeResult,
+    ParametricBootstrap,
     ResamplingDiagnostics,
     ResidualBootstrap,
     WildBootstrap,
@@ -66,7 +67,7 @@ def rust_block_length(block_length: BlockLength) -> int | None:
 
 
 def _diagnostics(
-    block_length: int,
+    block_length: int | None,
     estimates: list[tuple[str, float]] | None,
     failed: list[str],
     not_converged: int,
@@ -142,6 +143,42 @@ def run_bayesian_bootstrap(
         run,
         SampleMethod(
             name="bayesian_bootstrap", settings=method.model_dump(mode="json")
+        ),
+    )
+
+
+def run_parametric_bootstrap(
+    calibrator: "Calibrator", method: ParametricBootstrap
+) -> BootstrapResult:
+    """
+    Run a parametric bootstrap of the observation models.
+
+    Parameters
+    ----------
+    calibrator : Calibrator
+        The calibration problem, with observation models.
+    method : ParametricBootstrap
+        The settings.
+
+    Returns
+    -------
+    BootstrapResult
+        The fit, one draw per replicate and the diagnostics.
+    """
+    fit = calibrator.run(starts=method.starts)
+    run = calibrator.rust_problem.parametric_bootstrap(
+        calibrator.rust_optimizer,
+        fit_values(calibrator, fit),
+        method.replicates,
+        method.starts,
+        calibrator.seed,
+    )
+    return _bootstrap_result(
+        calibrator,
+        fit,
+        run,
+        SampleMethod(
+            name="parametric_bootstrap", settings=method.model_dump(mode="json")
         ),
     )
 
@@ -274,6 +311,7 @@ def run_block_jackknife(
 
 
 register(BayesianBootstrap, run_bayesian_bootstrap)
+register(ParametricBootstrap, run_parametric_bootstrap)
 register(ResidualBootstrap, run_residual_bootstrap)
 register(WildBootstrap, run_wild_bootstrap)
 register(BlockJackknife, run_block_jackknife)

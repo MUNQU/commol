@@ -35,7 +35,12 @@ from commol.context.inference.method import (
     InferenceMethod,
     UncertaintyMethod,
 )
-from commol.context.inference.noise import NoNoise, ObservationNoise, ResidualNoise
+from commol.context.inference.noise import (
+    DistributionNoise,
+    NoNoise,
+    ObservationNoise,
+    ResidualNoise,
+)
 from commol.context.inference.resampling import (
     BayesianBootstrap,
     BlockJackknife,
@@ -43,6 +48,7 @@ from commol.context.inference.resampling import (
     BootstrapResult,
     BoundError,
     JackknifeResult,
+    ParametricBootstrap,
     ResamplingDiagnostics,
     ResidualBootstrap,
     WildBootstrap,
@@ -55,6 +61,7 @@ from commol.context.inference.sample import (
 from commol.context.inference.smc import (
     AbcRejection,
     AbcSmc,
+    BayesianPosterior,
     BootstrapCoverage,
     EtaCalibration,
     GibbsPosterior,
@@ -71,6 +78,7 @@ __all__ = [
     "AbcSmc",
     "AdaptiveConformal",
     "BayesianBootstrap",
+    "BayesianPosterior",
     "Beta",
     "BlockJackknife",
     "BlockLength",
@@ -80,6 +88,7 @@ __all__ = [
     "Collinearity",
     "ConformalMethod",
     "ConformalResult",
+    "DistributionNoise",
     "EnbPI",
     "EtaCalibration",
     "Gamma",
@@ -99,6 +108,7 @@ __all__ = [
     "ObservationNoise",
     "ParameterSample",
     "ParameterSummary",
+    "ParametricBootstrap",
     "PredictionIntervals",
     "Priors",
     "ResamplingDiagnostics",

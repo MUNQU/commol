@@ -211,12 +211,14 @@ class SmcResult(BaseModel):
         above 0 to 1, or the tolerance of ABC, falling.
     kept : list[float | None]
         The value each particle of the sample keeps, in its order: the loss
-        of a Gibbs posterior, or the distance of ABC; None for a particle
-        outside the support.
+        of a Gibbs posterior, the log-likelihood of a Bayesian posterior, or
+        the distance of ABC; None for a particle outside the support.
     log_evidence : float
         The log of the product of the mean incremental weights: for a Gibbs
-        posterior, the log of ``∫ prior(θ) exp(−η loss(θ)) dθ``; for ABC, the
-        log of the prior probability of the last tolerance.
+        posterior, the log of ``∫ prior(θ) exp(−η loss(θ)) dθ``; for a
+        Bayesian posterior, the log marginal likelihood
+        ``log ∫ prior(θ) L(θ) dθ``; for ABC, the log of the prior probability
+        of the last tolerance.
     diagnostics : SmcDiagnostics
         The effective sizes, acceptance rates and move counts of each step.
     """
@@ -308,6 +310,46 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult]):
             if isinstance(eta, int | float) and not eta > 0:
                 raise ValueError(f"eta must be {ETA_CHOICES}; got {eta}.")
         return data
+
+
+class BayesianPosterior(WithPriors, UncertaintyMethod[SmcResult]):
+    """
+    The posterior ``π(θ) ∝ prior(θ) · L(θ)`` of the problem's observation
+    models, sampled by sequential Monte Carlo from the priors (temperature
+    0) to the posterior (temperature 1), with its log evidence.
+
+    It needs a problem with ``observation_models``: their likelihood sets the
+    weight of the data, so it has no `η`. The noise parameters are sampled
+    with the others, so each needs a prior.
+
+    Attributes
+    ----------
+    priors : Priors | dict[str, Distribution]
+        The prior of each calibrated parameter, or
+        ``Priors.uniform_on_bounds()``.
+    particles : int
+        Number of particles, at least 2.
+    target_cess : float
+        The conditional effective sample size of each step, as a share of
+        the particles, strictly between 0 and 1: the next temperature is the
+        highest that keeps it.
+    resample_threshold : float
+        Resample when the effective size falls below this share of the
+        particles, in ``(0, 1]``.
+    stay_probability : float
+        The probability that a particle does not move in a step, strictly
+        between 0 and 1: each step moves every particle
+        ``⌈log c / log(1 − a)⌉`` times.
+    """
+
+    particles: int = Field(ge=2, description="Number of particles.")
+    target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
+    resample_threshold: float = Field(
+        gt=0.0, le=1.0, description="Resample below this share."
+    )
+    stay_probability: float = Field(
+        gt=0.0, lt=1.0, description="Probability a particle does not move."
+    )
 
 
 class AbcSmc(WithPriors, UncertaintyMethod[SmcResult]):

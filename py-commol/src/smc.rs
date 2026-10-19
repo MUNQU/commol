@@ -9,7 +9,9 @@
 use commol_inference::resampling::{
     BlockDrawing, BlockScheme, ResidualScale, Residuals, automatic_block_length,
 };
-use commol_inference::smc::{self, AbcTarget, Distance, RandomWalk, SmcRun, SmcSampler, Stop};
+use commol_inference::smc::{
+    self, AbcTarget, Distance, LikelihoodTarget, RandomWalk, SmcRun, SmcSampler, Stop,
+};
 use commol_inference::{Distribution, Family, Priors};
 use commol_random::{Generator, replicate_seed};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -240,6 +242,43 @@ fn gibbs_posterior(
     Ok(PySmcRun::of(run.run))
 }
 
+/// Sample the posterior of the observation models of the problem
+///
+/// Args:
+///     problem: The calibration problem, with observation models
+///     priors: The priors, or None for uniform on the bounds
+///     particles: Number of particles
+///     resample_threshold: Resample below this share of effective size
+///     target_cess: The conditional effective sample size of each step
+///     stay_probability: The probability that a particle never moves in a
+///         step
+///     seed: Seed of every random number
+///
+/// Raises:
+///     ValueError: If the problem has a loss, or a prior or a setting is not
+///         valid
+///     RuntimeError: If the run fails
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn bayesian_posterior(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    priors: Option<Vec<PriorArgs>>,
+    particles: usize,
+    resample_threshold: f64,
+    target_cess: f64,
+    stay_probability: f64,
+    seed: u64,
+) -> PyResult<PySmcRun> {
+    let priors = problem_priors(problem, priors)?;
+    LikelihoodTarget::new(&problem.inner, &priors).map_err(value_error)?;
+    let mut sampler = sampler(particles, resample_threshold, target_cess, stay_probability)?;
+    let run = py
+        .detach(|| smc::bayesian_posterior(&problem.inner, &priors, &mut sampler, seed))
+        .map_err(PyRuntimeError::new_err)?;
+    Ok(PySmcRun::of(run))
+}
+
 /// The `η` of information matching at the fit
 ///
 /// Raises:
@@ -373,7 +412,7 @@ fn abc_smc(
     let mut sampler = sampler(particles, 1.0, target_cess, stay_probability)?
         .with_min_acceptance(min_acceptance)
         .map_err(value_error)?;
-    let target = AbcTarget::new(&problem.inner, &priors, distance);
+    let target = AbcTarget::new(&problem.inner, &priors, distance).map_err(value_error)?;
     let run = py
         .detach(|| sampler.run(&target, seed))
         .map_err(PyRuntimeError::new_err)?;
@@ -411,7 +450,7 @@ fn abc_rejection(
 ) -> PyResult<(PySmcRun, bool)> {
     let priors = problem_priors(problem, priors)?;
     let distance = Distance::from_metric(metric).map_err(value_error)?;
-    let target = AbcTarget::new(&problem.inner, &priors, distance);
+    let target = AbcTarget::new(&problem.inner, &priors, distance).map_err(value_error)?;
     let run = py
         .detach(|| smc::abc_rejection(&target, draws, quantile, seed))
         .map_err(PyRuntimeError::new_err)?;
@@ -424,6 +463,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySmcRun>()?;
     m.add_class::<PyEtaCoverage>()?;
     m.add_function(wrap_pyfunction!(gibbs_posterior, m)?)?;
+    m.add_function(wrap_pyfunction!(bayesian_posterior, m)?)?;
     m.add_function(wrap_pyfunction!(information_matching_eta, m)?)?;
     m.add_function(wrap_pyfunction!(bootstrap_coverage_eta, m)?)?;
     m.add_function(wrap_pyfunction!(abc_smc, m)?)?;

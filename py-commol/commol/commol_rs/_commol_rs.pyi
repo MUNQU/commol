@@ -108,12 +108,28 @@ class ObservedDataPointProtocol(Protocol):
         weight: float | None = None,
         factor_id: str | None = None,
         window: float | None = None,
+        trials: int | None = None,
     ) -> None: ...
 
 class CalibrationParameterTypeProtocol(Protocol):
     Parameter: ClassVar["CalibrationParameterTypeProtocol"]
     InitialCondition: ClassVar["CalibrationParameterTypeProtocol"]
     Factor: ClassVar["CalibrationParameterTypeProtocol"]
+    Noise: ClassVar["CalibrationParameterTypeProtocol"]
+
+class ObservationModelProtocol(Protocol):
+    @staticmethod
+    def normal(sd: float | str) -> ObservationModelProtocol: ...
+    @staticmethod
+    def log_normal(sigma: float | str, median: bool) -> ObservationModelProtocol: ...
+    @staticmethod
+    def student_t(df: float | str, scale: float | str) -> ObservationModelProtocol: ...
+    @staticmethod
+    def poisson() -> ObservationModelProtocol: ...
+    @staticmethod
+    def negative_binomial(overdispersion: float | str) -> ObservationModelProtocol: ...
+    @staticmethod
+    def binomial(trials: int | None = None) -> ObservationModelProtocol: ...
 
 class CalibrationParameterProtocol(Protocol):
     def __init__(
@@ -288,6 +304,7 @@ class CalibrationModule(Protocol):
     CalibrationParameter: type[CalibrationParameterProtocol]
     CalibrationConstraint: type[CalibrationConstraintProtocol]
     LossConfig: type[LossConfigProtocol]
+    ObservationModel: type[ObservationModelProtocol]
     NelderMeadConfig: type[NelderMeadConfigProtocol]
     PSOInertiaConstant: type[PSOInertiaConstantProtocol]
     PSOInertiaChaotic: type[PSOInertiaChaoticProtocol]
@@ -328,8 +345,9 @@ class CalibrationProblemProtocol(Protocol):
         observed_data: list[ObservedDataPointProtocol],
         parameters: list[CalibrationParameterProtocol],
         constraints: list[CalibrationConstraintProtocol],
-        loss_config: LossConfigProtocol,
+        loss_config: LossConfigProtocol | None = None,
         initial_condition_remainder: str | None = None,
+        observation_models: list[tuple[str, ObservationModelProtocol]] | None = None,
     ) -> None: ...
     def optimize(
         self, config: OptimizationConfigProtocol, starts: int, seed: int
@@ -349,7 +367,22 @@ class CalibrationProblemProtocol(Protocol):
         observations: list[ObservedDataPointProtocol],
         seed: int,
         residual_noise: tuple[list[float], int, str] | None = None,
+        distribution_noise: bool = False,
     ) -> ObservationDrawsProtocol: ...
+    def log_score(
+        self,
+        sample: ParameterSampleProtocol,
+        observations: list[ObservedDataPointProtocol],
+    ) -> list[float]: ...
+    def pointwise_log_likelihood(self, values: list[float]) -> list[float]: ...
+    def parametric_bootstrap(
+        self,
+        config: OptimizationConfigProtocol,
+        fit: list[float],
+        replicates: int,
+        starts: int,
+        seed: int,
+    ) -> BootstrapRunProtocol: ...
     def bayesian_bootstrap(
         self,
         config: OptimizationConfigProtocol,
@@ -401,7 +434,7 @@ class BootstrapRunProtocol(Protocol):
     @property
     def negative_values(self) -> int: ...
     @property
-    def block_length(self) -> int: ...
+    def block_length(self) -> int | None: ...
     @property
     def block_length_estimates(self) -> list[tuple[str, float]] | None: ...
 
@@ -655,6 +688,16 @@ class InferenceModule(Protocol):
         problem: CalibrationProblemProtocol,
         priors: _Priors,
         eta: float,
+        particles: int,
+        resample_threshold: float,
+        target_cess: float,
+        stay_probability: float,
+        seed: int,
+    ) -> SmcRunProtocol: ...
+    def bayesian_posterior(
+        self,
+        problem: CalibrationProblemProtocol,
+        priors: _Priors,
         particles: int,
         resample_threshold: float,
         target_cess: float,

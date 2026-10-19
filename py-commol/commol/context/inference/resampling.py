@@ -1,9 +1,12 @@
-"""The resampling methods: the Bayesian, residual and wild block bootstraps
-and the block jackknife, their settings and their results.
+"""The resampling methods: the Bayesian, residual and wild block bootstraps,
+the block jackknife and the parametric bootstrap, their settings and their
+results.
 
 Each fits the model again to reweighted or resampled data, starting from the
-fit, with no noise model and no prior. Blocks of consecutive positions, across
-every series at once, keep the dependence of the data inside each block.
+fit, with no prior. Blocks of consecutive positions, across every series at
+once, keep the dependence of the data inside each block. Every method but the
+parametric bootstrap needs no noise model; the parametric bootstrap draws the
+data from the observation models.
 """
 
 from typing import Annotated, Literal
@@ -27,8 +30,9 @@ class ResamplingDiagnostics(BaseModel):
 
     Attributes
     ----------
-    block_length : int
-        The block length the method ran with.
+    block_length : int | None
+        The block length the method ran with; None for the parametric
+        bootstrap, which draws no blocks.
     block_length_estimates : dict[str, float] | None
         With ``block_length="auto"``, the estimate of each series, by label;
         otherwise None.
@@ -44,7 +48,7 @@ class ResamplingDiagnostics(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    block_length: int = Field(description="The block length used.")
+    block_length: int | None = Field(description="The block length used.")
     block_length_estimates: dict[str, float] | None = Field(
         description="The estimate of each series with the automatic length."
     )
@@ -157,6 +161,29 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult]):
 
     replicates: int = Field(ge=1, description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
+    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+
+
+class ParametricBootstrap(UncertaintyMethod[BootstrapResult]):
+    """
+    The parametric bootstrap of the problem's observation models.
+
+    Each replicate draws every observed value from the model of its series
+    at the fit, around the fitted prediction and with the fitted noise
+    parameters, and fits the new data. It needs a problem with
+    ``observation_models``; the observations of a replicate are independent
+    given the fit, so it assumes the models hold.
+
+    Attributes
+    ----------
+    replicates : int
+        Number of replicates, at least 1.
+    starts : int
+        Starts of the fit and of each replicate (default 1): the fit, then
+        rows of a Latin hypercube over the bounds.
+    """
+
+    replicates: int = Field(ge=1, description="Number of replicates.")
     starts: int = Field(default=1, ge=1, description="Starts per fit.")
 
 

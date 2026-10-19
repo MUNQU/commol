@@ -56,6 +56,7 @@ def calibrate(constraints: list[CalibrationConstraint]) -> dict[str, float]:
             CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.01, max_bound=1.0),
         ],
         constraints=constraints,
+        loss_function="sse",
         optimization_config=ParticleSwarmConfig(num_particles=30, max_iterations=300),
         seed=3,
     )

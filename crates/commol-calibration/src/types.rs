@@ -14,6 +14,9 @@ pub enum CalibrationParameterType {
     /// Factor that multiplies the model output of an observation before
     /// comparison
     Factor,
+    /// A parameter of an observation model, such as the standard deviation
+    /// of a normal model. It never reaches the engine.
+    Noise,
 }
 
 /// Represents an observed data point to fit against
@@ -46,6 +49,11 @@ pub struct ObservedDataPoint {
     /// Optional window length for cumulative-output observations.
     /// When set, the predicted value is `output(at) - output(at - window)`.
     pub window: Option<f64>,
+
+    /// The trials of a binomial observation model that takes them from each
+    /// observation; `None` for every other observation.
+    #[serde(default)]
+    pub trials: Option<u64>,
 }
 
 impl ObservedDataPoint {
@@ -59,6 +67,7 @@ impl ObservedDataPoint {
             weight: 1.0,
             factor_id: None,
             window: None,
+            trials: None,
         }
     }
 

@@ -91,14 +91,20 @@ class Calibrator:
         self._validate_calibration_parameters()
         self._validate_observed_data()
         self._warn_constraint_positions_beyond_observations()
+        models = problem.observation_models
         self._rust_problem: "CalibrationProblemProtocol" = (
             commol_rs.inference.CalibrationProblem(
                 self._engine,
                 engine_state.rust_observed_data(problem.observed_data),
                 engine_state.rust_parameters(problem.parameters),
                 engine_state.rust_constraints(problem.constraints),
-                loss_config,
+                loss_config=loss_config,
                 initial_condition_remainder=problem.initial_condition_remainder,
+                observation_models=(
+                    None
+                    if models is None
+                    else engine_state.rust_observation_models(models)
+                ),
             )
         )
 
@@ -184,9 +190,14 @@ class Calibrator:
             if isinstance(self.problem.optimization_config, NelderMeadConfig)
             else OptimizationAlgorithm.PARTICLE_SWARM
         )
+        measure = (
+            f"{self.problem.loss_function} loss function"
+            if self.problem.loss_function is not None
+            else "the negative log-likelihood of its observation models"
+        )
         logger.info(
             f"Starting calibration with {algorithm_name} algorithm, "
-            f"{self.problem.loss_function} loss function and {starts} start(s)."
+            f"{measure} and {starts} start(s)."
         )
         if starts < 1:
             raise ValueError(f"A calibration needs at least one start, got {starts}.")
@@ -342,10 +353,15 @@ class Calibrator:
 
         return run_method(self, method, IdentifiabilityMethod)
 
-    def _build_loss_config(self) -> "LossConfigProtocol":
-        """The Rust loss, with the replicates of a stochastic engine."""
+    def _build_loss_config(self) -> "LossConfigProtocol | None":
+        """The Rust loss, with the replicates of a stochastic engine; None with
+        observation models."""
+        if self.problem.loss_function is None:
+            return None
         return engine_state.rust_loss_config(
-            self.problem, self.simulation.model_definition.engine.type
+            self.problem,
+            self.problem.loss_function,
+            self.simulation.model_definition.engine.type,
         )
 
     def _build_optimization_config(self) -> "OptimizationConfigProtocol":

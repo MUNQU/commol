@@ -90,7 +90,23 @@ impl Distance {
 
 impl<'a, E: SimulationEngine> AbcTarget<'a, E> {
     /// ABC on `problem` with `priors` and `distance`.
-    pub fn new(problem: &'a CalibrationProblem<E>, priors: &'a Priors, distance: Distance) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when the distance is the loss and the problem has
+    /// observation models instead.
+    pub fn new(
+        problem: &'a CalibrationProblem<E>,
+        priors: &'a Priors,
+        distance: Distance,
+    ) -> Result<Self, String> {
+        if distance == Distance::Loss && problem.discrepancy().loss().is_none() {
+            return Err(
+                "LossDistance() needs a loss; the problem has observation models. Use \
+                 SeriesDistance(...), or BayesianPosterior(...) for their likelihood"
+                    .to_string(),
+            );
+        }
         let labels: Vec<String> = problem
             .observed_data()
             .iter()
@@ -108,7 +124,7 @@ impl<'a, E: SimulationEngine> AbcTarget<'a, E> {
             })
             .collect();
         let observed = problem.discrepancy().observed().to_vec();
-        Self {
+        Ok(Self {
             problem,
             priors,
             distance,
@@ -117,7 +133,7 @@ impl<'a, E: SimulationEngine> AbcTarget<'a, E> {
             series,
             count: names.len(),
             scale: observation_normalization(&labels, &observed),
-        }
+        })
     }
 
     /// Whether each evaluation runs one fresh replicate of a stochastic
@@ -126,11 +142,14 @@ impl<'a, E: SimulationEngine> AbcTarget<'a, E> {
         self.stochastic
     }
 
-    /// The distance of the predictions of one run.
-    pub fn distance(&self, predictions: &[f64]) -> f64 {
+    /// The distance of the predictions of one run at the parameter
+    /// `values`.
+    pub fn distance(&self, values: &[f64], predictions: &[f64]) -> f64 {
         let discrepancy = self.problem.discrepancy();
         match self.distance {
-            Distance::Loss => discrepancy.of_run(predictions),
+            Distance::Loss => discrepancy
+                .of_run(values, predictions)
+                .expect("the loss of a run has no violation"),
             Distance::Series(metric) => {
                 let loss = metric.loss();
                 let mut sums = vec![(0.0, 0.0); self.count];
@@ -174,7 +193,7 @@ impl<E: SimulationEngine + Sync> TemperedTarget for AbcTarget<'_, E> {
         }
         match self.problem.predict_once(values, seed, workspace) {
             Ok(()) => {
-                let distance = self.distance(&workspace.predictions);
+                let distance = self.distance(values, &workspace.predictions);
                 Ok(distance.is_finite().then_some(distance))
             }
             Err(EvaluationError::Violation(_)) => Ok(None),

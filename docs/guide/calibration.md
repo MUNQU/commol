@@ -10,6 +10,7 @@ describe the observations and the unknowns in a `CalibrationProblem`, and a
 | Topic | Page |
 |---|---|
 | The workflow, the problem, losses and results | This page |
+| Maximum likelihood with a model of the noise of each series | [Observation Models](uncertainty/observation-models.md) |
 | Calibrating initial conditions | [Calibrating Initial Conditions](calibration-initial-conditions.md) |
 | Several outputs, aggregates, weights, scale factors, windowed data | [Observations](calibration-observations.md) |
 | Nelder-Mead and particle swarm settings | [Optimizers](calibration-optimizers.md) |
@@ -93,10 +94,11 @@ also when it was created while a parameter was `None`. See
 |---|---|---|---|
 | `observed_data` | `list[ObservedDataPoint]` | required | What the model must reproduce. See [Observations](calibration-observations.md). |
 | `parameters` | `list[CalibrationParameter]` | required | The unknowns and their bounds. |
-| `loss_function` | `str` | `"sse"` | How the misfit is measured; see [Losses](#losses). |
+| `loss_function` | `str \| None` | `None` | How the misfit is measured; see [Losses](#losses). A problem has `loss_function` or `observation_models`, exactly one. |
+| `observation_models` | `dict[str, ObservationModel] \| None` | `None` | One observation model per series label: the fit maximizes their likelihood. See [Observation Models](uncertainty/observation-models.md). |
 | `optimization_config` | `NelderMeadConfig` or `ParticleSwarmConfig` | required | The optimizer and its settings. See [Optimizers](calibration-optimizers.md). |
 | `constraints` | `list[CalibrationConstraint]` | `[]` | Relations the result must respect. See [Constraints](calibration-constraints.md). |
-| `normalize_observations` | `bool` | `False` | Divides each residual by the RMS of its observation series, so series of very different size weigh the same. |
+| `normalize_observations` | `bool` | `False` | Divides each residual by the RMS of its observation series, so series of very different size weigh the same. Needs a loss. |
 | `initial_condition_remainder` | `str \| None` | `None` | The compartment or bin that absorbs the difference when initial conditions are calibrated. See [Calibrating Initial Conditions](calibration-initial-conditions.md). |
 | `seed` | `int \| None` | `None` | Makes every random choice reproducible. |
 
@@ -109,16 +111,17 @@ also when it was created while a parameter was `None`. See
 | `outputs` | `list[str] \| None` | `None` | Outputs to sum before the comparison; needs a `label`. |
 | `label` | `str` | `output` | The name of the observed series in reports, plots and the normalization. |
 | `value` | `float` | required | The observed value. |
-| `weight` | `float` | `1.0` | How much the observation counts in every loss; see [Losses](#losses). |
+| `weight` | `float` | `1.0` | How much the observation counts in every loss, and the power of its term of a likelihood; see [Losses](#losses). |
 | `factor_id` | `str \| None` | `None` | A `factor` parameter that multiplies the prediction. |
 | `window` | `float \| None` | `None` | Compares with the gain over `(at − window, at]` instead of the value. |
+| `trials` | `int \| None` | `None` | The trials of the observation, for a `BinomialObservations()` model that reads them from each observation. |
 
 ### Unknowns
 
 | `CalibrationParameter` field | Type | Default | Meaning |
 |---|---|---|---|
 | `id` | `str` | required | What to calibrate; depends on `parameter_type`. |
-| `parameter_type` | `str` | required | `"parameter"`, `"initial_condition"` or `"factor"`. |
+| `parameter_type` | `str` | required | `"parameter"`, `"initial_condition"`, `"factor"` or `"noise"`. |
 | `min_bound`, `max_bound` | `float` | required | The search interval. |
 | `initial_guess` | `float \| None` | `None` | Where the optimizer starts; the midpoint of the bounds if `None`. |
 
@@ -127,8 +130,9 @@ also when it was created while a parameter was `None`. See
 | `"parameter"` | A model parameter, usually declared with `value=None` | The parameter value |
 | `"initial_condition"` | A bin, a category, or an expanded compartment | A fraction of the total; see [Calibrating Initial Conditions](calibration-initial-conditions.md) |
 | `"factor"` | Any new id, used by observations through `factor_id` | A factor on the predictions; not part of the model |
+| `"noise"` | Any new id, named by an [observation model](uncertainty/observation-models.md#noise-parameters) | An argument of the model, such as its standard deviation; not part of the model |
 
-`"parameter"` and `"factor"` work with every kind of model. The other types are
+`"parameter"`, `"factor"` and `"noise"` work with every kind of model. The other types are
 values of the model kind, and the kind declares which it accepts
 (`model.structure.calibration_value_types()`): an aggregate model accepts
 `"initial_condition"`. A type the kind does not accept raises a `ValueError`
@@ -136,9 +140,15 @@ that names the kind when you create the `Calibrator`.
 
 ## Losses
 
+A problem has a loss or observation models, exactly one, and neither has a
+default: what to fit is a modelling choice. A loss measures the residuals;
+[observation models](uncertainty/observation-models.md) say how each series
+scatters, and the fit maximizes their likelihood, so its loss is `−log L`.
+`CalibrationProblem` raises a `ValueError` with both or neither.
+
 | `loss_function` | Formula (residual `r = observed − predicted`, weight `w`) | Use when |
 |---|---|---|
-| `"sse"` (default) | `Σ w·r²` | The usual choice |
+| `"sse"` | `Σ w·r²` | The usual choice |
 | `"rmse"` | `√(Σ w·r² / Σ w)` | You want the error in the data's unit |
 | `"mae"` | `Σ w·|r| / Σ w` | The data has outliers |
 
@@ -207,6 +217,7 @@ print(round(result.best_parameters["k1"], 1))  # 0.4
 |---|---|
 | A stochastic engine needs `replicates`, `replicate_summary` and `seed`; without one, `Calibrator` raises and the message lists the summaries | `rust_loss_config` in `py-commol/commol/context/_model/engine_state.py` |
 | A deterministic engine does not use `replicates` and `replicate_summary` | The same |
+| A stochastic engine needs a loss: with `observation_models`, `Calibrator` raises a `ValueError` | `PyCalibrationProblem::new` in `py-commol/src/inference.rs`; `Discrepancy::set_summary` |
 | The summaries and the CRPS are computed in `LossConfig`, and the observation weights apply to every option | `LossConfig::replicate_loss` in `crates/commol-calibration/src/types.rs` |
 | A constraint at positions is checked on every replicate | `CalibrationProblem::evaluate` |
 
@@ -222,7 +233,7 @@ replicate of each draw.
 | `CalibrationResult` field | Meaning |
 |---|---|
 | `best_parameters` | `dict[str, float]`: the best value of every unknown, in the order of `problem.parameters` |
-| `final_loss` | The loss at `best_parameters` |
+| `final_loss` | The loss at `best_parameters`; with observation models, the negative log-likelihood |
 | `iterations` | The optimizer iterations performed |
 | `converged` | `True` only when the optimizer met its convergence test or `target_cost`; a run that used all `max_iterations` is `False`. See [Optimizers](calibration-optimizers.md#converged-and-termination_reason). |
 | `termination_reason` | Why it stopped |
@@ -249,7 +260,7 @@ value into the model, routed by its `parameter_type`:
 |---|---|
 | `"parameter"` | The model parameter with that id |
 | `"initial_condition"` | The initial conditions, so the model rebuilds exactly the state the optimizer scored |
-| `"factor"` | Nothing: it describes the observations, not the model |
+| `"factor"`, `"noise"` | Nothing: they describe the observations, not the model |
 
 It accepts a `CalibrationResult` or a plain `{id: value}` mapping, such as one
 of `sample.draws()`; a `ParameterSample` has no single set of values and raises

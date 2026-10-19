@@ -1,12 +1,13 @@
 """Calibration problems that many tests share."""
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 from commol import (
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
+    ObservationModel,
     ObservedDataPoint,
     Simulation,
 )
@@ -102,6 +103,8 @@ def flow_calibrator(
     windowed: bool,
     seed: int = 1,
     bounds: tuple[float, float] = (0.0, 50.0),
+    observation_models: Mapping[str, ObservationModel] | None = None,
+    noise: Sequence[CalibrationParameter] = (),
 ) -> Calibrator:
     """
     Fit a constant flow ``c`` from A to B (``a_to_b_builder`` with the rate
@@ -112,12 +115,17 @@ def flow_calibrator(
     flow of one step and its prediction is ``c``, so the fit is the mean of
     the values; otherwise each observation is the amount of B at ``t`` and
     its prediction is ``c·t``, a regression through the origin.
+
+    The fit minimizes the sum of squares, or, with `observation_models` (of
+    the series ``"B"``), maximizes their likelihood, with the `noise`
+    parameters calibrated after ``c``.
     """
     model = build(a_to_b_builder(parameters={"c": None}, rate="c * A / A", total=1e6))
     problem = CalibrationProblem(
         observed_data=flow_observations(values, windowed=windowed),
-        parameters=[bounded("c", *bounds, initial_guess=sum(bounds) / 2)],
-        loss_function="sse",
+        parameters=[bounded("c", *bounds, initial_guess=sum(bounds) / 2), *noise],
+        loss_function=None if observation_models else "sse",
+        observation_models=dict(observation_models) if observation_models else None,
         optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-14),
         seed=seed,
     )

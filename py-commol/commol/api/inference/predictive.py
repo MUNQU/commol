@@ -8,7 +8,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from commol.api.results import SimulationResults
 from commol.context._model import engine_state
 from commol.context.calibration import ObservedDataPoint
-from commol.context.inference.noise import ObservationNoise, ResidualNoise
+from commol.context.inference.noise import (
+    DistributionNoise,
+    ObservationNoise,
+    ResidualNoise,
+)
 from commol.context.inference.sample import ParameterSample
 
 if TYPE_CHECKING:
@@ -309,10 +313,11 @@ class Predictive:
         ----------
         observed_data : Sequence[ObservedDataPoint]
             The observations.
-        noise : NoNoise | ResidualNoise
+        noise : NoNoise | ResidualNoise | DistributionNoise
             What an observation shows around a draw's prediction, with no
             default: ``NoNoise()`` gives a band of the model,
-            ``ResidualNoise(...)`` a prediction interval.
+            ``ResidualNoise(...)`` and ``DistributionNoise()`` a prediction
+            interval.
 
         Returns
         -------
@@ -322,8 +327,10 @@ class Predictive:
         Raises
         ------
         ValueError
-            If an observation names an unknown output or factor, or a series
-            the residual noise has no residuals of.
+            If an observation names an unknown output or factor, a series the
+            residual noise has no residuals of, or a series with no
+            observation model; or `DistributionNoise` comes with a problem
+            that has a loss.
         InfeasibleStateError
             If a draw leaves the values its model allows.
         """
@@ -342,5 +349,6 @@ class Predictive:
             engine_state.rust_observed_data(list(observed_data)),
             self.calibrator.seed,
             residual_noise=residual_noise,
+            distribution_noise=isinstance(noise, DistributionNoise),
         )
         return ObservationDraws(observed_data, draws)

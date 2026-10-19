@@ -1,5 +1,5 @@
 //! The optimization objective: the argmin cost function of a calibration
-//! problem.
+//! problem, its loss or its negative log-likelihood.
 //!
 //! It is the only code that turns a [`Violation`] into a penalty. An
 //! optimizer needs a number at every point; an inference method sees the
@@ -46,20 +46,15 @@ pub struct OptimizationObjective<'a, E: SimulationEngine> {
 impl<'a, E: SimulationEngine> OptimizationObjective<'a, E> {
     /// The objective of `problem`.
     pub fn new(problem: &'a CalibrationProblem<E>) -> Self {
-        let max_observed = problem
-            .observed_data()
-            .iter()
-            .map(|obs| obs.value)
-            .fold(0.0f64, f64::max);
-        let count = problem.observed_data().len() as f64;
         Self {
             problem,
-            base_penalty: (max_observed * max_observed * count * 1000.0).max(1e10),
+            base_penalty: problem.discrepancy().penalty_base(),
         }
     }
 
-    /// The penalty of a violation: `base × (1 + amount)`, where `base` scales
-    /// with the largest observed value and is at least `1e10`.
+    /// The penalty of a violation: `base × (1 + amount)`, where `base`
+    /// ([`crate::Discrepancy::penalty_base`]) is above the discrepancy of a
+    /// poor fit and at least `1e10`.
     pub fn penalty(&self, violation: &Violation) -> f64 {
         self.base_penalty * (1.0 + violation.amount())
     }

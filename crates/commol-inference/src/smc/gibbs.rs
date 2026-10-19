@@ -121,17 +121,18 @@ where
     K: Kernel,
 {
     let target = GibbsTarget::new(problem, priors, eta)?;
-    let run = reached_the_posterior(sampler.run(&target, seed)?)?;
+    let run = reached_the_posterior(sampler.run(&target, seed)?, "The Gibbs posterior")?;
     Ok(GibbsRun { run, eta })
 }
 
-/// `run`, when it reached the temperature 1.
-fn reached_the_posterior(run: SmcRun) -> Result<SmcRun, String> {
+/// `run`, when it reached the temperature 1; `posterior` names it in the
+/// message.
+pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcRun, String> {
     match run.stopped_at {
         Some(Stop::NoNextLevel { level }) | Some(Stop::LowAcceptance { level, .. }) => {
             Err(format!(
-                "The Gibbs posterior stopped at the temperature {level}: no higher one keeps \
-                 the effective sample size; use more particles"
+                "{posterior} stopped at the temperature {level}: no higher one keeps the \
+                 effective sample size; use more particles"
             ))
         }
         None => Ok(run),
@@ -148,8 +149,9 @@ fn reached_the_posterior(run: SmcRun) -> Result<SmcRun, String> {
 ///
 /// # Errors
 ///
-/// Returns a message when the loss is not the sum of squares, the engine is
-/// stochastic, the derivatives fail at the fit, or `I` is singular.
+/// Returns a message when the problem has observation models or a loss that
+/// is not the sum of squares, the engine is stochastic, the derivatives fail
+/// at the fit, or `I` is singular.
 pub fn information_matching_eta<E>(
     problem: &CalibrationProblem<E>,
     fit: &[f64],
@@ -158,15 +160,16 @@ where
     E: SimulationEngine + Send + Sync,
 {
     let discrepancy = problem.discrepancy();
-    if discrepancy.loss() != LossConfig::SumSquaredError {
-        let name = match discrepancy.loss() {
-            LossConfig::RootMeanSquaredError => "rmse",
-            _ => "mae",
-        };
+    let name = match discrepancy.loss() {
+        Some(LossConfig::SumSquaredError) => None,
+        Some(LossConfig::RootMeanSquaredError) => Some("the loss is \"rmse\""),
+        Some(LossConfig::MeanAbsoluteError) => Some("the loss is \"mae\""),
+        None => Some("the problem has observation models"),
+    };
+    if let Some(name) = name {
         return Err(format!(
             "EtaCalibration.information_matching() needs loss_function=\"sse\", a sum of smooth \
-             terms; the loss is \"{name}\". Use EtaCalibration.bootstrap_coverage(...) or a \
-             number"
+             terms; {name}. Use EtaCalibration.bootstrap_coverage(...) or a number"
         ));
     }
     if problem.forward().replicates().is_some() {
@@ -516,9 +519,13 @@ mod tests {
 
     #[test]
     fn a_stop_below_the_posterior_says_why() {
-        let error = reached_the_posterior(run(Some(Stop::NoNextLevel { level: 0.3 }))).unwrap_err();
+        let error = reached_the_posterior(
+            run(Some(Stop::NoNextLevel { level: 0.3 })),
+            "The Gibbs posterior",
+        )
+        .unwrap_err();
         assert!(error.contains("temperature 0.3"), "{error}");
-        assert!(reached_the_posterior(run(None)).is_ok());
+        assert!(reached_the_posterior(run(None), "The Gibbs posterior").is_ok());
     }
 
     fn snapshot(values: &[f64], kept: &[Option<f64>]) -> Snapshot {

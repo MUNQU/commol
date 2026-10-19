@@ -93,7 +93,10 @@ print(result.diagnostics.block_length)  # 1
 
 None of them needs a noise model. The Bayesian bootstrap never changes the
 observed values, so it also works when the model is wrong; the residual and
-wild bootstraps make new data from the model and its residuals.
+wild bootstraps make new data from the model and its residuals. With
+[observation models](observation-models.md), `ParametricBootstrap(replicates)`
+draws new data from the models at the fit; it draws no blocks, so its
+`diagnostics.block_length` is `None`.
 
 ## Blocks and their length
 

@@ -5,18 +5,17 @@
 //! runs the engine; the observation operator ([`ObservationOperator`]), which
 //! turns a run into observations; the feasibility ([`Feasibility`]), which
 //! checks bounds and constraints; and the discrepancy ([`Discrepancy`]),
-//! which compares predictions with data. It has no interior mutability: the
+//! which compares predictions with data by a loss or by the likelihood of
+//! observation models. It has no interior mutability: the
 //! buffers of an evaluation live in a [`Workspace`] the caller owns.
 
 use commol_core::SimulationEngine;
 
-use crate::discrepancy::Discrepancy;
+use crate::discrepancy::{Discrepancy, DiscrepancyConfig};
 use crate::feasibility::{constraint_positions, EvaluationError, Feasibility, Violation};
 use crate::forward::{ForwardModel, Workspace};
 use crate::observation::ObservationOperator;
-use crate::types::{
-    CalibrationConstraint, CalibrationParameter, LossConfig, ObservedDataPoint, Replicates,
-};
+use crate::types::{CalibrationConstraint, CalibrationParameter, ObservedDataPoint, Replicates};
 use crate::values::{clamp_to_bounds, ValueWriter};
 
 /// A calibration problem for any [`SimulationEngine`].
@@ -62,20 +61,22 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// * `observed_data` - Vector of observed data points
     /// * `parameters` - Parameters to calibrate with their bounds
     /// * `constraints` - Constraints on parameters and/or compartment values
-    /// * `loss_config` - Loss function to use
+    /// * `discrepancy` - A loss ([`crate::LossConfig`]), or one observation
+    ///   model per series label ([`DiscrepancyConfig::Likelihood`])
     ///
     /// # Errors
     ///
     /// Returns a message when there is no observation or parameter, a
     /// position is one the engine rejects, an observation names an unknown
     /// output or factor, the engine does not resolve a value of its model
-    /// kind, or a constraint is invalid.
+    /// kind, a constraint is invalid, or the observation models do not fit
+    /// the observations and parameters ([`crate::Likelihood::new`]).
     pub fn new(
         base_engine: E,
         observed_data: Vec<ObservedDataPoint>,
         parameters: Vec<CalibrationParameter>,
         constraints: Vec<CalibrationConstraint>,
-        loss_config: LossConfig,
+        discrepancy: impl Into<DiscrepancyConfig>,
     ) -> Result<Self, String> {
         if observed_data.is_empty() {
             return Err("No observed data provided".to_string());
@@ -105,7 +106,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             base_engine.output_sums(),
             &schedule,
         )?;
-        let discrepancy = Discrepancy::new(loss_config, &observed_data);
+        let discrepancy = Discrepancy::new(discrepancy.into(), &observed_data, &parameters)?;
 
         Ok(Self {
             forward: ForwardModel::new(base_engine, parameters, values, schedule, observation),
@@ -120,9 +121,14 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// When enabled, each residual is multiplied by `1 / rms` of its series'
     /// observed values before the loss, so that series measured on very
     /// different scales contribute comparably. Disabled by default.
-    pub fn with_observation_normalization(mut self, enabled: bool) -> Self {
-        self.discrepancy.set_normalization(enabled);
-        self
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when it is enabled on a problem with observation
+    /// models, which set the scale of each series themselves.
+    pub fn with_observation_normalization(mut self, enabled: bool) -> Result<Self, String> {
+        self.discrepancy.set_normalization(enabled)?;
+        Ok(self)
     }
 
     /// Run `replicates` at each evaluation, for a stochastic engine.
@@ -131,12 +137,17 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// evaluation (common random numbers), so the loss is a deterministic
     /// function of the parameters and the optimizers keep working. The
     /// observations are compared with the summary of the replicates
-    /// ([`LossConfig::replicate_loss`]). `None` runs the engine once.
-    pub fn with_replicates(mut self, replicates: Option<Replicates>) -> Self {
+    /// ([`crate::LossConfig::replicate_loss`]). `None` runs the engine once.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when the problem has observation models: a
+    /// stochastic engine needs a loss.
+    pub fn with_replicates(mut self, replicates: Option<Replicates>) -> Result<Self, String> {
         self.discrepancy
-            .set_summary(replicates.as_ref().map(|r| r.summary));
+            .set_summary(replicates.as_ref().map(|r| r.summary))?;
         self.forward.set_replicates(replicates);
-        self
+        Ok(self)
     }
 
     /// Name the id that takes what the calibrated initial conditions leave of
@@ -168,17 +179,18 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// values and weights, one of each per observation in problem order.
     ///
     /// Everything else stays: the engine, the parameters, the observation
-    /// operator, the feasibility, the loss and its settings. The discrepancy
-    /// is built as [`Self::new`] builds it, so with normalization on its
-    /// factors come from the new values. A resampling method makes each
-    /// replicate with it.
+    /// operator, the feasibility, the loss or the observation models and
+    /// their settings. The discrepancy is built as [`Self::new`] builds it,
+    /// so with normalization on its factors come from the new values. A
+    /// resampling method makes each replicate with it.
     ///
     /// # Errors
     ///
     /// Returns a message that names the observation when a value is not
-    /// finite or a weight is negative or not finite, or when the numbers of
-    /// values or weights are not the number of observations, or every weight
-    /// is zero.
+    /// finite or lies outside the support of its observation model, or a
+    /// weight is negative or not finite, or when the numbers of values or
+    /// weights are not the number of observations, or every weight is
+    /// zero.
     pub fn with_data(&self, values: &[f64], weights: &[f64]) -> Result<Self, String> {
         let n = self.observed_data.len();
         if values.len() != n || weights.len() != n {
@@ -212,7 +224,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             obs.value = value;
             obs.weight = weight;
         }
-        problem.discrepancy = self.discrepancy.with_data(&problem.observed_data);
+        problem.discrepancy = self.discrepancy.with_data(&problem.observed_data)?;
         Ok(problem)
     }
 
@@ -300,12 +312,35 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             }
         }
         self.forward.observe(values, workspace);
-        let loss = self.discrepancy.of(&mut workspace.predictions);
-        if loss.is_finite() {
-            Ok(loss)
+        let discrepancy = self.discrepancy.of(values, &mut workspace.predictions)?;
+        if discrepancy.is_finite() {
+            Ok(discrepancy)
         } else {
             Err(Violation::NonFinite.into())
         }
+    }
+
+    /// The weighted log density `wᵢ · log p(yᵢ | μᵢ)` of each observation
+    /// at `values`, which are inside their bounds; they sum to the
+    /// log-likelihood. The steps are those of [`Self::evaluate`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::evaluate`], and a failure when the problem has a loss
+    /// instead of observation models.
+    pub fn pointwise_log_likelihood(
+        &self,
+        values: &[f64],
+        workspace: &mut Workspace,
+    ) -> Result<Vec<f64>, EvaluationError> {
+        let likelihood = self.discrepancy.likelihood().ok_or_else(|| {
+            EvaluationError::Failed(
+                "The pointwise log-likelihood needs observation models; the problem has a                  loss"
+                    .to_string(),
+            )
+        })?;
+        self.predict_once(values, None, workspace)?;
+        Ok(likelihood.pointwise(values, &workspace.predictions)?)
     }
 
     /// The predicted observations of one run at `values`, which are inside
@@ -335,8 +370,8 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         Ok(())
     }
 
-    /// The discrepancy: the loss, the observed values, their weights and
-    /// normalization.
+    /// The discrepancy: the loss or the likelihood, the observed values,
+    /// their weights and normalization.
     pub fn discrepancy(&self) -> &Discrepancy {
         &self.discrepancy
     }

@@ -12,6 +12,7 @@ from statistics import NormalDist
 import pytest
 
 from commol import (
+    DistributionNoise,
     NoNoise,
     CalibrationProblem,
     Calibrator,
@@ -20,10 +21,18 @@ from commol import (
     ParameterSample,
     Predictive,
     SampleMethod,
+    PoissonObservations,
+    ResidualNoise,
     Simulation,
     scores,
 )
-from tests.support import abc_builder, bounded, build
+from tests.support import (
+    abc_builder,
+    bounded,
+    build,
+    flow_calibrator,
+    flow_observations,
+)
 
 MU, SIGMA, DRAWS = 1.0, 0.1, 4001
 STANDARD = NormalDist()
@@ -176,3 +185,40 @@ class TestSeries:
         )
 
         assert score.mean == pytest.approx(expected, rel=1e-12)
+
+
+class TestLogScore:
+    def test_log_score_of_one_draw_is_the_log_density(self) -> None:
+        calibrator = flow_calibrator(
+            [3.0, 7.0], windowed=True, observation_models={"B": PoissonObservations()}
+        )
+        sample = ParameterSample.equally_weighted(
+            ["c"], [(0.0, 50.0)], [[5.0]], SampleMethod(name="point")
+        )
+        observations = flow_observations([3.0, 7.0], windowed=True)
+
+        score = scores.log_score(
+            Predictive(calibrator, sample, [0, 1]), observations, DistributionNoise()
+        )
+
+        expected = [y * math.log(5.0) - 5.0 - math.lgamma(y + 1) for y in (3.0, 7.0)]
+        assert score.per_observation == pytest.approx(expected, rel=1e-12)
+        assert score.per_series == {"B": pytest.approx(sum(expected) / 2)}
+
+    @pytest.mark.parametrize("noise", ["none", "residual"])
+    def test_log_score_needs_distribution_noise(
+        self, normal: tuple[Predictive, NormalDist], noise: str
+    ) -> None:
+        predictive, _ = normal
+        other = (
+            NoNoise()
+            if noise == "none"
+            else ResidualNoise(
+                fit=predictive.calibrator.run(),
+                block_length=1,
+                residual_scale="additive",
+            )
+        )
+
+        with pytest.raises(TypeError, match="takes DistributionNoise"):
+            scores.log_score(predictive, [_observation(1.0)], other)  # type: ignore[arg-type]

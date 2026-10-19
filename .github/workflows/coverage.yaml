@@ -45,6 +45,8 @@ jobs:
               tests/uncertainty/test_coverage.py::TestSplitConformal
               tests/uncertainty/test_coverage.py::TestJackknifePlus
               tests/uncertainty/test_coverage.py::TestEnbPI
+          - name: posterior predictive of observation models
+            tests: tests/uncertainty/test_coverage.py::TestPosteriorPredictive
     defaults:
       run:
         working-directory: ./py-commol

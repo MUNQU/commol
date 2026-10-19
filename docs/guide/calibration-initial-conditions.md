@@ -56,6 +56,7 @@ problem = CalibrationProblem(
         )
     ],
     initial_condition_remainder="A",
+    loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=1000),
 )
 
@@ -165,6 +166,7 @@ problem = CalibrationProblem(
         )
     ],
     initial_condition_remainder="A_g1",
+    loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=1000),
 )
 

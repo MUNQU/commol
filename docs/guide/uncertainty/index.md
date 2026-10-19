@@ -25,9 +25,10 @@ observation will fall: an observation also carries measurement noise. A
 **prediction interval** adds that noise to every draw before it reduces them
 (the `ObservationNoise` port of `commol-inference`). Every reader of
 observations takes the noise as an argument with no default: `NoNoise()` gives
-a band of the model, and `ResidualNoise(...)` adds residuals of a fit, which
+a band of the model, `ResidualNoise(...)` adds residuals of a fit, which
 gives a prediction interval with no noise model
-([Resampling](resampling.md#prediction-intervals)). Comparing a band of the
+([Resampling](resampling.md#prediction-intervals)), and `DistributionNoise()`
+draws from the [observation models](observation-models.md) of the problem. Comparing a band of the
 model with data underestimates the spread, so its coverage of the data is below
 its level. A [conformal](conformal.md) interval is a prediction interval with a
 coverage guarantee, from the scores of observations the fit did not use.
@@ -54,6 +55,10 @@ coverage guarantee, from the scores of observations the fit did not use.
 | `JackknifePlus` | Where new observations fall, with a guaranteed coverage and no held-out data | No | [Conformal](conformal.md#jackknife) |
 | `EnbPI` | Where the next observations of a series with dependent errors fall | No | [Conformal](conformal.md#enbpi) |
 | `AdaptiveConformal` | Intervals for observations as they arrive, whose share of misses tends to its level | No | [Conformal](conformal.md#adaptive-conformal-inference) |
+| `observation_models` with `Calibrator.run()` | The maximum-likelihood fit of the parameters and the noise | Yes | [Observation Models](observation-models.md#maximum-likelihood-against-the-posterior) |
+| `BayesianPosterior` | The posterior of the parameters from the likelihood and priors, with its evidence | Yes | [Observation Models](observation-models.md#maximum-likelihood-against-the-posterior) |
+| `ParametricBootstrap` | How far the parameters move in data sets drawn from the models at the fit | Yes | [Observation Models](observation-models.md#maximum-likelihood-against-the-posterior) |
+| `DistributionNoise` | Where the next observations fall: a prediction interval of the models | Yes | [Observation Models](observation-models.md#prediction-with-noise) |
 
 Each uncertainty method adds its row here when it lands.
 ## Quick path
@@ -195,7 +200,7 @@ of the predictive, with an equal share of its weight.
 |---|---|
 | `band(confidence_level)` | The weighted mean, median and central interval of every output at every position (`PredictiveBand`) |
 | `series_band(outputs, confidence_level, cumulative=False)` | The band of the sum of some outputs, or of its running total; each draw is reduced first |
-| `at_observations(observed_data, noise)` | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with `noise` drawn from the calibrator's seed: `NoNoise()` or `ResidualNoise(...)` (`ObservationDraws`) |
+| `at_observations(observed_data, noise)` | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with `noise` drawn from the calibrator's seed: `NoNoise()`, `ResidualNoise(...)` or `DistributionNoise()` (`ObservationDraws`) |
 | `runs()`, `weights` | The trajectory and weight of every draw |
 
 `SimulationPlotter.plot_series` and `plot_cumulative` draw the band of a
@@ -211,7 +216,8 @@ return a `Score`: the value of each observation, the mean of each series and
 the overall mean. Which observations to score and the observation noise are
 arguments with no default: score data the method did not see, such as the
 held-out positions above, and say whether you score a band of the model
-(`NoNoise()`) or a prediction interval (`ResidualNoise(...)`).
+(`NoNoise()`) or a prediction interval (`ResidualNoise(...)`,
+`DistributionNoise()`).
 
 | Function | Score | Better |
 |---|---|---|
@@ -220,6 +226,7 @@ held-out positions above, and say whether you score a band of the model
 | `weighted_interval_score(predictive, observations, noise, confidence_levels)` | The weighted interval score of Bracher et al. (2021) | Lower |
 | `crps(predictive, observations, noise)` | `Σ wᵢ|xᵢ − y| − ½ Σᵢⱼ wᵢwⱼ|xᵢ − xⱼ|`, the CRPS of a stochastic calibration's loss | Lower |
 | `pit(predictive, observations, noise, seed)` | `F(y)`, randomized where draws tie with `y` | Uniform |
+| `log_score(predictive, observations, DistributionNoise())` | `log Σ_d w_d · p(y | μ_d)`, the log density of `y` under the mixture of the observation models over the draws; another noise raises a `TypeError` | Higher |
 
 ## The entry point
 
@@ -255,6 +262,7 @@ print(type(result).__name__, len(result.sample))  # BootstrapResult 20
 |---|---|
 | Bootstraps, the jackknife and prediction intervals with no noise model | [Resampling](resampling.md) |
 | Posteriors with no noise model: the Gibbs posterior and ABC | [Sequential Monte Carlo](smc.md) |
+| Maximum likelihood, the posterior and prediction intervals of observation models | [Observation Models](observation-models.md) |
 | Prediction intervals with a coverage guarantee | [Conformal Prediction Intervals](conformal.md) |
 | Several starts of an optimizer | [Optimizers](../calibration-optimizers.md#several-starts) |
 | Which parameters the data determine | [Identifiability](identifiability.md) |

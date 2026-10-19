@@ -186,6 +186,7 @@ dependencies = [
  "commol-difference",
  "commol-differential",
  "commol-random",
+ "libm",
  "rand 0.10.3",
  "rayon",
  "serde",

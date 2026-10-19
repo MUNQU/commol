@@ -3,18 +3,20 @@
 //! Parameters are set by id. Values of the model kind, such as initial
 //! conditions, are resolved and written by the engine
 //! ([`SimulationEngine::plan_values`], [`SimulationEngine::apply_values`]), so
-//! this crate does not know how a kind stores them. Factors are not written:
-//! they apply to observations.
+//! this crate does not know how a kind stores them. Factors and noise
+//! parameters are not written: they apply to observations.
 
 use commol_core::{ModelValue, ModelValueType, SimulationEngine, ValuePlan};
 
 use crate::types::{CalibrationParameter, CalibrationParameterType};
 
 /// The type of model value a calibration parameter is, or `None` for a
-/// parameter or a factor.
+/// parameter, a factor or a noise parameter.
 fn model_value_type(parameter_type: CalibrationParameterType) -> Option<ModelValueType> {
     match parameter_type {
-        CalibrationParameterType::Parameter | CalibrationParameterType::Factor => None,
+        CalibrationParameterType::Parameter
+        | CalibrationParameterType::Factor
+        | CalibrationParameterType::Noise => None,
         CalibrationParameterType::InitialCondition => Some(ModelValueType::InitialCondition),
     }
 }

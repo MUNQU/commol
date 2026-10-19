@@ -53,6 +53,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SimulationPlotter.plot_series(prediction_intervals=...)` draws the band of
   conformal intervals, and `simulation_report(..., prediction_intervals=...)`
   reports them.
+- Observation models: `CalibrationProblem(observation_models={series: model})`
+  takes one model per series label, `NormalObservations(sd)`,
+  `LogNormalObservations(sigma, center)` (`center="mean"` or `"median"`, no
+  default), `StudentTObservations(df, scale)`, `PoissonObservations()`,
+  `NegativeBinomialObservations(overdispersion)` (variance `μ + φμ²`) or
+  `BinomialObservations(trials)` (or the new `ObservedDataPoint.trials` of each
+  observation), and the problem fits by maximum likelihood. A noise argument
+  is a number or a calibration parameter of the new type `"noise"`, which never
+  reaches the engine. Observed values outside a model's support raise a
+  `ValueError` that names the observation. A stochastic engine and
+  `normalize_observations` need a loss. See
+  [Observation Models](../guide/uncertainty/observation-models.md).
+- `BayesianPosterior`: the posterior of the observation models and its log
+  evidence, on the sequential Monte Carlo sampler. `GibbsPosterior` on
+  observation models is the fractional posterior `prior · L^η`.
+- `DistributionNoise()`: prediction intervals that draw from the observation
+  models; `commol.scores.log_score`, the log density of held-out observations
+  under the predictive, which needs `DistributionNoise()`.
+- `ParametricBootstrap(replicates)`: fits to data sets drawn from the
+  observation models at the fit. `ResamplingDiagnostics.block_length` is `None`
+  for it.
+
+### Changed
+
+- **Breaking:** `CalibrationProblem.loss_function` has no default: a problem needs
+  `loss_function` or `observation_models`, exactly one, and raises a
+  `ValueError` with both or neither. Write `loss_function="sse"` where a
+  problem relied on the default.
 
 ## [0.5.0] - 2026-10-19
 
