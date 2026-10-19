@@ -1481,6 +1481,34 @@
   
   
     <li class="md-nav__item">
+      <a href="smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="conformal/" class="md-nav__link">
         
   
@@ -3167,6 +3195,24 @@ coverage guarantee, from the scores of observations the fit did not use.</p>
 <td><a href="resampling/#prediction-intervals">Resampling</a></td>
 </tr>
 <tr>
+<td><code>GibbsPosterior</code></td>
+<td>A posterior of the parameters from the loss and priors, with a scale <code>η</code> of the loss</td>
+<td>No</td>
+<td><a href="smc/#gibbs-posterior">Sequential Monte Carlo</a></td>
+</tr>
+<tr>
+<td><code>AbcSmc</code></td>
+<td>A posterior of the parameters whose runs come within a tolerance of the data, with priors</td>
+<td>No</td>
+<td><a href="smc/#abc">Sequential Monte Carlo</a></td>
+</tr>
+<tr>
+<td><code>AbcRejection</code></td>
+<td>The same, from the closest draws of the priors</td>
+<td>No</td>
+<td><a href="smc/#abc">Sequential Monte Carlo</a></td>
+</tr>
+<tr>
 <td><code>SplitConformal</code></td>
 <td>Where new observations fall, with a guaranteed coverage, from held-out observations</td>
 <td>No</td>
@@ -3481,6 +3527,10 @@ other kind with a <code>TypeError</code> that names the right one.</p>
 <tr>
 <td>Bootstraps, the jackknife and prediction intervals with no noise model</td>
 <td><a href="resampling/">Resampling</a></td>
+</tr>
+<tr>
+<td>Posteriors with no noise model: the Gibbs posterior and ABC</td>
+<td><a href="smc/">Sequential Monte Carlo</a></td>
 </tr>
 <tr>
 <td>Prediction intervals with a coverage guarantee</td>

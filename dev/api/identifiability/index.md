@@ -126,11 +126,12 @@ Practical identifiability from any parameter sample: how much it contracts each 
 
 Attributes:
 
-| Name                    | Type              | Description                                                                                                                                                       |
-| ----------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sample`                | `ParameterSample` | The sample, such as the draws of an uncertainty method.                                                                                                           |
-| `reference`             | `str`             | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds.                                                                 |
-| `correlation_threshold` | `float`           | The absolute correlation above which a pair is listed and its parameters are poorly determined, strictly between 0 and 1. No default: it is a modelling judgment. |
+| Name                    | Type              | Description                                                                                                                                                                                        |
+| ----------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sample`                | `ParameterSample` | The sample, such as the draws of an uncertainty method.                                                                                                                                            |
+| `reference`             | `{bounds, prior}` | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds, or "prior", the prior of each parameter in priors, such as the priors the sample was drawn with. |
+| `correlation_threshold` | `float`           | The absolute correlation above which a pair is listed and its parameters are poorly determined, strictly between 0 and 1. No default: it is a modelling judgment.                                  |
+| `priors`                | \`Priors          | dict[str, Distribution]                                                                                                                                                                            |
 
 Source code in `commol/context/inference/identifiability.py`
 
@@ -145,18 +146,92 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
     ----------
     sample : ParameterSample
         The sample, such as the draws of an uncertainty method.
-    reference : str
+    reference : {"bounds", "prior"}
         The distribution the contraction compares with: ``"bounds"``, the
-        uniform distribution on the bounds.
+        uniform distribution on the bounds, or ``"prior"``, the prior of each
+        parameter in `priors`, such as the priors the sample was drawn with.
     correlation_threshold : float
         The absolute correlation above which a pair is listed and its
         parameters are poorly determined, strictly between 0 and 1. No
         default: it is a modelling judgment.
+    priors : Priors | dict[str, Distribution] | None
+        The prior of each parameter, with ``reference="prior"`` only.
     """
 
     sample: ParameterSample
-    reference: Literal["bounds"]
+    reference: Literal["bounds", "prior"]
     correlation_threshold: float = Field(gt=0.0, lt=1.0)
+    priors: Priors | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def read_priors(cls, data: object) -> object:
+        """Read a mapping of parameter to distribution as `Priors`."""
+        if isinstance(data, Mapping) and data.get("priors") is not None:
+            return {**data, "priors": coerce_priors(data["priors"])}
+        return data
+
+    @model_validator(mode="after")
+    def check_priors(self) -> Self:
+        """The priors go with ``reference="prior"``, and only with it."""
+        if self.reference == "prior" and self.priors is None:
+            raise ValueError(
+                "reference='prior' needs priors: the prior of each parameter."
+            )
+        if self.reference == "bounds" and self.priors is not None:
+            raise ValueError(
+                "priors are read only with reference='prior'; with "
+                "reference='bounds' leave them out."
+            )
+        return self
+```
+
+### Methods:
+
+#### read_priors
+
+```python
+read_priors(data: object) -> object
+```
+
+Read a mapping of parameter to distribution as `Priors`.
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+@model_validator(mode="before")
+@classmethod
+def read_priors(cls, data: object) -> object:
+    """Read a mapping of parameter to distribution as `Priors`."""
+    if isinstance(data, Mapping) and data.get("priors") is not None:
+        return {**data, "priors": coerce_priors(data["priors"])}
+    return data
+```
+
+#### check_priors
+
+```python
+check_priors() -> Self
+```
+
+The priors go with `reference="prior"`, and only with it.
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+@model_validator(mode="after")
+def check_priors(self) -> Self:
+    """The priors go with ``reference="prior"``, and only with it."""
+    if self.reference == "prior" and self.priors is None:
+        raise ValueError(
+            "reference='prior' needs priors: the prior of each parameter."
+        )
+    if self.reference == "bounds" and self.priors is not None:
+        raise ValueError(
+            "priors are read only with reference='prior'; with "
+            "reference='bounds' leave them out."
+        )
+    return self
 ```
 
 ## StartsIdentifiability
@@ -758,14 +833,14 @@ The evidence of `SampleIdentifiability`.
 
 Attributes:
 
-| Name                    | Type                          | Description                                                                                                                          |
-| ----------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `reference`             | `str`                         | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds.                                    |
-| `correlation_threshold` | `float`                       | The absolute correlation above which a pair is listed.                                                                               |
-| `contraction`           | `dict[str, float]`            | 1 − Var(sample) / Var(reference) of each parameter: near 0 when the sample spreads as the reference, near 1 when it sits on a value. |
-| `correlation`           | `dict[str, dict[str, float]]` | The weighted correlation matrix.                                                                                                     |
-| `correlated_pairs`      | `list[CorrelatedPair]`        | The pairs above the threshold.                                                                                                       |
-| `modes`                 | `dict[str, list[float]]`      | The modes of the marginal of each parameter.                                                                                         |
+| Name                    | Type                          | Description                                                                                                                                |
+| ----------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `reference`             | `{bounds, prior}`             | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds, or "prior", the prior of each parameter. |
+| `correlation_threshold` | `float`                       | The absolute correlation above which a pair is listed.                                                                                     |
+| `contraction`           | `dict[str, float]`            | 1 − Var(sample) / Var(reference) of each parameter: near 0 when the sample spreads as the reference, near 1 when it sits on a value.       |
+| `correlation`           | `dict[str, dict[str, float]]` | The weighted correlation matrix.                                                                                                           |
+| `correlated_pairs`      | `list[CorrelatedPair]`        | The pairs above the threshold.                                                                                                             |
+| `modes`                 | `dict[str, list[float]]`      | The modes of the marginal of each parameter.                                                                                               |
 
 Source code in `commol/context/inference/identifiability.py`
 
@@ -776,9 +851,10 @@ class SampleSection(_Frozen):
 
     Attributes
     ----------
-    reference : str
+    reference : {"bounds", "prior"}
         The distribution the contraction compares with: ``"bounds"``, the
-        uniform distribution on the bounds.
+        uniform distribution on the bounds, or ``"prior"``, the prior of each
+        parameter.
     correlation_threshold : float
         The absolute correlation above which a pair is listed.
     contraction : dict[str, float]
@@ -792,7 +868,7 @@ class SampleSection(_Frozen):
         The modes of the marginal of each parameter.
     """
 
-    reference: Literal["bounds"]
+    reference: Literal["bounds", "prior"]
     correlation_threshold: float
     contraction: dict[str, float]
     correlation: dict[str, dict[str, float]]

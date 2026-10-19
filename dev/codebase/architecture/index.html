@@ -1293,6 +1293,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/uncertainty/conformal/" class="md-nav__link">
         
   
@@ -2966,7 +2994,7 @@ top to bottom. The dashed box is the base that every box uses.</p>
     E3["Stochastic&lt;br/&gt;random events"]
     O[/one series per output/]
     C["Calibration&lt;br/&gt;the problem in layers, optimizers"]
-    I["Inference&lt;br/&gt;parameter sample, predictive, scores,&lt;br/&gt;resampling, conformal, sensitivities, identifiability"]
+    I["Inference&lt;br/&gt;parameter sample, predictive, scores,&lt;br/&gt;resampling, conformal, sensitivities, identifiability,&lt;br/&gt;priors, sequential Monte Carlo"]
     F["Base: commol-core, commol-random&lt;br/&gt;used by every box"]
     J --&gt; M
     M --&gt; E1 &amp; E2 &amp; E3
@@ -3013,7 +3041,7 @@ top to bottom. The dashed box is the base that every box uses.</p>
 <tr>
 <td>Inference</td>
 <td><code>commol-inference</code></td>
-<td>What every uncertainty method returns or reads: the weighted parameter sample, the one quantile, the predictive of a sample, its observation noise and its scores; the resampling methods, which fit copies of the problem with other data (<code>CalibrationProblem::with_data</code>); the conformal prediction intervals; the port of sensitivities and the identifiability analyses. It depends on calibration, never the reverse.</td>
+<td>What every uncertainty method returns or reads: the weighted parameter sample, the one quantile, the predictive of a sample, its observation noise and its scores; the resampling methods, which fit copies of the problem with other data (<code>CalibrationProblem::with_data</code>); the conformal prediction intervals; the port of sensitivities and the identifiability analyses; the distributions and priors, and the sequential Monte Carlo sampler with its targets (Gibbs posterior, ABC). It depends on calibration, never the reverse.</td>
 </tr>
 </tbody>
 </table>

@@ -3982,23 +3982,26 @@ A **band of the model** is the spread of the model's output across the draws of 
 
 ## Which method answers which question
 
-| Method                                     | Question                                                                             | Needs a noise model | Page                                                                                                         |
-| ------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Several starts, `Calibrator.run(starts=n)` | Which parameters fit the data: distinct ends with equal losses                       | No                  | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)             |
-| `StructuralRank`                           | Which parameters any data of this design can determine, and which combinations       | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#structural-rank)  |
-| `Collinearity`                             | Which parameters can be fitted together                                              | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#collinearity)     |
-| `SampleIdentifiability`                    | Which parameters a sample determines: contraction, correlations, modes               | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)         |
-| `StartsIdentifiability`                    | Which parameters differ between starts of equal loss                                 | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)           |
-| `BayesianBootstrap`                        | How far the parameters move when the data are reweighted by blocks                   | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#bayesian-bootstrap)         |
-| `ResidualBootstrap`                        | How far the parameters move when the residuals of the fit are resampled by blocks    | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#residual-block-bootstrap)   |
-| `WildBootstrap`                            | The same, when the size of the noise changes along the series                        | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#wild-block-bootstrap)       |
-| `BlockJackknife`                           | The standard error and bias of each parameter, and which block of data moves it most | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#block-jackknife)            |
-| `ResidualNoise`                            | Where the next observations fall: a prediction interval                              | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)       |
-| `SplitConformal`                           | Where new observations fall, with a guaranteed coverage, from held-out observations  | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#split-conformal)              |
-| `RollingConformal`                         | Where the next observations fall at each horizon ahead of the data                   | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#rolling-origins)              |
-| `JackknifePlus`                            | Where new observations fall, with a guaranteed coverage and no held-out data         | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#jackknife)                    |
-| `EnbPI`                                    | Where the next observations of a series with dependent errors fall                   | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#enbpi)                        |
-| `AdaptiveConformal`                        | Intervals for observations as they arrive, whose share of misses tends to its level  | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#adaptive-conformal-inference) |
+| Method                                     | Question                                                                                  | Needs a noise model | Page                                                                                                         |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Several starts, `Calibrator.run(starts=n)` | Which parameters fit the data: distinct ends with equal losses                            | No                  | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)             |
+| `StructuralRank`                           | Which parameters any data of this design can determine, and which combinations            | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#structural-rank)  |
+| `Collinearity`                             | Which parameters can be fitted together                                                   | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#collinearity)     |
+| `SampleIdentifiability`                    | Which parameters a sample determines: contraction, correlations, modes                    | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)         |
+| `StartsIdentifiability`                    | Which parameters differ between starts of equal loss                                      | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)           |
+| `BayesianBootstrap`                        | How far the parameters move when the data are reweighted by blocks                        | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#bayesian-bootstrap)         |
+| `ResidualBootstrap`                        | How far the parameters move when the residuals of the fit are resampled by blocks         | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#residual-block-bootstrap)   |
+| `WildBootstrap`                            | The same, when the size of the noise changes along the series                             | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#wild-block-bootstrap)       |
+| `BlockJackknife`                           | The standard error and bias of each parameter, and which block of data moves it most      | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#block-jackknife)            |
+| `ResidualNoise`                            | Where the next observations fall: a prediction interval                                   | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)       |
+| `GibbsPosterior`                           | A posterior of the parameters from the loss and priors, with a scale `η` of the loss      | No                  | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#gibbs-posterior)       |
+| `AbcSmc`                                   | A posterior of the parameters whose runs come within a tolerance of the data, with priors | No                  | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                   |
+| `AbcRejection`                             | The same, from the closest draws of the priors                                            | No                  | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                   |
+| `SplitConformal`                           | Where new observations fall, with a guaranteed coverage, from held-out observations       | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#split-conformal)              |
+| `RollingConformal`                         | Where the next observations fall at each horizon ahead of the data                        | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#rolling-origins)              |
+| `JackknifePlus`                            | Where new observations fall, with a guaranteed coverage and no held-out data              | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#jackknife)                    |
+| `EnbPI`                                    | Where the next observations of a series with dependent errors fall                        | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#enbpi)                        |
+| `AdaptiveConformal`                        | Intervals for observations as they arrive, whose share of misses tends to its level       | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#adaptive-conformal-inference) |
 
 Each uncertainty method adds its row here when it lands.
 
@@ -4170,6 +4173,7 @@ print(type(result).__name__, len(result.sample))  # BootstrapResult 20
 | To learn                                                               | Read                                                                                                         |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Bootstraps, the jackknife and prediction intervals with no noise model | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md)                    |
+| Posteriors with no noise model: the Gibbs posterior and ABC            | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md)               |
 | Prediction intervals with a coverage guarantee                         | [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) |
 | Several starts of an optimizer                                         | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)             |
 | Which parameters the data determine                                    | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md)          |
@@ -4288,12 +4292,12 @@ Fix `alpha` (or `k1`) at a value, or calibrate their product as one parameter: t
 
 Every method runs through `Calibrator.identifiability(method)` and returns an `IdentifiabilityReport`. A threshold or a tolerance has no default: it is a modelling judgment, and the table gives the range the literature uses.
 
-| Method                                                               | Needs                                                                    | Answers                                                                                                                                               | Engine        |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| `StructuralRank(points, design, seed=None)`                          | The problem only                                                         | The rank of the sensitivities, the non-identifiable parameters and the identifiable combinations                                                      | Deterministic |
-| `Collinearity(at, max_subset_size, threshold)`                       | A fit (`CalibrationResult`) or a sample                                  | Which subsets of parameters can be fitted together; `threshold` from 5 to 20                                                                          | Deterministic |
-| `SampleIdentifiability(sample, reference, correlation_threshold)`    | Any `ParameterSample`                                                    | How much the sample contracts each parameter, which pairs move together, which marginals have several modes; `correlation_threshold` from 0.8 to 0.95 | Any           |
-| `StartsIdentifiability(result, parameter_tolerance, loss_tolerance)` | A result of `Calibrator.run(starts=n)` with two or more converged starts | Which parameters differ between starts of equal loss                                                                                                  | Any           |
+| Method                                                                    | Needs                                                                    | Answers                                                                                                                                                                               | Engine        |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| `StructuralRank(points, design, seed=None)`                               | The problem only                                                         | The rank of the sensitivities, the non-identifiable parameters and the identifiable combinations                                                                                      | Deterministic |
+| `Collinearity(at, max_subset_size, threshold)`                            | A fit (`CalibrationResult`) or a sample                                  | Which subsets of parameters can be fitted together; `threshold` from 5 to 20                                                                                                          | Deterministic |
+| `SampleIdentifiability(sample, reference, correlation_threshold, priors)` | Any `ParameterSample`                                                    | How much the sample contracts each parameter against its bounds or its prior, which pairs move together, which marginals have several modes; `correlation_threshold` from 0.8 to 0.95 | Any           |
+| `StartsIdentifiability(result, parameter_tolerance, loss_tolerance)`      | A result of `Calibrator.run(starts=n)` with two or more converged starts | Which parameters differ between starts of equal loss                                                                                                                                  | Any           |
 
 ### Structural rank
 
@@ -4356,6 +4360,23 @@ print(pair.first, pair.second, round(pair.correlation, 1))  # k1 alpha -1.0
 | `contraction`      | `1 − Var(sample) / Var(reference)`: near 0 when the sample spreads over the bounds, near 1 when it sits on one value |
 | `correlated_pairs` | The pairs whose absolute correlation is above `correlation_threshold`                                                |
 | `modes`            | The modes of each marginal: the maxima of a kernel density above a tenth of the highest                              |
+
+The `reference` of the contraction is `"bounds"`, the uniform distribution on the bounds, or `"prior"` with `priors`, the prior of each parameter: the sample of a [Gibbs posterior or ABC](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md) contracts its priors by how much the data inform each parameter, and a sample drawn from the priors themselves has a contraction near 0.
+
+```python
+from commol import Priors, Uniform
+
+against_priors = calibrator.identifiability(
+    SampleIdentifiability(
+        sample=sample,
+        reference="prior",
+        priors=Priors(distributions={name: Uniform() for name in names}),
+        correlation_threshold=0.9,
+    )
+)
+section = against_priors.sample[0]
+print(section.reference, section.contraction == from_sample.sample[0].contraction)  # prior True
+```
 
 A parameter is `poorly_determined` when it is in a correlated pair or its marginal has two or more modes.
 
@@ -4620,6 +4641,223 @@ A block bootstrap reads the dependence of the noise from few blocks. On a short 
 | --------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | The parameter sample, the predictive and the scores | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)           |
 | The settings of the optimizer each replicate runs   | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md) |
+
+# Sequential Monte Carlo: Gibbs Posteriors and ABC
+
+[Back to Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)
+
+These methods give a posterior of the parameters with no noise model. The **Gibbs posterior** turns the loss of the calibration into a posterior; **ABC** (approximate Bayesian computation) keeps the parameters whose runs come close to the data. Use them when you can state priors but not how the observations scatter around the model. One sequential Monte Carlo (SMC) sampler runs both, in parallel in Rust (`crates/commol-inference/src/smc/`), through `Calibrator.uncertainty`.
+
+## Quick path
+
+```python
+import numpy as np
+
+from commol import (
+    AbcSmc,
+    Aggregate,
+    CalibrationParameter,
+    CalibrationProblem,
+    Calibrator,
+    EtaCalibration,
+    GibbsPosterior,
+    LossDistance,
+    ModelBuilder,
+    NelderMeadConfig,
+    ObservedDataPoint,
+    Priors,
+    Simulation,
+)
+
+
+def flow_model(engine: str):
+    """A flow c from A to B each step: absolute, since the rate names A."""
+    return (
+        ModelBuilder(name="Flow")
+        .add_bin(id="A", name="A")
+        .add_bin(id="B", name="B")
+        .add_parameter(id="c", value=None)
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="c * A / A")
+        .build(
+            Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}),
+            engine=engine,
+        )
+    )
+
+
+# The flow of each of 30 steps, 10 plus a noise of sd 1.
+rng = np.random.default_rng(1)
+flows = 10.0 + rng.normal(0.0, 1.0, 30)
+problem = CalibrationProblem(
+    observed_data=[
+        ObservedDataPoint(at=step, output="B", value=float(value), window=1)
+        for step, value in enumerate(flows, start=1)
+    ],
+    parameters=[
+        CalibrationParameter(id="c", parameter_type="parameter", min_bound=0.0, max_bound=30.0)
+    ],
+    loss_function="sse",
+    optimization_config=NelderMeadConfig(max_iterations=500),
+    seed=3,
+)
+calibrator = Calibrator(Simulation(flow_model("DifferenceEquations")), problem)
+
+gibbs = calibrator.uncertainty(
+    GibbsPosterior(
+        priors=Priors.uniform_on_bounds(),
+        eta=EtaCalibration.information_matching(),
+        particles=500,
+        target_cess=0.5,
+        resample_threshold=0.5,
+        stay_probability=0.05,
+    )
+)
+print(round(gibbs.eta, 2))  # 0.73: 1/(2σ̂²), with σ̂² the mean squared residual
+lower, upper = gibbs.sample.interval(0.9)["c"]
+print(lower < float(np.mean(flows)) < upper)  # True
+
+# ABC on the same data, from the chain binomial: each run draws its own flows.
+stochastic = problem.model_copy(update={"replicates": 1, "replicate_summary": "mean"})
+abc = Calibrator(Simulation(flow_model("StochasticSteps")), stochastic).uncertainty(
+    AbcSmc(
+        priors=Priors.uniform_on_bounds(),
+        distance=LossDistance(),
+        particles=300,
+        target_cess=0.5,
+        min_acceptance=0.05,
+        stay_probability=0.05,
+    )
+)
+print(abc.levels[0] > abc.levels[-1])  # True: the tolerance falls
+print(abc.diagnostics.notes[0][:44])  # Each distance reads one fresh replicate of t
+```
+
+## Priors
+
+Every method of this page takes its `priors` with no default: what you know about each parameter before the data is a modelling choice. Give a mapping of parameter to distribution, or `Priors.uniform_on_bounds()`. A parameter without a prior, or a prior of a parameter that is not calibrated, raises a `ValueError` that names it.
+
+Each distribution is truncated to the bounds of its parameter:
+
+| Distribution               | Density                                                 | Bounds it needs       |
+| -------------------------- | ------------------------------------------------------- | --------------------- |
+| `Uniform()`                | Uniform on the bounds                                   | Finite                |
+| `LogUniform()`             | `∝ 1/x` on the bounds: `log x` is uniform               | Finite, lower above 0 |
+| `Beta(a=…, b=…)`           | Beta, scaled to the bounds                              | Finite                |
+| `Normal(mean=…, sd=…)`     | Normal, truncated                                       | Any                   |
+| `LogNormal(mu=…, sigma=…)` | `log x` normal, truncated to `(0, ∞)` too               | Upper above 0         |
+| `Gamma(shape=…, rate=…)`   | Gamma of mean `shape / rate`, truncated to `(0, ∞)` too | Upper above 0         |
+
+A prior whose bounds do not fit raises a `ValueError` that names the parameter, its bounds and the distributions that fit them: a parameter in `[0, inf]` takes `Normal`, `LogNormal` or `Gamma`, not `Uniform`. Each distribution has `log_density(x, bounds)`, `cdf(x, bounds)`, `quantile(p, bounds)` and `sample(count, bounds, seed)`. A draw inverts the distribution function of a number of the commol generator, so a seed gives the same draws on every platform.
+
+```python
+from commol import Gamma, Normal
+
+bounds = (0.0, 30.0)
+print(round(Normal(mean=10.0, sd=2.0).cdf(10.0, bounds), 3))  # 0.5
+draws = Gamma(shape=4.0, rate=0.4).sample(3, bounds, seed=1)
+print(all(0.0 <= draw <= 30.0 for draw in draws))  # True
+priors = Priors(distributions={"c": Normal(mean=10.0, sd=2.0)})
+```
+
+## How the sampler works
+
+The sampler draws `particles` particles from the priors, runs the model at each, and keeps one value per particle: the loss for a Gibbs posterior, the distance for ABC. Each step then:
+
+1. **Chooses the next level.** The level is a temperature from 0 (the priors) to 1 (the posterior), or an ABC tolerance that falls. The next one is the farthest whose conditional effective sample size (Zhou, Johansen and Aston 2016) is `target_cess` of the particles, by bisection.
+1. **Reweights** each particle from the value it keeps. No model runs.
+1. **Resamples** (systematic) when the effective size falls below `resample_threshold` of the particles.
+1. **Moves** every particle by random-walk Metropolis, in parallel, each from its own stream of the generator. The walk proposes on an unbounded scale: the logit of the position between two finite bounds, `log(θ − a)` with a lower bound `a` only, `log(b − θ)` with an upper bound only, the parameter itself with none; so no proposal leaves the bounds. Its covariance is that of the particles on that scale, times `2.38² / d`. If the first move accepts a share `a` of its proposals, the step moves every particle `⌈log c / log(1 − a)⌉` times (Drovandi and Pettitt 2011), with `c` the `stay_probability`: each particle moves at least once with probability `1 − c`.
+
+| Setting              | Meaning                                                  | Larger values                     |
+| -------------------- | -------------------------------------------------------- | --------------------------------- |
+| `particles`          | The size of the sample                                   | Less Monte Carlo error, more runs |
+| `target_cess`        | The share of the particles each step keeps               | More, smaller steps               |
+| `resample_threshold` | Resample below this share of effective size (Gibbs only) | More resampling                   |
+| `stay_probability`   | The chance that a particle does not move in a step       | Fewer moves per step              |
+
+None of them has a default: each sets the cost and the accuracy of the run.
+
+## Gibbs posterior
+
+`GibbsPosterior` samples `π(θ) ∝ prior(θ) · exp(−η · loss(θ))`, where `loss` is the problem's loss with its weights and normalization. It returns a `GibbsResult`: the sample at temperature 1, the temperatures, the log of `∫ prior(θ) exp(−η loss(θ)) dθ`, the diagnostics, the `η` it ran with, the fit a calibration of `η` read (`fit`), and the coverage of a bootstrap calibration (`coverage`).
+
+### What `η` means
+
+`η` weighs the data against the priors. The loss has no scale of its own, so `η` has no default: with `η` too large the posterior is too narrow, with `η` too small too wide. For the sum of squares of a model with Gaussian noise of variance `σ²`, `η = 1/(2σ²)` makes the Gibbs posterior the Bayesian posterior.
+
+| `eta`                                                                           | How it is chosen                                                                                                              | Needs                                         | Cost                                          |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | --------------------------------------------- |
+| A number above 0                                                                | By you                                                                                                                        | Nothing                                       | One sampler                                   |
+| `EtaCalibration.information_matching()`                                         | `η = tr(J I⁻¹ J) / tr(J)` at the fit: the curvature `J` of the loss terms against their variance `I` (Holmes and Walker 2017) | `loss_function="sse"`, a deterministic engine | A fit, finite differences and one sampler     |
+| `EtaCalibration.bootstrap_coverage(replicates, block_length, confidence_level)` | The posteriors of Bayesian-bootstrap data sets hold the fit at `confidence_level` (Syring and Martin 2019)                    | Any loss and engine                           | A fit and one sampler per replicate, then one |
+
+Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. Bootstrap coverage runs one tempered sampler per replicate to a large `η`, reads the posterior of every smaller `η` by reweighting, so its search runs no model, and finds for each replicate and parameter the `η` where the interval stops holding the fit. `η` interpolates those thresholds at the level, so the expected coverage is the level; it needs at least `1/(1 − c) − 1` replicates times parameters.
+
+With a stochastic engine the loss reads the problem's `replicates` with common random numbers, as the optimizers do, so it is a function of the parameters.
+
+## ABC
+
+`AbcSmc` keeps a particle when the distance between its run and the data is at most a tolerance `ε`, and lowers `ε` step by step (Del Moral, Doucet and Jasra 2012). With weights of 0 or 1, the share of the particles that a tolerance keeps is its conditional effective sample size, so each next tolerance is the weighted quantile of the current distances at `target_cess`: the smallest distance whose share of the weight at or below it reaches it. The run stops when the first move of a step accepts less than `min_acceptance`, and keeps the sample of the tolerance before; it also stops when no lower tolerance keeps `target_cess` of the particles, as with whole numbers that tie. `diagnostics.stop_reason` says which.
+
+| `distance`                                 | Value                                                                                                                             |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `LossDistance()`                           | The problem's `loss_function`, with its weights and `normalize_observations`                                                      |
+| `SeriesDistance(metric="rmse")` or `"mae"` | `metric` of each series on its residuals divided by the root mean square of its observed values, then the largest over the series |
+
+`SeriesDistance` compares series in different units on one scale: scaling a series and its prediction by a constant leaves its distance unchanged, so the series of large values does not decide alone.
+
+With a stochastic engine each distance runs one fresh replicate, seeded from its particle's stream, and the particle keeps that distance until a move replaces it: that is what makes ABC sample its target. The problem's `replicates` and `replicate_summary` do not apply, and `diagnostics.notes` says so. The problem still needs them, since every calibration of a stochastic engine does.
+
+`AbcRejection(priors, distance, draws, quantile)` is one step of the same code with no move: it draws from the priors and keeps the closest share `quantile` of the draws.
+
+```python
+from commol import AbcRejection
+
+rejection = calibrator.uncertainty(
+    AbcRejection(
+        priors=Priors.uniform_on_bounds(), distance=LossDistance(), draws=400, quantile=0.1
+    )
+)
+kept = [weight > float("-inf") for weight in rejection.sample.log_weights]
+print(sum(kept))  # 40
+```
+
+## Reading the diagnostics
+
+| Field                          | One entry per | What to look for                                                               |
+| ------------------------------ | ------------- | ------------------------------------------------------------------------------ |
+| `levels`                       | Step          | A Gibbs posterior ends at 1; an ABC run lists its falling tolerances           |
+| `diagnostics.effective_sizes`  | Step          | Kish's effective size after reweighting; near `target_cess` of the particles   |
+| `diagnostics.resampled`        | Step          | Whether the step resampled                                                     |
+| `diagnostics.acceptance_rates` | Step          | The share of the first move's proposals accepted; a small one means many moves |
+| `diagnostics.move_counts`      | Step          | How many times each particle moved; it grows as the acceptance falls           |
+| `diagnostics.evaluations`      | Run           | The number of model runs                                                       |
+| `diagnostics.stop_reason`      | Run           | Why the run stopped before its last level, or None                             |
+| `log_evidence`                 | Run           | The log of the product of the mean incremental weights                         |
+| `kept`                         | Particle      | The loss or distance each particle keeps                                       |
+
+```python
+print(gibbs.levels[-1])  # 1.0
+print(len(gibbs.diagnostics.move_counts) == len(gibbs.levels))  # True
+```
+
+A step whose acceptance rate is small moves each particle many times, and the run costs more; more particles or a larger `target_cess` make the steps smaller. A sample whose effective size is small gives intervals with a large Monte Carlo error.
+
+## Checklist
+
+- [ ] Each calibrated parameter has a prior you can defend, on bounds that fit it.
+- [ ] `η` is a number you can justify, or one of its calibrations.
+- [ ] A Gibbs posterior ends at temperature 1; an ABC run says why it stopped.
+- [ ] With a stochastic engine, ABC reads one replicate per particle, not the problem's summary.
+
+## Next steps
+
+| To learn                                                | Read                                                                                                 |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| What every method returns and reads                     | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                      |
+| Uncertainty with no prior: bootstraps and the jackknife | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md)            |
+| How far a sample contracts each prior                   | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample) |
+| The stochastic engines and their replicates             | [Stochastic engines](https://munqu.github.io/commol/latest/guide/stochastic/index.md)                |
 
 # Conformal Prediction Intervals
 
@@ -9767,11 +10005,12 @@ Practical identifiability from any parameter sample: how much it contracts each 
 
 Attributes:
 
-| Name                    | Type              | Description                                                                                                                                                       |
-| ----------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sample`                | `ParameterSample` | The sample, such as the draws of an uncertainty method.                                                                                                           |
-| `reference`             | `str`             | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds.                                                                 |
-| `correlation_threshold` | `float`           | The absolute correlation above which a pair is listed and its parameters are poorly determined, strictly between 0 and 1. No default: it is a modelling judgment. |
+| Name                    | Type              | Description                                                                                                                                                                                        |
+| ----------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sample`                | `ParameterSample` | The sample, such as the draws of an uncertainty method.                                                                                                                                            |
+| `reference`             | `{bounds, prior}` | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds, or "prior", the prior of each parameter in priors, such as the priors the sample was drawn with. |
+| `correlation_threshold` | `float`           | The absolute correlation above which a pair is listed and its parameters are poorly determined, strictly between 0 and 1. No default: it is a modelling judgment.                                  |
+| `priors`                | \`Priors          | dict[str, Distribution]                                                                                                                                                                            |
 
 Source code in `commol/context/inference/identifiability.py`
 
@@ -9786,18 +10025,92 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
     ----------
     sample : ParameterSample
         The sample, such as the draws of an uncertainty method.
-    reference : str
+    reference : {"bounds", "prior"}
         The distribution the contraction compares with: ``"bounds"``, the
-        uniform distribution on the bounds.
+        uniform distribution on the bounds, or ``"prior"``, the prior of each
+        parameter in `priors`, such as the priors the sample was drawn with.
     correlation_threshold : float
         The absolute correlation above which a pair is listed and its
         parameters are poorly determined, strictly between 0 and 1. No
         default: it is a modelling judgment.
+    priors : Priors | dict[str, Distribution] | None
+        The prior of each parameter, with ``reference="prior"`` only.
     """
 
     sample: ParameterSample
-    reference: Literal["bounds"]
+    reference: Literal["bounds", "prior"]
     correlation_threshold: float = Field(gt=0.0, lt=1.0)
+    priors: Priors | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def read_priors(cls, data: object) -> object:
+        """Read a mapping of parameter to distribution as `Priors`."""
+        if isinstance(data, Mapping) and data.get("priors") is not None:
+            return {**data, "priors": coerce_priors(data["priors"])}
+        return data
+
+    @model_validator(mode="after")
+    def check_priors(self) -> Self:
+        """The priors go with ``reference="prior"``, and only with it."""
+        if self.reference == "prior" and self.priors is None:
+            raise ValueError(
+                "reference='prior' needs priors: the prior of each parameter."
+            )
+        if self.reference == "bounds" and self.priors is not None:
+            raise ValueError(
+                "priors are read only with reference='prior'; with "
+                "reference='bounds' leave them out."
+            )
+        return self
+```
+
+### Methods:
+
+#### read_priors
+
+```python
+read_priors(data: object) -> object
+```
+
+Read a mapping of parameter to distribution as `Priors`.
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+@model_validator(mode="before")
+@classmethod
+def read_priors(cls, data: object) -> object:
+    """Read a mapping of parameter to distribution as `Priors`."""
+    if isinstance(data, Mapping) and data.get("priors") is not None:
+        return {**data, "priors": coerce_priors(data["priors"])}
+    return data
+```
+
+#### check_priors
+
+```python
+check_priors() -> Self
+```
+
+The priors go with `reference="prior"`, and only with it.
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+@model_validator(mode="after")
+def check_priors(self) -> Self:
+    """The priors go with ``reference="prior"``, and only with it."""
+    if self.reference == "prior" and self.priors is None:
+        raise ValueError(
+            "reference='prior' needs priors: the prior of each parameter."
+        )
+    if self.reference == "bounds" and self.priors is not None:
+        raise ValueError(
+            "priors are read only with reference='prior'; with "
+            "reference='bounds' leave them out."
+        )
+    return self
 ```
 
 ## StartsIdentifiability
@@ -10399,14 +10712,14 @@ The evidence of `SampleIdentifiability`.
 
 Attributes:
 
-| Name                    | Type                          | Description                                                                                                                          |
-| ----------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `reference`             | `str`                         | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds.                                    |
-| `correlation_threshold` | `float`                       | The absolute correlation above which a pair is listed.                                                                               |
-| `contraction`           | `dict[str, float]`            | 1 − Var(sample) / Var(reference) of each parameter: near 0 when the sample spreads as the reference, near 1 when it sits on a value. |
-| `correlation`           | `dict[str, dict[str, float]]` | The weighted correlation matrix.                                                                                                     |
-| `correlated_pairs`      | `list[CorrelatedPair]`        | The pairs above the threshold.                                                                                                       |
-| `modes`                 | `dict[str, list[float]]`      | The modes of the marginal of each parameter.                                                                                         |
+| Name                    | Type                          | Description                                                                                                                                |
+| ----------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `reference`             | `{bounds, prior}`             | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds, or "prior", the prior of each parameter. |
+| `correlation_threshold` | `float`                       | The absolute correlation above which a pair is listed.                                                                                     |
+| `contraction`           | `dict[str, float]`            | 1 − Var(sample) / Var(reference) of each parameter: near 0 when the sample spreads as the reference, near 1 when it sits on a value.       |
+| `correlation`           | `dict[str, dict[str, float]]` | The weighted correlation matrix.                                                                                                           |
+| `correlated_pairs`      | `list[CorrelatedPair]`        | The pairs above the threshold.                                                                                                             |
+| `modes`                 | `dict[str, list[float]]`      | The modes of the marginal of each parameter.                                                                                               |
 
 Source code in `commol/context/inference/identifiability.py`
 
@@ -10417,9 +10730,10 @@ class SampleSection(_Frozen):
 
     Attributes
     ----------
-    reference : str
+    reference : {"bounds", "prior"}
         The distribution the contraction compares with: ``"bounds"``, the
-        uniform distribution on the bounds.
+        uniform distribution on the bounds, or ``"prior"``, the prior of each
+        parameter.
     correlation_threshold : float
         The absolute correlation above which a pair is listed.
     contraction : dict[str, float]
@@ -10433,7 +10747,7 @@ class SampleSection(_Frozen):
         The modes of the marginal of each parameter.
     """
 
-    reference: Literal["bounds"]
+    reference: Literal["bounds", "prior"]
     correlation_threshold: float
     contraction: dict[str, float]
     correlation: dict[str, dict[str, float]]
@@ -23473,6 +23787,1033 @@ class BoundError(BaseModel):
     upper: tuple[float, float]
 ```
 
+## Sequential Monte Carlo
+
+Guide: [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md).
+
+## Priors
+
+Bases: `BaseModel`
+
+One prior per calibrated parameter.
+
+A sampling method takes its priors with no default: what is known about each parameter before the data is a modelling choice. Give a mapping of parameter to distribution, or `uniform_on_bounds` for `Uniform()` on every parameter.
+
+Attributes:
+
+| Name            | Type                      | Description |
+| --------------- | ------------------------- | ----------- |
+| `distributions` | \`dict[str, Distribution] | None\`      |
+
+Source code in `commol/context/inference/distributions.py`
+
+```python
+class Priors(BaseModel):
+    """
+    One prior per calibrated parameter.
+
+    A sampling method takes its priors with no default: what is known about
+    each parameter before the data is a modelling choice. Give a mapping of
+    parameter to distribution, or `uniform_on_bounds` for ``Uniform()`` on
+    every parameter.
+
+    Attributes
+    ----------
+    distributions : dict[str, Distribution] | None
+        The prior of each parameter; None gives ``Uniform()`` to every
+        parameter (`uniform_on_bounds`).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    distributions: dict[str, Distribution] | None = Field(
+        description="The prior of each parameter, or None for uniform on the bounds."
+    )
+
+    @classmethod
+    def uniform_on_bounds(cls) -> Self:
+        """
+        ``Uniform()`` on the bounds of every parameter.
+
+        Returns
+        -------
+        Priors
+            The priors; every parameter needs finite bounds.
+        """
+        return cls(distributions=None)
+
+    def rust_priors(self) -> list[tuple[str, str, list[float]]] | None:
+        """The priors as the Rust runners read them; None is uniform."""
+        if self.distributions is None:
+            return None
+        return [
+            distribution.rust_prior(name)
+            for name, distribution in self.distributions.items()
+        ]
+```
+
+### Methods:
+
+#### uniform_on_bounds
+
+```python
+uniform_on_bounds() -> Self
+```
+
+`Uniform()` on the bounds of every parameter.
+
+Returns:
+
+| Type     | Description                                      |
+| -------- | ------------------------------------------------ |
+| `Priors` | The priors; every parameter needs finite bounds. |
+
+Source code in `commol/context/inference/distributions.py`
+
+```python
+@classmethod
+def uniform_on_bounds(cls) -> Self:
+    """
+    ``Uniform()`` on the bounds of every parameter.
+
+    Returns
+    -------
+    Priors
+        The priors; every parameter needs finite bounds.
+    """
+    return cls(distributions=None)
+```
+
+#### rust_priors
+
+```python
+rust_priors() -> list[tuple[str, str, list[float]]] | None
+```
+
+The priors as the Rust runners read them; None is uniform.
+
+Source code in `commol/context/inference/distributions.py`
+
+```python
+def rust_priors(self) -> list[tuple[str, str, list[float]]] | None:
+    """The priors as the Rust runners read them; None is uniform."""
+    if self.distributions is None:
+        return None
+    return [
+        distribution.rust_prior(name)
+        for name, distribution in self.distributions.items()
+    ]
+```
+
+## Uniform
+
+Bases: `DistributionBase`
+
+The uniform distribution on the bounds; they must be finite.
+
+Source code in `commol/context/inference/distributions.py`
+
+```python
+class Uniform(DistributionBase):
+    """The uniform distribution on the bounds; they must be finite."""
+
+    rust_kind: ClassVar[str] = "uniform"
+    kind: Literal["uniform"] = "uniform"
+```
+
+## LogUniform
+
+Bases: `DistributionBase`
+
+The log-uniform distribution on the bounds: `log x` is uniform, the density is proportional to `1/x`. The bounds must be finite and the lower one above 0.
+
+Source code in `commol/context/inference/distributions.py`
+
+```python
+class LogUniform(DistributionBase):
+    """
+    The log-uniform distribution on the bounds: ``log x`` is uniform, the
+    density is proportional to ``1/x``. The bounds must be finite and the
+    lower one above 0.
+    """
+
+    rust_kind: ClassVar[str] = "log_uniform"
+    kind: Literal["log_uniform"] = "log_uniform"
+```
+
+## Beta
+
+Bases: `DistributionBase`
+
+The beta distribution of shapes `a` and `b`, scaled to the bounds; they must be finite.
+
+Attributes:
+
+| Name | Type    | Description                |
+| ---- | ------- | -------------------------- |
+| `a`  | `float` | The first shape, above 0.  |
+| `b`  | `float` | The second shape, above 0. |
+
+Source code in `commol/context/inference/distributions.py`
+
+```python
+class Beta(DistributionBase):
+    """
+    The beta distribution of shapes `a` and `b`, scaled to the bounds; they
+    must be finite.
+
+    Attributes
+    ----------
+    a : float
+        The first shape, above 0.
+    b : float
+        The second shape, above 0.
+    """
+
+    rust_kind: ClassVar[str] = "beta"
+    kind: Literal["beta"] = "beta"
+    a: float = Field(gt=0.0, allow_inf_nan=False, description="The first shape.")
+    b: float = Field(gt=0.0, allow_inf_nan=False, description="The second shape.")
+
+    def rust_parameters(self) -> list[float]:
+        """The shapes `a` and `b`."""
+        return [self.a, self.b]
+```
+
+### Methods:
+
+#### rust_parameters
+
+```python
+rust_parameters() -> list[float]
+```
+
+The shapes `a` and `b`.
+
+Source code in `commol/context/inference/distributions.py`
+
+```python
+def rust_parameters(self) -> list[float]:
+    """The shapes `a` and `b`."""
+    return [self.a, self.b]
+```
+
+## Normal
+
+Bases: `DistributionBase`
+
+The normal distribution, truncated to the bounds.
+
+Attributes:
+
+| Name   | Type    | Description                                        |
+| ------ | ------- | -------------------------------------------------- |
+| `mean` | `float` | The mean before truncation.                        |
+| `sd`   | `float` | The standard deviation before truncation, above 0. |
+
+Source code in `commol/context/inference/distributions.py`
+
+```python
+class Normal(DistributionBase):
+    """
+    The normal distribution, truncated to the bounds.
+
+    Attributes
+    ----------
+    mean : float
+        The mean before truncation.
+    sd : float
+        The standard deviation before truncation, above 0.
+    """
+
+    rust_kind: ClassVar[str] = "normal"
+    kind: Literal["normal"] = "normal"
+    mean: float = Field(allow_inf_nan=False, description="The mean.")
+    sd: float = Field(
+        gt=0.0, allow_inf_nan=False, description="The standard deviation."
+    )
+
+    def rust_parameters(self) -> list[float]:
+        """The mean and the standard deviation."""
+        return [self.mean, self.sd]
+```
+
+### Methods:
+
+#### rust_parameters
+
+```python
+rust_parameters() -> list[float]
+```
+
+The mean and the standard deviation.
+
+Source code in `commol/context/inference/distributions.py`
+
+```python
+def rust_parameters(self) -> list[float]:
+    """The mean and the standard deviation."""
+    return [self.mean, self.sd]
+```
+
+## LogNormal
+
+Bases: `DistributionBase`
+
+The log-normal distribution, truncated to the bounds and to `(0, ∞)`: `log x` is normal. The upper bound must be above 0.
+
+Attributes:
+
+| Name    | Type    | Description                               |
+| ------- | ------- | ----------------------------------------- |
+| `mu`    | `float` | The mean of log x.                        |
+| `sigma` | `float` | The standard deviation of log x, above 0. |
+
+Source code in `commol/context/inference/distributions.py`
+
+```python
+class LogNormal(DistributionBase):
+    """
+    The log-normal distribution, truncated to the bounds and to ``(0, ∞)``:
+    ``log x`` is normal. The upper bound must be above 0.
+
+    Attributes
+    ----------
+    mu : float
+        The mean of ``log x``.
+    sigma : float
+        The standard deviation of ``log x``, above 0.
+    """
+
+    rust_kind: ClassVar[str] = "log_normal"
+    kind: Literal["log_normal"] = "log_normal"
+    mu: float = Field(allow_inf_nan=False, description="The mean of log x.")
+    sigma: float = Field(
+        gt=0.0, allow_inf_nan=False, description="The standard deviation of log x."
+    )
+
+    def rust_parameters(self) -> list[float]:
+        """`mu` and `sigma`."""
+        return [self.mu, self.sigma]
+```
+
+### Methods:
+
+#### rust_parameters
+
+```python
+rust_parameters() -> list[float]
+```
+
+`mu` and `sigma`.
+
+Source code in `commol/context/inference/distributions.py`
+
+```python
+def rust_parameters(self) -> list[float]:
+    """`mu` and `sigma`."""
+    return [self.mu, self.sigma]
+```
+
+## Gamma
+
+Bases: `DistributionBase`
+
+The gamma distribution of shape `shape` and rate `rate` (mean `shape / rate`), truncated to the bounds and to `(0, ∞)`. The upper bound must be above 0.
+
+Attributes:
+
+| Name    | Type    | Description         |
+| ------- | ------- | ------------------- |
+| `shape` | `float` | The shape, above 0. |
+| `rate`  | `float` | The rate, above 0.  |
+
+Source code in `commol/context/inference/distributions.py`
+
+```python
+class Gamma(DistributionBase):
+    """
+    The gamma distribution of shape `shape` and rate `rate` (mean
+    ``shape / rate``), truncated to the bounds and to ``(0, ∞)``. The upper
+    bound must be above 0.
+
+    Attributes
+    ----------
+    shape : float
+        The shape, above 0.
+    rate : float
+        The rate, above 0.
+    """
+
+    rust_kind: ClassVar[str] = "gamma"
+    kind: Literal["gamma"] = "gamma"
+    shape: float = Field(gt=0.0, allow_inf_nan=False, description="The shape.")
+    rate: float = Field(gt=0.0, allow_inf_nan=False, description="The rate.")
+
+    def rust_parameters(self) -> list[float]:
+        """The shape and the rate."""
+        return [self.shape, self.rate]
+```
+
+### Methods:
+
+#### rust_parameters
+
+```python
+rust_parameters() -> list[float]
+```
+
+The shape and the rate.
+
+Source code in `commol/context/inference/distributions.py`
+
+```python
+def rust_parameters(self) -> list[float]:
+    """The shape and the rate."""
+    return [self.shape, self.rate]
+```
+
+## GibbsPosterior
+
+Bases: `WithPriors`, `UncertaintyMethod[GibbsResult]`
+
+The Gibbs posterior `π(θ) ∝ prior(θ) · exp(−η · loss(θ))` of the problem's loss, with its weights and normalization, sampled by sequential Monte Carlo from the priors (temperature 0) to the posterior (temperature 1).
+
+`η` sets how much the data weigh against the priors; the loss has no scale of its own, so `η` has no default.
+
+Attributes:
+
+| Name                 | Type     | Description                                                                                                                                                   |
+| -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `priors`             | \`Priors | dict[str, Distribution]\`                                                                                                                                     |
+| `eta`                | \`float  | InformationMatching                                                                                                                                           |
+| `particles`          | `int`    | Number of particles, at least 2.                                                                                                                              |
+| `target_cess`        | `float`  | The conditional effective sample size of each step, as a share of the particles, strictly between 0 and 1: the next temperature is the highest that keeps it. |
+| `resample_threshold` | `float`  | Resample when the effective size falls below this share of the particles, in (0, 1\].                                                                         |
+| `stay_probability`   | `float`  | The probability that a particle does not move in a step, strictly between 0 and 1: each step moves every particle ⌈log c / log(1 − a)⌉ times.                 |
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult]):
+    """
+    The Gibbs posterior ``π(θ) ∝ prior(θ) · exp(−η · loss(θ))`` of the
+    problem's loss, with its weights and normalization, sampled by sequential
+    Monte Carlo from the priors (temperature 0) to the posterior
+    (temperature 1).
+
+    `η` sets how much the data weigh against the priors; the loss has no
+    scale of its own, so `η` has no default.
+
+    Attributes
+    ----------
+    priors : Priors | dict[str, Distribution]
+        The prior of each calibrated parameter, or
+        ``Priors.uniform_on_bounds()``.
+    eta : float | InformationMatching | BootstrapCoverage
+        A number above 0, ``EtaCalibration.information_matching()`` or
+        ``EtaCalibration.bootstrap_coverage(...)``.
+    particles : int
+        Number of particles, at least 2.
+    target_cess : float
+        The conditional effective sample size of each step, as a share of
+        the particles, strictly between 0 and 1: the next temperature is the
+        highest that keeps it.
+    resample_threshold : float
+        Resample when the effective size falls below this share of the
+        particles, in ``(0, 1]``.
+    stay_probability : float
+        The probability that a particle does not move in a step, strictly
+        between 0 and 1: each step moves every particle
+        ``⌈log c / log(1 − a)⌉`` times.
+    """
+
+    eta: Eta = Field(description="The scale of the loss, or its calibration.")
+    particles: int = Field(ge=2, description="Number of particles.")
+    target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
+    resample_threshold: float = Field(
+        gt=0.0, le=1.0, description="Resample below this share."
+    )
+    stay_probability: float = Field(
+        gt=0.0, lt=1.0, description="Probability a particle does not move."
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def require_eta(cls, data: object) -> object:
+        """Name the choices of `eta` when it is missing."""
+        _require(data, "eta", f"give {ETA_CHOICES}")
+        if isinstance(data, Mapping):
+            eta = data["eta"]
+            if isinstance(eta, int | float) and not eta > 0:
+                raise ValueError(f"eta must be {ETA_CHOICES}; got {eta}.")
+        return data
+```
+
+### Methods:
+
+#### require_eta
+
+```python
+require_eta(data: object) -> object
+```
+
+Name the choices of `eta` when it is missing.
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+@model_validator(mode="before")
+@classmethod
+def require_eta(cls, data: object) -> object:
+    """Name the choices of `eta` when it is missing."""
+    _require(data, "eta", f"give {ETA_CHOICES}")
+    if isinstance(data, Mapping):
+        eta = data["eta"]
+        if isinstance(eta, int | float) and not eta > 0:
+            raise ValueError(f"eta must be {ETA_CHOICES}; got {eta}.")
+    return data
+```
+
+## EtaCalibration
+
+Bases: `BaseModel`
+
+A rule that chooses the scale `η` of a Gibbs posterior from the data.
+
+Use `information_matching` or `bootstrap_coverage`.
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+class EtaCalibration(BaseModel):
+    """
+    A rule that chooses the scale `η` of a Gibbs posterior from the data.
+
+    Use `information_matching` or `bootstrap_coverage`.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    @classmethod
+    def information_matching(cls) -> "InformationMatching":
+        """
+        Match the curvature of the loss to the variance of its terms at the
+        fit (Holmes and Walker 2017).
+
+        It needs ``loss_function="sse"`` and a deterministic engine, and is
+        cheap and local.
+
+        Returns
+        -------
+        InformationMatching
+            The calibration.
+        """
+        return InformationMatching()
+
+    @classmethod
+    def bootstrap_coverage(
+        cls, replicates: int, block_length: BlockLength, confidence_level: float
+    ) -> "BootstrapCoverage":
+        """
+        Choose `η` so that the posterior intervals of Bayesian-bootstrap data
+        sets cover the fit at their level (Syring and Martin 2019).
+
+        It works with any loss and engine, and costs one sampler per
+        replicate.
+
+        Parameters
+        ----------
+        replicates : int
+            Number of Bayesian-bootstrap data sets, at least 1.
+        block_length : int | "auto"
+            Positions per block of the bootstrap.
+        confidence_level : float
+            The level of the intervals, strictly between 0 and 1.
+
+        Returns
+        -------
+        BootstrapCoverage
+            The calibration.
+        """
+        return BootstrapCoverage(
+            replicates=replicates,
+            block_length=block_length,
+            confidence_level=confidence_level,
+        )
+```
+
+### Methods:
+
+#### information_matching
+
+```python
+information_matching() -> InformationMatching
+```
+
+Match the curvature of the loss to the variance of its terms at the fit (Holmes and Walker 2017).
+
+It needs `loss_function="sse"` and a deterministic engine, and is cheap and local.
+
+Returns:
+
+| Type                  | Description      |
+| --------------------- | ---------------- |
+| `InformationMatching` | The calibration. |
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+@classmethod
+def information_matching(cls) -> "InformationMatching":
+    """
+    Match the curvature of the loss to the variance of its terms at the
+    fit (Holmes and Walker 2017).
+
+    It needs ``loss_function="sse"`` and a deterministic engine, and is
+    cheap and local.
+
+    Returns
+    -------
+    InformationMatching
+        The calibration.
+    """
+    return InformationMatching()
+```
+
+#### bootstrap_coverage
+
+```python
+bootstrap_coverage(replicates: int, block_length: BlockLength, confidence_level: float) -> BootstrapCoverage
+```
+
+Choose `η` so that the posterior intervals of Bayesian-bootstrap data sets cover the fit at their level (Syring and Martin 2019).
+
+It works with any loss and engine, and costs one sampler per replicate.
+
+Parameters:
+
+| Name               | Type    | Description                                           | Default                               |
+| ------------------ | ------- | ----------------------------------------------------- | ------------------------------------- |
+| `replicates`       | `int`   | Number of Bayesian-bootstrap data sets, at least 1.   | *required*                            |
+| `block_length`     | \`int   | auto\`                                                | Positions per block of the bootstrap. |
+| `confidence_level` | `float` | The level of the intervals, strictly between 0 and 1. | *required*                            |
+
+Returns:
+
+| Type                | Description      |
+| ------------------- | ---------------- |
+| `BootstrapCoverage` | The calibration. |
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+@classmethod
+def bootstrap_coverage(
+    cls, replicates: int, block_length: BlockLength, confidence_level: float
+) -> "BootstrapCoverage":
+    """
+    Choose `η` so that the posterior intervals of Bayesian-bootstrap data
+    sets cover the fit at their level (Syring and Martin 2019).
+
+    It works with any loss and engine, and costs one sampler per
+    replicate.
+
+    Parameters
+    ----------
+    replicates : int
+        Number of Bayesian-bootstrap data sets, at least 1.
+    block_length : int | "auto"
+        Positions per block of the bootstrap.
+    confidence_level : float
+        The level of the intervals, strictly between 0 and 1.
+
+    Returns
+    -------
+    BootstrapCoverage
+        The calibration.
+    """
+    return BootstrapCoverage(
+        replicates=replicates,
+        block_length=block_length,
+        confidence_level=confidence_level,
+    )
+```
+
+## InformationMatching
+
+Bases: `EtaCalibration`
+
+`η = tr(J I⁻¹ J) / tr(J)` at the fit, with `J` the curvature of the loss terms and `I` their variance (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019). For the sum of squares of a model with Gaussian noise of variance `σ²` it estimates `1/(2σ²)`. It needs `loss_function="sse"` and a deterministic engine.
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+class InformationMatching(EtaCalibration):
+    """
+    `η = tr(J I⁻¹ J) / tr(J)` at the fit, with ``J`` the curvature of the
+    loss terms and ``I`` their variance (Holmes and Walker 2017; Lyddon,
+    Holmes and Walker 2019). For the sum of squares of a model with Gaussian
+    noise of variance ``σ²`` it estimates ``1/(2σ²)``. It needs
+    ``loss_function="sse"`` and a deterministic engine.
+    """
+
+    kind: Literal["information_matching"] = "information_matching"
+```
+
+## BootstrapCoverage
+
+Bases: `EtaCalibration`
+
+The `η` at which the central intervals of `confidence_level` of the Gibbs posteriors of Bayesian-bootstrap data sets hold the fit at that rate, over the replicates and the parameters (Syring and Martin 2019).
+
+Attributes:
+
+| Name               | Type    | Description                                           |
+| ------------------ | ------- | ----------------------------------------------------- |
+| `replicates`       | `int`   | Number of Bayesian-bootstrap data sets, at least 1.   |
+| `block_length`     | \`int   | auto\`                                                |
+| `confidence_level` | `float` | The level of the intervals, strictly between 0 and 1. |
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+class BootstrapCoverage(EtaCalibration):
+    """
+    The `η` at which the central intervals of `confidence_level` of the Gibbs
+    posteriors of Bayesian-bootstrap data sets hold the fit at that rate,
+    over the replicates and the parameters (Syring and Martin 2019).
+
+    Attributes
+    ----------
+    replicates : int
+        Number of Bayesian-bootstrap data sets, at least 1.
+    block_length : int | "auto"
+        Positions per block of the bootstrap.
+    confidence_level : float
+        The level of the intervals, strictly between 0 and 1.
+    """
+
+    kind: Literal["bootstrap_coverage"] = "bootstrap_coverage"
+    replicates: int = Field(ge=1, description="Number of bootstrap data sets.")
+    block_length: BlockLength = Field(description="Positions per block.")
+    confidence_level: float = Field(
+        gt=0.0, lt=1.0, description="The level of the intervals."
+    )
+```
+
+## AbcSmc
+
+Bases: `WithPriors`, `UncertaintyMethod[SmcResult]`
+
+Approximate Bayesian computation by sequential Monte Carlo (Del Moral, Doucet and Jasra 2012): the tolerance `ε` falls step by step, and a particle is inside when the distance of its run is at most `ε`.
+
+Each next tolerance keeps the weighted share `target_cess` of the particles: with weights of 0 or 1, the weighted quantile of their distances. With a stochastic engine each distance reads one fresh replicate, which the particle keeps until a move replaces it. The run stops when the first move of a step accepts less than `min_acceptance`, and keeps the sample of the tolerance before.
+
+Attributes:
+
+| Name               | Type           | Description                                                                         |
+| ------------------ | -------------- | ----------------------------------------------------------------------------------- |
+| `priors`           | \`Priors       | dict[str, Distribution]\`                                                           |
+| `distance`         | \`LossDistance | SeriesDistance\`                                                                    |
+| `particles`        | `int`          | Number of particles, at least 2.                                                    |
+| `target_cess`      | `float`        | The weighted share of the particles each tolerance keeps, strictly between 0 and 1. |
+| `min_acceptance`   | `float`        | The acceptance rate below which the run stops, strictly between 0 and 1.            |
+| `stay_probability` | `float`        | The probability that a particle does not move in a step, strictly between 0 and 1.  |
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+class AbcSmc(WithPriors, UncertaintyMethod[SmcResult]):
+    """
+    Approximate Bayesian computation by sequential Monte Carlo (Del Moral,
+    Doucet and Jasra 2012): the tolerance ``ε`` falls step by step, and a
+    particle is inside when the distance of its run is at most ``ε``.
+
+    Each next tolerance keeps the weighted share `target_cess` of the
+    particles: with weights of 0 or 1, the weighted quantile of their
+    distances. With a stochastic engine each distance reads one fresh
+    replicate, which the particle keeps until a move replaces it. The run
+    stops when the first move of a step accepts less than `min_acceptance`,
+    and keeps the sample of the tolerance before.
+
+    Attributes
+    ----------
+    priors : Priors | dict[str, Distribution]
+        The prior of each calibrated parameter, or
+        ``Priors.uniform_on_bounds()``.
+    distance : LossDistance | SeriesDistance
+        How far a run is from the observations.
+    particles : int
+        Number of particles, at least 2.
+    target_cess : float
+        The weighted share of the particles each tolerance keeps, strictly
+        between 0 and 1.
+    min_acceptance : float
+        The acceptance rate below which the run stops, strictly between 0
+        and 1.
+    stay_probability : float
+        The probability that a particle does not move in a step, strictly
+        between 0 and 1.
+    """
+
+    distance: AbcDistance = Field(description="The distance.")
+    particles: int = Field(ge=2, description="Number of particles.")
+    target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
+    min_acceptance: float = Field(
+        gt=0.0, lt=1.0, description="Acceptance rate below which the run stops."
+    )
+    stay_probability: float = Field(
+        gt=0.0, lt=1.0, description="Probability a particle does not move."
+    )
+```
+
+## AbcRejection
+
+Bases: `WithPriors`, `UncertaintyMethod[SmcResult]`
+
+ABC rejection: `draws` draws of the priors, of which the closest share `quantile` is kept, with equal weights. It is one step of `AbcSmc` with no move. With a stochastic engine each distance reads one fresh replicate.
+
+Attributes:
+
+| Name       | Type           | Description                                            |
+| ---------- | -------------- | ------------------------------------------------------ |
+| `priors`   | \`Priors       | dict[str, Distribution]\`                              |
+| `distance` | \`LossDistance | SeriesDistance\`                                       |
+| `draws`    | `int`          | Number of draws of the priors, at least 2.             |
+| `quantile` | `float`        | The share of the draws kept, strictly between 0 and 1. |
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+class AbcRejection(WithPriors, UncertaintyMethod[SmcResult]):
+    """
+    ABC rejection: `draws` draws of the priors, of which the closest share
+    `quantile` is kept, with equal weights. It is one step of `AbcSmc` with
+    no move. With a stochastic engine each distance reads one fresh
+    replicate.
+
+    Attributes
+    ----------
+    priors : Priors | dict[str, Distribution]
+        The prior of each calibrated parameter, or
+        ``Priors.uniform_on_bounds()``.
+    distance : LossDistance | SeriesDistance
+        How far a run is from the observations.
+    draws : int
+        Number of draws of the priors, at least 2.
+    quantile : float
+        The share of the draws kept, strictly between 0 and 1.
+    """
+
+    distance: AbcDistance = Field(description="The distance.")
+    draws: int = Field(ge=2, description="Number of draws.")
+    quantile: float = Field(gt=0.0, lt=1.0, description="The share of draws kept.")
+```
+
+## LossDistance
+
+Bases: `BaseModel`
+
+The problem's loss as the distance of ABC: `loss_function` with the observation weights and `normalize_observations`. With a stochastic engine it reads one fresh replicate per evaluation, so the problem's `replicates` and `replicate_summary` do not apply.
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+class LossDistance(BaseModel):
+    """
+    The problem's loss as the distance of ABC: ``loss_function`` with the
+    observation weights and ``normalize_observations``. With a stochastic
+    engine it reads one fresh replicate per evaluation, so the problem's
+    ``replicates`` and ``replicate_summary`` do not apply.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["loss"] = "loss"
+```
+
+## SeriesDistance
+
+Bases: `BaseModel`
+
+The largest distance over the series: `metric` of each series on its residuals divided by the root mean square of its observed values, so series in different units compare on one scale.
+
+Attributes:
+
+| Name     | Type          | Description                                                                               |
+| -------- | ------------- | ----------------------------------------------------------------------------------------- |
+| `metric` | `{rmse, mae}` | The weighted root mean square or mean absolute value of the scaled residuals of a series. |
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+class SeriesDistance(BaseModel):
+    """
+    The largest distance over the series: `metric` of each series on its
+    residuals divided by the root mean square of its observed values, so
+    series in different units compare on one scale.
+
+    Attributes
+    ----------
+    metric : {"rmse", "mae"}
+        The weighted root mean square or mean absolute value of the scaled
+        residuals of a series.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["series"] = "series"
+    metric: Literal["rmse", "mae"] = Field(description="The metric of a series.")
+```
+
+## SmcResult
+
+Bases: `BaseModel`
+
+The result of a sequential Monte Carlo method.
+
+Attributes:
+
+| Name           | Type              | Description                                                                                                                                                                               |
+| -------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sample`       | `ParameterSample` | The weighted particles at the last level.                                                                                                                                                 |
+| `levels`       | `list[float]`     | The level of each step: the temperature of a Gibbs posterior, from above 0 to 1, or the tolerance of ABC, falling.                                                                        |
+| `kept`         | \`list\[float     | None\]\`                                                                                                                                                                                  |
+| `log_evidence` | `float`           | The log of the product of the mean incremental weights: for a Gibbs posterior, the log of ∫ prior(θ) exp(−η loss(θ)) dθ; for ABC, the log of the prior probability of the last tolerance. |
+| `diagnostics`  | `SmcDiagnostics`  | The effective sizes, acceptance rates and move counts of each step.                                                                                                                       |
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+class SmcResult(BaseModel):
+    """
+    The result of a sequential Monte Carlo method.
+
+    Attributes
+    ----------
+    sample : ParameterSample
+        The weighted particles at the last level.
+    levels : list[float]
+        The level of each step: the temperature of a Gibbs posterior, from
+        above 0 to 1, or the tolerance of ABC, falling.
+    kept : list[float | None]
+        The value each particle of the sample keeps, in its order: the loss
+        of a Gibbs posterior, or the distance of ABC; None for a particle
+        outside the support.
+    log_evidence : float
+        The log of the product of the mean incremental weights: for a Gibbs
+        posterior, the log of ``∫ prior(θ) exp(−η loss(θ)) dθ``; for ABC, the
+        log of the prior probability of the last tolerance.
+    diagnostics : SmcDiagnostics
+        The effective sizes, acceptance rates and move counts of each step.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+
+    sample: ParameterSample
+    levels: list[float]
+    kept: list[float | None]
+    log_evidence: float
+    diagnostics: SmcDiagnostics
+```
+
+## GibbsResult
+
+Bases: `SmcResult`
+
+The result of a Gibbs posterior.
+
+Attributes:
+
+| Name       | Type                | Description                   |
+| ---------- | ------------------- | ----------------------------- |
+| `eta`      | `float`             | The η the posterior ran with. |
+| `fit`      | \`CalibrationResult | None\`                        |
+| `coverage` | \`float             | None\`                        |
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+class GibbsResult(SmcResult):
+    """
+    The result of a Gibbs posterior.
+
+    Attributes
+    ----------
+    eta : float
+        The `η` the posterior ran with.
+    fit : CalibrationResult | None
+        The fit a calibration of `η` read; None when `η` is a number.
+    coverage : float | None
+        With `BootstrapCoverage`, the coverage of the fit by the intervals of
+        the bootstrap posteriors at `η`; otherwise None.
+    """
+
+    eta: float
+    fit: CalibrationResult | None
+    coverage: float | None
+```
+
+## SmcDiagnostics
+
+Bases: `BaseModel`
+
+What happened at each step of a sequential Monte Carlo run.
+
+Attributes:
+
+| Name               | Type          | Description                                                                                                                  |
+| ------------------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `effective_sizes`  | `list[float]` | Kish's effective size of the weights after the reweighting of each step. A step that keeps few particles has a small one.    |
+| `resampled`        | `list[bool]`  | Whether each step resampled.                                                                                                 |
+| `acceptance_rates` | `list[float]` | The share of the proposals of the first move of each step that were accepted; for ABC rejection, the share of draws kept.    |
+| `move_counts`      | `list[int]`   | How many times each particle moved in each step: ⌈log c / log(1 − a)⌉ with c the stay probability and a the acceptance rate. |
+| `evaluations`      | `int`         | The number of model runs.                                                                                                    |
+| `stop_reason`      | \`str         | None\`                                                                                                                       |
+| `notes`            | `list[str]`   | What the reader of the sample should know, such as settings of the problem that do not apply.                                |
+
+Source code in `commol/context/inference/smc.py`
+
+```python
+class SmcDiagnostics(BaseModel):
+    """
+    What happened at each step of a sequential Monte Carlo run.
+
+    Attributes
+    ----------
+    effective_sizes : list[float]
+        Kish's effective size of the weights after the reweighting of each
+        step. A step that keeps few particles has a small one.
+    resampled : list[bool]
+        Whether each step resampled.
+    acceptance_rates : list[float]
+        The share of the proposals of the first move of each step that were
+        accepted; for ABC rejection, the share of draws kept.
+    move_counts : list[int]
+        How many times each particle moved in each step:
+        ``⌈log c / log(1 − a)⌉`` with ``c`` the stay probability and ``a``
+        the acceptance rate.
+    evaluations : int
+        The number of model runs.
+    stop_reason : str | None
+        Why the run stopped before its last level, or None.
+    notes : list[str]
+        What the reader of the sample should know, such as settings of the
+        problem that do not apply.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    effective_sizes: list[float]
+    resampled: list[bool]
+    acceptance_rates: list[float]
+    move_counts: list[int]
+    evaluations: int
+    stop_reason: str | None
+    notes: list[str]
+```
+
 ## Conformal prediction
 
 Guide: [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md).
@@ -26791,6 +28132,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- `GibbsPosterior`: the Gibbs posterior `prior(θ) · exp(−η · loss(θ))` of the problem's loss, sampled by sequential Monte Carlo from the priors to the posterior; it returns a `GibbsResult` with the `η` it ran with. `eta` is required: a number above 0, `EtaCalibration.information_matching()` (the sum of squares and a deterministic engine) or `EtaCalibration.bootstrap_coverage(replicates, block_length, confidence_level)` (any loss). See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#gibbs-posterior).
+- `AbcSmc` and `AbcRejection`: approximate Bayesian computation on a required distance, `LossDistance()` or `SeriesDistance(metric)`. With a stochastic engine each distance reads one fresh replicate of its particle, so the problem's `replicates` and `replicate_summary` do not apply, and the result says so. See [ABC](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc).
+- `SmcResult`: the sample, the level of each step, the log evidence, the value each particle keeps and the diagnostics of each step (`SmcDiagnostics`: effective size, resampling, acceptance rate and move count).
+- Priors: `Uniform()`, `LogUniform()`, `Beta(a, b)`, `Normal(mean, sd)`, `LogNormal(mu, sigma)` and `Gamma(shape, rate)`, each truncated to the bounds of its parameter, and `Priors` (a mapping of parameter to distribution, or `Priors.uniform_on_bounds()`). Every sampling method takes `priors` with no default, and a prior whose bounds do not fit raises a `ValueError` that names the distributions that fit them. Their draws are the same on every platform. See [Priors](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#priors).
+- `SampleIdentifiability(reference="prior", priors=...)`: the contraction of each parameter against its prior. See [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample).
 - Conformal prediction intervals through `Calibrator.uncertainty`: intervals for observations with a coverage guarantee that needs no noise model, no prior and no correct model. `SplitConformal` scores held-out observations; `RollingConformal` gives intervals ahead of the data, one quantile per horizon (the `k`-th observation after an origin); `JackknifePlus` refits once per block left out, with the CV+ bound for blocks of more than one observation; `EnbPI` draws its own replicates of blocks for series with dependent errors; `AdaptiveConformal` walks a stream of new observations with a working level that moves with each miss. Each takes a required `score` (`"absolute"`, `"normalized"` or `"spread"`), `by` (`"series"` or `"all"`) and `level`, and returns a `ConformalResult` (`PredictionIntervals`, the scores and the guarantee). See [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md).
 - `SimulationPlotter.plot_series(prediction_intervals=...)` draws the band of conformal intervals, and `simulation_report(..., prediction_intervals=...)` reports them.
 

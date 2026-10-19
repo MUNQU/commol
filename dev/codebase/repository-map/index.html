@@ -1293,6 +1293,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/uncertainty/conformal/" class="md-nav__link">
         
   
@@ -3067,12 +3095,12 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/calibration_problem.rs</code></td>
-<td><code>CalibrationProblem</code>: the layers below, built once (<code>new</code>, <code>with_replicates</code>, <code>with_observation_normalization</code>, <code>with_initial_condition_remainder</code>), a copy with other observed values and weights (<code>with_data</code>), the one evaluation of a point (<code>evaluate</code>), and the position check that names an observation or constraint (<code>check_positions</code>). It uses only <code>SimulationEngine</code>.</td>
+<td><code>CalibrationProblem</code>: the layers below, built once (<code>new</code>, <code>with_replicates</code>, <code>with_observation_normalization</code>, <code>with_initial_condition_remainder</code>), a copy with other observed values and weights (<code>with_data</code>), the one evaluation of a point (<code>evaluate</code>), the predictions of one seeded run (<code>predict_once</code>), and the position check that names an observation or constraint (<code>check_positions</code>). It uses only <code>SimulationEngine</code>.</td>
 <td>Penalties; optimizer setup; anything of one model kind.</td>
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/forward.rs</code></td>
-<td><code>ForwardModel</code>: every clone, reset, write of values and run of the engine (<code>run_schedule</code>, <code>run_observed</code>, <code>run_at</code>), one run per replicate of a stochastic engine; the same model on other observations (<code>with_observations</code>); <code>Workspace</code>.</td>
+<td><code>ForwardModel</code>: every clone, reset, write of values and run of the engine (<code>run_schedule</code>, <code>run_observed</code>, <code>run_at</code>), one run per replicate of a stochastic engine, or one run seeded by its caller (<code>run_once</code>); the same model on other observations (<code>with_observations</code>); <code>Workspace</code>.</td>
 <td>Loss, penalties, history.</td>
 </tr>
 <tr>
@@ -3087,7 +3115,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/discrepancy.rs</code></td>
-<td><code>Discrepancy</code>: the loss of predictions against the data, with weights, per-series normalization and the summary of the replicates.</td>
+<td><code>Discrepancy</code>: the loss of predictions against the data, with weights, per-series normalization and the summary of the replicates; the loss of one run (<code>of_run</code>).</td>
 <td>Running engines.</td>
 </tr>
 <tr>
@@ -3160,6 +3188,26 @@
 <td><code>Target</code> (a log density, <code>−∞</code> outside the support) and <code>discrepancy_in_support</code>.</td>
 <td>Penalties.</td>
 </tr>
+<tr>
+<td><code>crates/commol-inference/src/distribution.rs</code>, <code>special.rs</code></td>
+<td><code>Family</code> and <code>Distribution</code>, one family truncated to the bounds of a parameter (density, distribution function, quantile, closed-form moments, draws by inversion); the special functions on <code>libm</code>.</td>
+<td>Distributions from a dependency, whose draws change with it.</td>
+</tr>
+<tr>
+<td><code>crates/commol-inference/src/priors.rs</code></td>
+<td><code>Priors</code>: one distribution per parameter, the check of their bounds, the joint density and draws.</td>
+<td>Defaults of a prior.</td>
+</tr>
+<tr>
+<td><code>crates/commol-inference/src/transform.rs</code></td>
+<td><code>Transform</code>: the unbounded scale a move proposes on (logit, log or identity by the bounds) and its log Jacobian.</td>
+<td>Kernels.</td>
+</tr>
+<tr>
+<td><code>crates/commol-inference/src/smc/</code></td>
+<td>Sequential Monte Carlo: the <code>TemperedTarget</code> port (<code>smc/mod.rs</code>), <code>SmcSampler</code>, <code>next_level</code> and <code>abc_rejection</code> (<code>sampler.rs</code>), the <code>Kernel</code> port and <code>RandomWalk</code> (<code>kernel.rs</code>), <code>GibbsTarget</code> with the calibrations of <code>η</code> (<code>gibbs.rs</code>), <code>AbcTarget</code> with its distances (<code>abc.rs</code>).</td>
+<td>Anything of one target in the sampler.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="pyo3-bindings">PyO3 bindings<a class="headerlink" href="#pyo3-bindings" title="Permanent link">&para;</a></h2>
@@ -3200,6 +3248,11 @@
 <tr>
 <td><code>py-commol/src/identifiability.rs</code></td>
 <td><code>commol_rs.inference</code>: <code>structural_rank</code>, <code>collinearity</code>, <code>sample_identifiability</code>, <code>starts_identifiability</code> and their result classes.</td>
+<td>Logic beyond type conversion.</td>
+</tr>
+<tr>
+<td><code>py-commol/src/smc.rs</code></td>
+<td><code>commol_rs.inference</code>: <code>Distribution</code>, the priors as Python passes them, the runners of the sequential Monte Carlo methods (<code>gibbs_posterior</code>, <code>information_matching_eta</code>, <code>bootstrap_coverage_eta</code>, <code>abc_smc</code>, <code>abc_rejection</code>) and <code>SmcRun</code>, <code>EtaCoverage</code>.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
@@ -3256,7 +3309,7 @@
 </tr>
 <tr>
 <td><code>api/inference/</code></td>
-<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), the scores (<code>api/inference/scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), the runners of the identifiability methods (<code>api/inference/identifiability.py</code>), which build the report, the runners of the resampling methods (<code>api/inference/resampling.py</code>), and the runners of the conformal methods (<code>api/inference/conformal.py</code>), which build <code>ConformalResult</code>.</td>
+<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), the scores (<code>api/inference/scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), the runners of the identifiability methods (<code>api/inference/identifiability.py</code>), which build the report, the runners of the resampling methods (<code>api/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>api/inference/smc.py</code>), and of the conformal methods (<code>api/inference/conformal.py</code>), which build <code>ConformalResult</code>.</td>
 <td>Transforms of predictions; quantile formulas.</td>
 </tr>
 <tr>
@@ -3276,7 +3329,7 @@
 </tr>
 <tr>
 <td><code>context/inference/</code></td>
-<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code> and <code>IdentifiabilityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>), the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), and those of the conformal methods (<code>context/inference/conformal.py</code>).</td>
+<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code> and <code>IdentifiabilityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>), the distributions and <code>Priors</code> (<code>distributions.py</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>context/inference/smc.py</code>: <code>GibbsPosterior</code>, <code>EtaCalibration</code>, <code>AbcSmc</code>, <code>AbcRejection</code>, the distances, <code>SmcResult</code>, <code>GibbsResult</code>), and of the conformal methods (<code>context/inference/conformal.py</code>).</td>
 <td>Runners.</td>
 </tr>
 <tr>
@@ -3525,6 +3578,11 @@
 <td>Change a bootstrap, the jackknife, blocks or residual noise</td>
 <td><code>crates/commol-inference/src/resampling/</code></td>
 <td><code>crates/commol-calibration/src/calibration_problem.rs</code> (<code>with_data</code>), <code>py-commol/src/inference.rs</code> (<code>bootstrap</code>, <code>jackknife</code>), <code>py-commol/commol/context/inference/resampling.py</code>, <code>api/inference/resampling.py</code>, <code>docs/guide/uncertainty/resampling.md</code></td>
+</tr>
+<tr>
+<td>Change a sequential Monte Carlo method (the sampler, a target, a move kernel) or a prior</td>
+<td><code>crates/commol-inference/src/smc/</code> (<code>sampler.rs</code>, <code>gibbs.rs</code>, <code>abc.rs</code>, <code>kernel.rs</code>); <code>distribution.rs</code>, <code>priors.rs</code>, <code>transform.rs</code></td>
+<td><code>py-commol/src/smc.rs</code>, <code>py-commol/commol/context/inference/smc.py</code>, <code>context/inference/distributions.py</code>, <code>api/inference/smc.py</code>, <code>docs/guide/uncertainty/smc.md</code></td>
 </tr>
 <tr>
 <td>Change a conformal method, its scores or its quantile</td>

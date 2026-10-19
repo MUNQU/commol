@@ -1293,6 +1293,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/uncertainty/conformal/" class="md-nav__link">
         
   
@@ -3272,8 +3300,8 @@ and the release runs them before it publishes (<a href="../../development/workfl
 <code>test_every_coverage_study_runs_in_a_group_of_the_workflow</code> checks that
 <code>coverage.yaml</code> runs each of them, and
 <code>test_the_studies_run_for_a_change_of_any_crate_they_use</code> that a change of
-<code>commol-inference</code>, of a crate it depends on or of the difference engine runs
-them.</p>
+<code>commol-inference</code>, of a crate it depends on or of the engines of their models
+(difference and stochastic) runs them.</p>
 <p>The check reads the wall time of the run, so a machine that runs other work
 at the same time can exceed the budget. <code>pytest --durations=20</code> shows the
 slowest tests; Python Coverage prints them, slowed by coverage. A row names

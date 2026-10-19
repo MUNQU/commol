@@ -1289,6 +1289,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/uncertainty/conformal/" class="md-nav__link">
         
   
@@ -3514,6 +3542,32 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>GibbsPosterior</code>: the Gibbs posterior <code>prior(θ) · exp(−η · loss(θ))</code> of the
+  problem's loss, sampled by sequential Monte Carlo from the priors to the
+  posterior; it returns a <code>GibbsResult</code> with the <code>η</code> it ran with. <code>eta</code> is
+  required: a number above 0, <code>EtaCalibration.information_matching()</code> (the
+  sum of squares and a deterministic engine) or
+  <code>EtaCalibration.bootstrap_coverage(replicates, block_length,
+  confidence_level)</code> (any loss). See
+  <a href="../../guide/uncertainty/smc/#gibbs-posterior">Sequential Monte Carlo</a>.</li>
+<li><code>AbcSmc</code> and <code>AbcRejection</code>: approximate Bayesian computation on a required
+  distance, <code>LossDistance()</code> or <code>SeriesDistance(metric)</code>. With a stochastic
+  engine each distance reads one fresh replicate of its particle, so the
+  problem's <code>replicates</code> and <code>replicate_summary</code> do not apply, and the result
+  says so. See <a href="../../guide/uncertainty/smc/#abc">ABC</a>.</li>
+<li><code>SmcResult</code>: the sample, the level of each step, the log evidence, the
+  value each particle keeps and the diagnostics of each step (<code>SmcDiagnostics</code>:
+  effective size, resampling, acceptance rate and move count).</li>
+<li>Priors: <code>Uniform()</code>, <code>LogUniform()</code>, <code>Beta(a, b)</code>, <code>Normal(mean, sd)</code>,
+  <code>LogNormal(mu, sigma)</code> and <code>Gamma(shape, rate)</code>, each truncated to the
+  bounds of its parameter, and <code>Priors</code> (a mapping of parameter to
+  distribution, or <code>Priors.uniform_on_bounds()</code>). Every sampling method takes
+  <code>priors</code> with no default, and a prior whose bounds do not fit raises a
+  <code>ValueError</code> that names the distributions that fit them. Their draws are
+  the same on every platform. See <a href="../../guide/uncertainty/smc/#priors">Priors</a>.</li>
+<li><code>SampleIdentifiability(reference="prior", priors=...)</code>: the contraction of
+  each parameter against its prior. See
+  <a href="../../guide/uncertainty/identifiability/#a-sample">Identifiability</a>.</li>
 <li>Conformal prediction intervals through <code>Calibrator.uncertainty</code>: intervals
   for observations with a coverage guarantee that needs no noise model, no
   prior and no correct model. <code>SplitConformal</code> scores held-out observations;

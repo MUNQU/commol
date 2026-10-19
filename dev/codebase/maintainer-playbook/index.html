@@ -1293,6 +1293,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/uncertainty/conformal/" class="md-nav__link">
         
   
@@ -3274,6 +3302,10 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
       <code>ObservationOperator</code>, sees a <code>Violation</code> as outside the support
       (<code>discrepancy_in_support</code>), and draws every random number from a
       <code>commol_random::Generator</code> seeded from the problem's seed.</li>
+<li>[ ] A method that samples a posterior is a <code>TemperedTarget</code> on
+      <code>SmcSampler</code> (<code>crates/commol-inference/src/smc/</code>), not a sampler of its
+      own, and its configuration takes required <code>priors</code> (<code>WithPriors</code>)
+      (<a href="../decisions/uncertainty/#one-smc-core-many-targets">Design decisions</a>).</li>
 <li>[ ] The runner, bound in <code>py-commol/src/inference.rs</code>, and its stub in
       <code>_commol_rs.pyi</code>.</li>
 <li>[ ] The configuration, a subclass of <code>UncertaintyMethod[YourResult]</code>, and
