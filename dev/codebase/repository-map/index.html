@@ -3489,15 +3489,15 @@
 </tr>
 <tr>
 <td><code>.github/scripts/start.sh</code></td>
-<td>Start an issue: take it, set it to <code>In Progress</code>, and create its branch and worktree, linked to the issue; then refresh the precedence levels (<code>parallel.py --levels</code>).</td>
+<td>Start an issue: link each open issue to the release before its milestone (<code>parallel.py --releases</code>), check the issue, take it, set it to <code>In Progress</code>, and create its branch and worktree, linked to the issue; then refresh the precedence levels (<code>parallel.py --levels</code>).</td>
 </tr>
 <tr>
 <td><code>.github/scripts/next.sh</code></td>
-<td>The next proposals and changes to implement: open, not blocked, not taken, not touching an issue in progress, by priority, milestone and number, after it refreshes the precedence levels (<code>parallel.py --levels --next</code>).</td>
+<td>The next proposals and changes to implement: open, not blocked, not taken, not touching an issue in progress, by priority, milestone and number, after it links each open issue to the release before its milestone and refreshes the precedence levels (<code>parallel.py --releases --levels --next</code>).</td>
 </tr>
 <tr>
 <td><code>.github/scripts/parallel.py</code></td>
-<td>The proposals and changes that can run in parallel, from their Touches or Where and the links of the open issues; <code>--next</code> gives the next ones, and <code>--levels</code> writes the precedence level of each open issue into the field <code>Level</code> of the project.</td>
+<td>The proposals and changes that can run in parallel, from their Touches or Where and the links of the open issues; <code>--next</code> gives the next ones, <code>--releases</code> links each open issue to the release before its milestone, and <code>--levels</code> writes the precedence level of each open issue into the field <code>Level</code> of the project.</td>
 </tr>
 <tr>
 <td><code>.github/scripts/github.py</code></td>

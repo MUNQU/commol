@@ -3348,7 +3348,10 @@ Python package version.</p>
 <strong>Release to PyPI</strong> workflow (<code>.github/workflows/release.yaml</code>), which
 publishes to PyPI immediately: the <code>pypi</code> environment has no approval step.
 The release issue (label <code>release</code>) holds the checklist of this page, and the
-milestone of the release lists the issues it ships.</p>
+milestone of the release lists the issues it ships.
+The milestone has the version as its title (<code>0.9.1</code>): every issue of a later
+milestone waits for this release issue, through a "blocked by" link that
+<code>next.sh</code> and <code>start.sh</code> write (<a href="../workflow/#milestones">Milestones</a>).</p>
 <div class="admonition warning">
 <p class="admonition-title">A published version is final</p>
 <p>PyPI never accepts the same version number twice, even after you delete
