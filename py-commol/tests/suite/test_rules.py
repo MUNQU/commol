@@ -5,6 +5,7 @@ The rules are in ``docs/codebase/tests.md``."""
 
 import ast
 import re
+import subprocess
 import sys
 import tomllib
 from collections.abc import Iterator
@@ -485,3 +486,24 @@ def test_every_coverage_exclusion_has_a_reason() -> None:
         "Give each coverage exclusion its reason (`# pragma: no cover: <why>`, "
         "or a comment above the pattern):\n" + "\n".join(unexplained)
     )
+
+
+def test_no_coverage_profile_is_tracked() -> None:
+    """An instrumented binary writes ``default_<binary>_<pid>.profraw`` where
+    it runs when ``LLVM_PROFILE_FILE`` is not set; no such profile, nor a
+    merged ``.profdata``, is part of the repository, and git ignores both."""
+
+    def git(*arguments: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-C", str(REPO_ROOT), *arguments],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    tracked = git("ls-files", "--", "*.profraw", "*.profdata").stdout.split()
+    profiles = ["default_1_0_2.profraw", "py-commol/merged.profdata"]
+    ignored = git("check-ignore", "--no-index", *profiles).stdout.split()
+
+    assert not tracked, f"Remove the coverage profiles from git: {tracked}"
+    assert ignored == profiles

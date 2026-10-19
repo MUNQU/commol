@@ -30,6 +30,12 @@ release extension. It puts the release extension back when it ends. It needs `ca
 after the script go to `cargo llvm-cov report`, such as `--summary-only` or
 `--lcov --output-path lcov.info`.
 
+An instrumented binary that runs while `LLVM_PROFILE_FILE` is not set writes
+`default_<binary>_<pid>.profraw` in the directory it runs in. Git ignores
+`*.profraw` and `*.profdata` (`.gitignore`), and
+`tests/suite/test_rules.py::test_no_coverage_profile_is_tracked` fails when
+one is tracked.
+
 A threshold is the coverage reached. It rises when coverage rises; a pull
 request that lowers it says why.
 
