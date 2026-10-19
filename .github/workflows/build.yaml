@@ -58,11 +58,11 @@ jobs:
                       echo "code=false" >> "$GITHUB_OUTPUT"
                   fi
                   # What the coverage studies run: the uncertainty methods and the
-                  # crates they depend on, the difference engine of their models,
-                  # the bindings, the Python package, the support code of the
-                  # tests, and the locks and toolchain that build them
+                  # crates they depend on, the difference and stochastic engines of
+                  # their models, the bindings, the Python package, the support code
+                  # of the tests, and the locks and toolchain that build them
                   # (tests/suite/test_rules.py checks the crates).
-                  studies='^(crates/commol-(core|model|difference|calibration|random|inference)/|py-commol/(src|commol)/|py-commol/tests/(support/|conftest\.py$|uncertainty/test_[a-z_]*coverage\.py$)|py-commol/(Cargo\.toml|pyproject\.toml|uv\.lock)$|Cargo\.(toml|lock)$|rust-toolchain\.toml$|\.github/workflows/coverage\.yaml$)'
+                  studies='^(crates/commol-(core|model|difference|stochastic|calibration|random|inference)/|py-commol/(src|commol)/|py-commol/tests/(support/|conftest\.py$|uncertainty/test_[a-z_]*coverage\.py$)|py-commol/(Cargo\.toml|pyproject\.toml|uv\.lock)$|Cargo\.(toml|lock)$|rust-toolchain\.toml$|\.github/workflows/coverage\.yaml$)'
                   if [ "$EVENT" = "pull_request" ] && printf '%s\n' "$files" | grep -q -E "$studies"; then
                       echo "studies=true" >> "$GITHUB_OUTPUT"
                   else

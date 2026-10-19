@@ -200,8 +200,8 @@ and the release runs them before it publishes ([CI pipelines](../development/wor
 `test_every_coverage_study_runs_in_a_group_of_the_workflow` checks that
 `coverage.yaml` runs each of them, and
 `test_the_studies_run_for_a_change_of_any_crate_they_use` that a change of
-`commol-inference`, of a crate it depends on or of the difference engine runs
-them.
+`commol-inference`, of a crate it depends on or of the engines of their models
+(difference and stochastic) runs them.
 
 The check reads the wall time of the run, so a machine that runs other work
 at the same time can exceed the budget. `pytest --durations=20` shows the

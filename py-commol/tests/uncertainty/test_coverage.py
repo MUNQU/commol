@@ -1,10 +1,13 @@
 """The coverage harness accepts calibrated intervals and rejects narrow ones,
-and the coverage studies of the conformal prediction intervals.
+and the coverage studies of the sequential Monte Carlo methods and of the
+conformal prediction intervals.
 
-The model is linear, ``y_j = θ x_j + ε_j`` with ``ε_j ~ N(0, σ²)`` and a flat
-prior, so the posterior of ``θ`` is ``N(θ̂, σ²/Σx²)`` with ``θ̂ = Σxy/Σx²``.
-The oracle draws from it; a 90 % interval of its draws covers ``θ`` in 90 % of
-the data sets.
+The harness's model is linear, ``y_j = θ x_j + ε_j`` with ``ε_j ~ N(0, σ²)``
+and a flat prior, so the posterior of ``θ`` is ``N(θ̂, σ²/Σx²)`` with
+``θ̂ = Σxy/Σx²``. The oracle draws from it; a 90 % interval of its draws
+covers ``θ`` in 90 % of the data sets. The Gibbs posterior fits a constant
+flow with Gaussian noise (``flow_calibrator``); ABC fits the probability of a
+chain binomial from the units that moved in one step.
 
 A prediction interval holds a new observation, not a fixed value: a study of
 one shifts the interval by the observation, so it holds 0 when it holds the
@@ -16,8 +19,30 @@ import math
 import numpy as np
 import pytest
 
-from commol import EnbPI, JackknifePlus, SplitConformal, weighted_quantiles
-from tests.support import flow_calibrator, flow_observations
+from commol import (
+    AbcSmc,
+    CalibrationProblem,
+    Calibrator,
+    EnbPI,
+    EtaCalibration,
+    GibbsPosterior,
+    JackknifePlus,
+    LossDistance,
+    NelderMeadConfig,
+    ObservedDataPoint,
+    Priors,
+    Simulation,
+    SplitConformal,
+    weighted_quantiles,
+)
+from commol.context.inference.smc import BootstrapCoverage, InformationMatching
+from tests.support import (
+    a_to_b_builder,
+    bounded,
+    build_stochastic,
+    flow_calibrator,
+    flow_observations,
+)
 from tests.support.coverage import CoverageStudy, Interval, StudyMethod, coverage_study
 
 THETA, NOISE, LEVEL = 2.0, 0.5, 0.9
@@ -63,6 +88,82 @@ class TestHarness:
 
         assert not study.calibrated(), study
         assert study.coverage("theta") < LEVEL - study.tolerance
+
+
+FLOW, FLOW_NOISE, FLOW_COUNT = 10.0, 1.0, 30
+
+
+@pytest.mark.coverage_study
+class TestGibbsPosterior:
+    @pytest.mark.parametrize(
+        "eta",
+        [
+            EtaCalibration.information_matching(),
+            EtaCalibration.bootstrap_coverage(
+                replicates=20, block_length=1, confidence_level=LEVEL
+            ),
+        ],
+        ids=["information_matching", "bootstrap_coverage"],
+    )
+    def test_gibbs_posterior_is_calibrated(
+        self, eta: InformationMatching | BootstrapCoverage
+    ) -> None:
+        method = GibbsPosterior(
+            priors=Priors.uniform_on_bounds(),
+            eta=eta,
+            particles=400,
+            target_cess=0.5,
+            resample_threshold=0.5,
+            stay_probability=0.05,
+        )
+
+        def interval(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+            values = FLOW + rng.normal(0.0, FLOW_NOISE, FLOW_COUNT)
+            calibrator = flow_calibrator(values.tolist(), windowed=True, seed=index)
+            return {"c": calibrator.uncertainty(method).sample.interval(LEVEL)["c"]}
+
+        study = coverage_study(interval, {"c": FLOW}, LEVEL, data_sets=200, seed=3)
+
+        assert study.calibrated(), study
+
+
+UNITS, PROBABILITY = 200, 0.3
+
+
+@pytest.mark.coverage_study
+class TestAbcSmc:
+    def test_abc_smc_with_a_stochastic_engine_is_calibrated(self) -> None:
+        method = AbcSmc(
+            priors=Priors.uniform_on_bounds(),
+            distance=LossDistance(),
+            particles=300,
+            target_cess=0.5,
+            min_acceptance=0.01,
+            stay_probability=0.05,
+        )
+        model = build_stochastic(
+            a_to_b_builder(parameters={"k": None}, total=UNITS), "StochasticSteps"
+        )
+
+        def interval(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+            moved = float(rng.binomial(UNITS, PROBABILITY))
+            problem = CalibrationProblem(
+                observed_data=[ObservedDataPoint(at=1, output="B", value=moved)],
+                parameters=[bounded("k", 0.0, 1.0, initial_guess=0.5)],
+                loss_function="mae",
+                replicates=1,
+                replicate_summary="mean",
+                optimization_config=NelderMeadConfig(max_iterations=10),
+                seed=index,
+            )
+            result = Calibrator(Simulation(model), problem).uncertainty(method)
+            return {"k": result.sample.interval(LEVEL)["k"]}
+
+        study = coverage_study(
+            interval, {"k": PROBABILITY}, LEVEL, data_sets=200, seed=11
+        )
+
+        assert study.calibrated(), study
 
 
 def _held(lower: float, upper: float, observed: float) -> dict[str, Interval]:

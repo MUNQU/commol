@@ -237,8 +237,9 @@ def run_sample_identifiability(
         raise ValueError(
             f"The sample's parameters {sample.names} are not the problem's {names}."
         )
+    priors = method.priors.rust_priors() if method.priors is not None else None
     analysis = rust.sample_identifiability(
-        sample.rust_sample, method.correlation_threshold
+        sample.rust_sample, method.correlation_threshold, priors
     )
     pairs = [
         CorrelatedPair(first=names[j], second=names[k], correlation=r)

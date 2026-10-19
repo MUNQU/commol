@@ -2,8 +2,8 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-How the uncertainty methods share one sample, one entry point and their ports,
-and what a replicate may change.
+How the uncertainty methods share one sample, one entry point, their ports and
+one sampler, and what a replicate may change.
 
 ## A sample carries its weights
 
@@ -120,6 +120,59 @@ window of positions (`BlockScheme`), and `block_length` has no default.
 **Guards:** `crates/commol-calibration/tests/test_with_data.rs`,
 `crates/commol-inference/tests/test_resampling.rs`,
 `tests/uncertainty/test_resampling.py`.
+
+## One SMC core, many targets
+
+Every sequential Monte Carlo method runs on one sampler, `SmcSampler`
+(`crates/commol-inference/src/smc/sampler.rs`), which knows no method. A
+method is a `TemperedTarget` of two steps: `evaluate(θ, stream)` runs the
+model once (one fresh replicate, seeded from the particle's stream, with a
+stochastic engine) and gives the value the particle keeps, or `None` outside
+the support (`discrepancy_in_support`); `log_kernel(value, level)` is a pure
+function of that value. Reweighting and the choice of the next level read the
+kept values, so they run no model: only a proposed move calls `evaluate`. The
+Gibbs posterior keeps the loss (`−level · η · loss`, temperatures from 0 to
+1); ABC keeps the distance (0 within the tolerance, `−∞` outside); the
+likelihood of an observation model will keep its log likelihood.
+
+The sampler owns the rest, the same for every target: the next level by
+bisection on the conditional effective sample size, to `target_cess`;
+systematic resampling under `resample_threshold`; random-walk Metropolis on
+the unbounded scale of `transform.rs`, with the covariance of the particles
+times `2.38² / d` and the log Jacobian in the acceptance; and
+`⌈log c / log(1 − a)⌉` moves per step, with `a` the acceptance of the first
+move and `c` the required `stay_probability`. Every particle draws from its
+own stream, so a run repeats from its seed whatever the threads. ABC reaches
+the same rule with weights of 0 or 1: the next tolerance is the weighted
+quantile of the distances, so `AbcSmc` takes `target_cess` and no quantile.
+ABC resamples at every step, since a particle of weight 0 cannot move, and
+when the first move of a step accepts less than `min_acceptance` it keeps the
+particles of the step before, whose moves completed.
+
+Every prior is a `Distribution` of one family (`distribution.rs`), truncated
+to its parameter's bounds and drawn by inverting its distribution function
+with special functions on `libm`, so a seed gives the same draws on every
+platform. Each sampling method takes `priors` with no default, and `η` of a
+Gibbs posterior has no default either: a number or a calibration.
+Information matching needs the sum of squares and a deterministic engine;
+bootstrap coverage interpolates the per-replicate thresholds of `η` at the
+positions `i / (M + 1)`, because the largest `η` that covers at the level is
+an order statistic whose expected coverage is below it.
+
+| Alternative | Why not |
+|---|---|
+| One sampler per method (population Monte Carlo for ABC, a tempering sampler for the Gibbs posterior) | Two codes for resampling, moves and diagnostics, which drift apart. |
+| `log_kernel(θ, level)` that runs the model | Every change of level would run every particle again, and with a stochastic engine a new simulation would replace the distance a particle was accepted with, so ABC would no longer sample its target. |
+| The problem's replicates and their summary for ABC | ABC is valid only when each particle keeps the distance of one simulation. |
+| Moves on the scale of the parameters | Proposals near a bound fall outside, each at the cost of a model run, and a parameter over orders of magnitude has a skewed posterior. |
+| A fixed number of moves, or moves until the mean squared jump stabilizes | A cost hidden in the code, or no rule a test can check. |
+| Distributions from a dependency | Their draws change with its version. |
+| A uniform prior by default, or `η = 1` | A modelling choice made silently; the loss has no scale. |
+
+**Guards:** `crates/commol-inference/tests/test_smc.rs`,
+`crates/commol-inference/tests/test_distributions.rs`,
+`tests/uncertainty/test_smc.py`,
+`tests/uncertainty/test_coverage.py` (`TestGibbsPosterior`, `TestAbcSmc`).
 
 ## Observation noise is an argument
 

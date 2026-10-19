@@ -3,6 +3,7 @@
 //! together, and which marginals have several modes.
 
 use super::IdentifiabilityError;
+use crate::priors::Priors;
 use crate::sample::ParameterSample;
 use crate::statistics::{effective_size, quantiles};
 
@@ -15,9 +16,9 @@ const MODE_HEIGHT: f64 = 0.1;
 /// The result of [`sample_identifiability`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct SampleIdentifiability {
-    /// `1 − Var(sample) / Var(reference)` of each parameter, with the
-    /// uniform distribution on its bounds as the reference: near 0 when the
-    /// sample spreads over the bounds, near 1 when it sits on one value.
+    /// `1 − Var(sample) / Var(reference)` of each parameter ([`Reference`]):
+    /// near 0 when the sample spreads as the reference, near 1 when it sits
+    /// on one value.
     pub contraction: Vec<f64>,
     /// The weighted correlation matrix.
     pub correlation: Vec<Vec<f64>>,
@@ -30,6 +31,15 @@ pub struct SampleIdentifiability {
     pub modes: Vec<Vec<f64>>,
 }
 
+/// The distribution the contraction of each parameter compares with.
+#[derive(Debug, Clone, Copy)]
+pub enum Reference<'a> {
+    /// The uniform distribution on the bounds of each parameter.
+    Bounds,
+    /// The prior of each parameter, truncated to its bounds.
+    Prior(&'a Priors),
+}
+
 /// The practical identifiability of `sample`, with the pairs whose absolute
 /// correlation is above `correlation_threshold`.
 ///
@@ -40,9 +50,11 @@ pub struct SampleIdentifiability {
 /// # Errors
 ///
 /// [`IdentifiabilityError::Invalid`] when `correlation_threshold` is not
-/// strictly between 0 and 1.
+/// strictly between 0 and 1, or the priors are not those of the sample's
+/// parameters and bounds.
 pub fn sample_identifiability(
     sample: &ParameterSample,
+    reference: Reference<'_>,
     correlation_threshold: f64,
 ) -> Result<SampleIdentifiability, IdentifiabilityError> {
     if !(correlation_threshold > 0.0 && correlation_threshold < 1.0) {
@@ -50,12 +62,35 @@ pub fn sample_identifiability(
             "correlation_threshold must be strictly between 0 and 1, got {correlation_threshold}"
         )));
     }
+    let variances: Vec<f64> = match reference {
+        Reference::Bounds => sample
+            .bounds()
+            .iter()
+            .map(|(min, max)| (max - min).powi(2) / 12.0)
+            .collect(),
+        Reference::Prior(priors) => {
+            if priors.names() != sample.names() || priors.bounds() != sample.bounds() {
+                return Err(IdentifiabilityError::Invalid(format!(
+                    "The priors of {:?} on {:?} are not those of the sample's parameters {:?} \
+                     on {:?}",
+                    priors.names(),
+                    priors.bounds(),
+                    sample.names(),
+                    sample.bounds()
+                )));
+            }
+            priors
+                .distributions()
+                .iter()
+                .map(|d| d.variance())
+                .collect()
+        }
+    };
     let covariance = sample.covariance();
-    let contraction = sample
-        .bounds()
+    let contraction = variances
         .iter()
         .enumerate()
-        .map(|(j, (min, max))| 1.0 - covariance[j][j] / ((max - min).powi(2) / 12.0))
+        .map(|(j, variance)| 1.0 - covariance[j][j] / variance)
         .collect();
     let correlation = sample.correlation();
     let mut correlated_pairs = Vec::new();
@@ -134,6 +169,30 @@ mod tests {
 
     fn close(a: f64, b: f64) -> bool {
         (a - b).abs() <= 1e-12 * b.abs().max(1.0)
+    }
+
+    #[test]
+    fn priors_of_other_parameters_are_no_reference() {
+        let names = vec!["k".to_string()];
+        let sample = ParameterSample::new(
+            names.clone(),
+            vec![(0.0, 1.0)],
+            vec![vec![0.2], vec![0.7]],
+            &[0.0, 0.0],
+            None,
+        )
+        .unwrap();
+        let wider = Priors::uniform_on_bounds(&names, &[(0.0, 2.0)]).unwrap();
+        let error = sample_identifiability(&sample, Reference::Prior(&wider), 0.9).unwrap_err();
+        assert!(
+            error.to_string().contains("are not those of the sample"),
+            "{error}"
+        );
+
+        let same = Priors::uniform_on_bounds(&names, &[(0.0, 1.0)]).unwrap();
+        let by_prior = sample_identifiability(&sample, Reference::Prior(&same), 0.9).unwrap();
+        let by_bounds = sample_identifiability(&sample, Reference::Bounds, 0.9).unwrap();
+        assert!(close(by_prior.contraction[0], by_bounds.contraction[0]));
     }
 
     #[test]

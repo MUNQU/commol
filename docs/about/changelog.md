@@ -11,6 +11,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `GibbsPosterior`: the Gibbs posterior `prior(θ) · exp(−η · loss(θ))` of the
+  problem's loss, sampled by sequential Monte Carlo from the priors to the
+  posterior; it returns a `GibbsResult` with the `η` it ran with. `eta` is
+  required: a number above 0, `EtaCalibration.information_matching()` (the
+  sum of squares and a deterministic engine) or
+  `EtaCalibration.bootstrap_coverage(replicates, block_length,
+  confidence_level)` (any loss). See
+  [Sequential Monte Carlo](../guide/uncertainty/smc.md#gibbs-posterior).
+- `AbcSmc` and `AbcRejection`: approximate Bayesian computation on a required
+  distance, `LossDistance()` or `SeriesDistance(metric)`. With a stochastic
+  engine each distance reads one fresh replicate of its particle, so the
+  problem's `replicates` and `replicate_summary` do not apply, and the result
+  says so. See [ABC](../guide/uncertainty/smc.md#abc).
+- `SmcResult`: the sample, the level of each step, the log evidence, the
+  value each particle keeps and the diagnostics of each step (`SmcDiagnostics`:
+  effective size, resampling, acceptance rate and move count).
+- Priors: `Uniform()`, `LogUniform()`, `Beta(a, b)`, `Normal(mean, sd)`,
+  `LogNormal(mu, sigma)` and `Gamma(shape, rate)`, each truncated to the
+  bounds of its parameter, and `Priors` (a mapping of parameter to
+  distribution, or `Priors.uniform_on_bounds()`). Every sampling method takes
+  `priors` with no default, and a prior whose bounds do not fit raises a
+  `ValueError` that names the distributions that fit them. Their draws are
+  the same on every platform. See [Priors](../guide/uncertainty/smc.md#priors).
+- `SampleIdentifiability(reference="prior", priors=...)`: the contraction of
+  each parameter against its prior. See
+  [Identifiability](../guide/uncertainty/identifiability.md#a-sample).
 - Conformal prediction intervals through `Calibrator.uncertainty`: intervals
   for observations with a coverage guarantee that needs no noise model, no
   prior and no correct model. `SplitConformal` scores held-out observations;

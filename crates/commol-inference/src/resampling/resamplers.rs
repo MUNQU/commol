@@ -45,20 +45,25 @@ impl BayesianBootstrap {
     }
 }
 
-impl Resampler for BayesianBootstrap {
-    fn replicate(&self, generator: &mut Generator) -> Perturbation {
+impl BayesianBootstrap {
+    /// The weights of one replicate, drawn with `generator`.
+    pub fn draw_weights(&self, generator: &mut Generator) -> Vec<f64> {
         // Normalized Exp(1) draws are a Dirichlet(1, …, 1) draw.
         let draws: Vec<f64> = (0..self.blocks)
             .map(|_| exponential(generator, 1.0))
             .collect();
         let scale = self.blocks as f64 / draws.iter().sum::<f64>();
-        Perturbation::Weights(
-            self.weights
-                .iter()
-                .zip(&self.block_of)
-                .map(|(weight, &block)| weight * draws[block] * scale)
-                .collect(),
-        )
+        self.weights
+            .iter()
+            .zip(&self.block_of)
+            .map(|(weight, &block)| weight * draws[block] * scale)
+            .collect()
+    }
+}
+
+impl Resampler for BayesianBootstrap {
+    fn replicate(&self, generator: &mut Generator) -> Perturbation {
+        Perturbation::Weights(self.draw_weights(generator))
     }
 }
 

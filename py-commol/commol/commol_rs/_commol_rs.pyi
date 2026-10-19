@@ -541,6 +541,49 @@ class StartsAnalysisProtocol(Protocol):
     @property
     def flagged(self) -> list[bool]: ...
 
+class DistributionProtocol(Protocol):
+    def __init__(
+        self, kind: str, parameters: list[float], lower: float, upper: float
+    ) -> None: ...
+    def log_density(self, x: float) -> float: ...
+    def cdf(self, x: float) -> float: ...
+    def quantile(self, p: float) -> float: ...
+    def sample(self, count: int, seed: int) -> list[float]: ...
+
+class SmcRunProtocol(Protocol):
+    @property
+    def values(self) -> list[list[float]]: ...
+    @property
+    def log_weights(self) -> list[float]: ...
+    @property
+    def kept(self) -> list[float | None]: ...
+    @property
+    def levels(self) -> list[float]: ...
+    @property
+    def effective_sizes(self) -> list[float]: ...
+    @property
+    def resampled(self) -> list[bool]: ...
+    @property
+    def acceptance_rates(self) -> list[float]: ...
+    @property
+    def move_counts(self) -> list[int]: ...
+    @property
+    def log_evidence(self) -> float: ...
+    @property
+    def evaluations(self) -> int: ...
+    @property
+    def stop_reason(self) -> str | None: ...
+
+class EtaCoverageProtocol(Protocol):
+    @property
+    def eta(self) -> float: ...
+    @property
+    def coverage(self) -> float: ...
+    @property
+    def failed(self) -> list[tuple[int, str]]: ...
+
+_Priors = list[tuple[str, str, list[float]]] | None
+
 class ConformalRunProtocol(Protocol):
     @property
     def labels(self) -> list[str]: ...
@@ -572,6 +615,9 @@ class InferenceModule(Protocol):
     ObservationDraws: type[ObservationDrawsProtocol]
     BootstrapRun: type[BootstrapRunProtocol]
     JackknifeRun: type[JackknifeRunProtocol]
+    Distribution: type[DistributionProtocol]
+    SmcRun: type[SmcRunProtocol]
+    EtaCoverage: type[EtaCoverageProtocol]
     ConformalRun: type[ConformalRunProtocol]
     def quantile_error(
         self, values: list[float], level: float
@@ -599,8 +645,59 @@ class InferenceModule(Protocol):
         threshold: float,
     ) -> CollinearityAnalysisProtocol: ...
     def sample_identifiability(
-        self, sample: ParameterSampleProtocol, correlation_threshold: float
+        self,
+        sample: ParameterSampleProtocol,
+        correlation_threshold: float,
+        priors: _Priors = None,
     ) -> SampleAnalysisProtocol: ...
+    def gibbs_posterior(
+        self,
+        problem: CalibrationProblemProtocol,
+        priors: _Priors,
+        eta: float,
+        particles: int,
+        resample_threshold: float,
+        target_cess: float,
+        stay_probability: float,
+        seed: int,
+    ) -> SmcRunProtocol: ...
+    def information_matching_eta(
+        self, problem: CalibrationProblemProtocol, fit: list[float]
+    ) -> float: ...
+    def bootstrap_coverage_eta(
+        self,
+        problem: CalibrationProblemProtocol,
+        priors: _Priors,
+        fit: list[float],
+        replicates: int,
+        block_length: int | None,
+        confidence_level: float,
+        particles: int,
+        resample_threshold: float,
+        target_cess: float,
+        stay_probability: float,
+        seed: int,
+    ) -> EtaCoverageProtocol: ...
+    def abc_smc(
+        self,
+        problem: CalibrationProblemProtocol,
+        priors: _Priors,
+        metric: str | None,
+        particles: int,
+        target_cess: float,
+        min_acceptance: float,
+        stay_probability: float,
+        seed: int,
+    ) -> tuple[SmcRunProtocol, bool]: ...
+    def abc_rejection(
+        self,
+        problem: CalibrationProblemProtocol,
+        priors: _Priors,
+        metric: str | None,
+        draws: int,
+        quantile: float,
+        seed: int,
+    ) -> tuple[SmcRunProtocol, bool]: ...
     def starts_identifiability(
         self,
         ends: list[list[float]],

@@ -4,7 +4,9 @@
 //! sample, and returns the analysis as plain values; Python builds the
 //! report.
 
-use commol_inference::identifiability::{self, IdentifiabilityError, StructuralVerdict, Subset};
+use commol_inference::identifiability::{
+    self, IdentifiabilityError, Reference, StructuralVerdict, Subset,
+};
 use commol_inference::sensitivity::{Design, FiniteDifferences, SensitivityError};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -187,7 +189,7 @@ fn collinearity(
 /// The practical identifiability of a sample
 #[pyclass(name = "SampleAnalysis", frozen, get_all)]
 pub struct PySampleAnalysis {
-    /// The contraction of each parameter against its bounds
+    /// The contraction of each parameter against its reference
     contraction: Vec<f64>,
     /// The weighted correlation matrix
     correlation: Vec<Vec<f64>>,
@@ -202,15 +204,32 @@ pub struct PySampleAnalysis {
 
 /// The contraction, correlations and modes of `sample`
 ///
+/// Args:
+///     sample: The sample
+///     correlation_threshold: Strictly between 0 and 1
+///     priors: The prior of each parameter, the reference of the
+///         contraction; None compares with the uniform on the bounds
+///
 /// Raises:
-///     ValueError: If `correlation_threshold` is not strictly between 0 and 1
+///     ValueError: If `correlation_threshold` is not strictly between 0 and
+///         1, or a prior is missing or does not fit its bounds
 #[pyfunction]
+#[pyo3(signature = (sample, correlation_threshold, priors=None))]
 fn sample_identifiability(
     sample: &PyParameterSample,
     correlation_threshold: f64,
+    priors: Option<Vec<crate::smc::PriorArgs>>,
 ) -> PyResult<PySampleAnalysis> {
-    let analysis = identifiability::sample_identifiability(&sample.inner, correlation_threshold)
-        .map_err(identifiability_error)?;
+    let priors = priors
+        .map(|given| crate::smc::priors(sample.inner.names(), sample.inner.bounds(), Some(given)))
+        .transpose()?;
+    let reference = match &priors {
+        Some(priors) => Reference::Prior(priors),
+        None => Reference::Bounds,
+    };
+    let analysis =
+        identifiability::sample_identifiability(&sample.inner, reference, correlation_threshold)
+            .map_err(identifiability_error)?;
     Ok(PySampleAnalysis {
         contraction: analysis.contraction,
         correlation: analysis.correlation,

@@ -308,6 +308,39 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         }
     }
 
+    /// The predicted observations of one run at `values`, which are inside
+    /// their bounds: one replicate seeded with `seed`, whatever the
+    /// problem's replicates, or the one run of the engine without a seed.
+    /// The steps are those of [`Self::evaluate`] but the discrepancy; the
+    /// predictions are in `workspace.predictions`.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::evaluate`].
+    pub fn predict_once(
+        &self,
+        values: &[f64],
+        seed: Option<u64>,
+        workspace: &mut Workspace,
+    ) -> Result<(), EvaluationError> {
+        self.feasibility.check_parameters(values)?;
+        self.forward.run_once(values, seed, workspace)?;
+        if self.feasibility.reads_rows() {
+            let amount = self.feasibility.row_violation(values, &workspace.rows[0]);
+            if amount > 0.0 {
+                return Err(Violation::Constraint { amount }.into());
+            }
+        }
+        self.forward.observe(values, workspace);
+        Ok(())
+    }
+
+    /// The discrepancy: the loss, the observed values, their weights and
+    /// normalization.
+    pub fn discrepancy(&self) -> &Discrepancy {
+        &self.discrepancy
+    }
+
     /// An engine clone with the values applied exactly as the objective
     /// applies them (clamped to their bounds), including calibrated initial
     /// conditions.

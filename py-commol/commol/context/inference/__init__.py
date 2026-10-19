@@ -1,7 +1,7 @@
 """What every inference method takes and returns: the configuration bases,
-the weighted parameter sample, the observation noise, the identifiability
-methods and report, and the settings and results of the resampling and
-conformal methods."""
+the weighted parameter sample, the observation noise, the distributions and
+priors, the identifiability methods and report, and the settings and results
+of the resampling, sequential Monte Carlo and conformal methods."""
 
 from commol.context.inference.conformal import (
     AdaptiveConformal,
@@ -13,6 +13,15 @@ from commol.context.inference.conformal import (
     RollingConformal,
     SeriesIntervals,
     SplitConformal,
+)
+from commol.context.inference.distributions import (
+    Beta,
+    Gamma,
+    LogNormal,
+    LogUniform,
+    Normal,
+    Priors,
+    Uniform,
 )
 from commol.context.inference.identifiability import (
     Collinearity,
@@ -43,38 +52,69 @@ from commol.context.inference.sample import (
     ParameterSummary,
     SampleMethod,
 )
+from commol.context.inference.smc import (
+    AbcRejection,
+    AbcSmc,
+    BootstrapCoverage,
+    EtaCalibration,
+    GibbsPosterior,
+    GibbsResult,
+    InformationMatching,
+    LossDistance,
+    SeriesDistance,
+    SmcDiagnostics,
+    SmcResult,
+)
 
 __all__ = [
+    "AbcRejection",
+    "AbcSmc",
     "AdaptiveConformal",
     "BayesianBootstrap",
+    "Beta",
     "BlockJackknife",
     "BlockLength",
+    "BootstrapCoverage",
     "BootstrapResult",
     "BoundError",
     "Collinearity",
     "ConformalMethod",
     "ConformalResult",
     "EnbPI",
+    "EtaCalibration",
+    "Gamma",
+    "GibbsPosterior",
+    "GibbsResult",
     "IdentifiabilityMethod",
     "IdentifiabilityReport",
     "InferenceMethod",
+    "InformationMatching",
     "JackknifePlus",
     "JackknifeResult",
+    "LogNormal",
+    "LogUniform",
+    "LossDistance",
     "NoNoise",
+    "Normal",
     "ObservationNoise",
     "ParameterSample",
     "ParameterSummary",
     "PredictionIntervals",
+    "Priors",
     "ResamplingDiagnostics",
     "ResidualBootstrap",
     "ResidualNoise",
     "RollingConformal",
     "SampleIdentifiability",
     "SampleMethod",
+    "SeriesDistance",
     "SeriesIntervals",
+    "SmcDiagnostics",
+    "SmcResult",
     "SplitConformal",
     "StartsIdentifiability",
     "StructuralRank",
     "UncertaintyMethod",
+    "Uniform",
     "WildBootstrap",
 ]

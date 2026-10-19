@@ -16,6 +16,7 @@ crate-type = ["rlib"]
 commol-calibration = { path = "../commol-calibration" }
 commol-core = { path = "../commol-core" }
 commol-random = { path = "../commol-random" }
+libm = "0.2.15"
 nalgebra = { version = "0.35.0", default-features = false, features = ["std"] }
 rayon = "1.11"
 

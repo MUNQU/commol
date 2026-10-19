@@ -31,6 +31,10 @@ jobs:
             tests: tests/uncertainty/test_resampling_coverage.py::TestResidualBlockBootstrap
           - name: Bayesian bootstrap
             tests: tests/uncertainty/test_resampling_coverage.py::TestBayesianBootstrap
+          - name: Gibbs posterior and ABC
+            tests: >-
+              tests/uncertainty/test_coverage.py::TestGibbsPosterior
+              tests/uncertainty/test_coverage.py::TestAbcSmc
           - name: harness, wild bootstrap and prediction interval
             tests: >-
               tests/uncertainty/test_coverage.py::TestHarness
