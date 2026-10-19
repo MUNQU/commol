@@ -22,9 +22,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `DistributionNoise()`: prediction intervals that draw from the observation models; `commol.scores.log_score`, the log density of held-out observations under the predictive, which needs `DistributionNoise()`.
 - `ParametricBootstrap(replicates)`: fits to data sets drawn from the observation models at the fit. `ResamplingDiagnostics.block_length` is `None` for it.
 - A model can hold bins of different units, such as people and the concentration of bacteria in water: each bin starts at an amount in its own unit, a model whose bins all start at `0` builds and runs, and the `Calibrator` rejects an initial-condition remainder whose unit is not the unit of a calibrated amount. See [Bins of different units](https://munqu.github.io/commol/latest/guide/building-models/#bins-of-different-units).
+- Sensitivity analysis with no data: `SensitivityAnalysis(simulation, inputs, replicates=None, seed=None).run(method)`, the third entry point of the registry, with methods that subclass `SensitivityMethod[R]`. What varies is an `InputSpace` of calibration parameters (model parameters or initial conditions): independent distributions (`InputSpace.independent`, `InputSpace.uniform_on_bounds`) or a weighted sample (`InputSpace.from_sample`). Each run is reduced in Rust to quantities of interest: `ValueAt`, `Gain` (as an observation with a window), `Peak`, `PeakPosition` and `Trajectory`. With a stochastic engine `replicates` and `seed` are required; a point of a design holds the mean of its replicates on common seeds, and a propagation keeps every replicate. See [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md).
+- `Propagation`: the draws of the inputs and the quantities of each run (`PropagationResult`, with `summary(confidence_level)`); its sample gives the bands of a `Predictive`, which runs the same replicates.
+- `PRCC`: partial rank correlation coefficients and their p-values (`PRCCResult`), weighted for a sample, with Kish's effective size in the test.
+- `Morris`: elementary effects, `mu`, `mu_star` and `sigma` (`MorrisResult`), on levels at the centres of strata of equal probability.
+- `Sobol`: first-order and total indices on the design of Saltelli, with bootstrap intervals (`SobolResult`).
+- `PolynomialChaos`: a Legendre expansion of `F(x)`, its leave-one-out error, its Sobol indices and `predict` as a surrogate (`ChaosResult`); the number of terms is checked before any run.
+- `SimulationPlotter.plot_prcc`, `plot_morris` and `plot_sobol`.
 
 ### Changed
 
+- **Breaking:** `Predictive(source, sample, positions)` takes a `Calibrator` or a `SensitivityAnalysis` (any `PredictiveSource`), and its attribute `calibrator` is now `source`. `Predictive.at_observations` of an analysis takes only `NoNoise()`, and `scores.log_score` refuses its predictive.
+- With a stochastic engine, every replicate of every draw of a `Predictive`, of `Predictive.at_observations` and of `scores.log_score` has a seed of its own, derived from the calibrator's seed; before, every draw ran the same replicates of the problem, so a predictive with few replicates showed the same few noise paths for every draw. The bands and scores of a stochastic predictive change; a seed still repeats them.
+- **Breaking:** `ModelStructure.check_calibration_values(model, engine, parameters, remainder)` takes the values and the remainder instead of a calibration problem; a model kind that implements it changes its signature.
+- A prior whose family does not fit its bounds is named "The distribution ... of" in its message, instead of "The prior ... of".
+- The starts of `Calibrator.run(starts=n)` come from the Latin hypercube of `commol-random`; a seed gives the same starts as before.
 - **Breaking:** an `Aggregate` states the initial amount of each bin in the unit of the bin, not fractions of one total. A structure that states `total`, `bin_fractions` or `compartment_fractions` is rejected with the fields to use.
 
 | Before                                                        | Now                                                                                 |

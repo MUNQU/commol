@@ -8,21 +8,21 @@ What every uncertainty method takes and returns: the configuration base, the wei
 
 Bases: `BaseModel`, `Generic[ResultT]`
 
-The configuration of a method that reads a calibration problem, whose result is `ResultT`.
+The configuration of a method that reads a calibration problem or a sensitivity analysis, whose result is `ResultT`.
 
-A method subclasses one of its kinds, `UncertaintyMethod` or `IdentifiabilityMethod`, with its result type, and registers its runner (`commol.api.inference.registry.register`).
+A method subclasses one of its kinds, `UncertaintyMethod`, `IdentifiabilityMethod` or `SensitivityMethod`, with its result type, and registers its runner (`commol.api.inference.registry.register`).
 
 Source code in `commol/context/inference/method.py`
 
 ```python
 class InferenceMethod(BaseModel, Generic[ResultT]):
     """
-    The configuration of a method that reads a calibration problem, whose
-    result is `ResultT`.
+    The configuration of a method that reads a calibration problem or a
+    sensitivity analysis, whose result is `ResultT`.
 
-    A method subclasses one of its kinds, `UncertaintyMethod` or
-    `IdentifiabilityMethod`, with its result type, and registers its runner
-    (`commol.api.inference.registry.register`).
+    A method subclasses one of its kinds, `UncertaintyMethod`,
+    `IdentifiabilityMethod` or `SensitivityMethod`, with its result type, and
+    registers its runner (`commol.api.inference.registry.register`).
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -1043,7 +1043,7 @@ class ParameterSummary(BaseModel):
 
 The run of every draw of a parameter sample.
 
-The draws run in parallel in Rust, through the forward model of the calibration problem: with a stochastic engine every replicate of a draw is a draw of the predictive, with an equal share of its weight. A band reduces the draws position by position with their weights; without observation noise it is a band of the model, not a prediction interval.
+The draws run in parallel in Rust, through the forward model of a calibration problem or of a sensitivity analysis: with a stochastic engine every replicate of a draw is a draw of the predictive, with an equal share of its weight. A band reduces the draws position by position with their weights; without observation noise it is a band of the model, not a prediction interval.
 
 Source code in `commol/api/inference/predictive.py`
 
@@ -1052,16 +1052,17 @@ class Predictive:
     """
     The run of every draw of a parameter sample.
 
-    The draws run in parallel in Rust, through the forward model of the
-    calibration problem: with a stochastic engine every replicate of a draw is
-    a draw of the predictive, with an equal share of its weight. A band
+    The draws run in parallel in Rust, through the forward model of a
+    calibration problem or of a sensitivity analysis: with a stochastic engine
+    every replicate of a draw is a draw of the predictive, with an equal share
+    of its weight. A band
     reduces the draws position by position with their weights; without
     observation noise it is a band of the model, not a prediction interval.
     """
 
     def __init__(
         self,
-        calibrator: "Calibrator",
+        source: PredictiveSource,
         sample: ParameterSample,
         positions: Sequence[float],
     ):
@@ -1070,27 +1071,26 @@ class Predictive:
 
         Parameters
         ----------
-        calibrator : Calibrator
-            The calibration problem the sample is a sample of.
+        source : PredictiveSource
+            The calibration problem the sample is a sample of (`Calibrator`),
+            or the sensitivity analysis of its inputs (`SensitivityAnalysis`).
         sample : ParameterSample
-            Its parameters, in the problem's order.
+            Its parameters, in the order of the problem or the analysis.
         positions : Sequence[float]
             Positions to report at, ascending.
 
         Raises
         ------
         ValueError
-            If the sample's parameters are not the problem's.
+            If the sample's parameters are not the source's.
         InfeasibleStateError
             If a draw leaves the values its model allows.
         """
-        self.calibrator: "Calibrator" = calibrator
+        self.source: PredictiveSource = source
         self.sample: ParameterSample = sample
         self.positions: list[float] = [float(position) for position in positions]
-        self.output_names: list[str] = list(calibrator.simulation.engine.output_names)
-        self._rust = calibrator.rust_problem.predictive(
-            sample.rust_sample, self.positions
-        )
+        self.output_names: list[str] = list(source.simulation.engine.output_names)
+        self._rust = source.rust_predictive(sample, self.positions)
 
     @property
     def weights(self) -> list[float]:
@@ -1206,8 +1206,9 @@ class Predictive:
         Every draw's value of each observation, with observation noise.
 
         The observations need not be the ones the problem was fitted to: held
-        out data are read the same way, through the observation operator.
-        The noise is drawn from the calibrator's seed.
+        out data are read the same way, through the observation operator,
+        and so are the observations of the model of an analysis. The noise
+        is drawn from the calibrator's seed.
 
         Parameters
         ----------
@@ -1217,7 +1218,8 @@ class Predictive:
             What an observation shows around a draw's prediction, with no
             default: ``NoNoise()`` gives a band of the model,
             ``ResidualNoise(...)`` and ``DistributionNoise()`` a prediction
-            interval.
+            interval. Both need a calibrator: residuals come from a fit, and
+            observation models from a problem.
 
         Returns
         -------
@@ -1229,27 +1231,14 @@ class Predictive:
         ValueError
             If an observation names an unknown output or factor, a series the
             residual noise has no residuals of, or a series with no
-            observation model; or `DistributionNoise` comes with a problem
-            that has a loss.
+            observation model; `DistributionNoise` comes with a problem that
+            has a loss; or the noise is not `NoNoise()` and the source is an
+            analysis.
         InfeasibleStateError
             If a draw leaves the values its model allows.
         """
-        residual_noise = None
-        if isinstance(noise, ResidualNoise):
-            residual_noise = (
-                [
-                    noise.fit.best_parameters[name]
-                    for name in self.calibrator.parameter_names
-                ],
-                noise.block_length,
-                noise.residual_scale,
-            )
-        draws = self.calibrator.rust_problem.observation_draws(
-            self.sample.rust_sample,
-            engine_state.rust_observed_data(list(observed_data)),
-            self.calibrator.seed,
-            residual_noise=residual_noise,
-            distribution_noise=isinstance(noise, DistributionNoise),
+        draws = self.source.rust_observation_draws(
+            self.sample, list(observed_data), noise
         )
         return ObservationDraws(observed_data, draws)
 ```
@@ -1269,32 +1258,32 @@ The weight of each draw of the predictive; they sum to 1.
 #### __init__
 
 ```python
-__init__(calibrator: Calibrator, sample: ParameterSample, positions: Sequence[float])
+__init__(source: PredictiveSource, sample: ParameterSample, positions: Sequence[float])
 ```
 
 Run every draw of `sample` at `positions`.
 
 Parameters:
 
-| Name         | Type              | Description                                        | Default    |
-| ------------ | ----------------- | -------------------------------------------------- | ---------- |
-| `calibrator` | `Calibrator`      | The calibration problem the sample is a sample of. | *required* |
-| `sample`     | `ParameterSample` | Its parameters, in the problem's order.            | *required* |
-| `positions`  | `Sequence[float]` | Positions to report at, ascending.                 | *required* |
+| Name        | Type               | Description                                                                                                                      | Default    |
+| ----------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `source`    | `PredictiveSource` | The calibration problem the sample is a sample of (Calibrator), or the sensitivity analysis of its inputs (SensitivityAnalysis). | *required* |
+| `sample`    | `ParameterSample`  | Its parameters, in the order of the problem or the analysis.                                                                     | *required* |
+| `positions` | `Sequence[float]`  | Positions to report at, ascending.                                                                                               | *required* |
 
 Raises:
 
-| Type                   | Description                                       |
-| ---------------------- | ------------------------------------------------- |
-| `ValueError`           | If the sample's parameters are not the problem's. |
-| `InfeasibleStateError` | If a draw leaves the values its model allows.     |
+| Type                   | Description                                      |
+| ---------------------- | ------------------------------------------------ |
+| `ValueError`           | If the sample's parameters are not the source's. |
+| `InfeasibleStateError` | If a draw leaves the values its model allows.    |
 
 Source code in `commol/api/inference/predictive.py`
 
 ```python
 def __init__(
     self,
-    calibrator: "Calibrator",
+    source: PredictiveSource,
     sample: ParameterSample,
     positions: Sequence[float],
 ):
@@ -1303,27 +1292,26 @@ def __init__(
 
     Parameters
     ----------
-    calibrator : Calibrator
-        The calibration problem the sample is a sample of.
+    source : PredictiveSource
+        The calibration problem the sample is a sample of (`Calibrator`),
+        or the sensitivity analysis of its inputs (`SensitivityAnalysis`).
     sample : ParameterSample
-        Its parameters, in the problem's order.
+        Its parameters, in the order of the problem or the analysis.
     positions : Sequence[float]
         Positions to report at, ascending.
 
     Raises
     ------
     ValueError
-        If the sample's parameters are not the problem's.
+        If the sample's parameters are not the source's.
     InfeasibleStateError
         If a draw leaves the values its model allows.
     """
-    self.calibrator: "Calibrator" = calibrator
+    self.source: PredictiveSource = source
     self.sample: ParameterSample = sample
     self.positions: list[float] = [float(position) for position in positions]
-    self.output_names: list[str] = list(calibrator.simulation.engine.output_names)
-    self._rust = calibrator.rust_problem.predictive(
-        sample.rust_sample, self.positions
-    )
+    self.output_names: list[str] = list(source.simulation.engine.output_names)
+    self._rust = source.rust_predictive(sample, self.positions)
 ```
 
 #### runs
@@ -1516,7 +1504,7 @@ at_observations(observed_data: Sequence[ObservedDataPoint], noise: ObservationNo
 
 Every draw's value of each observation, with observation noise.
 
-The observations need not be the ones the problem was fitted to: held out data are read the same way, through the observation operator. The noise is drawn from the calibrator's seed.
+The observations need not be the ones the problem was fitted to: held out data are read the same way, through the observation operator, and so are the observations of the model of an analysis. The noise is drawn from the calibrator's seed.
 
 Parameters:
 
@@ -1533,10 +1521,10 @@ Returns:
 
 Raises:
 
-| Type                   | Description                                                                                                                                                                                             |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError`           | If an observation names an unknown output or factor, a series the residual noise has no residuals of, or a series with no observation model; or DistributionNoise comes with a problem that has a loss. |
-| `InfeasibleStateError` | If a draw leaves the values its model allows.                                                                                                                                                           |
+| Type                   | Description                                                                                                                                                                                                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`           | If an observation names an unknown output or factor, a series the residual noise has no residuals of, or a series with no observation model; DistributionNoise comes with a problem that has a loss; or the noise is not NoNoise() and the source is an analysis. |
+| `InfeasibleStateError` | If a draw leaves the values its model allows.                                                                                                                                                                                                                     |
 
 Source code in `commol/api/inference/predictive.py`
 
@@ -1550,8 +1538,9 @@ def at_observations(
     Every draw's value of each observation, with observation noise.
 
     The observations need not be the ones the problem was fitted to: held
-    out data are read the same way, through the observation operator.
-    The noise is drawn from the calibrator's seed.
+    out data are read the same way, through the observation operator,
+    and so are the observations of the model of an analysis. The noise
+    is drawn from the calibrator's seed.
 
     Parameters
     ----------
@@ -1561,7 +1550,8 @@ def at_observations(
         What an observation shows around a draw's prediction, with no
         default: ``NoNoise()`` gives a band of the model,
         ``ResidualNoise(...)`` and ``DistributionNoise()`` a prediction
-        interval.
+        interval. Both need a calibrator: residuals come from a fit, and
+        observation models from a problem.
 
     Returns
     -------
@@ -1573,27 +1563,14 @@ def at_observations(
     ValueError
         If an observation names an unknown output or factor, a series the
         residual noise has no residuals of, or a series with no
-        observation model; or `DistributionNoise` comes with a problem
-        that has a loss.
+        observation model; `DistributionNoise` comes with a problem that
+        has a loss; or the noise is not `NoNoise()` and the source is an
+        analysis.
     InfeasibleStateError
         If a draw leaves the values its model allows.
     """
-    residual_noise = None
-    if isinstance(noise, ResidualNoise):
-        residual_noise = (
-            [
-                noise.fit.best_parameters[name]
-                for name in self.calibrator.parameter_names
-            ],
-            noise.block_length,
-            noise.residual_scale,
-        )
-    draws = self.calibrator.rust_problem.observation_draws(
-        self.sample.rust_sample,
-        engine_state.rust_observed_data(list(observed_data)),
-        self.calibrator.seed,
-        residual_noise=residual_noise,
-        distribution_noise=isinstance(noise, DistributionNoise),
+    draws = self.source.rust_observation_draws(
+        self.sample, list(observed_data), noise
     )
     return ObservationDraws(observed_data, draws)
 ```
@@ -4542,10 +4519,10 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                           |
-| ------------ | --------------------------------------------------------------------------------------------------------------------- |
-| `TypeError`  | If noise is not DistributionNoise.                                                                                    |
-| `ValueError` | If the problem has a loss, or an observation names an unknown output or factor or a series with no observation model. |
+| Type         | Description                                                                                                                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`  | If noise is not DistributionNoise.                                                                                                                                                                  |
+| `ValueError` | If the problem has a loss, an observation names an unknown output or factor or a series with no observation model, or the predictive is of a sensitivity analysis, which has no observation models. |
 
 Source code in `commol/api/inference/scores.py`
 
@@ -4584,18 +4561,16 @@ def log_score(
     TypeError
         If `noise` is not `DistributionNoise`.
     ValueError
-        If the problem has a loss, or an observation names an unknown output
-        or factor or a series with no observation model.
+        If the problem has a loss, an observation names an unknown output or
+        factor or a series with no observation model, or the predictive is of
+        a sensitivity analysis, which has no observation models.
     """
     if not isinstance(noise, DistributionNoise):
         raise TypeError(
             f"The log score needs the density of the observation models, so it "
             f"takes DistributionNoise(); {type(noise).__name__} has no density."
         )
-    values = predictive.calibrator.rust_problem.log_score(
-        predictive.sample.rust_sample,
-        engine_state.rust_observed_data(list(observations)),
-    )
+    values = predictive.source.rust_log_score(predictive.sample, list(observations))
     return _score_of(observations, values)
 ```
 
@@ -4859,7 +4834,17 @@ def ci_percentiles(confidence_level: float) -> tuple[float, float]:
 
 The runners of inference methods, looked up by configuration type.
 
-A method registers its runner with `register`; `Calibrator.uncertainty` and `Calibrator.identifiability` find it with `run_method`. The entry points know no method.
+A method registers its runner with `register`; `Calibrator.uncertainty`, `Calibrator.identifiability` and `SensitivityAnalysis.run` find it with `run_method`, and pass the runner themselves. The entry points know no method.
+
+### Type Aliases
+
+#### EntryPoint
+
+```python
+EntryPoint = Calibrator | SensitivityAnalysis
+```
+
+What a runner runs on: the calibrator of an uncertainty or identifiability method, or the analysis of a sensitivity method.
 
 ### Classes
 
@@ -4868,17 +4853,17 @@ A method registers its runner with `register`; `Calibrator.uncertainty` and `Cal
 #### register
 
 ```python
-register(method_type: type[MethodT], runner: Callable[[Calibrator, MethodT], BaseModel]) -> None
+register(method_type: type[MethodT], runner: Callable[[Any, MethodT], BaseModel]) -> None
 ```
 
 Register the runner of an inference method.
 
 Parameters:
 
-| Name          | Type                                                 | Description                                             | Default    |
-| ------------- | ---------------------------------------------------- | ------------------------------------------------------- | ---------- |
-| `method_type` | `type[InferenceMethod]`                              | The configuration type of the method.                   | *required* |
-| `runner`      | `Callable[[Calibrator, InferenceMethod], BaseModel]` | Runs the method on a calibrator and returns its result. | *required* |
+| Name          | Type                     | Description                                           | Default                                                                                                                                    |
+| ------------- | ------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `method_type` | `type[InferenceMethod]`  | The configuration type of the method.                 | *required*                                                                                                                                 |
+| `runner`      | \`Callable\[\[Calibrator | SensitivityAnalysis, InferenceMethod\], BaseModel\]\` | Runs the method on the object of its entry point (a Calibrator, or a SensitivityAnalysis for a sensitivity method) and returns its result. |
 
 Raises:
 
@@ -4891,7 +4876,7 @@ Source code in `commol/api/inference/registry.py`
 ```python
 def register(
     method_type: type[MethodT],
-    runner: Callable[["Calibrator", MethodT], BaseModel],
+    runner: Callable[[Any, MethodT], BaseModel],
 ) -> None:
     """
     Register the runner of an inference method.
@@ -4900,8 +4885,10 @@ def register(
     ----------
     method_type : type[InferenceMethod]
         The configuration type of the method.
-    runner : Callable[[Calibrator, InferenceMethod], BaseModel]
-        Runs the method on a calibrator and returns its result.
+    runner : Callable[[Calibrator | SensitivityAnalysis, InferenceMethod], BaseModel]
+        Runs the method on the object of its entry point (a `Calibrator`,
+        or a `SensitivityAnalysis` for a sensitivity method) and returns its
+        result.
 
     Raises
     ------
@@ -4945,18 +4932,18 @@ def registered() -> list[str]:
 #### run_method
 
 ```python
-run_method(calibrator: Calibrator, method: InferenceMethod[ResultT], kind: type[InferenceMethod[BaseModel]]) -> ResultT
+run_method(entry_point: EntryPoint, method: InferenceMethod[ResultT], kind: type[InferenceMethod[BaseModel]]) -> ResultT
 ```
 
-Run `method` on `calibrator` with the runner of its type.
+Run `method` on `entry_point` with the runner of its type.
 
 Parameters:
 
-| Name         | Type                       | Description                                                                           | Default    |
-| ------------ | -------------------------- | ------------------------------------------------------------------------------------- | ---------- |
-| `calibrator` | `Calibrator`               | The calibration problem.                                                              | *required* |
-| `method`     | `InferenceMethod[ResultT]` | The configuration of the method.                                                      | *required* |
-| `kind`       | `type[InferenceMethod]`    | The kind of method the entry point takes: UncertaintyMethod or IdentifiabilityMethod. | *required* |
+| Name          | Type                       | Description                                                                                              | Default                                               |
+| ------------- | -------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `entry_point` | \`Calibrator               | SensitivityAnalysis\`                                                                                    | The calibration problem, or the sensitivity analysis. |
+| `method`      | `InferenceMethod[ResultT]` | The configuration of the method.                                                                         | *required*                                            |
+| `kind`        | `type[InferenceMethod]`    | The kind of method the entry point takes: UncertaintyMethod, IdentifiabilityMethod or SensitivityMethod. | *required*                                            |
 
 Returns:
 
@@ -4975,22 +4962,22 @@ Source code in `commol/api/inference/registry.py`
 
 ```python
 def run_method(
-    calibrator: "Calibrator",
+    entry_point: EntryPoint,
     method: InferenceMethod[ResultT],
     kind: type[InferenceMethod[BaseModel]],
 ) -> ResultT:
     """
-    Run `method` on `calibrator` with the runner of its type.
+    Run `method` on `entry_point` with the runner of its type.
 
     Parameters
     ----------
-    calibrator : Calibrator
-        The calibration problem.
+    entry_point : Calibrator | SensitivityAnalysis
+        The calibration problem, or the sensitivity analysis.
     method : InferenceMethod[ResultT]
         The configuration of the method.
     kind : type[InferenceMethod]
-        The kind of method the entry point takes: `UncertaintyMethod` or
-        `IdentifiabilityMethod`.
+        The kind of method the entry point takes: `UncertaintyMethod`,
+        `IdentifiabilityMethod` or `SensitivityMethod`.
 
     Returns
     -------
@@ -5021,5 +5008,5 @@ def run_method(
             f"No method is registered for {type(method).__name__}. "
             f"Registered: {registered()}."
         )
-    return cast("ResultT", runner(calibrator, method))
+    return cast("ResultT", runner(entry_point, method))
 ```

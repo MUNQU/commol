@@ -90,6 +90,91 @@ class Calibrator:
         """
         return self._rust_problem
 
+    def rust_predictive(
+        self, sample: ParameterSample, positions: list[float]
+    ) -> "PredictiveProtocol":
+        """
+        The run of every draw of `sample` at `positions`, for a `Predictive`:
+        each replicate of a stochastic engine has a seed of its own, derived
+        from the calibrator's seed.
+
+        Parameters
+        ----------
+        sample : ParameterSample
+            The draws, in the problem's order.
+        positions : list[float]
+            Positions to report at, ascending.
+
+        Returns
+        -------
+        PredictiveProtocol
+            The runs, computed in Rust.
+        """
+        return self._rust_problem.predictive(sample.rust_sample, positions, self.seed)
+
+    def rust_observation_draws(
+        self,
+        sample: ParameterSample,
+        observed_data: list[ObservedDataPoint],
+        noise: ObservationNoise,
+    ) -> "ObservationDrawsProtocol":
+        """
+        Every draw's value of `observed_data` with `noise`, for a `Predictive`.
+
+        Parameters
+        ----------
+        sample : ParameterSample
+            The draws, in the problem's order.
+        observed_data : list[ObservedDataPoint]
+            The observations.
+        noise : NoNoise | ResidualNoise | DistributionNoise
+            The observation noise, drawn from the calibrator's seed.
+
+        Returns
+        -------
+        ObservationDrawsProtocol
+            The draws, computed in Rust.
+        """
+        residual_noise = None
+        if isinstance(noise, ResidualNoise):
+            residual_noise = (
+                [noise.fit.best_parameters[name] for name in self.parameter_names],
+                noise.block_length,
+                noise.residual_scale,
+            )
+        return self._rust_problem.observation_draws(
+            sample.rust_sample,
+            engine_state.rust_observed_data(observed_data),
+            self.seed,
+            residual_noise=residual_noise,
+            distribution_noise=isinstance(noise, DistributionNoise),
+        )
+
+    def rust_log_score(
+        self, sample: ParameterSample, observed_data: list[ObservedDataPoint]
+    ) -> list[float]:
+        """
+        The log score of each observation under the predictive of `sample`,
+        for `commol.scores.log_score`.
+
+        Parameters
+        ----------
+        sample : ParameterSample
+            The draws, in the problem's order.
+        observed_data : list[ObservedDataPoint]
+            The observations.
+
+        Returns
+        -------
+        list[float]
+            One log score per observation, computed in Rust.
+        """
+        return self._rust_problem.log_score(
+            sample.rust_sample,
+            engine_state.rust_observed_data(observed_data),
+            self.seed,
+        )
+
     @property
     def rust_optimizer(self) -> "OptimizationConfigProtocol":
         """
@@ -448,33 +533,12 @@ class Calibrator:
         ValueError
             If a parameter ID doesn't exist in the model or if a bin ID is invalid.
         """
-        model = self.simulation.model_definition
-        model_param_ids = {p.id for p in model.parameters}
-
-        for param in self.problem.parameters:
-            if param.parameter_type == CalibrationParameterType.PARAMETER:
-                if param.id not in model_param_ids:
-                    raise ValueError(
-                        f"Calibration parameter '{param.id}' not found in model "
-                        f"parameters. Available parameters: "
-                        f"{sorted(model_param_ids)}"
-                    )
-            elif param.parameter_type == CalibrationParameterType.FACTOR:
-                if param.min_bound <= 0 or param.max_bound <= 0:
-                    raise ValueError(
-                        f"Factor parameter '{param.id}' must have positive bounds "
-                        f"(got min={param.min_bound}, max={param.max_bound})"
-                    )
-
-        # The structure and the engine check the values of the model kind,
-        # such as initial conditions.
-        engine_state.check_model_values(
-            model,
+        check_values(
+            self.simulation.model_definition,
             self._engine,
             self.problem.parameters,
             self.problem.initial_condition_remainder,
         )
-        model.structure.check_calibration_values(model, self._engine, self.problem)
 
     def _validate_observed_data(self) -> None:
         """Validate that observed data compartments exist and have valid steps.
@@ -665,6 +729,167 @@ def __init__(
                 else engine_state.rust_observation_models(models)
             ),
         )
+    )
+```
+
+#### rust_predictive
+
+```python
+rust_predictive(sample: ParameterSample, positions: list[float]) -> PredictiveProtocol
+```
+
+The run of every draw of `sample` at `positions`, for a `Predictive`: each replicate of a stochastic engine has a seed of its own, derived from the calibrator's seed.
+
+Parameters:
+
+| Name        | Type              | Description                        | Default    |
+| ----------- | ----------------- | ---------------------------------- | ---------- |
+| `sample`    | `ParameterSample` | The draws, in the problem's order. | *required* |
+| `positions` | `list[float]`     | Positions to report at, ascending. | *required* |
+
+Returns:
+
+| Type                 | Description                 |
+| -------------------- | --------------------------- |
+| `PredictiveProtocol` | The runs, computed in Rust. |
+
+Source code in `commol/api/calibrator.py`
+
+```python
+def rust_predictive(
+    self, sample: ParameterSample, positions: list[float]
+) -> "PredictiveProtocol":
+    """
+    The run of every draw of `sample` at `positions`, for a `Predictive`:
+    each replicate of a stochastic engine has a seed of its own, derived
+    from the calibrator's seed.
+
+    Parameters
+    ----------
+    sample : ParameterSample
+        The draws, in the problem's order.
+    positions : list[float]
+        Positions to report at, ascending.
+
+    Returns
+    -------
+    PredictiveProtocol
+        The runs, computed in Rust.
+    """
+    return self._rust_problem.predictive(sample.rust_sample, positions, self.seed)
+```
+
+#### rust_observation_draws
+
+```python
+rust_observation_draws(sample: ParameterSample, observed_data: list[ObservedDataPoint], noise: ObservationNoise) -> ObservationDrawsProtocol
+```
+
+Every draw's value of `observed_data` with `noise`, for a `Predictive`.
+
+Parameters:
+
+| Name            | Type                      | Description                        | Default             |
+| --------------- | ------------------------- | ---------------------------------- | ------------------- |
+| `sample`        | `ParameterSample`         | The draws, in the problem's order. | *required*          |
+| `observed_data` | `list[ObservedDataPoint]` | The observations.                  | *required*          |
+| `noise`         | \`NoNoise                 | ResidualNoise                      | DistributionNoise\` |
+
+Returns:
+
+| Type                       | Description                  |
+| -------------------------- | ---------------------------- |
+| `ObservationDrawsProtocol` | The draws, computed in Rust. |
+
+Source code in `commol/api/calibrator.py`
+
+```python
+def rust_observation_draws(
+    self,
+    sample: ParameterSample,
+    observed_data: list[ObservedDataPoint],
+    noise: ObservationNoise,
+) -> "ObservationDrawsProtocol":
+    """
+    Every draw's value of `observed_data` with `noise`, for a `Predictive`.
+
+    Parameters
+    ----------
+    sample : ParameterSample
+        The draws, in the problem's order.
+    observed_data : list[ObservedDataPoint]
+        The observations.
+    noise : NoNoise | ResidualNoise | DistributionNoise
+        The observation noise, drawn from the calibrator's seed.
+
+    Returns
+    -------
+    ObservationDrawsProtocol
+        The draws, computed in Rust.
+    """
+    residual_noise = None
+    if isinstance(noise, ResidualNoise):
+        residual_noise = (
+            [noise.fit.best_parameters[name] for name in self.parameter_names],
+            noise.block_length,
+            noise.residual_scale,
+        )
+    return self._rust_problem.observation_draws(
+        sample.rust_sample,
+        engine_state.rust_observed_data(observed_data),
+        self.seed,
+        residual_noise=residual_noise,
+        distribution_noise=isinstance(noise, DistributionNoise),
+    )
+```
+
+#### rust_log_score
+
+```python
+rust_log_score(sample: ParameterSample, observed_data: list[ObservedDataPoint]) -> list[float]
+```
+
+The log score of each observation under the predictive of `sample`, for `commol.scores.log_score`.
+
+Parameters:
+
+| Name            | Type                      | Description                        | Default    |
+| --------------- | ------------------------- | ---------------------------------- | ---------- |
+| `sample`        | `ParameterSample`         | The draws, in the problem's order. | *required* |
+| `observed_data` | `list[ObservedDataPoint]` | The observations.                  | *required* |
+
+Returns:
+
+| Type          | Description                                      |
+| ------------- | ------------------------------------------------ |
+| `list[float]` | One log score per observation, computed in Rust. |
+
+Source code in `commol/api/calibrator.py`
+
+```python
+def rust_log_score(
+    self, sample: ParameterSample, observed_data: list[ObservedDataPoint]
+) -> list[float]:
+    """
+    The log score of each observation under the predictive of `sample`,
+    for `commol.scores.log_score`.
+
+    Parameters
+    ----------
+    sample : ParameterSample
+        The draws, in the problem's order.
+    observed_data : list[ObservedDataPoint]
+        The observations.
+
+    Returns
+    -------
+    list[float]
+        One log score per observation, computed in Rust.
+    """
+    return self._rust_problem.log_score(
+        sample.rust_sample,
+        engine_state.rust_observed_data(observed_data),
+        self.seed,
     )
 ```
 

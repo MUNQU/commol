@@ -1370,6 +1370,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1732,6 +1760,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -3350,6 +3406,14 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
 <code>IdentifiabilityMethod[IdentifiabilityReport]</code> and <code>Calibrator.identifiability</code>;
 it reads derivatives only through <code>SensitivitySource</code>, adds its section to
 <code>IdentifiabilityReport</code>, and needs no coverage study.</p>
+<p>A sensitivity method subclasses <code>SensitivityMethod[YourResult]</code> and runs
+through <code>SensitivityAnalysis.run</code>. Its Rust side is a method of
+<code>ForwardAnalysis</code> (<code>crates/commol-inference/src/global_sensitivity/</code>), which
+builds the design from <code>InputSpace</code> (<code>design.rs</code>), runs it with
+<code>BatchRunner</code> and calls the estimator; the binding and the Python runner only
+convert. A method of independent inputs refuses a sample through
+<code>InputSpace::independent</code>, and a random number comes from a stream of the
+seed of the analysis (<code>stream_seed</code>).</p>
 <h3 id="model-type-engine">Model type (engine)<a class="headerlink" href="#model-type-engine" title="Permanent link">&para;</a></h3>
 <p>To add an engine to the list:</p>
 <ul>

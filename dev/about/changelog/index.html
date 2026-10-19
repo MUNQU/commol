@@ -1366,6 +1366,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1728,6 +1756,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -3655,15 +3711,63 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><code>ParametricBootstrap(replicates)</code>: fits to data sets drawn from the
   observation models at the fit. <code>ResamplingDiagnostics.block_length</code> is <code>None</code>
   for it.</li>
-<li>A model can hold bins of different units, such as people and the
+<li>
+<p>A model can hold bins of different units, such as people and the
   concentration of bacteria in water: each bin starts at an amount in its own
   unit, a model whose bins all start at <code>0</code> builds and runs, and the
   <code>Calibrator</code> rejects an initial-condition remainder whose unit is not the
   unit of a calibrated amount. See
-  <a href="../../guide/building-models/#bins-of-different-units">Bins of different units</a>.</li>
+  <a href="../../guide/building-models/#bins-of-different-units">Bins of different units</a>.</p>
+</li>
+<li>
+<p>Sensitivity analysis with no data: <code>SensitivityAnalysis(simulation,
+  inputs, replicates=None, seed=None).run(method)</code>, the third entry point of
+  the registry, with methods that subclass <code>SensitivityMethod[R]</code>. What varies
+  is an <code>InputSpace</code> of calibration parameters (model parameters or initial
+  conditions): independent distributions (<code>InputSpace.independent</code>,
+  <code>InputSpace.uniform_on_bounds</code>) or a weighted sample
+  (<code>InputSpace.from_sample</code>). Each run is reduced in Rust to quantities of
+  interest: <code>ValueAt</code>, <code>Gain</code> (as an observation with a window), <code>Peak</code>,
+  <code>PeakPosition</code> and <code>Trajectory</code>. With a stochastic engine <code>replicates</code> and
+  <code>seed</code> are required; a point of a design holds the mean of its replicates
+  on common seeds, and a propagation keeps every replicate. See
+  <a href="../../guide/uncertainty/sensitivity/">Sensitivity Analysis</a>.</p>
+</li>
+<li><code>Propagation</code>: the draws of the inputs and the quantities of each run
+  (<code>PropagationResult</code>, with <code>summary(confidence_level)</code>); its sample gives
+  the bands of a <code>Predictive</code>, which runs the same replicates.</li>
+<li><code>PRCC</code>: partial rank correlation coefficients and their p-values
+  (<code>PRCCResult</code>), weighted for a sample, with Kish's effective size in the
+  test.</li>
+<li><code>Morris</code>: elementary effects, <code>mu</code>, <code>mu_star</code> and <code>sigma</code> (<code>MorrisResult</code>),
+  on levels at the centres of strata of equal probability.</li>
+<li><code>Sobol</code>: first-order and total indices on the design of Saltelli, with
+  bootstrap intervals (<code>SobolResult</code>).</li>
+<li><code>PolynomialChaos</code>: a Legendre expansion of <code>F(x)</code>, its leave-one-out error,
+  its Sobol indices and <code>predict</code> as a surrogate (<code>ChaosResult</code>); the number
+  of terms is checked before any run.</li>
+<li><code>SimulationPlotter.plot_prcc</code>, <code>plot_morris</code> and <code>plot_sobol</code>.</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Breaking:</strong> <code>Predictive(source, sample, positions)</code> takes a <code>Calibrator</code>
+  or a <code>SensitivityAnalysis</code> (any <code>PredictiveSource</code>), and its attribute
+  <code>calibrator</code> is now <code>source</code>. <code>Predictive.at_observations</code> of an analysis
+  takes only <code>NoNoise()</code>, and <code>scores.log_score</code> refuses its predictive.</li>
+<li>With a stochastic engine, every replicate of every draw of a <code>Predictive</code>,
+  of <code>Predictive.at_observations</code> and of <code>scores.log_score</code> has a seed of its
+  own, derived from the calibrator's seed; before, every draw ran the same
+  replicates of the problem, so a predictive with few replicates showed the
+  same few noise paths for every draw. The bands and scores of a stochastic
+  predictive change; a seed still repeats them.</li>
+<li><strong>Breaking:</strong> <code>ModelStructure.check_calibration_values(model, engine,
+  parameters, remainder)</code> takes the values and the remainder instead of a
+  calibration problem; a model kind that implements it changes its
+  signature.</li>
+<li>A prior whose family does not fit its bounds is named "The distribution
+  ... of" in its message, instead of "The prior ... of".</li>
+<li>The starts of <code>Calibrator.run(starts=n)</code> come from the Latin hypercube of
+  <code>commol-random</code>; a seed gives the same starts as before.</li>
 <li><strong>Breaking:</strong> an <code>Aggregate</code> states the initial amount of each bin in the
   unit of the bin, not fractions of one total. A structure that states
   <code>total</code>, <code>bin_fractions</code> or <code>compartment_fractions</code> is rejected with the

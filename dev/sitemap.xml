@@ -53,6 +53,10 @@
          <lastmod>2026-10-19</lastmod>
     </url>
     <url>
+         <loc>https://munqu.github.io/commol/dev/api/sensitivity/</loc>
+         <lastmod>2026-10-19</lastmod>
+    </url>
+    <url>
          <loc>https://munqu.github.io/commol/dev/api/simulation/</loc>
          <lastmod>2026-10-19</lastmod>
     </url>
@@ -242,6 +246,10 @@
     </url>
     <url>
          <loc>https://munqu.github.io/commol/dev/guide/uncertainty/resampling/</loc>
+         <lastmod>2026-10-19</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/guide/uncertainty/sensitivity/</loc>
          <lastmod>2026-10-19</lastmod>
     </url>
     <url>

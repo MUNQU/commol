@@ -1504,10 +1504,12 @@ class ModelStructure(BaseModel, ABC):
         self,
         model: "Model[Self]",  # noqa: ARG002
         engine: "EngineProtocol",  # noqa: ARG002
-        problem: "CalibrationProblem",  # noqa: ARG002
+        parameters: Sequence["CalibrationParameter"],  # noqa: ARG002
+        remainder: str | None,  # noqa: ARG002
     ) -> None:
         """
-        Check the values of this kind that a calibration sets.
+        Check the values of this kind that a calibration or a sensitivity
+        analysis sets.
 
         The engine has resolved each value and the remainder when this runs;
         a kind checks here what only the Python definition knows, such as the
@@ -1516,11 +1518,14 @@ class ModelStructure(BaseModel, ABC):
         Parameters
         ----------
         model : Model
-            The model the calibration runs on.
+            The model the values are set on.
         engine : EngineProtocol
             The engine built from it.
-        problem : CalibrationProblem
-            The problem, for its parameters and remainder.
+        parameters : Sequence[CalibrationParameter]
+            The values set, with their types and bounds.
+        remainder : str | None
+            The id that takes what the initial conditions leave of the sum
+            the kind keeps, if any.
         """
 
     def with_calibrated_values(
@@ -1919,20 +1924,21 @@ def uncalibrated_values(self) -> list[str]:
 #### check_calibration_values
 
 ```python
-check_calibration_values(model: Model[Self], engine: EngineProtocol, problem: CalibrationProblem) -> None
+check_calibration_values(model: Model[Self], engine: EngineProtocol, parameters: Sequence[CalibrationParameter], remainder: str | None) -> None
 ```
 
-Check the values of this kind that a calibration sets.
+Check the values of this kind that a calibration or a sensitivity analysis sets.
 
 The engine has resolved each value and the remainder when this runs; a kind checks here what only the Python definition knows, such as the units of the bins. The default checks nothing.
 
 Parameters:
 
-| Name      | Type                 | Description                                    | Default    |
-| --------- | -------------------- | ---------------------------------------------- | ---------- |
-| `model`   | `Model`              | The model the calibration runs on.             | *required* |
-| `engine`  | `EngineProtocol`     | The engine built from it.                      | *required* |
-| `problem` | `CalibrationProblem` | The problem, for its parameters and remainder. | *required* |
+| Name         | Type                             | Description                                  | Default                                                                                |
+| ------------ | -------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `model`      | `Model`                          | The model the values are set on.             | *required*                                                                             |
+| `engine`     | `EngineProtocol`                 | The engine built from it.                    | *required*                                                                             |
+| `parameters` | `Sequence[CalibrationParameter]` | The values set, with their types and bounds. | *required*                                                                             |
+| `remainder`  | \`str                            | None\`                                       | The id that takes what the initial conditions leave of the sum the kind keeps, if any. |
 
 Source code in `commol/context/structure.py`
 
@@ -1941,10 +1947,12 @@ def check_calibration_values(
     self,
     model: "Model[Self]",  # noqa: ARG002
     engine: "EngineProtocol",  # noqa: ARG002
-    problem: "CalibrationProblem",  # noqa: ARG002
+    parameters: Sequence["CalibrationParameter"],  # noqa: ARG002
+    remainder: str | None,  # noqa: ARG002
 ) -> None:
     """
-    Check the values of this kind that a calibration sets.
+    Check the values of this kind that a calibration or a sensitivity
+    analysis sets.
 
     The engine has resolved each value and the remainder when this runs;
     a kind checks here what only the Python definition knows, such as the
@@ -1953,11 +1961,14 @@ def check_calibration_values(
     Parameters
     ----------
     model : Model
-        The model the calibration runs on.
+        The model the values are set on.
     engine : EngineProtocol
         The engine built from it.
-    problem : CalibrationProblem
-        The problem, for its parameters and remainder.
+    parameters : Sequence[CalibrationParameter]
+        The values set, with their types and bounds.
+    remainder : str | None
+        The id that takes what the initial conditions leave of the sum
+        the kind keeps, if any.
     """
 ```
 
@@ -2316,39 +2327,42 @@ class Aggregate(ModelStructure, InitialConditions):
         self,
         model: "Model[Self]",
         engine: "EngineProtocol",
-        problem: "CalibrationProblem",
+        parameters: Sequence["CalibrationParameter"],
+        remainder: str | None,
     ) -> None:
         """
         Check that the remainder has the unit of every amount it gives.
 
-        The remainder takes what the calibrated amounts leave of the sum it
-        keeps, so a bin, prefix or compartment value must be in the unit of
-        the remainder; a category split has no unit.
+        The remainder takes what the amounts set leave of the sum it keeps, so
+        a bin, prefix or compartment value must be in the unit of the
+        remainder; a category split has no unit.
 
         Parameters
         ----------
         model : Model
-            The model the calibration runs on.
+            The model the values are set on.
         engine : EngineProtocol
             The engine built from it.
-        problem : CalibrationProblem
-            The problem, for its parameters and remainder.
+        parameters : Sequence[CalibrationParameter]
+            The values set, with their types and bounds.
+        remainder : str | None
+            The bin or compartment that takes what the initial conditions
+            leave, if any.
 
         Raises
         ------
         ValueError
-            If a calibrated amount is in another unit than the remainder.
+            If an amount set is in another unit than the remainder.
         """
-        remainder = problem.initial_condition_remainder
         if remainder is None:
             return
-        parameters = [
+        initial_conditions = [
             param
-            for param in problem.parameters
+            for param in parameters
             if param.parameter_type == CalibrationParameterType.INITIAL_CONDITION
         ]
         covered, kept = engine_state.initial_condition_coverage(
-            engine, parameters, remainder
+            engine, initial_conditions, remainder
         )
         bin_of = {c.name: c.bin for c in self.initial_state(model.process)}
 
@@ -2357,7 +2371,7 @@ class Aggregate(ModelStructure, InitialConditions):
             return None if bin_item is None else bin_item.unit
 
         remainder_unit = unit(kept[0])
-        for param, compartments in zip(parameters, covered, strict=True):
+        for param, compartments in zip(initial_conditions, covered, strict=True):
             for compartment in compartments:
                 if unit(compartment) != remainder_unit:
                     raise ValueError(
@@ -2966,26 +2980,27 @@ def uncalibrated_values(self) -> list[str]:
 #### check_calibration_values
 
 ```python
-check_calibration_values(model: Model[Self], engine: EngineProtocol, problem: CalibrationProblem) -> None
+check_calibration_values(model: Model[Self], engine: EngineProtocol, parameters: Sequence[CalibrationParameter], remainder: str | None) -> None
 ```
 
 Check that the remainder has the unit of every amount it gives.
 
-The remainder takes what the calibrated amounts leave of the sum it keeps, so a bin, prefix or compartment value must be in the unit of the remainder; a category split has no unit.
+The remainder takes what the amounts set leave of the sum it keeps, so a bin, prefix or compartment value must be in the unit of the remainder; a category split has no unit.
 
 Parameters:
 
-| Name      | Type                 | Description                                    | Default    |
-| --------- | -------------------- | ---------------------------------------------- | ---------- |
-| `model`   | `Model`              | The model the calibration runs on.             | *required* |
-| `engine`  | `EngineProtocol`     | The engine built from it.                      | *required* |
-| `problem` | `CalibrationProblem` | The problem, for its parameters and remainder. | *required* |
+| Name         | Type                             | Description                                  | Default                                                                      |
+| ------------ | -------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------- |
+| `model`      | `Model`                          | The model the values are set on.             | *required*                                                                   |
+| `engine`     | `EngineProtocol`                 | The engine built from it.                    | *required*                                                                   |
+| `parameters` | `Sequence[CalibrationParameter]` | The values set, with their types and bounds. | *required*                                                                   |
+| `remainder`  | \`str                            | None\`                                       | The bin or compartment that takes what the initial conditions leave, if any. |
 
 Raises:
 
-| Type         | Description                                                   |
-| ------------ | ------------------------------------------------------------- |
-| `ValueError` | If a calibrated amount is in another unit than the remainder. |
+| Type         | Description                                             |
+| ------------ | ------------------------------------------------------- |
+| `ValueError` | If an amount set is in another unit than the remainder. |
 
 Source code in `commol/context/aggregate.py`
 
@@ -2994,39 +3009,42 @@ def check_calibration_values(
     self,
     model: "Model[Self]",
     engine: "EngineProtocol",
-    problem: "CalibrationProblem",
+    parameters: Sequence["CalibrationParameter"],
+    remainder: str | None,
 ) -> None:
     """
     Check that the remainder has the unit of every amount it gives.
 
-    The remainder takes what the calibrated amounts leave of the sum it
-    keeps, so a bin, prefix or compartment value must be in the unit of
-    the remainder; a category split has no unit.
+    The remainder takes what the amounts set leave of the sum it keeps, so
+    a bin, prefix or compartment value must be in the unit of the
+    remainder; a category split has no unit.
 
     Parameters
     ----------
     model : Model
-        The model the calibration runs on.
+        The model the values are set on.
     engine : EngineProtocol
         The engine built from it.
-    problem : CalibrationProblem
-        The problem, for its parameters and remainder.
+    parameters : Sequence[CalibrationParameter]
+        The values set, with their types and bounds.
+    remainder : str | None
+        The bin or compartment that takes what the initial conditions
+        leave, if any.
 
     Raises
     ------
     ValueError
-        If a calibrated amount is in another unit than the remainder.
+        If an amount set is in another unit than the remainder.
     """
-    remainder = problem.initial_condition_remainder
     if remainder is None:
         return
-    parameters = [
+    initial_conditions = [
         param
-        for param in problem.parameters
+        for param in parameters
         if param.parameter_type == CalibrationParameterType.INITIAL_CONDITION
     ]
     covered, kept = engine_state.initial_condition_coverage(
-        engine, parameters, remainder
+        engine, initial_conditions, remainder
     )
     bin_of = {c.name: c.bin for c in self.initial_state(model.process)}
 
@@ -3035,7 +3053,7 @@ def check_calibration_values(
         return None if bin_item is None else bin_item.unit
 
     remainder_unit = unit(kept[0])
-    for param, compartments in zip(parameters, covered, strict=True):
+    for param, compartments in zip(initial_conditions, covered, strict=True):
         for compartment in compartments:
             if unit(compartment) != remainder_unit:
                 raise ValueError(

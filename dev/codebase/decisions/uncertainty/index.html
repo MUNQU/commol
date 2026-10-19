@@ -1370,6 +1370,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1732,6 +1760,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -2466,6 +2522,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#an-analysis-needs-no-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An analysis needs no data
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3007,6 +3074,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#an-analysis-needs-no-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An analysis needs no data
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3029,8 +3107,8 @@
 
 <h1 id="uncertainty">Uncertainty<a class="headerlink" href="#uncertainty" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>How the uncertainty methods share one sample, one entry point, their ports and
-one sampler, and what a replicate may change.</p>
+<p>How the uncertainty methods share one sample, one registry, their ports and
+one sampler, what a replicate may change, and why an analysis needs no data.</p>
 <h2 id="a-sample-carries-its-weights">A sample carries its weights<a class="headerlink" href="#a-sample-carries-its-weights" title="Permanent link">&para;</a></h2>
 <p>A method with draws returns its own result type, which holds a
 <code>ParameterSample</code> (<code>crates/commol-inference/src/sample.rs</code>,
@@ -3061,11 +3139,13 @@ weights give the unweighted statistic.</p>
 <code>tests/uncertainty/test_sample.py</code>.</p>
 <h2 id="methods-plug-into-one-entry-point">Methods plug into one entry point<a class="headerlink" href="#methods-plug-into-one-entry-point" title="Permanent link">&para;</a></h2>
 <p><code>Calibrator.uncertainty(method: UncertaintyMethod[R]) -&gt; R</code> runs every
-uncertainty method, and <code>Calibrator.identifiability(method:
-IdentifiabilityMethod[R]) -&gt; R</code> every identifiability method. Both kinds
-subclass <code>InferenceMethod[R]</code> (<code>context/inference/method.py</code>) and share one
-registry; each entry point refuses the other kind with a <code>TypeError</code> that
-names the right one.
+uncertainty method, <code>Calibrator.identifiability(method:
+IdentifiabilityMethod[R]) -&gt; R</code> every identifiability method, and
+<code>SensitivityAnalysis.run(method: SensitivityMethod[R]) -&gt; R</code> every sensitivity
+method. The kinds subclass <code>InferenceMethod[R]</code> (<code>context/inference/method.py</code>)
+and share one registry, which hands each runner the object of its entry
+point; each entry point refuses another kind with a <code>TypeError</code> that names the
+right one.
 A method is three parts: a configuration that subclasses <code>UncertaintyMethod</code>
 with its result type (<code>context/inference/</code>), a runner in Rust bound in
 <code>py-commol/src/inference.rs</code>, and a result (<code>context/inference/</code>). It registers
@@ -3379,6 +3459,41 @@ same <code>ConformalResult</code> as every variant.</p>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_conformal.rs</code>,
 <code>tests/uncertainty/test_conformal.py</code>, the studies of
 <code>tests/uncertainty/test_coverage.py</code>.</p>
+<h2 id="an-analysis-needs-no-data">An analysis needs no data<a class="headerlink" href="#an-analysis-needs-no-data" title="Permanent link">&para;</a></h2>
+<p><code>ForwardAnalysis</code> runs every method on <code>ForwardModel::unobserved</code> (values
+written as a calibration writes them). Quantities read the observation
+operator. A design point is the mean of its replicates on common seeds; a
+predictive or a propagation gives each replicate of each draw its own seed
+(<code>run_sets</code>), and each purpose has a stream (<code>stream_seed</code>). Morris, Sobol
+and chaos refuse a sample; PRCC reads its weights.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A problem with fake observations</td>
+<td>Invented data in a type that means a fit.</td>
+</tr>
+<tr>
+<td>Python callables as quantities</td>
+<td>Every run would return to Python, one at a time.</td>
+</tr>
+<tr>
+<td>Resampling a sample to equal weights</td>
+<td>Repeated draws that the test of PRCC counts as independent.</td>
+</tr>
+<tr>
+<td>Hermite polynomials for a normal input</td>
+<td>Every distribution is truncated, so they are not orthogonal.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_global_sensitivity.rs</code>,
+<code>tests/uncertainty/test_sensitivity.py</code>.</p>
 
 
 

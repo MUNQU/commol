@@ -1558,6 +1558,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1920,6 +1948,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -3130,7 +3186,7 @@ Each method has its own page, listed in the table below.</p>
 </tr>
 <tr>
 <td>How do the inputs move the outputs?</td>
-<td>The predictive of a sample: the run of every draw, and its band</td>
+<td>The predictive of a sample: the run of every draw, and its band; with no data, a <a href="sensitivity/">sensitivity analysis</a>, which propagates the inputs and ranks them</td>
 </tr>
 <tr>
 <td>Are the intervals calibrated?</td>
@@ -3294,6 +3350,36 @@ coverage guarantee, from the scores of observations the fit did not use.</p>
 <td>Where the next observations fall: a prediction interval of the models</td>
 <td>Yes</td>
 <td><a href="observation-models/#prediction-with-noise">Observation Models</a></td>
+</tr>
+<tr>
+<td><code>Propagation</code></td>
+<td>How uncertainty in the inputs moves the outputs, with no data</td>
+<td>No</td>
+<td><a href="sensitivity/#propagation">Sensitivity Analysis</a></td>
+</tr>
+<tr>
+<td><code>PRCC</code></td>
+<td>How steadily each output rises or falls with each input, of independent inputs or a sample</td>
+<td>No</td>
+<td><a href="sensitivity/#prcc">Sensitivity Analysis</a></td>
+</tr>
+<tr>
+<td><code>Morris</code></td>
+<td>Which inputs matter, in few runs</td>
+<td>No</td>
+<td><a href="sensitivity/#morris-screening">Sensitivity Analysis</a></td>
+</tr>
+<tr>
+<td><code>Sobol</code></td>
+<td>The share of the variance of an output each input explains, alone and with interactions</td>
+<td>No</td>
+<td><a href="sensitivity/#sobol-indices">Sensitivity Analysis</a></td>
+</tr>
+<tr>
+<td><code>PolynomialChaos</code></td>
+<td>A polynomial surrogate of an output and its Sobol indices, in few runs</td>
+<td>No</td>
+<td><a href="sensitivity/#polynomial-chaos">Sensitivity Analysis</a></td>
 </tr>
 </tbody>
 </table>
@@ -3468,9 +3554,12 @@ values, and <code>member_statistics</code> reduces ensemble members with it.</p>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">weighted_quantiles</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">],</span> <span class="n">levels</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">],</span> <span class="n">weights</span><span class="o">=</span><span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">]))</span>  <span class="c1"># [0.75]</span>
 </span></code></pre></div>
 <h2 id="the-predictive">The predictive<a class="headerlink" href="#the-predictive" title="Permanent link">&para;</a></h2>
-<p><code>Predictive(calibrator, sample, positions)</code> runs every draw at <code>positions</code>, in
-parallel in Rust. With a stochastic engine every replicate of a draw is a draw
-of the predictive, with an equal share of its weight.</p>
+<p><code>Predictive(source, sample, positions)</code> runs every draw at <code>positions</code>, in
+parallel in Rust, through the forward model of its source: a <code>Calibrator</code>, or
+a <code>SensitivityAnalysis</code> of the inputs of the sample. With a stochastic engine
+every replicate of a draw is a draw of the predictive, with an equal share of
+its weight and a seed of its own, derived from the seed of the source, so
+every draw shows fresh noise and the predictive repeats from that seed.</p>
 <table>
 <thead>
 <tr>
@@ -3562,7 +3651,10 @@ the configuration's type. A configuration with no registered runner raises a
 <code>IdentifiabilityMethod[R]</code>: they answer another question
 (<a href="identifiability/">Identifiability</a>). Both kinds subclass
 <code>InferenceMethod[R]</code> and share one registry; each entry point refuses the
-other kind with a <code>TypeError</code> that names the right one.</p>
+other kind with a <code>TypeError</code> that names the right one. The sensitivity
+methods, subclasses of <code>SensitivityMethod[R]</code>, run with no data through
+<code>SensitivityAnalysis(simulation, inputs).run(method)</code>, the third entry point
+of the registry (<a href="sensitivity/">Sensitivity Analysis</a>).</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">BayesianBootstrap</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">result</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span><span class="n">BayesianBootstrap</span><span class="p">(</span><span class="n">replicates</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">block_length</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
@@ -3598,6 +3690,10 @@ other kind with a <code>TypeError</code> that names the right one.</p>
 <tr>
 <td>Prediction intervals with a coverage guarantee</td>
 <td><a href="conformal/">Conformal Prediction Intervals</a></td>
+</tr>
+<tr>
+<td>How the inputs move the outputs, with no data</td>
+<td><a href="sensitivity/">Sensitivity Analysis</a></td>
 </tr>
 <tr>
 <td>Several starts of an optimizer</td>
