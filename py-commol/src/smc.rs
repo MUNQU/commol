@@ -194,7 +194,7 @@ fn sampler(
     .map_err(value_error)
 }
 
-fn problem_priors(
+pub(crate) fn problem_priors(
     problem: &PyCalibrationProblem,
     given: Option<Vec<PriorArgs>>,
 ) -> PyResult<Priors> {

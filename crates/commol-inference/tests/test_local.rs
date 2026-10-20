@@ -10,14 +10,24 @@ use commol_calibration::{
     DiscrepancyConfig, ObservationModel, ObservedDataPoint,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
-use commol_inference::local::{Curvature, laplace};
+use commol_inference::Priors;
+use commol_inference::distribution::Family;
+use commol_inference::importance::TemperedPosterior;
+use commol_inference::local::{Curvature, CurvatureKind, laplace, laplace_mixture};
+use commol_inference::psis::smooth;
 use commol_inference::sensitivity::{Design, FiniteDifferences};
+use commol_inference::smc::LikelihoodTarget;
 
 /// The closed form of the outputs of a [`Curve`].
 #[derive(Clone, Copy, Debug)]
 enum Shape {
     /// One output `x = a + b·t`.
     Line,
+    /// One output `x = a²`: two optima, `±√y`.
+    Square,
+    /// Two outputs, `x = a` and `y = b + a²`: with a precise `y`, the
+    /// posterior of `(a, b)` bends along `b = y − a²`.
+    Banana,
 }
 
 /// An engine whose outputs at a position `t` are a closed form of its
@@ -62,6 +72,8 @@ impl SimulationEngine for Curve {
         buffer.clear();
         buffer.extend(positions.iter().map(|&t| match self.shape {
             Shape::Line => vec![a + b * t],
+            Shape::Square => vec![a * a],
+            Shape::Banana => vec![a, b + a * a],
         }));
         Ok(())
     }
@@ -72,7 +84,8 @@ impl SimulationEngine for Curve {
 
     fn output_names(&self) -> Vec<String> {
         match self.shape {
-            Shape::Line => vec!["x".to_string()],
+            Shape::Line | Shape::Square => vec!["x".to_string()],
+            Shape::Banana => vec!["x".to_string(), "y".to_string()],
         }
     }
 
@@ -252,4 +265,228 @@ fn draws_mapped_back_stay_inside_the_bounds() {
     // the bound.
     let below = draws.iter().filter(|draw| draw[0] < 0.02).count();
     assert!((900..1100).contains(&below), "{below} draws below the fit");
+}
+
+/// The weighted share of `values` whose first entry is above 0.
+fn positive_share(values: &[Vec<f64>], log_weights: &[f64]) -> f64 {
+    let weights: Vec<f64> = log_weights.iter().map(|w| w.exp()).collect();
+    let total: f64 = weights.iter().sum();
+    values
+        .iter()
+        .zip(&weights)
+        .filter(|(draw, _)| draw[0] > 0.0)
+        .map(|(_, w)| w)
+        .sum::<f64>()
+        / total
+}
+
+#[test]
+fn mixture_finds_both_modes_in_proportion() {
+    // x = a² observed near 4: the likelihood has the modes ±2, and the prior
+    // N(0.5, 1) gives the positive one more mass.
+    let values: Vec<f64> = (0..10).map(|i| 4.0 + [0.2, -0.3, 0.1][i % 3]).collect();
+    let mean: f64 = values.iter().sum::<f64>() / 10.0;
+    let sd = 0.5;
+    let problem = CalibrationProblem::new(
+        Curve::new(Shape::Square),
+        observed("x", &values),
+        vec![CalibrationParameter::new("a".to_string(), -5.0, 5.0)],
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(sd))]),
+    )
+    .unwrap();
+    let priors = Priors::new(
+        &["a".to_string()],
+        &[(-5.0, 5.0)],
+        &[("a".to_string(), Family::Normal { mean: 0.5, sd: 1.0 })],
+    )
+    .unwrap();
+    let target = LikelihoodTarget::new(&problem, &priors).unwrap();
+    let ends = [vec![mean.sqrt()], vec![-mean.sqrt()]];
+
+    let run = laplace_mixture(
+        &problem,
+        &TemperedPosterior::new(&target),
+        1.0,
+        &ends,
+        4000,
+        CurvatureKind::GaussNewton,
+        3,
+    )
+    .unwrap();
+
+    // The oracle: the posterior mass above 0, by the midpoint rule on a fine
+    // grid of the prior times the likelihood.
+    let log_posterior = |a: f64| {
+        let prior = -0.5 * ((a - 0.5) / 1.0_f64).powi(2);
+        let likelihood: f64 = values
+            .iter()
+            .map(|y| -0.5 * ((y - a * a) / sd).powi(2))
+            .sum();
+        prior + likelihood
+    };
+    let grid: Vec<f64> = (0..200_000)
+        .map(|i| -5.0 + (i as f64 + 0.5) * 5e-5)
+        .collect();
+    let densities: Vec<f64> = grid.iter().map(|&a| log_posterior(a).exp()).collect();
+    let total: f64 = densities.iter().sum();
+    let above: f64 = grid
+        .iter()
+        .zip(&densities)
+        .filter(|(a, _)| **a > 0.0)
+        .map(|(_, d)| d)
+        .sum();
+    let expected = above / total;
+
+    assert_eq!(run.components.len(), 2);
+    let share = positive_share(&run.sample.values, &run.sample.log_weights);
+    let error = (expected * (1.0 - expected) / run.sample.effective_size).sqrt();
+    assert!(
+        (share - expected).abs() < 4.0 * error,
+        "{share} against {expected} ± {error}"
+    );
+    assert!(run.sample.reliable, "{}", run.sample.k_hat);
+}
+
+#[test]
+fn banana_target_gives_a_large_k_hat() {
+    let problem = CalibrationProblem::new(
+        Curve::new(Shape::Banana),
+        vec![
+            ObservedDataPoint::new(0.0, "x".to_string(), 0.0),
+            ObservedDataPoint::new(0.0, "y".to_string(), 0.0),
+        ],
+        vec![
+            CalibrationParameter::new("a".to_string(), -10.0, 10.0),
+            CalibrationParameter::new("b".to_string(), -50.0, 10.0),
+        ],
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![
+            normal("x", Argument::Value(2.0)),
+            normal("y", Argument::Value(0.1)),
+        ]),
+    )
+    .unwrap();
+    let names = ["a".to_string(), "b".to_string()];
+    let priors = Priors::uniform_on_bounds(&names, &[(-10.0, 10.0), (-50.0, 10.0)]).unwrap();
+    let target = LikelihoodTarget::new(&problem, &priors).unwrap();
+
+    let run = laplace_mixture(
+        &problem,
+        &TemperedPosterior::new(&target),
+        1.0,
+        &[vec![0.0, 0.0]],
+        2000,
+        CurvatureKind::GaussNewton,
+        5,
+    )
+    .unwrap();
+
+    assert!(run.sample.k_hat > 0.7, "{}", run.sample.k_hat);
+    assert!(!run.sample.reliable);
+    assert!(run.notes.iter().any(|note| note.contains("unreliable")));
+}
+
+/// Log weights of `n` draws in a fixed order: `2u − 1`, or `−m·log(1 − u)`
+/// (a Pareto of shape `m` in the weights), at `u = (i + ½)/n`, the draw at
+/// `37·i mod n` first.
+fn reference_log_weights(n: usize, pareto: Option<f64>) -> Vec<f64> {
+    let base: Vec<f64> = (0..n)
+        .map(|i| {
+            let u = (i as f64 + 0.5) / n as f64;
+            match pareto {
+                None => 2.0 * u - 1.0,
+                Some(m) => -(-u).ln_1p() * m,
+            }
+        })
+        .collect();
+    (0..n).map(|i| base[(i * 37) % n]).collect()
+}
+
+/// The smoothed log weights of the largest draws, ascending by their log
+/// weight before smoothing, and of the smallest draw.
+fn tail_and_smallest(log_weights: &[f64], smoothed: &[f64], tail: usize) -> (Vec<f64>, f64) {
+    let mut order: Vec<usize> = (0..log_weights.len()).collect();
+    order.sort_by(|&i, &j| log_weights[i].total_cmp(&log_weights[j]));
+    let tail_values = order[order.len() - tail..]
+        .iter()
+        .map(|&i| smoothed[i])
+        .collect();
+    (tail_values, smoothed[order[0]])
+}
+
+fn assert_close(actual: f64, expected: f64) {
+    assert!(
+        (actual - expected).abs() <= 1e-9 * expected.abs().max(1.0),
+        "{actual} differs from {expected}"
+    );
+}
+
+#[test]
+fn psis_matches_the_reference_values() {
+    // Computed once with ArviZ 1.3.0 (arviz-stats 1.3.3), not a dependency
+    // of commol: `arviz_stats.base.array_stats.psislw(-log_weights)`, whose
+    // argument is the log-likelihood of LOO, the negated log weights.
+    let uniform = reference_log_weights(100, None);
+    let smoothed = smooth(&uniform).unwrap();
+    assert_close(smoothed.k_hat, -0.31684968871602176);
+    let (tail, smallest) = tail_and_smallest(&uniform, &smoothed.log_weights, 20);
+    let expected = [
+        -4.17354114557456,
+        -4.153234386138045,
+        -4.132590297543125,
+        -4.111566393789103,
+        -4.090113532336781,
+        -4.068174300791891,
+        -4.045680874289283,
+        -4.0225521160040065,
+        -3.998689568442881,
+        -3.9739717725222343,
+        -3.9482459813781157,
+        -3.92131565475853,
+        -3.892920794973578,
+        -3.862705429750347,
+        -3.8301603201312235,
+        -3.7945133259372117,
+        -3.783579793532023,
+        -3.783579793532023,
+        -3.783579793532023,
+        -3.783579793532023,
+    ];
+    for (actual, expected) in tail.iter().zip(expected) {
+        assert_close(*actual, expected);
+    }
+    assert_close(smallest, -5.763579793532022);
+
+    let cases = [
+        (
+            1000,
+            0.5,
+            94,
+            0.4966301751636287,
+            -6.408328992825719,
+            [-4.598972185995217, -4.344806705667466, -3.7985127731413586],
+            -7.590339627135899,
+        ),
+        (
+            400,
+            0.9,
+            60,
+            0.8183704168942164,
+            -5.9091529614789655,
+            [-3.1968997692663184, -2.7757820590857962, -1.873210090064678],
+            -7.615747553918605,
+        ),
+    ];
+    for (n, shape, tail_count, k_hat, first, largest, smallest) in cases {
+        let log_weights = reference_log_weights(n, Some(shape));
+        let smoothed = smooth(&log_weights).unwrap();
+        assert_close(smoothed.k_hat, k_hat);
+        let (tail, lowest) = tail_and_smallest(&log_weights, &smoothed.log_weights, tail_count);
+        assert_close(tail[0], first);
+        for (actual, expected) in tail[tail_count - 3..].iter().zip(largest) {
+            assert_close(*actual, expected);
+        }
+        assert_close(lowest, smallest);
+    }
 }

@@ -12,7 +12,11 @@ chain binomial from the units that moved in one step.
 The Laplace approximation fits the same flow with a normal model of known
 ``sd``, whose likelihood is exactly normal in ``c``. The sandwich fits a line
 through the origin, ``B(t) = c·t``, whose noise grows with ``t``: a normal
-model of one ``sd`` is wrong there, and so are its Laplace intervals.
+model of one ``sd`` is wrong there, and so are its Laplace intervals. The
+Laplace mixture fits a flow ``c²``, whose likelihood has the two optima
+``±√ȳ``: with a flat prior its central interval runs from the negative mode
+to the upper quantile of the positive one, so it holds ``c > 0`` when that
+quantile does.
 
 A prediction interval holds a new observation, not a fixed value: a study of
 one shifts the interval by the observation, so it holds 0 when it holds the
@@ -37,6 +41,8 @@ from commol import (
     GibbsPosterior,
     JackknifePlus,
     Laplace,
+    LaplaceMixture,
+    LikelihoodTarget,
     LogUniform,
     LossDistance,
     NelderMeadConfig,
@@ -54,6 +60,7 @@ from commol.context.inference.smc import BootstrapCoverage, InformationMatching
 from tests.support import (
     a_to_b_builder,
     bounded,
+    build,
     build_stochastic,
     flow_calibrator,
     flow_observations,
@@ -382,3 +389,41 @@ class TestSandwich:
 
         assert sandwich.calibrated(), sandwich
         assert laplace.coverage("c") < LEVEL - laplace.tolerance, laplace
+
+
+SQUARE_ROOT, SQUARE_COUNT = 2.0, 10
+
+
+@pytest.mark.coverage_study
+class TestLaplaceMixture:
+    def test_laplace_mixture_is_calibrated_with_two_optima(self) -> None:
+        method = LaplaceMixture(
+            starts=8,
+            draws=2000,
+            target=LikelihoodTarget(priors=Priors.uniform_on_bounds()),
+        )
+        model = build(
+            a_to_b_builder(
+                parameters={"c": None}, rate="c * c * A / A", amounts={"A": 1e6, "B": 0}
+            )
+        )
+
+        def interval(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+            values = SQUARE_ROOT**2 + rng.normal(0.0, FLOW_NOISE, SQUARE_COUNT)
+            problem = CalibrationProblem(
+                observed_data=flow_observations(values.tolist(), windowed=True),
+                parameters=[bounded("c", -4.0, 4.0, initial_guess=1.0)],
+                observation_models={"B": NormalObservations(sd=FLOW_NOISE)},
+                optimization_config=NelderMeadConfig(
+                    max_iterations=1000, sd_tolerance=1e-12
+                ),
+                seed=index,
+            )
+            result = Calibrator(Simulation(model), problem).uncertainty(method)
+            return {"c": result.sample.interval(LEVEL)["c"]}
+
+        study = coverage_study(
+            interval, {"c": SQUARE_ROOT}, LEVEL, data_sets=200, seed=41
+        )
+
+        assert study.calibrated(), study

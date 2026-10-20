@@ -1,15 +1,19 @@
 //! Python bindings of the local approximations of `commol-inference`: the
-//! Laplace approximation, the delta method and the sandwich.
+//! Laplace approximation, the delta method, the sandwich and the Laplace
+//! mixture.
 //!
 //! Each runner takes the problem built once by a `Calibrator` and the fit,
 //! and returns plain values; Python builds the result.
 
-use commol_inference::local::{self, CurvatureKind, Gaussian, LocalError};
+use commol_inference::importance::TemperedPosterior;
+use commol_inference::local::{self, CurvatureKind, Gaussian, LocalError, MixtureRun};
 use commol_inference::sensitivity::Matrix;
+use commol_inference::smc::{GibbsTarget, LikelihoodTarget};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
 use crate::inference::PyCalibrationProblem;
+use crate::smc::{PriorArgs, problem_priors};
 
 /// A refusal is a `ValueError`, a failure a `RuntimeError`.
 fn local_error(error: LocalError) -> PyErr {
@@ -187,11 +191,127 @@ fn delta_band(
     Ok((band.outputs, band.center, band.lower, band.upper))
 }
 
+/// A Laplace mixture and its importance sample, as the runner returns it
+#[pyclass(name = "MixtureRun", frozen, get_all)]
+pub struct PyMixtureRun {
+    /// One row per draw, on the scale of the parameters
+    values: Vec<Vec<f64>>,
+    /// The smoothed log weight of each draw, normalized
+    log_weights: Vec<f64>,
+    /// The centre of each component, on the scale of the parameters
+    centers: Vec<Vec<f64>>,
+    /// The weight of each component
+    weights: Vec<f64>,
+    /// The covariance of each component, on the unbounded scale
+    covariances: Vec<Vec<Vec<f64>>>,
+    /// The log Laplace evidence of each component
+    log_evidences: Vec<f64>,
+    /// The Pareto shape of the tail of the weights
+    k_hat: f64,
+    /// Kish's effective size of the smoothed weights
+    effective_size: f64,
+    /// Whether k_hat is at most 0.7
+    reliable: bool,
+    /// Ends that gave no component, and an unreliable sample, in words
+    notes: Vec<String>,
+}
+
+impl PyMixtureRun {
+    fn of(run: MixtureRun) -> Self {
+        Self {
+            centers: run.components.iter().map(|c| c.center.clone()).collect(),
+            weights: run.components.iter().map(|c| c.weight).collect(),
+            covariances: run
+                .components
+                .iter()
+                .map(|c| rows(c.gaussian.covariance()))
+                .collect(),
+            log_evidences: run.components.iter().map(|c| c.log_evidence).collect(),
+            values: run.sample.values,
+            log_weights: run.sample.log_weights,
+            k_hat: run.sample.k_hat,
+            effective_size: run.sample.effective_size,
+            reliable: run.sample.reliable,
+            notes: run.notes,
+        }
+    }
+}
+
+/// A Laplace mixture at the ends of the starts, the proposal of an
+/// importance sampler of a posterior
+///
+/// Args:
+///     problem: The calibration problem
+///     priors: The priors, or None for uniform on the bounds
+///     eta: The scale of the loss of a Gibbs posterior, or None for the
+///         posterior of the observation models
+///     ends: The end of each start, in problem order
+///     draws: Number of draws
+///     curvature: "gauss_newton" or "hessian"
+///     seed: Seed of the draws
+///
+/// Raises:
+///     ValueError: If a prior or eta is not valid, the target needs
+///         observation models the problem lacks, or no end gives a
+///         component
+///     RuntimeError: If a run, the derivatives or the weights fail
+#[pyfunction]
+#[pyo3(signature = (problem, priors, eta, ends, draws, curvature, seed))]
+#[allow(clippy::too_many_arguments)]
+fn laplace_mixture(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    priors: Option<Vec<PriorArgs>>,
+    eta: Option<f64>,
+    ends: Vec<Vec<f64>>,
+    draws: usize,
+    curvature: &str,
+    seed: u64,
+) -> PyResult<PyMixtureRun> {
+    let kind = curvature_kind(curvature)?;
+    let priors = problem_priors(problem, priors)?;
+    let inner = &problem.inner;
+    let run = match eta {
+        None => {
+            let target = LikelihoodTarget::new(inner, &priors).map_err(PyValueError::new_err)?;
+            py.detach(|| {
+                local::laplace_mixture(
+                    inner,
+                    &TemperedPosterior::new(&target),
+                    1.0,
+                    &ends,
+                    draws,
+                    kind,
+                    seed,
+                )
+            })
+        }
+        Some(eta) => {
+            let target = GibbsTarget::new(inner, &priors, eta).map_err(PyValueError::new_err)?;
+            py.detach(|| {
+                local::laplace_mixture(
+                    inner,
+                    &TemperedPosterior::new(&target),
+                    eta,
+                    &ends,
+                    draws,
+                    kind,
+                    seed,
+                )
+            })
+        }
+    }
+    .map_err(local_error)?;
+    Ok(PyMixtureRun::of(run))
+}
+
 /// Register the classes and functions of this module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyLocalRun>()?;
+    m.add_class::<PyMixtureRun>()?;
     m.add_function(wrap_pyfunction!(laplace, m)?)?;
     m.add_function(wrap_pyfunction!(sandwich, m)?)?;
     m.add_function(wrap_pyfunction!(delta_band, m)?)?;
+    m.add_function(wrap_pyfunction!(laplace_mixture, m)?)?;
     Ok(())
 }

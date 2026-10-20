@@ -84,6 +84,38 @@ impl Gaussian {
         &self.transform
     }
 
+    /// `L⁻¹ (u − c)`: the point `u` of the unbounded scale in standard units;
+    /// its norm is the Mahalanobis distance from the centre.
+    pub fn standardized(&self, unbounded: &[f64]) -> Vec<f64> {
+        let difference = DVector::from_iterator(
+            unbounded.len(),
+            unbounded.iter().zip(&self.center).map(|(u, c)| u - c),
+        );
+        self.factor
+            .solve_lower_triangular(&difference)
+            .expect("a Cholesky factor has a positive diagonal")
+            .iter()
+            .copied()
+            .collect()
+    }
+
+    /// The log density at a point `u` of the unbounded scale.
+    pub fn log_density(&self, unbounded: &[f64]) -> f64 {
+        let d = self.center.len() as f64;
+        let squared: f64 = self.standardized(unbounded).iter().map(|z| z * z).sum();
+        let log_determinant: f64 = self.factor.diagonal().iter().map(|l| 2.0 * l.ln()).sum();
+        match self.degrees_of_freedom {
+            None => -0.5 * (d * (2.0 * std::f64::consts::PI).ln() + log_determinant + squared),
+            Some(nu) => {
+                libm::lgamma(0.5 * (nu + d))
+                    - libm::lgamma(0.5 * nu)
+                    - 0.5 * d * (nu * std::f64::consts::PI).ln()
+                    - 0.5 * log_determinant
+                    - 0.5 * (nu + d) * (squared / nu).ln_1p()
+            }
+        }
+    }
+
     /// One draw on the unbounded scale: `c + L z`, with `z` standard normal,
     /// divided by `√(w/ν)` with `w ~ χ²_ν` for a Student t.
     pub fn draw_unbounded(&self, generator: &mut Generator) -> Vec<f64> {

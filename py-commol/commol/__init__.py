@@ -135,6 +135,11 @@ from commol.context.inference import (
     LocalResult,
     Sandwich,
     SandwichResult,
+    GibbsTarget,
+    ImportanceResult,
+    LaplaceMixture,
+    LikelihoodTarget,
+    MixtureComponent,
 )
 from commol.context.observation_models import (
     BinomialObservations,
@@ -240,6 +245,11 @@ __all__ = [
     "LocalResult",
     "Sandwich",
     "SandwichResult",
+    "GibbsTarget",
+    "ImportanceResult",
+    "LaplaceMixture",
+    "LikelihoodTarget",
+    "MixtureComponent",
     "CalibrationConstraint",
     "CalibrationEvaluation",
     "CalibrationHistory",

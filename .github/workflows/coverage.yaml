@@ -51,6 +51,7 @@ jobs:
             tests: >-
               tests/uncertainty/test_coverage.py::TestLaplace
               tests/uncertainty/test_coverage.py::TestSandwich
+              tests/uncertainty/test_coverage.py::TestLaplaceMixture
     defaults:
       run:
         working-directory: ./py-commol

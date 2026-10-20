@@ -1,5 +1,5 @@
-"""The local approximations around a fit: the Laplace approximation and the
-sandwich, their settings and their results.
+"""The local approximations around a fit: the Laplace approximation, the
+sandwich and the Laplace mixture, their settings and their results.
 
 Each reads the curvature of the objective at the fit on the unbounded scale
 of the parameters (the logit of a parameter between two bounds, a log with
@@ -8,12 +8,13 @@ bounds.
 """
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import CalibrationResult
+from commol.context.inference.distributions import WithPriors
 from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
@@ -276,6 +277,145 @@ class Sandwich(UncertaintyMethod[SandwichResult]):
 
     block_length: BlockLength = Field(description="Positions per block.")
     draws: int = Field(ge=1, description="Number of draws.")
+    curvature: CurvatureName = Field(
+        default="gauss_newton", description="The curvature."
+    )
+
+
+class LikelihoodTarget(WithPriors):
+    """
+    The posterior of the problem's observation models,
+    ``π(θ) ∝ prior(θ) · L(θ)``, as the target of a `LaplaceMixture`.
+
+    Attributes
+    ----------
+    priors : Priors | dict[str, Distribution]
+        The prior of each calibrated parameter, or
+        ``Priors.uniform_on_bounds()``.
+    """
+
+    kind: Literal["likelihood"] = "likelihood"
+
+
+class GibbsTarget(WithPriors):
+    """
+    The Gibbs posterior of the problem's loss,
+    ``π(θ) ∝ prior(θ) · exp(−η · loss(θ))``, as the target of a
+    `LaplaceMixture`.
+
+    Attributes
+    ----------
+    priors : Priors | dict[str, Distribution]
+        The prior of each calibrated parameter, or
+        ``Priors.uniform_on_bounds()``.
+    eta : float
+        The scale of the loss, above 0.
+    """
+
+    kind: Literal["gibbs"] = "gibbs"
+    eta: float = Field(gt=0.0, allow_inf_nan=False, description="Scale of the loss.")
+
+
+type MixtureTarget = Annotated[
+    LikelihoodTarget | GibbsTarget, Field(discriminator="kind")
+]
+"""The posterior a `LaplaceMixture` samples."""
+
+
+class MixtureComponent(BaseModel):
+    """
+    One component of a Laplace mixture: the Laplace approximation at one
+    optimum of the starts.
+
+    Attributes
+    ----------
+    center : dict[str, float]
+        The optimum, by parameter.
+    weight : float
+        Its weight in the mixture: its Laplace evidence over the sum.
+    covariance : list[list[float]]
+        Its covariance on the unbounded scale of the parameters.
+    log_evidence : float
+        The log of its Laplace evidence,
+        ``log p(θ̂) + log |dθ/du| + (d/2) log 2π + ½ log |Σ|``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    center: dict[str, float]
+    weight: float
+    covariance: list[list[float]]
+    log_evidence: float
+
+
+class ImportanceResult(BaseModel):
+    """
+    The result of a Laplace mixture: draws of the mixture weighted by the
+    target over the mixture, smoothed by Pareto-smoothed importance
+    sampling.
+
+    Attributes
+    ----------
+    fit : CalibrationResult
+        The multi-start fit whose ends made the components:
+        ``Calibrator.run(starts)``.
+    sample : ParameterSample
+        The draws with their smoothed weights.
+    components : list[MixtureComponent]
+        The components, in order of their objective.
+    k_hat : float
+        The Pareto shape of the tail of the weights. Up to 0.5 the weights
+        have a finite variance; above 0.7 the estimate is unreliable.
+    effective_size : float
+        Kish's effective size of the smoothed weights.
+    reliable : bool
+        Whether ``k_hat`` is at most 0.7. An unreliable sample is also
+        logged as a warning.
+    notes : list[str]
+        Ends that gave no component, and an unreliable sample, in words.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    fit: CalibrationResult
+    sample: ParameterSample
+    components: list[MixtureComponent]
+    k_hat: float
+    effective_size: float
+    reliable: bool
+    notes: list[str]
+
+
+class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
+    """
+    The Laplace mixture: a Laplace approximation at each distinct optimum of
+    a multi-start fit, weighted by its Laplace evidence, as the proposal of
+    importance sampling of a posterior, with the largest weights smoothed
+    (Pareto-smoothed importance sampling, Vehtari et al. 2024).
+
+    The ends of the starts merge into a component when they are closer than
+    one Mahalanobis unit to it. Every draw is weighted by the target over
+    the mixture, on the unbounded scale. ``k_hat`` says whether the mixture
+    covers the target: above 0.7 the sample is marked unreliable.
+
+    Attributes
+    ----------
+    starts : int
+        Starts of the fit, at least 1: the initial guess, then rows of a
+        Latin hypercube over the bounds.
+    draws : int
+        Number of draws of the mixture, at least 25, so that the tail of the
+        weights has 5.
+    target : LikelihoodTarget | GibbsTarget
+        The posterior of the observation models with priors, or the Gibbs
+        posterior of the loss with priors and ``eta``.
+    curvature : "gauss_newton"
+        The curvature of each component (default ``"gauss_newton"``).
+    """
+
+    starts: int = Field(ge=1, description="Starts of the fit.")
+    draws: int = Field(ge=25, description="Number of draws.")
+    target: MixtureTarget = Field(description="The posterior to sample.")
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
     )

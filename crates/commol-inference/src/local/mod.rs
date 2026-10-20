@@ -1,12 +1,13 @@
 //! Local approximations around a fit: the curvature of the objective on the
-//! unbounded scale, the Laplace approximation, the delta method and the
-//! sandwich.
+//! unbounded scale, the Laplace approximation, the delta method, the
+//! sandwich and the Laplace mixture.
 //!
 //! | Module | Holds |
 //! |---|---|
 //! | [`approximation`] | [`CurvatureKind`], [`curvature_at`] and [`laplace_approximation`]: the approximations of a problem at a fit |
 //! | [`band`] | [`DeltaBand`]: the band of every output by the delta method, [`delta_band`] |
 //! | [`curvature`] | [`Curvature`]: the expected curvature (Gauss–Newton) of the objective at a fit, on the unbounded scale of [`crate::transform`] |
+//! | [`mixture`] | [`laplace_mixture`]: a Laplace approximation at each optimum of the starts, the proposal of an importance sampler |
 //! | [`sandwich`] | [`sandwich()`]: the covariance `H⁻¹ B H⁻¹` with the meat summed over blocks, [`sandwich_approximation`] |
 //! | [`gaussian`] | [`Gaussian`]: a normal or Student-t distribution on the unbounded scale, its draws mapped back; [`laplace`] |
 //!
@@ -18,6 +19,7 @@ pub mod approximation;
 pub mod band;
 pub mod curvature;
 pub mod gaussian;
+pub mod mixture;
 pub mod sandwich;
 
 use std::fmt;
@@ -26,6 +28,7 @@ pub use approximation::{CurvatureKind, curvature_at, laplace_approximation};
 pub use band::{DeltaBand, delta_band};
 pub use curvature::Curvature;
 pub use gaussian::{Gaussian, laplace};
+pub use mixture::{Component, MixtureRun, laplace_mixture};
 pub use sandwich::{SandwichRun, sandwich, sandwich_approximation};
 
 /// Why a local approximation could not be made.

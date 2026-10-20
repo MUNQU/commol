@@ -1,9 +1,9 @@
 """The runners of the local approximations, registered for
 ``Calibrator.uncertainty``.
 
-Each runner fits the problem with ``Calibrator.run`` and hands the fit to the
-Rust runner, which differentiates the problem there and draws on the
-unbounded scale.
+Each runner fits the problem with ``Calibrator.run`` and hands the fit, or
+the ends of its starts, to the Rust runner, which differentiates the problem
+there and draws on the unbounded scale.
 """
 
 import logging
@@ -13,8 +13,12 @@ from commol.api.inference.registry import register
 from commol.api.inference.resampling import fit_values, rust_block_length
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.inference.local import (
+    GibbsTarget,
+    ImportanceResult,
     Laplace,
+    LaplaceMixture,
     LaplaceResult,
+    MixtureComponent,
     Sandwich,
     SandwichResult,
 )
@@ -128,5 +132,74 @@ def run_sandwich(calibrator: "Calibrator", method: Sandwich) -> SandwichResult:
     return result
 
 
+def run_laplace_mixture(
+    calibrator: "Calibrator", method: LaplaceMixture
+) -> ImportanceResult:
+    """
+    Fit from several starts and sample the target with the Laplace mixture of
+    their ends.
+
+    Parameters
+    ----------
+    calibrator : Calibrator
+        The calibration problem.
+    method : LaplaceMixture
+        The settings.
+
+    Returns
+    -------
+    ImportanceResult
+        The fit, the weighted draws, the components, ``k_hat`` and the
+        effective size.
+    """
+    fit = calibrator.run(starts=method.starts)
+    names = calibrator.parameter_names
+    target = method.target
+    run = rust.laplace_mixture(
+        calibrator.rust_problem,
+        target.priors.rust_priors(),
+        target.eta if isinstance(target, GibbsTarget) else None,
+        [[start.end[name] for name in names] for start in fit.starts],
+        method.draws,
+        method.curvature,
+        calibrator.seed,
+    )
+    for note in run.notes:
+        logger.warning(note)
+    parameters = calibrator.problem.parameters
+    return ImportanceResult(
+        fit=fit,
+        sample=ParameterSample(
+            names=names,
+            bounds=[(p.min_bound, p.max_bound) for p in parameters],
+            values=run.values,
+            log_weights=run.log_weights,
+            method=SampleMethod(
+                name="laplace_mixture", settings=method.model_dump(mode="json")
+            ),
+        ),
+        components=[
+            MixtureComponent(
+                center=dict(zip(names, center, strict=True)),
+                weight=weight,
+                covariance=covariance,
+                log_evidence=log_evidence,
+            )
+            for center, weight, covariance, log_evidence in zip(
+                run.centers,
+                run.weights,
+                run.covariances,
+                run.log_evidences,
+                strict=True,
+            )
+        ],
+        k_hat=run.k_hat,
+        effective_size=run.effective_size,
+        reliable=run.reliable,
+        notes=list(run.notes),
+    )
+
+
 register(Laplace, run_laplace)
+register(LaplaceMixture, run_laplace_mixture)
 register(Sandwich, run_sandwich)
