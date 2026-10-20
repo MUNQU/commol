@@ -284,8 +284,8 @@ the example below uses.
 [identifiability report](identifiability.md#the-report) with a `profile`
 section, which `merge` joins with the other methods. A rate that reads
 `k1 * s` cannot tell `k1` from `s`: their profiles are flat on the ridge
-`k1 · s = constant`, resetting `s` breaks it, and both read `in_combination`,
-as the structural rank does. The two still disagree in some cases, and the
+`k1 · s = constant`, resetting `s` breaks it, and the profile of `k1` reads
+`in_combination`, compensated by `s`, as the structural rank does. The two still disagree in some cases, and the
 merged verdict is then `conflicting`:
 
 - the rank reads the rank most points of a Latin hypercube across the whole
@@ -333,10 +333,10 @@ product_problem = CalibrationProblem(
 )
 product = Calibrator(Simulation(product_model(None, None, None)), product_problem)
 profiles = product.uncertainty(
-    ProfileLikelihood(parameters=["k1", "s", "k2"], threshold=Threshold.chi_square(0.95))
+    ProfileLikelihood(parameters=["k1"], threshold=Threshold.chi_square(0.95))
 )
 print(profiles.verdicts)
-# {'k1': 'structurally_non_identifiable', 's': 'structurally_non_identifiable', 'k2': 'identifiable'}
+# {'k1': 'structurally_non_identifiable'}
 print(profiles.notes[0])
 # 'k1': the ridge leaves the box at 0.8 above the fit, where 's' reaches its
 # bound; the profile is flat inside the box, and its rise past it comes from
@@ -344,8 +344,8 @@ print(profiles.notes[0])
 print(profiles.structure["k1"].compensated_by)  # ['s']
 report = product.identifiability(StructuralRank(points=5, design="observations"))
 merged = report.merge(profiles.report())
-print(merged.verdicts["k1"].structural.verdict, merged.verdicts["k2"].practical.verdict)
-# in_combination determined
+print(merged.verdicts["k1"].structural.verdict, merged.verdicts["s"].structural.verdict)
+# in_combination in_combination
 ```
 
 ## Plots
@@ -355,7 +355,7 @@ statistic of each point, the threshold as a dashed line and the ends of the
 interval as dotted lines.
 
 ```python
-figure = SimulationPlotter.plot_profiles(profiles, output_file="profiles.png")
+figure = SimulationPlotter.plot_profiles(result)
 ```
 
 ## Checklist
