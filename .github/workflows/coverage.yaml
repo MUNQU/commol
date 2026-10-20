@@ -50,6 +50,7 @@ jobs:
           - name: local approximations
             tests: >-
               tests/uncertainty/test_coverage.py::TestLaplace
+              tests/uncertainty/test_coverage.py::TestSandwich
     defaults:
       run:
         working-directory: ./py-commol

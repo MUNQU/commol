@@ -1,5 +1,5 @@
 //! Python bindings of the local approximations of `commol-inference`: the
-//! Laplace approximation and the delta method.
+//! Laplace approximation, the delta method and the sandwich.
 //!
 //! Each runner takes the problem built once by a `Calibrator` and the fit,
 //! and returns plain values; Python builds the result.
@@ -91,6 +91,46 @@ fn laplace(
     ))
 }
 
+/// A sandwich: the run, the blocks, the block length and its estimates.
+type SandwichTables = (PyLocalRun, usize, usize, Option<Vec<(String, f64)>>);
+
+/// The sandwich covariance at the fit, with the meat summed over blocks
+///
+/// Args:
+///     problem: The calibration problem
+///     fit: The fitted values, in problem order
+///     curvature: "gauss_newton" or "hessian"
+///     block_length: Positions per block, or None for the automatic length
+///     draws: Number of draws
+///     seed: Seed of the draws
+///
+/// Returns:
+///     The run, the number of blocks, the positions per block and, with the
+///     automatic length, the estimate of each series
+///
+/// Raises:
+///     ValueError: If the loss is the absolute error, a fit is on a bound,
+///         the engine is stochastic, the block length does not fit the
+///         positions, or there are not more blocks than parameters
+///     RuntimeError: If the derivatives fail at the fit
+#[pyfunction]
+fn sandwich(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    fit: Vec<f64>,
+    curvature: &str,
+    block_length: Option<usize>,
+    draws: usize,
+    seed: u64,
+) -> PyResult<SandwichTables> {
+    let kind = curvature_kind(curvature)?;
+    let run = py
+        .detach(|| local::sandwich_approximation(&problem.inner, &fit, kind, block_length))
+        .map_err(local_error)?;
+    let local = PyLocalRun::of(&run.gaussian, draws, seed, run.curvature.notes().to_vec());
+    Ok((local, run.blocks, run.block_length, run.estimates))
+}
+
 /// A band and its outputs: `(outputs, center, lower, upper)`, one row per
 /// output and one value per position in each table.
 type BandTables = (Vec<String>, Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>);
@@ -151,6 +191,7 @@ fn delta_band(
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyLocalRun>()?;
     m.add_function(wrap_pyfunction!(laplace, m)?)?;
+    m.add_function(wrap_pyfunction!(sandwich, m)?)?;
     m.add_function(wrap_pyfunction!(delta_band, m)?)?;
     Ok(())
 }

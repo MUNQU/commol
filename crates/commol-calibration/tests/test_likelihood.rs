@@ -751,3 +751,121 @@ fn fisher_information_of_continuous_models_is_the_variance_of_their_scores() {
         }
     }
 }
+
+/// The derivative of the discrepancy of one run with respect to the
+/// prediction `i`, or to the parameter value `j`, by central differences.
+fn differenced(f: impl Fn(&[f64]) -> f64, at: &[f64], index: usize) -> f64 {
+    let h = 1e-6 * at[index].abs().max(1.0);
+    let mut up = at.to_vec();
+    let mut down = at.to_vec();
+    up[index] += h;
+    down[index] -= h;
+    (f(&up) - f(&down)) / (2.0 * h)
+}
+
+/// Each term's gradient with respect to its mean equals the difference of
+/// the discrepancy in that prediction, and the gradients of the noise
+/// arguments sum to the difference in their parameter.
+fn assert_scores(problem: &CalibrationProblem<LineEngine>, values: &[f64], predictions: &[f64]) {
+    let discrepancy = problem.discrepancy();
+    let terms = problem.term_derivatives(values, predictions).unwrap();
+    for (i, term) in terms.iter().enumerate() {
+        let expected = differenced(|p| discrepancy.of_run(values, p).unwrap(), predictions, i);
+        close_to(term.gradient[0], expected, 1e-6);
+    }
+    for j in 0..values.len() {
+        let summed: f64 = terms
+            .iter()
+            .flat_map(|term| {
+                term.parameters
+                    .iter()
+                    .zip(&term.gradient[1..])
+                    .filter(move |(parameter, _)| **parameter == Some(j))
+                    .map(|(_, gradient)| *gradient)
+            })
+            .sum();
+        let expected = differenced(|v| discrepancy.of_run(v, predictions).unwrap(), values, j);
+        assert!(
+            (summed - expected).abs() <= 1e-6 * expected.abs().max(1e-3),
+            "parameter {j}: {summed} against {expected}"
+        );
+    }
+}
+
+#[test]
+fn scores_equal_the_differences_of_the_terms() {
+    let data = observed(&[3.0, 4.0, 1.0, 6.0]);
+    let weights = [1.0, 2.0, 0.5, 1.0];
+    let values = [3.0, 4.0, 1.0, 6.0];
+    let predictions = [2.5, 4.4, 1.5, 5.0];
+    for loss in [
+        LossConfig::SumSquaredError,
+        LossConfig::RootMeanSquaredError,
+    ] {
+        let problem = problem(data.clone(), line_parameters(), loss.into())
+            .unwrap()
+            .with_observation_normalization(true)
+            .unwrap()
+            .with_data(&values, &weights)
+            .unwrap();
+        assert_scores(&problem, &[0.0, 0.0], &predictions);
+    }
+
+    let parameter = |id: &str| Argument::Parameter(id.to_string());
+    let cases = [
+        (
+            ObservationModel::Normal { sd: parameter("s") },
+            vec![noise("s", 0.1, 5.0)],
+            vec![0.7],
+        ),
+        (
+            ObservationModel::LogNormal {
+                sigma: parameter("s"),
+                center: Center::Mean,
+            },
+            vec![noise("s", 0.1, 5.0)],
+            vec![0.4],
+        ),
+        (
+            ObservationModel::LogNormal {
+                sigma: parameter("s"),
+                center: Center::Median,
+            },
+            vec![noise("s", 0.1, 5.0)],
+            vec![0.4],
+        ),
+        (
+            ObservationModel::StudentT {
+                df: parameter("df"),
+                scale: parameter("s"),
+            },
+            vec![noise("df", 1.0, 30.0), noise("s", 0.1, 5.0)],
+            vec![3.5, 0.8],
+        ),
+        (ObservationModel::Poisson, vec![], vec![]),
+        (
+            ObservationModel::NegativeBinomial {
+                overdispersion: parameter("s"),
+            },
+            vec![noise("s", 0.0, 5.0)],
+            vec![0.3],
+        ),
+        (
+            ObservationModel::Binomial { trials: Some(8) },
+            vec![],
+            vec![],
+        ),
+    ];
+    for (model, noise_parameters, noise_values) in cases {
+        let problem = problem(
+            data.clone(),
+            [line_parameters(), noise_parameters].concat(),
+            models(model),
+        )
+        .unwrap()
+        .with_data(&values, &weights)
+        .unwrap();
+        let values = [vec![0.0, 0.0], noise_values].concat();
+        assert_scores(&problem, &values, &predictions);
+    }
+}

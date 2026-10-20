@@ -133,6 +133,8 @@ from commol.context.inference import (
     LaplaceResult,
     DeltaBand,
     LocalResult,
+    Sandwich,
+    SandwichResult,
 )
 from commol.context.observation_models import (
     BinomialObservations,
@@ -236,6 +238,8 @@ __all__ = [
     "LaplaceResult",
     "DeltaBand",
     "LocalResult",
+    "Sandwich",
+    "SandwichResult",
     "CalibrationConstraint",
     "CalibrationEvaluation",
     "CalibrationHistory",

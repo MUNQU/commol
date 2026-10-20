@@ -213,6 +213,58 @@ impl Noise {
         }
     }
 
+    /// The derivatives of `log p(y | μ, …)` at the mean `mean` with respect
+    /// to the arguments `(μ, noise arguments…)` ([`Self::argument_count`]):
+    /// the scores of one observation, whose variance is
+    /// [`Self::information`].
+    pub fn scores(&self, y: f64, mean: f64) -> Vec<f64> {
+        match *self {
+            Self::Normal { sd } => {
+                let z = (y - mean) / sd;
+                vec![z / sd, (z * z - 1.0) / sd]
+            }
+            Self::LogNormal { sigma, center } => {
+                let z = (libm::log(y) - log_location(mean, sigma, center)) / sigma;
+                // The location `log μ − σ²/2` of a `Mean` center moves with σ.
+                let location_slope = match center {
+                    Center::Mean => -sigma,
+                    Center::Median => 0.0,
+                };
+                vec![
+                    z / (sigma * mean),
+                    (z * z - 1.0) / sigma + z * location_slope / sigma,
+                ]
+            }
+            Self::StudentT { df, scale } => {
+                let d = y - mean;
+                let z2 = d * d / (scale * scale);
+                vec![
+                    (df + 1.0) * d / (df * scale * scale + d * d),
+                    0.5 * (digamma(0.5 * (df + 1.0)) - digamma(0.5 * df))
+                        - 0.5 / df
+                        - 0.5 * libm::log1p(z2 / df)
+                        + (df + 1.0) * z2 / (2.0 * df * (df + z2)),
+                    -1.0 / scale + (df + 1.0) * z2 / (scale * (df + z2)),
+                ]
+            }
+            Self::Poisson => vec![y / mean - 1.0],
+            Self::NegativeBinomial { overdispersion } => {
+                let phi = overdispersion;
+                vec![
+                    (y - mean) / (mean * (1.0 + phi * mean)),
+                    dispersion_score(y, mean, phi, dispersion_first_terms(y, phi)),
+                ]
+            }
+            Self::Binomial { trials } => {
+                let n = trials as f64;
+                if n == 0.0 {
+                    return vec![0.0];
+                }
+                vec![(y - mean) * n / (mean * (n - mean))]
+            }
+        }
+    }
+
     /// The log density of `y` at a mean far from it: `distance` above `y`,
     /// or, for a binomial, half a trial from the end of its trials farther
     /// from `y`. [`crate::OptimizationObjective`] scales its penalty with it.
@@ -313,6 +365,19 @@ fn dispersion_score(y: f64, mean: f64, phi: f64, first_terms: f64) -> f64 {
     first_terms - y * mean / (1.0 + phi * mean) + dispersion_bracket(mean, phi)
 }
 
+/// `Σ_{j<y} j/(1 + jφ)`: the sum of its terms below [`SUM_TERMS`] or
+/// [`SMALL_OVERDISPERSION`], otherwise `y/φ − (ψ(y + 1/φ) − ψ(1/φ))/φ²`.
+fn dispersion_first_terms(y: f64, phi: f64) -> f64 {
+    if y < SUM_TERMS || phi < SMALL_OVERDISPERSION {
+        (0..y as u64)
+            .map(|j| j as f64 / (1.0 + j as f64 * phi))
+            .sum()
+    } else {
+        let r = 1.0 / phi;
+        y / phi - (digamma(y + r) - digamma(r)) / (phi * phi)
+    }
+}
+
 /// The Fisher information of the overdispersion `φ` of a negative binomial
 /// of mean `mean`: `Σ_y p(y) s(y)²`, a sum of positive terms over the
 /// counts, from 0 until the terms above the mean are negligible.
@@ -341,9 +406,27 @@ fn dispersion_information(mean: f64, phi: f64) -> f64 {
     }
 }
 
-/// Where the asymptotic series of trigamma starts: its next term is below
-/// `1e-14` there.
+/// Where the asymptotic series of digamma and trigamma start: their next
+/// terms are below `1e-14` there.
 const ASYMPTOTIC: f64 = 12.0;
+
+/// The digamma function `ψ(x) = d ln Γ(x)/dx` for `x > 0`: the recurrence
+/// `ψ(x) = ψ(x + 1) − 1/x` up to [`ASYMPTOTIC`], then its asymptotic series.
+pub(crate) fn digamma(mut x: f64) -> f64 {
+    let mut shift = 0.0;
+    while x < ASYMPTOTIC {
+        shift -= 1.0 / x;
+        x += 1.0;
+    }
+    let inverse = 1.0 / (x * x);
+    shift + libm::log(x)
+        - 0.5 / x
+        - inverse
+            * (1.0 / 12.0
+                - inverse
+                    * (1.0 / 120.0
+                        - inverse * (1.0 / 252.0 - inverse * (1.0 / 240.0 - inverse / 132.0))))
+}
 
 /// The trigamma function `ψ'(x)` for `x > 0`: the recurrence
 /// `ψ'(x) = ψ'(x + 1) + 1/x²` up to [`ASYMPTOTIC`], then its asymptotic
@@ -370,10 +453,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn trigamma_has_its_values_at_one_and_one_half() {
+    fn digamma_and_trigamma_have_their_values_at_one_and_one_half() {
+        let euler = std::f64::consts::EULER_GAMMA;
+        assert!((digamma(1.0) + euler).abs() < 1e-14);
+        assert!((digamma(0.5) + euler + 2.0 * std::f64::consts::LN_2).abs() < 1e-14);
         let pi2 = std::f64::consts::PI * std::f64::consts::PI;
         assert!((trigamma(1.0) - pi2 / 6.0).abs() < 1e-14);
         assert!((trigamma(0.5) - pi2 / 2.0).abs() < 1e-13);
+    }
+
+    #[test]
+    fn large_counts_sum_the_dispersion_score_by_digamma() {
+        let (y, phi) = (1500.0, 0.01);
+        let summed: f64 = (0..1500).map(|j| j as f64 / (1.0 + j as f64 * phi)).sum();
+        let by_digamma = dispersion_first_terms(y, phi);
+        assert!(
+            (summed - by_digamma).abs() < 1e-9 * summed,
+            "{summed} {by_digamma}"
+        );
     }
 
     #[test]

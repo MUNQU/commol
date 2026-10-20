@@ -814,6 +814,15 @@ class InferenceModule(Protocol):
         draws: int,
         seed: int,
     ) -> LocalRunProtocol: ...
+    def sandwich(
+        self,
+        problem: CalibrationProblemProtocol,
+        fit: list[float],
+        curvature: str,
+        block_length: int | None,
+        draws: int,
+        seed: int,
+    ) -> tuple[LocalRunProtocol, int, int, list[tuple[str, float]] | None]: ...
     def delta_band(
         self,
         problem: CalibrationProblemProtocol,

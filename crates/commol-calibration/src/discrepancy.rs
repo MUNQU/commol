@@ -259,13 +259,14 @@ impl Discrepancy {
     /// run, at the parameter `values` and the means `predictions`, with
     /// respect to its arguments ([`TermDerivatives`]).
     ///
-    /// | Discrepancy | Curvature of the mean |
-    /// |---|---|
-    /// | `SumSquaredError` | `2 w n²` |
-    /// | `RootMeanSquaredError` | `2 w n² · c`, `c = 1 / (2 √(W · S))` |
-    /// | Observation models | `w` times the Fisher information ([`crate::Noise::information`]) |
+    /// | Discrepancy | Gradient | Curvature |
+    /// |---|---|---|
+    /// | `SumSquaredError` | `−2 w n² r` | `2 w n²` |
+    /// | `RootMeanSquaredError` | `−2 w n² r · c` | `2 w n² · c`, `c = 1 / (2 √(W · S))` |
+    /// | Observation models | `−w` times the scores ([`crate::Noise::scores`]) | `w` times the Fisher information ([`crate::Noise::information`]) |
     ///
-    /// `n` is the normalization of the observation, `S = Σ w (n r)²` and
+    /// `r = y − μ` is the residual, `n` the normalization of the observation,
+    /// `S = Σ w (n r)²` and
     /// `W = Σ w`: the root mean squared error `√(S / W)` changes by `c` per
     /// unit of `S`, so its terms are those of the sum of squares times `c`.
     ///
@@ -282,7 +283,7 @@ impl Discrepancy {
         let loss = match &self.measure {
             Measure::Likelihood(likelihood) => {
                 return likelihood
-                    .term_curvatures(values, predictions)
+                    .term_derivatives(values, predictions)
                     .map_err(TermError::MeanOutside);
             }
             Measure::Loss(loss) => *loss,
@@ -310,12 +311,18 @@ impl Discrepancy {
             }
         };
         Ok(self
-            .weights
+            .observed
             .iter()
+            .zip(predictions)
+            .zip(&self.weights)
             .zip(&self.normalization)
-            .map(|(&weight, &normalization)| TermDerivatives {
-                parameters: Vec::new(),
-                curvature: vec![2.0 * weight * normalization * normalization * scale],
+            .map(|(((&y, &mean), &weight), &normalization)| {
+                let factor = 2.0 * weight * normalization * normalization * scale;
+                TermDerivatives {
+                    parameters: Vec::new(),
+                    gradient: vec![-factor * (y - mean)],
+                    curvature: vec![factor],
+                }
             })
             .collect())
     }

@@ -13,8 +13,24 @@ import math
 import numpy as np
 import pytest
 
-from commol import Laplace, LaplaceResult, NormalObservations, Predictive
-from tests.support import flow_calibrator
+from commol import (
+    CalibrationProblem,
+    Calibrator,
+    Laplace,
+    LaplaceResult,
+    NelderMeadConfig,
+    NormalObservations,
+    Predictive,
+    Sandwich,
+    Simulation,
+)
+from tests.support import (
+    a_to_b_builder,
+    bounded,
+    build,
+    flow_calibrator,
+    flow_observations,
+)
 
 
 def _normal_data(count: int, seed: int, sd: float, level: float = 10.0) -> list[float]:
@@ -89,3 +105,49 @@ class TestLaplace:
         assert read.covariance == result.covariance
         with pytest.raises(ValueError, match="needs the calibration problem"):
             read.delta_band([1.0], 0.9)
+
+
+class TestSandwich:
+    def test_sandwich_equals_laplace_under_gaussian_noise(self) -> None:
+        count = 200
+        calibrator = flow_calibrator(
+            _normal_data(count, 3, sd=1.0),
+            windowed=True,
+            observation_models={"B": NormalObservations(sd=1.0)},
+        )
+
+        laplace = calibrator.uncertainty(Laplace(draws=10))
+        sandwich = calibrator.uncertainty(Sandwich(block_length=1, draws=10))
+
+        # B/H is the mean of the squared residuals over sd²: its relative
+        # error is about √(2/n).
+        assert sandwich.covariance[0][0] == pytest.approx(
+            laplace.covariance[0][0], rel=3 * math.sqrt(2 / count)
+        )
+        assert sandwich.blocks == count
+
+    def test_sandwich_refuses_too_few_blocks(self) -> None:
+        calibrator = flow_calibrator(_normal_data(6, 4, sd=1.0), windowed=True)
+
+        with pytest.raises(
+            ValueError, match=r"block_length 6 makes 1 block for 1 parameter.*shorter"
+        ):
+            calibrator.uncertainty(Sandwich(block_length=6, draws=10))
+
+    def test_sandwich_refuses_the_absolute_error(self) -> None:
+        model = build(
+            a_to_b_builder(
+                parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": 0}
+            )
+        )
+        problem = CalibrationProblem(
+            observed_data=flow_observations(_normal_data(10, 5, sd=1.0), windowed=True),
+            parameters=[bounded("c", 0.0, 50.0, initial_guess=25.0)],
+            loss_function="mae",
+            optimization_config=NelderMeadConfig(max_iterations=500),
+            seed=1,
+        )
+        calibrator = Calibrator(Simulation(model), problem)
+
+        with pytest.raises(ValueError, match=r"density of the residuals.*bootstrap"):
+            calibrator.uncertainty(Sandwich(block_length=1, draws=10))

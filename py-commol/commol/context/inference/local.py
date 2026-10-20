@@ -1,5 +1,5 @@
-"""The local approximations around a fit: the Laplace approximation, its
-settings and its result.
+"""The local approximations around a fit: the Laplace approximation and the
+sandwich, their settings and their results.
 
 Each reads the curvature of the objective at the fit on the unbounded scale
 of the parameters (the logit of a parameter between two bounds, a log with
@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.method import UncertaintyMethod
+from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
 
 if TYPE_CHECKING:
@@ -196,6 +197,84 @@ class Laplace(UncertaintyMethod[LaplaceResult]):
         The curvature (default ``"gauss_newton"``).
     """
 
+    draws: int = Field(ge=1, description="Number of draws.")
+    curvature: CurvatureName = Field(
+        default="gauss_newton", description="The curvature."
+    )
+
+
+class SandwichResult(LocalResult):
+    """
+    The result of a sandwich: a Student t on the unbounded scale of the
+    parameters, centred on the fit, of covariance ``H⁻¹ B H⁻¹`` and
+    ``blocks − 1`` degrees of freedom.
+
+    Attributes
+    ----------
+    fit : CalibrationResult
+        The fit the sandwich is centred on: ``Calibrator.run()``.
+    covariance : list[list[float]]
+        ``H⁻¹ B H⁻¹`` on the unbounded scale of the parameters.
+    sample : ParameterSample
+        Draws of the Student t, mapped back to the parameters, with equal
+        weights.
+    notes : list[str]
+        The entries of the curvature whose estimated error is not small
+        against their scale.
+    blocks : int
+        The number of blocks ``G``; intervals read a Student t with
+        ``G − 1`` degrees of freedom.
+    block_length : int
+        The positions per block.
+    block_length_estimates : dict[str, float] | None
+        With ``block_length="auto"``, the estimate of each series, by label;
+        otherwise None.
+    """
+
+    blocks: int
+    block_length: int
+    block_length_estimates: dict[str, float] | None
+
+    def degrees_of_freedom(self) -> float | None:
+        """
+        The degrees of freedom of the Student t.
+
+        Returns
+        -------
+        float | None
+            ``blocks − 1``.
+        """
+        return float(self.blocks - 1)
+
+
+class Sandwich(UncertaintyMethod[SandwichResult]):
+    """
+    The sandwich covariance ``H⁻¹ B H⁻¹`` at the fit, with the meat ``B``
+    summed over blocks of positions (the clustered estimator CR1):
+    ``B = G/(G − 1) · Σ_b s_b s_bᵀ``, with ``s_b`` the sum of the gradients
+    of the terms of the observations of block ``b``.
+
+    It needs no noise model: with a loss, ``H`` is the curvature of the loss;
+    with observation models, of ``−log L``. It holds when the noise depends
+    on its neighbours inside a block, when its size changes, and when the
+    noise model is wrong but the mean is right. Intervals and draws read a
+    Student t with ``G − 1`` degrees of freedom; with ``G`` blocks not above
+    the parameters it is refused, since ``B`` would have rank below them.
+    ``loss_function="mae"`` is refused: its sandwich needs a density of the
+    residuals at 0 and a bandwidth (use a bootstrap).
+
+    Attributes
+    ----------
+    block_length : int | "auto"
+        Positions per block; ``"auto"`` is the rule of Politis and White
+        (2004) for non-overlapping blocks on the residuals of the fit.
+    draws : int
+        Number of draws of the Student t, at least 1.
+    curvature : "gauss_newton"
+        The curvature ``H`` (default ``"gauss_newton"``).
+    """
+
+    block_length: BlockLength = Field(description="Positions per block.")
     draws: int = Field(ge=1, description="Number of draws.")
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."

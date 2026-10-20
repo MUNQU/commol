@@ -55,6 +55,8 @@ from commol.context.inference.local import (
     Laplace,
     LaplaceResult,
     LocalResult,
+    Sandwich,
+    SandwichResult,
 )
 from commol.context.inference.method import (
     IdentifiabilityMethod,
@@ -161,6 +163,8 @@ __all__ = [
     "RollingConformal",
     "SampleIdentifiability",
     "SampleMethod",
+    "Sandwich",
+    "SandwichResult",
     "SensitivityMethod",
     "SeriesDistance",
     "SeriesIntervals",

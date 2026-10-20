@@ -32,6 +32,8 @@ pub struct Curvature {
     derivatives: Vec<f64>,
     matrix: Matrix,
     errors: Matrix,
+    gradients: Matrix,
+    predictions: Vec<f64>,
     notes: Vec<String>,
 }
 
@@ -63,10 +65,14 @@ impl Curvature {
         let p = fit.len();
         let mut matrix = Matrix::zeros(p, p);
         let mut errors = Matrix::zeros(p, p);
+        let mut gradients = Matrix::zeros(terms.len(), p);
         for (i, term) in terms.iter().enumerate() {
             let jacobian: Vec<f64> = sensitivities.jacobian.row(i).iter().copied().collect();
             let error: Vec<f64> = sensitivities.errors.row(i).iter().copied().collect();
             add_term(&mut matrix, &mut errors, term, &jacobian, &error);
+            for (j, gradient) in term_gradient(term, &jacobian).into_iter().enumerate() {
+                gradients[(i, j)] = gradient;
+            }
         }
         if matrix.iter().any(|entry| !entry.is_finite()) {
             return Err(LocalError::Failed(
@@ -76,9 +82,15 @@ impl Curvature {
             ));
         }
         let names = problem.parameter_names();
-        Ok(Self::on_the_unbounded_scale(
-            names, transform, fit, matrix, errors,
-        ))
+        let mut curvature = Self::on_the_unbounded_scale(names, transform, fit, matrix, errors);
+        for i in 0..gradients.nrows() {
+            for j in 0..p {
+                gradients[(i, j)] *= curvature.derivatives[j];
+            }
+        }
+        curvature.gradients = gradients;
+        curvature.predictions = sensitivities.predictions;
+        Ok(curvature)
     }
 
     /// The curvature of `problem` at `fit` by central differences of its
@@ -140,6 +152,8 @@ impl Curvature {
             derivatives,
             matrix,
             errors,
+            gradients: Matrix::zeros(0, p),
+            predictions: Vec::new(),
             notes,
         }
     }
@@ -178,6 +192,19 @@ impl Curvature {
     /// errors of the derivatives.
     pub fn errors(&self) -> &Matrix {
         &self.errors
+    }
+
+    /// The gradient of each observation's term of the objective on the
+    /// unbounded scale, one row per observation: `D · Aᵢᵀ ∇ᵢ`, with `∇ᵢ` the
+    /// gradient of the term over its arguments. Their block sums make the
+    /// meat of the sandwich.
+    pub fn gradients(&self) -> &Matrix {
+        &self.gradients
+    }
+
+    /// The predicted observations at the fit.
+    pub fn predictions(&self) -> &[f64] {
+        &self.predictions
     }
 
     /// The entries whose estimated error is above 1 % of the scale of their
@@ -257,6 +284,18 @@ fn add_term(
             }
         }
     }
+}
+
+/// `Aᵀ ∇` of one term: the gradient of its arguments through the Jacobian of
+/// the mean and the parameters of its noise arguments.
+fn term_gradient(term: &TermDerivatives, jacobian: &[f64]) -> Vec<f64> {
+    let mut gradient: Vec<f64> = jacobian.iter().map(|j| term.gradient[0] * j).collect();
+    for (parameter, slope) in term.parameters.iter().zip(&term.gradient[1..]) {
+        if let Some(index) = parameter {
+            gradient[*index] += slope;
+        }
+    }
+    gradient
 }
 
 /// A failure of the derivatives as a local error: a stochastic engine is a

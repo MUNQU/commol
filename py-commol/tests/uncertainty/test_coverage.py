@@ -10,7 +10,9 @@ flow with Gaussian noise (``flow_calibrator``); ABC fits the probability of a
 chain binomial from the units that moved in one step.
 
 The Laplace approximation fits the same flow with a normal model of known
-``sd``, whose likelihood is exactly normal in ``c``.
+``sd``, whose likelihood is exactly normal in ``c``. The sandwich fits a line
+through the origin, ``B(t) = c·t``, whose noise grows with ``t``: a normal
+model of one ``sd`` is wrong there, and so are its Laplace intervals.
 
 A prediction interval holds a new observation, not a fixed value: a study of
 one shifts the interval by the observation, so it holds 0 when it holds the
@@ -42,6 +44,7 @@ from commol import (
     ObservedDataPoint,
     Predictive,
     Priors,
+    Sandwich,
     Simulation,
     SplitConformal,
     Uniform,
@@ -348,3 +351,34 @@ class TestLaplace:
         study = coverage_study(interval, {"c": FLOW}, LEVEL, data_sets=200, seed=21)
 
         assert study.calibrated(), study
+
+
+SLOPE, SLOPE_POSITIONS = 10.0, np.arange(1.0, 31.0)
+
+
+def _changing_noise_study(method: Laplace | Sandwich, models: bool) -> CoverageStudy:
+    def interval(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+        noise = 0.02 * SLOPE_POSITIONS**1.5 * rng.normal(0.0, 1.0, SLOPE_POSITIONS.size)
+        values = SLOPE * SLOPE_POSITIONS + noise
+        calibrator = flow_calibrator(
+            values.tolist(),
+            windowed=False,
+            seed=index,
+            observation_models={"B": NormalObservations(sd="sd")} if models else None,
+            noise=[bounded("sd", 1e-3, 100.0, kind="noise")] if models else (),
+        )
+        return {"c": calibrator.uncertainty(method).sample.interval(LEVEL)["c"]}
+
+    return coverage_study(interval, {"c": SLOPE}, LEVEL, data_sets=300, seed=31)
+
+
+@pytest.mark.coverage_study
+class TestSandwich:
+    def test_sandwich_holds_under_changing_noise(self) -> None:
+        sandwich = _changing_noise_study(
+            Sandwich(block_length=1, draws=2000), models=False
+        )
+        laplace = _changing_noise_study(Laplace(draws=2000), models=True)
+
+        assert sandwich.calibrated(), sandwich
+        assert laplace.coverage("c") < LEVEL - laplace.tolerance, laplace

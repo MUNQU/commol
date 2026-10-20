@@ -167,6 +167,9 @@ pub struct Term {
 pub struct TermDerivatives {
     /// The parameter each noise argument reads, `None` for a number.
     pub parameters: Vec<Option<usize>>,
+    /// The first derivatives of the term over `(μ, noise arguments…)`: its
+    /// score, whose outer products the sandwich sums.
+    pub gradient: Vec<f64>,
     /// The expected second derivatives of the term, row-major over
     /// `(μ, noise arguments…)`.
     pub curvature: Vec<f64>,
@@ -397,32 +400,35 @@ impl Likelihood {
         }
     }
 
-    /// The expected curvature of each observation's term of `−log L` at the
-    /// parameter `values` and the means `predictions`: `wᵢ` times the Fisher
-    /// information of its model ([`Noise::information`]), with the
-    /// parameters its noise arguments read.
+    /// The derivatives of each observation's term of `−log L` at the
+    /// parameter `values` and the means `predictions`: its gradient
+    /// `−wᵢ s(yᵢ)` ([`Noise::scores`]) and its expected curvature `wᵢ`
+    /// times the Fisher information of its model ([`Noise::information`]),
+    /// with the parameters its noise arguments read.
     ///
     /// # Errors
     ///
     /// The index of the first observation with weight whose mean lies
     /// outside the means its model allows.
-    pub fn term_curvatures(
+    pub fn term_derivatives(
         &self,
         values: &[f64],
         predictions: &[f64],
     ) -> Result<Vec<TermDerivatives>, usize> {
         self.terms
             .iter()
+            .zip(&self.observed)
             .zip(&self.weights)
             .zip(predictions)
             .enumerate()
-            .map(|(index, ((&term, &weight), &mean))| {
+            .map(|(index, (((&term, &y), &weight), &mean))| {
                 let noise = self.noise(term, values);
                 let parameters = self.argument_parameters(term);
                 if weight == 0.0 {
                     let size = 1 + parameters.len();
                     return Ok(TermDerivatives {
                         parameters,
+                        gradient: vec![0.0; size],
                         curvature: vec![0.0; size * size],
                     });
                 }
@@ -431,6 +437,11 @@ impl Likelihood {
                 }
                 Ok(TermDerivatives {
                     parameters,
+                    gradient: noise
+                        .scores(y, mean)
+                        .into_iter()
+                        .map(|score| -weight * score)
+                        .collect(),
                     curvature: noise
                         .information(mean)
                         .into_iter()

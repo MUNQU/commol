@@ -1,11 +1,13 @@
 //! Local approximations around a fit: the curvature of the objective on the
-//! unbounded scale, the Laplace approximation and the delta method.
+//! unbounded scale, the Laplace approximation, the delta method and the
+//! sandwich.
 //!
 //! | Module | Holds |
 //! |---|---|
 //! | [`approximation`] | [`CurvatureKind`], [`curvature_at`] and [`laplace_approximation`]: the approximations of a problem at a fit |
 //! | [`band`] | [`DeltaBand`]: the band of every output by the delta method, [`delta_band`] |
 //! | [`curvature`] | [`Curvature`]: the expected curvature (Gauss–Newton) of the objective at a fit, on the unbounded scale of [`crate::transform`] |
+//! | [`sandwich`] | [`sandwich()`]: the covariance `H⁻¹ B H⁻¹` with the meat summed over blocks, [`sandwich_approximation`] |
 //! | [`gaussian`] | [`Gaussian`]: a normal or Student-t distribution on the unbounded scale, its draws mapped back; [`laplace`] |
 //!
 //! Every matrix lives on the unbounded scale of [`crate::transform::Transform`]:
@@ -16,6 +18,7 @@ pub mod approximation;
 pub mod band;
 pub mod curvature;
 pub mod gaussian;
+pub mod sandwich;
 
 use std::fmt;
 
@@ -23,6 +26,7 @@ pub use approximation::{CurvatureKind, curvature_at, laplace_approximation};
 pub use band::{DeltaBand, delta_band};
 pub use curvature::Curvature;
 pub use gaussian::{Gaussian, laplace};
+pub use sandwich::{SandwichRun, sandwich, sandwich_approximation};
 
 /// Why a local approximation could not be made.
 #[derive(Debug, Clone, PartialEq)]
