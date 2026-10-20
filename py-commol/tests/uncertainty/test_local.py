@@ -35,10 +35,12 @@ from commol import (
     Simulation,
     UncertaintyMethod,
 )
+from commol.context.engine import OdeSolver
 from tests.support import (
     a_to_b_builder,
     bounded,
     build,
+    build_ode,
     flow_calibrator,
     flow_observations,
 )
@@ -97,6 +99,35 @@ class TestCurvature:
             expected.covariance[0][0], rel=1e-5
         )
         assert observed.notes == []
+
+    def test_an_uncertain_curvature_is_noted(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # An ODE solved to rtol = 1e-2 makes the differences of its runs
+        # coarse: the error of the curvature is a large share of it.
+        model = build_ode(
+            a_to_b_builder(
+                parameters={"c": None}, rate="c * A / 1000", amounts={"A": 1000, "B": 0}
+            ),
+            OdeSolver(rtol=1e-2, atol=1e-2),
+        )
+        values = [1000 * (1 - math.exp(-0.1 * t)) for t in range(1, 11)]
+        problem = CalibrationProblem(
+            observed_data=flow_observations(values, windowed=False),
+            parameters=[bounded("c", 0.0, 500.0, initial_guess=50.0)],
+            observation_models={"B": NormalObservations(sd=1.0)},
+            optimization_config=NelderMeadConfig(max_iterations=500),
+            seed=1,
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = Calibrator(Simulation(model), problem).uncertainty(
+                Laplace(draws=10)
+            )
+
+        assert len(result.notes) == 1
+        assert "The curvature of ('c', 'c')" in result.notes[0]
+        assert result.notes[0] in caplog.text
 
 
 class TestLaplace:
@@ -170,6 +201,21 @@ class TestSandwich:
             laplace.covariance[0][0], rel=3 * math.sqrt(2 / count)
         )
         assert sandwich.blocks == count
+
+    def test_a_sandwich_band_reads_a_t_of_its_blocks(self) -> None:
+        # Four blocks: the band is the prediction ± t₃(0.95) times its
+        # standard deviation, J Σ Jᵀ with J = t · dc/du at position t.
+        calibrator = flow_calibrator(_normal_data(8, 10, sd=1.0), windowed=True)
+        result = calibrator.uncertainty(Sandwich(block_length=2, draws=10))
+        c = result.fit.best_parameters["c"]
+        derivative = c * (50.0 - c) / 50.0
+
+        band = result.delta_band([3.0], 0.9)
+
+        t_quantile = 2.353363434801823
+        half = t_quantile * 3.0 * derivative * math.sqrt(result.covariance[0][0])
+        assert result.blocks == 4
+        assert band.upper["B"][0] - band.center["B"][0] == pytest.approx(half, rel=1e-6)
 
     def test_sandwich_refuses_too_few_blocks(self) -> None:
         calibrator = flow_calibrator(_normal_data(6, 4, sd=1.0), windowed=True)

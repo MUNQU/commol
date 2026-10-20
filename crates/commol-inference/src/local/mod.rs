@@ -8,7 +8,7 @@
 //! | [`band`] | [`DeltaBand`]: the band of every output by the delta method, [`delta_band`] |
 //! | [`curvature`] | [`Curvature`]: the expected curvature (Gauss–Newton) of the objective at a fit, on the unbounded scale of [`crate::transform`] |
 //! | [`mixture`] | [`laplace_mixture`]: a Laplace approximation at each optimum of the starts, the proposal of an importance sampler |
-//! | [`sandwich`] | [`sandwich()`]: the covariance `H⁻¹ B H⁻¹` with the meat summed over blocks, [`sandwich_approximation`] |
+//! | [`sandwich`](mod@sandwich) | [`sandwich()`]: the covariance `H⁻¹ B H⁻¹` with the meat summed over blocks, [`sandwich_approximation`] |
 //! | [`gaussian`] | [`Gaussian`]: a normal or Student-t distribution on the unbounded scale, its draws mapped back; [`laplace`] |
 //!
 //! Every matrix lives on the unbounded scale of [`crate::transform::Transform`]:
