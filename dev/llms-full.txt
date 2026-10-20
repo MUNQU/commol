@@ -3970,11 +3970,11 @@ A calibration gives one set of parameters. This section shows how far you can tr
 
 ## The three questions
 
-| Question                            | What answers it                                                                                                                                                                                                                                                          |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Which parameters fit the data?      | The [identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) methods; a sample of the parameters, or a profile of the loss; several starts that end apart with equal losses show that the data do not identify the parameters |
-| How do the inputs move the outputs? | The predictive of a sample: the run of every draw, and its band; with no data, a [sensitivity analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md), which propagates the inputs and ranks them                                        |
-| Are the intervals calibrated?       | Scores of the predictive against observations the method did not see, and coverage studies                                                                                                                                                                               |
+| Question                            | What answers it                                                                                                                                                                                                                                                                                                                                                         |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Which parameters fit the data?      | The [identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) methods; a sample of the parameters, or a [profile](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md) of the likelihood or the loss; several starts that end apart with equal losses show that the data do not identify the parameters |
+| How do the inputs move the outputs? | The predictive of a sample: the run of every draw, and its band; with no data, a [sensitivity analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md), which propagates the inputs and ranks them                                                                                                                                       |
+| Are the intervals calibrated?       | Scores of the predictive against observations the method did not see, and coverage studies                                                                                                                                                                                                                                                                              |
 
 ## A band of the model, or a prediction interval
 
@@ -3982,38 +3982,40 @@ A **band of the model** is the spread of the model's output across the draws of 
 
 ## Which method answers which question
 
-| Method                                       | Question                                                                                                                | Needs a noise model     | Page                                                                                                                                       |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Several starts, `Calibrator.run(starts=n)`   | Which parameters fit the data: distinct ends with equal losses                                                          | No                      | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)                                           |
-| `StructuralRank`                             | Which parameters any data of this design can determine, and which combinations                                          | No                      | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#structural-rank)                                |
-| `Collinearity`                               | Which parameters can be fitted together                                                                                 | No                      | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#collinearity)                                   |
-| `SampleIdentifiability`                      | Which parameters a sample determines: contraction, correlations, modes                                                  | No                      | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)                                       |
-| `StartsIdentifiability`                      | Which parameters differ between starts of equal loss                                                                    | No                      | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)                                         |
-| `BayesianBootstrap`                          | How far the parameters move when the data are reweighted by blocks                                                      | No                      | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#bayesian-bootstrap)                                       |
-| `ResidualBootstrap`                          | How far the parameters move when the residuals of the fit are resampled by blocks                                       | No                      | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#residual-block-bootstrap)                                 |
-| `WildBootstrap`                              | The same, when the size of the noise changes along the series                                                           | No                      | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#wild-block-bootstrap)                                     |
-| `BlockJackknife`                             | The standard error and bias of each parameter, and which block of data moves it most                                    | No                      | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#block-jackknife)                                          |
-| `ResidualNoise`                              | Where the next observations fall: a prediction interval                                                                 | No                      | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)                                     |
-| `GibbsPosterior`                             | A posterior of the parameters from the loss and priors, with a scale `η` of the loss                                    | No                      | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#gibbs-posterior)                                     |
-| `AbcSmc`                                     | A posterior of the parameters whose runs come within a tolerance of the data, with priors                               | No                      | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                                                 |
-| `AbcRejection`                               | The same, from the closest draws of the priors                                                                          | No                      | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                                                 |
-| `SplitConformal`                             | Where new observations fall, with a guaranteed coverage, from held-out observations                                     | No                      | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#split-conformal)                                            |
-| `RollingConformal`                           | Where the next observations fall at each horizon ahead of the data                                                      | No                      | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#rolling-origins)                                            |
-| `JackknifePlus`                              | Where new observations fall, with a guaranteed coverage and no held-out data                                            | No                      | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#jackknife)                                                  |
-| `EnbPI`                                      | Where the next observations of a series with dependent errors fall                                                      | No                      | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#enbpi)                                                      |
-| `AdaptiveConformal`                          | Intervals for observations as they arrive, whose share of misses tends to its level                                     | No                      | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#adaptive-conformal-inference)                               |
-| `observation_models` with `Calibrator.run()` | The maximum-likelihood fit of the parameters and the noise                                                              | Yes                     | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) |
-| `BayesianPosterior`                          | The posterior of the parameters from the likelihood and priors, with its evidence                                       | Yes                     | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) |
-| `ParametricBootstrap`                        | How far the parameters move in data sets drawn from the models at the fit                                               | Yes                     | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) |
-| `DistributionNoise`                          | Where the next observations fall: a prediction interval of the models                                                   | Yes                     | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#prediction-with-noise)                    |
-| `Laplace`                                    | A normal around the fit from the curvature of `−log L`, and the band of the outputs by the delta method                 | Yes                     | [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/#laplace-approximation-and-the-delta-method)          |
-| `Sandwich`                                   | A covariance around the fit that holds when the noise model is wrong or the noise depends on its neighbours             | No                      | [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich)                                            |
-| `LaplaceMixture`                             | A posterior from Laplace approximations at the optima of several starts, corrected by importance sampling, with `k_hat` | With `LikelihoodTarget` | [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/#laplace-mixture-and-importance-sampling)             |
-| `Propagation`                                | How uncertainty in the inputs moves the outputs, with no data                                                           | No                      | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#propagation)                                   |
-| `PRCC`                                       | How steadily each output rises or falls with each input, of independent inputs or a sample                              | No                      | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#prcc)                                          |
-| `Morris`                                     | Which inputs matter, in few runs                                                                                        | No                      | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#morris-screening)                              |
-| `Sobol`                                      | The share of the variance of an output each input explains, alone and with interactions                                 | No                      | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#sobol-indices)                                 |
-| `PolynomialChaos`                            | A polynomial surrogate of an output and its Sobol indices, in few runs                                                  | No                      | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#polynomial-chaos)                              |
+| Method                                       | Question                                                                                                                | Needs a noise model                                                             | Page                                                                                                                                       |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Several starts, `Calibrator.run(starts=n)`   | Which parameters fit the data: distinct ends with equal losses                                                          | No                                                                              | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)                                           |
+| `StructuralRank`                             | Which parameters any data of this design can determine, and which combinations                                          | No                                                                              | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#structural-rank)                                |
+| `Collinearity`                               | Which parameters can be fitted together                                                                                 | No                                                                              | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#collinearity)                                   |
+| `SampleIdentifiability`                      | Which parameters a sample determines: contraction, correlations, modes                                                  | No                                                                              | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)                                       |
+| `StartsIdentifiability`                      | Which parameters differ between starts of equal loss                                                                    | No                                                                              | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)                                         |
+| `BayesianBootstrap`                          | How far the parameters move when the data are reweighted by blocks                                                      | No                                                                              | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#bayesian-bootstrap)                                       |
+| `ResidualBootstrap`                          | How far the parameters move when the residuals of the fit are resampled by blocks                                       | No                                                                              | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#residual-block-bootstrap)                                 |
+| `WildBootstrap`                              | The same, when the size of the noise changes along the series                                                           | No                                                                              | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#wild-block-bootstrap)                                     |
+| `BlockJackknife`                             | The standard error and bias of each parameter, and which block of data moves it most                                    | No                                                                              | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#block-jackknife)                                          |
+| `ResidualNoise`                              | Where the next observations fall: a prediction interval                                                                 | No                                                                              | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)                                     |
+| `GibbsPosterior`                             | A posterior of the parameters from the loss and priors, with a scale `η` of the loss                                    | No                                                                              | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#gibbs-posterior)                                     |
+| `AbcSmc`                                     | A posterior of the parameters whose runs come within a tolerance of the data, with priors                               | No                                                                              | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                                                 |
+| `AbcRejection`                               | The same, from the closest draws of the priors                                                                          | No                                                                              | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                                                 |
+| `SplitConformal`                             | Where new observations fall, with a guaranteed coverage, from held-out observations                                     | No                                                                              | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#split-conformal)                                            |
+| `RollingConformal`                           | Where the next observations fall at each horizon ahead of the data                                                      | No                                                                              | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#rolling-origins)                                            |
+| `JackknifePlus`                              | Where new observations fall, with a guaranteed coverage and no held-out data                                            | No                                                                              | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#jackknife)                                                  |
+| `EnbPI`                                      | Where the next observations of a series with dependent errors fall                                                      | No                                                                              | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#enbpi)                                                      |
+| `AdaptiveConformal`                          | Intervals for observations as they arrive, whose share of misses tends to its level                                     | No                                                                              | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#adaptive-conformal-inference)                               |
+| `observation_models` with `Calibrator.run()` | The maximum-likelihood fit of the parameters and the noise                                                              | Yes                                                                             | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) |
+| `BayesianPosterior`                          | The posterior of the parameters from the likelihood and priors, with its evidence                                       | Yes                                                                             | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) |
+| `ParametricBootstrap`                        | How far the parameters move in data sets drawn from the models at the fit                                               | Yes                                                                             | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) |
+| `DistributionNoise`                          | Where the next observations fall: a prediction interval of the models                                                   | Yes                                                                             | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#prediction-with-noise)                    |
+| `Laplace`                                    | A normal around the fit from the curvature of `−log L`, and the band of the outputs by the delta method                 | Yes                                                                             | [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/#laplace-approximation-and-the-delta-method)          |
+| `Sandwich`                                   | A covariance around the fit that holds when the noise model is wrong or the noise depends on its neighbours             | No                                                                              | [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich)                                            |
+| `LaplaceMixture`                             | A posterior from Laplace approximations at the optima of several starts, corrected by importance sampling, with `k_hat` | With `LikelihoodTarget`                                                         | [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/#laplace-mixture-and-importance-sampling)             |
+| `Propagation`                                | How uncertainty in the inputs moves the outputs, with no data                                                           | No                                                                              | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#propagation)                                   |
+| `PRCC`                                       | How steadily each output rises or falls with each input, of independent inputs or a sample                              | No                                                                              | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#prcc)                                          |
+| `Morris`                                     | Which inputs matter, in few runs                                                                                        | No                                                                              | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#morris-screening)                              |
+| `Sobol`                                      | The share of the variance of an output each input explains, alone and with interactions                                 | No                                                                              | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#sobol-indices)                                 |
+| `PolynomialChaos`                            | A polynomial surrogate of an output and its Sobol indices, in few runs                                                  | No                                                                              | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#polynomial-chaos)                              |
+| `ProfileLikelihood`                          | The interval of each parameter and whether the data determine it, from refits with the parameter held                   | No: `Threshold.chi_square` needs one, `beale` and `bootstrap_calibrated` do not | [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md)                                            |
+| `PredictionProfile`                          | The interval of a prediction: the values the data do not reject                                                         | No, as `ProfileLikelihood`                                                      | [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#prediction-profiles)                                |
 
 Each uncertainty method adds its row here when it lands.
 
@@ -4203,10 +4205,10 @@ A parameter the data cannot determine shows up as a wide interval, or as starts 
 
 ## Structural against practical
 
-| Kind           | Question                                               | Depends on                                                                | Methods                                                          |
-| -------------- | ------------------------------------------------------ | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| **Structural** | Can any data from this design determine the parameter? | The model and the positions and outputs observed, not the observed values | `StructuralRank`                                                 |
-| **Practical**  | Do these data determine it?                            | The observed values, their noise and the fit                              | `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability` |
+| Kind           | Question                                               | Depends on                                                                | Methods                                                                                                 |
+| -------------- | ------------------------------------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **Structural** | Can any data from this design determine the parameter? | The model and the positions and outputs observed, not the observed values | `StructuralRank`                                                                                        |
+| **Practical**  | Do these data determine it?                            | The observed values, their noise and the fit                              | `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, the profiles of a `ProfileLikelihood` |
 
 A parameter that is not structurally identifiable is never practically identifiable: no amount of data of the same design fixes it. A parameter that is structurally identifiable can still be poorly determined by the data at hand.
 
@@ -4401,7 +4403,7 @@ A parameter is `poorly_determined` when it is in a correlated pair or its margin
 
 ## The report
 
-An `IdentifiabilityReport` holds, for each parameter, a **structural** and a **practical** verdict, and the sections of the methods that ran (`structural`, `collinearity`, `sample`, `starts`). `merge` joins reports: a verdict the reports agree on stays, with every reason; one they disagree on is `conflicting`, with both reasons. `identifiability_report` gives it as plain data.
+An `IdentifiabilityReport` holds, for each parameter, a **structural** and a **practical** verdict, and the sections of the methods that ran (`structural`, `collinearity`, `sample`, `starts`, `profile`). The profiles of a `ProfileLikelihood` give their report with `ProfileResult.report()`; a flat profile gives the structural verdict `in_combination` when resetting the other parameters to their fitted values breaks it, and `non_identifiable` when nothing the data read depends on the parameter ([Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#verdicts-and-the-identifiability-report)). `merge` joins reports: a verdict the reports agree on stays, with every reason; one they disagree on is `conflicting`, with both reasons. `identifiability_report` gives it as plain data.
 
 ```python
 data = identifiability_report(report)
@@ -4428,6 +4430,7 @@ print(data["parameters"]["k2"]["practical"]["verdict"])  # determined
 | Several starts of an optimizer              | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts) |
 | Scale factors, which often pair with a rate | [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)    |
 | What a sample is                            | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/#the-parameter-sample)     |
+| Intervals and verdicts from profiles        | [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md)  |
 
 # Resampling: Bootstraps and the Jackknife
 
@@ -5532,6 +5535,288 @@ figure = SimulationPlotter.plot_sobol(indices)
 | The parameter sample, the predictive and its scores | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                                                                                                                           |
 | A posterior to propagate                            | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md), [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md) |
 | Which parameters the data determine                 | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md)                                                                                                       |
+
+# Profile Likelihood
+
+[Back to Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)
+
+A profile holds one parameter, or one prediction, at values that step away from the fit, and fits the other parameters again at each value. How fast the fit gets worse tells how well the data determine that quantity: the profile gives a confidence interval of each parameter and each prediction, and a verdict on its identifiability (Raue et al. 2009; Kreutz et al. 2012). Use it when the model is not linear in its parameters, where the intervals of a local approximation fail. Each profile refits with the problem's own optimizer, in parallel in Rust (`crates/commol-inference/src/profiles/`).
+
+## Quick path
+
+```python
+import numpy as np
+
+from commol import (
+    Aggregate,
+    CalibrationParameter,
+    CalibrationProblem,
+    Calibrator,
+    ModelBuilder,
+    NelderMeadConfig,
+    NormalObservations,
+    ObservedDataPoint,
+    PredictionProfile,
+    PredictionSpec,
+    ProfileLikelihood,
+    Simulation,
+    Threshold,
+)
+
+
+def basic_model(k1: float | None, k2: float | None):
+    return (
+        ModelBuilder(name="Basic Model")
+        .add_bin(id="A", name="State A")
+        .add_bin(id="B", name="State B")
+        .add_bin(id="C", name="State C")
+        .add_parameter(id="k1", value=k1)
+        .add_parameter(id="k2", value=k2)
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
+        .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
+        .build(
+            Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0}),
+            engine="DifferenceEquations",
+        )
+    )
+
+
+# B every 4 steps up to step 40, with normal noise of sd 10.
+truth = Simulation(basic_model(0.4, 0.1)).run(num_steps=60)
+rng = np.random.default_rng(3)
+observations = [
+    ObservedDataPoint(
+        at=step,
+        output="B",
+        value=max(truth["B"][step] + rng.normal(0.0, 10.0), 0.0),
+    )
+    for step in range(4, 41, 4)
+]
+parameters = [
+    CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+    CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+]
+problem = CalibrationProblem(
+    observed_data=observations,
+    parameters=parameters,
+    observation_models={"B": NormalObservations(sd=10.0)},
+    optimization_config=NelderMeadConfig(max_iterations=2000, sd_tolerance=1e-10),
+    seed=42,
+)
+calibrator = Calibrator(Simulation(basic_model(None, None)), problem)
+
+# The profile of each parameter, and its 95 % interval.
+result = calibrator.uncertainty(
+    ProfileLikelihood(parameters=["k1", "k2"], threshold=Threshold.chi_square(0.95))
+)
+for name in ("k1", "k2"):
+    interval = result.intervals[name]
+    print(name, round(interval.lower, 4), round(interval.upper, 4), result.verdicts[name])
+# k1 0.3929 0.4055 identifiable
+# k2 0.0984 0.104 identifiable
+
+# The profile of B at step 20, inside the data, and at step 50, after them.
+bands = calibrator.uncertainty(
+    PredictionProfile(
+        specs=[PredictionSpec(at=step, output="B", label=f"B at {step}") for step in (20, 50)],
+        threshold=Threshold.chi_square(0.95),
+    )
+)
+for label, interval in bands.intervals.items():
+    print(label, round(interval.lower, 1), round(interval.upper, 1))
+# B at 20 407.7 430.1
+# B at 50 37.1 44.0
+```
+
+## How to read a profile
+
+The **statistic** of a point is the objective of its refit less the objective of the fit: `−log L` with observation models, the loss otherwise. It is 0 at the fit and rises as the quantity moves away from it. The **interval** of the quantity is where the statistic stays below the **threshold**; each interval is pointwise, for one quantity at a time.
+
+| Field of `ProfileResult` | Holds                                                                                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `profiles[name]`         | A `Profile`: the `values`, the `statistics`, every parameter of each refit, the `threshold`, the `ends` of each side and the `evaluations` of the objective |
+| `intervals[name]`        | A `ProfileInterval`: `lower` and `upper`, `None` on a side that does not cross the threshold                                                                |
+| `verdicts[name]`         | What the shape says ([Verdicts](#verdicts-and-the-identifiability-report))                                                                                  |
+| `fit`                    | The fit every profile starts from                                                                                                                           |
+| `tolerance`              | The numerical tolerance of the statistic, `max(τ, ν)` ([Verdicts](#verdicts-and-the-identifiability-report))                                                |
+| `structure`              | What resetting the other parameters says of each flat profile of a parameter (`ProfileStructure`)                                                           |
+| `notes`                  | A threshold below the tolerance, or a refit below the fit                                                                                                   |
+
+| Shape                                             | Means                                                                          |
+| ------------------------------------------------- | ------------------------------------------------------------------------------ |
+| A valley that crosses the threshold on both sides | The data determine the quantity; the interval is closed                        |
+| A valley open on one side, up to a bound          | The data bound the quantity on one side only                                   |
+| Flat over the whole range                         | The data cannot tell the values apart: another parameter makes up for this one |
+
+A refit below the fit (a negative statistic) means that the fit is not the optimum; `notes` says so, and a fit with more starts (`starts=n`) fixes it.
+
+```python
+profile = result.profiles["k1"]
+print(profile.ends, round(profile.threshold, 4))
+# ('crossed', 'crossed') 1.9207
+```
+
+## Thresholds
+
+The threshold is a required argument: it states what you assume about the noise.
+
+| Threshold                                          | Statistic                          | Assumes                                                                                                                        |
+| -------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `Threshold.chi_square(level)`                      | `−log L` of observation models     | The models hold, and `2 × statistic` is near `χ²₁` (Wilks); it gives `½ χ²₁(level)`. It needs observation models               |
+| `Threshold.beale(level)`                           | A sum of squares, the loss `"sse"` | Independent Gaussian errors of one variance: `S(θ̂) · F(1, n − p; level) / (n − p)`, exact for a model linear in its parameters |
+| `Threshold.bootstrap_calibrated(bootstrap, level)` | Any loss                           | That the bootstrap mimics how the data vary                                                                                    |
+
+The bootstrap threshold calibrates the statistic itself (prepivoting, Beran 1988). Each replicate of `bootstrap` is the replicate `Calibrator.uncertainty(bootstrap)` makes from the problem's seed. It is fitted (`θ̂_b`), then fitted again with the quantity held at its value at the fit of the original data; the rise of the replicate is `PL_b(θ̂ⱼ) − L_b(θ̂_b)`. The threshold of the quantity is the quantile `level` of the rises, so each parameter gets its own. It costs one fit and one refit per quantity for each replicate. Any bootstrap of [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md) works, and the [parametric bootstrap](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) with observation models.
+
+```python
+from commol import ResidualBootstrap
+
+loss_problem = CalibrationProblem(
+    observed_data=observations,
+    parameters=parameters,
+    loss_function="sse",
+    optimization_config=NelderMeadConfig(max_iterations=2000, sd_tolerance=1e-10),
+    seed=42,
+)
+loss_calibrator = Calibrator(Simulation(basic_model(None, None)), loss_problem)
+bootstrap = ResidualBootstrap(
+    replicates=100, block_length=1, residual_scale="additive", scheme="moving"
+)
+for threshold in (
+    Threshold.beale(0.95),
+    Threshold.bootstrap_calibrated(bootstrap, 0.95),
+):
+    profiled = loss_calibrator.uncertainty(
+        ProfileLikelihood(parameters=["k1"], threshold=threshold)
+    )
+    interval = profiled.intervals["k1"]
+    print(threshold.kind, round(interval.lower, 4), round(interval.upper, 4))
+# beale 0.3858 0.4129
+# bootstrap_calibrated 0.3886 0.41
+```
+
+`Threshold.chi_square` on a problem with a loss raises a `ValueError` that names the other two; `Threshold.beale` on another loss, or on observation models, raises one too.
+
+## How a profile is traced
+
+| Step                | Rule                                                                                                                                                                                                                                                        |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Start               | The fit of `Calibrator.run(starts)`                                                                                                                                                                                                                         |
+| Step                | The adaptive step of Raue et al. (2009): it starts at 1 % of the width of the bounds (of the value at the fit, for a prediction), doubles while a step rises by less than half of 10 % of the threshold, and halves when a step rises by more than twice it |
+| Start of each refit | Every parameter extrapolated along the line through the two points before, as in Data2Dynamics                                                                                                                                                              |
+| End of a side       | Past the threshold (`"crossed"`), at a bound (`"bound"`), after `max_steps` points (`"max_steps"`), or at a prediction no values within the bounds give (`"unreachable"`)                                                                                   |
+
+Every side of every quantity runs in parallel. A held parameter leaves the values the optimizer searches, so Nelder-Mead searches one dimension less. A held prediction `g(θ) = c` is an equality constraint met by an augmented Lagrangian whose inner solver is the problem's optimizer. Its final multiplier is minus the slope of the profile (`Profile.multipliers`). With a particle swarm, each refit draws from a seed of its own, derived from the problem's seed, so a profile repeats; a swarm runs each outer iteration of a held prediction to its `max_iterations`.
+
+## Prediction profiles
+
+`PredictionProfile(specs, threshold)` profiles the value of each prediction: a `PredictionSpec` reads an output, or a sum of outputs, at a position, with a `window` and a `factor_id`, as an observation does. Its interval is the set of values the data do not reject (Kreutz et al. 2012); specs at several positions give a band. A prediction past the data has a wider interval, as `B at 50` shows in the [quick path](#quick-path). The intervals are pointwise: a band of them is not a joint region.
+
+## Verdicts and the identifiability report
+
+| Verdict                         | The profile                                                                                                       | In the report                                                                                                                |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `identifiable`                  | Crosses the threshold on both sides                                                                               | Practical `determined`                                                                                                       |
+| `practically_non_identifiable`  | Stays below on at least one side, up to a bound or `max_steps`                                                    | Practical `poorly_determined`                                                                                                |
+| `structurally_non_identifiable` | Flat within `tolerance` over its whole range inside the box of the parameters, or proven flat by the resets below | Structural `in_combination` or `non_identifiable` from the resets; with no structural verdict, practical `poorly_determined` |
+
+`tolerance` is `ε = max(τ, ν)`. `τ` is the `sd_tolerance` of Nelder-Mead, an absolute amount: argmin stops when the costs of its simplex spread by less. For a particle swarm, `τ` is `1e-6 · max(1, |objective at the fit|)` until the swarm gets stop rules. `ν`, the noise floor, is the error of one evaluation of the objective at the fit, from the accuracy of a run: `Σ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on an observation that sums `k` outputs, its prediction `mᵢ`, and the accuracy of the engine (machine epsilon for a difference model, the `rtol` and `atol` of the ODE solver). A solver holds its tolerances at each step, so `ν` is an estimate, not a bound. A threshold at or below `ε` gives no verdict: the profile cannot tell a rise from numerical error, and `notes` says so.
+
+A refit whose free parameter sits on a bound, within `1e-8` of the width of its bounds, that it is not on at the fit has left the box of the parameters: the bound, not the data, makes its rise. The flatness reads only the points inside the box, and a note names the parameter and the value where the ridge leaves it. A side whose crossing point has a free parameter on a bound it is not on over the whole side from the fit crosses because of the box: it counts as open, and its interval end stays, with a note. A parameter that stays on its bound from the fit to the crossing is not seen this way: the verdict holds within the box.
+
+A profile is flat for one of two reasons: other parameters compensate the parameter along it, or nothing the data read depends on it. Raue et al. (2009) read such relations from the paths of the profiles. To tell them apart with no optimizer, the parameter is set to each value of its profile inside the box, and to both ends of its box, with every other parameter at its fitted value, and the objective is evaluated once and compared with the objective at the fit, `f̂`. Two evaluations differ by up to the evaluation floor `2 · (ν₁ + ν₂) + 2 · γₙ · Σ |ℓᵢ|` (`ProfileResult.evaluation_floor`): `ν₁` is `ν`, `ν₂ = Σ ½ |ℓᵢ''| · eᵢ²` uses the expected curvature of each term (an estimate for a model that is not normal), and `γₙ · Σ |ℓᵢ|` bounds the rounding of the sum of the `n` terms, with the constants of `−log L`.
+
+| Resets                                                                                                                        | Structural verdict                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Every reset feasible and within the floor of `f̂`                                                                              | `non_identifiable`, unless another parameter sits on its bound at the fit; the profile then reads `structurally_non_identifiable` |
+| A flat profile with a feasible reset inside the box above `f̂ + T`                                                             | `in_combination`                                                                                                                  |
+| Otherwise, a profile below the fit by more than the floor, no floor (a loss with no term derivatives), or a stochastic engine | None: practical `poorly_determined` for a flat profile, and a note                                                                |
+
+A reset whose evaluation fails counts as infeasible. The ends of the box only rule out `non_identifiable`. A parameter is named in the reason when resetting it alone, where it moves most along the profile, raises the objective of that point above `T`; the parameters not named are then reset together, and a rise above the floor says that the list may be incomplete. Noise parameters of observation models are never named. `combinations` stays empty for a profile: it holds the algebraic combinations of the structural rank. Every reason says that the verdict holds with the other parameters at their fitted values. `Profile.refit_error` is the distance of a refit at the fit from `f̂`, a diagnostic of the optimizer, with a note when it is above `ε`.
+
+What the settings give: with Nelder-Mead at its default `sd_tolerance` (`1e-6`), the resets prove a parameter with no effect `non_identifiable` on a difference model and on an ODE model at the default solver tolerances. A ridge needs its profile flat within `ε`: on an ODE model at the default tolerances `ν` is near `1e-4` and the profiles of the ridge below read `in_combination`; on a difference model `ν` is near `1e-13`, a refit lands about `1e-6` from its minimum, and the profile reads practically non-identifiable. Its `in_combination` needs an `sd_tolerance` near `ν`, as the example below uses.
+
+`ProfileResult.report()` turns the verdicts into an [identifiability report](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#the-report) with a `profile` section, which `merge` joins with the other methods. A rate that reads `k1 * s` cannot tell `k1` from `s`: their profiles are flat on the ridge `k1 · s = constant`, resetting `s` breaks it, and the profile of `k1` reads `in_combination`, compensated by `s`, as the structural rank does. The two still disagree in some cases, and the merged verdict is then `conflicting`:
+
+- the rank reads the rank most points of a Latin hypercube across the whole box have, a profile one ridge through the fit;
+- the rank calls a parameter non-identifiable when its projection on the null space is above 0.95, and identifiable below 0.05: in a sum `k1 + k2` with `k1 ≫ k2`, the rank finds `k2` non-identifiable while its profile, which `k1` compensates, reads `in_combination`;
+- a parameter with no effect while the others sit at their fit, but an effect elsewhere in the box, is `non_identifiable` for the profile, and may be identifiable for the rank.
+
+```python
+from commol import SimulationPlotter, StructuralRank
+
+
+def product_model(k1: float | None, s: float | None, k2: float | None):
+    return (
+        ModelBuilder(name="Product")
+        .add_bin(id="A", name="State A")
+        .add_bin(id="B", name="State B")
+        .add_bin(id="C", name="State C")
+        .add_parameter(id="k1", value=k1)
+        .add_parameter(id="s", value=s)
+        .add_parameter(id="k2", value=k2)
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * s * A * B / total")
+        .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
+        .build(
+            Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0}),
+            engine="DifferenceEquations",
+        )
+    )
+
+
+product_problem = CalibrationProblem(
+    observed_data=observations,
+    parameters=[
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.2, max_bound=0.8),
+        CalibrationParameter(id="s", parameter_type="parameter", min_bound=0.5, max_bound=2.0),
+        CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+    ],
+    observation_models={"B": NormalObservations(sd=10.0)},
+    optimization_config=NelderMeadConfig(max_iterations=4000, sd_tolerance=1e-15),
+    seed=42,
+)
+product = Calibrator(Simulation(product_model(None, None, None)), product_problem)
+profiles = product.uncertainty(
+    ProfileLikelihood(parameters=["k1"], threshold=Threshold.chi_square(0.95))
+)
+print(profiles.verdicts)
+# {'k1': 'structurally_non_identifiable'}
+print(profiles.notes[0])
+# 'k1': the ridge leaves the box at 0.8 above the fit, where 's' reaches its
+# bound; the profile is flat inside the box, and its rise past it comes from
+# the bounds, not the data.
+print(profiles.structure["k1"].compensated_by)  # ['s']
+report = product.identifiability(StructuralRank(points=5, design="observations"))
+merged = report.merge(profiles.report())
+print(merged.verdicts["k1"].structural.verdict, merged.verdicts["s"].structural.verdict)
+# in_combination in_combination
+```
+
+## Plots
+
+`SimulationPlotter.plot_profiles(result)` draws one panel per profile: the statistic of each point, the threshold as a dashed line and the ends of the interval as dotted lines.
+
+```python
+figure = SimulationPlotter.plot_profiles(result)
+```
+
+## Checklist
+
+- [ ] The threshold states your noise: `chi_square` with observation models, `beale` for a sum of squares of independent Gaussian errors, `bootstrap_calibrated` otherwise.
+- [ ] No note says that a refit went below the fit; if one does, fit with more starts.
+- [ ] Every verdict is set; a threshold below the tolerance needs data with noise, or a tighter `sd_tolerance`.
+- [ ] For `in_combination` on a difference model, `sd_tolerance` is near the noise floor `ν` (`notes` says why a flat profile has no structural verdict, and when a refit is less accurate than the tolerance).
+- [ ] A side that ends at `max_steps` is open only because it stopped: raise `max_steps`.
+- [ ] Read an open or flat profile with the [structural rank](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#structural-rank) before you call a parameter non-identifiable.
+
+## Next steps
+
+| To learn                                              | Read                                                                                                      |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| The other evidence of identifiability, and the report | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md)       |
+| Intervals from refits to resampled data               | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md)                 |
+| Observation models and the likelihood                 | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md) |
+| The parameter sample, the predictive and its scores   | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                           |
 
 # Reports
 
@@ -11262,15 +11547,15 @@ Bases: `_Frozen`
 
 Which parameters the model and the data determine: one structural and one practical verdict per parameter, and the evidence of each method.
 
-The structural verdict comes from `StructuralRank` on the design of the observations; a dense design answers what denser data would determine, so its verdicts stay in its section. The practical verdict comes from `Collinearity`, `SampleIdentifiability` and `StartsIdentifiability`.
+The structural verdict comes from `StructuralRank` on the design of the observations, and from a flat profile; a dense design answers what denser data would determine, so its verdicts stay in its section. The practical verdict comes from `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability` and the other profiles.
 
 Attributes:
 
-| Name                                       | Type                           | Description                                        |
-| ------------------------------------------ | ------------------------------ | -------------------------------------------------- |
-| `parameters`                               | `list[str]`                    | The parameters, in problem order.                  |
-| `verdicts`                                 | `dict[str, ParameterVerdicts]` | The verdicts of each parameter.                    |
-| `structural, collinearity, sample, starts` | `list`                         | The sections of the methods that ran, one per run. |
+| Name                                                | Type                           | Description                                        |
+| --------------------------------------------------- | ------------------------------ | -------------------------------------------------- |
+| `parameters`                                        | `list[str]`                    | The parameters, in problem order.                  |
+| `verdicts`                                          | `dict[str, ParameterVerdicts]` | The verdicts of each parameter.                    |
+| `structural, collinearity, sample, starts, profile` | `list`                         | The sections of the methods that ran, one per run. |
 
 Source code in `commol/context/inference/identifiability.py`
 
@@ -11281,9 +11566,10 @@ class IdentifiabilityReport(_Frozen):
     practical verdict per parameter, and the evidence of each method.
 
     The structural verdict comes from `StructuralRank` on the design of the
-    observations; a dense design answers what denser data would determine,
-    so its verdicts stay in its section. The practical verdict comes from
-    `Collinearity`, `SampleIdentifiability` and `StartsIdentifiability`.
+    observations, and from a flat profile; a dense design answers what
+    denser data would determine, so its verdicts stay in its section. The
+    practical verdict comes from `Collinearity`, `SampleIdentifiability`,
+    `StartsIdentifiability` and the other profiles.
 
     Attributes
     ----------
@@ -11291,7 +11577,7 @@ class IdentifiabilityReport(_Frozen):
         The parameters, in problem order.
     verdicts : dict[str, ParameterVerdicts]
         The verdicts of each parameter.
-    structural, collinearity, sample, starts : list
+    structural, collinearity, sample, starts, profile : list
         The sections of the methods that ran, one per run.
     """
 
@@ -11301,6 +11587,7 @@ class IdentifiabilityReport(_Frozen):
     collinearity: list[CollinearitySection] = Field(default_factory=list)
     sample: list[SampleSection] = Field(default_factory=list)
     starts: list[StartsSection] = Field(default_factory=list)
+    profile: list[ProfileSection] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def check_parameters(self) -> Self:
@@ -11368,6 +11655,7 @@ class IdentifiabilityReport(_Frozen):
             collinearity=[s for r in reports for s in r.collinearity],
             sample=[s for r in reports for s in r.sample],
             starts=[s for r in reports for s in r.starts],
+            profile=[s for r in reports for s in r.profile],
         )
 ```
 
@@ -11482,6 +11770,7 @@ def merge(self, *others: "IdentifiabilityReport") -> "IdentifiabilityReport":
         collinearity=[s for r in reports for s in r.collinearity],
         sample=[s for r in reports for s in r.sample],
         starts=[s for r in reports for s in r.starts],
+        profile=[s for r in reports for s in r.profile],
     )
 ```
 
@@ -11525,11 +11814,11 @@ The structural verdict of one parameter.
 
 Attributes:
 
-| Name           | Type                    | Description                                                                                                                                                                                                          |
-| -------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdict`      | `StructuralVerdictName` | identifiable: the null space of the sensitivities has no component on it. in_combination: only the combinations in combinations are. non_identifiable: it lies in the null space. conflicting: two reports disagree. |
-| `reasons`      | `list[str]`             | Why, one per piece of evidence.                                                                                                                                                                                      |
-| `combinations` | `list[str]`             | The identifiable combinations that hold the parameter, such as "k1 · s".                                                                                                                                             |
+| Name           | Type                    | Description                                                                                                                                                                                                                                                                                                      |
+| -------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verdict`      | `StructuralVerdictName` | identifiable: the null space of the sensitivities has no component on it, or a profile crosses its threshold. in_combination: the data determine it only together with other parameters. non_identifiable: it lies in the null space, or nothing the data read depends on it. conflicting: two reports disagree. |
+| `reasons`      | `list[str]`             | Why, one per piece of evidence.                                                                                                                                                                                                                                                                                  |
+| `combinations` | `list[str]`             | The algebraic combinations that hold the parameter, such as "k1 · s", from the methods that compute them (the structural rank); empty for the verdict of a profile, whose reason names the compensating parameters.                                                                                              |
 
 Source code in `commol/context/inference/identifiability.py`
 
@@ -11542,14 +11831,17 @@ class StructuralVerdict(_Frozen):
     ----------
     verdict : StructuralVerdictName
         ``identifiable``: the null space of the sensitivities has no
-        component on it. ``in_combination``: only the combinations in
-        `combinations` are. ``non_identifiable``: it lies in the null space.
-        ``conflicting``: two reports disagree.
+        component on it, or a profile crosses its threshold. ``in_combination``:
+        the data determine it only together with other parameters.
+        ``non_identifiable``: it lies in the null space, or nothing the data
+        read depends on it. ``conflicting``: two reports disagree.
     reasons : list[str]
         Why, one per piece of evidence.
     combinations : list[str]
-        The identifiable combinations that hold the parameter, such as
-        ``"k1 · s"``.
+        The algebraic combinations that hold the parameter, such as
+        ``"k1 · s"``, from the methods that compute them (the structural
+        rank); empty for the verdict of a profile, whose reason names the
+        compensating parameters.
     """
 
     verdict: StructuralVerdictName
@@ -11936,6 +12228,52 @@ class StartsSection(_Frozen):
     near_best: list[int]
     spread: dict[str, float]
     flagged: list[str]
+```
+
+## ProfileSection
+
+Bases: `_Frozen`
+
+The evidence of a `ProfileLikelihood`.
+
+Attributes:
+
+| Name        | Type                                        | Description                               |
+| ----------- | ------------------------------------------- | ----------------------------------------- |
+| `threshold` | `{chi_square, beale, bootstrap_calibrated}` | The rule of the threshold.                |
+| `level`     | `float`                                     | The level of each pointwise interval.     |
+| `tolerance` | `float`                                     | The numerical tolerance of the statistic. |
+| `verdicts`  | \`dict\[str, ProfileVerdictName             | None\]\`                                  |
+| `intervals` | \`dict\[str, tuple\[float                   | None, float                               |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class ProfileSection(_Frozen):
+    """
+    The evidence of a `ProfileLikelihood`.
+
+    Attributes
+    ----------
+    threshold : {"chi_square", "beale", "bootstrap_calibrated"}
+        The rule of the threshold.
+    level : float
+        The level of each pointwise interval.
+    tolerance : float
+        The numerical tolerance of the statistic.
+    verdicts : dict[str, ProfileVerdictName | None]
+        The verdict of each profiled parameter; None when its threshold is
+        below the tolerance.
+    intervals : dict[str, tuple[float | None, float | None]]
+        The interval of each profiled parameter; None on a side that does not
+        cross the threshold.
+    """
+
+    threshold: Literal["chi_square", "beale", "bootstrap_calibrated"]
+    level: float
+    tolerance: float
+    verdicts: dict[str, ProfileVerdictName | None]
+    intervals: dict[str, tuple[float | None, float | None]]
 ```
 
 # ModelBuilder API
@@ -18687,6 +19025,51 @@ class SimulationPlotter:
         return fig
 
     @staticmethod
+    def plot_profiles(
+        result: ProfileResult,
+        output_file: str | None = None,
+        config: PlotConfig | None = None,
+    ) -> "Figure":
+        """
+        Plot each profile: one subplot per parameter or prediction, with the
+        statistic of each point, the threshold, and the ends of the interval.
+
+        A profile that stays under the threshold up to a bound is open on that
+        side; a flat one stays near 0 over its whole range.
+
+        Parameters
+        ----------
+        result : ProfileResult
+            The result of `ProfileLikelihood` or `PredictionProfile`.
+        output_file : str | None
+            Path to save the figure. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+
+        Returns
+        -------
+        Figure
+            The matplotlib Figure object.
+        """
+        config = config or PlotConfig()
+        SimulationPlotter._apply_seaborn_style(config)
+        names = list(result.profiles)
+        fig, axes = SimulationPlotter._create_grid(config, len(names))
+        for ax, name in zip(axes, names, strict=False):
+            profile = result.profiles[name]
+            ax.plot(profile.values, profile.statistics, marker="o", markersize=3)
+            ax.axhline(profile.threshold, color="grey", linestyle="--", linewidth=1)
+            interval = result.intervals[name]
+            for end in (interval.lower, interval.upper):
+                if end is not None:
+                    ax.axvline(end, color="grey", linestyle=":", linewidth=1)
+            ax.set_xlabel(name)
+            ax.set_ylabel("Profile statistic")
+            ax.set_title(name)
+        SimulationPlotter._finalize_plot(axes, names, output_file, config, "Profiles")
+        return fig
+
+    @staticmethod
     def _create_grid(config: PlotConfig, count: int) -> tuple["Figure", list["Axes"]]:
         """A figure of `count` subplots in the layout of `config`."""
         rows, cols = config.layout or SimulationPlotter._calculate_layout(count)
@@ -19995,6 +20378,79 @@ def plot_sobol(
     SimulationPlotter._finalize_plot(
         axes, result.labels, output_file, config, "Sobol"
     )
+    return fig
+```
+
+#### plot_profiles
+
+```python
+plot_profiles(result: ProfileResult, output_file: str | None = None, config: PlotConfig | None = None) -> Figure
+```
+
+Plot each profile: one subplot per parameter or prediction, with the statistic of each point, the threshold, and the ends of the interval.
+
+A profile that stays under the threshold up to a bound is open on that side; a flat one stays near 0 over its whole range.
+
+Parameters:
+
+| Name          | Type            | Description                                           | Default                                                        |
+| ------------- | --------------- | ----------------------------------------------------- | -------------------------------------------------------------- |
+| `result`      | `ProfileResult` | The result of ProfileLikelihood or PredictionProfile. | *required*                                                     |
+| `output_file` | \`str           | None\`                                                | Path to save the figure. If None, the figure is only returned. |
+| `config`      | \`PlotConfig    | None\`                                                | Layout and style. If None, the defaults.                       |
+
+Returns:
+
+| Type     | Description                   |
+| -------- | ----------------------------- |
+| `Figure` | The matplotlib Figure object. |
+
+Source code in `commol/api/plotter.py`
+
+```python
+@staticmethod
+def plot_profiles(
+    result: ProfileResult,
+    output_file: str | None = None,
+    config: PlotConfig | None = None,
+) -> "Figure":
+    """
+    Plot each profile: one subplot per parameter or prediction, with the
+    statistic of each point, the threshold, and the ends of the interval.
+
+    A profile that stays under the threshold up to a bound is open on that
+    side; a flat one stays near 0 over its whole range.
+
+    Parameters
+    ----------
+    result : ProfileResult
+        The result of `ProfileLikelihood` or `PredictionProfile`.
+    output_file : str | None
+        Path to save the figure. If None, the figure is only returned.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+
+    Returns
+    -------
+    Figure
+        The matplotlib Figure object.
+    """
+    config = config or PlotConfig()
+    SimulationPlotter._apply_seaborn_style(config)
+    names = list(result.profiles)
+    fig, axes = SimulationPlotter._create_grid(config, len(names))
+    for ax, name in zip(axes, names, strict=False):
+        profile = result.profiles[name]
+        ax.plot(profile.values, profile.statistics, marker="o", markersize=3)
+        ax.axhline(profile.threshold, color="grey", linestyle="--", linewidth=1)
+        interval = result.intervals[name]
+        for end in (interval.lower, interval.upper):
+            if end is not None:
+                ax.axvline(end, color="grey", linestyle=":", linewidth=1)
+        ax.set_xlabel(name)
+        ax.set_ylabel("Profile statistic")
+        ax.set_title(name)
+    SimulationPlotter._finalize_plot(axes, names, output_file, config, "Profiles")
     return fig
 ```
 
@@ -25438,7 +25894,7 @@ def windowed_totals(
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-What every uncertainty method takes and returns: the configuration base, the weighted parameter sample, the predictive and its observation noise, the resampling and conformal methods, the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
+What every uncertainty method takes and returns: the configuration base, the weighted parameter sample, the predictive and its observation noise, the resampling, profile and conformal methods, the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
 
 ## InferenceMethod
 
@@ -27952,6 +28408,1231 @@ class BoundError(BaseModel):
 
     lower: tuple[float, float]
     upper: tuple[float, float]
+```
+
+## Profile likelihood
+
+Guide: [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md).
+
+## ProfileLikelihood
+
+Bases: `UncertaintyMethod['ProfileResult']`
+
+The profile likelihood of parameters (Raue et al. 2009).
+
+Each parameter is held at values that step away from the fit, in both directions, and the others are fitted again with the problem's own optimizer. The step grows while the profile rises slowly and shrinks when it jumps, and each point starts from a line through the two points before it. A side ends past the threshold, at a bound, or after `max_steps` points. Parameters run in parallel.
+
+Attributes:
+
+| Name         | Type        | Description                                                                             |
+| ------------ | ----------- | --------------------------------------------------------------------------------------- |
+| `parameters` | `list[str]` | The parameters to profile, at least one.                                                |
+| `threshold`  | `Threshold` | The threshold of the statistic.                                                         |
+| `max_steps`  | `int`       | The most points on each side of a profile (default 100).                                |
+| `starts`     | `int`       | Starts of the fit (default 1): the fit, then rows of a Latin hypercube over the bounds. |
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+class ProfileLikelihood(UncertaintyMethod["ProfileResult"]):
+    """
+    The profile likelihood of parameters (Raue et al. 2009).
+
+    Each parameter is held at values that step away from the fit, in both
+    directions, and the others are fitted again with the problem's own
+    optimizer. The step grows while the profile rises slowly and shrinks
+    when it jumps, and each point starts from a line through the two points
+    before it. A side ends past the threshold, at a bound, or after
+    `max_steps` points. Parameters run in parallel.
+
+    Attributes
+    ----------
+    parameters : list[str]
+        The parameters to profile, at least one.
+    threshold : Threshold
+        The threshold of the statistic.
+    max_steps : int
+        The most points on each side of a profile (default 100).
+    starts : int
+        Starts of the fit (default 1): the fit, then rows of a Latin
+        hypercube over the bounds.
+    """
+
+    parameters: list[str] = Field(min_length=1)
+    threshold: Threshold
+    max_steps: int = Field(default=100, ge=1)
+    starts: int = Field(default=1, ge=1)
+
+    @model_validator(mode="after")
+    def check_unique(self) -> Self:
+        """Each parameter is profiled once."""
+        if len(set(self.parameters)) != len(self.parameters):
+            raise ValueError(f"A parameter is listed twice: {self.parameters}.")
+        return self
+```
+
+### Methods:
+
+#### check_unique
+
+```python
+check_unique() -> Self
+```
+
+Each parameter is profiled once.
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+@model_validator(mode="after")
+def check_unique(self) -> Self:
+    """Each parameter is profiled once."""
+    if len(set(self.parameters)) != len(self.parameters):
+        raise ValueError(f"A parameter is listed twice: {self.parameters}.")
+    return self
+```
+
+## PredictionProfile
+
+Bases: `UncertaintyMethod['ProfileResult']`
+
+The profile likelihood of predictions (Kreutz et al. 2012).
+
+Each prediction is held at values that step away from its value at the fit, as an equality constraint met by an augmented Lagrangian whose inner solver is the problem's own optimizer, and the parameters are fitted again. The interval of a prediction is the set of values the data do not reject; several specs at several positions give a band.
+
+Attributes:
+
+| Name        | Type                   | Description                                              |
+| ----------- | ---------------------- | -------------------------------------------------------- |
+| `specs`     | `list[PredictionSpec]` | The predictions, at least one, with distinct labels.     |
+| `threshold` | `Threshold`            | The threshold of the statistic.                          |
+| `max_steps` | `int`                  | The most points on each side of a profile (default 100). |
+| `starts`    | `int`                  | Starts of the fit (default 1).                           |
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+class PredictionProfile(UncertaintyMethod["ProfileResult"]):
+    """
+    The profile likelihood of predictions (Kreutz et al. 2012).
+
+    Each prediction is held at values that step away from its value at the
+    fit, as an equality constraint met by an augmented Lagrangian whose
+    inner solver is the problem's own optimizer, and the parameters are
+    fitted again. The interval of a prediction is the set of values the data
+    do not reject; several specs at several positions give a band.
+
+    Attributes
+    ----------
+    specs : list[PredictionSpec]
+        The predictions, at least one, with distinct labels.
+    threshold : Threshold
+        The threshold of the statistic.
+    max_steps : int
+        The most points on each side of a profile (default 100).
+    starts : int
+        Starts of the fit (default 1).
+    """
+
+    specs: list[PredictionSpec] = Field(min_length=1)
+    threshold: Threshold
+    max_steps: int = Field(default=100, ge=1)
+    starts: int = Field(default=1, ge=1)
+
+    @model_validator(mode="after")
+    def check_labels(self) -> Self:
+        """Each prediction has a label of its own."""
+        labels = [spec.as_observation().label for spec in self.specs]
+        if len(set(labels)) != len(labels):
+            raise ValueError(
+                f"Each prediction needs a label of its own, got {labels}; set label."
+            )
+        return self
+```
+
+### Methods:
+
+#### check_labels
+
+```python
+check_labels() -> Self
+```
+
+Each prediction has a label of its own.
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+@model_validator(mode="after")
+def check_labels(self) -> Self:
+    """Each prediction has a label of its own."""
+    labels = [spec.as_observation().label for spec in self.specs]
+    if len(set(labels)) != len(labels):
+        raise ValueError(
+            f"Each prediction needs a label of its own, got {labels}; set label."
+        )
+    return self
+```
+
+## PredictionSpec
+
+Bases: `_Frozen`
+
+A prediction to profile: an output, or a sum of outputs, at a position, read as an observation is.
+
+Attributes:
+
+| Name        | Type        | Description                                                   |
+| ----------- | ----------- | ------------------------------------------------------------- |
+| `at`        | `float`     | The position.                                                 |
+| `output`    | \`str       | None\`                                                        |
+| `outputs`   | \`list[str] | None\`                                                        |
+| `label`     | `str`       | The name of the prediction in the result; defaults to output. |
+| `window`    | \`float     | None\`                                                        |
+| `factor_id` | \`str       | None\`                                                        |
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+class PredictionSpec(_Frozen):
+    """
+    A prediction to profile: an output, or a sum of outputs, at a position,
+    read as an observation is.
+
+    Attributes
+    ----------
+    at : float
+        The position.
+    output : str | None
+        The output. Give either `output` or `outputs`.
+    outputs : list[str] | None
+        Outputs summed. Needs a `label`.
+    label : str
+        The name of the prediction in the result; defaults to `output`.
+    window : float | None
+        A window length: the prediction is the output at `at` less the
+        output at ``at - window``.
+    factor_id : str | None
+        A factor parameter that multiplies the prediction.
+    """
+
+    at: float = Field(ge=0, allow_inf_nan=False)
+    output: str | None = Field(default=None, min_length=1)
+    outputs: list[str] | None = None
+    label: str = ""
+    window: float | None = Field(default=None, gt=0)
+    factor_id: str | None = None
+
+    def as_observation(self) -> ObservedDataPoint:
+        """
+        The observation that reads this prediction; its value is not read.
+
+        Returns
+        -------
+        ObservedDataPoint
+            The observation.
+
+        Raises
+        ------
+        ValueError
+            If the outputs or the label are not valid.
+        """
+        return ObservedDataPoint(
+            at=self.at,
+            output=self.output,
+            outputs=self.outputs,
+            label=self.label,
+            value=0.0,
+            window=self.window,
+            factor_id=self.factor_id,
+        )
+```
+
+### Methods:
+
+#### as_observation
+
+```python
+as_observation() -> ObservedDataPoint
+```
+
+The observation that reads this prediction; its value is not read.
+
+Returns:
+
+| Type                | Description      |
+| ------------------- | ---------------- |
+| `ObservedDataPoint` | The observation. |
+
+Raises:
+
+| Type         | Description                                |
+| ------------ | ------------------------------------------ |
+| `ValueError` | If the outputs or the label are not valid. |
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+def as_observation(self) -> ObservedDataPoint:
+    """
+    The observation that reads this prediction; its value is not read.
+
+    Returns
+    -------
+    ObservedDataPoint
+        The observation.
+
+    Raises
+    ------
+    ValueError
+        If the outputs or the label are not valid.
+    """
+    return ObservedDataPoint(
+        at=self.at,
+        output=self.output,
+        outputs=self.outputs,
+        label=self.label,
+        value=0.0,
+        window=self.window,
+        factor_id=self.factor_id,
+    )
+```
+
+## Threshold
+
+Bases: `_Frozen`
+
+How far the statistic of a profile may rise above the fit inside an interval of level `level`.
+
+Build one with `chi_square`, `beale` or `bootstrap_calibrated`.
+
+Attributes:
+
+| Name        | Type                                        | Description                                                     |
+| ----------- | ------------------------------------------- | --------------------------------------------------------------- |
+| `kind`      | `{chi_square, beale, bootstrap_calibrated}` | The rule.                                                       |
+| `level`     | `float`                                     | The level of each pointwise interval, strictly between 0 and 1. |
+| `bootstrap` | \`BayesianBootstrap                         | ParametricBootstrap                                             |
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+class Threshold(_Frozen):
+    """
+    How far the statistic of a profile may rise above the fit inside an
+    interval of level `level`.
+
+    Build one with `chi_square`, `beale` or `bootstrap_calibrated`.
+
+    Attributes
+    ----------
+    kind : {"chi_square", "beale", "bootstrap_calibrated"}
+        The rule.
+    level : float
+        The level of each pointwise interval, strictly between 0 and 1.
+    bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap | None
+        The bootstrap of ``"bootstrap_calibrated"``; None otherwise.
+    """  # noqa: E501
+
+    kind: Literal["chi_square", "beale", "bootstrap_calibrated"]
+    level: float = Field(gt=0.0, lt=1.0)
+    bootstrap: ProfileBootstrap | None = None
+
+    @model_validator(mode="after")
+    def check_bootstrap(self) -> Self:
+        """A bootstrap goes with ``"bootstrap_calibrated"``, and only with it."""
+        if (self.kind == "bootstrap_calibrated") != (self.bootstrap is not None):
+            raise ValueError(
+                "A bootstrap calibrates the threshold 'bootstrap_calibrated' and no "
+                "other; build thresholds with Threshold.chi_square, Threshold.beale "
+                "or Threshold.bootstrap_calibrated."
+            )
+        return self
+
+    @classmethod
+    def chi_square(cls, level: float) -> Self:
+        """
+        ``½ χ²₁(level)`` on ``−log L`` (Wilks): the threshold of a problem
+        with observation models.
+
+        It assumes that the models hold and that the statistic is near its
+        large-sample distribution.
+
+        Parameters
+        ----------
+        level : float
+            The level of each interval, strictly between 0 and 1.
+
+        Returns
+        -------
+        Threshold
+            The threshold.
+
+        Raises
+        ------
+        ValueError
+            If the level is not strictly between 0 and 1.
+        """
+        return cls(kind="chi_square", level=_level(level))
+
+    @classmethod
+    def beale(cls, level: float) -> Self:
+        """
+        Beale's threshold of a sum of squares: ``S(θ̂) · F(1, n − p; level) /
+        (n − p)``, with ``n`` observations of positive weight and ``p``
+        parameters.
+
+        It assumes independent Gaussian errors of one variance, and is exact
+        for a model linear in its parameters. It needs the loss ``"sse"``.
+
+        Parameters
+        ----------
+        level : float
+            The level of each interval, strictly between 0 and 1.
+
+        Returns
+        -------
+        Threshold
+            The threshold.
+
+        Raises
+        ------
+        ValueError
+            If the level is not strictly between 0 and 1.
+        """
+        return cls(kind="beale", level=_level(level))
+
+    @classmethod
+    def bootstrap_calibrated(cls, bootstrap: ProfileBootstrap, level: float) -> Self:
+        """
+        The threshold of each quantity calibrated by `bootstrap`
+        (prepivoting, Beran 1988), for any loss.
+
+        Each replicate of the bootstrap, rebuilt from the problem's seed as
+        ``Calibrator.uncertainty(bootstrap)`` builds it, is fitted
+        (``θ̂_b``) and then fitted again with the quantity held at its value
+        at the fit of the original data: the rise of the replicate is
+        ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile `level` of
+        the rises. It costs one fit and one refit per quantity for each
+        replicate.
+
+        Parameters
+        ----------
+        bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap
+            The bootstrap, with its replicates and starts.
+        level : float
+            The level of each interval, strictly between 0 and 1.
+
+        Returns
+        -------
+        Threshold
+            The threshold.
+
+        Raises
+        ------
+        ValueError
+            If the level is not strictly between 0 and 1.
+        """  # noqa: E501
+        return cls(
+            kind="bootstrap_calibrated", level=_level(level), bootstrap=bootstrap
+        )
+```
+
+### Methods:
+
+#### check_bootstrap
+
+```python
+check_bootstrap() -> Self
+```
+
+A bootstrap goes with `"bootstrap_calibrated"`, and only with it.
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+@model_validator(mode="after")
+def check_bootstrap(self) -> Self:
+    """A bootstrap goes with ``"bootstrap_calibrated"``, and only with it."""
+    if (self.kind == "bootstrap_calibrated") != (self.bootstrap is not None):
+        raise ValueError(
+            "A bootstrap calibrates the threshold 'bootstrap_calibrated' and no "
+            "other; build thresholds with Threshold.chi_square, Threshold.beale "
+            "or Threshold.bootstrap_calibrated."
+        )
+    return self
+```
+
+#### chi_square
+
+```python
+chi_square(level: float) -> Self
+```
+
+`½ χ²₁(level)` on `−log L` (Wilks): the threshold of a problem with observation models.
+
+It assumes that the models hold and that the statistic is near its large-sample distribution.
+
+Parameters:
+
+| Name    | Type    | Description                                           | Default    |
+| ------- | ------- | ----------------------------------------------------- | ---------- |
+| `level` | `float` | The level of each interval, strictly between 0 and 1. | *required* |
+
+Returns:
+
+| Type        | Description    |
+| ----------- | -------------- |
+| `Threshold` | The threshold. |
+
+Raises:
+
+| Type         | Description                                   |
+| ------------ | --------------------------------------------- |
+| `ValueError` | If the level is not strictly between 0 and 1. |
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+@classmethod
+def chi_square(cls, level: float) -> Self:
+    """
+    ``½ χ²₁(level)`` on ``−log L`` (Wilks): the threshold of a problem
+    with observation models.
+
+    It assumes that the models hold and that the statistic is near its
+    large-sample distribution.
+
+    Parameters
+    ----------
+    level : float
+        The level of each interval, strictly between 0 and 1.
+
+    Returns
+    -------
+    Threshold
+        The threshold.
+
+    Raises
+    ------
+    ValueError
+        If the level is not strictly between 0 and 1.
+    """
+    return cls(kind="chi_square", level=_level(level))
+```
+
+#### beale
+
+```python
+beale(level: float) -> Self
+```
+
+Beale's threshold of a sum of squares: `S(θ̂) · F(1, n − p; level) / (n − p)`, with `n` observations of positive weight and `p` parameters.
+
+It assumes independent Gaussian errors of one variance, and is exact for a model linear in its parameters. It needs the loss `"sse"`.
+
+Parameters:
+
+| Name    | Type    | Description                                           | Default    |
+| ------- | ------- | ----------------------------------------------------- | ---------- |
+| `level` | `float` | The level of each interval, strictly between 0 and 1. | *required* |
+
+Returns:
+
+| Type        | Description    |
+| ----------- | -------------- |
+| `Threshold` | The threshold. |
+
+Raises:
+
+| Type         | Description                                   |
+| ------------ | --------------------------------------------- |
+| `ValueError` | If the level is not strictly between 0 and 1. |
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+@classmethod
+def beale(cls, level: float) -> Self:
+    """
+    Beale's threshold of a sum of squares: ``S(θ̂) · F(1, n − p; level) /
+    (n − p)``, with ``n`` observations of positive weight and ``p``
+    parameters.
+
+    It assumes independent Gaussian errors of one variance, and is exact
+    for a model linear in its parameters. It needs the loss ``"sse"``.
+
+    Parameters
+    ----------
+    level : float
+        The level of each interval, strictly between 0 and 1.
+
+    Returns
+    -------
+    Threshold
+        The threshold.
+
+    Raises
+    ------
+    ValueError
+        If the level is not strictly between 0 and 1.
+    """
+    return cls(kind="beale", level=_level(level))
+```
+
+#### bootstrap_calibrated
+
+```python
+bootstrap_calibrated(bootstrap: ProfileBootstrap, level: float) -> Self
+```
+
+The threshold of each quantity calibrated by `bootstrap` (prepivoting, Beran 1988), for any loss.
+
+Each replicate of the bootstrap, rebuilt from the problem's seed as `Calibrator.uncertainty(bootstrap)` builds it, is fitted (`θ̂_b`) and then fitted again with the quantity held at its value at the fit of the original data: the rise of the replicate is `PL_b(θ̂ⱼ) − L_b(θ̂_b)`. The threshold is the quantile `level` of the rises. It costs one fit and one refit per quantity for each replicate.
+
+Parameters:
+
+| Name        | Type                | Description                                           | Default           |
+| ----------- | ------------------- | ----------------------------------------------------- | ----------------- |
+| `bootstrap` | \`BayesianBootstrap | ParametricBootstrap                                   | ResidualBootstrap |
+| `level`     | `float`             | The level of each interval, strictly between 0 and 1. | *required*        |
+
+Returns:
+
+| Type        | Description    |
+| ----------- | -------------- |
+| `Threshold` | The threshold. |
+
+Raises:
+
+| Type         | Description                                   |
+| ------------ | --------------------------------------------- |
+| `ValueError` | If the level is not strictly between 0 and 1. |
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+@classmethod
+def bootstrap_calibrated(cls, bootstrap: ProfileBootstrap, level: float) -> Self:
+    """
+    The threshold of each quantity calibrated by `bootstrap`
+    (prepivoting, Beran 1988), for any loss.
+
+    Each replicate of the bootstrap, rebuilt from the problem's seed as
+    ``Calibrator.uncertainty(bootstrap)`` builds it, is fitted
+    (``θ̂_b``) and then fitted again with the quantity held at its value
+    at the fit of the original data: the rise of the replicate is
+    ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile `level` of
+    the rises. It costs one fit and one refit per quantity for each
+    replicate.
+
+    Parameters
+    ----------
+    bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap
+        The bootstrap, with its replicates and starts.
+    level : float
+        The level of each interval, strictly between 0 and 1.
+
+    Returns
+    -------
+    Threshold
+        The threshold.
+
+    Raises
+    ------
+    ValueError
+        If the level is not strictly between 0 and 1.
+    """  # noqa: E501
+    return cls(
+        kind="bootstrap_calibrated", level=_level(level), bootstrap=bootstrap
+    )
+```
+
+## ProfileResult
+
+Bases: `_Frozen`
+
+The result of a profile likelihood.
+
+Attributes:
+
+| Name                | Type                            | Description                                                                                                                          |
+| ------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `fit`               | `CalibrationResult`             | The fit every profile starts from.                                                                                                   |
+| `quantity`          | `{parameter, prediction}`       | What the profiles hold fixed: parameters (ProfileLikelihood) or predictions (PredictionProfile).                                     |
+| `threshold`         | `Threshold`                     | The threshold the profiles ran with.                                                                                                 |
+| `profiles`          | `dict[str, Profile]`            | The profile of each parameter or prediction, by name.                                                                                |
+| `intervals`         | `dict[str, ProfileInterval]`    | The interval of each.                                                                                                                |
+| `verdicts`          | \`dict\[str, ProfileVerdictName | None\]\`                                                                                                                             |
+| `structure`         | `dict[str, ProfileStructure]`   | For each profile of a parameter that does not cross on both sides, what resetting the other parameters says.                         |
+| `tolerance`         | `float`                         | The numerical tolerance of the statistic: max(τ, ν), the tolerance of the optimizer and the noise floor of the objective at the fit. |
+| `evaluation_floor`  | \`float                         | None\`                                                                                                                               |
+| `notes`             | `list[str]`                     | What a reader should know, such as a threshold below the tolerance or a refit below the fit.                                         |
+| `failed_replicates` | `list[str]`                     | With a bootstrap threshold, each replicate that failed.                                                                              |
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+class ProfileResult(_Frozen):
+    """
+    The result of a profile likelihood.
+
+    Attributes
+    ----------
+    fit : CalibrationResult
+        The fit every profile starts from.
+    quantity : {"parameter", "prediction"}
+        What the profiles hold fixed: parameters (`ProfileLikelihood`) or
+        predictions (`PredictionProfile`).
+    threshold : Threshold
+        The threshold the profiles ran with.
+    profiles : dict[str, Profile]
+        The profile of each parameter or prediction, by name.
+    intervals : dict[str, ProfileInterval]
+        The interval of each.
+    verdicts : dict[str, ProfileVerdictName | None]
+        What the shape of each profile says: ``identifiable`` (it crosses the
+        threshold on both sides), ``practically_non_identifiable`` (it stays
+        below on a side, up to a bound or `max_steps`) or
+        ``structurally_non_identifiable`` (flat within `tolerance` over the
+        whole range). None when the threshold is below `tolerance`: the
+        profile cannot tell a rise from numerical error.
+    structure : dict[str, ProfileStructure]
+        For each profile of a parameter that does not cross on both sides,
+        what resetting the other parameters says.
+    tolerance : float
+        The numerical tolerance of the statistic: ``max(τ, ν)``, the
+        tolerance of the optimizer and the noise floor of the objective at
+        the fit.
+    evaluation_floor : float | None
+        The floor of a comparison of two evaluations of the objective; None
+        when it cannot be computed.
+    notes : list[str]
+        What a reader should know, such as a threshold below the tolerance or
+        a refit below the fit.
+    failed_replicates : list[str]
+        With a bootstrap threshold, each replicate that failed.
+    """
+
+    fit: CalibrationResult
+    quantity: Literal["parameter", "prediction"]
+    threshold: Threshold
+    profiles: dict[str, Profile]
+    intervals: dict[str, ProfileInterval]
+    verdicts: dict[str, ProfileVerdictName | None]
+    tolerance: float
+    evaluation_floor: float | None = None
+    structure: dict[str, ProfileStructure] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+    failed_replicates: list[str] = Field(default_factory=list)
+
+    def report(self) -> IdentifiabilityReport:
+        """
+        The verdicts of the profiled parameters as an identifiability report,
+        with a ``profile`` section.
+
+        ``identifiable`` gives the practical verdict ``determined`` and
+        ``practically_non_identifiable`` the practical verdict
+        ``poorly_determined``. ``structurally_non_identifiable`` gives the
+        structural verdict of its `structure`, ``in_combination`` or
+        ``non_identifiable``, with no combination: the reason names the
+        compensating parameters. A flat profile with no structural verdict
+        gives the practical verdict ``poorly_determined``. Every reason says
+        that the verdict holds with the other parameters at their fitted
+        values. A parameter with no profile, or no verdict, gets neither.
+        `IdentifiabilityReport.merge` joins it with the reports of other
+        methods.
+
+        Returns
+        -------
+        IdentifiabilityReport
+            One entry per parameter of the problem, in problem order.
+
+        Raises
+        ------
+        ValueError
+            If the result holds prediction profiles, which have no verdict
+            on a parameter.
+        """
+        if self.quantity != "parameter":
+            raise ValueError(
+                "Only the profiles of parameters report on identifiability; this "
+                "result holds the profiles of predictions."
+            )
+        parameters = list(self.fit.best_parameters)
+        verdicts: dict[str, ParameterVerdicts] = {}
+        for name in parameters:
+            verdict = self.verdicts.get(name)
+            reason = f"profile likelihood: {verdict}. {_RESET}"
+            if verdict == "structurally_non_identifiable":
+                structure = self.structure[name]
+                reason = structure.reason(
+                    name, self.profiles[name].threshold, self.evaluation_floor
+                )
+                if structure.verdict is None:
+                    verdicts[name] = ParameterVerdicts(
+                        practical=PracticalVerdict(
+                            verdict="poorly_determined", reasons=[reason]
+                        )
+                    )
+                else:
+                    verdicts[name] = ParameterVerdicts(
+                        structural=StructuralVerdict(
+                            verdict=structure.verdict, reasons=[reason]
+                        )
+                    )
+            elif verdict is not None:
+                verdicts[name] = ParameterVerdicts(
+                    practical=PracticalVerdict(
+                        verdict=(
+                            "determined"
+                            if verdict == "identifiable"
+                            else "poorly_determined"
+                        ),
+                        reasons=[reason],
+                    )
+                )
+            else:
+                verdicts[name] = ParameterVerdicts()
+        return IdentifiabilityReport(
+            parameters=parameters,
+            verdicts=verdicts,
+            profile=[
+                ProfileSection(
+                    threshold=self.threshold.kind,
+                    level=self.threshold.level,
+                    tolerance=self.tolerance,
+                    verdicts=self.verdicts,
+                    intervals={
+                        name: (interval.lower, interval.upper)
+                        for name, interval in self.intervals.items()
+                    },
+                )
+            ],
+        )
+```
+
+### Methods:
+
+#### report
+
+```python
+report() -> IdentifiabilityReport
+```
+
+The verdicts of the profiled parameters as an identifiability report, with a `profile` section.
+
+`identifiable` gives the practical verdict `determined` and `practically_non_identifiable` the practical verdict `poorly_determined`. `structurally_non_identifiable` gives the structural verdict of its `structure`, `in_combination` or `non_identifiable`, with no combination: the reason names the compensating parameters. A flat profile with no structural verdict gives the practical verdict `poorly_determined`. Every reason says that the verdict holds with the other parameters at their fitted values. A parameter with no profile, or no verdict, gets neither. `IdentifiabilityReport.merge` joins it with the reports of other methods.
+
+Returns:
+
+| Type                    | Description                                               |
+| ----------------------- | --------------------------------------------------------- |
+| `IdentifiabilityReport` | One entry per parameter of the problem, in problem order. |
+
+Raises:
+
+| Type         | Description                                                                    |
+| ------------ | ------------------------------------------------------------------------------ |
+| `ValueError` | If the result holds prediction profiles, which have no verdict on a parameter. |
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+def report(self) -> IdentifiabilityReport:
+    """
+    The verdicts of the profiled parameters as an identifiability report,
+    with a ``profile`` section.
+
+    ``identifiable`` gives the practical verdict ``determined`` and
+    ``practically_non_identifiable`` the practical verdict
+    ``poorly_determined``. ``structurally_non_identifiable`` gives the
+    structural verdict of its `structure`, ``in_combination`` or
+    ``non_identifiable``, with no combination: the reason names the
+    compensating parameters. A flat profile with no structural verdict
+    gives the practical verdict ``poorly_determined``. Every reason says
+    that the verdict holds with the other parameters at their fitted
+    values. A parameter with no profile, or no verdict, gets neither.
+    `IdentifiabilityReport.merge` joins it with the reports of other
+    methods.
+
+    Returns
+    -------
+    IdentifiabilityReport
+        One entry per parameter of the problem, in problem order.
+
+    Raises
+    ------
+    ValueError
+        If the result holds prediction profiles, which have no verdict
+        on a parameter.
+    """
+    if self.quantity != "parameter":
+        raise ValueError(
+            "Only the profiles of parameters report on identifiability; this "
+            "result holds the profiles of predictions."
+        )
+    parameters = list(self.fit.best_parameters)
+    verdicts: dict[str, ParameterVerdicts] = {}
+    for name in parameters:
+        verdict = self.verdicts.get(name)
+        reason = f"profile likelihood: {verdict}. {_RESET}"
+        if verdict == "structurally_non_identifiable":
+            structure = self.structure[name]
+            reason = structure.reason(
+                name, self.profiles[name].threshold, self.evaluation_floor
+            )
+            if structure.verdict is None:
+                verdicts[name] = ParameterVerdicts(
+                    practical=PracticalVerdict(
+                        verdict="poorly_determined", reasons=[reason]
+                    )
+                )
+            else:
+                verdicts[name] = ParameterVerdicts(
+                    structural=StructuralVerdict(
+                        verdict=structure.verdict, reasons=[reason]
+                    )
+                )
+        elif verdict is not None:
+            verdicts[name] = ParameterVerdicts(
+                practical=PracticalVerdict(
+                    verdict=(
+                        "determined"
+                        if verdict == "identifiable"
+                        else "poorly_determined"
+                    ),
+                    reasons=[reason],
+                )
+            )
+        else:
+            verdicts[name] = ParameterVerdicts()
+    return IdentifiabilityReport(
+        parameters=parameters,
+        verdicts=verdicts,
+        profile=[
+            ProfileSection(
+                threshold=self.threshold.kind,
+                level=self.threshold.level,
+                tolerance=self.tolerance,
+                verdicts=self.verdicts,
+                intervals={
+                    name: (interval.lower, interval.upper)
+                    for name, interval in self.intervals.items()
+                },
+            )
+        ],
+    )
+```
+
+## Profile
+
+Bases: `_Frozen`
+
+The profile of one parameter or prediction.
+
+Attributes:
+
+| Name              | Type                                    | Description                                                                   |
+| ----------------- | --------------------------------------- | ----------------------------------------------------------------------------- |
+| `center`          | `float`                                 | The value at the fit.                                                         |
+| `threshold`       | `float`                                 | The threshold of the statistic.                                               |
+| `values`          | `list[float]`                           | The value of each point, increasing; the fit is one of them.                  |
+| `statistics`      | `list[float]`                           | The statistic of each point: the objective of its refit less that of the fit. |
+| `parameters`      | `list[dict[str, float]]`                | Every parameter of each refit.                                                |
+| `multipliers`     | \`list\[float                           | None\]\`                                                                      |
+| `converged`       | `list[bool]`                            | Whether each refit converged.                                                 |
+| `ends`            | `tuple[ProfileEndName, ProfileEndName]` | Why the side below and the side above the fit end.                            |
+| `evaluations`     | `int`                                   | Evaluations of the objective.                                                 |
+| `replicate_rises` | \`list[float]                           | None\`                                                                        |
+| `box_crossings`   | \`tuple\[str                            | None, str                                                                     |
+| `refit_error`     | \`float                                 | None\`                                                                        |
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+class Profile(_Frozen):
+    """
+    The profile of one parameter or prediction.
+
+    Attributes
+    ----------
+    center : float
+        The value at the fit.
+    threshold : float
+        The threshold of the statistic.
+    values : list[float]
+        The value of each point, increasing; the fit is one of them.
+    statistics : list[float]
+        The statistic of each point: the objective of its refit less that of
+        the fit.
+    parameters : list[dict[str, float]]
+        Every parameter of each refit.
+    multipliers : list[float | None]
+        For a prediction, the multiplier of each point: minus the slope of
+        the profile there.
+    converged : list[bool]
+        Whether each refit converged.
+    ends : tuple[ProfileEndName, ProfileEndName]
+        Why the side below and the side above the fit end.
+    evaluations : int
+        Evaluations of the objective.
+    replicate_rises : list[float] | None
+        With a bootstrap threshold, the rise of each replicate kept.
+    box_crossings : tuple[str | None, str | None]
+        For the side below and the side above, the free parameter whose bound
+        makes the profile cross the threshold: it is on a bound at the
+        crossing point that it is not on over the whole side from the fit.
+        Such a side counts as open; its interval end stays, flagged in
+        `ProfileResult.notes`. A parameter that stays on its bound from the
+        fit to the crossing is not seen.
+    refit_error : float | None
+        For a parameter, ``|δ|``: the largest distance from the objective at
+        the fit of a refit with the parameter at its fitted value, from each
+        neighbour of the fit. A diagnostic of the optimizer.
+    """
+
+    center: float
+    threshold: float
+    values: list[float]
+    statistics: list[float]
+    parameters: list[dict[str, float]]
+    multipliers: list[float | None]
+    converged: list[bool]
+    ends: tuple[ProfileEndName, ProfileEndName]
+    evaluations: int
+    replicate_rises: list[float] | None = None
+    box_crossings: tuple[str | None, str | None] = (None, None)
+    refit_error: float | None = None
+```
+
+## ProfileInterval
+
+Bases: `_Frozen`
+
+The pointwise interval of a quantity: where its profile crosses the threshold.
+
+Attributes:
+
+| Name           | Type    | Description |
+| -------------- | ------- | ----------- |
+| `lower, upper` | \`float | None\`      |
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+class ProfileInterval(_Frozen):
+    """
+    The pointwise interval of a quantity: where its profile crosses the
+    threshold.
+
+    Attributes
+    ----------
+    lower, upper : float | None
+        The ends; None on a side that does not cross.
+    """
+
+    lower: float | None
+    upper: float | None
+```
+
+## ProfileStructure
+
+Bases: `_Frozen`
+
+What resetting the other parameters says about a profile.
+
+A profile is flat because other parameters compensate the parameter along it, or because nothing the data read depends on it. At each point of the profile inside the box, and at both ends of the box of the parameter, the other parameters are reset to their fitted values and the objective is evaluated once, with no optimizer; each reset is compared with the objective at the fit.
+
+Attributes:
+
+| Name             | Type                                 | Description                                                                                                                                                       |
+| ---------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verdict`        | \`{in_combination, non_identifiable} | None\`                                                                                                                                                            |
+| `largest_rise`   | \`float                              | None\`                                                                                                                                                            |
+| `compensated_by` | `list[str]`                          | The parameters whose reset alone, where each moves most along the profile, raises it above the threshold. Noise parameters of observation models are never named. |
+| `joint_rise`     | \`float                              | None\`                                                                                                                                                            |
+| `undetermined`   | \`UndeterminedName                   | None\`                                                                                                                                                            |
+| `on_bound`       | \`str                                | None\`                                                                                                                                                            |
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+class ProfileStructure(_Frozen):
+    """
+    What resetting the other parameters says about a profile.
+
+    A profile is flat because other parameters compensate the parameter
+    along it, or because nothing the data read depends on it. At each point
+    of the profile inside the box, and at both ends of the box of the
+    parameter, the other parameters are reset to their fitted values and the
+    objective is evaluated once, with no optimizer; each reset is compared
+    with the objective at the fit.
+
+    Attributes
+    ----------
+    verdict : {"in_combination", "non_identifiable"} | None
+        ``non_identifiable``: every reset is feasible and within the
+        evaluation floor of the fit. ``in_combination``: the profile is flat
+        and a feasible reset inside the box rises above the threshold. None
+        otherwise, and `undetermined` says why.
+    largest_rise : float | None
+        The largest rise of a feasible reset over the objective at the fit;
+        None when none was feasible.
+    compensated_by : list[str]
+        The parameters whose reset alone, where each moves most along the
+        profile, raises it above the threshold. Noise parameters of
+        observation models are never named.
+    joint_rise : float | None
+        The largest rise of resetting the parameters not named together, at
+        the outermost point of each side, over the objective of that point,
+        when it is above the evaluation floor: `compensated_by` may be
+        incomplete. Infinite when such a reset is not feasible.
+    undetermined : UndeterminedName | None
+        Why there is no verdict.
+    on_bound : str | None
+        With ``undetermined="on_bound"``, the parameter on its bound at the
+        fit.
+    """
+
+    verdict: Literal["in_combination", "non_identifiable"] | None
+    largest_rise: float | None
+    compensated_by: list[str]
+    joint_rise: float | None
+    undetermined: UndeterminedName | None = None
+    on_bound: str | None = None
+
+    def reason(self, name: str, threshold: float, floor: float | None) -> str:
+        """
+        The reason of the verdict of parameter `name` in a report.
+
+        Parameters
+        ----------
+        name : str
+            The parameter.
+        threshold : float
+            The threshold of its profile.
+        floor : float | None
+            The evaluation floor of the result.
+
+        Returns
+        -------
+        str
+            The reason, which says that the verdict holds with the other
+            parameters at their fitted values.
+        """
+        rise = (
+            "no feasible reset"
+            if self.largest_rise is None
+            else (f"a largest rise of {self.largest_rise:.3g}")
+        )
+        if self.verdict == "in_combination":
+            text = (
+                f"profile likelihood: flat, and resetting the other parameters "
+                f"gives {rise}, above the threshold {threshold:.3g}"
+            )
+            if self.compensated_by:
+                text += (
+                    f"; {name}, compensated by {', '.join(self.compensated_by)} "
+                    "along its profile"
+                )
+            if self.joint_rise is not None:
+                text += (
+                    f"; the list may be incomplete (largest rise {self.joint_rise:.3g})"
+                )
+        elif self.verdict == "non_identifiable":
+            text = (
+                "profile likelihood: resetting the other parameters leaves the "
+                f"objective within the evaluation floor {floor:.3g} of the fit "
+                f"along the profile and at both ends of the box ({rise}): nothing "
+                f"the data read depends on {name}"
+            )
+        else:
+            text = (
+                f"profile likelihood: flat, with no structural verdict "
+                f"({self.undetermined}; {rise}, threshold {threshold:.3g})"
+            )
+        return f"{text}. {_RESET}"
+```
+
+### Methods:
+
+#### reason
+
+```python
+reason(name: str, threshold: float, floor: float | None) -> str
+```
+
+The reason of the verdict of parameter `name` in a report.
+
+Parameters:
+
+| Name        | Type    | Description                   | Default                             |
+| ----------- | ------- | ----------------------------- | ----------------------------------- |
+| `name`      | `str`   | The parameter.                | *required*                          |
+| `threshold` | `float` | The threshold of its profile. | *required*                          |
+| `floor`     | \`float | None\`                        | The evaluation floor of the result. |
+
+Returns:
+
+| Type  | Description                                                                                     |
+| ----- | ----------------------------------------------------------------------------------------------- |
+| `str` | The reason, which says that the verdict holds with the other parameters at their fitted values. |
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+def reason(self, name: str, threshold: float, floor: float | None) -> str:
+    """
+    The reason of the verdict of parameter `name` in a report.
+
+    Parameters
+    ----------
+    name : str
+        The parameter.
+    threshold : float
+        The threshold of its profile.
+    floor : float | None
+        The evaluation floor of the result.
+
+    Returns
+    -------
+    str
+        The reason, which says that the verdict holds with the other
+        parameters at their fitted values.
+    """
+    rise = (
+        "no feasible reset"
+        if self.largest_rise is None
+        else (f"a largest rise of {self.largest_rise:.3g}")
+    )
+    if self.verdict == "in_combination":
+        text = (
+            f"profile likelihood: flat, and resetting the other parameters "
+            f"gives {rise}, above the threshold {threshold:.3g}"
+        )
+        if self.compensated_by:
+            text += (
+                f"; {name}, compensated by {', '.join(self.compensated_by)} "
+                "along its profile"
+            )
+        if self.joint_rise is not None:
+            text += (
+                f"; the list may be incomplete (largest rise {self.joint_rise:.3g})"
+            )
+    elif self.verdict == "non_identifiable":
+        text = (
+            "profile likelihood: resetting the other parameters leaves the "
+            f"objective within the evaluation floor {floor:.3g} of the fit "
+            f"along the profile and at both ends of the box ({rise}): nothing "
+            f"the data read depends on {name}"
+        )
+    else:
+        text = (
+            f"profile likelihood: flat, with no structural verdict "
+            f"({self.undetermined}; {rise}, threshold {threshold:.3g})"
+        )
+    return f"{text}. {_RESET}"
 ```
 
 ## Sequential Monte Carlo
@@ -33027,6 +34708,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `Sobol`: first-order and total indices on the design of Saltelli, with bootstrap intervals (`SobolResult`).
 - `PolynomialChaos`: a Legendre expansion of `F(x)`, its leave-one-out error, its Sobol indices and `predict` as a surrogate (`ChaosResult`); the number of terms is checked before any run.
 - `SimulationPlotter.plot_prcc`, `plot_morris` and `plot_sobol`.
+- `ProfileLikelihood(parameters, threshold, max_steps)`: the profile of each parameter, refitted with the problem's own optimizer at values that step away from the fit by the adaptive step of Raue et al. (2009), its pointwise interval and its verdict (`identifiable`, `practically_non_identifiable`, `structurally_non_identifiable`), in a `ProfileResult`; `ProfileResult.report()` gives the verdicts as an `IdentifiabilityReport` with a `profile` section. A profile is read by resetting the other parameters to their fitted values (`ProfileResult.structure`), against the floor of two evaluations (`ProfileResult.evaluation_floor`): it gives the structural verdict `in_combination` or `non_identifiable`, and names the parameters that compensate it. A crossing made by the bound of another parameter counts as an open side (`Profile.box_crossings`), and `Profile.refit_error` measures the error of a refit at the fit. See [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md).
+- `PredictionProfile(specs, threshold)`: the interval of each prediction (`PredictionSpec`), held at each value as an equality constraint by an augmented Lagrangian. See [Prediction profiles](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#prediction-profiles).
+- `Threshold.chi_square(level)` (observation models), `Threshold.beale(level)` (a sum of squares of independent Gaussian errors) and `Threshold.bootstrap_calibrated(bootstrap, level)` (any loss, calibrated by the replicates of a bootstrap).
+- `SimulationPlotter.plot_profiles`.
 
 ### Changed
 
@@ -33057,6 +34742,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 - The finite-difference step of a parameter with an infinite bound was infinite, so its sensitivities, identifiability and curvature failed: the width of its bounds now counts as 1 in the step.
+- The quantile of a distribution hundreds of orders of magnitude below 1, such as `Beta(0.01, 1)` at `1e-3`, was far from it, so a prior or a draw of such a shape was wrong: when its Newton and halving steps run out, the quantile now bisects the floating-point numbers between the two ends.
+- A particle swarm whose first particle had a NaN cost kept no best particle and returned its start point: a NaN cost now counts as the worst.
 
 ## [0.5.0] - 2026-10-19
 

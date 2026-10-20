@@ -6,10 +6,10 @@ A parameter the data cannot determine shows up as a wide interval, or as starts 
 
 ## Structural against practical
 
-| Kind           | Question                                               | Depends on                                                                | Methods                                                          |
-| -------------- | ------------------------------------------------------ | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| **Structural** | Can any data from this design determine the parameter? | The model and the positions and outputs observed, not the observed values | `StructuralRank`                                                 |
-| **Practical**  | Do these data determine it?                            | The observed values, their noise and the fit                              | `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability` |
+| Kind           | Question                                               | Depends on                                                                | Methods                                                                                                 |
+| -------------- | ------------------------------------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **Structural** | Can any data from this design determine the parameter? | The model and the positions and outputs observed, not the observed values | `StructuralRank`                                                                                        |
+| **Practical**  | Do these data determine it?                            | The observed values, their noise and the fit                              | `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, the profiles of a `ProfileLikelihood` |
 
 A parameter that is not structurally identifiable is never practically identifiable: no amount of data of the same design fixes it. A parameter that is structurally identifiable can still be poorly determined by the data at hand.
 
@@ -204,7 +204,7 @@ A parameter is `poorly_determined` when it is in a correlated pair or its margin
 
 ## The report
 
-An `IdentifiabilityReport` holds, for each parameter, a **structural** and a **practical** verdict, and the sections of the methods that ran (`structural`, `collinearity`, `sample`, `starts`). `merge` joins reports: a verdict the reports agree on stays, with every reason; one they disagree on is `conflicting`, with both reasons. `identifiability_report` gives it as plain data.
+An `IdentifiabilityReport` holds, for each parameter, a **structural** and a **practical** verdict, and the sections of the methods that ran (`structural`, `collinearity`, `sample`, `starts`, `profile`). The profiles of a `ProfileLikelihood` give their report with `ProfileResult.report()`; a flat profile gives the structural verdict `in_combination` when resetting the other parameters to their fitted values breaks it, and `non_identifiable` when nothing the data read depends on the parameter ([Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#verdicts-and-the-identifiability-report)). `merge` joins reports: a verdict the reports agree on stays, with every reason; one they disagree on is `conflicting`, with both reasons. `identifiability_report` gives it as plain data.
 
 ```python
 data = identifiability_report(report)
@@ -231,3 +231,4 @@ print(data["parameters"]["k2"]["practical"]["verdict"])  # determined
 | Several starts of an optimizer              | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts) |
 | Scale factors, which often pair with a rate | [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)    |
 | What a sample is                            | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/#the-parameter-sample)     |
+| Intervals and verdicts from profiles        | [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md)  |

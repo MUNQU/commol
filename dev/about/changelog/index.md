@@ -30,6 +30,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `Sobol`: first-order and total indices on the design of Saltelli, with bootstrap intervals (`SobolResult`).
 - `PolynomialChaos`: a Legendre expansion of `F(x)`, its leave-one-out error, its Sobol indices and `predict` as a surrogate (`ChaosResult`); the number of terms is checked before any run.
 - `SimulationPlotter.plot_prcc`, `plot_morris` and `plot_sobol`.
+- `ProfileLikelihood(parameters, threshold, max_steps)`: the profile of each parameter, refitted with the problem's own optimizer at values that step away from the fit by the adaptive step of Raue et al. (2009), its pointwise interval and its verdict (`identifiable`, `practically_non_identifiable`, `structurally_non_identifiable`), in a `ProfileResult`; `ProfileResult.report()` gives the verdicts as an `IdentifiabilityReport` with a `profile` section. A profile is read by resetting the other parameters to their fitted values (`ProfileResult.structure`), against the floor of two evaluations (`ProfileResult.evaluation_floor`): it gives the structural verdict `in_combination` or `non_identifiable`, and names the parameters that compensate it. A crossing made by the bound of another parameter counts as an open side (`Profile.box_crossings`), and `Profile.refit_error` measures the error of a refit at the fit. See [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md).
+- `PredictionProfile(specs, threshold)`: the interval of each prediction (`PredictionSpec`), held at each value as an equality constraint by an augmented Lagrangian. See [Prediction profiles](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#prediction-profiles).
+- `Threshold.chi_square(level)` (observation models), `Threshold.beale(level)` (a sum of squares of independent Gaussian errors) and `Threshold.bootstrap_calibrated(bootstrap, level)` (any loss, calibrated by the replicates of a bootstrap).
+- `SimulationPlotter.plot_profiles`.
 
 ### Changed
 
@@ -60,6 +64,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 - The finite-difference step of a parameter with an infinite bound was infinite, so its sensitivities, identifiability and curvature failed: the width of its bounds now counts as 1 in the step.
+- The quantile of a distribution hundreds of orders of magnitude below 1, such as `Beta(0.01, 1)` at `1e-3`, was far from it, so a prior or a draw of such a shape was wrong: when its Newton and halving steps run out, the quantile now bisects the floating-point numbers between the two ends.
+- A particle swarm whose first particle had a NaN cost kept no best particle and returned its start point: a NaN cost now counts as the worst.
 
 ## [0.5.0] - 2026-10-19
 

@@ -1426,6 +1426,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2581,6 +2609,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/results/" class="md-nav__link">
         
   
@@ -3235,7 +3291,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/calibration_problem.rs</code></td>
-<td><code>CalibrationProblem</code>: the layers below, built once (<code>new</code>, <code>with_replicates</code>, <code>with_observation_normalization</code>, <code>with_initial_condition_remainder</code>), a copy with other observed values and weights (<code>with_data</code>), the one evaluation of a point (<code>evaluate</code>), the predictions of one seeded run (<code>predict_once</code>), and the position check that names an observation or constraint (<code>check_positions</code>). It uses only <code>SimulationEngine</code>.</td>
+<td><code>CalibrationProblem</code>: the layers below, built once (<code>new</code>, <code>with_replicates</code>, <code>with_observation_normalization</code>, <code>with_initial_condition_remainder</code>), a copy with other observed values and weights (<code>with_data</code>), a copy whose runs also report at the positions of other observations (<code>observing</code>), the one evaluation of a point (<code>evaluate</code>), the predictions of one seeded run (<code>predict_once</code>), and the position check that names an observation or constraint (<code>check_positions</code>). It uses only <code>SimulationEngine</code>.</td>
 <td>Penalties; optimizer setup; anything of one model kind.</td>
 </tr>
 <tr>
@@ -3285,8 +3341,13 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/optimization.rs</code></td>
-<td>Nelder-Mead and particle swarm setup on the argmin fork, from a start point (<code>optimize</code>, <code>optimize_from</code>, <code>optimize_with_history</code>, <code>optimize_with_observer</code>); no output to the process streams.</td>
+<td>Nelder-Mead and particle swarm setup on the argmin fork, from a start point (<code>optimize</code>, <code>optimize_from</code>, <code>optimize_with_history</code>, <code>optimize_with_observer</code>), and on a subproblem (<code>optimize_subproblem</code>: a smaller search space, or the augmented Lagrangian of the fork around the problem's optimizer); no output to the process streams.</td>
 <td>Loss definitions.</td>
+</tr>
+<tr>
+<td><code>crates/commol-calibration/src/subproblem.rs</code></td>
+<td><code>Subproblem</code>: the problem with one parameter held (left out of the search) or one prediction held (an equality constraint, <code>ConstraintSettings</code>); <code>predict</code>, the value of a prediction; <code>SubproblemResult</code>.</td>
+<td>Stepping along a profile; thresholds.</td>
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/statistics.rs</code></td>
@@ -3337,6 +3398,11 @@
 <td><code>crates/commol-inference/src/identifiability/</code></td>
 <td>The analyses: <code>structural_rank</code> (ranks, null space, combinations), <code>collinearity</code> (Brun's indices), <code>sample_identifiability</code> (contraction, correlations, modes), <code>starts_identifiability</code>.</td>
 <td>Derivatives; reports.</td>
+</tr>
+<tr>
+<td><code>crates/commol-inference/src/profiles/</code></td>
+<td>Profile likelihood: <code>tracer.rs</code> (<code>ProfileTracer</code>, the adaptive step and the secant start, <code>Profile</code> and its interval), <code>threshold.rs</code> (<code>chi_square</code>, <code>beale</code>, <code>bootstrap_thresholds</code>), <code>verdict.rs</code> (<code>ProfileVerdict</code>), <code>resets.rs</code> (<code>read_structure</code>: the resets of a flat profile, <code>StructuralReading</code>).</td>
+<td>Holding a quantity (a <code>Subproblem</code>'s); optimizers.</td>
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/target.rs</code></td>
@@ -3441,6 +3507,11 @@
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
+<td><code>py-commol/src/profiles.rs</code></td>
+<td><code>commol_rs.inference</code>: <code>trace_profiles</code>, <code>BootstrapSettings</code>, <code>Profile</code>, <code>ProfileRun</code>.</td>
+<td>Logic beyond type conversion.</td>
+</tr>
+<tr>
 <td><code>py-commol/src/python_observer.rs</code></td>
 <td>The progress table of a verbose optimization, written to Python's <code>sys.stdout</code>.</td>
 <td>Writes to the standard error.</td>
@@ -3489,7 +3560,7 @@
 </tr>
 <tr>
 <td><code>api/inference/</code></td>
-<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), the scores (<code>api/inference/scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), the runners of the identifiability methods (<code>api/inference/identifiability.py</code>), which build the report, the runners of the resampling methods (<code>api/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>api/inference/smc.py</code>), of the local approximations (<code>api/inference/local.py</code>), of the conformal methods (<code>api/inference/conformal.py</code>), which build <code>ConformalResult</code>, and of the sensitivity methods (<code>api/inference/global_sensitivity.py</code>).</td>
+<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), the scores (<code>api/inference/scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), the runners of the identifiability methods (<code>api/inference/identifiability.py</code>), which build the report, the runners of the resampling methods (<code>api/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>api/inference/smc.py</code>), of the local approximations (<code>api/inference/local.py</code>), of the conformal methods (<code>api/inference/conformal.py</code>), which build <code>ConformalResult</code>, of the sensitivity methods (<code>api/inference/global_sensitivity.py</code>), and of the profiles (<code>api/inference/profiles.py</code>), which build <code>ProfileResult</code>.</td>
 <td>Transforms of predictions; quantile formulas.</td>
 </tr>
 <tr>
@@ -3504,12 +3575,12 @@
 </tr>
 <tr>
 <td><code>api/plotter.py</code></td>
-<td>Plots of results, of the bands of a <code>Predictive</code>, and of sensitivity results (<code>plot_prcc</code>, <code>plot_morris</code>, <code>plot_sobol</code>).</td>
+<td>Plots of results, of the bands of a <code>Predictive</code>, of sensitivity results (<code>plot_prcc</code>, <code>plot_morris</code>, <code>plot_sobol</code>) and of profiles (<code>plot_profiles</code>).</td>
 <td>Computation of results.</td>
 </tr>
 <tr>
 <td><code>context/inference/</code></td>
-<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code>, <code>IdentifiabilityMethod</code> and <code>SensitivityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>, <code>DistributionNoise</code>), the distributions and <code>Priors</code> (<code>distributions.py</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>context/inference/smc.py</code>: <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, <code>EtaCalibration</code>, <code>AbcSmc</code>, <code>AbcRejection</code>, the distances, <code>SmcResult</code>, <code>GibbsResult</code>), of the local approximations (<code>context/inference/local.py</code>: <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, its targets, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>DeltaBand</code>, <code>ImportanceResult</code>), of the conformal methods (<code>context/inference/conformal.py</code>), and of the sensitivity methods with <code>InputSpace</code> and the quantities of interest (<code>context/inference/global_sensitivity.py</code>).</td>
+<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code>, <code>IdentifiabilityMethod</code> and <code>SensitivityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>, <code>DistributionNoise</code>), the distributions and <code>Priors</code> (<code>distributions.py</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>context/inference/smc.py</code>: <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, <code>EtaCalibration</code>, <code>AbcSmc</code>, <code>AbcRejection</code>, the distances, <code>SmcResult</code>, <code>GibbsResult</code>), of the local approximations (<code>context/inference/local.py</code>: <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, its targets, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>DeltaBand</code>, <code>ImportanceResult</code>), of the conformal methods (<code>context/inference/conformal.py</code>), of the sensitivity methods with <code>InputSpace</code> and the quantities of interest (<code>context/inference/global_sensitivity.py</code>), and of the profiles (<code>context/inference/profiles.py</code>: <code>ProfileLikelihood</code>, <code>PredictionProfile</code>, <code>PredictionSpec</code>, <code>Threshold</code>, <code>ProfileResult</code>).</td>
 <td>Runners.</td>
 </tr>
 <tr>
@@ -3758,6 +3829,11 @@
 <td>Add an uncertainty method</td>
 <td><code>crates/commol-inference/</code></td>
 <td><code>py-commol/src/inference.rs</code>, <code>py-commol/commol/context/inference/</code>, <code>api/inference/registry.py</code>, the checklist "Uncertainty method" in <code>docs/codebase/maintainer-playbook.md</code></td>
+</tr>
+<tr>
+<td>Change a profile, its thresholds or a subproblem that holds a quantity</td>
+<td><code>crates/commol-inference/src/profiles/</code> (<code>tracer.rs</code>, <code>threshold.rs</code>, <code>verdict.rs</code>, <code>resets.rs</code>), <code>crates/commol-calibration/src/subproblem.rs</code></td>
+<td><code>crates/commol-calibration/src/optimization.rs</code> (<code>optimize_subproblem</code>), <code>py-commol/src/profiles.rs</code>, <code>py-commol/commol/context/inference/profiles.py</code>, <code>api/inference/profiles.py</code>, <code>docs/guide/uncertainty/profiles.md</code></td>
 </tr>
 <tr>
 <td>Change sensitivities or identifiability</td>

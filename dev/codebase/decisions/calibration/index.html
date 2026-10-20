@@ -1426,6 +1426,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2500,6 +2528,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-subproblem-holds-one-quantity-fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A subproblem holds one quantity fixed
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2552,6 +2591,34 @@
     
   
     Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
   
 
     
@@ -3075,6 +3142,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-subproblem-holds-one-quantity-fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A subproblem holds one quantity fixed
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3236,6 +3314,55 @@ edge of the support: its log density is <code>−∞</code> (<code>discrepancy_i
 <p><strong>Guards:</strong> <code>feasibility::tests</code>,
 <code>crates/commol-calibration/tests/test_infeasible_runs.rs</code>,
 <code>crates/commol-calibration/tests/test_likelihood.rs::the_penalty_is_above_every_feasible_cost</code>.</p>
+<h2 id="a-subproblem-holds-one-quantity-fixed">A subproblem holds one quantity fixed<a class="headerlink" href="#a-subproblem-holds-one-quantity-fixed" title="Permanent link">&para;</a></h2>
+<p><code>Subproblem</code> (<code>crates/commol-calibration/src/subproblem.rs</code>) holds one
+parameter or one prediction while <code>optimize_subproblem</code> (<code>optimization.rs</code>)
+fits the others with the problem's own optimizer. A held parameter leaves the
+search space (<code>SearchSpace</code>): the optimizer searches one dimension less, and
+the cost puts the fixed value back before it scores a point. A held
+prediction <code>g(θ) = c</code> is an equality constraint met by the augmented
+Lagrangian of the argmin fork, whose factory builds the problem's optimizer
+at each outer iteration: Nelder-Mead on the sine transform, from the point of
+the iteration before, or a swarm seeded by <code>replicate_seed(seed, k)</code>. The
+prediction is read through the observation operator of a copy of the problem
+whose runs also report at its positions (<code>CalibrationProblem::observing</code>), so
+one run gives the objective and the constraint, and the cost keeps the
+constraint of the last point it scored. A point that is not feasible keeps
+its penalty and a constraint of 0. Each point starts from Algencan's scaled
+penalty; the multiplier is the warm start.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bounds <code>[v, v]</code> for a held parameter</td>
+<td>Nelder-Mead keeps a vertex for a dimension that moves nothing.</td>
+</tr>
+<tr>
+<td>A growing quadratic penalty on <code>g − c</code></td>
+<td>It meets the constraint only as <code>μ → ∞</code>, and a large <code>μ</code> makes a narrow valley where Nelder-Mead stops early.</td>
+</tr>
+<tr>
+<td>A second run for the prediction</td>
+<td>Twice the model runs of each evaluation.</td>
+</tr>
+<tr>
+<td><code>μ = 100·|Δλ/Δc|</code> from the two points before</td>
+<td>In the experiment of #132 (the ABC model of <code>tests/support/</code> with a normal model, the problem of <code>the_multiplier_of_a_prediction_profile_is_minus_its_slope</code>), B at 30 took 5465 evaluations against 3179 with Algencan's <code>μ₀</code>, C at 24 5405 against 3175, for the same intervals and a mean error of the multipliers of 0.8e-4 against 1.2e-4; <code>10⁴·|Δλ/Δc|</code> gained 4 %. The stop rule reads <code>‖g − c‖</code>, which a small <code>μ</code> leaves large.</td>
+</tr>
+</tbody>
+</table>
+<p>A swarm without stop rules runs each outer iteration to its <code>max_iterations</code>,
+so a held prediction stops at the outer limit and never reports convergence.</p>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_profiles.rs</code>
+(<code>fixing_a_parameter_at_the_fit_keeps_the_loss</code>,
+<code>fixing_a_prediction_at_the_fit_keeps_the_parameters</code>,
+<code>a_problem_observing_more_positions_scores_as_the_problem</code>,
+<code>a_swarm_fits_a_subproblem_and_repeats_from_its_seed</code>).</p>
 
 
 

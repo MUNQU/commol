@@ -1625,6 +1625,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2646,6 +2674,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/results/" class="md-nav__link">
         
   
@@ -3269,7 +3325,7 @@ anyone who fits more than one parameter.</p>
 <td><strong>Practical</strong></td>
 <td>Do these data determine it?</td>
 <td>The observed values, their noise and the fit</td>
-<td><code>Collinearity</code>, <code>SampleIdentifiability</code>, <code>StartsIdentifiability</code></td>
+<td><code>Collinearity</code>, <code>SampleIdentifiability</code>, <code>StartsIdentifiability</code>, the profiles of a <code>ProfileLikelihood</code></td>
 </tr>
 </tbody>
 </table>
@@ -3552,7 +3608,12 @@ within a relative tolerance but the best; use data with noise.</p>
 <h2 id="the-report">The report<a class="headerlink" href="#the-report" title="Permanent link">&para;</a></h2>
 <p>An <code>IdentifiabilityReport</code> holds, for each parameter, a <strong>structural</strong> and a
 <strong>practical</strong> verdict, and the sections of the methods that ran
-(<code>structural</code>, <code>collinearity</code>, <code>sample</code>, <code>starts</code>). <code>merge</code> joins reports: a
+(<code>structural</code>, <code>collinearity</code>, <code>sample</code>, <code>starts</code>, <code>profile</code>). The profiles of
+a <code>ProfileLikelihood</code> give their report with <code>ProfileResult.report()</code>; a flat
+profile gives the structural verdict <code>in_combination</code> when resetting the
+other parameters to their fitted values breaks it, and <code>non_identifiable</code>
+when nothing the data read depends on the parameter
+(<a href="../profiles/#verdicts-and-the-identifiability-report">Profile Likelihood</a>). <code>merge</code> joins reports: a
 verdict the reports agree on stays, with every reason; one they disagree on is
 <code>conflicting</code>, with both reasons. <code>identifiability_report</code> gives it as plain
 data.</p>
@@ -3600,6 +3661,10 @@ data.</p>
 <tr>
 <td>What a sample is</td>
 <td><a href="../#the-parameter-sample">Uncertainty</a></td>
+</tr>
+<tr>
+<td>Intervals and verdicts from profiles</td>
+<td><a href="../profiles/">Profile Likelihood</a></td>
 </tr>
 </tbody>
 </table>

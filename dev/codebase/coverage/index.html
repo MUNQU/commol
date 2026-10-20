@@ -1426,6 +1426,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2457,6 +2485,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/results/" class="md-nav__link">
         
   
@@ -3111,7 +3167,7 @@ input reaches is removed, not tested.</p>
 <tr>
 <td>Rust (<code>crates/</code>, <code>py-commol/src/</code>)</td>
 <td><code>.github/scripts/rust_coverage.sh</code>, from the root, with the virtual environment of <code>py-commol</code> active</td>
-<td><code>RUST_LINES</code> of the script (98.6 % of the lines), in the job Rust Code Quality</td>
+<td>Every line, or a marker <code>// coverage: &lt;reason&gt;</code> on it, in the job Rust Code Quality</td>
 </tr>
 </tbody>
 </table>
@@ -3122,16 +3178,23 @@ runs both, and writes one report. It builds in the debug profile, so
 (<code>test_slow_tests_are_listed</code>) stays out, as the job Test of Build times the
 release extension. It puts the release extension back when it ends. It needs <code>cargo-llvm-cov</code>
 (<code>cargo install --locked cargo-llvm-cov</code>) and the component
-<code>llvm-tools-preview</code> (<code>rustup component add llvm-tools-preview</code>). Options
-after the script go to <code>cargo llvm-cov report</code>, such as <code>--summary-only</code> or
-<code>--lcov --output-path lcov.info</code>.</p>
+<code>llvm-tools-preview</code> (<code>rustup component add llvm-tools-preview</code>). It writes
+<code>lcov.info</code> at the root, which CI uploads, and checks it with
+<code>.github/scripts/rust_uncovered.py</code>. Options after the script go to one more
+<code>cargo llvm-cov report</code>, such as <code>--summary-only</code> or <code>--show-missing-lines</code>.</p>
+<p>The check reads each source line once, with the counts of every
+instantiation and every binary joined: a line counts as run when any test
+runs it, through the Rust tests or through <code>pytest</code>. The summary of
+<code>cargo llvm-cov</code> counts the lines of a generic function by its instantiation
+that runs the most, so it reports as missed a line that only another
+instantiation runs, and it is not the measure.</p>
 <p>An instrumented binary that runs while <code>LLVM_PROFILE_FILE</code> is not set writes
 <code>default_&lt;binary&gt;_&lt;pid&gt;.profraw</code> in the directory it runs in. Git ignores
 <code>*.profraw</code> and <code>*.profdata</code> (<code>.gitignore</code>), and
 <code>tests/suite/test_rules.py::test_no_coverage_profile_is_tracked</code> fails when
 one is tracked.</p>
-<p>A threshold is the coverage reached. It rises when coverage rises; a pull
-request that lowers it says why.</p>
+<p>Both rules leave no threshold to move: a line runs in a test, or it says why
+it does not.</p>
 <h3 id="what-python-leaves-out">What Python leaves out<a class="headerlink" href="#what-python-leaves-out" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -3159,9 +3222,14 @@ request that lowers it says why.</p>
 it that says why. <code>test_every_coverage_exclusion_has_a_reason</code>
 (<code>tests/suite/test_rules.py</code>) checks both.</p>
 <h3 id="what-rust-leaves-out">What Rust leaves out<a class="headerlink" href="#what-rust-leaves-out" title="Permanent link">&para;</a></h3>
-<p><code>cargo llvm-cov</code> has no exclusion by line on the stable toolchain, so the
-threshold counts every line of a product file, and these are the kinds of
-line it allows to stay uncovered:</p>
+<p><code>cargo llvm-cov</code> has no exclusion by line on the stable toolchain, so
+<code>rust_uncovered.py</code> makes one: a run of lines that no test runs (a comment or
+a blank line in it does not break it; a line that runs does) carries a marker
+<code>// coverage: &lt;reason&gt;</code> on one of its lines, or on a comment line just above
+it. The script fails on a run with no marker, on a marker with no reason,
+and on a marker that excuses no line that no test runs, as its code now runs.
+<code>cargo llvm-cov</code> measures no file of <code>tests/</code>. These are the kinds of line
+that may carry a marker:</p>
 <table>
 <thead>
 <tr>
@@ -3173,7 +3241,7 @@ line it allows to stay uncovered:</p>
 <tbody>
 <tr>
 <td>A file of the tests</td>
-<td><code>py-commol/src/test_kind.rs</code>, the test model kind (<code>--ignore-filename-regex</code> of the script)</td>
+<td><code>py-commol/src/test_kind.rs</code>, the test model kind (<code>--ignore-filename-regex</code> of the script, so it needs no marker)</td>
 <td>It is not part of the product: only the feature <code>test-kind</code> builds it.</td>
 </tr>
 <tr>
@@ -3198,7 +3266,7 @@ line it allows to stay uncovered:</p>
 </tr>
 <tr>
 <td>The failure of a test</td>
-<td>The <code>panic!</code> or the message of an <code>assert!</code> that reports what went wrong</td>
+<td>The <code>panic!</code> or the message of an <code>assert!</code> of a <code>#[cfg(test)]</code> module that reports what went wrong</td>
 <td>It runs only when the test fails.</td>
 </tr>
 </tbody>

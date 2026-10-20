@@ -1614,6 +1614,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2635,6 +2663,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/results/" class="md-nav__link">
         
   
@@ -3238,7 +3294,7 @@ Each method has its own page, listed in the table below.</p>
 <tbody>
 <tr>
 <td>Which parameters fit the data?</td>
-<td>The <a href="identifiability/">identifiability</a> methods; a sample of the parameters, or a profile of the loss; several starts that end apart with equal losses show that the data do not identify the parameters</td>
+<td>The <a href="identifiability/">identifiability</a> methods; a sample of the parameters, or a <a href="profiles/">profile</a> of the likelihood or the loss; several starts that end apart with equal losses show that the data do not identify the parameters</td>
 </tr>
 <tr>
 <td>How do the inputs move the outputs?</td>
@@ -3454,6 +3510,18 @@ coverage guarantee, from the scores of observations the fit did not use.</p>
 <td>A polynomial surrogate of an output and its Sobol indices, in few runs</td>
 <td>No</td>
 <td><a href="sensitivity/#polynomial-chaos">Sensitivity Analysis</a></td>
+</tr>
+<tr>
+<td><code>ProfileLikelihood</code></td>
+<td>The interval of each parameter and whether the data determine it, from refits with the parameter held</td>
+<td>No: <code>Threshold.chi_square</code> needs one, <code>beale</code> and <code>bootstrap_calibrated</code> do not</td>
+<td><a href="profiles/">Profile Likelihood</a></td>
+</tr>
+<tr>
+<td><code>PredictionProfile</code></td>
+<td>The interval of a prediction: the values the data do not reject</td>
+<td>No, as <code>ProfileLikelihood</code></td>
+<td><a href="profiles/#prediction-profiles">Profile Likelihood</a></td>
 </tr>
 </tbody>
 </table>

@@ -442,6 +442,51 @@ class SimulationPlotter:
         return fig
 
     @staticmethod
+    def plot_profiles(
+        result: ProfileResult,
+        output_file: str | None = None,
+        config: PlotConfig | None = None,
+    ) -> "Figure":
+        """
+        Plot each profile: one subplot per parameter or prediction, with the
+        statistic of each point, the threshold, and the ends of the interval.
+
+        A profile that stays under the threshold up to a bound is open on that
+        side; a flat one stays near 0 over its whole range.
+
+        Parameters
+        ----------
+        result : ProfileResult
+            The result of `ProfileLikelihood` or `PredictionProfile`.
+        output_file : str | None
+            Path to save the figure. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+
+        Returns
+        -------
+        Figure
+            The matplotlib Figure object.
+        """
+        config = config or PlotConfig()
+        SimulationPlotter._apply_seaborn_style(config)
+        names = list(result.profiles)
+        fig, axes = SimulationPlotter._create_grid(config, len(names))
+        for ax, name in zip(axes, names, strict=False):
+            profile = result.profiles[name]
+            ax.plot(profile.values, profile.statistics, marker="o", markersize=3)
+            ax.axhline(profile.threshold, color="grey", linestyle="--", linewidth=1)
+            interval = result.intervals[name]
+            for end in (interval.lower, interval.upper):
+                if end is not None:
+                    ax.axvline(end, color="grey", linestyle=":", linewidth=1)
+            ax.set_xlabel(name)
+            ax.set_ylabel("Profile statistic")
+            ax.set_title(name)
+        SimulationPlotter._finalize_plot(axes, names, output_file, config, "Profiles")
+        return fig
+
+    @staticmethod
     def _create_grid(config: PlotConfig, count: int) -> tuple["Figure", list["Axes"]]:
         """A figure of `count` subplots in the layout of `config`."""
         rows, cols = config.layout or SimulationPlotter._calculate_layout(count)
@@ -1750,6 +1795,79 @@ def plot_sobol(
     SimulationPlotter._finalize_plot(
         axes, result.labels, output_file, config, "Sobol"
     )
+    return fig
+```
+
+#### plot_profiles
+
+```python
+plot_profiles(result: ProfileResult, output_file: str | None = None, config: PlotConfig | None = None) -> Figure
+```
+
+Plot each profile: one subplot per parameter or prediction, with the statistic of each point, the threshold, and the ends of the interval.
+
+A profile that stays under the threshold up to a bound is open on that side; a flat one stays near 0 over its whole range.
+
+Parameters:
+
+| Name          | Type            | Description                                           | Default                                                        |
+| ------------- | --------------- | ----------------------------------------------------- | -------------------------------------------------------------- |
+| `result`      | `ProfileResult` | The result of ProfileLikelihood or PredictionProfile. | *required*                                                     |
+| `output_file` | \`str           | None\`                                                | Path to save the figure. If None, the figure is only returned. |
+| `config`      | \`PlotConfig    | None\`                                                | Layout and style. If None, the defaults.                       |
+
+Returns:
+
+| Type     | Description                   |
+| -------- | ----------------------------- |
+| `Figure` | The matplotlib Figure object. |
+
+Source code in `commol/api/plotter.py`
+
+```python
+@staticmethod
+def plot_profiles(
+    result: ProfileResult,
+    output_file: str | None = None,
+    config: PlotConfig | None = None,
+) -> "Figure":
+    """
+    Plot each profile: one subplot per parameter or prediction, with the
+    statistic of each point, the threshold, and the ends of the interval.
+
+    A profile that stays under the threshold up to a bound is open on that
+    side; a flat one stays near 0 over its whole range.
+
+    Parameters
+    ----------
+    result : ProfileResult
+        The result of `ProfileLikelihood` or `PredictionProfile`.
+    output_file : str | None
+        Path to save the figure. If None, the figure is only returned.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+
+    Returns
+    -------
+    Figure
+        The matplotlib Figure object.
+    """
+    config = config or PlotConfig()
+    SimulationPlotter._apply_seaborn_style(config)
+    names = list(result.profiles)
+    fig, axes = SimulationPlotter._create_grid(config, len(names))
+    for ax, name in zip(axes, names, strict=False):
+        profile = result.profiles[name]
+        ax.plot(profile.values, profile.statistics, marker="o", markersize=3)
+        ax.axhline(profile.threshold, color="grey", linestyle="--", linewidth=1)
+        interval = result.intervals[name]
+        for end in (interval.lower, interval.upper):
+            if end is not None:
+                ax.axvline(end, color="grey", linestyle=":", linewidth=1)
+        ax.set_xlabel(name)
+        ax.set_ylabel("Profile statistic")
+        ax.set_title(name)
+    SimulationPlotter._finalize_plot(axes, names, output_file, config, "Profiles")
     return fig
 ```
 

@@ -1422,6 +1422,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2423,6 +2451,34 @@
     
   
     Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../codebase/decisions/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
   
 
     
@@ -3846,6 +3902,29 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   its Sobol indices and <code>predict</code> as a surrogate (<code>ChaosResult</code>); the number
   of terms is checked before any run.</li>
 <li><code>SimulationPlotter.plot_prcc</code>, <code>plot_morris</code> and <code>plot_sobol</code>.</li>
+<li><code>ProfileLikelihood(parameters, threshold, max_steps)</code>: the profile of each
+  parameter, refitted with the problem's own optimizer at values that step
+  away from the fit by the adaptive step of Raue et al. (2009), its pointwise
+  interval and its verdict (<code>identifiable</code>, <code>practically_non_identifiable</code>,
+  <code>structurally_non_identifiable</code>), in a <code>ProfileResult</code>;
+  <code>ProfileResult.report()</code> gives the verdicts as an <code>IdentifiabilityReport</code>
+  with a <code>profile</code> section. A profile is read by resetting the other
+  parameters to their fitted values (<code>ProfileResult.structure</code>), against the
+  floor of two evaluations (<code>ProfileResult.evaluation_floor</code>): it gives the
+  structural verdict <code>in_combination</code> or <code>non_identifiable</code>, and names the
+  parameters that compensate it. A crossing made by the bound of another
+  parameter counts as an open side (<code>Profile.box_crossings</code>), and
+  <code>Profile.refit_error</code> measures the error of a refit at the fit. See
+  <a href="../../guide/uncertainty/profiles/">Profile Likelihood</a>.</li>
+<li><code>PredictionProfile(specs, threshold)</code>: the interval of each prediction
+  (<code>PredictionSpec</code>), held at each value as an equality constraint by an
+  augmented Lagrangian. See
+  <a href="../../guide/uncertainty/profiles/#prediction-profiles">Prediction profiles</a>.</li>
+<li><code>Threshold.chi_square(level)</code> (observation models),
+  <code>Threshold.beale(level)</code> (a sum of squares of independent Gaussian errors)
+  and <code>Threshold.bootstrap_calibrated(bootstrap, level)</code> (any loss, calibrated
+  by the replicates of a bootstrap).</li>
+<li><code>SimulationPlotter.plot_profiles</code>.</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3947,6 +4026,12 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>The finite-difference step of a parameter with an infinite bound was
   infinite, so its sensitivities, identifiability and curvature failed: the
   width of its bounds now counts as 1 in the step.</li>
+<li>The quantile of a distribution hundreds of orders of magnitude below 1,
+  such as <code>Beta(0.01, 1)</code> at <code>1e-3</code>, was far from it, so a prior or a draw
+  of such a shape was wrong: when its Newton and halving steps run out, the
+  quantile now bisects the floating-point numbers between the two ends.</li>
+<li>A particle swarm whose first particle had a NaN cost kept no best particle
+  and returned its start point: a NaN cost now counts as the worst.</li>
 </ul>
 <h2 id="050-2026-10-19">[0.5.0] - 2026-10-19<a class="headerlink" href="#050-2026-10-19" title="Permanent link">&para;</a></h2>
 <p>This release replaces the ensemble calibration with uncertainty methods that

@@ -1426,6 +1426,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2435,6 +2463,34 @@
     
   
     Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../codebase/decisions/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
   
 
     
@@ -3926,8 +3982,8 @@ the same zones (<code>gh issue list --label area:inference -s open</code>).</p>
 <li><strong>Build Pipeline</strong>: Builds on Ubuntu, Windows, and macOS with Python versions</li>
 <li><strong>Test Coverage</strong>: Python Coverage (<code>pytest --cov --cov-fail-under=100</code>) and
   Rust Code Quality (<code>.github/scripts/rust_coverage.sh</code>, the Rust tests and
-  <code>pytest</code> on an instrumented extension) measure the coverage, fail under their
-  threshold, and upload it to Codecov, which feeds the coverage badges of the
+  <code>pytest</code> on an instrumented extension) measure the coverage, fail on a line
+  that no test runs and that says no reason, and upload it to Codecov, which feeds the coverage badges of the
   README. See <a href="../../codebase/coverage/#test-coverage">Test coverage</a></li>
 </ul>
 <p><strong>PR Requirements</strong>:</p>
@@ -3938,8 +3994,8 @@ the same zones (<code>gh issue list --label area:inference -s open</code>).</p>
 <li>No merge conflicts with target branch</li>
 <li>The merge queue: it merges each pull request on top of the ones queued
   before it, after the required checks pass on that result</li>
-<li>Coverage does not fall under its thresholds: 100 % of the Python
-  statements, and <code>RUST_LINES</code> of the Rust lines</li>
+<li>Every Python statement and every Rust line runs in a test, or carries its
+  reason: <code># pragma: no cover: &lt;reason&gt;</code> or <code>// coverage: &lt;reason&gt;</code></li>
 </ul>
 <h3 id="7-merging">7. Merging<a class="headerlink" href="#7-merging" title="Permanent link">&para;</a></h3>
 <p>Once its checks pass, add the pull request to the merge queue ("Merge when ready", or
@@ -3968,7 +4024,7 @@ Updating the file there also triggers a version-update check right away.</p>
 <tr>
 <td>Code Quality (<code>code-quality.yaml</code>)</td>
 <td>Pull requests, the merge queue and on demand</td>
-<td>Python Code Quality: Ruff (lint, format, docstrings <code>D1</code>/<code>D417</code>) of <code>py-commol/</code> and <code>.github/scripts/</code>, Ty and Vulture, on the source and the stubs, so it builds nothing. Python Coverage: every test, the documentation checks (<code>pytest -m docs</code>) too, under coverage, for every change, the documentation included; it fails under 100 % of the statements. Rust: rustfmt, Clippy (<code>-D warnings</code>, so <code>missing_docs</code> too), rustdoc without broken links, then the Rust tests and <code>pytest</code> on an extension built with the instrumentation of <code>cargo llvm-cov</code> (<code>.github/scripts/rust_coverage.sh</code>), so the bindings are measured where they run; it fails under the <code>RUST_LINES</code> of the script. Both upload their coverage to Codecov (flags <code>python</code> and <code>rust</code>) with the OIDC token of the run, so no secret is needed; <code>.github/codecov.yml</code> makes its checks informational: the thresholds live in the repository (<a href="../../codebase/coverage/#test-coverage">Test coverage</a>).</td>
+<td>Python Code Quality: Ruff (lint, format, docstrings <code>D1</code>/<code>D417</code>) of <code>py-commol/</code> and <code>.github/scripts/</code>, Ty and Vulture, on the source and the stubs, so it builds nothing. Python Coverage: every test, the documentation checks (<code>pytest -m docs</code>) too, under coverage, for every change, the documentation included; it fails under 100 % of the statements. Rust: rustfmt, Clippy (<code>-D warnings</code>, so <code>missing_docs</code> too), rustdoc without broken links, then the Rust tests and <code>pytest</code> on an extension built with the instrumentation of <code>cargo llvm-cov</code> (<code>.github/scripts/rust_coverage.sh</code>), so the bindings are measured where they run; it fails on a line that no test runs and that has no marker <code>// coverage: &lt;reason&gt;</code> (<code>.github/scripts/rust_uncovered.py</code>). Both upload their coverage to Codecov (flags <code>python</code> and <code>rust</code>) with the OIDC token of the run, so no secret is needed; <code>.github/codecov.yml</code> makes its checks informational: the thresholds live in the repository (<a href="../../codebase/coverage/#test-coverage">Test coverage</a>).</td>
 <td><code>Python Code Quality</code>, <code>Python Coverage</code>, <code>Rust Code Quality</code></td>
 </tr>
 <tr>
@@ -4050,7 +4106,7 @@ Updating the file there also triggers a version-update check right away.</p>
 </tr>
 <tr>
 <td>Test coverage, as CI measures it</td>
-<td><code>pytest --cov=commol --cov-fail-under=100</code>; from the root, <code>.github/scripts/rust_coverage.sh --summary-only</code> (the Rust tests and <code>pytest</code> on an instrumented extension, failing under its <code>RUST_LINES</code>; needs <code>cargo-llvm-cov</code> and the <code>llvm-tools-preview</code> component). Policy: <code>docs/codebase/coverage.md</code></td>
+<td><code>pytest --cov=commol --cov-fail-under=100</code>; from the root, <code>.github/scripts/rust_coverage.sh --summary-only</code> (the Rust tests and <code>pytest</code> on an instrumented extension, failing on a line that no test runs and that has no <code>// coverage: &lt;reason&gt;</code>; needs <code>cargo-llvm-cov</code> and the <code>llvm-tools-preview</code> component). Policy: <code>docs/codebase/coverage.md</code></td>
 </tr>
 <tr>
 <td>Rust lint (from the root)</td>
