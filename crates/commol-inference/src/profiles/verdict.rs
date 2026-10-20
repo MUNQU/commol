@@ -125,6 +125,7 @@ mod tests {
             ends,
             interval: [None, None],
             evaluations: 0,
+            moving: Vec::new(),
         }
     }
 

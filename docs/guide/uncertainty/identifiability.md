@@ -250,7 +250,8 @@ An `IdentifiabilityReport` holds, for each parameter, a **structural** and a
 **practical** verdict, and the sections of the methods that ran
 (`structural`, `collinearity`, `sample`, `starts`, `profile`). The profiles of
 a `ProfileLikelihood` give their report with `ProfileResult.report()`; a flat
-profile gives the structural verdict `non_identifiable`
+profile gives the structural verdict `in_combination` when other parameters
+move along it, and `non_identifiable` when none does
 ([Profile Likelihood](profiles.md#verdicts-and-the-identifiability-report)). `merge` joins reports: a
 verdict the reports agree on stays, with every reason; one they disagree on is
 `conflicting`, with both reasons. `identifiability_report` gives it as plain

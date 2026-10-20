@@ -70,8 +70,21 @@ The tolerance is the `sd_tolerance` of Nelder-Mead (at least `1e-9`), or
 `1e-6` for a swarm, times `max(1, |objective at the fit|)`
 (`ProfileTracer::tolerance`). A threshold below it gives no verdict, and the
 result says why. `ProfileResult.report()` maps `identifiable` to the practical
-`determined`, `practically_non_identifiable` to `poorly_determined` and
-`structurally_non_identifiable` to the structural `non_identifiable`.
+`determined` and `practically_non_identifiable` to `poorly_determined`.
+`structurally_non_identifiable` gives the structural `in_combination`, with a
+combination such as `"k1 with s (along the profile)"`, when a free parameter
+moves along the profile, and `non_identifiable` when none does. A parameter
+moves when its range over the points inside the box, on the unbounded scale
+of `Transform` (`transform.rs`), is above the relative tolerance of the
+statistic times `max(1, |its value at the fit|)` on that scale
+(`ProfileTracer::moving`, `Profile::moving`). A flat profile says only that
+the data do not determine the parameter alone, which both verdicts satisfy;
+the paths of the other parameters tell which one, as Raue et al. (2009) read
+relations from the profiles. Limit: when two other parameters have no effect,
+the optimizer may move them along the profile, so the verdict reads
+`in_combination` while the structural rank says `non_identifiable`; the merge
+shows `conflicting`, so the case stays visible. Checking each point for a
+combination would multiply the cost of a profile.
 
 | Alternative | Why not |
 |---|---|
@@ -79,7 +92,9 @@ result says why. `ProfileResult.report()` maps `identifiable` to the practical
 | The structural verdict from every flat stretch | Flat is what the structural rank answers; the profile adds only what holds over the whole range. |
 | Every point, outside the box too | A ridge `k1 · s = c` leaves a box unless its bounds match `c` exactly, so a flat ridge would read as practically non-identifiable. |
 | Any parameter on a bound | A parameter whose fit sits on its bound would put every point outside the box, and any profile would read as flat. |
+| A flat profile is always `non_identifiable` | It conflicts with the structural rank, which says `in_combination`, for every product of parameters. |
 
 **Guards:** `verdict::tests`,
 `tests/uncertainty/test_profiles.py` (`TestVerdicts`, with
-`test_a_ridge_that_leaves_the_box_is_flat_inside_it`).
+`test_a_ridge_that_leaves_the_box_is_flat_inside_it`,
+`test_a_parameter_with_no_effect_moves_nothing`).

@@ -329,6 +329,11 @@ class Profile(_Frozen):
         Evaluations of the objective.
     replicate_rises : list[float] | None
         With a bootstrap threshold, the rise of each replicate kept.
+    moving : list[str]
+        The free parameters that move along the profile inside the box of
+        the parameters: their range over its points, on the unbounded scale
+        of the moves of a sampler, is above the tolerance of the statistic,
+        relative to the value at the fit.
     """
 
     center: float
@@ -341,6 +346,7 @@ class Profile(_Frozen):
     ends: tuple[ProfileEndName, ProfileEndName]
     evaluations: int
     replicate_rises: list[float] | None = None
+    moving: list[str] = Field(default_factory=list)
 
 
 class ProfileInterval(_Frozen):
@@ -406,10 +412,13 @@ class ProfileResult(_Frozen):
         The verdicts of the profiled parameters as an identifiability report,
         with a ``profile`` section.
 
-        ``identifiable`` gives the practical verdict ``determined``,
+        ``identifiable`` gives the practical verdict ``determined`` and
         ``practically_non_identifiable`` the practical verdict
-        ``poorly_determined``, and ``structurally_non_identifiable`` the
-        structural verdict ``non_identifiable``. A parameter with no profile,
+        ``poorly_determined``. ``structurally_non_identifiable`` gives a
+        structural verdict: ``in_combination`` when other free parameters
+        move along the flat profile (`Profile.moving`), with a combination
+        that names them, such as ``"k1 with s (along the profile)"``, and
+        ``non_identifiable`` when none moves. A parameter with no profile,
         or no verdict, gets neither. `IdentifiabilityReport.merge` joins it
         with the reports of other methods.
 
@@ -435,9 +444,16 @@ class ProfileResult(_Frozen):
             verdict = self.verdicts.get(name)
             reason = f"profile likelihood: {verdict}" if verdict else ""
             if verdict == "structurally_non_identifiable":
+                moving = self.profiles[name].moving
                 verdicts[name] = ParameterVerdicts(
                     structural=StructuralVerdict(
-                        verdict="non_identifiable", reasons=[reason]
+                        verdict="in_combination" if moving else "non_identifiable",
+                        reasons=[reason],
+                        combinations=(
+                            [f"{name} with {', '.join(moving)} (along the profile)"]
+                            if moving
+                            else []
+                        ),
                     )
                 )
             elif verdict is not None:

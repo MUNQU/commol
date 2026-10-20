@@ -21,6 +21,8 @@ use commol_core::SimulationEngine;
 use commol_random::replicate_seed;
 use rayon::prelude::*;
 
+use crate::transform::Transform;
+
 /// The share of the threshold a step aims to rise by.
 const RISE_FRACTION: f64 = 0.1;
 /// The first step, as a share of the scale of the quantity.
@@ -106,6 +108,11 @@ pub struct Profile {
     pub interval: [Option<f64>; 2],
     /// The evaluations of the objective, rejected steps included.
     pub evaluations: usize,
+    /// The free parameters, by index, that move along the profile inside
+    /// the box of the parameters: their range over its points, on the
+    /// unbounded scale of [`Transform`], is above the relative tolerance of
+    /// the statistic times `max(1, |value at the fit|)` on that scale.
+    pub moving: Vec<usize>,
 }
 
 impl Profile {
@@ -183,11 +190,46 @@ where
     /// simplex at the end, or `1e-6` for a particle swarm, which has none;
     /// at least `1e-9`, both relative to `max(1, |objective at the fit|)`.
     pub fn tolerance(&self) -> f64 {
-        let relative = match self.config {
+        self.relative_tolerance() * self.fit_loss.abs().max(1.0)
+    }
+
+    /// The tolerance of [`Self::tolerance`] relative to its scale.
+    fn relative_tolerance(&self) -> f64 {
+        match self.config {
             OptimizationConfig::NelderMead(config) => config.sd_tolerance.max(1e-9),
             OptimizationConfig::ParticleSwarm(_) => 1e-6,
-        };
-        relative * self.fit_loss.abs().max(1.0)
+        }
+    }
+
+    /// The free parameters that move along the points of a profile inside
+    /// the box: those whose range over the points, on the unbounded scale of
+    /// [`Transform`], is above the tolerance of the statistic measured the
+    /// same way, the relative tolerance times `max(1, |value at the fit|)`
+    /// on that scale. The statistic is flat when it stays within
+    /// `relative · max(1, |objective at the fit|)`; a parameter moves when
+    /// it leaves `relative · max(1, |u at the fit|)`. A parameter the
+    /// objective does not read can move by chance: the optimizer has no
+    /// reason to keep it.
+    fn moving(&self, held: Option<usize>, points: &[ProfilePoint]) -> Vec<usize> {
+        let transform = Transform::new(&self.problem.parameter_bounds());
+        let fit = transform.to_unbounded(&self.fit);
+        let inside: Vec<Vec<f64>> = points
+            .iter()
+            .filter(|point| point.on_bound.is_none())
+            .map(|point| transform.to_unbounded(&point.parameters))
+            .collect();
+        let relative = self.relative_tolerance();
+        (0..fit.len())
+            .filter(|&i| Some(i) != held)
+            .filter(|&i| {
+                let (lo, hi) = inside
+                    .iter()
+                    .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), u| {
+                        (lo.min(u[i]), hi.max(u[i]))
+                    });
+                hi - lo > relative * fit[i].abs().max(1.0)
+            })
+            .collect()
     }
 
     /// The value of `quantity` at the fit.
@@ -263,17 +305,29 @@ where
         centers
             .into_iter()
             .zip(thresholds)
-            .map(|(center, &threshold)| {
+            .enumerate()
+            .map(|(index, (center, &threshold))| {
                 let below = sides.next().expect("two sides per quantity");
                 let above = sides.next().expect("two sides per quantity");
                 let (center, below, above) = (center?, below?, above?);
-                Ok(self.join(center, threshold, below, above))
+                let held = match &quantities[index] {
+                    ProfiledQuantity::Parameter(j) => Some(*j),
+                    ProfiledQuantity::Prediction(_) => None,
+                };
+                Ok(self.join(held, center, threshold, below, above))
             })
             .collect()
     }
 
     /// The point of the fit, and both sides, as one profile.
-    fn join(&self, center: f64, threshold: f64, below: Side, above: Side) -> Profile {
+    fn join(
+        &self,
+        held: Option<usize>,
+        center: f64,
+        threshold: f64,
+        below: Side,
+        above: Side,
+    ) -> Profile {
         let fit = ProfilePoint {
             value: center,
             statistic: 0.0,
@@ -293,6 +347,7 @@ where
         Profile {
             center,
             threshold,
+            moving: self.moving(held, &points),
             points,
             ends,
             interval,

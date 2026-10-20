@@ -24,6 +24,7 @@ from commol import (
     ProfileLikelihood,
     ResidualBootstrap,
     Simulation,
+    StructuralRank,
     Threshold,
     WildBootstrap,
 )
@@ -304,10 +305,12 @@ class TestVerdicts:
         assert result.verdicts["k2"] == "identifiable"
         report = result.report()
         assert report.parameters == ["k1", "s", "k2"]
-        for name in ("k1", "s"):
+        # Along each flat profile the other parameter of the product moves.
+        for name, other in (("k1", "s"), ("s", "k1")):
             structural = report.verdicts[name].structural
             assert structural is not None
-            assert structural.verdict == "non_identifiable"
+            assert structural.verdict == "in_combination"
+            assert other in result.profiles[name].moving
             assert report.verdicts[name].practical is None
         practical = report.verdicts["k2"].practical
         assert practical is not None
@@ -366,6 +369,65 @@ class TestVerdicts:
         assert "'k1': the ridge leaves the box" in notes
         assert "where 's' reaches its bound" in notes
         assert "where 'k1' reaches its bound" in notes
+        # Along the flat profile of k1, s moves: the two are determined
+        # together, as the structural rank says.
+        assert "s" in result.profiles["k1"].moving
+        assert "k1" in result.profiles["s"].moving
+        rank = calibrator.identifiability(
+            StructuralRank(points=5, design="observations")
+        )
+        merged = rank.merge(result.report())
+        for name in ("k1", "s"):
+            structural = merged.verdicts[name].structural
+            assert structural is not None
+            assert structural.verdict == "in_combination"
+        assert any(
+            text.startswith("k1 with s") and text.endswith("(along the profile)")
+            for text in merged.verdicts["k1"].structural.combinations
+        )
+
+    def test_a_parameter_with_no_effect_moves_nothing(self) -> None:
+        # k3 empties C into D, and only B is observed: no data read k3.
+        truth = Simulation(build(abc_builder(parameters={"k1": 0.3, "k2": 0.1}))).run(
+            40
+        )
+        model = build(
+            abc_builder(
+                parameters={"k1": None, "k2": None, "k3": None},
+                amounts={"A": 990, "B": 10, "C": 0, "D": 0},
+            )
+            .add_bin(id="D", name="State D")
+            .add_transition(id="cd", source=["C"], target=["D"], rate="k3 * C")
+        )
+        problem = CalibrationProblem(
+            observed_data=observed(truth, "B", range(4, 41, 4)),
+            parameters=[
+                bounded("k1", 0.0, 1.0),
+                bounded("k2", 0.0, 1.0),
+                bounded("k3", 0.0, 1.0),
+            ],
+            observation_models={"B": NormalObservations(sd=10.0)},
+            optimization_config=NelderMeadConfig(
+                max_iterations=4000, sd_tolerance=1e-12
+            ),
+            seed=42,
+        )
+        calibrator = Calibrator(Simulation(model), problem)
+
+        result = calibrator.uncertainty(
+            ProfileLikelihood(parameters=["k3"], threshold=Threshold.chi_square(0.95))
+        )
+
+        assert result.verdicts["k3"] == "structurally_non_identifiable"
+        assert result.profiles["k3"].moving == []
+        rank = calibrator.identifiability(
+            StructuralRank(points=5, design="observations")
+        )
+        merged = rank.merge(result.report())
+        structural = merged.verdicts["k3"].structural
+        assert structural is not None
+        assert structural.verdict == "non_identifiable"
+        assert structural.combinations == []
 
     def test_late_parameter_gives_a_one_sided_profile(self) -> None:
         # B starts to fill at `tau`; the data stop at 10 and see no flow, so

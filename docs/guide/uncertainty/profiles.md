@@ -216,7 +216,7 @@ them is not a joint region.
 |---|---|---|
 | `identifiable` | Crosses the threshold on both sides | Practical `determined` |
 | `practically_non_identifiable` | Stays below on at least one side, up to a bound or `max_steps` | Practical `poorly_determined` |
-| `structurally_non_identifiable` | Flat within `tolerance` over its whole range inside the box of the parameters: each side reaches its bound, or rises only where another parameter sits on its bound | Structural `non_identifiable` |
+| `structurally_non_identifiable` | Flat within `tolerance` over its whole range inside the box of the parameters: each side reaches its bound, or rises only where another parameter sits on its bound | Structural `in_combination` when other parameters move along it (`Profile.moving`), `non_identifiable` when none moves |
 
 A threshold below `tolerance` gives no verdict: the profile cannot tell a rise
 from numerical error, and `notes` says so. `tolerance` is the `sd_tolerance`
@@ -233,10 +233,22 @@ box, and a note names the parameter and the value where the ridge leaves it.
 section, which `merge` joins with the other methods. A rate that reads
 `k1 * s` cannot tell `k1` from `s`: their profiles are flat on the ridge
 `k1 · s = constant`, and rise only where the ridge leaves the box, where the
-other parameter reaches its bound. Merged with the structural rank, which
-says `in_combination`, their structural verdict is `conflicting`, with both
-reasons: the rank names the combination the data determine, the profile says
-that neither parameter alone is.
+other parameter reaches its bound. A flat profile says that the data do not
+determine the parameter alone, which `in_combination` and `non_identifiable`
+both satisfy; the paths of the other parameters along it tell which one, as
+Raue et al. (2009) read relations between parameters from the profiles. When
+`s` moves along the profile of `k1`, the structural verdict is
+`in_combination`, with the combination `"k1 with s (along the profile)"`, and
+it agrees with the structural rank. A parameter that moves along no flat
+profile, such as a rate that feeds nothing observed, is `non_identifiable`.
+
+A parameter moves when its range along the profile, on the unbounded scale of
+the moves of a sampler, is above the tolerance of the statistic, relative to
+its value at the fit. A parameter that nothing reads can move by chance: the
+optimizer has no reason to keep it. When two other parameters have no
+effect, the profile of one may read `in_combination` while the rank says
+`non_identifiable`; the merged report then shows `conflicting`, so the case
+stays visible.
 
 ```python
 from commol import SimulationPlotter, StructuralRank
@@ -284,7 +296,7 @@ print(profiles.notes[0])
 report = product.identifiability(StructuralRank(points=5, design="observations"))
 merged = report.merge(profiles.report())
 print(merged.verdicts["k1"].structural.verdict, merged.verdicts["k2"].practical.verdict)
-# conflicting determined
+# in_combination determined
 ```
 
 ## Plots

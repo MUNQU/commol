@@ -116,6 +116,9 @@ pub struct PyProfile {
     /// Where the side below and the side above leave the box: the value and
     /// the index of the free parameter on its bound, or None
     box_exits: (Option<BoxExit>, Option<BoxExit>),
+    /// The free parameters, by index, that move along the profile inside
+    /// the box
+    moving: Vec<usize>,
 }
 
 fn end_name(end: ProfileEnd) -> String {
@@ -136,6 +139,7 @@ impl PyProfile {
                 .verdict(tolerance)
                 .map(|verdict| verdict.name().to_string()),
             lowest: profile.lowest(),
+            moving: profile.moving.clone(),
             box_exits: {
                 let [below, above] = profile.box_exits();
                 (below, above)

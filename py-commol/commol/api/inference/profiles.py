@@ -146,6 +146,7 @@ def _result(
                 "ends": profile.ends,
                 "evaluations": profile.evaluations,
                 "replicate_rises": profile.rises,
+                "moving": [parameter_names[index] for index in profile.moving],
             }
         )
         lower, upper = profile.interval
