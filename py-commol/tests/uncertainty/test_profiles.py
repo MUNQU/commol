@@ -321,3 +321,35 @@ class TestVerdicts:
 
         with pytest.raises(ValueError, match="profiles of predictions"):
             result.report()
+
+
+class TestResult:
+    def test_profile_result_has_one_entry_per_parameter(self) -> None:
+        calibrator = line_calibrator(
+            VALUES, observation_models={"B": NormalObservations(sd=1.0)}
+        )
+
+        result = calibrator.uncertainty(
+            ProfileLikelihood(
+                parameters=["B", "c"],
+                threshold=Threshold.chi_square(0.95),
+                max_steps=50,
+            )
+        )
+
+        assert list(result.profiles) == ["B", "c"]
+        assert list(result.intervals) == ["B", "c"]
+        assert result.verdicts == {"B": "identifiable", "c": "identifiable"}
+        assert result.quantity == "parameter"
+        for name, profile in result.profiles.items():
+            assert profile.values == sorted(profile.values)
+            fit = profile.values.index(result.fit.best_parameters[name])
+            assert profile.statistics[fit] == 0.0
+            assert profile.parameters[fit] == result.fit.best_parameters
+            interval = result.intervals[name]
+            assert interval.lower is not None and interval.upper is not None
+            assert interval.lower < profile.center < interval.upper
+            assert all(
+                (s > profile.threshold) == (not interval.lower <= v <= interval.upper)
+                for v, s in zip(profile.values, profile.statistics, strict=True)
+            )
