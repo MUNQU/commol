@@ -8,21 +8,30 @@ the information of ``c`` is ``n / sd²``; without windows the prediction at
 ``t`` is ``c·t``, a line through the origin.
 """
 
+import logging
 import math
 
 import numpy as np
 import pytest
+from pydantic import BaseModel
 
 from commol import (
     CalibrationProblem,
     Calibrator,
+    GibbsTarget,
+    ImportanceResult,
     Laplace,
+    LaplaceMixture,
     LaplaceResult,
+    LikelihoodTarget,
     NelderMeadConfig,
     NormalObservations,
     Predictive,
+    Priors,
     Sandwich,
+    SandwichResult,
     Simulation,
+    UncertaintyMethod,
 )
 from tests.support import (
     a_to_b_builder,
@@ -36,6 +45,24 @@ from tests.support import (
 def _normal_data(count: int, seed: int, sd: float, level: float = 10.0) -> list[float]:
     rng = np.random.default_rng(seed)
     return (level + rng.normal(0.0, sd, count)).tolist()
+
+
+def _square_calibrator(values: list[float], low: float, high: float) -> Calibrator:
+    """A flow ``c²`` from A to B, with a normal model of ``sd = 1``: two
+    optima, ``±√ȳ``, when the bounds of ``c`` hold both."""
+    model = build(
+        a_to_b_builder(
+            parameters={"c": None}, rate="c * c * A / A", amounts={"A": 1e6, "B": 0}
+        )
+    )
+    problem = CalibrationProblem(
+        observed_data=flow_observations(values, windowed=True),
+        parameters=[bounded("c", low, high, initial_guess=1.0)],
+        observation_models={"B": NormalObservations(sd=1.0)},
+        optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-12),
+        seed=2,
+    )
+    return Calibrator(Simulation(model), problem)
 
 
 class TestCurvature:
@@ -151,3 +178,67 @@ class TestSandwich:
 
         with pytest.raises(ValueError, match=r"density of the residuals.*bootstrap"):
             calibrator.uncertainty(Sandwich(block_length=1, draws=10))
+
+
+class TestResults:
+    @pytest.mark.parametrize(
+        ("method", "result_type"),
+        [
+            (Laplace(draws=10), LaplaceResult),
+            (Sandwich(block_length=2, draws=10), SandwichResult),
+            (
+                LaplaceMixture(
+                    starts=4,
+                    draws=100,
+                    target=LikelihoodTarget(priors=Priors.uniform_on_bounds()),
+                ),
+                ImportanceResult,
+            ),
+            (
+                LaplaceMixture(
+                    starts=4,
+                    draws=100,
+                    target=GibbsTarget(priors=Priors.uniform_on_bounds(), eta=0.5),
+                ),
+                ImportanceResult,
+            ),
+        ],
+        ids=["laplace", "sandwich", "mixture_of_a_likelihood", "mixture_of_a_loss"],
+    )
+    def test_each_method_returns_its_result(
+        self, method: UncertaintyMethod[BaseModel], result_type: type[BaseModel]
+    ) -> None:
+        data = _normal_data(12, 6, sd=1.0)
+        models = (
+            None
+            if isinstance(method, LaplaceMixture)
+            and isinstance(method.target, GibbsTarget)
+            else {"B": NormalObservations(sd=1.0)}
+        )
+        calibrator = flow_calibrator(data, windowed=True, observation_models=models)
+
+        result = calibrator.uncertainty(method)
+
+        assert type(result) is result_type
+        assert result.sample.names == ["c"]
+        mean = float(np.mean(data))
+        assert result.sample.mean()["c"] == pytest.approx(mean, abs=1.0)
+
+    def test_an_end_on_a_bound_gives_no_component(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # c² near 4 has the optima ±2; the bound 1.5 holds the positive one.
+        calibrator = _square_calibrator([4.2, 3.8, 4.1, 3.9], -4.0, 1.5)
+        method = LaplaceMixture(
+            starts=8,
+            draws=200,
+            target=LikelihoodTarget(priors=Priors.uniform_on_bounds()),
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = calibrator.uncertainty(method)
+
+        assert len(result.components) == 1
+        assert result.components[0].center["c"] == pytest.approx(-2.0, abs=0.1)
+        assert any("'c' is on its bound" in note for note in result.notes)
+        assert "'c' is on its bound" in caplog.text

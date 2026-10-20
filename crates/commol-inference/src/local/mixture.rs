@@ -17,6 +17,7 @@ use commol_random::Generator;
 
 use super::LocalError;
 use super::approximation::{CurvatureKind, curvature_at};
+use super::curvature::on_bound;
 use super::gaussian::{Gaussian, inverse};
 use crate::distribution::open_uniform;
 use crate::importance::{ImportanceRun, Proposal, importance_sample};
@@ -136,9 +137,9 @@ where
         if merged {
             continue;
         }
-        if let Some(j) = transform.derivatives(end).iter().position(|&d| d == 0.0) {
+        if let Some((j, bound)) = on_bound(&transform, end) {
             notes.push(format!(
-                "The end {end:?} gives no component: '{}' is on its bound",
+                "The end {end:?} gives no component: '{}' is on its bound {bound}",
                 names[j]
             ));
             continue;

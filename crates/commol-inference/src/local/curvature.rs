@@ -18,6 +18,11 @@ use super::LocalError;
 use crate::sensitivity::{Matrix, SensitivityError, SensitivitySource};
 use crate::transform::{Scale, Transform};
 
+/// A value this close to a bound, relative to the width of the bounds, is on
+/// it: about the square root of the machine epsilon, where an optimizer that
+/// the bound stops ends.
+const ON_BOUND: f64 = 1e-8;
+
 /// An entry of the curvature is reported when its estimated error is above
 /// this share of `√(H_jj · H_kk)`, the scale of its row and column.
 const UNCERTAIN_ENTRY: f64 = 0.01;
@@ -214,34 +219,47 @@ impl Curvature {
     }
 }
 
-/// Refuse a fit on a bound of its parameter: the unbounded scale puts it at
-/// infinity, where the variance is infinite.
+/// Refuse a fit on a bound of its parameter ([`on_bound`]): the unbounded
+/// scale puts it at infinity, where the variance is infinite.
 fn check_inside<E: SimulationEngine>(
     problem: &CalibrationProblem<E>,
     transform: &Transform,
     fit: &[f64],
 ) -> Result<(), LocalError> {
-    for ((parameter, scale), &value) in problem.parameters().iter().zip(transform.scales()).zip(fit)
-    {
-        let bound = match *scale {
-            Scale::Logit { lower, upper } => [Some(lower), Some(upper)],
-            Scale::Log { lower } => [Some(lower), None],
-            Scale::LogFromAbove { upper } => [None, Some(upper)],
-            Scale::Identity => [None, None],
-        }
-        .into_iter()
-        .flatten()
-        .find(|&bound| value == bound);
-        if let Some(bound) = bound {
-            return Err(LocalError::Refused(format!(
-                "The fit of '{}' is on its bound {bound}: on the unbounded scale its variance \
-                 is infinite there. A profile likelihood describes the uncertainty of a \
-                 parameter on its bound (MUNQU/commol#132)",
-                parameter.id
-            )));
-        }
+    match on_bound(transform, fit) {
+        Some((index, bound)) => Err(LocalError::Refused(format!(
+            "The fit of '{}' is on its bound {bound}: on the unbounded scale its variance is \
+             infinite there. A profile likelihood describes the uncertainty of a parameter on \
+             its bound (MUNQU/commol#132)",
+            problem.parameters()[index].id
+        ))),
+        None => Ok(()),
     }
-    Ok(())
+}
+
+/// The first parameter of `values` on one of its bounds, and that bound: at
+/// most [`ON_BOUND`] times the width of its bounds from it, or times the
+/// larger of 1 and the bound's magnitude for a parameter with one bound. An
+/// optimizer that a bound stops ends there up to its rounding.
+pub(crate) fn on_bound(transform: &Transform, values: &[f64]) -> Option<(usize, f64)> {
+    transform
+        .scales()
+        .iter()
+        .zip(values)
+        .enumerate()
+        .find_map(|(index, (scale, &value))| {
+            let (bounds, scale_of) = match *scale {
+                Scale::Logit { lower, upper } => ([Some(lower), Some(upper)], upper - lower),
+                Scale::Log { lower } => ([Some(lower), None], lower.abs().max(1.0)),
+                Scale::LogFromAbove { upper } => ([None, Some(upper)], upper.abs().max(1.0)),
+                Scale::Identity => ([None, None], 1.0),
+            };
+            bounds
+                .into_iter()
+                .flatten()
+                .find(|&bound| (value - bound).abs() <= ON_BOUND * scale_of)
+                .map(|bound| (index, bound))
+        })
 }
 
 /// Add `Aᵀ C A` of one term to `matrix`, and the first-order error of the
