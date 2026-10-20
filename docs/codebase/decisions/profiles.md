@@ -16,7 +16,9 @@ halved, one that rises by less than `q T / 2` doubles the next (`q = 0.1`,
 `T` the threshold, at least the tolerance). Each refit starts from every
 parameter, and the multiplier of a held prediction, extrapolated along the
 line through the two points before. A side ends past the threshold, at a
-bound, after `max_steps` points, or after four misses of a held prediction.
+bound, after `max_steps` points, or at the fifth miss of a held prediction
+(20 outer iterations of the augmented Lagrangian that leave `|g − c|` above
+a thousandth of the step).
 The end of the interval is the root of the quadratic through the last three
 points of the side, or of the line through the last two.
 

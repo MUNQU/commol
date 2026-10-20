@@ -31,11 +31,13 @@ const SMALLEST_STEP: f64 = 1e-8;
 const LARGEST_STEP: f64 = 0.25;
 /// The tolerance of a held prediction, as a share of the step.
 const CONSTRAINT_TOLERANCE: f64 = 1e-4;
-/// How many times in a row a held prediction may be missed before the
-/// profile ends.
+/// How many times a side may miss a held prediction and halve its step;
+/// the next miss ends it.
 const RETRIES: usize = 4;
-/// The outer iterations of a held prediction.
-const OUTER_ITERATIONS: u64 = 50;
+/// The outer iterations of a held prediction: the penalty grows tenfold in
+/// each one that does not halve the violation, so a prediction still missed
+/// after them is out of reach.
+const OUTER_ITERATIONS: u64 = 20;
 
 /// What a profile holds fixed.
 #[derive(Debug, Clone)]
@@ -161,16 +163,6 @@ where
             fit_loss: score.cost,
             seed,
         })
-    }
-
-    /// The problem.
-    pub fn problem(&self) -> &CalibrationProblem<E> {
-        self.problem
-    }
-
-    /// The fit, clamped to the bounds.
-    pub fn fit(&self) -> &[f64] {
-        &self.fit
     }
 
     /// The objective at the fit: the discrepancy, a loss or `−log L`.
@@ -379,7 +371,6 @@ where
                 step = (step / 2.0).max(smallest);
                 continue;
             }
-            misses = 0;
             let statistic = result.fit.final_loss - self.fit_loss;
             let rise = statistic - current.statistic;
             if rise > 2.0 * RISE_FRACTION * control && step > smallest {
@@ -526,8 +517,9 @@ mod tests {
         // A line has its one root.
         let root = quadratic_root([0.0, 1.0, 2.0], [0.0, 1.0, 2.0], 1.5).unwrap();
         assert!((root - 1.5).abs() < 1e-12, "{root}");
-        // No root between the last two points.
+        // No root between the last two points, or none at all.
         assert_eq!(quadratic_root([0.0, 1.0, 2.0], [0.0, 1.0, 2.0], 3.0), None);
+        assert_eq!(quadratic_root([0.0, 1.0, 2.0], [5.0, 6.0, 9.0], 1.0), None);
         assert_eq!(quadratic_root([0.0, 1.0, 2.0], [5.0, 5.0, 5.0], 3.0), None);
     }
 }

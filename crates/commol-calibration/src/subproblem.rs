@@ -184,11 +184,6 @@ impl<'a, E: SimulationEngine> Subproblem<'a, E> {
             }
         }
     }
-
-    /// The problem.
-    pub fn problem(&self) -> &CalibrationProblem<E> {
-        self.problem
-    }
 }
 
 /// The prediction of `spec` at `values`, which are inside their bounds: the
@@ -341,5 +336,60 @@ impl<E: SimulationEngine> Operator for PredictionCost<'_, E> {
             None => self.evaluate(values)?.1,
         };
         Ok(vec![prediction.map_or(0.0, |g| g - self.value)])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{CalibrationParameter, LossConfig};
+    use commol_core::Model;
+    use commol_difference::DifferenceEquations;
+
+    /// A → B at the proportional rate `k`, from A = 1000, with B observed at
+    /// 2 and the prediction of B at 5.
+    fn held() -> HeldPrediction<DifferenceEquations> {
+        let json = r#"{"name":"m","parameters":[{"id":"k","value":0.1}],
+            "engine":{"type":"DifferenceEquations"},
+            "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
+            "accumulators":[],"stratifications":[],
+            "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"k",
+            "stratified_rates":null,"per_compartment":null}]},
+            "structure":{"kind":"aggregate","bin_amounts":{"A":1000.0,"B":0.0}}}"#;
+        let model: Model = serde_json::from_str(json).expect("valid model JSON");
+        let problem = CalibrationProblem::new(
+            DifferenceEquations::try_from_model(&model).unwrap(),
+            vec![ObservedDataPoint::new(2.0, "B".to_string(), 190.0)],
+            vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+            vec![],
+            LossConfig::SumSquaredError,
+        )
+        .unwrap();
+        let spec = ObservedDataPoint::new(5.0, "B".to_string(), 0.0);
+        let (observing, operator) = problem.observing(&[spec]).unwrap();
+        HeldPrediction {
+            observing,
+            operator,
+            value: 400.0,
+            settings: ConstraintSettings::for_value(400.0),
+        }
+    }
+
+    #[test]
+    fn the_constraint_of_a_point_not_scored_runs_it_once() {
+        let held = held();
+        let cost = PredictionCost::new(&held);
+
+        // B at 5 is 1000 (1 − 0.9⁵) = 409.51 at k = 0.1, and B at 2 is the
+        // observed 190.
+        let constraint = cost.apply(&vec![0.1]).unwrap();
+        assert!((constraint[0] - 9.51).abs() < 1e-9, "{constraint:?}");
+        assert_eq!(cost.evaluations.get(), 1);
+        // The cost of the same point reads the run again; the constraint of
+        // the point just scored does not.
+        let loss = cost.cost(&vec![0.1]).unwrap();
+        assert!(loss.abs() < 1e-9, "{loss}");
+        assert_eq!(cost.apply(&vec![0.1]).unwrap(), constraint);
+        assert_eq!(cost.evaluations.get(), 2);
     }
 }

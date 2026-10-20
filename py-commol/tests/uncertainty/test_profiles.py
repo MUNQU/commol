@@ -17,6 +17,7 @@ from commol import (
     ParametricBootstrap,
     PredictionProfile,
     PredictionSpec,
+    ProfileInterval,
     ProfileLikelihood,
     ResidualBootstrap,
     Simulation,
@@ -443,3 +444,53 @@ class TestSettings:
                 ],
                 threshold=Threshold.chi_square(0.9),
             )
+
+    def test_the_bindings_refuse_a_bootstrap_they_cannot_build(self) -> None:
+        settings = commol_rs.inference.BootstrapSettings
+        with pytest.raises(ValueError, match="Unknown bootstrap 'jackknife'"):
+            settings("jackknife", 10, 1)
+        with pytest.raises(ValueError, match="A residual bootstrap needs scheme"):
+            settings("residual", 10, 1, 1, residual_scale="additive")
+        calibrator = line_calibrator(VALUES)
+        with pytest.raises(ValueError, match="only when it is 'bootstrap'"):
+            commol_rs.inference.trace_profiles(
+                calibrator.rust_problem,
+                calibrator.rust_optimizer,
+                [2.0, 5.0],
+                [0],
+                [],
+                "beale",
+                0.9,
+                5,
+                1,
+                bootstrap=settings("bayesian", 10, 1, 1),
+            )
+
+
+class TestUnreachable:
+    def test_a_prediction_no_parameters_give_ends_the_profile(self) -> None:
+        # With a noise of sd 1000 the data reject no value of B at 1, which
+        # the bounds hold in [0, 100]: each side ends where no values give it.
+        calibrator = line_calibrator(
+            VALUES, observation_models={"B": NormalObservations(sd=1000.0)}
+        )
+        problem = calibrator.problem.model_copy(
+            update={
+                "optimization_config": NelderMeadConfig(
+                    max_iterations=300, sd_tolerance=1e-8
+                )
+            }
+        )
+
+        result = Calibrator(calibrator.simulation, problem).uncertainty(
+            PredictionProfile(
+                specs=[PredictionSpec(at=1, output="B")],
+                threshold=Threshold.chi_square(0.9),
+            )
+        )
+
+        profile = result.profiles["B"]
+        assert profile.ends == ("unreachable", "unreachable")
+        assert 0.0 <= min(profile.values) and max(profile.values) <= 100.0
+        assert result.intervals["B"] == ProfileInterval(lower=None, upper=None)
+        assert result.verdicts["B"] == "practically_non_identifiable"

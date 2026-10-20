@@ -9,7 +9,11 @@ use commol_calibration::{
     OptimizationConfig, ParticleSwarmConfig, Subproblem, Workspace, optimize, optimize_subproblem,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
-use commol_inference::profiles::{ProfileEnd, ProfileTracer, ProfiledQuantity};
+use commol_inference::profiles::{
+    ProfileEnd, ProfileTracer, ProfiledQuantity, beale, bootstrap_thresholds, chi_square,
+};
+use commol_inference::resampling::{Perturbation, ReplicateRunner, Resampler};
+use commol_random::{Generator, replicate_seed};
 
 type Formula = fn(&HashMap<String, f64>, f64) -> f64;
 
@@ -479,4 +483,201 @@ fn the_multiplier_of_a_prediction_profile_is_minus_its_slope() {
             point.value
         );
     }
+}
+
+#[test]
+fn a_held_prediction_takes_a_warm_start() {
+    let problem = line_problem(&VALUES);
+    let (a, b) = least_squares(&VALUES);
+    let spec = ObservedDataPoint::new(15.0, "x".to_string(), 0.0);
+    // Held one above the fit: the multiplier is −dS/dc = −2 (c − ĉ) / h,
+    // with h = 1/n + (15 − 4.5)² / Stt.
+    let h = 0.1 + 10.5_f64.powi(2) / 82.5;
+    let held = Subproblem::fix_prediction(&problem, &spec, a + 15.0 * b + 1.0)
+        .unwrap()
+        .with_settings(ConstraintSettings {
+            tolerance: 1e-9,
+            max_outer_iterations: 50,
+            multiplier: Some(-1.0),
+            penalty: Some(10.0),
+        })
+        .unwrap();
+    let refit = optimize_subproblem(&held, &config(), &[a, b], None).unwrap();
+
+    assert!(refit.fit.converged, "{}", refit.fit.termination_reason);
+    let multiplier = refit.multiplier.unwrap();
+    assert!((multiplier + 2.0 / h).abs() < 1e-4, "{multiplier}");
+    // The loss rises by (c − ĉ)² / h.
+    let fit = optimize(&problem, &config()).unwrap();
+    assert!((refit.fit.final_loss - fit.final_loss - 1.0 / h).abs() < 1e-6);
+}
+
+#[test]
+fn an_invalid_optimizer_fails_a_subproblem() {
+    let problem = line_problem(&VALUES);
+    let config = OptimizationConfig::NelderMead(NelderMeadConfig {
+        initial_simplex_size: 0.0,
+        ..NelderMeadConfig::default()
+    });
+    let spec = ObservedDataPoint::new(15.0, "x".to_string(), 0.0);
+    let subproblems = [
+        Subproblem::fix_parameter(&problem, 0, 1.0).unwrap(),
+        Subproblem::fix_prediction(&problem, &spec, 8.0).unwrap(),
+    ];
+    for subproblem in &subproblems {
+        let error = optimize_subproblem(subproblem, &config, &[1.0, 0.5], None).unwrap_err();
+        assert!(
+            error.contains("initial_simplex_size must be in (0, 1]"),
+            "{error}"
+        );
+    }
+}
+
+#[test]
+fn a_tracer_refuses_a_fit_it_cannot_start_from() {
+    let config = config();
+    let problem = line_problem(&VALUES);
+    assert_eq!(
+        ProfileTracer::new(&problem, &config, &[1.0], 0).err(),
+        Some("The fit has 1 values for 2 parameters".to_string())
+    );
+    let tracer = ProfileTracer::new(&problem, &config, &[1.0, 0.5], 0).unwrap();
+    assert_eq!(
+        tracer.center(&ProfiledQuantity::Parameter(2)),
+        Err("Parameter 2 does not exist; the problem has 2".to_string())
+    );
+    // a ≥ 20 cannot hold inside the bounds of a.
+    let constrained = CalibrationProblem::new(
+        problem.forward().base_engine().clone(),
+        problem.observed_data().to_vec(),
+        problem.parameters().to_vec(),
+        vec![CalibrationConstraint::new(
+            "a20".to_string(),
+            "a - 20".to_string(),
+        )],
+        LossConfig::SumSquaredError,
+    )
+    .unwrap();
+    assert_eq!(
+        ProfileTracer::new(&constrained, &config, &[1.0, 0.5], 0).err(),
+        Some("The fit a profile starts from is not feasible".to_string())
+    );
+}
+
+#[test]
+fn a_side_that_starts_at_a_bound_ends_there() {
+    let problem = line_problem(&VALUES);
+    let config = config();
+    // The slope held at its lower bound, −5, from a fit there.
+    let tracer = ProfileTracer::new(&problem, &config, &[20.0 / 2.0, -5.0], 0).unwrap();
+    let profile = tracer
+        .trace(&ProfiledQuantity::Parameter(1), 1.0, 3)
+        .unwrap();
+
+    assert_eq!(profile.ends[0], ProfileEnd::Bound);
+    assert_eq!(profile.points[0].value, -5.0);
+    assert_eq!(profile.interval()[0], None);
+}
+
+#[test]
+fn the_tolerance_follows_the_optimizer() {
+    let problem = line_problem(&VALUES);
+    let fit = optimize(&problem, &config()).unwrap();
+    let nelder_mead = config();
+    let swarm = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig::default());
+    let scale = fit.final_loss.max(1.0);
+    for (config, relative) in [(&nelder_mead, 1e-9), (&swarm, 1e-6)] {
+        let tracer = ProfileTracer::new(&problem, config, &fit.best_parameters, 0).unwrap();
+        assert!((tracer.tolerance() - relative * scale).abs() < 1e-18);
+    }
+}
+
+#[test]
+fn thresholds_refuse_what_they_cannot_read() {
+    let problem = line_problem(&VALUES);
+    assert_eq!(
+        chi_square(&problem, 0.9).unwrap_err(),
+        "The chi-square threshold reads −log L and needs observation models; the problem \
+         has a loss. With a loss, use Threshold.beale (a sum of squares of independent \
+         Gaussian errors) or Threshold.bootstrap_calibrated"
+    );
+    assert_eq!(
+        beale(&problem, 1.0, 1.0).unwrap_err(),
+        "A level is strictly between 0 and 1, got 1"
+    );
+    assert_eq!(
+        beale(&line_problem(&VALUES[..2]), 1.0, 0.9).unwrap_err(),
+        "Beale's threshold needs more observations than parameters: 2 observations, \
+         2 parameters"
+    );
+    let config = config();
+    let runner = ReplicateRunner::new(&problem, &config, &[1.0, 0.5], 1, 0).unwrap();
+    let quantity = [ProfiledQuantity::Parameter(0)];
+    assert_eq!(
+        bootstrap_thresholds(&runner, &ZeroWeights, 2, &quantity, &[], 0.9).unwrap_err(),
+        "One center per quantity: 1 quantities, 0 centers"
+    );
+    let error = bootstrap_thresholds(&runner, &ZeroWeights, 2, &quantity, &[1.0], 0.9).unwrap_err();
+    assert!(error.starts_with("Every replicate failed (2)"), "{error}");
+}
+
+/// A resampler that gives every observation weight 0, which no problem
+/// accepts.
+struct ZeroWeights;
+
+impl Resampler for ZeroWeights {
+    fn replicate(&self, _: &mut Generator) -> Perturbation {
+        Perturbation::Weights(vec![0.0; VALUES.len()])
+    }
+}
+
+/// `VALUES` plus a uniform draw in `[−1, 1]` at each position.
+struct Noisy;
+
+impl Resampler for Noisy {
+    fn replicate(&self, generator: &mut Generator) -> Perturbation {
+        Perturbation::Values(
+            VALUES
+                .iter()
+                .map(|&value| value + 2.0 * generator.uniform() - 1.0)
+                .collect(),
+        )
+    }
+}
+
+#[test]
+fn a_bootstrap_threshold_of_a_prediction_reads_the_rise_of_each_replicate() {
+    let problem = line_problem(&VALUES);
+    let config = config();
+    let fit = optimize(&problem, &config).unwrap();
+    let (a, b) = least_squares(&VALUES);
+    let center = a + 15.0 * b;
+    let runner = ReplicateRunner::new(&problem, &config, &fit.best_parameters, 1, 9).unwrap();
+    let quantity = [ProfiledQuantity::Prediction(ObservedDataPoint::new(
+        15.0,
+        "x".to_string(),
+        0.0,
+    ))];
+    let run = bootstrap_thresholds(&runner, &Noisy, 8, &quantity, &[center], 0.9).unwrap();
+
+    // On a line, the sum of squares of a replicate held at the prediction
+    // `c` rises by (c − ĉ_b)² / h above its fit.
+    let h = 0.1 + 10.5_f64.powi(2) / 82.5;
+    for (b_index, rise) in run.replicates.iter().zip(&run.rises[0]) {
+        let mut generator = Generator::from_seed(replicate_seed(9, *b_index as u64));
+        let Perturbation::Values(values) = Noisy.replicate(&mut generator) else {
+            unreachable!("Noisy draws values")
+        };
+        let (a_b, b_b) = least_squares(&values);
+        let expected = (center - (a_b + 15.0 * b_b)).powi(2) / h;
+        assert!(
+            (rise - expected).abs() < 1e-6 * expected.max(1.0),
+            "{rise} against {expected}"
+        );
+    }
+    let weights = vec![1.0; 8];
+    assert_eq!(
+        run.thresholds[0],
+        commol_inference::statistics::quantiles(&run.rises[0], &weights, &[0.9])[0]
+    );
 }
