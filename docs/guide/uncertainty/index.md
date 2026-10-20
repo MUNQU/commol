@@ -59,6 +59,9 @@ coverage guarantee, from the scores of observations the fit did not use.
 | `BayesianPosterior` | The posterior of the parameters from the likelihood and priors, with its evidence | Yes | [Observation Models](observation-models.md#maximum-likelihood-against-the-posterior) |
 | `ParametricBootstrap` | How far the parameters move in data sets drawn from the models at the fit | Yes | [Observation Models](observation-models.md#maximum-likelihood-against-the-posterior) |
 | `DistributionNoise` | Where the next observations fall: a prediction interval of the models | Yes | [Observation Models](observation-models.md#prediction-with-noise) |
+| `Laplace` | A normal around the fit from the curvature of `−log L`, and the band of the outputs by the delta method | Yes | [Local Approximations](local.md#laplace-approximation-and-the-delta-method) |
+| `Sandwich` | A covariance around the fit that holds when the noise model is wrong or the noise depends on its neighbours | No | [Local Approximations](local.md#sandwich) |
+| `LaplaceMixture` | A posterior from Laplace approximations at the optima of several starts, corrected by importance sampling, with `k_hat` | With `LikelihoodTarget` | [Local Approximations](local.md#laplace-mixture-and-importance-sampling) |
 | `Propagation` | How uncertainty in the inputs moves the outputs, with no data | No | [Sensitivity Analysis](sensitivity.md#propagation) |
 | `PRCC` | How steadily each output rises or falls with each input, of independent inputs or a sample | No | [Sensitivity Analysis](sensitivity.md#prcc) |
 | `Morris` | Which inputs matter, in few runs | No | [Sensitivity Analysis](sensitivity.md#morris-screening) |

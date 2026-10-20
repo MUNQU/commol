@@ -172,7 +172,7 @@ optimizer gets a penalty, and a sampler a density of 0.
 |---|---|---|
 | `Calibrator.run()` | The maximum-likelihood fit; `final_loss` is `−log L` | Nothing more |
 | `BayesianPosterior(priors, …)` | The posterior `prior(θ) · L(θ)` and its log evidence, on the core of [Sequential Monte Carlo](smc.md) | A prior for every parameter, the noise parameters too |
-| `GibbsPosterior(eta=…)` | The fractional posterior `prior(θ) · L(θ)^η`; `η = 1` is the posterior | `η` as a number or `EtaCalibration.bootstrap_coverage(...)`; `information_matching()` needs a loss |
+| `GibbsPosterior(eta=…)` | The fractional posterior `prior(θ) · L(θ)^η`; `η = 1` is the posterior | `η` as a number, `EtaCalibration.information_matching(block_length)` (`η ≈ 1` for correct models) or `EtaCalibration.bootstrap_coverage(...)` |
 | `ParametricBootstrap(replicates)` | Fits to data sets drawn from the models at the fit | Models that hold: the observations of a replicate are independent given the fit |
 
 A posterior answers "what do the data and the priors say about the

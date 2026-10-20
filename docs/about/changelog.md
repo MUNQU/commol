@@ -11,11 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Local approximations through `Calibrator.uncertainty`, on the unbounded
+  scale of the parameters, with a fit on a bound refused: `Laplace(draws)`,
+  the normal `N(θ̂, H⁻¹)` of the observation models, and
+  `LaplaceResult.delta_band(positions, level)`, the band of the outputs by
+  the delta method; `Sandwich(block_length, draws)`, the covariance
+  `H⁻¹ B H⁻¹` with the scores summed over blocks (CR1) and a Student t with
+  `G − 1` degrees of freedom, which needs no noise model and refuses
+  `loss_function="mae"` and too few blocks; `LaplaceMixture(starts, draws,
+  target)`, a Laplace approximation at each optimum of a multi-start fit as
+  the proposal of Pareto-smoothed importance sampling of a
+  `LikelihoodTarget(priors)` or `GibbsTarget(priors, eta)`, which reports
+  `k_hat` and marks a sample with `k_hat > 0.7` as unreliable. `curvature`
+  is `"gauss_newton"` (the expected Fisher information of each observation
+  model, by default) or `"hessian"`. See
+  [Local Approximations](../guide/uncertainty/local.md).
+
 - `GibbsPosterior`: the Gibbs posterior `prior(θ) · exp(−η · loss(θ))` of the
   problem's loss, sampled by sequential Monte Carlo from the priors to the
   posterior; it returns a `GibbsResult` with the `η` it ran with. `eta` is
-  required: a number above 0, `EtaCalibration.information_matching()` (the
-  sum of squares and a deterministic engine) or
+  required: a number above 0, `EtaCalibration.information_matching(block_length)`
+  (the curvature of the sum of squares or of observation models against the
+  variance of the scores of its terms summed over blocks, with a
+  deterministic engine) or
   `EtaCalibration.bootstrap_coverage(replicates, block_length,
   confidence_level)` (any loss). See
   [Sequential Monte Carlo](../guide/uncertainty/smc.md#gibbs-posterior).

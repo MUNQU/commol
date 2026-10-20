@@ -158,7 +158,7 @@ to its parameter's bounds and drawn by inverting its distribution function
 with special functions on `libm`, so a seed gives the same draws on every
 platform. Each sampling method takes `priors` with no default, and `η` of a
 Gibbs posterior has no default either: a number or a calibration.
-Information matching needs the sum of squares and a deterministic engine;
+Information matching reads the curvature and the meat of the sandwich;
 bootstrap coverage interpolates the per-replicate thresholds of `η` at the
 positions `i / (M + 1)`, because the largest `η` that covers at the level is
 an order statistic whose expected coverage is below it.
