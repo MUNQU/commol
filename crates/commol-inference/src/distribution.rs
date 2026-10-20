@@ -13,6 +13,8 @@
 
 use std::fmt;
 
+use argmin::core::{CostFunction, Error, Executor, Gradient};
+use argmin::solver::newtonroot::NewtonRoot;
 use commol_random::Generator;
 
 use crate::special::{
@@ -22,7 +24,7 @@ use crate::special::{
 
 /// Iterations of the inversion of a distribution function by safeguarded
 /// Newton steps.
-const INVERSION_STEPS: usize = 200;
+const INVERSION_STEPS: u64 = 200;
 
 /// A family of distributions and its parameters.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -378,64 +380,39 @@ impl Distribution {
         }
     }
 
-    /// The `x` with `cdf(x) = p`, by Newton steps kept inside a bracket that
-    /// bisection narrows.
+    /// The `x` with `cdf(x) = p`, by the safeguarded Newton root finder of
+    /// the argmin fork. Above an infinite upper bound, the mean and the
+    /// spread set the bracket.
     fn invert(&self, p: f64) -> f64 {
-        let mut low = self.low;
-        let mut high = self.upper;
+        // The distribution function is 0 at the lower bound and 1 at the upper.
+        let (mut low, mut f_low) = (self.low, -p);
+        let (mut high, mut f_high) = (self.upper, 1.0 - p);
         if high.is_infinite() {
-            // The mean and the spread above the lower end set the first step.
             let scale = self.mean() - low + self.variance().sqrt();
             high = low + scale;
-            while self.cdf(high) < p {
-                low = high;
+            f_high = self.cdf(high) - p;
+            while f_high < 0.0 {
+                (low, f_low) = (high, f_high);
                 high = 2.0 * high + scale;
+                f_high = self.cdf(high) - p;
             }
         }
-        let mut x = 0.5 * (low + high);
-        for _ in 0..INVERSION_STEPS {
-            let error = self.cdf(x) - p;
-            if error == 0.0 {
-                return x;
-            }
-            if error > 0.0 {
-                high = x;
-            } else {
-                low = x;
-            }
-            let density = self.log_density(x).exp();
-            let newton = x - error / density;
-            let next = if density > 0.0 && newton > low && newton < high {
-                newton
-            } else {
-                0.5 * (low + high)
-            };
-            if (next - x).abs() <= 4.0 * f64::EPSILON * x.abs() || next == low || next == high {
-                return next;
-            }
-            x = next;
-        }
-        // The quantile lies many orders of magnitude from the first guess,
-        // as for a shape far below 1, where the Newton steps leave the
-        // bracket and each halving gains one bit.
-        self.bisect_order(p, low, high)
-    }
-
-    /// The smallest `x` between `low` and `high` with `cdf(x) ≥ p`, by
-    /// bisection of the floating-point numbers between them in their order:
-    /// each step halves their count, so it ends within 64 steps at any
-    /// scale.
-    fn bisect_order(&self, p: f64, low: f64, high: f64) -> f64 {
-        let (mut below, mut above) = (order(low), order(high));
-        while above - below > 1 {
-            let middle = below + (above - below) / 2;
-            if self.cdf(from_order(middle)) < p {
-                below = middle;
-            } else {
-                above = middle;
-            }
-        }
-        from_order(above)
+        let solver = NewtonRoot::new(low, high)
+            .and_then(|solver| solver.with_bracket_values(f_low, f_high))
+            .expect("the bracket is finite and holds a change of sign");
+        Executor::new(
+            Level {
+                distribution: self,
+                p,
+            },
+            solver,
+        )
+        .configure(|state| state.max_iters(INVERSION_STEPS))
+        .run()
+        .expect("the level and its derivative never fail")
+        .state
+        .param
+        .expect("the root finder ends at a point")
     }
 
     /// The mean of the truncated distribution.
@@ -527,17 +504,29 @@ fn x_log_y(c: f64, y: f64) -> f64 {
     if c == 0.0 { 0.0 } else { c * libm::log(y) }
 }
 
-/// The place of `x` among the floating-point numbers, as an integer that
-/// grows with `x`: the order of [`f64::total_cmp`], shifted to start at 0.
-fn order(x: f64) -> u64 {
-    let bits = x.to_bits() as i64;
-    ((bits ^ (((bits >> 63) as u64) >> 1) as i64) as u64) ^ (1 << 63)
+/// `cdf(x) − p`, whose root is the quantile at `p`, and its derivative, the
+/// density.
+struct Level<'a> {
+    distribution: &'a Distribution,
+    p: f64,
 }
 
-/// The floating-point number at the place `key` of [`order`].
-fn from_order(key: u64) -> f64 {
-    let bits = (key ^ (1 << 63)) as i64;
-    f64::from_bits((bits ^ (((bits >> 63) as u64) >> 1) as i64) as u64)
+impl CostFunction for Level<'_> {
+    type Param = f64;
+    type Output = f64;
+
+    fn cost(&self, x: &f64) -> Result<f64, Error> {
+        Ok(self.distribution.cdf(*x) - self.p)
+    }
+}
+
+impl Gradient for Level<'_> {
+    type Param = f64;
+    type Gradient = f64;
+
+    fn gradient(&self, x: &f64) -> Result<f64, Error> {
+        Ok(self.distribution.log_density(*x).exp())
+    }
 }
 
 /// A uniform number strictly between 0 and 1: the 53 high bits of the
