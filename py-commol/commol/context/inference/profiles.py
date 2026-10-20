@@ -329,6 +329,17 @@ class Profile(_Frozen):
         Evaluations of the objective.
     replicate_rises : list[float] | None
         With a bootstrap threshold, the rise of each replicate kept.
+    box_crossings : tuple[str | None, str | None]
+        For the side below and the side above, the free parameter whose bound
+        makes the profile cross the threshold: it is on a bound at the
+        crossing point that it is not on over the whole side from the fit.
+        Such a side counts as open; its interval end stays, flagged in
+        `ProfileResult.notes`. A parameter that stays on its bound from the
+        fit to the crossing is not seen.
+    refit_error : float | None
+        For a parameter, ``|δ|``: the largest distance from the objective at
+        the fit of a refit with the parameter at its fitted value, from each
+        neighbour of the fit. A diagnostic of the optimizer.
     """
 
     center: float
@@ -341,10 +352,18 @@ class Profile(_Frozen):
     ends: tuple[ProfileEndName, ProfileEndName]
     evaluations: int
     replicate_rises: list[float] | None = None
+    box_crossings: tuple[str | None, str | None] = (None, None)
+    refit_error: float | None = None
 
 
 UndeterminedName = Literal[
-    "below_tolerance", "not_flat", "below_fit", "stochastic", "on_bound", "undecided"
+    "below_tolerance",
+    "not_flat",
+    "below_fit",
+    "stochastic",
+    "on_bound",
+    "undecided",
+    "no_noise_floor",
 ]
 """Why a flat profile gives no structural verdict."""
 
@@ -353,32 +372,34 @@ _RESET = "The verdict holds with the other parameters at their fitted values."
 
 class ProfileStructure(_Frozen):
     """
-    What resetting the other parameters says about a flat profile.
+    What resetting the other parameters says about a profile.
 
     A profile is flat because other parameters compensate the parameter
     along it, or because nothing the data read depends on it. At each point
-    inside the box, and at each end of the box where the profile has a
-    point, the other parameters are reset to their fitted values and the
-    objective is evaluated once; the rise is measured against the profile at
-    that point.
+    of the profile inside the box, and at both ends of the box of the
+    parameter, the other parameters are reset to their fitted values and the
+    objective is evaluated once, with no optimizer; each reset is compared
+    with the objective at the fit.
 
     Attributes
     ----------
     verdict : {"in_combination", "non_identifiable"} | None
-        ``in_combination``: a feasible reset rises above the threshold.
-        ``non_identifiable``: every reset is feasible and rises by no more
-        than the tolerance. None otherwise, and when `undetermined` says why.
+        ``non_identifiable``: every reset is feasible and within the
+        evaluation floor of the fit. ``in_combination``: the profile is flat
+        and a feasible reset inside the box rises above the threshold. None
+        otherwise, and `undetermined` says why.
     largest_rise : float | None
-        The largest rise of a feasible reset; None when none was feasible.
+        The largest rise of a feasible reset over the objective at the fit;
+        None when none was feasible.
     compensated_by : list[str]
         The parameters whose reset alone, where each moves most along the
         profile, raises it above the threshold. Noise parameters of
         observation models are never named.
     joint_rise : float | None
         The largest rise of resetting the parameters not named together, at
-        the outermost point of each side, when it is above the tolerance:
-        `compensated_by` may be incomplete. Infinite when such a reset is not
-        feasible.
+        the outermost point of each side, over the objective of that point,
+        when it is above the evaluation floor: `compensated_by` may be
+        incomplete. Infinite when such a reset is not feasible.
     undetermined : UndeterminedName | None
         Why there is no verdict.
     on_bound : str | None
@@ -393,7 +414,7 @@ class ProfileStructure(_Frozen):
     undetermined: UndeterminedName | None = None
     on_bound: str | None = None
 
-    def reason(self, name: str, threshold: float, tolerance: float) -> str:
+    def reason(self, name: str, threshold: float, floor: float | None) -> str:
         """
         The reason of the verdict of parameter `name` in a report.
 
@@ -403,8 +424,8 @@ class ProfileStructure(_Frozen):
             The parameter.
         threshold : float
             The threshold of its profile.
-        tolerance : float
-            The numerical tolerance of the statistic.
+        floor : float | None
+            The evaluation floor of the result.
 
         Returns
         -------
@@ -433,8 +454,10 @@ class ProfileStructure(_Frozen):
                 )
         elif self.verdict == "non_identifiable":
             text = (
-                f"profile likelihood: flat, and resetting the other parameters "
-                f"gives {rise}, within the tolerance {tolerance:.3g}"
+                "profile likelihood: resetting the other parameters leaves the "
+                f"objective within the evaluation floor {floor:.3g} of the fit "
+                f"along the profile and at both ends of the box ({rise}): nothing "
+                f"the data read depends on {name}"
             )
         else:
             text = (
@@ -484,12 +507,15 @@ class ProfileResult(_Frozen):
         whole range). None when the threshold is below `tolerance`: the
         profile cannot tell a rise from numerical error.
     structure : dict[str, ProfileStructure]
-        For each flat profile of a parameter, what resetting the other
-        parameters says.
+        For each profile of a parameter that does not cross on both sides,
+        what resetting the other parameters says.
     tolerance : float
         The numerical tolerance of the statistic: ``max(τ, ν)``, the
         tolerance of the optimizer and the noise floor of the objective at
         the fit.
+    evaluation_floor : float | None
+        The floor of a comparison of two evaluations of the objective; None
+        when it cannot be computed.
     notes : list[str]
         What a reader should know, such as a threshold below the tolerance or
         a refit below the fit.
@@ -504,6 +530,7 @@ class ProfileResult(_Frozen):
     intervals: dict[str, ProfileInterval]
     verdicts: dict[str, ProfileVerdictName | None]
     tolerance: float
+    evaluation_floor: float | None = None
     structure: dict[str, ProfileStructure] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
     failed_replicates: list[str] = Field(default_factory=list)
@@ -549,7 +576,7 @@ class ProfileResult(_Frozen):
             if verdict == "structurally_non_identifiable":
                 structure = self.structure[name]
                 reason = structure.reason(
-                    name, self.profiles[name].threshold, self.tolerance
+                    name, self.profiles[name].threshold, self.evaluation_floor
                 )
                 if structure.verdict is None:
                     verdicts[name] = ParameterVerdicts(

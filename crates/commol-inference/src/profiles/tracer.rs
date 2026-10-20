@@ -14,7 +14,7 @@
 //! caller gives the threshold.
 
 use commol_calibration::{
-    CalibrationProblem, ConstraintSettings, ObservedDataPoint, OptimizationConfig,
+    CalibrationProblem, ConstraintSettings, LossConfig, ObservedDataPoint, OptimizationConfig,
     OptimizationObjective, Subproblem, SubproblemResult, Workspace, optimize_subproblem, predict,
 };
 use commol_core::SimulationEngine;
@@ -108,6 +108,12 @@ pub struct Profile {
     pub interval: [Option<f64>; 2],
     /// The evaluations of the objective, rejected steps included.
     pub evaluations: usize,
+    /// For each side that crosses the threshold, the free parameter, by
+    /// index, on a bound at the crossing point that it is not on over the
+    /// whole side from the fit: the box, not the data, makes the crossing,
+    /// and the side counts as open. A parameter that stays on its bound
+    /// from the fit to the crossing is not seen.
+    pub box_crossings: [Option<usize>; 2],
 }
 
 impl Profile {
@@ -133,6 +139,7 @@ pub struct ProfileTracer<'a, E: SimulationEngine> {
     pub(crate) fit_loss: f64,
     seed: u64,
     noise_floor: f64,
+    evaluation_floor: Option<f64>,
     pub(crate) stochastic: bool,
 }
 
@@ -169,12 +176,14 @@ where
             return Err("The fit a profile starts from is not feasible".to_string());
         }
         let stochastic = problem.forward().replicates().is_some();
+        let floors = if stochastic {
+            None
+        } else {
+            floors(problem, &fit)
+        };
         Ok(Self {
-            noise_floor: if stochastic {
-                0.0
-            } else {
-                noise_floor(problem, &fit)
-            },
+            noise_floor: floors.map_or(0.0, |(first, _)| first),
+            evaluation_floor: floors.map(|(_, floor)| floor),
             problem,
             config,
             fit,
@@ -201,16 +210,33 @@ where
         }
     }
 
-    /// The noise floor `ν`: the error of one evaluation of the objective at
-    /// the fit, from the accuracy of a run. To first order it is
-    /// `Σᵢ |∂ℓᵢ/∂mᵢ| · (rtol · |mᵢ| + atol)`, with `ℓᵢ` the term of
-    /// observation `i` ([`CalibrationProblem::term_derivatives`]), `mᵢ` its
-    /// prediction, `rtol` the [`SimulationEngine::output_accuracy`] and
-    /// `atol` the [`SimulationEngine::output_absolute_accuracy`] of the
-    /// engine. 0 for a loss with no term derivatives, such as the mean
-    /// absolute error, and for a problem of replicates.
+    /// The noise floor `ν₁`: the error of one evaluation of the objective
+    /// at the fit, from the accuracy of a run, to first order:
+    /// `Σᵢ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `ℓᵢ` the term of observation `i`
+    /// ([`CalibrationProblem::term_derivatives`]), `mᵢ` its prediction and
+    /// `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on it, for an
+    /// observation that sums `k` outputs; `rtol` is the
+    /// [`SimulationEngine::output_accuracy`] and `atol` the
+    /// [`SimulationEngine::output_absolute_accuracy`] of the engine. They
+    /// are the tolerances of each step of a solver, so `ν₁` is an estimate,
+    /// not a bound. 0 when it cannot be computed: a loss with no term
+    /// derivatives, or a problem of replicates.
     pub fn noise_floor(&self) -> f64 {
         self.noise_floor
+    }
+
+    /// The floor of a comparison of two evaluations of the objective:
+    /// `2 · (ν₁ + ν₂) + 2 · γₙ · Σᵢ |ℓᵢ|`, with `ν₁` the
+    /// [`Self::noise_floor`], `ν₂ = Σᵢ ½ · |ℓᵢ''| · eᵢ²` from the expected
+    /// curvature of each term (`TermDerivatives::curvature`, an estimate for
+    /// a model that is not normal), and `γₙ = n·u / (1 − n·u)` the bound of
+    /// the rounding of a sum of `n` terms, `u` the unit roundoff, on the
+    /// terms `ℓᵢ` with the constants of `−log L`. `None` when it cannot be
+    /// computed, as for a loss with no term derivatives (the mean absolute
+    /// error, the root mean squared error of a perfect fit) or a problem of
+    /// replicates.
+    pub fn evaluation_floor(&self) -> Option<f64> {
+        self.evaluation_floor
     }
 
     /// The numerical tolerance of a profile value, `ε = max(τ, ν)`
@@ -233,6 +259,44 @@ where
                 verdict
             },
         )
+    }
+
+    /// The verdict of `profile` read with its resets
+    /// ([`Self::read_structure`]): `structurally_non_identifiable` when the
+    /// resets prove the parameter non-identifiable, [`Self::verdict`]
+    /// otherwise.
+    pub fn verdict_with(
+        &self,
+        profile: &Profile,
+        structure: Option<&crate::profiles::resets::Structure>,
+    ) -> Option<ProfileVerdict> {
+        if structure.is_some_and(|structure| structure.non_identifiable()) {
+            return Some(ProfileVerdict::StructurallyNonIdentifiable);
+        }
+        self.verdict(profile)
+    }
+
+    /// The error of a refit at the fit, `|δ|`: the parameter at `index`
+    /// held at its fitted value and the others fitted again from the
+    /// nearest point of each side of `profile`, the largest
+    /// `|refit − objective at the fit|`. A diagnostic of the optimizer: a
+    /// value above [`Self::tolerance`] says that refits are less accurate
+    /// than the tolerance. `None` when the profile has no neighbour or a
+    /// refit fails.
+    pub fn refit_error(&self, index: usize, profile: &Profile) -> Option<f64> {
+        let center = self.fit[index];
+        let subproblem = Subproblem::fix_parameter(self.problem, index, center).ok()?;
+        let sides = profile.sides();
+        let mut largest: Option<f64> = None;
+        for neighbour in sides.iter().filter_map(|side| side.first()) {
+            let mut start = neighbour.parameters.clone();
+            start[index] = center;
+            let refit =
+                optimize_subproblem(&subproblem, self.config, &start, Some(self.seed)).ok()?;
+            let error = (refit.fit.final_loss - self.fit_loss).abs();
+            largest = Some(largest.map_or(error, |kept: f64| kept.max(error)));
+        }
+        largest
     }
 
     /// The value of `quantity` at the fit.
@@ -308,17 +372,29 @@ where
         centers
             .into_iter()
             .zip(thresholds)
-            .map(|(center, &threshold)| {
+            .enumerate()
+            .map(|(index, (center, &threshold))| {
                 let below = sides.next().expect("two sides per quantity");
                 let above = sides.next().expect("two sides per quantity");
                 let (center, below, above) = (center?, below?, above?);
-                Ok(self.join(center, threshold, below, above))
+                let held = match &quantities[index] {
+                    ProfiledQuantity::Parameter(j) => Some(*j),
+                    ProfiledQuantity::Prediction(_) => None,
+                };
+                Ok(self.join(held, center, threshold, below, above))
             })
             .collect()
     }
 
     /// The point of the fit, and both sides, as one profile.
-    fn join(&self, center: f64, threshold: f64, below: Side, above: Side) -> Profile {
+    fn join(
+        &self,
+        held: Option<usize>,
+        center: f64,
+        threshold: f64,
+        below: Side,
+        above: Side,
+    ) -> Profile {
         let fit = ProfilePoint {
             value: center,
             statistic: 0.0,
@@ -331,6 +407,11 @@ where
             (side.end == ProfileEnd::Crossed).then(|| crossing(&fit, &side.points, threshold))
         });
         let ends = [below.end, above.end];
+        let box_crossings = [&below, &above].map(|side| {
+            (side.end == ProfileEnd::Crossed)
+                .then(|| self.box_crossing(held, &fit, &side.points))
+                .flatten()
+        });
         let evaluations = below.evaluations + above.evaluations;
         let mut points: Vec<ProfilePoint> = below.points.into_iter().rev().collect();
         points.push(fit);
@@ -342,6 +423,7 @@ where
             ends,
             interval,
             evaluations,
+            box_crossings,
         }
     }
 
@@ -468,20 +550,31 @@ where
             ProfiledQuantity::Prediction(_) => None,
         };
         let bounds = self.problem.parameter_bounds();
-        // Which bound a value sits on: -1 the lower, 1 the upper, 0 neither.
-        let side = |value: f64, (lo, hi): (f64, f64)| {
-            let tolerance = ON_BOUND * (hi - lo);
-            if value - lo <= tolerance {
-                -1
-            } else if hi - value <= tolerance {
-                1
-            } else {
-                0
-            }
-        };
         (0..parameters.len()).find(|&i| {
-            let now = side(parameters[i], bounds[i]);
-            Some(i) != held && now != 0 && now != side(self.fit[i], bounds[i])
+            let now = bound_side(parameters[i], bounds[i]);
+            Some(i) != held && now != 0 && now != bound_side(self.fit[i], bounds[i])
+        })
+    }
+
+    /// The free parameter that makes a side cross the threshold by reaching
+    /// a bound: on a bound at the crossing point (the last of `side`, which
+    /// runs outward from `fit`), and off that bound at the fit or at some
+    /// point between.
+    fn box_crossing(
+        &self,
+        held: Option<usize>,
+        fit: &ProfilePoint,
+        side: &[ProfilePoint],
+    ) -> Option<usize> {
+        let (crossing, before) = side.split_last()?;
+        let bounds = self.problem.parameter_bounds();
+        (0..crossing.parameters.len()).find(|&i| {
+            let bound = bound_side(crossing.parameters[i], bounds[i]);
+            Some(i) != held
+                && bound != 0
+                && std::iter::once(fit)
+                    .chain(before)
+                    .any(|point| bound_side(point.parameters[i], bounds[i]) != bound)
         })
     }
 
@@ -524,23 +617,90 @@ where
     }
 }
 
-/// The noise floor of the objective at `fit` ([`ProfileTracer::noise_floor`]).
-fn noise_floor<E: SimulationEngine>(problem: &CalibrationProblem<E>, fit: &[f64]) -> f64 {
+/// The noise floor `ν₁` and the evaluation floor of the objective at `fit`
+/// ([`ProfileTracer::noise_floor`], [`ProfileTracer::evaluation_floor`]);
+/// `None` when the term derivatives cannot be computed.
+fn floors<E: SimulationEngine>(problem: &CalibrationProblem<E>, fit: &[f64]) -> Option<(f64, f64)> {
     let mut workspace = Workspace::default();
-    let Ok(predictions) = problem.forward().run_observed(fit, &mut workspace) else {
-        return 0.0;
-    };
-    let predictions = predictions.to_vec();
-    let Ok(terms) = problem.term_derivatives(fit, &predictions) else {
-        return 0.0;
-    };
+    let predictions = problem
+        .forward()
+        .run_observed(fit, &mut workspace)
+        .ok()?
+        .to_vec();
+    let terms = problem.term_derivatives(fit, &predictions).ok()?;
     let engine = problem.forward().base_engine();
     let (relative, absolute) = (engine.output_accuracy(), engine.output_absolute_accuracy());
-    terms
+    let errors: Vec<f64> = problem
+        .observed_data()
         .iter()
         .zip(&predictions)
-        .map(|(term, mean)| term.gradient[0].abs() * (relative * mean.abs() + absolute))
-        .sum()
+        .map(|(obs, mean)| relative * mean.abs() + obs.outputs.len() as f64 * absolute)
+        .collect();
+    let first: f64 = terms
+        .iter()
+        .zip(&errors)
+        .map(|(term, error)| term.gradient[0].abs() * error)
+        .sum();
+    let second: f64 = terms
+        .iter()
+        .zip(&errors)
+        .map(|(term, error)| 0.5 * term.curvature[0].abs() * error * error)
+        .sum();
+    let n = predictions.len() as f64;
+    let unit = f64::EPSILON / 2.0;
+    let gamma = n * unit / (1.0 - n * unit);
+    let magnitude = term_magnitude(problem, fit, &predictions, &mut workspace)?;
+    Some((first, 2.0 * (first + second) + 2.0 * gamma * magnitude))
+}
+
+/// `Σᵢ |ℓᵢ|`, the terms of the objective at `fit`: the weighted log
+/// densities with their constants for observation models; for a loss, the
+/// weighted squares, times the derivative of the root for the root mean
+/// squared error. `None` for the mean absolute error, which the evaluation
+/// floor does not cover.
+fn term_magnitude<E: SimulationEngine>(
+    problem: &CalibrationProblem<E>,
+    fit: &[f64],
+    predictions: &[f64],
+    workspace: &mut Workspace,
+) -> Option<f64> {
+    let discrepancy = problem.discrepancy();
+    if discrepancy.likelihood().is_some() {
+        let terms = problem.pointwise_log_likelihood(fit, workspace).ok()?;
+        return Some(terms.iter().map(|term| term.abs()).sum());
+    }
+    let squares: f64 = discrepancy
+        .observed()
+        .iter()
+        .zip(predictions)
+        .zip(discrepancy.weights())
+        .zip(discrepancy.normalization())
+        .map(|(((y, mean), weight), normalization)| {
+            let residual = normalization * (y - mean);
+            weight * residual * residual
+        })
+        .sum();
+    match discrepancy.loss()? {
+        LossConfig::SumSquaredError => Some(squares),
+        LossConfig::RootMeanSquaredError => {
+            let weights: f64 = discrepancy.weights().iter().sum();
+            Some(0.5 * squares / (weights * squares).sqrt())
+        }
+        LossConfig::MeanAbsoluteError => None,
+    }
+}
+
+/// Which bound `value` sits on, within [`ON_BOUND`] of the width: -1 the
+/// lower, 1 the upper, 0 neither.
+fn bound_side(value: f64, (lo, hi): (f64, f64)) -> i8 {
+    let tolerance = ON_BOUND * (hi - lo);
+    if value - lo <= tolerance {
+        -1
+    } else if hi - value <= tolerance {
+        1
+    } else {
+        0
+    }
 }
 
 /// Whether a refit holds its quantity: always for a parameter; for a

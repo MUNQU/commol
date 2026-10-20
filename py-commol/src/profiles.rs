@@ -117,8 +117,13 @@ pub struct PyProfile {
     /// Where the side below and the side above leave the box: the value and
     /// the index of the free parameter on its bound, or None
     box_exits: (Option<BoxExit>, Option<BoxExit>),
-    /// What the resets of a flat profile of a parameter say, or None
+    /// What the resets of a profile of a parameter say, or None
     structure: Option<PyStructure>,
+    /// For each side, the free parameter whose bound makes the crossing, or
+    /// None
+    box_crossings: (Option<usize>, Option<usize>),
+    /// The error of a refit at the fit, for a profile of a parameter
+    refit_error: Option<f64>,
 }
 
 /// What the resets of a flat profile say, as the runner returns it
@@ -181,9 +186,12 @@ impl PyProfile {
         rises: Option<Vec<f64>>,
         verdict: Option<ProfileVerdict>,
         structure: Option<Structure>,
+        refit_error: Option<f64>,
     ) -> Self {
         let [lower, upper] = profile.interval();
         Self {
+            box_crossings: (profile.box_crossings[0], profile.box_crossings[1]),
+            refit_error,
             verdict: verdict.map(|verdict| verdict.name().to_string()),
             lowest: profile.lowest(),
             structure: structure.map(PyStructure::from),
@@ -219,6 +227,8 @@ pub struct PyProfileRun {
     optimizer_tolerance: f64,
     /// The noise floor of the objective at the fit, ν
     noise_floor: f64,
+    /// The floor of a comparison of two evaluations, or None
+    evaluation_floor: Option<f64>,
     /// The replicates kept by a bootstrap threshold
     replicates: Option<Vec<usize>>,
     /// The index and reason of each replicate that failed
@@ -323,19 +333,29 @@ fn trace_profiles(
         let rises = rises
             .as_ref()
             .map(|rises: &Vec<Vec<f64>>| rises[index].clone());
-        // A flat profile of a parameter, before the rule of stochastic
-        // engines, says something of the structure.
-        let flat = profile.verdict(tracer.tolerance())
-            == Some(ProfileVerdict::StructurallyNonIdentifiable);
-        let structure = match quantity {
-            ProfiledQuantity::Parameter(parameter) if flat => Some(
-                py.detach(|| tracer.read_structure(*parameter, &profile))
-                    .map_err(PyRuntimeError::new_err)?,
-            ),
-            _ => None,
+        // Every profile of a parameter gets the error of a refit at the fit;
+        // one that does not cross on both sides also gets its resets.
+        let (structure, refit_error) = match quantity {
+            ProfiledQuantity::Parameter(parameter) => py.detach(|| {
+                let read = !matches!(
+                    profile.verdict(tracer.tolerance()),
+                    None | Some(ProfileVerdict::Identifiable)
+                );
+                (
+                    read.then(|| tracer.read_structure(*parameter, &profile)),
+                    tracer.refit_error(*parameter, &profile),
+                )
+            }),
+            ProfiledQuantity::Prediction(_) => (None, None),
         };
-        let verdict = tracer.verdict(&profile);
-        profiles.push(PyProfile::new(profile, rises, verdict, structure));
+        let verdict = tracer.verdict_with(&profile, structure.as_ref());
+        profiles.push(PyProfile::new(
+            profile,
+            rises,
+            verdict,
+            structure,
+            refit_error,
+        ));
     }
     Ok(PyProfileRun {
         profiles,
@@ -343,6 +363,7 @@ fn trace_profiles(
         tolerance: tracer.tolerance(),
         optimizer_tolerance: tracer.optimizer_tolerance(),
         noise_floor: tracer.noise_floor(),
+        evaluation_floor: tracer.evaluation_floor(),
         replicates,
         failed,
     })

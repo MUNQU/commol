@@ -17,6 +17,7 @@ from commol import (
     ProfileInterval,
     ProfileLikelihood,
     ProfileResult,
+    ResidualBootstrap,
     Simulation,
     StructuralRank,
     Threshold,
@@ -68,15 +69,18 @@ def _noisy(
     ]
 
 
-def _guide_calibrator() -> Calibrator:
+def _guide_calibrator(
+    engine: str = "DifferenceEquations",
+    optimizer: NelderMeadConfig | None = None,
+) -> Calibrator:
     """The product model of the guide: the rate reads ``k1 * s``, with ``k1``
-    in ``[0.2, 0.8]`` and ``s`` in ``[0.5, 2]``."""
-    model = build(
-        abc_builder(
-            ab="k1 * s * A * B / total",
-            parameters={"k1": None, "s": None, "k2": None},
-        )
+    in ``[0.2, 0.8]`` and ``s`` in ``[0.5, 2]``; by default Nelder-Mead runs
+    to an sd_tolerance of 1e-15."""
+    builder = abc_builder(
+        ab="k1 * s * A * B / total",
+        parameters={"k1": None, "s": None, "k2": None},
     )
+    model = builder.build(builder.structure, engine=engine)
     problem = CalibrationProblem(
         observed_data=_noisy_b(0.4),
         parameters=[
@@ -85,13 +89,14 @@ def _guide_calibrator() -> Calibrator:
             bounded("k2", 0.0, 1.0),
         ],
         observation_models={"B": NormalObservations(sd=10.0)},
-        optimization_config=NelderMeadConfig(max_iterations=4000, sd_tolerance=1e-15),
+        optimization_config=optimizer
+        or NelderMeadConfig(max_iterations=4000, sd_tolerance=1e-15),
         seed=42,
     )
     return Calibrator(Simulation(model), problem)
 
 
-def _unread_k3(ode: bool) -> Calibrator:
+def _unread_k3(ode: bool, optimizer: NelderMeadConfig | None = None) -> Calibrator:
     """``abc_builder`` with ``k3`` emptying C into D, and only B observed."""
     builder = abc_builder(
         parameters={"k1": None, "k2": None, "k3": None},
@@ -112,7 +117,8 @@ def _unread_k3(ode: bool) -> Calibrator:
             bounded("k3", 0.0, 1.0),
         ],
         observation_models={"B": NormalObservations(sd=10.0)},
-        optimization_config=NelderMeadConfig(max_iterations=4000, sd_tolerance=1e-15),
+        optimization_config=optimizer
+        or NelderMeadConfig(max_iterations=4000, sd_tolerance=1e-15),
         seed=42,
     )
     return Calibrator(Simulation(model), problem)
@@ -224,7 +230,7 @@ class TestShapes:
         lower = result.intervals["tau"].lower
         assert lower is not None and 9.0 < lower < 10.0
         assert result.verdicts["tau"] == "practically_non_identifiable"
-        assert "tau" not in result.structure
+        assert result.structure["tau"].undetermined == "not_flat"
         practical = result.report().verdicts["tau"].practical
         assert practical is not None
         assert practical.verdict == "poorly_determined"
@@ -412,6 +418,95 @@ class TestStructure:
         assert any("'u'" in note and "stochastic" in note for note in result.notes)
         report = result.report()
         assert report.verdicts["u"].structural is None
+
+
+class TestDefaults:
+    """Nelder-Mead at its default sd_tolerance (1e-6), the ODE solver at its
+    default tolerances."""
+
+    @pytest.mark.parametrize("ode", [False, True], ids=["difference", "ode"])
+    def test_a_parameter_with_no_effect_is_non_identifiable(self, ode: bool) -> None:
+        calibrator = _unread_k3(ode, NelderMeadConfig())
+
+        result = calibrator.uncertainty(
+            ProfileLikelihood(parameters=["k3"], threshold=Threshold.chi_square(0.95))
+        )
+
+        assert result.structure["k3"].verdict == "non_identifiable"
+        assert result.verdicts["k3"] == "structurally_non_identifiable"
+
+    def test_the_ridge_of_an_ode_model_is_in_combination(self) -> None:
+        # The solver's tolerance sets a floor above the error of a refit, so
+        # the profiles are flat; the ridge leaves the box where the other
+        # parameter reaches its bound, and the crossing past it is the box's.
+        calibrator = _guide_calibrator("DifferentialEquations", NelderMeadConfig())
+
+        result = calibrator.uncertainty(
+            ProfileLikelihood(parameters=["k1"], threshold=Threshold.chi_square(0.95))
+        )
+
+        assert result.structure["k1"].verdict == "in_combination"
+        assert result.profiles["k1"].box_crossings == (None, "s")
+        assert any("where 's' reaches a bound" in note for note in result.notes)
+
+    def test_the_ridge_of_a_difference_model_gives_no_structural_verdict(
+        self,
+    ) -> None:
+        # The error of a refit, near the sd_tolerance, is above the floor of a
+        # difference model: the profile is not flat, and a refit lands below
+        # the fit.
+        calibrator = _guide_calibrator(optimizer=NelderMeadConfig())
+
+        result = calibrator.uncertainty(
+            ProfileLikelihood(parameters=["k1"], threshold=Threshold.chi_square(0.95))
+        )
+
+        assert result.verdicts["k1"] == "practically_non_identifiable"
+        assert result.structure["k1"].verdict is None
+        assert result.report().verdicts["k1"].practical.verdict == "poorly_determined"
+
+
+class TestNotes:
+    def test_a_loss_with_no_floor_says_so(self) -> None:
+        calibrator = line_calibrator(VALUES)
+        problem = calibrator.problem.model_copy(update={"loss_function": "mae"})
+
+        result = Calibrator(calibrator.simulation, problem).uncertainty(
+            ProfileLikelihood(
+                parameters=["c"],
+                threshold=Threshold.bootstrap_calibrated(
+                    ResidualBootstrap(
+                        replicates=5,
+                        block_length=1,
+                        residual_scale="additive",
+                        scheme="moving",
+                    ),
+                    0.9,
+                ),
+                max_steps=3,
+            )
+        )
+
+        assert result.evaluation_floor is None
+        assert any("cannot be computed" in note for note in result.notes)
+
+    def test_a_refit_less_accurate_than_the_tolerance_is_noted(self) -> None:
+        calibrator = line_calibrator(
+            VALUES, observation_models={"B": NormalObservations(sd=1.0)}
+        )
+        problem = calibrator.problem.model_copy(
+            update={"optimization_config": NelderMeadConfig(max_iterations=5)}
+        )
+
+        result = Calibrator(calibrator.simulation, problem).uncertainty(
+            ProfileLikelihood(
+                parameters=["c"], threshold=Threshold.chi_square(0.9), max_steps=3
+            )
+        )
+
+        refit = result.profiles["c"].refit_error
+        assert refit is not None and refit > result.tolerance
+        assert any("a refit at the fit lands" in note for note in result.notes)
 
 
 class TestReport:

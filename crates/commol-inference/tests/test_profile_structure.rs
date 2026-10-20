@@ -46,6 +46,10 @@ impl SimulationEngine for ClosedForm {
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), SimulationError> {
+        // An engine that fails past z = 0.9, for the resets that fail.
+        if self.parameters.get("z").is_some_and(|&z| z > 0.9) {
+            return Err(SimulationError::Failed("z above 0.9".to_string()));
+        }
         buffer.clear();
         buffer.extend(
             positions
@@ -179,8 +183,8 @@ fn traced(
     let profile = tracer
         .trace(&ProfiledQuantity::Parameter(index), threshold, 200)
         .unwrap();
-    let verdict = tracer.verdict(&profile);
-    let structure = tracer.read_structure(index, &profile).unwrap();
+    let structure = tracer.read_structure(index, &profile);
+    let verdict = tracer.verdict_with(&profile, Some(&structure));
     (profile, verdict, structure, tracer.tolerance())
 }
 
@@ -210,6 +214,128 @@ fn the_noise_floor_propagates_the_accuracy_of_a_run() {
         tracer.tolerance(),
         tracer.optimizer_tolerance().max(tracer.noise_floor())
     );
+
+    // The floor of two evaluations: 2 (ν₁ + ν₂) + 2 γₙ Σ ℓᵢ, with the
+    // curvature 2 of a square, ν₂ = Σ ½ · 2 · (ε |m|)², and the squares
+    // ℓᵢ = r².
+    let (mut second, mut squares) = (0.0, 0.0);
+    for (i, e) in NOISE.iter().enumerate() {
+        let t = (i + 1) as f64;
+        let mean = fit[0] * fit[1] * t;
+        second += (f64::EPSILON * mean).powi(2);
+        squares += (t + e - mean).powi(2);
+    }
+    let unit = f64::EPSILON / 2.0;
+    let gamma = 10.0 * unit / (1.0 - 10.0 * unit);
+    let floor = 2.0 * (expected + second) + 2.0 * gamma * squares;
+    let computed = tracer.evaluation_floor().unwrap();
+    assert!(
+        (computed - floor).abs() <= 1e-6 * floor,
+        "{computed} against {floor}"
+    );
+}
+
+/// Nelder-Mead at its default sd_tolerance, 1e-6.
+fn default_config() -> OptimizationConfig {
+    OptimizationConfig::NelderMead(NelderMeadConfig::default())
+}
+
+#[test]
+fn a_parameter_with_no_effect_is_non_identifiable_at_the_default_tolerance() {
+    // u is read by nothing: every reset equals the fit within the floor,
+    // whatever the refits of the profile do.
+    let problem = problem(
+        two_unread,
+        &[("a", -10.0, 10.0), ("b", -5.0, 5.0), ("u", 0.0, 1.0)],
+        |t| 1.0 + 0.5 * t,
+        1.0,
+        vec![],
+        sse(),
+    );
+    let config = default_config();
+    let mut fit = optimize(&problem, &config).unwrap().best_parameters;
+    fit[2] = 0.4;
+    let (_, verdict, structure, _) = traced(&problem, &config, Some(&fit), 2, 2.0);
+
+    assert_eq!(structure.verdict, Ok(StructuralReading::NonIdentifiable));
+    assert_eq!(verdict, Some(ProfileVerdict::StructurallyNonIdentifiable));
+    assert!(structure.largest_rise.unwrap().abs() <= 1e-12);
+}
+
+fn late(p: &HashMap<String, f64>, t: f64) -> f64 {
+    p["a"] + p["b"] * t + 10.0 * (p["u"] - 0.95).max(0.0) * t
+}
+
+#[test]
+fn the_ends_of_the_box_rule_out_non_identifiable() {
+    // u acts only above 0.95; two steps from 0.4 never reach it, but the
+    // reset at the upper end of its box does.
+    let problem = problem(
+        late,
+        &[("a", -10.0, 10.0), ("b", -5.0, 5.0), ("u", 0.0, 1.0)],
+        |t| 1.0 + 0.5 * t,
+        1.0,
+        vec![],
+        sse(),
+    );
+    let config = config();
+    let mut fit = optimize(&problem, &config).unwrap().best_parameters;
+    fit[2] = 0.4;
+    let tracer = ProfileTracer::new(&problem, &config, &fit, 0).unwrap();
+    let profile = tracer
+        .trace(&ProfiledQuantity::Parameter(2), 2.0, 2)
+        .unwrap();
+    let structure = tracer.read_structure(2, &profile);
+
+    assert!(profile.points.iter().all(|p| p.value < 0.95));
+    assert_eq!(structure.verdict, Err(Undetermined::NotFlat));
+    assert!(structure.largest_rise.unwrap() > 1.0);
+}
+
+fn guarded(p: &HashMap<String, f64>, t: f64) -> f64 {
+    p["a"] + p["b"] * t
+}
+
+#[test]
+fn a_reset_whose_engine_fails_is_infeasible() {
+    // The engine fails past z = 0.9, the upper end of the box of z is 1:
+    // its reset counts as infeasible and rules out non_identifiable.
+    let problem = problem(
+        guarded,
+        &[("a", -10.0, 10.0), ("b", -5.0, 5.0), ("z", 0.0, 1.0)],
+        |t| 1.0 + 0.5 * t,
+        1.0,
+        vec![],
+        sse(),
+    );
+    let config = config();
+    let mut fit = optimize(&problem, &config).unwrap().best_parameters;
+    fit[2] = 0.4;
+    let tracer = ProfileTracer::new(&problem, &config, &fit, 0).unwrap();
+    let profile = tracer
+        .trace(&ProfiledQuantity::Parameter(2), 2.0, 2)
+        .unwrap();
+    let structure = tracer.read_structure(2, &profile);
+
+    assert_eq!(structure.infeasible, 1);
+    assert_ne!(structure.verdict, Ok(StructuralReading::NonIdentifiable));
+}
+
+#[test]
+fn a_loss_with_no_floor_reads_no_structure() {
+    // The root mean squared error of a perfect fit has no term derivatives.
+    let problem = problem(
+        product,
+        &[("a", 0.1, 10.0), ("s", 0.5, 2.0)],
+        |t| t,
+        0.0,
+        vec![],
+        LossConfig::RootMeanSquaredError.into(),
+    );
+    let config = config();
+    let (_, _, structure, _) = traced(&problem, &config, Some(&[1.0, 1.0]), 0, 0.5);
+
+    assert_eq!(structure.verdict, Err(Undetermined::NoNoiseFloor));
 }
 
 #[test]
@@ -331,13 +457,13 @@ fn a_parameter_on_its_bound_at_the_fit_never_gives_non_identifiable() {
 
     // k: above its fit, q would leave its bound, so the profile rises
     // there; below it, q rises off its bound and keeps k · q until it
-    // reaches 2, where the box makes the profile cross too. Both sides
-    // cross, so the shape reads identifiable, though the crossing below
-    // comes from the bound of q.
+    // reaches 2, where the box makes the profile cross too. That crossing
+    // comes from the bound of q, so that side counts as open.
     let (k, k_verdict, k_structure, _) = traced(&problem, &config, Some(&fit), 0, 2.0);
     assert_eq!(k.ends, [ProfileEnd::Crossed; 2]);
-    assert!(k.box_exits()[0].is_some_and(|(_, index)| index == 1));
-    assert_eq!(k_verdict, Some(ProfileVerdict::Identifiable));
+    assert_eq!(k.box_crossings, [Some(1), None]);
+    assert!(k.interval()[0].is_some());
+    assert_eq!(k_verdict, Some(ProfileVerdict::PracticallyNonIdentifiable));
     assert_eq!(k_structure.verdict, Err(Undetermined::NotFlat));
 
     // u: flat, and resetting moves nothing, but q sits on its bound at the

@@ -39,12 +39,15 @@ impl Profile {
     /// flat: its rise comes from the box of the parameters. The profile is
     /// structurally non-identifiable when each side is flat over its points
     /// inside the box, has one past the fit, and ends at a bound, at the end
-    /// of the reachable predictions, or on a point outside the box.
+    /// of the reachable predictions, or on a point outside the box. A side
+    /// whose crossing comes from the box ([`Profile::box_crossings`]) counts
+    /// as ending at a bound, so it is never `identifiable`.
     pub fn verdict(&self, tolerance: f64) -> Option<ProfileVerdict> {
         if self.threshold <= tolerance {
             return None;
         }
-        let flat_to_the_end = self.sides().iter().zip(self.ends).all(|(side, end)| {
+        let ends = self.effective_ends();
+        let flat_to_the_end = self.sides().iter().zip(ends).all(|(side, end)| {
             let inside: Vec<&ProfilePoint> = side
                 .iter()
                 .copied()
@@ -60,10 +63,19 @@ impl Profile {
         });
         Some(if flat_to_the_end {
             ProfileVerdict::StructurallyNonIdentifiable
-        } else if self.ends == [ProfileEnd::Crossed; 2] {
+        } else if ends == [ProfileEnd::Crossed; 2] {
             ProfileVerdict::Identifiable
         } else {
             ProfileVerdict::PracticallyNonIdentifiable
+        })
+    }
+
+    /// The ends of the sides, a crossing that comes from the box read as a
+    /// bound.
+    pub fn effective_ends(&self) -> [ProfileEnd; 2] {
+        [0, 1].map(|side| match self.box_crossings[side] {
+            Some(_) => ProfileEnd::Bound,
+            None => self.ends[side],
         })
     }
 
@@ -125,6 +137,7 @@ mod tests {
             ends,
             interval: [None, None],
             evaluations: 0,
+            box_crossings: [None, None],
         }
     }
 
@@ -225,6 +238,21 @@ mod tests {
         // A rise above the tolerance up to both bounds.
         assert_eq!(
             verdict(&[1e-3, 0.0, 1e-7], [Bound, Bound]),
+            Some(ProfileVerdict::PracticallyNonIdentifiable)
+        );
+    }
+
+    #[test]
+    fn a_crossing_made_by_the_box_counts_as_a_bound() {
+        let mut crossed = profile(&[3.0, 0.0, 2.5], [ProfileEnd::Crossed; 2], 2.0);
+        assert_eq!(crossed.verdict(1e-6), Some(ProfileVerdict::Identifiable));
+        crossed.box_crossings = [Some(1), None];
+        assert_eq!(
+            crossed.effective_ends(),
+            [ProfileEnd::Bound, ProfileEnd::Crossed]
+        );
+        assert_eq!(
+            crossed.verdict(1e-6),
             Some(ProfileVerdict::PracticallyNonIdentifiable)
         );
     }

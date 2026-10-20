@@ -37,8 +37,8 @@ pub struct NelderMeadConfig {
     /// Maximum number of iterations
     pub max_iterations: u64,
 
-    /// Sample standard deviation tolerance (convergence criterion)
-    /// Must be non-negative, defaults to EPSILON
+    /// The run stops when the sample standard deviation of the costs of the
+    /// simplex falls below it. Must be non-negative; defaults to 1e-6.
     pub sd_tolerance: f64,
 
     /// Size of the initial simplex, as a fraction of each parameter's bound

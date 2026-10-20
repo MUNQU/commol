@@ -110,12 +110,16 @@ def _structure(
 
 
 def _structure_notes(
-    name: str, structure: ProfileStructure, threshold: float
+    name: str, structure: ProfileStructure, threshold: float, flat: bool
 ) -> list[str]:
-    """What a reader should know of a flat profile with no structural verdict."""
+    """What a reader should know of a profile with no structural verdict."""
     rise = structure.largest_rise
+    if structure.undetermined in {"below_fit", "undecided"} and not flat:
+        return []
     why = {
-        "below_fit": "the profile goes below the fit, which is not the optimum",
+        "below_fit": "the profile goes below the fit by more than the "
+        "evaluation floor, so the fit is not the optimum",
+        "no_noise_floor": "the evaluation floor cannot be computed for this objective",
         "stochastic": "a stochastic engine runs replicates, which are not a "
         "smooth function of the parameters",
         "on_bound": f"'{structure.on_bound}' sits on its bound at the fit, so a "
@@ -126,7 +130,7 @@ def _structure_notes(
     }.get(structure.undetermined or "")
     if why is None:
         return []
-    return [f"'{name}': the profile is flat, with no structural verdict: {why}."]
+    return [f"'{name}': the profile gives no structural verdict: {why}."]
 
 
 def _result(
@@ -158,14 +162,36 @@ def _result(
             if exit is not None
             for value, index in [exit]
         ]
+        flat = profile.verdict == "structurally_non_identifiable"
         if profile.structure is not None:
             structure[name] = _structure(profile.structure, parameter_names)
-            notes.extend(_structure_notes(name, structure[name], profile.threshold))
-        if profile.structure is not None and exits:
+            notes.extend(
+                _structure_notes(name, structure[name], profile.threshold, flat)
+            )
+        if flat and exits:
             notes.append(
                 f"'{name}': the ridge leaves the box {' and '.join(exits)}; the "
                 "profile is flat inside the box, and its rise past it comes from "
                 "the bounds, not the data."
+            )
+        crossings = [
+            parameter_names[index] if index is not None else None
+            for index in profile.box_crossings
+        ]
+        for side, by, end in zip(
+            ("below", "above"), crossings, profile.interval, strict=True
+        ):
+            if by is not None:
+                notes.append(
+                    f"'{name}': the profile crosses the threshold {side} the fit "
+                    f"at {end:.4g} where '{by}' reaches a bound, so that side counts "
+                    "as open."
+                )
+        if profile.refit_error is not None and profile.refit_error > run.tolerance:
+            notes.append(
+                f"'{name}': a refit at the fit lands {profile.refit_error:.3g} from "
+                f"it, above the tolerance {run.tolerance:.3g}: the refits are less "
+                "accurate than the tolerance."
             )
         if profile.lowest < -run.tolerance:
             notes.append(
@@ -187,6 +213,8 @@ def _result(
                 "ends": profile.ends,
                 "evaluations": profile.evaluations,
                 "replicate_rises": profile.rises,
+                "box_crossings": crossings,
+                "refit_error": profile.refit_error,
             }
         )
         lower, upper = profile.interval
@@ -203,6 +231,7 @@ def _result(
             "intervals": intervals,
             "verdicts": verdicts,
             "tolerance": run.tolerance,
+            "evaluation_floor": run.evaluation_floor,
             "structure": structure,
             "notes": notes,
             "failed_replicates": failed,
