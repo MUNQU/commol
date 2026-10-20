@@ -147,15 +147,11 @@ impl From<Structure> for PyStructure {
             Ok(StructuralReading::InCombination) => (Some("in_combination"), None, None),
             Ok(StructuralReading::NonIdentifiable) => (Some("non_identifiable"), None, None),
             Err(why) => {
-                let (name, parameter) = match why {
-                    Undetermined::BelowTolerance => ("below_tolerance", None),
-                    Undetermined::NotFlat => ("not_flat", None),
-                    Undetermined::BelowFit => ("below_fit", None),
-                    Undetermined::Stochastic => ("stochastic", None),
-                    Undetermined::OnBound(index) => ("on_bound", Some(index)),
-                    Undetermined::Undecided => ("undecided", None),
+                let parameter = match why {
+                    Undetermined::OnBound(index) => Some(index),
+                    _ => None,
                 };
-                (None, Some(name), parameter)
+                (None, Some(why.name()), parameter)
             }
         };
         Self {

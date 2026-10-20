@@ -6,9 +6,9 @@
 use std::collections::HashMap;
 
 use commol_calibration::{
-    Argument, CalibrationConstraint, CalibrationParameter, CalibrationProblem, DiscrepancyConfig,
-    LossConfig, NelderMeadConfig, ObservationModel, ObservedDataPoint, OptimizationConfig,
-    optimize,
+    Argument, CalibrationConstraint, CalibrationParameter, CalibrationParameterType,
+    CalibrationProblem, DiscrepancyConfig, LossConfig, NelderMeadConfig, ObservationModel,
+    ObservedDataPoint, OptimizationConfig, optimize,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 use commol_inference::profiles::{
@@ -500,4 +500,68 @@ fn a_likelihood_far_from_zero_keeps_an_absolute_tolerance() {
     let (_, verdict, structure, _) = traced(&problem, &config, Some(&fit), 0, 1.92);
     assert_eq!(verdict, Some(ProfileVerdict::StructurallyNonIdentifiable));
     assert_eq!(structure.verdict, Ok(StructuralReading::InCombination));
+}
+
+#[test]
+fn a_loss_with_no_term_derivatives_has_no_noise_floor() {
+    let problem = problem(
+        product,
+        &[("a", 0.1, 10.0), ("s", 0.5, 2.0)],
+        |t| t,
+        1.0,
+        vec![],
+        LossConfig::MeanAbsoluteError.into(),
+    );
+    let config = config();
+    let fit = optimize(&problem, &config).unwrap().best_parameters;
+    let tracer = ProfileTracer::new(&problem, &config, &fit, 0).unwrap();
+
+    assert_eq!(tracer.noise_floor(), 0.0);
+    assert_eq!(tracer.tolerance(), 1e-16);
+}
+
+#[test]
+fn a_fit_that_is_not_the_optimum_reads_no_structure() {
+    // A fit off the ridge: the profile goes below it.
+    let problem = product_problem(1.0);
+    let (_, verdict, structure, _) = traced(&problem, &config(), Some(&[1.0, 0.9]), 0, 2.0);
+
+    assert_ne!(verdict, Some(ProfileVerdict::StructurallyNonIdentifiable));
+    assert_eq!(structure.verdict, Err(Undetermined::BelowFit));
+}
+
+#[test]
+fn a_noise_parameter_is_never_named() {
+    // A normal model whose sd is calibrated: the reset of the ridge names s,
+    // and the sd joins the joint check of the parameters not named.
+    let parameters = [("a", 0.1, 10.0), ("s", 0.5, 2.0)];
+    let mut calibrated: Vec<CalibrationParameter> = parameters
+        .iter()
+        .map(|(id, min, max)| CalibrationParameter::new(id.to_string(), *min, *max))
+        .collect();
+    calibrated.push(CalibrationParameter::with_type(
+        "sd".to_string(),
+        CalibrationParameterType::Noise,
+        0.01,
+        5.0,
+    ));
+    let base = product_problem(1.0);
+    let problem = CalibrationProblem::new(
+        base.forward().base_engine().clone(),
+        base.observed_data().to_vec(),
+        calibrated,
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![(
+            "x".to_string(),
+            ObservationModel::Normal {
+                sd: Argument::Parameter("sd".to_string()),
+            },
+        )]),
+    )
+    .unwrap();
+    let (_, verdict, structure, _) = traced(&problem, &config(), None, 0, 1.92);
+
+    assert_eq!(verdict, Some(ProfileVerdict::StructurallyNonIdentifiable));
+    assert_eq!(structure.verdict, Ok(StructuralReading::InCombination));
+    assert_eq!(structure.compensating, vec![1]);
 }

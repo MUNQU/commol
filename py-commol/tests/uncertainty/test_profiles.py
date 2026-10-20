@@ -305,6 +305,8 @@ class TestSettings:
             settings("jackknife", 10, 1)
         with pytest.raises(ValueError, match="A residual bootstrap needs scheme"):
             settings("residual", 10, 1, 1, residual_scale="additive")
+        with pytest.raises(ValueError, match="bogus"):
+            settings("residual", 10, 1, 1, residual_scale="bogus", scheme="moving")
         calibrator = line_calibrator(VALUES)
         with pytest.raises(ValueError, match="only when it is 'bootstrap'"):
             commol_rs.inference.trace_profiles(

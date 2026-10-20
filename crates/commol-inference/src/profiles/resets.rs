@@ -49,6 +49,21 @@ pub enum Undetermined {
     Undecided,
 }
 
+impl Undetermined {
+    /// The name of the reason: `"below_tolerance"`, `"not_flat"`,
+    /// `"below_fit"`, `"stochastic"`, `"on_bound"` or `"undecided"`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::BelowTolerance => "below_tolerance",
+            Self::NotFlat => "not_flat",
+            Self::BelowFit => "below_fit",
+            Self::Stochastic => "stochastic",
+            Self::OnBound(_) => "on_bound",
+            Self::Undecided => "undecided",
+        }
+    }
+}
+
 /// What the resets of a profile say.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Structure {
@@ -265,5 +280,34 @@ where
             structure.joint_rise = Some(joint);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_reason_has_a_name() {
+        let names = [
+            Undetermined::BelowTolerance,
+            Undetermined::NotFlat,
+            Undetermined::BelowFit,
+            Undetermined::Stochastic,
+            Undetermined::OnBound(2),
+            Undetermined::Undecided,
+        ]
+        .map(Undetermined::name);
+        assert_eq!(
+            names,
+            [
+                "below_tolerance",
+                "not_flat",
+                "below_fit",
+                "stochastic",
+                "on_bound",
+                "undecided"
+            ]
+        );
     }
 }
