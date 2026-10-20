@@ -193,9 +193,10 @@ jobs:
         working-directory: ./py-commol
         run: uv sync --locked --extra dev
 
-      # The script fails when the line coverage falls under its threshold.
+      # The script writes lcov.info and fails when a line that no test runs
+      # has no marker.
       - name: Run the Rust and the Python tests with the coverage of Rust
-        run: uv run --project py-commol .github/scripts/rust_coverage.sh --lcov --output-path lcov.info
+        run: uv run --project py-commol .github/scripts/rust_coverage.sh
 
       # cargo llvm-cov does not run the doctests on a stable toolchain.
       - name: Run doctests

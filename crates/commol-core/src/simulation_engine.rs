@@ -222,6 +222,15 @@ pub trait SimulationEngine: Clone {
         f64::EPSILON
     }
 
+    /// The absolute accuracy of the outputs of a run: the error a run may
+    /// carry on an output near 0, beside [`Self::output_accuracy`] times its
+    /// size. 0 by default; an engine that integrates with an absolute
+    /// tolerance returns it. A solver holds its tolerances at each step, not
+    /// over a run, so an error built on them is an estimate, not a bound.
+    fn output_absolute_accuracy(&self) -> f64 {
+        0.0
+    }
+
     /// Reset the simulation to its initial state.
     ///
     /// After calling this method:

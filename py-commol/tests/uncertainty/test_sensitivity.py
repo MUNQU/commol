@@ -276,6 +276,27 @@ class TestPropagation:
         with pytest.raises(ValueError, match=r"strictly between 0 and 1"):
             result.summary(1.0)
 
+    def test_a_gain_and_a_peak_position_read_the_run_of_each_draw(
+        self, simulation: Simulation
+    ) -> None:
+        analysis = SensitivityAnalysis(simulation, _rates(), seed=3)
+        positions = [float(t) for t in range(31)]
+        result = analysis.run(
+            Propagation(
+                draws=4,
+                quantities=[
+                    Gain(outputs=["B", "C"], start=5, end=20),
+                    PeakPosition(outputs="B", positions=positions),
+                ],
+            )
+        )
+
+        runs = Predictive(analysis, result.sample, positions).runs()
+        for (gain, peak_position), run in zip(result.values, runs, strict=True):
+            # B + C gains what A loses.
+            assert gain == pytest.approx(run["A"][5] - run["A"][20])
+            assert peak_position == positions[run["B"].index(max(run["B"]))]
+
     def test_quantity_outside_the_model_is_rejected(
         self, simulation: Simulation
     ) -> None:

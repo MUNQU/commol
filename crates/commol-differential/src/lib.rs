@@ -212,6 +212,11 @@ impl commol_core::SimulationEngine for DifferentialEquations {
         self.settings.rtol
     }
 
+    /// The absolute tolerance of the solver.
+    fn output_absolute_accuracy(&self) -> f64 {
+        self.settings.atol
+    }
+
     fn reset(&mut self) {
         self.state.copy_from_slice(self.model.initial_state());
         self.current_time = 0.0;

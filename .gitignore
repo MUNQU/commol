@@ -22,6 +22,8 @@ Session.vim
 # Coverage profiles that an instrumented binary writes where it runs
 *.profraw
 *.profdata
+# The report of .github/scripts/rust_coverage.sh
+lcov.info
 
 ## Python
 __pycache__/

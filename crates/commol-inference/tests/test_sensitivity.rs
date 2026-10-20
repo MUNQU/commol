@@ -439,3 +439,30 @@ fn a_center_that_cannot_be_run_says_why() {
         )
     );
 }
+
+#[test]
+fn a_difference_whose_run_fails_is_a_failure() {
+    // The rate √(k − 0.5) is not a number below k = 0.5: the center at
+    // 0.50001 runs, the central difference two steps below it does not.
+    let json = r#"{"name":"m","parameters":[{"id":"k","value":0.6}],
+        "engine":{"type":"DifferenceEquations"},
+        "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
+        "accumulators":[],"stratifications":[],
+        "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"sqrt(k - 0.5)",
+        "stratified_rates":null,"per_compartment":null}]},
+        "structure":{"kind":"aggregate","bin_amounts":{"A":1000.0,"B":0.0}}}"#;
+    let model: Model = serde_json::from_str(json).expect("valid model JSON");
+    let problem = problem(
+        DifferenceEquations::try_from_model(&model).unwrap(),
+        vec![ObservedDataPoint::new(1.0, "A".to_string(), 0.0)],
+        vec![CalibrationParameter::new("k".to_string(), 0.0, 2.0)],
+    );
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+
+    let error = source.jacobian(&[0.50001]).unwrap_err();
+
+    assert!(
+        matches!(&error, SensitivityError::Failed(message) if message.contains("not a number")),
+        "{error:?}"
+    );
+}

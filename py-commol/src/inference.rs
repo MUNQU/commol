@@ -53,7 +53,117 @@ fn prediction_error(index: usize, error: EvaluationError) -> PyErr {
     }
 }
 
+/// How a bootstrap draws the data of its replicates.
+pub(crate) enum ResamplerSpec {
+    /// Weights by blocks (Bayesian bootstrap); `None` for the automatic
+    /// length.
+    Bayesian { block_length: Option<usize> },
+    /// Values drawn from the observation models at the fit.
+    Parametric,
+    /// The fit plus blocks of its residuals.
+    Residual {
+        block_length: Option<usize>,
+        scale: ResidualScale,
+        blocks: ResidualBlocks,
+    },
+    /// The fit plus its residuals times multipliers shared by a block.
+    Wild {
+        block_length: Option<usize>,
+        multipliers: Multipliers,
+    },
+}
+
+impl ResamplerSpec {
+    /// The residual bootstrap of a scale and a scheme by name.
+    pub(crate) fn residual(
+        block_length: Option<usize>,
+        residual_scale: &str,
+        scheme: &str,
+    ) -> PyResult<Self> {
+        Ok(Self::Residual {
+            block_length,
+            scale: ResidualScale::from_name(residual_scale).map_err(value_error)?,
+            blocks: ResidualBlocks::from_name(scheme).map_err(value_error)?,
+        })
+    }
+
+    /// The wild bootstrap of multipliers by name.
+    pub(crate) fn wild(block_length: Option<usize>, multipliers: &str) -> PyResult<Self> {
+        Ok(Self::Wild {
+            block_length,
+            multipliers: Multipliers::from_name(multipliers).map_err(value_error)?,
+        })
+    }
+}
+
 impl PyCalibrationProblem {
+    /// The resampler of `spec` around the fit `fit`, and the block length it
+    /// chose, if it draws blocks.
+    pub(crate) fn resampler(
+        &self,
+        spec: &ResamplerSpec,
+        fit: &[f64],
+    ) -> PyResult<(Box<dyn Resampler>, Option<BlockLength>)> {
+        let observed = self.inner.observed_data();
+        let blocks = |scale: ResidualScale, requested: Option<usize>, drawing: BlockDrawing| {
+            let residuals = Residuals::new(&self.inner, fit, scale).map_err(value_error)?;
+            let chosen = BlockLength::resolve(observed, &residuals, requested, drawing);
+            let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
+            Ok::<_, PyErr>((residuals, chosen, scheme))
+        };
+        match spec {
+            ResamplerSpec::Parametric => {
+                let resampler = ParametricResampler::new(&self.inner, fit).map_err(value_error)?;
+                Ok((Box::new(resampler), None))
+            }
+            ResamplerSpec::Bayesian { block_length } => {
+                let (_, chosen, scheme) = blocks(
+                    ResidualScale::Additive,
+                    *block_length,
+                    BlockDrawing::NonOverlapping,
+                )?;
+                Ok((
+                    Box::new(BayesianBootstrap::new(observed, &scheme)),
+                    Some(chosen),
+                ))
+            }
+            ResamplerSpec::Residual {
+                block_length,
+                scale,
+                blocks: residual_blocks,
+            } => {
+                let drawing = match residual_blocks {
+                    ResidualBlocks::Moving => BlockDrawing::Moving,
+                    ResidualBlocks::Stationary => BlockDrawing::Stationary,
+                };
+                let (residuals, chosen, scheme) = blocks(*scale, *block_length, drawing)?;
+                Ok((
+                    Box::new(ResidualBootstrap::new(
+                        observed,
+                        residuals,
+                        &scheme,
+                        *residual_blocks,
+                    )),
+                    Some(chosen),
+                ))
+            }
+            ResamplerSpec::Wild {
+                block_length,
+                multipliers,
+            } => {
+                let (residuals, chosen, scheme) = blocks(
+                    ResidualScale::Additive,
+                    *block_length,
+                    BlockDrawing::NonOverlapping,
+                )?;
+                Ok((
+                    Box::new(WildBootstrap::new(residuals, &scheme, *multipliers)),
+                    Some(chosen),
+                ))
+            }
+        }
+    }
+
     /// Run `replicates` of the resampler that `resampler` makes from the fit,
     /// and the block length it chose, if it draws blocks.
     #[allow(clippy::too_many_arguments)]
@@ -400,8 +510,7 @@ impl PyCalibrationProblem {
         seed: u64,
     ) -> PyResult<PyBootstrapRun> {
         self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
-            let resampler = ParametricResampler::new(&self.inner, fit).map_err(value_error)?;
-            Ok((Box::new(resampler), None))
+            self.resampler(&ResamplerSpec::Parametric, fit)
         })
     }
 
@@ -431,21 +540,8 @@ impl PyCalibrationProblem {
         starts: usize,
         seed: u64,
     ) -> PyResult<PyBootstrapRun> {
-        let observed = self.inner.observed_data();
         self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
-            let residuals =
-                Residuals::new(&self.inner, fit, ResidualScale::Additive).map_err(value_error)?;
-            let chosen = BlockLength::resolve(
-                observed,
-                &residuals,
-                block_length,
-                BlockDrawing::NonOverlapping,
-            );
-            let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
-            Ok((
-                Box::new(BayesianBootstrap::new(observed, &scheme)),
-                Some(chosen),
-            ))
+            self.resampler(&ResamplerSpec::Bayesian { block_length }, fit)
         })
     }
 
@@ -480,26 +576,9 @@ impl PyCalibrationProblem {
         residual_scale: &str,
         scheme: &str,
     ) -> PyResult<PyBootstrapRun> {
-        let observed = self.inner.observed_data();
-        let scale = ResidualScale::from_name(residual_scale).map_err(value_error)?;
-        let blocks = ResidualBlocks::from_name(scheme).map_err(value_error)?;
-        let drawing = match blocks {
-            ResidualBlocks::Moving => BlockDrawing::Moving,
-            ResidualBlocks::Stationary => BlockDrawing::Stationary,
-        };
+        let spec = ResamplerSpec::residual(block_length, residual_scale, scheme)?;
         self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
-            let residuals = Residuals::new(&self.inner, fit, scale).map_err(value_error)?;
-            let chosen = BlockLength::resolve(observed, &residuals, block_length, drawing);
-            let block_scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
-            Ok((
-                Box::new(ResidualBootstrap::new(
-                    observed,
-                    residuals,
-                    &block_scheme,
-                    blocks,
-                )),
-                Some(chosen),
-            ))
+            self.resampler(&spec, fit)
         })
     }
 
@@ -532,22 +611,9 @@ impl PyCalibrationProblem {
         seed: u64,
         multipliers: &str,
     ) -> PyResult<PyBootstrapRun> {
-        let observed = self.inner.observed_data();
-        let multipliers = Multipliers::from_name(multipliers).map_err(value_error)?;
+        let spec = ResamplerSpec::wild(block_length, multipliers)?;
         self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
-            let residuals =
-                Residuals::new(&self.inner, fit, ResidualScale::Additive).map_err(value_error)?;
-            let chosen = BlockLength::resolve(
-                observed,
-                &residuals,
-                block_length,
-                BlockDrawing::NonOverlapping,
-            );
-            let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
-            Ok((
-                Box::new(WildBootstrap::new(residuals, &scheme, multipliers)),
-                Some(chosen),
-            ))
+            self.resampler(&spec, fit)
         })
     }
 
@@ -689,7 +755,7 @@ pub struct PyJackknifeRun {
     block_length_estimates: Option<Vec<(String, f64)>>,
 }
 
-fn value_error(message: String) -> PyErr {
+pub(crate) fn value_error(message: String) -> PyErr {
     PyErr::new::<pyo3::exceptions::PyValueError, _>(message)
 }
 
@@ -717,6 +783,8 @@ pub struct PyParameterSample {
     pub(crate) inner: ParameterSample,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyParameterSample {
     #[new]
@@ -790,6 +858,8 @@ pub struct PyPredictive {
     pub(crate) inner: Predictive,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyPredictive {
     /// The trajectory of every draw, `[draw][position][output]`
@@ -839,6 +909,8 @@ pub struct PyObservationDraws {
     pub(crate) inner: ObservationDraws,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyObservationDraws {
     /// `[draw][observation]`
@@ -969,5 +1041,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::local::register(m)?;
     crate::conformal::register(m)?;
     crate::sensitivity::register(m)?;
+    crate::profiles::register(m)?;
     Ok(())
 }

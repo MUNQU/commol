@@ -330,6 +330,7 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
         args: &[Expr],
     ) -> Result<Value, MathExpressionError> {
         let [first, rest @ ..] = args else {
+            // coverage: invariant, the parser gives a call at least one argument
             unreachable!("the parser gives a call at least one argument")
         };
         let mut result = self.generate(first)?;

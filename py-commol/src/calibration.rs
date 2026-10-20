@@ -5,6 +5,8 @@ use pyo3::prelude::*;
 use crate::engine::PyEngine;
 
 /// Type of value being calibrated
+// coverage: code that a PyO3 attribute generates: the __int__ and __repr__ of the enum, which no
+// call uses
 #[pyclass(name = "CalibrationParameterType", from_py_object)]
 #[derive(Clone, Copy)]
 pub enum PyCalibrationParameterType {
@@ -255,6 +257,8 @@ pub struct PyLossConfig {
     pub replicates: Option<commol_calibration::Replicates>,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyLossConfig {
     /// Sum of squared errors
@@ -690,6 +694,8 @@ pub struct PyCalibrationEvaluation {
     pub inner: commol_calibration::CalibrationEvaluation,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyCalibrationEvaluation {
     /// The parameter values the objective scored, in problem order
@@ -712,6 +718,8 @@ pub struct PyCalibrationResult {
     pub inner: commol_calibration::CalibrationResult,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyCalibrationResult {
     /// The best value of each parameter, as `(name, value)` pairs in problem
@@ -757,6 +765,8 @@ pub struct PyCalibrationResultWithHistory {
     pub inner: commol_calibration::CalibrationResultWithHistory,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyCalibrationResultWithHistory {
     /// The result of the optimization
@@ -784,6 +794,8 @@ pub struct PyStartOutcome {
     pub inner: commol_calibration::StartOutcome,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyStartOutcome {
     /// The start point, in problem order

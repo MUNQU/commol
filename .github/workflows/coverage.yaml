@@ -52,6 +52,8 @@ jobs:
               tests/uncertainty/test_coverage.py::TestLaplace
               tests/uncertainty/test_coverage.py::TestSandwich
               tests/uncertainty/test_coverage.py::TestLaplaceMixture
+          - name: profile likelihood
+            tests: tests/uncertainty/test_profiles_coverage.py
     defaults:
       run:
         working-directory: ./py-commol

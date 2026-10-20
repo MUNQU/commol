@@ -4,7 +4,7 @@
 
 What every uncertainty method takes and returns: the configuration base, the
 weighted parameter sample, the predictive and its observation noise, the
-resampling and conformal methods, the scores and the one quantile.
+resampling, profile and conformal methods, the scores and the one quantile.
 Guide: [Uncertainty](../guide/uncertainty/index.md).
 
 ::: commol.context.inference.method.InferenceMethod
@@ -52,6 +52,26 @@ Guide: [Resampling](../guide/uncertainty/resampling.md).
 ::: commol.context.inference.resampling.ResamplingDiagnostics
 
 ::: commol.context.inference.resampling.BoundError
+
+## Profile likelihood
+
+Guide: [Profile Likelihood](../guide/uncertainty/profiles.md).
+
+::: commol.context.inference.profiles.ProfileLikelihood
+
+::: commol.context.inference.profiles.PredictionProfile
+
+::: commol.context.inference.profiles.PredictionSpec
+
+::: commol.context.inference.profiles.Threshold
+
+::: commol.context.inference.profiles.ProfileResult
+
+::: commol.context.inference.profiles.Profile
+
+::: commol.context.inference.profiles.ProfileInterval
+
+::: commol.context.inference.profiles.ProfileStructure
 
 ## Sequential Monte Carlo
 

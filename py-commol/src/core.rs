@@ -63,6 +63,8 @@ impl PyAggregate {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         match structure {
             commol_core::ModelStructure::Aggregate(inner) => Ok(Self { inner }),
+            // coverage: an arm for the test model kind: Python loads only the JSON of an Aggregate
+            // (engine_state.py, _rust_structure)
             #[cfg(feature = "test-kind")]
             other => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                 "The structure is a {} structure, not an aggregate structure",
@@ -79,6 +81,8 @@ pub struct PyMathExpression {
     expression: String,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyMathExpression {
     #[new]

@@ -229,6 +229,19 @@ fn truncated_distributions_hold_their_mass_inside_the_bounds() {
 }
 
 #[test]
+fn a_quantile_hundreds_of_orders_of_magnitude_below_one_is_exact() {
+    // Beta(0.01, 1) has F(x) = x^0.01, so its quantile at 10⁻³ is 10⁻³⁰⁰:
+    // a halving from 0.5 gains one of the thousand bits to it, and a Newton
+    // step leaves the bracket.
+    let d = distribution(Family::Beta { a: 0.01, b: 1.0 }, 0.0, 1.0);
+
+    let x = d.quantile(1e-3);
+
+    assert!((x - 1e-300).abs() <= 1e-12 * 1e-300, "{x:e}");
+    assert!((d.cdf(x) - 1e-3).abs() <= 1e-14, "{}", d.cdf(x));
+}
+
+#[test]
 fn a_distribution_needs_parameters_and_bounds_that_fit_it() {
     let error = |family, lower, upper| Distribution::new(family, lower, upper).unwrap_err();
     assert!(error(Family::Uniform, 0.0, f64::INFINITY).contains("finite bounds"));

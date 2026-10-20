@@ -10,6 +10,9 @@ the data determine:
 - `SampleIdentifiability`: the contraction, correlations and modes of a
   sample. Practical.
 - `StartsIdentifiability`: starts of equal loss that end apart. Practical.
+- `ProfileResult.report` (`commol.context.inference.profiles`): the shape of
+  each profile of a `ProfileLikelihood`. Structural when a profile is flat,
+  practical otherwise.
 
 Each returns an `IdentifiabilityReport`: one structural and one practical
 verdict per parameter, and the evidence of its section.
@@ -34,6 +37,11 @@ StructuralVerdictName = Literal[
 PracticalVerdictName = Literal["determined", "poorly_determined", "conflicting"]
 """What these data say about a parameter."""
 
+ProfileVerdictName = Literal[
+    "identifiable", "practically_non_identifiable", "structurally_non_identifiable"
+]
+"""What the shape of a profile says about its quantity."""
+
 
 class _Frozen(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -47,14 +55,17 @@ class StructuralVerdict(_Frozen):
     ----------
     verdict : StructuralVerdictName
         ``identifiable``: the null space of the sensitivities has no
-        component on it. ``in_combination``: only the combinations in
-        `combinations` are. ``non_identifiable``: it lies in the null space.
-        ``conflicting``: two reports disagree.
+        component on it, or a profile crosses its threshold. ``in_combination``:
+        the data determine it only together with other parameters.
+        ``non_identifiable``: it lies in the null space, or nothing the data
+        read depends on it. ``conflicting``: two reports disagree.
     reasons : list[str]
         Why, one per piece of evidence.
     combinations : list[str]
-        The identifiable combinations that hold the parameter, such as
-        ``"k1 · s"``.
+        The algebraic combinations that hold the parameter, such as
+        ``"k1 · s"``, from the methods that compute them (the structural
+        rank); empty for the verdict of a profile, whose reason names the
+        compensating parameters.
     """
 
     verdict: StructuralVerdictName
@@ -295,6 +306,33 @@ class StartsSection(_Frozen):
     flagged: list[str]
 
 
+class ProfileSection(_Frozen):
+    """
+    The evidence of a `ProfileLikelihood`.
+
+    Attributes
+    ----------
+    threshold : {"chi_square", "beale", "bootstrap_calibrated"}
+        The rule of the threshold.
+    level : float
+        The level of each pointwise interval.
+    tolerance : float
+        The numerical tolerance of the statistic.
+    verdicts : dict[str, ProfileVerdictName | None]
+        The verdict of each profiled parameter; None when its threshold is
+        below the tolerance.
+    intervals : dict[str, tuple[float | None, float | None]]
+        The interval of each profiled parameter; None on a side that does not
+        cross the threshold.
+    """
+
+    threshold: Literal["chi_square", "beale", "bootstrap_calibrated"]
+    level: float
+    tolerance: float
+    verdicts: dict[str, ProfileVerdictName | None]
+    intervals: dict[str, tuple[float | None, float | None]]
+
+
 def _merge_structural(
     verdicts: list[StructuralVerdict],
 ) -> StructuralVerdict | None:
@@ -328,9 +366,10 @@ class IdentifiabilityReport(_Frozen):
     practical verdict per parameter, and the evidence of each method.
 
     The structural verdict comes from `StructuralRank` on the design of the
-    observations; a dense design answers what denser data would determine,
-    so its verdicts stay in its section. The practical verdict comes from
-    `Collinearity`, `SampleIdentifiability` and `StartsIdentifiability`.
+    observations, and from a flat profile; a dense design answers what
+    denser data would determine, so its verdicts stay in its section. The
+    practical verdict comes from `Collinearity`, `SampleIdentifiability`,
+    `StartsIdentifiability` and the other profiles.
 
     Attributes
     ----------
@@ -338,7 +377,7 @@ class IdentifiabilityReport(_Frozen):
         The parameters, in problem order.
     verdicts : dict[str, ParameterVerdicts]
         The verdicts of each parameter.
-    structural, collinearity, sample, starts : list
+    structural, collinearity, sample, starts, profile : list
         The sections of the methods that ran, one per run.
     """
 
@@ -348,6 +387,7 @@ class IdentifiabilityReport(_Frozen):
     collinearity: list[CollinearitySection] = Field(default_factory=list)
     sample: list[SampleSection] = Field(default_factory=list)
     starts: list[StartsSection] = Field(default_factory=list)
+    profile: list[ProfileSection] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def check_parameters(self) -> Self:
@@ -415,6 +455,7 @@ class IdentifiabilityReport(_Frozen):
             collinearity=[s for r in reports for s in r.collinearity],
             sample=[s for r in reports for s in r.sample],
             starts=[s for r in reports for s in r.starts],
+            profile=[s for r in reports for s in r.profile],
         )
 
 

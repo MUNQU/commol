@@ -881,3 +881,25 @@ fn a_rate_that_cannot_be_evaluated_stops_the_solver() {
 
     assert!(error.contains("not found"), "{error}");
 }
+
+#[test]
+fn a_solution_that_blows_up_stops_the_solver_where_it_fails() {
+    // X' = X², from X = 1: X = 1 / (1 − t) has no value at t = 1.
+    let model = model(
+        "DifferentialEquations",
+        &[("X", 1.0)],
+        &[],
+        &[],
+        &[transition("growth", &[], &["X"], "X * X", "")],
+        TIGHT_BDF,
+    );
+
+    let error = engine(&model).run_at(&[2.0]).unwrap_err().to_string();
+
+    let (position, _) = error
+        .strip_prefix("The ODE solver failed after t = ")
+        .and_then(|rest| rest.split_once(':'))
+        .expect("the message of a step the solver cannot take");
+    let failed_after: f64 = position.parse().unwrap();
+    assert!(failed_after > 0.999 && failed_after < 1.0, "{error}");
+}

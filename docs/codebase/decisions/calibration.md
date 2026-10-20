@@ -124,3 +124,37 @@ edge of the support: its log density is `−∞` (`discrepancy_in_support` in
 **Guards:** `feasibility::tests`,
 `crates/commol-calibration/tests/test_infeasible_runs.rs`,
 `crates/commol-calibration/tests/test_likelihood.rs::the_penalty_is_above_every_feasible_cost`.
+
+## A subproblem holds one quantity fixed
+
+`Subproblem` (`crates/commol-calibration/src/subproblem.rs`) holds one
+parameter or one prediction while `optimize_subproblem` (`optimization.rs`)
+fits the others with the problem's own optimizer. A held parameter leaves the
+search space (`SearchSpace`): the optimizer searches one dimension less, and
+the cost puts the fixed value back before it scores a point. A held
+prediction `g(θ) = c` is an equality constraint met by the augmented
+Lagrangian of the argmin fork, whose factory builds the problem's optimizer
+at each outer iteration: Nelder-Mead on the sine transform, from the point of
+the iteration before, or a swarm seeded by `replicate_seed(seed, k)`. The
+prediction is read through the observation operator of a copy of the problem
+whose runs also report at its positions (`CalibrationProblem::observing`), so
+one run gives the objective and the constraint, and the cost keeps the
+constraint of the last point it scored. A point that is not feasible keeps
+its penalty and a constraint of 0. Each point starts from Algencan's scaled
+penalty; the multiplier is the warm start.
+
+| Alternative | Why not |
+|---|---|
+| Bounds `[v, v]` for a held parameter | Nelder-Mead keeps a vertex for a dimension that moves nothing. |
+| A growing quadratic penalty on `g − c` | It meets the constraint only as `μ → ∞`, and a large `μ` makes a narrow valley where Nelder-Mead stops early. |
+| A second run for the prediction | Twice the model runs of each evaluation. |
+| `μ = 100·|Δλ/Δc|` from the two points before | In the experiment of #132 (the ABC model of `tests/support/` with a normal model, the problem of `the_multiplier_of_a_prediction_profile_is_minus_its_slope`), B at 30 took 5465 evaluations against 3179 with Algencan's `μ₀`, C at 24 5405 against 3175, for the same intervals and a mean error of the multipliers of 0.8e-4 against 1.2e-4; `10⁴·|Δλ/Δc|` gained 4 %. The stop rule reads `‖g − c‖`, which a small `μ` leaves large. |
+
+A swarm without stop rules runs each outer iteration to its `max_iterations`,
+so a held prediction stops at the outer limit and never reports convergence.
+
+**Guards:** `crates/commol-inference/tests/test_profiles.rs`
+(`fixing_a_parameter_at_the_fit_keeps_the_loss`,
+`fixing_a_prediction_at_the_fit_keeps_the_parameters`,
+`a_problem_observing_more_positions_scores_as_the_problem`,
+`a_swarm_fits_a_subproblem_and_repeats_from_its_seed`).

@@ -810,3 +810,17 @@ fn a_name_gives_its_setting_and_an_unknown_name_lists_the_names() {
         Some("multipliers is 'gauss'; it must be \"rademacher\" or \"mammen\"")
     );
 }
+
+#[test]
+fn a_bootstrap_of_a_parameter_named_twice_has_no_sample() {
+    // The problem takes two parameters 'k'; a sample names each column once.
+    let problem = problem(sine, &[("k", 0.0, 1.0), ("k", 0.0, 1.0)], &[0.0, 0.5, 0.8]);
+    let config = config();
+    let runner = ReplicateRunner::new(&problem, &config, &[0.5, 0.5], 1, 2).unwrap();
+    let scheme = BlockScheme::new(problem.observed_data(), 1).unwrap();
+    let resampler = BayesianBootstrap::new(problem.observed_data(), &scheme);
+
+    let error = bootstrap(&runner, &resampler, 2).unwrap_err();
+
+    assert_eq!(error, "A sample names 'k' twice; one name per column");
+}

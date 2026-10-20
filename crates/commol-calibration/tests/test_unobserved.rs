@@ -124,3 +124,15 @@ fn the_replicates_of_an_unobserved_model_are_seeded_from_its_seed() {
     assert_eq!(seeds.len(), 3);
     assert_eq!(seeds[1], commol_random::replicate_seed(7, 1));
 }
+
+#[test]
+fn observations_of_an_unknown_output_name_it() {
+    let model = ForwardModel::unobserved(engine(), parameters(), None, None, 0).unwrap();
+
+    let error = model
+        .with_observations(&[ObservedDataPoint::new(1.0, "C".to_string(), 0.0)])
+        .err()
+        .unwrap();
+
+    assert!(error.contains("output name 'C'"), "{error}");
+}

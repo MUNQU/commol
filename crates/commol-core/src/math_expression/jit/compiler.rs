@@ -133,6 +133,7 @@ impl JITCompiler {
         // Create a new JIT module for this function
         let mut builder =
             JITBuilder::new(cranelift_module::default_libcall_names()).map_err(|e| {
+                // coverage: an error that only Cranelift returns, a host it cannot target
                 MathExpressionError::InvalidExpression(format!(
                     "Failed to create JIT builder: {}",
                     e
@@ -160,6 +161,7 @@ impl JITCompiler {
         let func_id = module
             .declare_function("eval_expr", Linkage::Export, &sig)
             .map_err(|e| {
+                // coverage: an error that only Cranelift returns, a name declared twice
                 MathExpressionError::InvalidExpression(format!("Failed to declare function: {}", e))
             })?;
 
@@ -195,6 +197,7 @@ impl JITCompiler {
 
         // Compile to machine code
         module.define_function(func_id, &mut ctx).map_err(|e| {
+            // coverage: an error that only Cranelift returns, a function it cannot compile
             MathExpressionError::InvalidExpression(format!("Failed to define function: {}", e))
         })?;
 
@@ -202,6 +205,7 @@ impl JITCompiler {
 
         // Finalize and get function pointer
         module.finalize_definitions().map_err(|e| {
+            // coverage: an error that only Cranelift returns, memory it cannot map
             MathExpressionError::InvalidExpression(format!("Failed to finalize definitions: {}", e))
         })?;
 

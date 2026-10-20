@@ -13,7 +13,7 @@ anyone who fits more than one parameter.
 | Kind | Question | Depends on | Methods |
 |---|---|---|---|
 | **Structural** | Can any data from this design determine the parameter? | The model and the positions and outputs observed, not the observed values | `StructuralRank` |
-| **Practical** | Do these data determine it? | The observed values, their noise and the fit | `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability` |
+| **Practical** | Do these data determine it? | The observed values, their noise and the fit | `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, the profiles of a `ProfileLikelihood` |
 
 A parameter that is not structurally identifiable is never practically
 identifiable: no amount of data of the same design fixes it. A parameter that
@@ -248,7 +248,12 @@ within a relative tolerance but the best; use data with noise.
 
 An `IdentifiabilityReport` holds, for each parameter, a **structural** and a
 **practical** verdict, and the sections of the methods that ran
-(`structural`, `collinearity`, `sample`, `starts`). `merge` joins reports: a
+(`structural`, `collinearity`, `sample`, `starts`, `profile`). The profiles of
+a `ProfileLikelihood` give their report with `ProfileResult.report()`; a flat
+profile gives the structural verdict `in_combination` when resetting the
+other parameters to their fitted values breaks it, and `non_identifiable`
+when nothing the data read depends on the parameter
+([Profile Likelihood](profiles.md#verdicts-and-the-identifiability-report)). `merge` joins reports: a
 verdict the reports agree on stays, with every reason; one they disagree on is
 `conflicting`, with both reasons. `identifiability_report` gives it as plain
 data.
@@ -286,3 +291,4 @@ print(data["parameters"]["k2"]["practical"]["verdict"])  # determined
 | Several starts of an optimizer | [Optimizers](../calibration-optimizers.md#several-starts) |
 | Scale factors, which often pair with a rate | [Observations](../calibration-observations.md) |
 | What a sample is | [Uncertainty](index.md#the-parameter-sample) |
+| Intervals and verdicts from profiles | [Profile Likelihood](profiles.md) |

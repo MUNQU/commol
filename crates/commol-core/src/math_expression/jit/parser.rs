@@ -105,6 +105,7 @@ fn convert_node(node: &Node) -> Result<Expr, MathExpressionError> {
         // a tuple of the arguments or the one argument.
         Operator::FunctionIdentifier { identifier } => {
             let [arguments] = node.children() else {
+                // coverage: invariant, evalexpr gives a call one child
                 unreachable!("evalexpr gives a call one child")
             };
             let arg_exprs: Vec<Expr> = match arguments.children() {

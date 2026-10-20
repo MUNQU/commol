@@ -42,6 +42,7 @@ mod identifiability;
 mod inference;
 mod local;
 mod model;
+mod profiles;
 pub(crate) mod python_observer;
 mod sensitivity;
 mod smc;
@@ -60,7 +61,7 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         "__doc__",
         "Core data structures for compartment models.\n\n\
          Includes Model, Process, Aggregate, Bin, Transition, and related types.",
-    )?;
+    )?; // coverage: an error that only PyO3 returns, when the module cannot take it
     core::register(&core_module)?;
     m.add_submodule(&core_module)?;
 
@@ -71,7 +72,7 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         "What a model expands into, whatever engine runs it.\n\n\
          Provides the initial state, the expanded outputs, the transition\n\
          flows and the name checks of a model.",
-    )?;
+    )?; // coverage: an error that only PyO3 returns, when the module cannot take it
     model::register(&model_module)?;
     m.add_submodule(&model_module)?;
 
@@ -82,7 +83,7 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         "The engines a model can name.\n\n\
          Provides EngineType, the list of engines and what each one means,\n\
          and Engine, the engine a model names, built from the model.",
-    )?;
+    )?; // coverage: an error that only PyO3 returns, when the module cannot take it
     engine::register(&engine_module)?;
     m.add_submodule(&engine_module)?;
 
@@ -93,7 +94,7 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         "Model calibration and parameter optimization.\n\n\
          Provides tools for calibrating model parameters against observed data\n\
          using various optimization algorithms (Nelder-Mead, Particle Swarm, etc.).",
-    )?;
+    )?; // coverage: an error that only PyO3 returns, when the module cannot take it
     calibration::register(&calibration_module)?;
     m.add_submodule(&calibration_module)?;
 
@@ -104,7 +105,7 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         "__doc__",
         "A calibration problem built once, its optimizers and predictions,\n\
          and the inference methods that read it.",
-    )?;
+    )?; // coverage: an error that only PyO3 returns, when the module cannot take it
     inference::register(&inference_module)?;
     m.add_submodule(&inference_module)?;
 
@@ -113,7 +114,7 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "__doc__",
         "Commol: High-performance compartment modelling in Rust with Python bindings.",
-    )?;
+    )?; // coverage: an error that only PyO3 returns, when the module cannot take it
 
     Ok(())
 }

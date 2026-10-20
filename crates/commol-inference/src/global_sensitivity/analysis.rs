@@ -101,11 +101,6 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         &self.forward
     }
 
-    /// The inputs.
-    pub fn inputs(&self) -> &InputSpace {
-        &self.inputs
-    }
-
     /// The seed of the analysis; a predictive of its draws runs from it.
     pub fn seed(&self) -> u64 {
         self.seed

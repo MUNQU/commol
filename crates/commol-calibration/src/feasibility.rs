@@ -211,6 +211,20 @@ impl Feasibility {
         })
     }
 
+    /// The same feasibility on a run at `positions`, a schedule that holds
+    /// every position of the constraints.
+    pub(crate) fn on_schedule(&self, positions: &[f64]) -> Self {
+        let mut feasibility = self.clone();
+        for constraint in &mut feasibility.position_constraints {
+            for (position, row) in &mut constraint.rows {
+                *row = positions
+                    .binary_search_by(|candidate| candidate.total_cmp(position))
+                    .expect("the schedule holds every constraint position");
+            }
+        }
+        feasibility
+    }
+
     /// Whether some constraint reads the rows of a run.
     pub fn reads_rows(&self) -> bool {
         !self.position_constraints.is_empty()
@@ -344,6 +358,11 @@ mod tests {
         );
         let rows = vec![vec![0.0, 9.0], vec![1.0, 4.0]];
         assert_eq!(feasibility.row_violation(&[0.25, 0.5], &rows), 1.0);
+    }
+
+    #[test]
+    fn the_amount_of_a_bound_violation_is_its_distance_outside_them() {
+        assert_eq!(Violation::OutOfBounds { amount: 1.5 }.amount(), 1.5);
     }
 
     #[test]

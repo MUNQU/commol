@@ -48,6 +48,7 @@ impl LibmRegistry {
         let func_id = module
             .declare_function(name, Linkage::Import, &sig)
             .map_err(|e| {
+                // coverage: an error that only Cranelift returns, an import declared twice
                 MathExpressionError::InvalidExpression(format!(
                     "Failed to declare libm function '{}': {}",
                     name, e

@@ -847,3 +847,74 @@ fn a_new_initial_amount_before_the_run_starts_from_it() {
     assert_eq!(events.run_at(&[0.0]).unwrap(), [[4.0, 0.0]]);
     assert_eq!(steps.run_at(&[0.0]).unwrap(), [[4.0, 0.0]]);
 }
+
+#[test]
+fn a_propensity_negative_inside_a_piece_stops_the_events_where_it_is() {
+    // The Simpson rule refines the integral of t⁴ over [0, 1], and its
+    // second half is the first to read t = 0.875, where the rate dips below
+    // zero.
+    let mut engine = events(&death(
+        "StochasticEvents",
+        "null",
+        1.0,
+        "t^4 - 2 * exp(-100000 * (t - 0.875)^2)",
+    ));
+
+    let error = engine.run_at(&[1.0]).unwrap_err();
+
+    assert!(
+        matches!(&error, SimulationError::Infeasible { position, message }
+            if *position == 0.875 && message.starts_with("Flow 'death' has the propensity")),
+        "{error:?}"
+    );
+}
+
+/// The position of the one event of a unit that dies at the rate
+/// `0.01 + 100 t`, found within `tolerance`: the first of the positions
+/// `0.01, 0.02, ...` where the unit is dead.
+fn death_position(tolerance: f64, seed: u64) -> f64 {
+    let settings = format!(r#"{{"tolerance":{tolerance}}}"#);
+    let mut engine = events(&death("StochasticEvents", &settings, 1.0, "0.01 + 100 * t"));
+    engine.set_seed(seed);
+    let positions: Vec<f64> = (1..=100).map(|i| f64::from(i) / 100.0).collect();
+    let rows = engine.run_at(&positions).unwrap();
+    let dead = rows.iter().position(|row| row[0] == 0.0).unwrap();
+    positions[dead]
+}
+
+#[test]
+fn an_event_search_stops_when_its_bracket_is_within_the_tolerance() {
+    let exact = death_position(1e-8, 3);
+    let coarse = death_position(0.5, 3);
+
+    assert_ne!(coarse, exact);
+    assert!((coarse - exact).abs() <= 0.51, "{coarse} {exact}");
+}
+
+#[test]
+fn an_event_guessed_past_a_breakpoint_happens_at_it() {
+    // A coarse tolerance keeps the first guess of the event, which is past
+    // the impulse at 0.5: the unit dies at 0.5 instead of before 0.4.
+    let model = |tolerance: f64| {
+        model(
+            "StochasticEvents",
+            &format!(r#"{{"tolerance":{tolerance}}}"#),
+            &[("A", 1.0), ("D", 0.0)],
+            &[],
+            &[
+                transition("death", &["A"], &["D"], "0.01 + 100 * t"),
+                transition_with("none", &["A"], &["D"], "0", r#","impulse_at":[0.5]"#),
+            ],
+        )
+    };
+    let mut exact = events(&model(1e-8));
+    let mut coarse = events(&model(1e6));
+    exact.set_seed(3);
+    coarse.set_seed(3);
+
+    let exact_rows = exact.run_at(&[0.4, 0.6]).unwrap();
+    let coarse_rows = coarse.run_at(&[0.4, 0.6]).unwrap();
+
+    assert_eq!(exact_rows, vec![vec![0.0, 1.0], vec![0.0, 1.0]]);
+    assert_eq!(coarse_rows, vec![vec![1.0, 0.0], vec![0.0, 1.0]]);
+}

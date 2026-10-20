@@ -13,7 +13,7 @@ Each method has its own page, listed in the table below.
 
 | Question | What answers it |
 |---|---|
-| Which parameters fit the data? | The [identifiability](identifiability.md) methods; a sample of the parameters, or a profile of the loss; several starts that end apart with equal losses show that the data do not identify the parameters |
+| Which parameters fit the data? | The [identifiability](identifiability.md) methods; a sample of the parameters, or a [profile](profiles.md) of the likelihood or the loss; several starts that end apart with equal losses show that the data do not identify the parameters |
 | How do the inputs move the outputs? | The predictive of a sample: the run of every draw, and its band; with no data, a [sensitivity analysis](sensitivity.md), which propagates the inputs and ranks them |
 | Are the intervals calibrated? | Scores of the predictive against observations the method did not see, and coverage studies |
 
@@ -67,6 +67,8 @@ coverage guarantee, from the scores of observations the fit did not use.
 | `Morris` | Which inputs matter, in few runs | No | [Sensitivity Analysis](sensitivity.md#morris-screening) |
 | `Sobol` | The share of the variance of an output each input explains, alone and with interactions | No | [Sensitivity Analysis](sensitivity.md#sobol-indices) |
 | `PolynomialChaos` | A polynomial surrogate of an output and its Sobol indices, in few runs | No | [Sensitivity Analysis](sensitivity.md#polynomial-chaos) |
+| `ProfileLikelihood` | The interval of each parameter and whether the data determine it, from refits with the parameter held | No: `Threshold.chi_square` needs one, `beale` and `bootstrap_calibrated` do not | [Profile Likelihood](profiles.md) |
+| `PredictionProfile` | The interval of a prediction: the values the data do not reject | No, as `ProfileLikelihood` | [Profile Likelihood](profiles.md#prediction-profiles) |
 
 Each uncertainty method adds its row here when it lands.
 ## Quick path

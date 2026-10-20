@@ -278,11 +278,16 @@ fn moves_on_an_unbounded_scale_stay_inside_the_bounds() {
 #[test]
 fn move_count_follows_the_acceptance_rate() {
     let target = Tempered::new(vec![standard_normal(), standard_normal()], quadratic);
-    for stay_probability in [0.01, 0.3] {
+    for stay_probability in [0.01, 0.3, 0.99] {
         let run = sampler(300, stay_probability).run(&target, 2).unwrap();
         for step in &run.steps {
             let expected = (stay_probability.ln() / (1.0 - step.acceptance_rate).ln()).ceil();
             assert_eq!(step.moves, (expected as usize).max(1), "{step:?}");
+        }
+        // Any acceptance above 1 % leaves a particle with a chance of
+        // staying below 0.99 after one move.
+        if stay_probability == 0.99 {
+            assert!(run.steps.iter().all(|step| step.moves == 1));
         }
     }
 }

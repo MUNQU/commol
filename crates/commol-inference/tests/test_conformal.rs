@@ -336,3 +336,92 @@ fn an_enbpi_replicate_with_no_weight_is_a_failed_refit() {
     assert!(!run.failed.is_empty());
     assert_eq!(run.scores.len(), 9);
 }
+
+fn failed(result: Result<impl std::fmt::Debug, ConformalError>) -> String {
+    match result {
+        Err(ConformalError::Failed(message)) => message,
+        other => panic!("not a failure: {other:?}"),
+    }
+}
+
+#[test]
+fn rolling_conformal_fails_when_every_origin_fails() {
+    // The only origin, at 2, has only observations of weight 0 to fit.
+    let problem = problem(observations(&VALUES, &[1.0, 2.0]));
+    let config = config();
+    let runner = ReplicateRunner::new(&problem, &config, &[10.0], 1, 1).unwrap();
+
+    let message = failed(rolling_conformal(
+        &runner,
+        &[2.0],
+        &[11.0],
+        settings(NonconformityScore::Absolute),
+    ));
+
+    assert!(
+        message.starts_with("Every replicate failed (1); the first reasons: replicate 0:"),
+        "{message}"
+    );
+}
+
+/// Nine observations of which only the first block of three has weight:
+/// a refit without it has nothing to fit.
+fn weighted_first_block() -> CalibrationProblem<Constant> {
+    let unweighted: Vec<f64> = (4..=9).map(f64::from).collect();
+    problem(observations(&VALUES[..9], &unweighted))
+}
+
+#[test]
+fn enbpi_fails_when_every_replicate_fails() {
+    // The replicate of seed 0 draws no copy of the first block.
+    let problem = weighted_first_block();
+    let config = config();
+    let runner = ReplicateRunner::new(&problem, &config, &[10.0], 1, 0).unwrap();
+    let scheme = BlockScheme::new(problem.observed_data(), 3).unwrap();
+
+    let message = failed(enbpi(
+        &runner,
+        &scheme,
+        1,
+        &[10.0],
+        settings(NonconformityScore::Absolute),
+    ));
+
+    assert!(
+        message.starts_with("Every replicate failed (1); the first reasons: replicate 0:"),
+        "{message}"
+    );
+}
+
+#[test]
+fn jackknife_plus_of_a_series_with_no_scored_observation_has_no_prediction() {
+    // Series y holds the only weight, all in the first block, whose refit
+    // fails: x is scored by the two other refits, y by none.
+    let mut observed = observations(&VALUES[..9], &(1..=9).map(f64::from).collect::<Vec<_>>());
+    for (i, &value) in VALUES[..3].iter().enumerate() {
+        let mut point = ObservedDataPoint::new((i + 1) as f64, "x".to_string(), value);
+        point.label = "y".to_string();
+        observed.push(point);
+    }
+    let problem = problem(observed);
+    let config = config();
+    let runner = ReplicateRunner::new(&problem, &config, &[10.0], 1, 1).unwrap();
+    let scheme = BlockScheme::new(problem.observed_data(), 3).unwrap();
+
+    let run = jackknife_plus(
+        &runner,
+        &scheme,
+        &[10.0],
+        settings(NonconformityScore::Absolute),
+    )
+    .unwrap();
+
+    assert_eq!(run.run.failed.len(), 1);
+    let intervals = run.run.intervals;
+    let labels: Vec<&str> = intervals.targets.iter().map(|t| t.label.as_str()).collect();
+    assert_eq!(labels, ["x", "y"]);
+    assert!(intervals.prediction[0].is_finite());
+    assert!(intervals.prediction[1].is_nan());
+    assert_eq!(intervals.lower[1], f64::NEG_INFINITY);
+    assert_eq!(intervals.upper[1], f64::INFINITY);
+}

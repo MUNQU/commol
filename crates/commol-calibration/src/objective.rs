@@ -66,6 +66,16 @@ impl<'a, E: SimulationEngine> OptimizationObjective<'a, E> {
     /// Returns a message when the number of values is wrong, or the engine
     /// or a constraint cannot be evaluated.
     pub fn score(&self, values: &[f64]) -> Result<Score, Error> {
+        WORKSPACE.with(|workspace| self.score_in(values, &mut workspace.borrow_mut()))
+    }
+
+    /// Score `values` with the buffers of `workspace`, which then holds the
+    /// rows of the run of a feasible point.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::score`].
+    pub fn score_in(&self, values: &[f64], workspace: &mut Workspace) -> Result<Score, Error> {
         if values.len() != self.problem.num_parameters() {
             return Err(Error::msg(format!(
                 "Expected {} parameters, got {}",
@@ -74,9 +84,7 @@ impl<'a, E: SimulationEngine> OptimizationObjective<'a, E> {
             )));
         }
         let applied = self.problem.applied_parameter_values(values);
-        let result = WORKSPACE
-            .with(|workspace| self.problem.evaluate(&applied, &mut workspace.borrow_mut()));
-        match result {
+        match self.problem.evaluate(&applied, workspace) {
             Ok(cost) => Ok(Score {
                 applied,
                 cost,

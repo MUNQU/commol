@@ -48,6 +48,7 @@ pub mod objective;
 pub mod observation;
 pub mod optimization;
 pub mod starts;
+pub mod subproblem;
 pub mod types;
 pub mod values;
 
@@ -61,12 +62,13 @@ pub use likelihood::{
 pub use objective::{OptimizationObjective, Score};
 pub use observation::ObservationOperator;
 pub use optimization::{
-    converged, optimize, optimize_from, optimize_with_history, optimize_with_observer,
-    AccelerationStrategy, InertiaWeightStrategy, InitializationStrategy, MutationApplication,
-    MutationStrategy, NelderMeadConfig, NelderMeadState, NoObserver, OptimizationConfig,
-    ParticleSwarmConfig, ParticleSwarmState,
+    converged, optimize, optimize_from, optimize_subproblem, optimize_with_history,
+    optimize_with_observer, AccelerationStrategy, InertiaWeightStrategy, InitializationStrategy,
+    MutationApplication, MutationStrategy, NelderMeadConfig, NelderMeadState, NoObserver,
+    OptimizationConfig, ParticleSwarmConfig, ParticleSwarmState,
 };
 pub use starts::{optimize_starts, start_points, StartOutcome};
+pub use subproblem::{predict, ConstraintSettings, Subproblem, SubproblemResult};
 pub use types::{
     crps, weighted_crps, CalibrationConstraint, CalibrationEvaluation, CalibrationParameter,
     CalibrationParameterType, CalibrationResult, CalibrationResultWithHistory, LossConfig,

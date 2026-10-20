@@ -92,6 +92,27 @@ where
         self.seed
     }
 
+    /// The optimizer of every fit.
+    pub fn config(&self) -> &OptimizationConfig {
+        self.config
+    }
+
+    /// The problem of a replicate: a copy of the problem with the data of
+    /// `perturbation`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the reason when the data are not valid.
+    pub fn replicate_problem(
+        &self,
+        perturbation: &Perturbation,
+    ) -> Result<CalibrationProblem<E>, String> {
+        match perturbation {
+            Perturbation::Weights(weights) => self.problem.with_data(&self.values, weights),
+            Perturbation::Values(values) => self.problem.with_data(values, &self.weights),
+        }
+    }
+
     /// Fit replicate `index` with the data of `perturbation`.
     ///
     /// # Errors
@@ -102,10 +123,7 @@ where
         index: usize,
         perturbation: &Perturbation,
     ) -> Result<CalibrationResult, String> {
-        let problem = match perturbation {
-            Perturbation::Weights(weights) => self.problem.with_data(&self.values, weights),
-            Perturbation::Values(values) => self.problem.with_data(values, &self.weights),
-        }?;
+        let problem = self.replicate_problem(perturbation)?;
         let seed = replicate_seed(self.seed, index as u64);
         let mut starts = start_points(problem.parameters(), self.starts, replicate_seed(seed, 1));
         starts[0] = self.fit.clone();

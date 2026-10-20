@@ -135,3 +135,38 @@ def flow_calibrator(
         seed=seed,
     )
     return Calibrator(Simulation(model), problem)
+
+
+def line_calibrator(
+    values: Sequence[float],
+    *,
+    observation_models: Mapping[str, ObservationModel] | None = None,
+    seed: int = 1,
+) -> Calibrator:
+    """
+    Fit the line ``B(t) = b + c·t`` to `values` of B at positions 1, 2, ….
+
+    ``a_to_b_builder`` with the constant flow ``c * A / A`` from 10⁶ in A,
+    and the initial amount ``b`` of B as an initial condition: a model
+    linear in its two parameters, ``c`` in ``[0, 50]`` and ``B`` in
+    ``[0, 50]``. The fit minimizes the sum of squares, or, with
+    `observation_models` (of the series ``"B"``), maximizes their
+    likelihood.
+    """
+    model = build(
+        a_to_b_builder(
+            parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": None}
+        )
+    )
+    problem = CalibrationProblem(
+        observed_data=flow_observations(values, windowed=False),
+        parameters=[
+            bounded("c", 0.0, 50.0, initial_guess=25.0),
+            bounded("B", 0.0, 50.0, kind="initial_condition", initial_guess=25.0),
+        ],
+        loss_function=None if observation_models else "sse",
+        observation_models=dict(observation_models) if observation_models else None,
+        optimization_config=NelderMeadConfig(max_iterations=2000, sd_tolerance=1e-14),
+        seed=seed,
+    )
+    return Calibrator(Simulation(model), problem)

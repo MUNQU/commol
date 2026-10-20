@@ -46,8 +46,14 @@ class TestBands:
                 ValueError,
                 "Parameter set 0 gives a value that is not finite",
             ),
+            (
+                "sqrt(0.5 - t)",
+                0.5,
+                RuntimeError,
+                "Parameter set 0: Simulation failed: The rate of flow 't_in' at 1",
+            ),
         ],
-        ids=["infeasible", "not finite"],
+        ids=["infeasible", "not finite", "failed"],
     )
     def test_a_draw_without_a_run_names_its_set(
         self, inflow: str, value: float, error: type[Exception], message: str

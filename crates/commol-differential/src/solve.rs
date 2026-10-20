@@ -166,12 +166,14 @@ pub(crate) fn integrate_with(
                     len,
                 )
                 .build()
-                .map_err(|error| format!("Cannot build the ODE problem: {error}"))?
+                .expect("the problem sets its right-hand side, its initial state and one tolerance")
         };
     }
-    let solver_error =
-        |error: diffsol::DiffsolError| format!("Cannot start the ODE solver: {error}");
-    let result = match settings.method {
+    let solver_error = |error: diffsol::DiffsolError| {
+        // coverage: an error that only diffsol returns, a solver it cannot start
+        format!("Cannot start the ODE solver: {error}")
+    };
+    match settings.method {
         OdeMethod::Tsit45 => {
             let problem = problem!(NalgebraMat<f64>);
             drive(
@@ -192,10 +194,6 @@ pub(crate) fn integrate_with(
             let solver = problem.bdf::<FaerSparseLU<f64>>().map_err(solver_error)?;
             drive(solver, &rhs, &plan, state, rows)
         }
-    };
-    match rhs.take_error() {
-        Some(error) => Err(error),
-        None => result,
     }
 }
 
@@ -263,6 +261,7 @@ where
                 && !same_position(positions[next], end)
             {
                 let row = solver.interpolate(positions[next]).map_err(|error| {
+                    // coverage: an error that only diffsol returns, an interpolation it cannot take
                     format!("Cannot interpolate at {}: {error}", positions[next])
                 })?;
                 rows[next] = row.clone_as_vec();

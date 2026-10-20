@@ -262,6 +262,7 @@ fn reason(violation: &Violation) -> String {
         Violation::OutOfBounds { .. }
         | Violation::Constraint { .. }
         | Violation::MeanOutsideModel { .. } => {
+            // coverage: invariant, a run of the forward model returns only the violations above
             unreachable!(
                 "a run of the forward model checks no bounds, no constraint and no observation \
                  model"
