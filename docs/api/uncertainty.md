@@ -71,6 +71,8 @@ Guide: [Profile Likelihood](../guide/uncertainty/profiles.md).
 
 ::: commol.context.inference.profiles.ProfileInterval
 
+::: commol.context.inference.profiles.ProfileStructure
+
 ## Sequential Monte Carlo
 
 Guide: [Sequential Monte Carlo](../guide/uncertainty/smc.md).

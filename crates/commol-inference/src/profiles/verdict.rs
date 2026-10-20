@@ -31,7 +31,7 @@ impl ProfileVerdict {
 
 impl Profile {
     /// The verdict of the profile, whose statistic is known to `tolerance`;
-    /// `None` when the threshold is below the tolerance, where a rise
+    /// `None` when the threshold is at or below the tolerance, where a rise
     /// cannot be told from numerical error.
     ///
     /// A point where a free parameter sits on its bound
@@ -41,7 +41,7 @@ impl Profile {
     /// inside the box, has one past the fit, and ends at a bound, at the end
     /// of the reachable predictions, or on a point outside the box.
     pub fn verdict(&self, tolerance: f64) -> Option<ProfileVerdict> {
-        if self.threshold < tolerance {
+        if self.threshold <= tolerance {
             return None;
         }
         let flat_to_the_end = self.sides().iter().zip(self.ends).all(|(side, end)| {
@@ -79,7 +79,7 @@ impl Profile {
 
     /// The points of the side below and of the side above the fit, outward
     /// from it.
-    fn sides(&self) -> [Vec<&ProfilePoint>; 2] {
+    pub(crate) fn sides(&self) -> [Vec<&ProfilePoint>; 2] {
         let fit = self
             .points
             .iter()
@@ -125,7 +125,6 @@ mod tests {
             ends,
             interval: [None, None],
             evaluations: 0,
-            moving: Vec::new(),
         }
     }
 
@@ -234,6 +233,7 @@ mod tests {
     fn a_threshold_below_the_tolerance_gives_no_verdict() {
         let flat = profile(&[0.0, 0.0, 0.0], [ProfileEnd::Bound; 2], 1e-9);
         assert_eq!(flat.verdict(1e-6), None);
+        assert_eq!(flat.verdict(1e-9), None);
         assert_eq!(
             flat.verdict(1e-12),
             Some(ProfileVerdict::StructurallyNonIdentifiable)

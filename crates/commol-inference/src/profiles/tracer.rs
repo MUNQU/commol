@@ -15,13 +15,13 @@
 
 use commol_calibration::{
     CalibrationProblem, ConstraintSettings, ObservedDataPoint, OptimizationConfig,
-    OptimizationObjective, Subproblem, SubproblemResult, optimize_subproblem, predict,
+    OptimizationObjective, Subproblem, SubproblemResult, Workspace, optimize_subproblem, predict,
 };
 use commol_core::SimulationEngine;
 use commol_random::replicate_seed;
 use rayon::prelude::*;
 
-use crate::transform::Transform;
+use crate::profiles::verdict::ProfileVerdict;
 
 /// The share of the threshold a step aims to rise by.
 const RISE_FRACTION: f64 = 0.1;
@@ -79,8 +79,8 @@ pub struct ProfilePoint {
     pub multiplier: Option<f64>,
     /// Whether the refit converged.
     pub converged: bool,
-    /// The first free parameter, by index, that sits on a bound here and
-    /// not at the fit ([`ON_BOUND`]): the ridge of the profile has left the
+    /// The first free parameter, by index, that sits on a bound here that
+    /// it is not on at the fit ([`ON_BOUND`]): the ridge of the profile has left the
     /// box of the parameters, and the bound, not the data, shapes the rise.
     pub on_bound: Option<usize>,
 }
@@ -108,11 +108,6 @@ pub struct Profile {
     pub interval: [Option<f64>; 2],
     /// The evaluations of the objective, rejected steps included.
     pub evaluations: usize,
-    /// The free parameters, by index, that move along the profile inside
-    /// the box of the parameters: their range over its points, on the
-    /// unbounded scale of [`Transform`], is above the relative tolerance of
-    /// the statistic times `max(1, |value at the fit|)` on that scale.
-    pub moving: Vec<usize>,
 }
 
 impl Profile {
@@ -132,11 +127,13 @@ struct Side {
 
 /// Traces the profiles of a problem from a fit.
 pub struct ProfileTracer<'a, E: SimulationEngine> {
-    problem: &'a CalibrationProblem<E>,
+    pub(crate) problem: &'a CalibrationProblem<E>,
     config: &'a OptimizationConfig,
-    fit: Vec<f64>,
-    fit_loss: f64,
+    pub(crate) fit: Vec<f64>,
+    pub(crate) fit_loss: f64,
     seed: u64,
+    noise_floor: f64,
+    pub(crate) stochastic: bool,
 }
 
 impl<'a, E> ProfileTracer<'a, E>
@@ -171,12 +168,19 @@ where
         if !score.feasible {
             return Err("The fit a profile starts from is not feasible".to_string());
         }
+        let stochastic = problem.forward().replicates().is_some();
         Ok(Self {
+            noise_floor: if stochastic {
+                0.0
+            } else {
+                noise_floor(problem, &fit)
+            },
             problem,
             config,
             fit,
             fit_loss: score.cost,
             seed,
+            stochastic,
         })
     }
 
@@ -185,51 +189,50 @@ where
         self.fit_loss
     }
 
-    /// The numerical tolerance of a profile value: the `sd_tolerance` of
-    /// Nelder-Mead, which bounds the spread of the objective over its
-    /// simplex at the end, or `1e-6` for a particle swarm, which has none;
-    /// at least `1e-9`, both relative to `max(1, |objective at the fit|)`.
-    pub fn tolerance(&self) -> f64 {
-        self.relative_tolerance() * self.fit_loss.abs().max(1.0)
-    }
-
-    /// The tolerance of [`Self::tolerance`] relative to its scale.
-    fn relative_tolerance(&self) -> f64 {
+    /// The tolerance of the optimizer, `τ`: the `sd_tolerance` of
+    /// Nelder-Mead, an absolute amount, since argmin stops when the sample
+    /// standard deviation of the costs of the simplex falls below it. A
+    /// particle swarm has no such rule until it gets stop rules (#230); its
+    /// tolerance is `1e-6 · max(1, |objective at the fit|)`, provisional.
+    pub fn optimizer_tolerance(&self) -> f64 {
         match self.config {
-            OptimizationConfig::NelderMead(config) => config.sd_tolerance.max(1e-9),
-            OptimizationConfig::ParticleSwarm(_) => 1e-6,
+            OptimizationConfig::NelderMead(config) => config.sd_tolerance,
+            OptimizationConfig::ParticleSwarm(_) => 1e-6 * self.fit_loss.abs().max(1.0),
         }
     }
 
-    /// The free parameters that move along the points of a profile inside
-    /// the box: those whose range over the points, on the unbounded scale of
-    /// [`Transform`], is above the tolerance of the statistic measured the
-    /// same way, the relative tolerance times `max(1, |value at the fit|)`
-    /// on that scale. The statistic is flat when it stays within
-    /// `relative · max(1, |objective at the fit|)`; a parameter moves when
-    /// it leaves `relative · max(1, |u at the fit|)`. A parameter the
-    /// objective does not read can move by chance: the optimizer has no
-    /// reason to keep it.
-    fn moving(&self, held: Option<usize>, points: &[ProfilePoint]) -> Vec<usize> {
-        let transform = Transform::new(&self.problem.parameter_bounds());
-        let fit = transform.to_unbounded(&self.fit);
-        let inside: Vec<Vec<f64>> = points
-            .iter()
-            .filter(|point| point.on_bound.is_none())
-            .map(|point| transform.to_unbounded(&point.parameters))
-            .collect();
-        let relative = self.relative_tolerance();
-        (0..fit.len())
-            .filter(|&i| Some(i) != held)
-            .filter(|&i| {
-                let (lo, hi) = inside
-                    .iter()
-                    .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), u| {
-                        (lo.min(u[i]), hi.max(u[i]))
-                    });
-                hi - lo > relative * fit[i].abs().max(1.0)
-            })
-            .collect()
+    /// The noise floor `ν`: the error of one evaluation of the objective at
+    /// the fit, from the accuracy of a run. To first order it is
+    /// `Σᵢ |∂ℓᵢ/∂mᵢ| · (rtol · |mᵢ| + atol)`, with `ℓᵢ` the term of
+    /// observation `i` ([`CalibrationProblem::term_derivatives`]), `mᵢ` its
+    /// prediction, `rtol` the [`SimulationEngine::output_accuracy`] and
+    /// `atol` the [`SimulationEngine::output_absolute_accuracy`] of the
+    /// engine. 0 for a loss with no term derivatives, such as the mean
+    /// absolute error, and for a problem of replicates.
+    pub fn noise_floor(&self) -> f64 {
+        self.noise_floor
+    }
+
+    /// The numerical tolerance of a profile value, `ε = max(τ, ν)`
+    /// ([`Self::optimizer_tolerance`], [`Self::noise_floor`]): a statistic
+    /// within it is flat, and a rise within it is no rise.
+    pub fn tolerance(&self) -> f64 {
+        self.optimizer_tolerance().max(self.noise_floor)
+    }
+
+    /// The verdict of `profile` at the tolerance [`Self::tolerance`]; with a
+    /// stochastic engine, a flat profile reads `practically_non_identifiable`
+    /// and never `structurally_non_identifiable`: a run of replicates is not
+    /// a smooth function of the parameters.
+    pub fn verdict(&self, profile: &Profile) -> Option<ProfileVerdict> {
+        let verdict = profile.verdict(self.tolerance())?;
+        Some(
+            if self.stochastic && verdict == ProfileVerdict::StructurallyNonIdentifiable {
+                ProfileVerdict::PracticallyNonIdentifiable
+            } else {
+                verdict
+            },
+        )
     }
 
     /// The value of `quantity` at the fit.
@@ -305,29 +308,17 @@ where
         centers
             .into_iter()
             .zip(thresholds)
-            .enumerate()
-            .map(|(index, (center, &threshold))| {
+            .map(|(center, &threshold)| {
                 let below = sides.next().expect("two sides per quantity");
                 let above = sides.next().expect("two sides per quantity");
                 let (center, below, above) = (center?, below?, above?);
-                let held = match &quantities[index] {
-                    ProfiledQuantity::Parameter(j) => Some(*j),
-                    ProfiledQuantity::Prediction(_) => None,
-                };
-                Ok(self.join(held, center, threshold, below, above))
+                Ok(self.join(center, threshold, below, above))
             })
             .collect()
     }
 
     /// The point of the fit, and both sides, as one profile.
-    fn join(
-        &self,
-        held: Option<usize>,
-        center: f64,
-        threshold: f64,
-        below: Side,
-        above: Side,
-    ) -> Profile {
+    fn join(&self, center: f64, threshold: f64, below: Side, above: Side) -> Profile {
         let fit = ProfilePoint {
             value: center,
             statistic: 0.0,
@@ -347,7 +338,6 @@ where
         Profile {
             center,
             threshold,
-            moving: self.moving(held, &points),
             points,
             ends,
             interval,
@@ -470,22 +460,28 @@ where
     }
 
     /// The first free parameter of `parameters` within [`ON_BOUND`] of the
-    /// width of its bounds of a bound, where the fit is not; the held
-    /// parameter of a parameter profile is not free.
+    /// width of its bounds of a bound the fit is not on; the held parameter
+    /// of a parameter profile is not free.
     fn on_bound(&self, quantity: &ProfiledQuantity, parameters: &[f64]) -> Option<usize> {
         let held = match quantity {
             ProfiledQuantity::Parameter(index) => Some(*index),
             ProfiledQuantity::Prediction(_) => None,
         };
         let bounds = self.problem.parameter_bounds();
-        let at_bound = |value: f64, (lo, hi): (f64, f64)| {
+        // Which bound a value sits on: -1 the lower, 1 the upper, 0 neither.
+        let side = |value: f64, (lo, hi): (f64, f64)| {
             let tolerance = ON_BOUND * (hi - lo);
-            value - lo <= tolerance || hi - value <= tolerance
+            if value - lo <= tolerance {
+                -1
+            } else if hi - value <= tolerance {
+                1
+            } else {
+                0
+            }
         };
         (0..parameters.len()).find(|&i| {
-            Some(i) != held
-                && at_bound(parameters[i], bounds[i])
-                && !at_bound(self.fit[i], bounds[i])
+            let now = side(parameters[i], bounds[i]);
+            Some(i) != held && now != 0 && now != side(self.fit[i], bounds[i])
         })
     }
 
@@ -526,6 +522,25 @@ where
             on_bound: None,
         }
     }
+}
+
+/// The noise floor of the objective at `fit` ([`ProfileTracer::noise_floor`]).
+fn noise_floor<E: SimulationEngine>(problem: &CalibrationProblem<E>, fit: &[f64]) -> f64 {
+    let mut workspace = Workspace::default();
+    let Ok(predictions) = problem.forward().run_observed(fit, &mut workspace) else {
+        return 0.0;
+    };
+    let predictions = predictions.to_vec();
+    let Ok(terms) = problem.term_derivatives(fit, &predictions) else {
+        return 0.0;
+    };
+    let engine = problem.forward().base_engine();
+    let (relative, absolute) = (engine.output_accuracy(), engine.output_absolute_accuracy());
+    terms
+        .iter()
+        .zip(&predictions)
+        .map(|(term, mean)| term.gradient[0].abs() * (relative * mean.abs() + absolute))
+        .sum()
 }
 
 /// Whether a refit holds its quantity: always for a parameter; for a

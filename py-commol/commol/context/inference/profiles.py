@@ -329,11 +329,6 @@ class Profile(_Frozen):
         Evaluations of the objective.
     replicate_rises : list[float] | None
         With a bootstrap threshold, the rise of each replicate kept.
-    moving : list[str]
-        The free parameters that move along the profile inside the box of
-        the parameters: their range over its points, on the unbounded scale
-        of the moves of a sampler, is above the tolerance of the statistic,
-        relative to the value at the fit.
     """
 
     center: float
@@ -346,7 +341,107 @@ class Profile(_Frozen):
     ends: tuple[ProfileEndName, ProfileEndName]
     evaluations: int
     replicate_rises: list[float] | None = None
-    moving: list[str] = Field(default_factory=list)
+
+
+UndeterminedName = Literal[
+    "below_tolerance", "not_flat", "below_fit", "stochastic", "on_bound", "undecided"
+]
+"""Why a flat profile gives no structural verdict."""
+
+_RESET = "The verdict holds with the other parameters at their fitted values."
+
+
+class ProfileStructure(_Frozen):
+    """
+    What resetting the other parameters says about a flat profile.
+
+    A profile is flat because other parameters compensate the parameter
+    along it, or because nothing the data read depends on it. At each point
+    inside the box, and at each end of the box where the profile has a
+    point, the other parameters are reset to their fitted values and the
+    objective is evaluated once; the rise is measured against the profile at
+    that point.
+
+    Attributes
+    ----------
+    verdict : {"in_combination", "non_identifiable"} | None
+        ``in_combination``: a feasible reset rises above the threshold.
+        ``non_identifiable``: every reset is feasible and rises by no more
+        than the tolerance. None otherwise, and when `undetermined` says why.
+    largest_rise : float | None
+        The largest rise of a feasible reset; None when none was feasible.
+    compensated_by : list[str]
+        The parameters whose reset alone, where each moves most along the
+        profile, raises it above the threshold. Noise parameters of
+        observation models are never named.
+    joint_rise : float | None
+        The largest rise of resetting the parameters not named together, at
+        the outermost point of each side, when it is above the tolerance:
+        `compensated_by` may be incomplete. Infinite when such a reset is not
+        feasible.
+    undetermined : UndeterminedName | None
+        Why there is no verdict.
+    on_bound : str | None
+        With ``undetermined="on_bound"``, the parameter on its bound at the
+        fit.
+    """
+
+    verdict: Literal["in_combination", "non_identifiable"] | None
+    largest_rise: float | None
+    compensated_by: list[str]
+    joint_rise: float | None
+    undetermined: UndeterminedName | None = None
+    on_bound: str | None = None
+
+    def reason(self, name: str, threshold: float, tolerance: float) -> str:
+        """
+        The reason of the verdict of parameter `name` in a report.
+
+        Parameters
+        ----------
+        name : str
+            The parameter.
+        threshold : float
+            The threshold of its profile.
+        tolerance : float
+            The numerical tolerance of the statistic.
+
+        Returns
+        -------
+        str
+            The reason, which says that the verdict holds with the other
+            parameters at their fitted values.
+        """
+        rise = (
+            "no feasible reset"
+            if self.largest_rise is None
+            else (f"a largest rise of {self.largest_rise:.3g}")
+        )
+        if self.verdict == "in_combination":
+            text = (
+                f"profile likelihood: flat, and resetting the other parameters "
+                f"gives {rise}, above the threshold {threshold:.3g}"
+            )
+            if self.compensated_by:
+                text += (
+                    f"; {name}, compensated by {', '.join(self.compensated_by)} "
+                    "along its profile"
+                )
+            if self.joint_rise is not None:
+                text += (
+                    f"; the list may be incomplete (largest rise {self.joint_rise:.3g})"
+                )
+        elif self.verdict == "non_identifiable":
+            text = (
+                f"profile likelihood: flat, and resetting the other parameters "
+                f"gives {rise}, within the tolerance {tolerance:.3g}"
+            )
+        else:
+            text = (
+                f"profile likelihood: flat, with no structural verdict "
+                f"({self.undetermined}; {rise}, threshold {threshold:.3g})"
+            )
+        return f"{text}. {_RESET}"
 
 
 class ProfileInterval(_Frozen):
@@ -388,8 +483,13 @@ class ProfileResult(_Frozen):
         ``structurally_non_identifiable`` (flat within `tolerance` over the
         whole range). None when the threshold is below `tolerance`: the
         profile cannot tell a rise from numerical error.
+    structure : dict[str, ProfileStructure]
+        For each flat profile of a parameter, what resetting the other
+        parameters says.
     tolerance : float
-        The numerical tolerance of the statistic.
+        The numerical tolerance of the statistic: ``max(τ, ν)``, the
+        tolerance of the optimizer and the noise floor of the objective at
+        the fit.
     notes : list[str]
         What a reader should know, such as a threshold below the tolerance or
         a refit below the fit.
@@ -404,6 +504,7 @@ class ProfileResult(_Frozen):
     intervals: dict[str, ProfileInterval]
     verdicts: dict[str, ProfileVerdictName | None]
     tolerance: float
+    structure: dict[str, ProfileStructure] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
     failed_replicates: list[str] = Field(default_factory=list)
 
@@ -414,13 +515,15 @@ class ProfileResult(_Frozen):
 
         ``identifiable`` gives the practical verdict ``determined`` and
         ``practically_non_identifiable`` the practical verdict
-        ``poorly_determined``. ``structurally_non_identifiable`` gives a
-        structural verdict: ``in_combination`` when other free parameters
-        move along the flat profile (`Profile.moving`), with a combination
-        that names them, such as ``"k1 with s (along the profile)"``, and
-        ``non_identifiable`` when none moves. A parameter with no profile,
-        or no verdict, gets neither. `IdentifiabilityReport.merge` joins it
-        with the reports of other methods.
+        ``poorly_determined``. ``structurally_non_identifiable`` gives the
+        structural verdict of its `structure`, ``in_combination`` or
+        ``non_identifiable``, with no combination: the reason names the
+        compensating parameters. A flat profile with no structural verdict
+        gives the practical verdict ``poorly_determined``. Every reason says
+        that the verdict holds with the other parameters at their fitted
+        values. A parameter with no profile, or no verdict, gets neither.
+        `IdentifiabilityReport.merge` joins it with the reports of other
+        methods.
 
         Returns
         -------
@@ -442,20 +545,24 @@ class ProfileResult(_Frozen):
         verdicts: dict[str, ParameterVerdicts] = {}
         for name in parameters:
             verdict = self.verdicts.get(name)
-            reason = f"profile likelihood: {verdict}" if verdict else ""
+            reason = f"profile likelihood: {verdict}. {_RESET}"
             if verdict == "structurally_non_identifiable":
-                moving = self.profiles[name].moving
-                verdicts[name] = ParameterVerdicts(
-                    structural=StructuralVerdict(
-                        verdict="in_combination" if moving else "non_identifiable",
-                        reasons=[reason],
-                        combinations=(
-                            [f"{name} with {', '.join(moving)} (along the profile)"]
-                            if moving
-                            else []
-                        ),
-                    )
+                structure = self.structure[name]
+                reason = structure.reason(
+                    name, self.profiles[name].threshold, self.tolerance
                 )
+                if structure.verdict is None:
+                    verdicts[name] = ParameterVerdicts(
+                        practical=PracticalVerdict(
+                            verdict="poorly_determined", reasons=[reason]
+                        )
+                    )
+                else:
+                    verdicts[name] = ParameterVerdicts(
+                        structural=StructuralVerdict(
+                            verdict=structure.verdict, reasons=[reason]
+                        )
+                    )
             elif verdict is not None:
                 verdicts[name] = ParameterVerdicts(
                     practical=PracticalVerdict(

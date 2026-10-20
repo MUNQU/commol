@@ -131,7 +131,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   interval and its verdict (`identifiable`, `practically_non_identifiable`,
   `structurally_non_identifiable`), in a `ProfileResult`;
   `ProfileResult.report()` gives the verdicts as an `IdentifiabilityReport`
-  with a `profile` section. See
+  with a `profile` section. A flat profile is read by resetting the other
+  parameters to their fitted values (`ProfileResult.structure`): it gives
+  the structural verdict `in_combination` or `non_identifiable`, and names the
+  parameters that compensate it. See
   [Profile Likelihood](../guide/uncertainty/profiles.md).
 - `PredictionProfile(specs, threshold)`: the interval of each prediction
   (`PredictionSpec`), held at each value as an equality constraint by an

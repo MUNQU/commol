@@ -5,7 +5,8 @@
 //! values; Python builds the result.
 
 use commol_inference::profiles::{
-    Profile, ProfileEnd, ProfileTracer, ProfiledQuantity, beale, bootstrap_thresholds, chi_square,
+    Profile, ProfileEnd, ProfileTracer, ProfileVerdict, ProfiledQuantity, StructuralReading,
+    Structure, Undetermined, beale, bootstrap_thresholds, chi_square,
 };
 use commol_inference::resampling::ReplicateRunner;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -116,9 +117,56 @@ pub struct PyProfile {
     /// Where the side below and the side above leave the box: the value and
     /// the index of the free parameter on its bound, or None
     box_exits: (Option<BoxExit>, Option<BoxExit>),
-    /// The free parameters, by index, that move along the profile inside
-    /// the box
-    moving: Vec<usize>,
+    /// What the resets of a flat profile of a parameter say, or None
+    structure: Option<PyStructure>,
+}
+
+/// What the resets of a flat profile say, as the runner returns it
+#[pyclass(name = "ProfileStructure", frozen, get_all, skip_from_py_object)]
+#[derive(Clone)]
+pub struct PyStructure {
+    /// "in_combination", "non_identifiable", or None
+    verdict: Option<String>,
+    /// Why there is no verdict: "below_tolerance", "not_flat", "below_fit",
+    /// "stochastic", "on_bound" or "undecided"; None with a verdict
+    undetermined: Option<String>,
+    /// The free parameter on its bound at the fit, for "on_bound"
+    on_bound: Option<usize>,
+    /// The largest rise of a feasible reset
+    largest_rise: Option<f64>,
+    /// The free parameters that compensate, by index
+    compensating: Vec<usize>,
+    /// The largest rise of resetting the others together, when above the
+    /// tolerance
+    joint_rise: Option<f64>,
+}
+
+impl From<Structure> for PyStructure {
+    fn from(structure: Structure) -> Self {
+        let (verdict, undetermined, on_bound) = match structure.verdict {
+            Ok(StructuralReading::InCombination) => (Some("in_combination"), None, None),
+            Ok(StructuralReading::NonIdentifiable) => (Some("non_identifiable"), None, None),
+            Err(why) => {
+                let (name, parameter) = match why {
+                    Undetermined::BelowTolerance => ("below_tolerance", None),
+                    Undetermined::NotFlat => ("not_flat", None),
+                    Undetermined::BelowFit => ("below_fit", None),
+                    Undetermined::Stochastic => ("stochastic", None),
+                    Undetermined::OnBound(index) => ("on_bound", Some(index)),
+                    Undetermined::Undecided => ("undecided", None),
+                };
+                (None, Some(name), parameter)
+            }
+        };
+        Self {
+            verdict: verdict.map(str::to_string),
+            undetermined: undetermined.map(str::to_string),
+            on_bound,
+            largest_rise: structure.largest_rise,
+            compensating: structure.compensating,
+            joint_rise: structure.joint_rise,
+        }
+    }
 }
 
 fn end_name(end: ProfileEnd) -> String {
@@ -132,14 +180,17 @@ fn end_name(end: ProfileEnd) -> String {
 }
 
 impl PyProfile {
-    fn new(profile: Profile, rises: Option<Vec<f64>>, tolerance: f64) -> Self {
+    fn new(
+        profile: Profile,
+        rises: Option<Vec<f64>>,
+        verdict: Option<ProfileVerdict>,
+        structure: Option<Structure>,
+    ) -> Self {
         let [lower, upper] = profile.interval();
         Self {
-            verdict: profile
-                .verdict(tolerance)
-                .map(|verdict| verdict.name().to_string()),
+            verdict: verdict.map(|verdict| verdict.name().to_string()),
             lowest: profile.lowest(),
-            moving: profile.moving.clone(),
+            structure: structure.map(PyStructure::from),
             box_exits: {
                 let [below, above] = profile.box_exits();
                 (below, above)
@@ -166,8 +217,12 @@ pub struct PyProfileRun {
     profiles: Vec<PyProfile>,
     /// The objective at the fit
     fit_loss: f64,
-    /// The numerical tolerance of a profile value
+    /// The numerical tolerance of a profile value, max(τ, ν)
     tolerance: f64,
+    /// The tolerance of the optimizer, τ
+    optimizer_tolerance: f64,
+    /// The noise floor of the objective at the fit, ν
+    noise_floor: f64,
     /// The replicates kept by a bootstrap threshold
     replicates: Option<Vec<usize>>,
     /// The index and reason of each replicate that failed
@@ -267,17 +322,31 @@ fn trace_profiles(
     };
     let traced = py.detach(|| tracer.trace_all(&quantities, &thresholds, max_steps));
     let mut profiles = Vec::with_capacity(traced.len());
-    for (index, profile) in traced.into_iter().enumerate() {
+    for (index, (profile, quantity)) in traced.into_iter().zip(&quantities).enumerate() {
         let profile = profile.map_err(PyRuntimeError::new_err)?;
         let rises = rises
             .as_ref()
             .map(|rises: &Vec<Vec<f64>>| rises[index].clone());
-        profiles.push(PyProfile::new(profile, rises, tracer.tolerance()));
+        // A flat profile of a parameter, before the rule of stochastic
+        // engines, says something of the structure.
+        let flat = profile.verdict(tracer.tolerance())
+            == Some(ProfileVerdict::StructurallyNonIdentifiable);
+        let structure = match quantity {
+            ProfiledQuantity::Parameter(parameter) if flat => Some(
+                py.detach(|| tracer.read_structure(*parameter, &profile))
+                    .map_err(PyRuntimeError::new_err)?,
+            ),
+            _ => None,
+        };
+        let verdict = tracer.verdict(&profile);
+        profiles.push(PyProfile::new(profile, rises, verdict, structure));
     }
     Ok(PyProfileRun {
         profiles,
         fit_loss: tracer.fit_loss(),
         tolerance: tracer.tolerance(),
+        optimizer_tolerance: tracer.optimizer_tolerance(),
+        noise_floor: tracer.noise_floor(),
         replicates,
         failed,
     })
@@ -287,6 +356,7 @@ fn trace_profiles(
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyBootstrapSettings>()?;
     m.add_class::<PyProfile>()?;
+    m.add_class::<PyStructure>()?;
     m.add_class::<PyProfileRun>()?;
     m.add_function(wrap_pyfunction!(trace_profiles, m)?)?;
     Ok(())

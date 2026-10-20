@@ -1,9 +1,8 @@
-"""Profile likelihood: parameter and prediction profiles, their thresholds,
-intervals and verdicts."""
+"""Profile likelihood: parameter and prediction profiles, their thresholds
+and intervals; the verdicts are in test_profile_verdicts.py."""
 
 from statistics import NormalDist
 
-import numpy as np
 
 import pytest
 
@@ -11,32 +10,22 @@ from pydantic import ValidationError
 
 from commol import (
     BayesianBootstrap,
-    CalibrationProblem,
     Calibrator,
     LogNormalObservations,
     NelderMeadConfig,
     NormalObservations,
-    ObservedDataPoint,
     ParametricBootstrap,
     PredictionProfile,
     PredictionSpec,
     ProfileInterval,
     ProfileLikelihood,
     ResidualBootstrap,
-    Simulation,
-    StructuralRank,
     Threshold,
     WildBootstrap,
 )
 from commol.commol_rs import _commol_rs as commol_rs
 from tests.support import (
-    a_to_b_builder,
-    abc_builder,
-    bounded,
-    build,
-    build_ode,
     line_calibrator,
-    observed,
 )
 
 # ``5 + 2 t`` at t = 1, …, 10 plus a fixed draw of unit noise.
@@ -259,259 +248,6 @@ class TestPredictionProfiles:
             assert result.profiles[spec.label].center == pytest.approx(mean)
             assert interval.lower == pytest.approx(mean - half_width, rel=1e-5)
             assert interval.upper == pytest.approx(mean + half_width, rel=1e-5)
-
-
-class TestVerdicts:
-    def test_product_model_gives_flat_profiles(self) -> None:
-        # The model of the fixture `product` of test_identifiability.py: the
-        # rate reads `k1 * s`. The bounds of `k1` start at 0.15, so that the
-        # ridge `k1 · s = 0.3` crosses the whole box of both, and the data
-        # are scored by a normal model, so the threshold is above 0.
-        truth = Simulation(build(abc_builder(parameters={"k1": 0.3, "k2": 0.1}))).run(
-            50
-        )
-        model = build(
-            abc_builder(
-                ab="k1 * s * A * B / total",
-                parameters={"k1": None, "s": None, "k2": None},
-            )
-        )
-        problem = CalibrationProblem(
-            observed_data=observed(truth, "B", range(5, 51, 5)),
-            parameters=[
-                bounded("k1", 0.15, 0.6),
-                bounded("s", 0.5, 2.0),
-                bounded("k2", 0.02, 0.3),
-            ],
-            observation_models={"B": NormalObservations(sd=1.0)},
-            optimization_config=NelderMeadConfig(
-                max_iterations=4000, sd_tolerance=1e-13
-            ),
-            seed=3,
-        )
-        calibrator = Calibrator(Simulation(model), problem)
-
-        result = calibrator.uncertainty(
-            ProfileLikelihood(
-                parameters=["k1", "s", "k2"], threshold=Threshold.chi_square(0.95)
-            )
-        )
-
-        for name in ("k1", "s"):
-            profile = result.profiles[name]
-            assert profile.ends == ("bound", "bound")
-            assert max(abs(v) for v in profile.statistics) <= result.tolerance
-            assert result.verdicts[name] == "structurally_non_identifiable"
-        assert result.verdicts["k2"] == "identifiable"
-        report = result.report()
-        assert report.parameters == ["k1", "s", "k2"]
-        # Along each flat profile the other parameter of the product moves.
-        for name, other in (("k1", "s"), ("s", "k1")):
-            structural = report.verdicts[name].structural
-            assert structural is not None
-            assert structural.verdict == "in_combination"
-            assert other in result.profiles[name].moving
-            assert report.verdicts[name].practical is None
-        practical = report.verdicts["k2"].practical
-        assert practical is not None
-        assert practical.verdict == "determined"
-        assert report.profile[0].verdicts == result.verdicts
-
-    def test_a_ridge_that_leaves_the_box_is_flat_inside_it(self) -> None:
-        # The model and bounds of the guide: the ridge `k1 · s ≈ 0.4` leaves
-        # the box where `s` reaches 0.5 or 2, and the profiles rise past it.
-        truth = Simulation(build(abc_builder(parameters={"k1": 0.4, "k2": 0.1}))).run(
-            40
-        )
-        rng = np.random.default_rng(3)
-        observations = [
-            ObservedDataPoint(
-                at=step,
-                output="B",
-                value=max(truth["B"][step] + rng.normal(0.0, 10.0), 0.0),
-            )
-            for step in range(4, 41, 4)
-        ]
-        model = build(
-            abc_builder(
-                ab="k1 * s * A * B / total",
-                parameters={"k1": None, "s": None, "k2": None},
-            )
-        )
-        problem = CalibrationProblem(
-            observed_data=observations,
-            parameters=[
-                bounded("k1", 0.2, 0.8),
-                bounded("s", 0.5, 2.0),
-                bounded("k2", 0.0, 1.0),
-            ],
-            observation_models={"B": NormalObservations(sd=10.0)},
-            optimization_config=NelderMeadConfig(
-                max_iterations=4000, sd_tolerance=1e-12
-            ),
-            seed=42,
-        )
-        calibrator = Calibrator(Simulation(model), problem)
-
-        result = calibrator.uncertainty(
-            ProfileLikelihood(
-                parameters=["k1", "s", "k2"], threshold=Threshold.chi_square(0.95)
-            )
-        )
-
-        assert max(result.profiles["k1"].statistics) > result.tolerance
-        assert result.verdicts == {
-            "k1": "structurally_non_identifiable",
-            "s": "structurally_non_identifiable",
-            "k2": "identifiable",
-        }
-        notes = " ".join(result.notes)
-        assert "'k1': the ridge leaves the box" in notes
-        assert "where 's' reaches its bound" in notes
-        assert "where 'k1' reaches its bound" in notes
-        # Along the flat profile of k1, s moves: the two are determined
-        # together, as the structural rank says.
-        assert "s" in result.profiles["k1"].moving
-        assert "k1" in result.profiles["s"].moving
-        rank = calibrator.identifiability(
-            StructuralRank(points=5, design="observations")
-        )
-        merged = rank.merge(result.report())
-        for name in ("k1", "s"):
-            structural = merged.verdicts[name].structural
-            assert structural is not None
-            assert structural.verdict == "in_combination"
-        assert any(
-            text.startswith("k1 with s") and text.endswith("(along the profile)")
-            for text in merged.verdicts["k1"].structural.combinations
-        )
-
-    def test_a_parameter_with_no_effect_moves_nothing(self) -> None:
-        # k3 empties C into D, and only B is observed: no data read k3.
-        truth = Simulation(build(abc_builder(parameters={"k1": 0.3, "k2": 0.1}))).run(
-            40
-        )
-        model = build(
-            abc_builder(
-                parameters={"k1": None, "k2": None, "k3": None},
-                amounts={"A": 990, "B": 10, "C": 0, "D": 0},
-            )
-            .add_bin(id="D", name="State D")
-            .add_transition(id="cd", source=["C"], target=["D"], rate="k3 * C")
-        )
-        problem = CalibrationProblem(
-            observed_data=observed(truth, "B", range(4, 41, 4)),
-            parameters=[
-                bounded("k1", 0.0, 1.0),
-                bounded("k2", 0.0, 1.0),
-                bounded("k3", 0.0, 1.0),
-            ],
-            observation_models={"B": NormalObservations(sd=10.0)},
-            optimization_config=NelderMeadConfig(
-                max_iterations=4000, sd_tolerance=1e-12
-            ),
-            seed=42,
-        )
-        calibrator = Calibrator(Simulation(model), problem)
-
-        result = calibrator.uncertainty(
-            ProfileLikelihood(parameters=["k3"], threshold=Threshold.chi_square(0.95))
-        )
-
-        assert result.verdicts["k3"] == "structurally_non_identifiable"
-        assert result.profiles["k3"].moving == []
-        rank = calibrator.identifiability(
-            StructuralRank(points=5, design="observations")
-        )
-        merged = rank.merge(result.report())
-        structural = merged.verdicts["k3"].structural
-        assert structural is not None
-        assert structural.verdict == "non_identifiable"
-        assert structural.combinations == []
-
-    def test_late_parameter_gives_a_one_sided_profile(self) -> None:
-        # B starts to fill at `tau`; the data stop at 10 and see no flow, so
-        # every `tau` past 10 fits them, and an earlier one does not.
-        model = build_ode(
-            a_to_b_builder(
-                parameters={"tau": None},
-                rate="if(t > tau, 0.2, 0)",
-            )
-        )
-        problem = CalibrationProblem(
-            observed_data=observed({"B": [0.0] * 11}, "B", range(1, 11)),
-            parameters=[bounded("tau", 0.0, 30.0, initial_guess=20.0)],
-            observation_models={"B": NormalObservations(sd=1.0)},
-            optimization_config=NelderMeadConfig(max_iterations=500),
-            seed=3,
-        )
-        calibrator = Calibrator(Simulation(model), problem)
-
-        result = calibrator.uncertainty(
-            ProfileLikelihood(parameters=["tau"], threshold=Threshold.chi_square(0.95))
-        )
-
-        assert result.profiles["tau"].ends == ("crossed", "bound")
-        assert result.intervals["tau"].upper is None
-        lower = result.intervals["tau"].lower
-        assert lower is not None and 9.0 < lower < 10.0
-        assert result.verdicts["tau"] == "practically_non_identifiable"
-        practical = result.report().verdicts["tau"].practical
-        assert practical is not None
-        assert practical.verdict == "poorly_determined"
-
-    def test_a_threshold_below_the_tolerance_gives_no_verdict(self) -> None:
-        # Values on the line: the sum of squares of the fit, and Beale's
-        # threshold with it, are 0.
-        calibrator = line_calibrator([5.0 + 2.0 * t for t in range(1, 11)])
-
-        result = calibrator.uncertainty(
-            ProfileLikelihood(
-                parameters=["c"], threshold=Threshold.beale(0.95), max_steps=5
-            )
-        )
-
-        assert result.profiles["c"].threshold < result.tolerance
-        assert result.verdicts["c"] is None
-        assert any(
-            "'c'" in note and "below the numerical tolerance" in note
-            for note in result.notes
-        )
-        assert result.report().verdicts["c"].practical is None
-
-    def test_a_refit_below_the_fit_is_noted(self) -> None:
-        # Three iterations of Nelder-Mead leave the fit far from the optimum;
-        # the refits of the profile, which start from it, go below it.
-        calibrator = line_calibrator(
-            VALUES, observation_models={"B": NormalObservations(sd=1.0)}
-        )
-        problem = calibrator.problem.model_copy(
-            update={"optimization_config": NelderMeadConfig(max_iterations=3)}
-        )
-
-        result = Calibrator(calibrator.simulation, problem).uncertainty(
-            ProfileLikelihood(
-                parameters=["c"], threshold=Threshold.chi_square(0.9), max_steps=3
-            )
-        )
-
-        assert min(result.profiles["c"].statistics) < -result.tolerance
-        assert any("below the fit" in note for note in result.notes)
-
-    def test_only_parameter_profiles_report_on_identifiability(self) -> None:
-        calibrator = line_calibrator(
-            VALUES, observation_models={"B": NormalObservations(sd=1.0)}
-        )
-        result = calibrator.uncertainty(
-            PredictionProfile(
-                specs=[PredictionSpec(at=4, output="B")],
-                threshold=Threshold.chi_square(0.9),
-                max_steps=2,
-            )
-        )
-
-        with pytest.raises(ValueError, match="profiles of predictions"):
-            result.report()
 
 
 class TestResult:

@@ -231,6 +231,10 @@ impl SimulationEngine for Engine {
         dispatch!(self, engine => engine.output_accuracy())
     }
 
+    fn output_absolute_accuracy(&self) -> f64 {
+        dispatch!(self, engine => engine.output_absolute_accuracy())
+    }
+
     fn reset(&mut self) {
         dispatch!(self, engine => engine.reset())
     }

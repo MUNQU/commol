@@ -111,7 +111,8 @@ is pointwise, for one quantity at a time.
 | `intervals[name]` | A `ProfileInterval`: `lower` and `upper`, `None` on a side that does not cross the threshold |
 | `verdicts[name]` | What the shape says ([Verdicts](#verdicts-and-the-identifiability-report)) |
 | `fit` | The fit every profile starts from |
-| `tolerance` | The numerical tolerance of the statistic |
+| `tolerance` | The numerical tolerance of the statistic, `max(τ, ν)` ([Verdicts](#verdicts-and-the-identifiability-report)) |
+| `structure` | What resetting the other parameters says of each flat profile of a parameter (`ProfileStructure`) |
 | `notes` | A threshold below the tolerance, or a refit below the fit |
 
 | Shape | Means |
@@ -216,39 +217,66 @@ them is not a joint region.
 |---|---|---|
 | `identifiable` | Crosses the threshold on both sides | Practical `determined` |
 | `practically_non_identifiable` | Stays below on at least one side, up to a bound or `max_steps` | Practical `poorly_determined` |
-| `structurally_non_identifiable` | Flat within `tolerance` over its whole range inside the box of the parameters: each side reaches its bound, or rises only where another parameter sits on its bound | Structural `in_combination` when other parameters move along it (`Profile.moving`), `non_identifiable` when none moves |
+| `structurally_non_identifiable` | Flat within `tolerance` over its whole range inside the box of the parameters: each side reaches its bound, or rises only where another parameter sits on its bound | Structural `in_combination` or `non_identifiable` from the resets below; with no structural verdict, practical `poorly_determined` |
 
-A threshold below `tolerance` gives no verdict: the profile cannot tell a rise
-from numerical error, and `notes` says so. `tolerance` is the `sd_tolerance`
-of Nelder-Mead (at least `1e-9`), or `1e-6` for a particle swarm, times
-`max(1, |objective at the fit|)`.
+`tolerance` is `ε = max(τ, ν)`. `τ` is the `sd_tolerance` of Nelder-Mead, an
+absolute amount: argmin stops when the costs of its simplex spread by less.
+For a particle swarm, `τ` is `1e-6 · max(1, |objective at the fit|)` until
+the swarm gets stop rules. `ν`, the noise floor, is the error of one
+evaluation of the objective at the fit, from the accuracy of a run:
+`Σ |∂ℓᵢ/∂mᵢ| · (rtol · |mᵢ| + atol)` over the terms `ℓᵢ` of the observations
+and their predictions `mᵢ`, with the accuracy of the engine (machine epsilon
+for a difference model, the `rtol` and `atol` of the ODE solver). A refit of
+Nelder-Mead can land a few times `sd_tolerance` above its minimum, so set
+`sd_tolerance` below `ν` (as `1e-15` below) when you want a structural
+verdict. A threshold at or below `ε` gives no verdict: the profile cannot
+tell a rise from numerical error, and `notes` says so.
 
-A refit whose free parameter sits on its bound, within `1e-8` of the width of
-its bounds, and not at the fit, has left the box of the parameters: the bound,
-not the data, makes its rise. The verdict reads only the points inside the
-box, and a note names the parameter and the value where the ridge leaves it.
+A refit whose free parameter sits on a bound, within `1e-8` of the width of
+its bounds, that it is not on at the fit has left the box of the parameters:
+the bound, not the data, makes its rise. The verdict reads only the points
+inside the box, and a note names the parameter and the value where the ridge
+leaves it.
+
+A profile is flat for one of two reasons: other parameters compensate the
+parameter along it, or nothing the data read depends on it. Raue et al.
+(2009) read such relations from the paths of the profiles. To tell them
+apart, at each point inside the box (and at each end of the box where the
+profile has a point), the other parameters are reset to their fitted values
+and the objective is evaluated once; the rise is measured against the
+profile at the same point.
+
+| Resets | Structural verdict |
+|---|---|
+| One feasible rise above the threshold `T` | `in_combination` |
+| Every reset feasible, every rise within `ε` | `non_identifiable`, unless another parameter sits on its bound at the fit |
+| Otherwise, or a refit below the fit by more than `ε`, or a stochastic engine | None: practical `poorly_determined`, and a note |
+
+A parameter is named in the reason when resetting it alone, where it moves
+most along the profile, raises the profile above `T`; the parameters not
+named are then reset together, and a rise above `ε` says that the list may be
+incomplete. Noise parameters of observation models are never named.
+`combinations` stays empty for a profile: it holds the algebraic
+combinations of the structural rank. Every reason says that the verdict
+holds with the other parameters at their fitted values.
 
 `ProfileResult.report()` turns the verdicts into an
 [identifiability report](identifiability.md#the-report) with a `profile`
 section, which `merge` joins with the other methods. A rate that reads
 `k1 * s` cannot tell `k1` from `s`: their profiles are flat on the ridge
-`k1 · s = constant`, and rise only where the ridge leaves the box, where the
-other parameter reaches its bound. A flat profile says that the data do not
-determine the parameter alone, which `in_combination` and `non_identifiable`
-both satisfy; the paths of the other parameters along it tell which one, as
-Raue et al. (2009) read relations between parameters from the profiles. When
-`s` moves along the profile of `k1`, the structural verdict is
-`in_combination`, with the combination `"k1 with s (along the profile)"`, and
-it agrees with the structural rank. A parameter that moves along no flat
-profile, such as a rate that feeds nothing observed, is `non_identifiable`.
+`k1 · s = constant`, resetting `s` breaks it, and both read `in_combination`,
+as the structural rank does. The two still disagree in some cases, and the
+merged verdict is then `conflicting`:
 
-A parameter moves when its range along the profile, on the unbounded scale of
-the moves of a sampler, is above the tolerance of the statistic, relative to
-its value at the fit. A parameter that nothing reads can move by chance: the
-optimizer has no reason to keep it. When two other parameters have no
-effect, the profile of one may read `in_combination` while the rank says
-`non_identifiable`; the merged report then shows `conflicting`, so the case
-stays visible.
+- the rank reads the rank most points of a Latin hypercube across the whole
+  box have, a profile one ridge through the fit;
+- the rank calls a parameter non-identifiable when its projection on the null
+  space is above 0.95, and identifiable below 0.05: in a sum `k1 + k2` with
+  `k1 ≫ k2`, the rank finds `k2` non-identifiable while its profile, which
+  `k1` compensates, reads `in_combination`;
+- a parameter with no effect while the others sit at their fit, but an
+  effect elsewhere in the box, is `non_identifiable` for the profile, and may
+  be identifiable for the rank.
 
 ```python
 from commol import SimulationPlotter, StructuralRank
@@ -280,7 +308,7 @@ product_problem = CalibrationProblem(
         CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
     ],
     observation_models={"B": NormalObservations(sd=10.0)},
-    optimization_config=NelderMeadConfig(max_iterations=4000, sd_tolerance=1e-12),
+    optimization_config=NelderMeadConfig(max_iterations=4000, sd_tolerance=1e-15),
     seed=42,
 )
 product = Calibrator(Simulation(product_model(None, None, None)), product_problem)
@@ -293,6 +321,7 @@ print(profiles.notes[0])
 # 'k1': the ridge leaves the box at 0.8 above the fit, where 's' reaches its
 # bound; the profile is flat inside the box, and its rise past it comes from
 # the bounds, not the data.
+print(profiles.structure["k1"].compensated_by)  # ['s']
 report = product.identifiability(StructuralRank(points=5, design="observations"))
 merged = report.merge(profiles.report())
 print(merged.verdicts["k1"].structural.verdict, merged.verdicts["k2"].practical.verdict)
@@ -318,6 +347,8 @@ figure = SimulationPlotter.plot_profiles(profiles, output_file="profiles.png")
       more starts.
 - [ ] Every verdict is set; a threshold below the tolerance needs data with
       noise, or a tighter `sd_tolerance`.
+- [ ] For a structural verdict, `sd_tolerance` is below the noise floor `ν`
+      of the run (`notes` says why a flat profile has none).
 - [ ] A side that ends at `max_steps` is open only because it stopped:
       raise `max_steps`.
 - [ ] Read an open or flat profile with the [structural rank](identifiability.md#structural-rank)

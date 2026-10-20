@@ -55,14 +55,17 @@ class StructuralVerdict(_Frozen):
     ----------
     verdict : StructuralVerdictName
         ``identifiable``: the null space of the sensitivities has no
-        component on it. ``in_combination``: only the combinations in
-        `combinations` are. ``non_identifiable``: it lies in the null space.
-        ``conflicting``: two reports disagree.
+        component on it, or a profile crosses its threshold. ``in_combination``:
+        the data determine it only together with other parameters.
+        ``non_identifiable``: it lies in the null space, or nothing the data
+        read depends on it. ``conflicting``: two reports disagree.
     reasons : list[str]
         Why, one per piece of evidence.
     combinations : list[str]
-        The identifiable combinations that hold the parameter, such as
-        ``"k1 · s"``.
+        The algebraic combinations that hold the parameter, such as
+        ``"k1 · s"``, from the methods that compute them (the structural
+        rank); empty for the verdict of a profile, whose reason names the
+        compensating parameters.
     """
 
     verdict: StructuralVerdictName

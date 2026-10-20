@@ -30,3 +30,4 @@ OptimizationConfigProtocol
 EngineTypeProtocol
 BootstrapSettingsProtocol
 ProfileRunProtocol
+ProfileStructureProtocol

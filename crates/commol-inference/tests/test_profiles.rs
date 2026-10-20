@@ -585,10 +585,13 @@ fn the_tolerance_follows_the_optimizer() {
     let fit = optimize(&problem, &config()).unwrap();
     let nelder_mead = config();
     let swarm = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig::default());
+    // Nelder-Mead: its sd_tolerance, 1e-14; a swarm: 1e-6 of the objective
+    // at the fit, at least 1e-6. Both above the noise floor of this line.
     let scale = fit.final_loss.max(1.0);
-    for (config, relative) in [(&nelder_mead, 1e-9), (&swarm, 1e-6)] {
+    for (config, expected) in [(&nelder_mead, 1e-14), (&swarm, 1e-6 * scale)] {
         let tracer = ProfileTracer::new(&problem, config, &fit.best_parameters, 0).unwrap();
-        assert!((tracer.tolerance() - relative * scale).abs() < 1e-18);
+        assert!(tracer.noise_floor() < 1e-14, "{}", tracer.noise_floor());
+        assert!((tracer.tolerance() - expected).abs() < 1e-18);
     }
 }
 

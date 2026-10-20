@@ -6,6 +6,7 @@
 //! |---|---|
 //! | [`tracer`] | [`ProfileTracer`]: one quantity held at values that step away from the fit, the others fitted again |
 //! | [`threshold`] | The thresholds of the statistic: `½ χ²₁`, Beale's F and the bootstrap |
+//! | [`resets`] | What a flat profile says: resets of the other parameters, [`StructuralReading`] and the compensating parameters |
 //! | [`verdict`] | [`ProfileVerdict`]: what the shape of a profile says about its quantity |
 //!
 //! A subproblem of `commol-calibration` ([`commol_calibration::Subproblem`])
@@ -13,10 +14,12 @@
 //! a prediction is an equality constraint of an augmented Lagrangian. Both
 //! run the problem's own optimizer.
 
+pub mod resets;
 pub mod threshold;
 pub mod tracer;
 pub mod verdict;
 
+pub use resets::{StructuralReading, Structure, Undetermined};
 pub use threshold::{BootstrapThresholds, beale, bootstrap_thresholds, chi_square};
 pub use tracer::{ON_BOUND, Profile, ProfileEnd, ProfilePoint, ProfileTracer, ProfiledQuantity};
 pub use verdict::ProfileVerdict;

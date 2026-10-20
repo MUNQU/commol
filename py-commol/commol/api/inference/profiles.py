@@ -21,6 +21,7 @@ from commol.context.inference.profiles import (
     ProfileInterval,
     ProfileLikelihood,
     ProfileResult,
+    ProfileStructure,
     Threshold,
 )
 from commol.context.inference.resampling import (
@@ -35,6 +36,7 @@ if TYPE_CHECKING:
         BootstrapSettingsProtocol,
         ObservedDataPointProtocol,
         ProfileRunProtocol,
+        ProfileStructureProtocol,
     )
 
 logger = logging.getLogger(__name__)
@@ -92,6 +94,41 @@ def _trace(
     )
 
 
+def _structure(
+    run: "ProfileStructureProtocol", parameter_names: Sequence[str]
+) -> ProfileStructure:
+    return ProfileStructure.model_validate(
+        {
+            "verdict": run.verdict,
+            "largest_rise": run.largest_rise,
+            "compensated_by": [parameter_names[i] for i in run.compensating],
+            "joint_rise": run.joint_rise,
+            "undetermined": run.undetermined,
+            "on_bound": None if run.on_bound is None else parameter_names[run.on_bound],
+        }
+    )
+
+
+def _structure_notes(
+    name: str, structure: ProfileStructure, threshold: float
+) -> list[str]:
+    """What a reader should know of a flat profile with no structural verdict."""
+    rise = structure.largest_rise
+    why = {
+        "below_fit": "the profile goes below the fit, which is not the optimum",
+        "stochastic": "a stochastic engine runs replicates, which are not a "
+        "smooth function of the parameters",
+        "on_bound": f"'{structure.on_bound}' sits on its bound at the fit, so a "
+        "reset cannot show what lies past it",
+        "undecided": "the resets of the other parameters raise it by up to "
+        + ("no feasible value" if rise is None else f"{rise:.3g}")
+        + f", against the threshold {threshold:.3g}",
+    }.get(structure.undetermined or "")
+    if why is None:
+        return []
+    return [f"'{name}': the profile is flat, with no structural verdict: {why}."]
+
+
 def _result(
     calibrator: "Calibrator",
     fit: CalibrationResult,
@@ -104,14 +141,15 @@ def _result(
     profiles: dict[str, Profile] = {}
     intervals: dict[str, ProfileInterval] = {}
     verdicts: dict[str, str | None] = {}
+    structure: dict[str, ProfileStructure] = {}
     notes: list[str] = []
     for name, profile in zip(names, run.profiles, strict=True):
         verdicts[name] = profile.verdict
         if profile.verdict is None:
             notes.append(
-                f"'{name}': the threshold {profile.threshold:.3g} is below the "
-                f"numerical tolerance {run.tolerance:.3g}, so no rise can be told "
-                "from numerical error; no verdict."
+                f"'{name}': the threshold {profile.threshold:.3g} is at or below "
+                f"the numerical tolerance {run.tolerance:.3g}, so no rise can be "
+                "told from numerical error; no verdict."
             )
         exits = [
             f"at {value:.4g} {side} the fit, where '{parameter_names[index]}' "
@@ -120,7 +158,10 @@ def _result(
             if exit is not None
             for value, index in [exit]
         ]
-        if profile.verdict == "structurally_non_identifiable" and exits:
+        if profile.structure is not None:
+            structure[name] = _structure(profile.structure, parameter_names)
+            notes.extend(_structure_notes(name, structure[name], profile.threshold))
+        if profile.structure is not None and exits:
             notes.append(
                 f"'{name}': the ridge leaves the box {' and '.join(exits)}; the "
                 "profile is flat inside the box, and its rise past it comes from "
@@ -146,7 +187,6 @@ def _result(
                 "ends": profile.ends,
                 "evaluations": profile.evaluations,
                 "replicate_rises": profile.rises,
-                "moving": [parameter_names[index] for index in profile.moving],
             }
         )
         lower, upper = profile.interval
@@ -163,6 +203,7 @@ def _result(
             "intervals": intervals,
             "verdicts": verdicts,
             "tolerance": run.tolerance,
+            "structure": structure,
             "notes": notes,
             "failed_replicates": failed,
         }
