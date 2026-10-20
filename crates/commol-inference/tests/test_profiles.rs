@@ -9,7 +9,7 @@ use commol_calibration::{
     OptimizationConfig, ParticleSwarmConfig, Subproblem, Workspace, optimize, optimize_subproblem,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
-use commol_inference::profiles::{PenaltyRule, ProfileEnd, ProfileTracer, ProfiledQuantity};
+use commol_inference::profiles::{ProfileEnd, ProfileTracer, ProfiledQuantity};
 
 type Formula = fn(&HashMap<String, f64>, f64) -> f64;
 
@@ -450,72 +450,33 @@ fn abc_problem() -> CalibrationProblem<commol_difference::DifferenceEquations> {
     .unwrap()
 }
 
-/// The comparison of L10: the initial penalty of each point of a prediction
-/// profile from Algencan's default, or `100·|Δλ/Δc|` from the two points
-/// before. It prints the model runs and the error of the multipliers of
-/// each rule, against multipliers of a tight constraint, and checks that
-/// both rules trace the same profile.
 #[test]
-#[ignore = "experiment: cargo test -p commol-inference --release --test test_profiles -- --ignored --nocapture"]
-fn the_penalty_rules_trace_the_same_prediction_profile() {
+fn the_multiplier_of_a_prediction_profile_is_minus_its_slope() {
     let problem = abc_problem();
     let config = config();
     let fit = optimize(&problem, &config).unwrap();
-    let mut table = Vec::new();
-    for (label, spec) in [
-        (
-            "B at 30",
-            ObservedDataPoint::new(30.0, "B".to_string(), 0.0),
-        ),
-        (
-            "C at 24",
-            ObservedDataPoint::new(24.0, "C".to_string(), 0.0),
-        ),
-    ] {
-        let quantity = ProfiledQuantity::Prediction(spec.clone());
-        let mut profiles = Vec::new();
-        for rule in [PenaltyRule::Algencan, PenaltyRule::Curvature(100.0)] {
-            let tracer = ProfileTracer::new(&problem, &config, &fit.best_parameters, 3)
-                .unwrap()
-                .with_penalty_rule(rule);
-            profiles.push(tracer.trace(&quantity, 1.92, 100).unwrap());
-        }
-        for (rule, profile) in ["algencan", "curvature"].iter().zip(&profiles) {
-            // The multiplier of a tight constraint at each point.
-            let mut errors = Vec::new();
-            for point in profile.points.iter().filter(|p| p.multiplier.is_some()) {
-                let held = Subproblem::fix_prediction(&problem, &spec, point.value)
-                    .unwrap()
-                    .with_settings(ConstraintSettings {
-                        tolerance: 1e-10 * point.value.abs().max(1.0),
-                        max_outer_iterations: 200,
-                        multiplier: point.multiplier,
-                        penalty: None,
-                    })
-                    .unwrap();
-                let exact = optimize_subproblem(&held, &config, &point.parameters, None)
-                    .unwrap()
-                    .multiplier
-                    .unwrap();
-                let scale = exact.abs().max(1e-3);
-                errors.push((point.multiplier.unwrap() - exact).abs() / scale);
-            }
-            let mean = errors.iter().sum::<f64>() / errors.len() as f64;
-            let max = errors.iter().copied().fold(0.0, f64::max);
-            table.push(format!(
-                "{label} {rule}: {} points, {} evaluations, multiplier error mean {mean:.2e} max {max:.2e}, interval {:?}",
-                profile.points.len(),
-                profile.evaluations,
-                profile.interval()
-            ));
-        }
-        let [a, b] = [profiles[0].interval(), profiles[1].interval()];
-        for (x, y) in a.iter().zip(&b) {
-            let (x, y) = (x.unwrap(), y.unwrap());
-            assert!((x - y).abs() <= 1e-3 * x.abs().max(1.0), "{x} against {y}");
-        }
-    }
-    for line in table {
-        println!("{line}");
+    let tracer = ProfileTracer::new(&problem, &config, &fit.best_parameters, 3).unwrap();
+    let spec = ObservedDataPoint::new(30.0, "B".to_string(), 0.0);
+    let profile = tracer
+        .trace(&ProfiledQuantity::Prediction(spec), 1.92, 100)
+        .unwrap();
+
+    assert_eq!(profile.ends, [ProfileEnd::Crossed, ProfileEnd::Crossed]);
+    let points = &profile.points;
+    for window in points.windows(3) {
+        let [before, point, after] = [&window[0], &window[1], &window[2]];
+        let Some(multiplier) = point.multiplier else {
+            continue;
+        };
+        // The slope of the quadratic through the three points, at the middle.
+        let d1 = (point.statistic - before.statistic) / (point.value - before.value);
+        let d2 = ((after.statistic - point.statistic) / (after.value - point.value) - d1)
+            / (after.value - before.value);
+        let slope = d1 + d2 * (point.value - before.value);
+        assert!(
+            (multiplier + slope).abs() <= 5e-2 * slope.abs().max(1e-3),
+            "{multiplier} against {slope} at {}",
+            point.value
+        );
     }
 }

@@ -6,7 +6,9 @@
 //! the threshold) and halves when a step rises by more than twice it. Each
 //! point starts from a secant prediction of every parameter, extrapolated
 //! from the two points before it (from the point before at the first step),
-//! as the profile likelihood of Data2Dynamics does. The tracer knows no
+//! as the profile likelihood of Data2Dynamics does; a point of a prediction
+//! profile also extrapolates the multiplier of its augmented Lagrangian, and
+//! starts from the initial penalty of Algencan. The tracer knows no
 //! optimizer and no threshold rule: a subproblem
 //! ([`commol_calibration::Subproblem`]) runs the problem's optimizer, and the
 //! caller gives the threshold.
@@ -104,19 +106,6 @@ impl Profile {
     }
 }
 
-/// How each point of a prediction profile sets the initial penalty of its
-/// augmented Lagrangian.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum PenaltyRule {
-    /// The scaled initial penalty of Algencan, from the objective and the
-    /// constraint at the start.
-    Algencan,
-    /// `factor · |Δλ / Δc|`: the factor times the curvature of the profile
-    /// from the multipliers of the two points before; Algencan's at the
-    /// first step.
-    Curvature(f64),
-}
-
 /// One side of a profile, outward from the fit.
 struct Side {
     points: Vec<ProfilePoint>,
@@ -131,7 +120,6 @@ pub struct ProfileTracer<'a, E: SimulationEngine> {
     fit: Vec<f64>,
     fit_loss: f64,
     seed: u64,
-    penalty: PenaltyRule,
 }
 
 impl<'a, E> ProfileTracer<'a, E>
@@ -172,15 +160,7 @@ where
             fit,
             fit_loss: score.cost,
             seed,
-            penalty: PenaltyRule::Algencan,
         })
-    }
-
-    /// The same tracer with another rule for the penalty of a held
-    /// prediction.
-    pub fn with_penalty_rule(mut self, rule: PenaltyRule) -> Self {
-        self.penalty = rule;
-        self
     }
 
     /// The problem.
@@ -383,7 +363,7 @@ where
                         tolerance: CONSTRAINT_TOLERANCE * step,
                         max_outer_iterations: OUTER_ITERATIONS,
                         multiplier: start.multiplier,
-                        penalty: self.penalty(previous.as_ref(), &current),
+                        penalty: None,
                     };
                     let subproblem = Subproblem::fix_prediction(self.problem, spec, value)?
                         .with_settings(settings)?;
@@ -466,20 +446,6 @@ where
                 .multiplier
                 .map(|now| extrapolate(now, previous.and_then(|p| p.multiplier))),
             converged: false,
-        }
-    }
-
-    /// The initial penalty of the next point of a prediction profile.
-    fn penalty(&self, previous: Option<&ProfilePoint>, current: &ProfilePoint) -> Option<f64> {
-        match self.penalty {
-            PenaltyRule::Algencan => None,
-            PenaltyRule::Curvature(factor) => {
-                let previous = previous?;
-                let slope =
-                    (current.multiplier? - previous.multiplier?) / (current.value - previous.value);
-                let penalty = factor * slope.abs();
-                (penalty.is_finite() && penalty > 0.0).then_some(penalty)
-            }
         }
     }
 }
