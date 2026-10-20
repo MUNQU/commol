@@ -235,6 +235,32 @@ pub(crate) fn beta_i(a: f64, b: f64, x: f64) -> f64 {
     }
 }
 
+/// The quantile at `level`, in `(0, 1)`, of the F distribution with 1 and
+/// `nu` degrees of freedom: the square of the quantile `(1 + level) / 2`
+/// of Student's t with `nu` degrees of freedom. Bisection on its
+/// distribution function `I_{x/(x+ν)}(1/2, ν/2)`, to the precision of
+/// `f64`.
+pub(crate) fn f_one_quantile(nu: f64, level: f64) -> f64 {
+    let cdf = |x: f64| beta_i(0.5, nu / 2.0, x / (x + nu));
+    let mut hi = 1.0;
+    while cdf(hi) < level {
+        hi *= 2.0;
+    }
+    let mut lo = 0.0;
+    for _ in 0..200 {
+        let mid = 0.5 * (lo + hi);
+        if mid <= lo || mid >= hi {
+            break;
+        }
+        if cdf(mid) < level {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    0.5 * (lo + hi)
+}
+
 /// The continued fraction of `I_x(a, b)` (modified Lentz).
 fn beta_continued_fraction(a: f64, b: f64, x: f64) -> f64 {
     let qab = a + b;
@@ -304,6 +330,15 @@ mod tests {
             assert!((student_t_quantile(p, 2.0) - two).abs() < 1e-12, "{p}");
         }
         assert!((student_t_quantile(0.95, 1e6) - normal_quantile(0.95)).abs() < 1e-5);
+    }
+
+    #[test]
+    fn the_f_quantile_is_the_square_of_the_t_quantile() {
+        // SciPy 1.16: stats.t.ppf(0.975, 8) and stats.t.ppf(0.95, 30).
+        let t8 = 2.306004135204166;
+        let t30 = 1.6972608943617378;
+        assert!(close(f_one_quantile(8.0, 0.95), t8 * t8, 1e-12));
+        assert!(close(f_one_quantile(30.0, 0.9), t30 * t30, 1e-12));
     }
 
     #[test]

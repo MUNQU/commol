@@ -37,6 +37,7 @@ from .problems import (
     flow_calibrator,
     flow_observations,
     initial_condition_problem,
+    line_calibrator,
     observed,
 )
 from .reference import ABC_START, reference_run, abc_flows, total
@@ -70,6 +71,7 @@ __all__ = [
     "increments",
     "initial_condition_problem",
     "initial_state",
+    "line_calibrator",
     "observed",
     "override_builder",
     "reference_run",

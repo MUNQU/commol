@@ -9,6 +9,7 @@ use commol_calibration::{
     Subproblem, Workspace, optimize, optimize_subproblem,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
+use commol_inference::profiles::{ProfileEnd, ProfileTracer, ProfiledQuantity};
 
 type Formula = fn(&HashMap<String, f64>, f64) -> f64;
 
@@ -362,4 +363,40 @@ fn a_swarm_fits_a_subproblem_and_repeats_from_its_seed() {
     );
     assert_eq!(first.fit.best_parameters, again.fit.best_parameters);
     assert_eq!(first.evaluations, again.evaluations);
+}
+
+#[test]
+fn profile_of_a_linear_model_is_a_parabola() {
+    let problem = line_problem(&VALUES);
+    let fit = optimize(&problem, &config()).unwrap();
+    let (_, b) = least_squares(&VALUES);
+    // Σ (t − 4.5)² over t = 0, …, 9.
+    let stt: f64 = 82.5;
+    let config = config();
+    let tracer = ProfileTracer::new(&problem, &config, &fit.best_parameters, 7).unwrap();
+    let profile = tracer
+        .trace(&ProfiledQuantity::Parameter(1), 1.0, 100)
+        .unwrap();
+
+    assert!(profile.points.len() > 10, "{}", profile.points.len());
+    for point in &profile.points {
+        let expected = (point.value - b).powi(2) * stt;
+        assert!(
+            (point.statistic - expected).abs() < 1e-8,
+            "{} at {}: {expected}",
+            point.statistic,
+            point.value
+        );
+    }
+    assert_eq!(profile.ends, [ProfileEnd::Crossed, ProfileEnd::Crossed]);
+    let half_width = (1.0 / stt).sqrt();
+    let [lower, upper] = profile.interval();
+    assert!(
+        (lower.unwrap() - (b - half_width)).abs() < 1e-7,
+        "{lower:?}"
+    );
+    assert!(
+        (upper.unwrap() - (b + half_width)).abs() < 1e-7,
+        "{upper:?}"
+    );
 }

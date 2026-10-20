@@ -25,6 +25,7 @@
 //! | [`quantity`] | [`quantity::Quantity`]: the scalars a method reads from each run |
 //! | [`batch`] | [`batch::BatchRunner`]: every point of a design through a forward model, reduced to its quantities |
 //! | [`global_sensitivity`] | The estimators of global sensitivity: PRCC, Morris, Sobol and polynomial chaos |
+//! | [`profiles`] | Profile likelihood of parameters and predictions: the tracer and the thresholds |
 //!
 //! Rules: this crate depends on `commol-calibration`, never the reverse; a
 //! method touches an engine only through a
@@ -46,6 +47,7 @@ pub mod local;
 pub mod predictive;
 pub mod priors;
 pub mod psis;
+pub mod profiles;
 pub mod quantity;
 pub mod resampling;
 pub mod sample;

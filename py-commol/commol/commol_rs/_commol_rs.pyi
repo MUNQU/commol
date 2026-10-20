@@ -445,6 +445,54 @@ class BootstrapRunProtocol(Protocol):
     @property
     def block_length_estimates(self) -> list[tuple[str, float]] | None: ...
 
+class BootstrapSettingsProtocol(Protocol):
+    def __init__(
+        self,
+        method: str,
+        replicates: int,
+        starts: int,
+        block_length: int | None = None,
+        residual_scale: str | None = None,
+        scheme: str | None = None,
+        multipliers: str | None = None,
+    ) -> None: ...
+
+class ProfileProtocol(Protocol):
+    @property
+    def center(self) -> float: ...
+    @property
+    def threshold(self) -> float: ...
+    @property
+    def values(self) -> list[float]: ...
+    @property
+    def statistics(self) -> list[float]: ...
+    @property
+    def parameters(self) -> list[list[float]]: ...
+    @property
+    def multipliers(self) -> list[float | None]: ...
+    @property
+    def converged(self) -> list[bool]: ...
+    @property
+    def ends(self) -> tuple[str, str]: ...
+    @property
+    def interval(self) -> tuple[float | None, float | None]: ...
+    @property
+    def evaluations(self) -> int: ...
+    @property
+    def rises(self) -> list[float] | None: ...
+
+class ProfileRunProtocol(Protocol):
+    @property
+    def profiles(self) -> list[ProfileProtocol]: ...
+    @property
+    def fit_loss(self) -> float: ...
+    @property
+    def tolerance(self) -> float: ...
+    @property
+    def replicates(self) -> list[int] | None: ...
+    @property
+    def failed(self) -> list[tuple[int, str]]: ...
+
 class JackknifeRunProtocol(Protocol):
     @property
     def spans(self) -> list[tuple[float, float]]: ...
@@ -751,6 +799,22 @@ class InferenceModule(Protocol):
     ObservationDraws: type[ObservationDrawsProtocol]
     BootstrapRun: type[BootstrapRunProtocol]
     JackknifeRun: type[JackknifeRunProtocol]
+    Profile: type[ProfileProtocol]
+    ProfileRun: type[ProfileRunProtocol]
+    BootstrapSettings: type[BootstrapSettingsProtocol]
+    def trace_profiles(
+        self,
+        problem: CalibrationProblemProtocol,
+        config: OptimizationConfigProtocol,
+        fit: list[float],
+        parameters: list[int],
+        predictions: list[ObservedDataPointProtocol],
+        threshold: str,
+        level: float,
+        max_steps: int,
+        seed: int,
+        bootstrap: BootstrapSettingsProtocol | None = None,
+    ) -> ProfileRunProtocol: ...
     Distribution: type[DistributionProtocol]
     SmcRun: type[SmcRunProtocol]
     EtaCoverage: type[EtaCoverageProtocol]

@@ -42,6 +42,7 @@ mod identifiability;
 mod inference;
 mod local;
 mod model;
+mod profiles;
 pub(crate) mod python_observer;
 mod sensitivity;
 mod smc;

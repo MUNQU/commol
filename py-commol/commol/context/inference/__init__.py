@@ -75,6 +75,15 @@ from commol.context.inference.noise import (
     ObservationNoise,
     ResidualNoise,
 )
+from commol.context.inference.profiles import (
+    PredictionProfile,
+    PredictionSpec,
+    Profile,
+    ProfileInterval,
+    ProfileLikelihood,
+    ProfileResult,
+    Threshold,
+)
 from commol.context.inference.resampling import (
     BayesianBootstrap,
     BlockJackknife,
@@ -163,7 +172,13 @@ __all__ = [
     "PeakPosition",
     "PolynomialChaos",
     "PredictionIntervals",
+    "PredictionProfile",
+    "PredictionSpec",
     "Priors",
+    "Profile",
+    "ProfileInterval",
+    "ProfileLikelihood",
+    "ProfileResult",
     "Propagation",
     "PropagationResult",
     "QuantitySummary",
@@ -185,6 +200,7 @@ __all__ = [
     "SplitConformal",
     "StartsIdentifiability",
     "StructuralRank",
+    "Threshold",
     "Trajectory",
     "UncertaintyMethod",
     "Uniform",

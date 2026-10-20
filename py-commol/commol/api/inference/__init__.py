@@ -1,13 +1,14 @@
 """Uncertainty and identifiability methods and what reads their samples:
 intervals, the predictive and the scores. Importing it registers the runners
-of the identifiability, resampling, sequential Monte Carlo, conformal, local
-and sensitivity methods."""
+of the identifiability, resampling, sequential Monte Carlo, conformal, local,
+sensitivity and profile methods."""
 
 from commol.api.inference import (
     conformal,
     global_sensitivity,
     identifiability,
     local,
+    profiles,
     resampling,
     scores,
     smc,
@@ -35,6 +36,7 @@ __all__ = [
     "identifiability",
     "local",
     "member_statistics",
+    "profiles",
     "resampling",
     "scores",
     "smc",

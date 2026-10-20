@@ -28,3 +28,5 @@ LossConfigProtocol
 ObservationModelProtocol
 OptimizationConfigProtocol
 EngineTypeProtocol
+BootstrapSettingsProtocol
+ProfileRunProtocol
