@@ -869,3 +869,38 @@ fn scores_equal_the_differences_of_the_terms() {
         assert_scores(&problem, &values, &predictions);
     }
 }
+
+#[test]
+fn terms_skip_a_weight_of_zero_and_name_a_mean_outside_their_model() {
+    let problem = problem(
+        observed(&[1.0, 2.0]),
+        line_parameters(),
+        models(ObservationModel::Poisson),
+    )
+    .unwrap()
+    .with_data(&[1.0, 2.0], &[1.0, 0.0])
+    .unwrap();
+    // The second mean, −1, is outside the model, but its weight is 0.
+    let terms = problem.term_derivatives(&[0.0, 0.0], &[1.5, -1.0]).unwrap();
+    assert_eq!(
+        (terms[1].gradient.clone(), terms[1].curvature.clone()),
+        (vec![0.0], vec![0.0])
+    );
+
+    let error = problem
+        .term_derivatives(&[0.0, 0.0], &[-1.0, 2.0])
+        .unwrap_err();
+    assert_eq!(
+        error,
+        "Observation 'x' at 0 has the mean -1, outside the means its observation model allows"
+    );
+
+    let rmse = self::problem(
+        observed(&[1.0, 2.0]),
+        line_parameters(),
+        LossConfig::RootMeanSquaredError.into(),
+    )
+    .unwrap();
+    let error = rmse.term_derivatives(&[0.0, 0.0], &[1.0, 2.0]).unwrap_err();
+    assert!(error.contains("no derivative at a perfect fit"), "{error}");
+}

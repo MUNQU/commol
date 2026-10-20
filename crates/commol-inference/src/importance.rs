@@ -50,9 +50,6 @@ impl<T: TemperedTarget> Target for TemperedPosterior<'_, T> {
 
     fn log_density(&self, values: &[f64], workspace: &mut Workspace) -> Result<f64, String> {
         let log_prior = self.target.log_prior(values);
-        if log_prior == f64::NEG_INFINITY {
-            return Ok(f64::NEG_INFINITY);
-        }
         let kept = self
             .target
             .evaluate(values, &mut Generator::from_seed(0), workspace)?;
@@ -106,12 +103,10 @@ where
             let mut generator = Generator::from_seed(replicate_seed(base, i as u64));
             let unbounded = proposal.draw(&mut generator);
             let values = transform.from_unbounded(&unbounded);
-            let log_target = target.log_density(&values, workspace)?;
-            let log_weight = if log_target == f64::NEG_INFINITY {
-                f64::NEG_INFINITY
-            } else {
-                log_target + transform.log_jacobian(&values) - proposal.log_density(&unbounded)
-            };
+            // A target of `−∞` gives a weight of 0 whatever the rest.
+            let log_weight = target.log_density(&values, workspace)?
+                + transform.log_jacobian(&values)
+                - proposal.log_density(&unbounded);
             Ok((values, log_weight))
         })
         .collect::<Result<_, String>>()?;

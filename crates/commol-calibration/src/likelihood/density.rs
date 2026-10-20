@@ -131,21 +131,9 @@ impl Noise {
         }
     }
 
-    /// The number of noise arguments of the model, in the order of its
-    /// fields: one for `Normal` (`sd`), `LogNormal` (`sigma`) and
-    /// `NegativeBinomial` (`overdispersion`), two for `StudentT` (`df`,
-    /// `scale`), none for `Poisson` and `Binomial`.
-    pub fn argument_count(&self) -> usize {
-        match self {
-            Self::Normal { .. } | Self::LogNormal { .. } | Self::NegativeBinomial { .. } => 1,
-            Self::StudentT { .. } => 2,
-            Self::Poisson | Self::Binomial { .. } => 0,
-        }
-    }
-
     /// The expected Fisher information of one observation at the mean
-    /// `mean` with respect to its arguments `(μ, noise arguments…)`
-    /// ([`Self::argument_count`]), row-major: `E[s sᵀ]`, with `s` the
+    /// `mean` with respect to its arguments `(μ, noise arguments…)`, the
+    /// noise arguments in the order of the model's fields, row-major: `E[s sᵀ]`, with `s` the
     /// derivatives of `log p(y | μ, …)`.
     ///
     /// | Model | `μ` | Noise arguments |
@@ -214,7 +202,7 @@ impl Noise {
     }
 
     /// The derivatives of `log p(y | μ, …)` at the mean `mean` with respect
-    /// to the arguments `(μ, noise arguments…)` ([`Self::argument_count`]):
+    /// to the arguments `(μ, noise arguments…)` of [`Self::information`]:
     /// the scores of one observation, whose variance is
     /// [`Self::information`].
     pub fn scores(&self, y: f64, mean: f64) -> Vec<f64> {
@@ -471,6 +459,14 @@ mod tests {
             (summed - by_digamma).abs() < 1e-9 * summed,
             "{summed} {by_digamma}"
         );
+    }
+
+    #[test]
+    fn no_trials_and_no_mean_carry_no_information() {
+        let binomial = Noise::Binomial { trials: 0 };
+        assert_eq!(binomial.information(0.0), vec![0.0]);
+        assert_eq!(binomial.scores(0.0, 0.0), vec![0.0]);
+        assert_eq!(dispersion_information(0.0, 0.5), 0.0);
     }
 
     #[test]

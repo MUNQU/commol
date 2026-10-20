@@ -215,6 +215,25 @@ mod tests {
     }
 
     #[test]
+    fn a_tail_tied_at_its_cutoff_is_not_pareto_and_stays() {
+        // The tail of 20 holds 5 weights equal to the cutoff: its first
+        // quartile is not above its smallest excess, so the fit has no shape.
+        let mut log_weights = vec![0.0; 85];
+        log_weights.extend([1.0; 15]);
+        let smoothed = smooth(&log_weights).unwrap();
+        assert!(smoothed.k_hat.is_nan());
+        assert!(!smoothed.reliable());
+        let total = log_sum_exp(&log_weights);
+        for (w, raw) in smoothed.log_weights.iter().zip(&log_weights) {
+            assert!((w - (raw - total)).abs() < 1e-12);
+        }
+        assert_eq!(
+            log_sum_exp(&[f64::NEG_INFINITY, f64::NEG_INFINITY]),
+            f64::NEG_INFINITY
+        );
+    }
+
+    #[test]
     fn a_shape_of_zero_is_the_exponential_quantile() {
         let q = generalized_pareto_quantile(0.5, 0.0, 2.0, 1.0);
         assert!((q - (1.0 + 2.0 * 2f64.ln())).abs() < 1e-12);

@@ -41,7 +41,6 @@ pub struct Curvature {
     unbounded_fit: Vec<f64>,
     derivatives: Vec<f64>,
     matrix: Matrix,
-    errors: Matrix,
     gradients: Matrix,
     predictions: Vec<f64>,
     notes: Vec<String>,
@@ -216,16 +215,10 @@ impl Curvature {
             fit: fit.to_vec(),
             derivatives,
             matrix,
-            errors,
             gradients: Matrix::zeros(0, p),
             predictions: Vec::new(),
             notes,
         }
-    }
-
-    /// The parameter names, one per row and column.
-    pub fn names(&self) -> &[String] {
-        &self.names
     }
 
     /// The map between the scale of the parameters and the unbounded one.
@@ -251,12 +244,6 @@ impl Curvature {
     /// The curvature `H_u` on the unbounded scale.
     pub fn matrix(&self) -> &Matrix {
         &self.matrix
-    }
-
-    /// The estimated error of each entry of [`Self::matrix`], from the
-    /// errors of the derivatives.
-    pub fn errors(&self) -> &Matrix {
-        &self.errors
     }
 
     /// The gradient of each observation's term of the objective on the

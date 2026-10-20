@@ -79,11 +79,6 @@ impl Gaussian {
         self.degrees_of_freedom
     }
 
-    /// The map back to the parameters.
-    pub fn transform(&self) -> &Transform {
-        &self.transform
-    }
-
     /// `L⁻¹ (u − c)`: the point `u` of the unbounded scale in standard units;
     /// its norm is the Mahalanobis distance from the centre.
     pub fn standardized(&self, unbounded: &[f64]) -> Vec<f64> {
@@ -189,4 +184,32 @@ pub(crate) fn inverse(matrix: &Matrix) -> Result<Matrix, LocalError> {
                     .to_string(),
             )
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn gaussian(degrees_of_freedom: Option<f64>) -> Gaussian {
+        let transform = Transform::new(&[(f64::NEG_INFINITY, f64::INFINITY)]);
+        Gaussian::new(
+            transform,
+            vec![1.0],
+            Matrix::from_element(1, 1, 4.0),
+            degrees_of_freedom,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn densities_have_their_closed_forms() {
+        // At u = 3, one standard deviation of 2 from the centre 1.
+        let normal = -0.5 * (2.0 * std::f64::consts::PI).ln() - 2f64.ln() - 0.5;
+        assert!((gaussian(None).log_density(&[3.0]) - normal).abs() < 1e-12);
+        // A t of 3 degrees of freedom and scale 2: Γ(2)/(Γ(3/2)√(3π)·2)·(1 + 1/3)⁻².
+        let t = (1.0 / (libm::tgamma(1.5) * (3.0 * std::f64::consts::PI).sqrt() * 2.0)
+            * (1.0f64 + 1.0 / 3.0).powi(-2))
+        .ln();
+        assert!((gaussian(Some(3.0)).log_density(&[3.0]) - t).abs() < 1e-12);
+    }
 }

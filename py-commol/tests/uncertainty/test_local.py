@@ -35,6 +35,7 @@ from commol import (
     Simulation,
     UncertaintyMethod,
 )
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.engine import OdeSolver
 from tests.support import (
     a_to_b_builder,
@@ -198,6 +199,21 @@ class TestLaplace:
 
         with pytest.raises(ValueError, match=r"parameters \['c', 'sd'\]"):
             calibrator.delta_band(result, [1.0], 0.9)
+
+    def test_a_band_takes_the_positions_of_the_engine(self) -> None:
+        calibrator = flow_calibrator(
+            [9.0, 11.0, 10.0],
+            windowed=True,
+            observation_models={"B": NormalObservations(sd=1.0)},
+        )
+        result = calibrator.uncertainty(Laplace(draws=10))
+
+        with pytest.raises(ValueError, match="only at integer steps"):
+            calibrator.delta_band(result, [0.5], 0.9)
+        with pytest.raises(ValueError, match="1 rows of 1 values"):
+            commol_rs.inference.delta_band(
+                calibrator.rust_problem, [10.0], [[1.0, 0.0]], None, [1.0], 0.9
+            )
 
     def test_laplace_refuses_a_loss(self) -> None:
         calibrator = flow_calibrator([9.0, 11.0, 10.0], windowed=True)

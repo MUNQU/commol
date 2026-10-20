@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 
+use commol_calibration::Workspace;
 use commol_calibration::{
     Argument, CalibrationParameter, CalibrationParameterType, CalibrationProblem,
     DiscrepancyConfig, ObservationModel, ObservedDataPoint,
@@ -13,10 +14,15 @@ use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 use commol_inference::Priors;
 use commol_inference::distribution::Family;
 use commol_inference::importance::TemperedPosterior;
-use commol_inference::local::{Curvature, CurvatureKind, laplace, laplace_mixture};
+use commol_inference::local::{
+    Curvature, CurvatureKind, Gaussian, LocalError, laplace, laplace_mixture,
+    sandwich_approximation,
+};
 use commol_inference::psis::smooth;
 use commol_inference::sensitivity::{Design, FiniteDifferences};
 use commol_inference::smc::LikelihoodTarget;
+use commol_inference::target::Target;
+use commol_inference::transform::Transform;
 
 /// The closed form of the outputs of a [`Curve`].
 #[derive(Clone, Copy, Debug)]
@@ -560,4 +566,230 @@ fn psis_matches_the_reference_values() {
         }
         assert_close(lowest, smallest);
     }
+}
+
+#[test]
+fn every_scale_maps_the_curvature_by_its_derivative() {
+    // `a` has no bound (the identity) and `b` a lower bound only (a log), so
+    // `D = (1, b + 10)`.
+    let values: Vec<f64> = (0..10).map(|t| 1.0 + 0.5 * t as f64).collect();
+    let problem = CalibrationProblem::new(
+        Curve::new(Shape::Line),
+        observed("x", &values),
+        vec![
+            CalibrationParameter::new("a".to_string(), f64::NEG_INFINITY, f64::INFINITY),
+            CalibrationParameter::new("b".to_string(), -10.0, f64::INFINITY),
+        ],
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
+    )
+    .unwrap();
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+    let fit = [1.0, 0.5];
+    let d = [1.0, 10.5];
+    let mut expected = [[0.0; 2]; 2];
+    for t in 0..10 {
+        let row = [1.0, t as f64];
+        for j in 0..2 {
+            for k in 0..2 {
+                expected[j][k] += row[j] * row[k] / 0.25 * d[j] * d[k];
+            }
+        }
+    }
+
+    for curvature in [
+        Curvature::gauss_newton(&problem, &source, &fit).unwrap(),
+        Curvature::hessian(&problem, &source, &fit).unwrap(),
+    ] {
+        for j in 0..2 {
+            for k in 0..2 {
+                let scale = (expected[j][j] * expected[k][k]).sqrt();
+                assert!(
+                    (curvature.matrix()[(j, k)] - expected[j][k]).abs() < 1e-5 * scale,
+                    "({j}, {k}): {}",
+                    curvature.matrix()
+                );
+            }
+        }
+    }
+    let error = Curvature::gauss_newton(&problem, &source, &[1.0, -10.0]).unwrap_err();
+    assert!(
+        error.to_string().contains("'b' is on its bound -10"),
+        "{error}"
+    );
+}
+
+#[test]
+fn a_parameter_the_data_do_not_read_has_no_laplace_approximation() {
+    // One observation at t = 0 reads a but not b.
+    let problem = CalibrationProblem::new(
+        Curve::new(Shape::Line),
+        observed("x", &[1.0]),
+        vec![
+            CalibrationParameter::new("a".to_string(), -10.0, 10.0),
+            CalibrationParameter::new("b".to_string(), -5.0, 5.0),
+        ],
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
+    )
+    .unwrap();
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+    let curvature = Curvature::gauss_newton(&problem, &source, &[1.0, 0.0]).unwrap();
+
+    let error = laplace(&curvature).unwrap_err();
+    assert!(matches!(error, LocalError::Refused(_)));
+    assert!(
+        error.to_string().contains("not positive definite"),
+        "{error}"
+    );
+    let singular = nalgebra::DMatrix::zeros(2, 2);
+    let transform = Transform::new(&problem.parameter_bounds());
+    let error = Gaussian::new(transform, vec![0.0, 0.0], singular, None).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("covariance is not positive definite")
+    );
+}
+
+/// A Poisson model of the line, `a` in `[−1, 5]`, of the counts `values`.
+fn poisson_line(values: &[f64]) -> CalibrationProblem<Curve> {
+    CalibrationProblem::new(
+        Curve::new(Shape::Line),
+        observed("x", values),
+        vec![CalibrationParameter::new("a".to_string(), -1.0, 5.0)],
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![("x".to_string(), ObservationModel::Poisson)]),
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_mean_on_the_edge_of_its_model_has_no_finite_curvature() {
+    // A Poisson mean of 0 has the information 1/0.
+    let problem = poisson_line(&[0.0, 0.0, 0.0]);
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+
+    let error = Curvature::gauss_newton(&problem, &source, &[0.0]).unwrap_err();
+
+    assert!(matches!(error, LocalError::Failed(_)));
+    assert!(error.to_string().contains("not finite"), "{error}");
+}
+
+#[test]
+fn a_posterior_is_minus_infinity_outside_its_support() {
+    // A Poisson mean below 0 is outside the model.
+    let problem = poisson_line(&[1.0, 2.0]);
+    let priors = Priors::uniform_on_bounds(&["a".to_string()], &[(-1.0, 5.0)]).unwrap();
+    let target = LikelihoodTarget::new(&problem, &priors).unwrap();
+    let posterior = TemperedPosterior::new(&target);
+    let mut workspace = Workspace::default();
+
+    assert_eq!(posterior.dimension(), 1);
+    assert_eq!(
+        posterior.log_density(&[-0.5], &mut workspace),
+        Ok(f64::NEG_INFINITY)
+    );
+    let inside = posterior.log_density(&[1.5], &mut workspace).unwrap();
+    assert!(inside.is_finite());
+
+    // An end outside the support, and one whose curvature is 0, give no
+    // component; with no other end there is no mixture.
+    let error = laplace_mixture(
+        &problem,
+        &posterior,
+        1.0,
+        &[vec![-0.5]],
+        100,
+        CurvatureKind::GaussNewton,
+        1,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("outside the support"), "{error}");
+}
+
+#[test]
+fn an_end_whose_curvature_is_singular_gives_no_component() {
+    // x = a² at a = 0 has the slope 0: the curvature of a is 0 there.
+    let problem = CalibrationProblem::new(
+        Curve::new(Shape::Square),
+        observed("x", &[4.0, 4.2, 3.8]),
+        vec![CalibrationParameter::new("a".to_string(), -5.0, 5.0)],
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
+    )
+    .unwrap();
+    let priors = Priors::uniform_on_bounds(&["a".to_string()], &[(-5.0, 5.0)]).unwrap();
+    let target = LikelihoodTarget::new(&problem, &priors).unwrap();
+
+    let run = laplace_mixture(
+        &problem,
+        &TemperedPosterior::new(&target),
+        1.0,
+        &[vec![2.0], vec![0.0]],
+        200,
+        CurvatureKind::GaussNewton,
+        1,
+    )
+    .unwrap();
+
+    assert_eq!(run.components.len(), 1);
+    assert!(
+        run.notes
+            .iter()
+            .any(|note| note.contains("[0.0] gives no component"))
+    );
+}
+
+#[test]
+fn a_sandwich_needs_more_blocks_than_parameters_and_reads_the_automatic_length() {
+    let values: Vec<f64> = (0..8)
+        .map(|t| 1.0 + 0.5 * t as f64 + [0.3, -0.2, 0.1, -0.4][t % 4])
+        .collect();
+    let problem = CalibrationProblem::new(
+        Curve::new(Shape::Line),
+        observed("x", &values),
+        vec![
+            CalibrationParameter::new("a".to_string(), -10.0, 10.0),
+            CalibrationParameter::new("b".to_string(), -5.0, 5.0),
+        ],
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
+    )
+    .unwrap();
+    let fit = [1.0, 0.5];
+
+    let error =
+        sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, Some(4)).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("makes 2 blocks for 2 parameters"),
+        "{error}"
+    );
+    let run = sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, None).unwrap();
+    let estimates = run.estimates.unwrap();
+    assert_eq!(estimates.len(), 1);
+    assert_eq!(run.blocks, 8_usize.div_ceil(run.block_length));
+    assert_eq!(
+        run.gaussian.degrees_of_freedom(),
+        Some((run.blocks - 1) as f64)
+    );
+}
+
+#[test]
+fn a_curvature_has_two_names() {
+    assert_eq!(
+        CurvatureKind::from_name("gauss_newton"),
+        Ok(CurvatureKind::GaussNewton)
+    );
+    assert_eq!(
+        CurvatureKind::from_name("hessian"),
+        Ok(CurvatureKind::Hessian)
+    );
+    assert!(
+        CurvatureKind::from_name("newton")
+            .unwrap_err()
+            .contains("'gauss_newton' and 'hessian'")
+    );
 }
