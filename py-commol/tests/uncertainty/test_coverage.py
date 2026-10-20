@@ -9,6 +9,9 @@ covers ``θ`` in 90 % of the data sets. The Gibbs posterior fits a constant
 flow with Gaussian noise (``flow_calibrator``); ABC fits the probability of a
 chain binomial from the units that moved in one step.
 
+The Laplace approximation fits the same flow with a normal model of known
+``sd``, whose likelihood is exactly normal in ``c``.
+
 A prediction interval holds a new observation, not a fixed value: a study of
 one shifts the interval by the observation, so it holds 0 when it holds the
 observation. The posterior predictive of a normal observation model, with
@@ -31,6 +34,7 @@ from commol import (
     EtaCalibration,
     GibbsPosterior,
     JackknifePlus,
+    Laplace,
     LogUniform,
     LossDistance,
     NelderMeadConfig,
@@ -322,5 +326,25 @@ class TestPosteriorPredictive:
             return _held(band.lower[0], band.upper[0], float(values[15]))
 
         study = _conformal_study(make, level)
+
+        assert study.calibrated(), study
+
+
+@pytest.mark.coverage_study
+class TestLaplace:
+    def test_laplace_is_calibrated_near_gaussian(self) -> None:
+        method = Laplace(draws=2000)
+
+        def interval(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+            values = FLOW + rng.normal(0.0, FLOW_NOISE, 20)
+            calibrator = flow_calibrator(
+                values.tolist(),
+                windowed=True,
+                seed=index,
+                observation_models={"B": NormalObservations(sd=FLOW_NOISE)},
+            )
+            return {"c": calibrator.uncertainty(method).sample.interval(LEVEL)["c"]}
+
+        study = coverage_study(interval, {"c": FLOW}, LEVEL, data_sets=200, seed=21)
 
         assert study.calibrated(), study

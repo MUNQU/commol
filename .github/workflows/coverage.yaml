@@ -47,6 +47,9 @@ jobs:
               tests/uncertainty/test_coverage.py::TestEnbPI
           - name: posterior predictive of observation models
             tests: tests/uncertainty/test_coverage.py::TestPosteriorPredictive
+          - name: local approximations
+            tests: >-
+              tests/uncertainty/test_coverage.py::TestLaplace
     defaults:
       run:
         working-directory: ./py-commol

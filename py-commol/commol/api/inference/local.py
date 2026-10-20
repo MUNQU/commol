@@ -66,7 +66,7 @@ def run_laplace(calibrator: "Calibrator", method: Laplace) -> LaplaceResult:
         method.draws,
         calibrator.seed,
     )
-    return LaplaceResult(
+    result = LaplaceResult(
         fit=fit,
         covariance=run.covariance,
         sample=_sample(
@@ -76,6 +76,8 @@ def run_laplace(calibrator: "Calibrator", method: Laplace) -> LaplaceResult:
         ),
         notes=_notes(run),
     )
+    result.attach(calibrator.rust_problem)
+    return result
 
 
 register(Laplace, run_laplace)

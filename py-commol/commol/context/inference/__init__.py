@@ -51,8 +51,10 @@ from commol.context.inference.identifiability import (
     StructuralRank,
 )
 from commol.context.inference.local import (
+    DeltaBand,
     Laplace,
     LaplaceResult,
+    LocalResult,
 )
 from commol.context.inference.method import (
     IdentifiabilityMethod,
@@ -114,6 +116,7 @@ __all__ = [
     "Collinearity",
     "ConformalMethod",
     "ConformalResult",
+    "DeltaBand",
     "DistributionNoise",
     "EnbPI",
     "EtaCalibration",
@@ -130,6 +133,7 @@ __all__ = [
     "JackknifeResult",
     "Laplace",
     "LaplaceResult",
+    "LocalResult",
     "LogNormal",
     "LogUniform",
     "LossDistance",

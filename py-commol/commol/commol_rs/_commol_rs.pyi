@@ -814,6 +814,15 @@ class InferenceModule(Protocol):
         draws: int,
         seed: int,
     ) -> LocalRunProtocol: ...
+    def delta_band(
+        self,
+        problem: CalibrationProblemProtocol,
+        fit: list[float],
+        covariance: list[list[float]],
+        degrees_of_freedom: float | None,
+        positions: list[float],
+        confidence_level: float,
+    ) -> tuple[list[str], list[list[float]], list[list[float]], list[list[float]]]: ...
     def information_matching_eta(
         self, problem: CalibrationProblemProtocol, fit: list[float]
     ) -> float: ...

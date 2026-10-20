@@ -94,6 +94,35 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
         })
     }
 
+    /// Finite differences of the predictions of `observed_data`, which need
+    /// not be the problem's: the engine, parameters and values of `problem`
+    /// observed there, their values ignored.
+    ///
+    /// # Errors
+    ///
+    /// [`SensitivityError::Stochastic`] when the problem runs replicates of a
+    /// stochastic engine; a failure when the engine rejects a position or an
+    /// observation names an unknown output or factor.
+    pub fn of_observations(
+        problem: &CalibrationProblem<E>,
+        observed_data: Vec<ObservedDataPoint>,
+    ) -> Result<Self, SensitivityError> {
+        if problem.forward().replicates().is_some() {
+            return Err(SensitivityError::Stochastic);
+        }
+        let forward = problem
+            .forward()
+            .with_observations(&observed_data)
+            .map_err(SensitivityError::Failed)?;
+        let accuracy = forward.base_engine().output_accuracy();
+        Ok(Self {
+            forward,
+            observed_data,
+            design: Design::Observations,
+            accuracy,
+        })
+    }
+
     /// The step `h_j` of each parameter at `values`.
     pub fn steps(&self, values: &[f64]) -> Vec<f64> {
         let factor = self.accuracy.cbrt();

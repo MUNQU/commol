@@ -4,6 +4,7 @@
 //! | Module | Holds |
 //! |---|---|
 //! | [`approximation`] | [`CurvatureKind`], [`curvature_at`] and [`laplace_approximation`]: the approximations of a problem at a fit |
+//! | [`band`] | [`DeltaBand`]: the band of every output by the delta method, [`delta_band`] |
 //! | [`curvature`] | [`Curvature`]: the expected curvature (Gauss–Newton) of the objective at a fit, on the unbounded scale of [`crate::transform`] |
 //! | [`gaussian`] | [`Gaussian`]: a normal or Student-t distribution on the unbounded scale, its draws mapped back; [`laplace`] |
 //!
@@ -12,12 +13,14 @@
 //! mapped to that scale. A draw maps back inside the bounds.
 
 pub mod approximation;
+pub mod band;
 pub mod curvature;
 pub mod gaussian;
 
 use std::fmt;
 
 pub use approximation::{CurvatureKind, curvature_at, laplace_approximation};
+pub use band::{DeltaBand, delta_band};
 pub use curvature::Curvature;
 pub use gaussian::{Gaussian, laplace};
 

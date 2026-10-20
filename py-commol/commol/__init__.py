@@ -131,6 +131,8 @@ from commol.context.inference import (
     WildBootstrap,
     Laplace,
     LaplaceResult,
+    DeltaBand,
+    LocalResult,
 )
 from commol.context.observation_models import (
     BinomialObservations,
@@ -232,6 +234,8 @@ __all__ = [
     "Uniform",
     "Laplace",
     "LaplaceResult",
+    "DeltaBand",
+    "LocalResult",
     "CalibrationConstraint",
     "CalibrationEvaluation",
     "CalibrationHistory",

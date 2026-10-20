@@ -91,9 +91,66 @@ fn laplace(
     ))
 }
 
+/// A band and its outputs: `(outputs, center, lower, upper)`, one row per
+/// output and one value per position in each table.
+type BandTables = (Vec<String>, Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>);
+
+/// The band of every output by the delta method
+///
+/// Args:
+///     problem: The calibration problem
+///     fit: The fitted values, in problem order
+///     covariance: The covariance on the unbounded scale
+///     degrees_of_freedom: The degrees of freedom of a Student t, or None
+///         for a normal
+///     positions: Positions to report at
+///     confidence_level: The level of the band
+///
+/// Returns:
+///     The output names, and the center, lower and upper end of each
+///     output at each position
+///
+/// Raises:
+///     ValueError: If the covariance is not one row and column per
+///         parameter, the level is not strictly between 0 and 1, or a
+///         position is one the engine rejects
+///     RuntimeError: If the derivatives fail at the fit
+#[pyfunction]
+fn delta_band(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    fit: Vec<f64>,
+    covariance: Vec<Vec<f64>>,
+    degrees_of_freedom: Option<f64>,
+    positions: Vec<f64>,
+    confidence_level: f64,
+) -> PyResult<BandTables> {
+    let p = fit.len();
+    if covariance.len() != p || covariance.iter().any(|row| row.len() != p) {
+        return Err(PyValueError::new_err(format!(
+            "The covariance needs {p} rows of {p} values, one per parameter"
+        )));
+    }
+    let matrix = Matrix::from_fn(p, p, |j, k| covariance[j][k]);
+    let band = py
+        .detach(|| {
+            local::delta_band(
+                &problem.inner,
+                &fit,
+                &matrix,
+                degrees_of_freedom,
+                &positions,
+                confidence_level,
+            )
+        })
+        .map_err(local_error)?;
+    Ok((band.outputs, band.center, band.lower, band.upper))
+}
+
 /// Register the classes and functions of this module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyLocalRun>()?;
     m.add_function(wrap_pyfunction!(laplace, m)?)?;
+    m.add_function(wrap_pyfunction!(delta_band, m)?)?;
     Ok(())
 }
