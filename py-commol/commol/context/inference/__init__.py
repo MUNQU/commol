@@ -50,6 +50,10 @@ from commol.context.inference.identifiability import (
     StartsIdentifiability,
     StructuralRank,
 )
+from commol.context.inference.local import (
+    Laplace,
+    LaplaceResult,
+)
 from commol.context.inference.method import (
     IdentifiabilityMethod,
     InferenceMethod,
@@ -124,6 +128,8 @@ __all__ = [
     "InputSpace",
     "JackknifePlus",
     "JackknifeResult",
+    "Laplace",
+    "LaplaceResult",
     "LogNormal",
     "LogUniform",
     "LossDistance",

@@ -108,6 +108,24 @@ impl Transform {
             .collect()
     }
 
+    /// `dθ/du` of each parameter at `values`: `(θ − a)(b − θ)/(b − a)` for a
+    /// logit, `θ − a` or `b − θ` for a log, 1 for the identity; 0 on a
+    /// bound.
+    pub fn derivatives(&self, values: &[f64]) -> Vec<f64> {
+        self.scales
+            .iter()
+            .zip(values)
+            .map(|(scale, &theta)| match *scale {
+                Scale::Logit { lower, upper } => {
+                    ((theta - lower) * (upper - theta) / (upper - lower)).max(0.0)
+                }
+                Scale::Log { lower } => (theta - lower).max(0.0),
+                Scale::LogFromAbove { upper } => (upper - theta).max(0.0),
+                Scale::Identity => 1.0,
+            })
+            .collect()
+    }
+
     /// `log |dθ/du|` at `values`: the sum over the parameters, `−∞` when a
     /// value sits on a bound.
     pub fn log_jacobian(&self, values: &[f64]) -> f64 {
@@ -180,6 +198,8 @@ mod tests {
             expected += derivative.abs().ln();
         }
         assert!((transform.log_jacobian(&values) - expected).abs() < 1e-6);
+        let product: f64 = transform.derivatives(&values).iter().map(|d| d.ln()).sum();
+        assert!((transform.log_jacobian(&values) - product).abs() < 1e-12);
     }
 
     #[test]

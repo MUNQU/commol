@@ -129,6 +129,8 @@ from commol.context.inference import (
     UncertaintyMethod,
     Uniform,
     WildBootstrap,
+    Laplace,
+    LaplaceResult,
 )
 from commol.context.observation_models import (
     BinomialObservations,
@@ -228,6 +230,8 @@ __all__ = [
     "SmcDiagnostics",
     "SmcResult",
     "Uniform",
+    "Laplace",
+    "LaplaceResult",
     "CalibrationConstraint",
     "CalibrationEvaluation",
     "CalibrationHistory",

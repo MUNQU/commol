@@ -1,0 +1,269 @@
+//! The curvature of the objective of a problem at a fit, on the unbounded
+//! scale.
+//!
+//! Gauss–Newton reads the expected curvature of each observation's term
+//! ([`commol_calibration::CalibrationProblem::term_derivatives`]): over the
+//! arguments of the term, its mean `μ` and the noise arguments of its
+//! observation model, it is `wᵢ` times the Fisher information of the model,
+//! or `2 w n²` for the sum of squares. The chain rule through the Jacobian
+//! `J` of the means and the identity of the noise parameters gives
+//! `H_θ = Σᵢ Aᵢᵀ Cᵢ Aᵢ`, which is `Jᵀ W J` on the model parameters. On the
+//! unbounded scale, `H_u = D · H_θ · D`; the curvature of the log Jacobian
+//! is left out.
+
+use commol_calibration::{CalibrationProblem, TermDerivatives};
+use commol_core::SimulationEngine;
+
+use super::LocalError;
+use crate::sensitivity::{Matrix, SensitivityError, SensitivitySource};
+use crate::transform::{Scale, Transform};
+
+/// An entry of the curvature is reported when its estimated error is above
+/// this share of `√(H_jj · H_kk)`, the scale of its row and column.
+const UNCERTAIN_ENTRY: f64 = 0.01;
+
+/// The curvature of the objective at a fit, on the unbounded scale.
+#[derive(Debug, Clone)]
+pub struct Curvature {
+    names: Vec<String>,
+    transform: Transform,
+    fit: Vec<f64>,
+    unbounded_fit: Vec<f64>,
+    derivatives: Vec<f64>,
+    matrix: Matrix,
+    errors: Matrix,
+    notes: Vec<String>,
+}
+
+impl Curvature {
+    /// The Gauss–Newton curvature of the objective of `problem` at `fit`,
+    /// with the Jacobian of `source`.
+    ///
+    /// # Errors
+    ///
+    /// [`LocalError::Refused`] when a value of `fit` sits on a bound of its
+    /// parameter, the engine is stochastic, or the discrepancy has no
+    /// curvature (the mean absolute error); [`LocalError::Failed`] when the
+    /// derivatives fail or the curvature is not finite.
+    pub fn gauss_newton<E, S>(
+        problem: &CalibrationProblem<E>,
+        source: &S,
+        fit: &[f64],
+    ) -> Result<Self, LocalError>
+    where
+        E: SimulationEngine,
+        S: SensitivitySource + ?Sized,
+    {
+        let transform = Transform::new(&problem.parameter_bounds());
+        check_inside(problem, &transform, fit)?;
+        let sensitivities = source.jacobian(fit).map_err(sensitivity_error)?;
+        let terms = problem
+            .term_derivatives(fit, &sensitivities.predictions)
+            .map_err(LocalError::Refused)?;
+        let p = fit.len();
+        let mut matrix = Matrix::zeros(p, p);
+        let mut errors = Matrix::zeros(p, p);
+        for (i, term) in terms.iter().enumerate() {
+            let jacobian: Vec<f64> = sensitivities.jacobian.row(i).iter().copied().collect();
+            let error: Vec<f64> = sensitivities.errors.row(i).iter().copied().collect();
+            add_term(&mut matrix, &mut errors, term, &jacobian, &error);
+        }
+        if matrix.iter().any(|entry| !entry.is_finite()) {
+            return Err(LocalError::Failed(
+                "The curvature at the fit is not finite: a mean sits on the edge of the means \
+                 its observation model allows"
+                    .to_string(),
+            ));
+        }
+        let names = problem.parameter_names();
+        Ok(Self::on_the_unbounded_scale(
+            names, transform, fit, matrix, errors,
+        ))
+    }
+
+    /// The curvature of `problem` at `fit` by central differences of its
+    /// objective.
+    ///
+    /// # Errors
+    ///
+    /// Always [`LocalError::Refused`]: the central Hessian with given steps
+    /// of the argmin fork (MUNQU/argmin#6) is not yet a dependency.
+    pub fn hessian<E: SimulationEngine>(
+        problem: &CalibrationProblem<E>,
+        fit: &[f64],
+    ) -> Result<Self, LocalError> {
+        let _ = (problem, fit);
+        Err(LocalError::Refused(
+            "curvature=\"hessian\" needs the central Hessian with given steps of the argmin \
+             fork (MUNQU/argmin#6)"
+                .to_string(),
+        ))
+    }
+
+    /// `H_u = D · H_θ · D` and its errors, with the notes of entries whose
+    /// error is not small.
+    fn on_the_unbounded_scale(
+        names: Vec<String>,
+        transform: Transform,
+        fit: &[f64],
+        natural: Matrix,
+        natural_errors: Matrix,
+    ) -> Self {
+        let derivatives = transform.derivatives(fit);
+        let p = fit.len();
+        let scale =
+            |m: &Matrix| Matrix::from_fn(p, p, |j, k| derivatives[j] * m[(j, k)] * derivatives[k]);
+        let matrix = scale(&natural);
+        let errors = scale(&natural_errors);
+        let mut notes = Vec::new();
+        for j in 0..p {
+            for k in j..p {
+                let size = (matrix[(j, j)] * matrix[(k, k)]).abs().sqrt();
+                if errors[(j, k)] > UNCERTAIN_ENTRY * size {
+                    notes.push(format!(
+                        "The curvature of ('{}', '{}') is {:.6e} with an estimated error of \
+                         {:.3e}, {:.1}% of the scale of its row and column",
+                        names[j],
+                        names[k],
+                        matrix[(j, k)],
+                        errors[(j, k)],
+                        100.0 * errors[(j, k)] / size
+                    ));
+                }
+            }
+        }
+        Self {
+            names,
+            unbounded_fit: transform.to_unbounded(fit),
+            transform,
+            fit: fit.to_vec(),
+            derivatives,
+            matrix,
+            errors,
+            notes,
+        }
+    }
+
+    /// The parameter names, one per row and column.
+    pub fn names(&self) -> &[String] {
+        &self.names
+    }
+
+    /// The map between the scale of the parameters and the unbounded one.
+    pub fn transform(&self) -> &Transform {
+        &self.transform
+    }
+
+    /// The fit, on the scale of the parameters.
+    pub fn fit(&self) -> &[f64] {
+        &self.fit
+    }
+
+    /// The fit on the unbounded scale: the centre of every approximation.
+    pub fn unbounded_fit(&self) -> &[f64] {
+        &self.unbounded_fit
+    }
+
+    /// `dθ/du` of each parameter at the fit: the diagonal of `D`.
+    pub fn derivatives(&self) -> &[f64] {
+        &self.derivatives
+    }
+
+    /// The curvature `H_u` on the unbounded scale.
+    pub fn matrix(&self) -> &Matrix {
+        &self.matrix
+    }
+
+    /// The estimated error of each entry of [`Self::matrix`], from the
+    /// errors of the derivatives.
+    pub fn errors(&self) -> &Matrix {
+        &self.errors
+    }
+
+    /// The entries whose estimated error is above 1 % of the scale of their
+    /// row and column, in words.
+    pub fn notes(&self) -> &[String] {
+        &self.notes
+    }
+}
+
+/// Refuse a fit on a bound of its parameter: the unbounded scale puts it at
+/// infinity, where the variance is infinite.
+fn check_inside<E: SimulationEngine>(
+    problem: &CalibrationProblem<E>,
+    transform: &Transform,
+    fit: &[f64],
+) -> Result<(), LocalError> {
+    for ((parameter, scale), &value) in problem.parameters().iter().zip(transform.scales()).zip(fit)
+    {
+        let bound = match *scale {
+            Scale::Logit { lower, upper } => [Some(lower), Some(upper)],
+            Scale::Log { lower } => [Some(lower), None],
+            Scale::LogFromAbove { upper } => [None, Some(upper)],
+            Scale::Identity => [None, None],
+        }
+        .into_iter()
+        .flatten()
+        .find(|&bound| value == bound);
+        if let Some(bound) = bound {
+            return Err(LocalError::Refused(format!(
+                "The fit of '{}' is on its bound {bound}: on the unbounded scale its variance \
+                 is infinite there. A profile likelihood describes the uncertainty of a \
+                 parameter on its bound (MUNQU/commol#132)",
+                parameter.id
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Add `Aᵀ C A` of one term to `matrix`, and the first-order error of the
+/// Jacobian row to `errors`. Row 0 of `A` is the Jacobian of the mean; row
+/// `1 + k` is the unit vector of the parameter of noise argument `k`, or 0
+/// for a number.
+fn add_term(
+    matrix: &mut Matrix,
+    errors: &mut Matrix,
+    term: &TermDerivatives,
+    jacobian: &[f64],
+    error: &[f64],
+) {
+    let size = 1 + term.parameters.len();
+    let p = jacobian.len();
+    let row = |a: usize, j: usize| -> f64 {
+        if a == 0 {
+            jacobian[j]
+        } else {
+            f64::from(u8::from(term.parameters[a - 1] == Some(j)))
+        }
+    };
+    let row_error = |a: usize, j: usize| if a == 0 { error[j] } else { 0.0 };
+    for a in 0..size {
+        for b in 0..size {
+            let c = term.curvature[a * size + b];
+            if c == 0.0 {
+                continue;
+            }
+            for j in 0..p {
+                let (u, du) = (row(a, j), row_error(a, j));
+                if u == 0.0 && du == 0.0 {
+                    continue;
+                }
+                for k in 0..p {
+                    let (v, dv) = (row(b, k), row_error(b, k));
+                    matrix[(j, k)] += c * u * v;
+                    errors[(j, k)] += c.abs() * (du * v.abs() + u.abs() * dv);
+                }
+            }
+        }
+    }
+}
+
+/// A failure of the derivatives as a local error: a stochastic engine is a
+/// refusal, anything else a failure.
+pub(crate) fn sensitivity_error(error: SensitivityError) -> LocalError {
+    match error {
+        SensitivityError::Stochastic => LocalError::Refused(error.to_string()),
+        error => LocalError::Failed(error.to_string()),
+    }
+}

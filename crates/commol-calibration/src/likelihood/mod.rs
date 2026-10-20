@@ -160,6 +160,18 @@ pub struct Term {
     trials: Option<u64>,
 }
 
+/// The derivatives of one observation's term of the objective with respect
+/// to its arguments: its mean `μ` first, then the noise arguments of its
+/// observation model. A loss has the mean only.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TermDerivatives {
+    /// The parameter each noise argument reads, `None` for a number.
+    pub parameters: Vec<Option<usize>>,
+    /// The expected second derivatives of the term, row-major over
+    /// `(μ, noise arguments…)`.
+    pub curvature: Vec<f64>,
+}
+
 /// The likelihood of the observations of a problem.
 #[derive(Debug, Clone)]
 pub struct Likelihood {
@@ -366,6 +378,67 @@ impl Likelihood {
     /// The term of each of the problem's observations.
     pub fn problem_terms(&self) -> &[Term] {
         &self.terms
+    }
+
+    /// The parameter each noise argument of the model of `term` reads, in
+    /// the order of [`Noise::information`] after the mean: the index of a
+    /// noise parameter, or `None` for a number.
+    pub fn argument_parameters(&self, term: Term) -> Vec<Option<usize>> {
+        let of = |slot: Slot| match slot {
+            Slot::Parameter(index) => Some(index),
+            Slot::Value(_) => None,
+        };
+        match self.series[term.model].1 {
+            Resolved::Normal { sd } => vec![of(sd)],
+            Resolved::LogNormal { sigma, .. } => vec![of(sigma)],
+            Resolved::StudentT { df, scale } => vec![of(df), of(scale)],
+            Resolved::NegativeBinomial { overdispersion } => vec![of(overdispersion)],
+            Resolved::Poisson | Resolved::Binomial { .. } => Vec::new(),
+        }
+    }
+
+    /// The expected curvature of each observation's term of `−log L` at the
+    /// parameter `values` and the means `predictions`: `wᵢ` times the Fisher
+    /// information of its model ([`Noise::information`]), with the
+    /// parameters its noise arguments read.
+    ///
+    /// # Errors
+    ///
+    /// The index of the first observation with weight whose mean lies
+    /// outside the means its model allows.
+    pub fn term_curvatures(
+        &self,
+        values: &[f64],
+        predictions: &[f64],
+    ) -> Result<Vec<TermDerivatives>, usize> {
+        self.terms
+            .iter()
+            .zip(&self.weights)
+            .zip(predictions)
+            .enumerate()
+            .map(|(index, ((&term, &weight), &mean))| {
+                let noise = self.noise(term, values);
+                let parameters = self.argument_parameters(term);
+                if weight == 0.0 {
+                    let size = 1 + parameters.len();
+                    return Ok(TermDerivatives {
+                        parameters,
+                        curvature: vec![0.0; size * size],
+                    });
+                }
+                if noise.mean_outside(mean).is_some() {
+                    return Err(index);
+                }
+                Ok(TermDerivatives {
+                    parameters,
+                    curvature: noise
+                        .information(mean)
+                        .into_iter()
+                        .map(|entry| weight * entry)
+                        .collect(),
+                })
+            })
+            .collect()
     }
 
     fn check_value(&self, obs: &ObservedDataPoint, term: Term) -> Result<(), String> {

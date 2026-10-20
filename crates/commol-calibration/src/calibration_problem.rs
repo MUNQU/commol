@@ -11,9 +11,10 @@
 
 use commol_core::SimulationEngine;
 
-use crate::discrepancy::{Discrepancy, DiscrepancyConfig};
+use crate::discrepancy::{Discrepancy, DiscrepancyConfig, TermError};
 use crate::feasibility::{constraint_positions, EvaluationError, Feasibility, Violation};
 use crate::forward::{ForwardModel, Workspace};
+use crate::likelihood::TermDerivatives;
 use crate::observation::ObservationOperator;
 use crate::types::{CalibrationConstraint, CalibrationParameter, ObservedDataPoint, Replicates};
 use crate::values::{clamp_to_bounds, ValueWriter};
@@ -368,6 +369,34 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         }
         self.forward.observe(values, workspace);
         Ok(())
+    }
+
+    /// The derivatives of each observation's term of the discrepancy at the
+    /// parameter `values`, given the predictions of one run
+    /// ([`Discrepancy::term_derivatives`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns a message for a loss with no curvature, or that names the
+    /// observation whose mean lies outside its observation model.
+    pub fn term_derivatives(
+        &self,
+        values: &[f64],
+        predictions: &[f64],
+    ) -> Result<Vec<TermDerivatives>, String> {
+        self.discrepancy
+            .term_derivatives(values, predictions)
+            .map_err(|error| match error {
+                TermError::NoCurvature(message) => message,
+                TermError::MeanOutside(index) => {
+                    let obs = &self.observed_data[index];
+                    format!(
+                        "Observation '{}' at {} has the mean {}, outside the means its \
+                         observation model allows",
+                        obs.label, obs.at, predictions[index]
+                    )
+                }
+            })
     }
 
     /// The discrepancy: the loss or the likelihood, the observed values,

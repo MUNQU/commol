@@ -11,6 +11,7 @@
 //! | [`predictive`] | [`Predictive`]: the run of every draw, its bands, and every draw's value of observations |
 //! | [`scores`] | Coverage, interval scores, CRPS and PIT of a predictive |
 //! | [`identifiability`] | Structural rank, collinearity, and the identifiability of a sample and of starts |
+//! | [`local`] | Local approximations around a fit: the curvature on the unbounded scale and the Laplace approximation |
 //! | [`sensitivity`] | The port of derivatives, [`sensitivity::SensitivitySource`], and finite differences |
 //! | [`resampling`] | Bootstraps and the jackknife: fits to reweighted or resampled data, and residual noise |
 //! | [`distribution`] | [`Distribution`]: a family of distributions truncated to the bounds of a parameter |
@@ -38,6 +39,7 @@ pub mod design;
 pub mod distribution;
 pub mod global_sensitivity;
 pub mod identifiability;
+pub mod local;
 pub mod predictive;
 pub mod priors;
 pub mod quantity;

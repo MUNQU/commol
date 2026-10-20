@@ -624,6 +624,13 @@ class EtaCoverageProtocol(Protocol):
 
 _Priors = list[tuple[str, str, list[float]]] | None
 
+class LocalRunProtocol(Protocol):
+    values: list[list[float]]
+    center: list[float]
+    covariance: list[list[float]]
+    degrees_of_freedom: float | None
+    notes: list[str]
+
 class ConformalRunProtocol(Protocol):
     @property
     def labels(self) -> list[str]: ...
@@ -799,6 +806,14 @@ class InferenceModule(Protocol):
         stay_probability: float,
         seed: int,
     ) -> SmcRunProtocol: ...
+    def laplace(
+        self,
+        problem: CalibrationProblemProtocol,
+        fit: list[float],
+        curvature: str,
+        draws: int,
+        seed: int,
+    ) -> LocalRunProtocol: ...
     def information_matching_eta(
         self, problem: CalibrationProblemProtocol, fit: list[float]
     ) -> float: ...
