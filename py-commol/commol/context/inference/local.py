@@ -22,10 +22,13 @@ from commol.context.inference.sample import ParameterSample
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import CalibrationProblemProtocol
 
-type CurvatureName = Literal["gauss_newton"]
+type CurvatureName = Literal["gauss_newton", "hessian"]
 """The curvature a local approximation reads. ``"gauss_newton"``: the
 expected curvature, ``Jᵀ W J`` with the Fisher information ``W`` of each
-observation, and the Fisher information of each noise parameter."""
+observation, and the Fisher information of each noise parameter.
+``"hessian"``: the observed curvature, central differences of the objective
+with steps from the accuracy of the engine, ``4p² + 1`` runs; for a fit with
+large residuals or a wrong model, where the two differ."""
 
 
 class DeltaBand(BaseModel):
@@ -194,7 +197,7 @@ class Laplace(UncertaintyMethod[LaplaceResult]):
     ----------
     draws : int
         Number of draws of the normal, at least 1.
-    curvature : "gauss_newton"
+    curvature : {"gauss_newton", "hessian"}
         The curvature (default ``"gauss_newton"``).
     """
 
@@ -271,8 +274,9 @@ class Sandwich(UncertaintyMethod[SandwichResult]):
         (2004) for non-overlapping blocks on the residuals of the fit.
     draws : int
         Number of draws of the Student t, at least 1.
-    curvature : "gauss_newton"
-        The curvature ``H`` (default ``"gauss_newton"``).
+    curvature : {"gauss_newton", "hessian"}
+        The curvature ``H`` (default ``"gauss_newton"``). With the Hessian,
+        the sandwich also holds when the mean is wrong.
     """
 
     block_length: BlockLength = Field(description="Positions per block.")
@@ -409,7 +413,7 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
     target : LikelihoodTarget | GibbsTarget
         The posterior of the observation models with priors, or the Gibbs
         posterior of the loss with priors and ``eta``.
-    curvature : "gauss_newton"
+    curvature : {"gauss_newton", "hessian"}
         The curvature of each component (default ``"gauss_newton"``).
     """
 

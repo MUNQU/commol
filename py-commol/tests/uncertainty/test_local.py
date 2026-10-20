@@ -80,6 +80,22 @@ class TestCurvature:
         ):
             calibrator.uncertainty(Laplace(draws=10))
 
+    def test_the_hessian_of_a_correct_normal_model_is_its_information(self) -> None:
+        # With a known sd, −log L is quadratic in c: its Hessian is n / sd².
+        calibrator = flow_calibrator(
+            _normal_data(8, 7, sd=1.0),
+            windowed=True,
+            observation_models={"B": NormalObservations(sd=1.0)},
+        )
+
+        expected = calibrator.uncertainty(Laplace(draws=10))
+        observed = calibrator.uncertainty(Laplace(draws=10, curvature="hessian"))
+
+        assert observed.covariance[0][0] == pytest.approx(
+            expected.covariance[0][0], rel=1e-5
+        )
+        assert observed.notes == []
+
 
 class TestLaplace:
     def test_delta_band_of_a_linear_model_equals_the_draws(self) -> None:

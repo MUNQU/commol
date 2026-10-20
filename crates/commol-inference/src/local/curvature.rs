@@ -9,10 +9,15 @@
 //! `J` of the means and the identity of the noise parameters gives
 //! `H_θ = Σᵢ Aᵢᵀ Cᵢ Aᵢ`, which is `Jᵀ W J` on the model parameters. On the
 //! unbounded scale, `H_u = D · H_θ · D`; the curvature of the log Jacobian
-//! is left out.
+//! is left out. The Hessian takes central differences of the objective
+//! itself, the observed curvature, for a fit with large residuals or a wrong
+//! model, where the expected and the observed curvature differ.
 
-use commol_calibration::{CalibrationProblem, TermDerivatives};
+use std::cell::RefCell;
+
+use commol_calibration::{CalibrationProblem, TermDerivatives, Workspace};
 use commol_core::SimulationEngine;
+use finitediff::vec::hessian::central_hessian_nograd_error_vec;
 
 use super::LocalError;
 use crate::sensitivity::{Matrix, SensitivityError, SensitivitySource};
@@ -99,22 +104,77 @@ impl Curvature {
     }
 
     /// The curvature of `problem` at `fit` by central differences of its
-    /// objective.
+    /// objective: the stepped central Hessian of the `finitediff` crate of
+    /// the argmin fork, with its estimated error. The gradients of the terms
+    /// and the predictions are those of [`Self::gauss_newton`] with
+    /// `source`.
+    ///
+    /// The step of parameter `j` is `h_j = δ^{1/4} · s_j`, which balances the
+    /// truncation error of the central second difference, of order `h²`,
+    /// with the error `δ/h²` of an objective of relative accuracy `δ`
+    /// ([`SimulationEngine::output_accuracy`]). The scale `s_j` is `dθ/du`,
+    /// the length of a unit step on the unbounded scale, for a parameter
+    /// with a bound, and `max(|θ_j|, 1)` for one without: `dθ/du` is below
+    /// the distance to each bound, so `θ ± 2h` stays inside them.
     ///
     /// # Errors
     ///
-    /// Always [`LocalError::Refused`]: the central Hessian with given steps
-    /// of the argmin fork (MUNQU/argmin#6) is not yet a dependency.
-    pub fn hessian<E: SimulationEngine>(
+    /// As [`Self::gauss_newton`], and [`LocalError::Failed`] when a point of
+    /// the differences is infeasible or the engine fails.
+    pub fn hessian<E, S>(
         problem: &CalibrationProblem<E>,
+        source: &S,
         fit: &[f64],
-    ) -> Result<Self, LocalError> {
-        let _ = (problem, fit);
-        Err(LocalError::Refused(
-            "curvature=\"hessian\" needs the central Hessian with given steps of the argmin \
-             fork (MUNQU/argmin#6)"
-                .to_string(),
-        ))
+    ) -> Result<Self, LocalError>
+    where
+        E: SimulationEngine,
+        S: SensitivitySource + ?Sized,
+    {
+        let expected = Self::gauss_newton(problem, source, fit)?;
+        let accuracy = problem.forward().base_engine().output_accuracy();
+        let factor = accuracy.powf(0.25);
+        let steps: Vec<f64> = expected
+            .transform
+            .scales()
+            .iter()
+            .zip(&expected.derivatives)
+            .zip(fit)
+            .map(|((scale, &derivative), &value)| match scale {
+                Scale::Identity => factor * value.abs().max(1.0),
+                _ => factor * derivative,
+            })
+            .collect();
+        let workspace = RefCell::new(Workspace::default());
+        let objective = |values: &Vec<f64>| -> Result<f64, anyhow::Error> {
+            problem
+                .evaluate(values, &mut workspace.borrow_mut())
+                .map_err(|error| anyhow::Error::msg(error.to_string()))
+        };
+        let estimate = central_hessian_nograd_error_vec(fit, &objective, &steps, accuracy)
+            .map_err(|error| {
+                LocalError::Failed(format!(
+                    "The Hessian of the objective at the fit failed: {error}"
+                ))
+            })?;
+        let p = fit.len();
+        let error = estimate.error();
+        let matrix = Matrix::from_fn(p, p, |j, k| estimate.hessian[j][k]);
+        let errors = Matrix::from_fn(p, p, |j, k| error[j][k]);
+        if matrix.iter().any(|entry| !entry.is_finite()) {
+            return Err(LocalError::Failed(
+                "The Hessian of the objective at the fit is not finite".to_string(),
+            ));
+        }
+        let mut curvature = Self::on_the_unbounded_scale(
+            expected.names.clone(),
+            expected.transform.clone(),
+            fit,
+            matrix,
+            errors,
+        );
+        curvature.gradients = expected.gradients;
+        curvature.predictions = expected.predictions;
+        Ok(curvature)
     }
 
     /// `H_u = D · H_θ · D` and its errors, with the notes of entries whose

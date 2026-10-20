@@ -183,8 +183,9 @@ pub(crate) fn inverse(matrix: &Matrix) -> Result<Matrix, LocalError> {
         .map(|cholesky| cholesky.inverse())
         .ok_or_else(|| {
             LocalError::Refused(
-                "The curvature at the fit is singular: the data do not determine every \
-                 parameter there. Calibrator.identifiability(...) shows which"
+                "The curvature at the fit is not positive definite: the data do not \
+                 determine every parameter there, or the fit is not a minimum. \
+                 Calibrator.identifiability(...) shows which parameters the data determine"
                     .to_string(),
             )
         })

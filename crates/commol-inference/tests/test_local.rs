@@ -210,7 +210,6 @@ fn curvatures_of_a_linear_model_equal_the_information() {
 }
 
 #[test]
-#[ignore = "waits for the stepped Hessian of MUNQU/argmin#6; run with cargo test -p commol-inference --test test_local -- --ignored"]
 fn the_hessian_of_a_linear_model_equals_the_information() {
     // At the maximum of the likelihood the observed information of the line
     // is its expected information: the cross terms of `sd` sum the residuals,
@@ -237,7 +236,8 @@ fn the_hessian_of_a_linear_model_equals_the_information() {
         .sqrt();
     let fit = [a, b, sd];
 
-    let curvature = Curvature::hessian(&problem, &fit).unwrap();
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+    let curvature = Curvature::hessian(&problem, &source, &fit).unwrap();
 
     assert_matrix(curvature.matrix(), &line_information(&fit), 1e-5);
 }

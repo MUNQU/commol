@@ -36,7 +36,7 @@ impl CurvatureKind {
     }
 }
 
-/// The curvature of the objective of `problem` at `fit`; Gauss–Newton reads
+/// The curvature of the objective of `problem` at `fit`, with the
 /// finite differences of the observations.
 ///
 /// # Errors
@@ -50,13 +50,11 @@ pub fn curvature_at<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
+    let source =
+        FiniteDifferences::new(problem, Design::Observations).map_err(sensitivity_error)?;
     match kind {
-        CurvatureKind::GaussNewton => {
-            let source =
-                FiniteDifferences::new(problem, Design::Observations).map_err(sensitivity_error)?;
-            Curvature::gauss_newton(problem, &source, fit)
-        }
-        CurvatureKind::Hessian => Curvature::hessian(problem, fit),
+        CurvatureKind::GaussNewton => Curvature::gauss_newton(problem, &source, fit),
+        CurvatureKind::Hessian => Curvature::hessian(problem, &source, fit),
     }
 }
 
