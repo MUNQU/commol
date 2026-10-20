@@ -345,7 +345,78 @@ fn mixture_finds_both_modes_in_proportion() {
         (share - expected).abs() < 4.0 * error,
         "{share} against {expected} ± {error}"
     );
-    assert!(run.sample.reliable, "{}", run.sample.k_hat);
+    assert!(run.reliable, "{}", run.sample.k_hat);
+}
+
+/// `x = a²` observed near 4 with `a` in `[−5, 1.5]`: the positive optimum
+/// 2 lies beyond the upper bound, so a start ends on it.
+fn square_on_a_bound() -> (CalibrationProblem<Curve>, Priors) {
+    let values: Vec<f64> = (0..10).map(|i| 4.0 + [0.2, -0.3, 0.1][i % 3]).collect();
+    let problem = CalibrationProblem::new(
+        Curve::new(Shape::Square),
+        observed("x", &values),
+        vec![CalibrationParameter::new("a".to_string(), -5.0, 1.5)],
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
+    )
+    .unwrap();
+    let priors = Priors::uniform_on_bounds(&["a".to_string()], &[(-5.0, 1.5)]).unwrap();
+    (problem, priors)
+}
+
+#[test]
+fn an_end_on_a_bound_worse_than_every_component_is_only_noted() {
+    let (problem, priors) = square_on_a_bound();
+    let target = LikelihoodTarget::new(&problem, &priors).unwrap();
+
+    // The end on the bound fits worse than the optimum −2.
+    let run = laplace_mixture(
+        &problem,
+        &TemperedPosterior::new(&target),
+        1.0,
+        &[vec![-2.0], vec![1.5]],
+        400,
+        CurvatureKind::GaussNewton,
+        3,
+    )
+    .unwrap();
+
+    assert_eq!(run.components.len(), 1);
+    assert!(
+        run.notes
+            .iter()
+            .any(|note| note.contains("is on its bound 1.5"))
+    );
+    assert!(run.reliable, "{:?}", run.notes);
+}
+
+#[test]
+fn an_end_on_a_bound_better_than_a_component_marks_the_sample_unreliable() {
+    let (problem, priors) = square_on_a_bound();
+    let target = LikelihoodTarget::new(&problem, &priors).unwrap();
+
+    // The kept end −1 fits worse than the end on the bound: the mixture
+    // misses a mode at least as good as one it holds.
+    let run = laplace_mixture(
+        &problem,
+        &TemperedPosterior::new(&target),
+        1.0,
+        &[vec![-1.0], vec![1.5]],
+        400,
+        CurvatureKind::GaussNewton,
+        3,
+    )
+    .unwrap();
+
+    assert_eq!(run.components.len(), 1);
+    assert!(!run.reliable);
+    assert!(
+        run.notes
+            .iter()
+            .any(|note| note.contains("misses an optimum on a bound")),
+        "{:?}",
+        run.notes
+    );
 }
 
 #[test]
@@ -383,7 +454,7 @@ fn banana_target_gives_a_large_k_hat() {
     .unwrap();
 
     assert!(run.sample.k_hat > 0.7, "{}", run.sample.k_hat);
-    assert!(!run.sample.reliable);
+    assert!(!run.reliable);
     assert!(run.notes.iter().any(|note| note.contains("unreliable")));
 }
 

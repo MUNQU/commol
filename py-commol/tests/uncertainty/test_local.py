@@ -144,7 +144,7 @@ class TestLaplace:
         result = calibrator.uncertainty(Laplace(draws=draws))
         positions = [float(t) for t in range(13)]
 
-        band = result.delta_band(positions, level)
+        band = calibrator.delta_band(result, positions, level)
         drawn = Predictive(calibrator, result.sample, positions).band(level)
 
         # The error of a quantile at 0.05 of n normal draws, in standard
@@ -169,7 +169,7 @@ class TestLaplace:
             half, rel=1e-3
         )
 
-    def test_a_result_read_from_json_has_no_delta_band(self) -> None:
+    def test_a_result_read_from_json_gives_the_same_delta_band(self) -> None:
         calibrator = flow_calibrator(
             [9.0, 11.0, 10.0],
             windowed=True,
@@ -178,9 +178,35 @@ class TestLaplace:
         result = calibrator.uncertainty(Laplace(draws=10))
         read = LaplaceResult.model_validate_json(result.model_dump_json())
 
-        assert read.covariance == result.covariance
-        with pytest.raises(ValueError, match="needs the calibration problem"):
-            read.delta_band([1.0], 0.9)
+        band = calibrator.delta_band(read, [1.0, 2.0], 0.9)
+
+        assert band == calibrator.delta_band(result, [1.0, 2.0], 0.9)
+        assert band.lower["B"][1] < band.center["B"][1] < band.upper["B"][1]
+
+    def test_a_band_needs_a_result_of_its_problem(self) -> None:
+        models = {"B": NormalObservations(sd="sd")}
+        noise = [bounded("sd", 0.1, 10.0, kind="noise")]
+        other = flow_calibrator(
+            [9.0, 11.0, 10.0], windowed=True, observation_models=models, noise=noise
+        )
+        result = other.uncertainty(Laplace(draws=10))
+        calibrator = flow_calibrator(
+            [9.0, 11.0, 10.0],
+            windowed=True,
+            observation_models={"B": NormalObservations(sd=1.0)},
+        )
+
+        with pytest.raises(ValueError, match=r"parameters \['c', 'sd'\]"):
+            calibrator.delta_band(result, [1.0], 0.9)
+
+    def test_laplace_refuses_a_loss(self) -> None:
+        calibrator = flow_calibrator([9.0, 11.0, 10.0], windowed=True)
+
+        with pytest.raises(
+            ValueError,
+            match=r"NormalObservations\(sd=\"sd\"\) with a noise parameter.*Sandwich",
+        ):
+            calibrator.uncertainty(Laplace(draws=10))
 
 
 class TestSandwich:
@@ -210,7 +236,7 @@ class TestSandwich:
         c = result.fit.best_parameters["c"]
         derivative = c * (50.0 - c) / 50.0
 
-        band = result.delta_band([3.0], 0.9)
+        band = calibrator.delta_band(result, [3.0], 0.9)
 
         t_quantile = 2.353363434801823
         half = t_quantile * 3.0 * derivative * math.sqrt(result.covariance[0][0])
@@ -306,6 +332,8 @@ class TestResults:
         assert result.components[0].center["c"] == pytest.approx(-2.0, abs=0.1)
         assert any("'c' is on its bound" in note for note in result.notes)
         assert "'c' is on its bound" in caplog.text
+        # The end on the bound fits worse than the kept component: only a note.
+        assert result.reliable
 
 
 def _matching(block_length: int) -> GibbsPosterior:

@@ -9,7 +9,9 @@
 //! target's log density per unit of the objective (1 for a likelihood, `η`
 //! for a Gibbs posterior), and its log evidence is
 //! `log p(θ̂_k) + log |dθ/du| + (d/2) log 2π + ½ log |Σ_k|`. Every draw is
-//! weighted by the target over the mixture and smoothed by PSIS.
+//! weighted by the target over the mixture and smoothed by PSIS. An end on a
+//! bound gives no component; when it fits at least as well as the worst
+//! component, the sample misses an optimum and is unreliable.
 
 use commol_calibration::{CalibrationProblem, Workspace};
 use commol_core::SimulationEngine;
@@ -79,6 +81,9 @@ impl Proposal for Mixture<'_> {
 pub struct MixtureRun {
     /// The components, in order of their objective.
     pub components: Vec<Component>,
+    /// Whether the sample is reliable: `k̂ ≤ 0.7`, and no end on a bound
+    /// fits at least as well as the worst component.
+    pub reliable: bool,
     /// The draws and their smoothed weights.
     pub sample: ImportanceRun,
     /// What the reader should know: ends that gave no component, and an
@@ -123,7 +128,10 @@ where
     }
     scored.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut components: Vec<Component> = Vec::new();
-    for (_, end) in scored {
+    // The objective of each kept component, and of each end on a bound.
+    let mut kept = Vec::new();
+    let mut on_bounds = Vec::new();
+    for (objective, end) in scored {
         let unbounded = transform.to_unbounded(end);
         let merged = components.iter().any(|component| {
             let squared: f64 = component
@@ -138,6 +146,7 @@ where
             continue;
         }
         if let Some((j, bound)) = on_bound(&transform, end) {
+            on_bounds.push((objective, end));
             notes.push(format!(
                 "The end {end:?} gives no component: '{}' is on its bound {bound}",
                 names[j]
@@ -164,6 +173,7 @@ where
             .iter()
             .map(|l| 2.0 * l.ln())
             .sum();
+        kept.push(objective);
         components.push(Component {
             center: end.clone(),
             log_evidence: log_target
@@ -203,7 +213,24 @@ where
             sample.k_hat
         ));
     }
+    // An end on a bound that fits at least as well as a kept component is
+    // an optimum the mixture leaves out: its mass is missing from the
+    // sample, which k̂ cannot see.
+    let worst = kept.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let missed: Vec<String> = on_bounds
+        .iter()
+        .filter(|(objective, _)| *objective <= worst)
+        .map(|(objective, end)| format!("{end:?} (objective {objective})"))
+        .collect();
+    if !missed.is_empty() {
+        notes.push(format!(
+            "The mixture misses an optimum on a bound that fits at least as well as its \
+             worst component (objective {worst}): {}; the sample is unreliable",
+            missed.join(", ")
+        ));
+    }
     Ok(MixtureRun {
+        reliable: sample.reliable && missed.is_empty(),
         components,
         sample,
         notes,

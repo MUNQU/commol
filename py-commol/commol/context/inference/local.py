@@ -7,20 +7,15 @@ one bound, the identity with none), so every draw maps back inside the
 bounds.
 """
 
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field
 
-from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.distributions import WithPriors
 from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
-
-if TYPE_CHECKING:
-    from commol.commol_rs._commol_rs import CalibrationProblemProtocol
 
 type CurvatureName = Literal["gauss_newton", "hessian"]
 """The curvature a local approximation reads. ``"gauss_newton"``: the
@@ -33,7 +28,8 @@ large residuals or a wrong model, where the two differ."""
 
 class DeltaBand(BaseModel):
     """
-    The band of every output by the delta method: the prediction at the fit
+    The band of every output by the delta method (``Calibrator.delta_band``):
+    the prediction at the fit
     plus and minus a quantile times the standard deviation of the
     linearized model, ``J Σ Jᵀ``, with no run of the draws.
 
@@ -84,20 +80,6 @@ class LocalResult(BaseModel):
     sample: ParameterSample
     notes: list[str]
 
-    _problem: "CalibrationProblemProtocol | None" = PrivateAttr(default=None)
-
-    def attach(self, problem: "CalibrationProblemProtocol") -> None:
-        """
-        Keep the calibration problem the result was made from, which
-        `delta_band` differentiates.
-
-        Parameters
-        ----------
-        problem : CalibrationProblemProtocol
-            The problem of the calibrator (``Calibrator.rust_problem``).
-        """
-        self._problem = problem
-
     def degrees_of_freedom(self) -> float | None:
         """
         The degrees of freedom of the distribution.
@@ -108,58 +90,6 @@ class LocalResult(BaseModel):
             Those of a Student t, or None for a normal.
         """
         return None
-
-    def delta_band(
-        self, positions: Sequence[float], confidence_level: float
-    ) -> DeltaBand:
-        """
-        The band of every output by the delta method.
-
-        The model is linearized at the fit: the variance of an output is
-        ``J Σ Jᵀ``, with ``J`` its derivatives on the unbounded scale. It
-        runs the model a few times per parameter, not once per draw.
-
-        Parameters
-        ----------
-        positions : Sequence[float]
-            Positions to report at.
-        confidence_level : float
-            Strictly between 0 and 1.
-
-        Returns
-        -------
-        DeltaBand
-            The prediction at the fit and the ends of the interval of each
-            output at each position.
-
-        Raises
-        ------
-        ValueError
-            If the result has no problem (it was read from JSON), the level
-            is not strictly between 0 and 1, or the engine rejects a
-            position.
-        """
-        if self._problem is None:
-            raise ValueError(
-                "delta_band needs the calibration problem of the run; a result "
-                "read from JSON has none."
-            )
-        positions = [float(position) for position in positions]
-        outputs, center, lower, upper = commol_rs.inference.delta_band(
-            self._problem,
-            [self.fit.best_parameters[name] for name in self.sample.names],
-            self.covariance,
-            self.degrees_of_freedom(),
-            positions,
-            confidence_level,
-        )
-        return DeltaBand(
-            confidence_level=confidence_level,
-            positions=positions,
-            center=dict(zip(outputs, center, strict=True)),
-            lower=dict(zip(outputs, lower, strict=True)),
-            upper=dict(zip(outputs, upper, strict=True)),
-        )
 
 
 class LaplaceResult(LocalResult):

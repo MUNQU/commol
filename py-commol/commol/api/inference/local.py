@@ -75,7 +75,7 @@ def run_laplace(calibrator: "Calibrator", method: Laplace) -> LaplaceResult:
         method.draws,
         calibrator.seed,
     )
-    result = LaplaceResult(
+    return LaplaceResult(
         fit=fit,
         covariance=run.covariance,
         sample=_sample(
@@ -85,8 +85,6 @@ def run_laplace(calibrator: "Calibrator", method: Laplace) -> LaplaceResult:
         ),
         notes=_notes(run),
     )
-    result.attach(calibrator.rust_problem)
-    return result
 
 
 def run_sandwich(calibrator: "Calibrator", method: Sandwich) -> SandwichResult:
@@ -115,7 +113,7 @@ def run_sandwich(calibrator: "Calibrator", method: Sandwich) -> SandwichResult:
         method.draws,
         calibrator.seed,
     )
-    result = SandwichResult(
+    return SandwichResult(
         fit=fit,
         covariance=run.covariance,
         sample=_sample(
@@ -128,8 +126,6 @@ def run_sandwich(calibrator: "Calibrator", method: Sandwich) -> SandwichResult:
         block_length=block_length,
         block_length_estimates=dict(estimates) if estimates is not None else None,
     )
-    result.attach(calibrator.rust_problem)
-    return result
 
 
 def run_laplace_mixture(

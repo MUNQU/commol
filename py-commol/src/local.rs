@@ -231,7 +231,7 @@ impl PyMixtureRun {
             log_weights: run.sample.log_weights,
             k_hat: run.sample.k_hat,
             effective_size: run.sample.effective_size,
-            reliable: run.sample.reliable,
+            reliable: run.reliable,
             notes: run.notes,
         }
     }

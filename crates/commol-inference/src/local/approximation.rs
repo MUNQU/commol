@@ -77,8 +77,10 @@ where
     if problem.discrepancy().likelihood().is_none() {
         return Err(LocalError::Refused(
             "Laplace(...) needs observation models: a loss has no noise scale, so its \
-             curvature is no inverse variance. Give observation_models, or use \
-             Sandwich(...), which needs no noise model"
+             curvature is no inverse variance. For a Laplace approximation give \
+             observation_models, such as NormalObservations(sd=\"sd\") with a noise \
+             parameter sd, whose fit estimates the scale; or use Sandwich(...), which \
+             needs no noise model"
                 .to_string(),
         ));
     }
