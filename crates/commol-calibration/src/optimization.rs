@@ -653,7 +653,7 @@ where
             optimize_nelder_mead(space, cost, start, nm_config, observer)
         }
         OptimizationConfig::ParticleSwarm(ps_config) => {
-            optimize_particle_swarm(space, cost, start, &seeded(ps_config, seed), observer)
+            optimize_particle_swarm(space, cost, &seeded(ps_config, seed), observer)
         }
     }
 }
@@ -786,6 +786,21 @@ impl<C: Operator<Param = Vec<f64>, Output = Vec<f64>>> Operator for BoundedProbl
     }
 }
 
+/// A cost function whose NaN costs count as `+∞`. argmin keeps a particle
+/// as the best only when its cost is below the best so far, so a NaN cost
+/// first in the swarm would leave it with no best particle.
+struct NanAsWorst<C>(C);
+
+impl<C: CostFunction<Param = Vec<f64>, Output = f64>> CostFunction for NanAsWorst<C> {
+    type Param = Vec<f64>;
+    type Output = f64;
+
+    fn cost(&self, x: &Self::Param) -> Result<Self::Output, Error> {
+        // `min` returns its other argument when one is NaN.
+        self.0.cost(x).map(|cost| cost.min(f64::INFINITY))
+    }
+}
+
 /// Build Nelder-Mead solver from configuration, with its simplex in `u`
 fn build_nelder_mead_solver(
     transform: &SineTransform,
@@ -883,7 +898,6 @@ where
 fn optimize_particle_swarm<C, O>(
     space: &SearchSpace,
     cost: C,
-    start: &[f64],
     config: &ParticleSwarmConfig,
     observer: Option<O>,
 ) -> Result<(CalibrationResult, Option<C>), String>
@@ -892,7 +906,7 @@ where
     O: Observe<ParticleSwarmState> + 'static,
 {
     let solver = build_particle_swarm_solver(&space.bounds, config)?;
-    let mut executor = Executor::new(cost, solver)
+    let mut executor = Executor::new(NanAsWorst(cost), solver)
         .configure(|state| swarm_state(state, config))
         .timer(true);
     if let Some(observer) = observer {
@@ -903,20 +917,23 @@ where
         .map_err(|e| format!("Optimization failed: {}", e))?;
 
     let state = &result.state;
-    let (best, best_cost) = state.best_individual.as_ref().map_or_else(
-        || (start.to_vec(), f64::INFINITY),
-        |particle| (particle.position.clone(), particle.cost),
-    );
+    let best = state
+        .best_individual
+        .as_ref()
+        .expect("argmin keeps the first particle as the best, as no cost is NaN");
     let calibration = CalibrationResult {
         // The values the objective scored, clamped to their bounds.
-        best_parameters: space.clamp(&best),
+        best_parameters: space.clamp(&best.position),
         parameter_names: space.names.clone(),
-        final_loss: best_cost,
+        final_loss: best.cost,
         iterations: state.iter as usize,
         converged: converged(&state.termination_status),
         termination_reason: format!("{:?}", state.termination_status),
     };
-    Ok((calibration, result.problem.take_problem()))
+    Ok((
+        calibration,
+        result.problem.take_problem().map(|problem| problem.0),
+    ))
 }
 
 /// The limits of a swarm run: `max_iterations`, and `target_cost` when set.
@@ -1033,6 +1050,40 @@ pub(crate) fn build_particle_swarm_solver(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `(x − 0.7)²`, NaN below 0.5.
+    struct HalfNan;
+
+    impl CostFunction for HalfNan {
+        type Param = Vec<f64>;
+        type Output = f64;
+
+        fn cost(&self, x: &Self::Param) -> Result<Self::Output, Error> {
+            Ok(if x[0] < 0.5 {
+                f64::NAN
+            } else {
+                (x[0] - 0.7).powi(2)
+            })
+        }
+    }
+
+    #[test]
+    fn a_swarm_with_nan_costs_finds_the_minimum_where_the_cost_is_a_number() {
+        let space = SearchSpace {
+            bounds: vec![(0.0, 1.0)],
+            names: vec!["x".to_string()],
+        };
+        let config = ParticleSwarmConfig {
+            max_iterations: 200,
+            // A seed whose first particle falls where the cost is NaN.
+            seed: Some(0),
+            ..ParticleSwarmConfig::default()
+        };
+        let (fit, _) =
+            optimize_particle_swarm(&space, HalfNan, &config, None::<NoObserver>).unwrap();
+        assert!((fit.best_parameters[0] - 0.7).abs() < 1e-3);
+        assert!(fit.final_loss < 1e-6);
+    }
 
     #[test]
     fn a_name_gives_its_strategy_and_an_unknown_name_lists_the_names() {

@@ -361,6 +361,11 @@ mod tests {
     }
 
     #[test]
+    fn the_amount_of_a_bound_violation_is_its_distance_outside_them() {
+        assert_eq!(Violation::OutOfBounds { amount: 1.5 }.amount(), 1.5);
+    }
+
+    #[test]
     fn the_amount_of_an_infeasible_start_is_a_hundred_times_its_excess() {
         assert_eq!(Violation::InfeasibleStart { excess: 0.5 }.amount(), 50.0);
         assert_eq!(Violation::InfeasibleRun.amount(), 0.0);

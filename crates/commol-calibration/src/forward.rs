@@ -145,25 +145,28 @@ impl<E: SimulationEngine> ForwardModel<E> {
     /// every position of `observed_data` and the start of every window; the
     /// observation operator reads `observed_data` from those runs.
     ///
-    /// # Errors
+    /// # Panics
     ///
-    /// A message when an observation names an unknown output or factor.
+    /// Panics when an observation names an unknown output or factor: the
+    /// observations of a problem built their operator on these outputs and
+    /// parameters already, and the schedule does not change what it accepts.
     pub(crate) fn on_schedule(
         &self,
         observed_data: &[ObservedDataPoint],
         schedule: Vec<f64>,
-    ) -> Result<Self, String> {
+    ) -> Self {
         let observation = ObservationOperator::new(
             observed_data,
             &self.parameters,
             &self.base_engine.output_names(),
             &schedule,
-        )?;
-        Ok(Self {
+        )
+        .expect("the observations of the problem built their operator already");
+        Self {
             schedule,
             observation,
             ..self.clone()
-        })
+        }
     }
 
     /// The sorted, deduplicated positions every evaluation runs at.

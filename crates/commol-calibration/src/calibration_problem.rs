@@ -261,7 +261,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             &self.forward.base_engine().output_names(),
             &schedule,
         )?;
-        let forward = self.forward.on_schedule(&self.observed_data, schedule)?;
+        let forward = self.forward.on_schedule(&self.observed_data, schedule);
         let feasibility = self.feasibility.on_schedule(forward.schedule());
         Ok((
             Self {

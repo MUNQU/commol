@@ -679,6 +679,12 @@ mod replicate_tests {
     }
 
     #[test]
+    #[should_panic(expected = "the CRPS scores a distribution")]
+    fn the_crps_is_not_a_summary() {
+        ReplicateSummary::Crps.summarize(&mut [1.0, 2.0]);
+    }
+
+    #[test]
     fn summaries_reduce_the_replicates() {
         let values = [5.0, 1.0, 3.0, 2.0, 4.0];
         assert_eq!(ReplicateSummary::Mean.summarize(&mut values.clone()), 3.0);

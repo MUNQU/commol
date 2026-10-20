@@ -60,6 +60,19 @@ impl Generator {
         }
     }
 
+    /// A generator whose four words of state are `words`, for a test that
+    /// needs a given draw.
+    #[cfg(test)]
+    pub(crate) fn from_state(words: [u64; 4]) -> Self {
+        let mut bytes = [0u8; 32];
+        for (chunk, word) in bytes.as_chunks_mut::<8>().0.iter_mut().zip(words) {
+            *chunk = word.to_le_bytes();
+        }
+        Self {
+            rng: Xoshiro256PlusPlus::from_seed(bytes),
+        }
+    }
+
     /// The next 64 random bits.
     pub fn next_u64(&mut self) -> u64 {
         self.rng.next_u64()

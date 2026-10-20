@@ -35,6 +35,7 @@ pub(crate) fn evaluate_rate(
         (None, RateMathExpression::Formula(expr), Some(slots)) => {
             evaluate_jit_rate(expr, slots, amounts, ctx, clock, jit_buf)
         }
+        // coverage: invariant, the builder rejects a formula that does not compile
         _ => unreachable!("the builder gives every rate a fast path or the slots of its JIT"),
     };
 

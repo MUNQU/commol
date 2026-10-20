@@ -6,11 +6,11 @@ use std::collections::HashMap;
 
 use argmin::core::CostFunction;
 use commol_calibration::{
-    check_model_values, configured_engine, optimize_from, optimize_with_observer,
-    CalibrationConstraint, CalibrationParameter, CalibrationParameterType, CalibrationProblem,
-    EvaluationError, LossConfig, MutationApplication, MutationStrategy, NelderMeadConfig,
-    NoObserver, ObservedDataPoint, OptimizationConfig, OptimizationObjective, ParticleSwarmConfig,
-    Violation, Workspace,
+    check_model_values, configured_engine, optimize_from, optimize_with_history,
+    optimize_with_observer, CalibrationConstraint, CalibrationParameter, CalibrationParameterType,
+    CalibrationProblem, EvaluationError, LossConfig, MutationApplication, MutationStrategy,
+    NelderMeadConfig, NoObserver, ObservedDataPoint, OptimizationConfig, OptimizationObjective,
+    ParticleSwarmConfig, Violation, Workspace,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 
@@ -282,6 +282,19 @@ fn every_entry_takes_one_value_per_parameter() {
     assert!(errors[2].ends_with(expected), "{}", errors[2]);
     assert_eq!(errors[3], "Expected 3 parameters, got 4");
     assert_eq!(errors[4], "Expected 3 start values, got 2");
+}
+
+#[test]
+fn a_history_reports_an_optimizer_it_cannot_build() {
+    let problem = problem(vec![]).unwrap();
+    let config = OptimizationConfig::NelderMead(NelderMeadConfig {
+        initial_simplex_size: 0.0,
+        ..NelderMeadConfig::default()
+    });
+
+    let error = optimize_with_history(&problem, &config).err().unwrap();
+
+    assert_eq!(error, "initial_simplex_size must be in (0, 1], got 0");
 }
 
 #[test]

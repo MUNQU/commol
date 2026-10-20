@@ -535,6 +535,7 @@ mod tests {
             assert!(
                 (b[k] - b[k - 1]).abs() < 1e-10,
                 "B should not change at step {}, delta = {}",
+                // coverage: the failure of a test, the message of its assert
                 k - 1,
                 (b[k] - b[k - 1]).abs()
             );
@@ -548,6 +549,7 @@ mod tests {
             assert!(
                 (b[k] - b[k - 1]).abs() < 1e-10,
                 "B should not change at step {}, delta = {}",
+                // coverage: the failure of a test, the message of its assert
                 k - 1,
                 (b[k] - b[k - 1]).abs()
             );
@@ -559,6 +561,7 @@ mod tests {
                 (a[k] + b[k] - 1000.0).abs() < 1e-8,
                 "Total not kept at step {}: A={}, B={}, total={}",
                 k,
+                // coverage: the failure of a test, the message of its assert
                 a[k],
                 b[k],
                 a[k] + b[k]
@@ -723,6 +726,7 @@ mod tests {
     fn infeasible(error: SimulationError) -> (f64, String) {
         match error {
             SimulationError::Infeasible { position, message } => (position, message),
+            // coverage: the failure of a test, a run that is not infeasible
             SimulationError::Failed(message) => panic!("expected an infeasible run: {message}"),
         }
     }
@@ -841,6 +845,7 @@ mod tests {
             assert!(
                 (results[1][0] - expected).abs() < 1e-9,
                 "{rate}: expected A = {expected}, got {}",
+                // coverage: the failure of a test, the message of its assert
                 results[1][0]
             );
         }

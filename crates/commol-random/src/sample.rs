@@ -337,6 +337,19 @@ mod tests {
     }
 
     #[test]
+    fn an_inversion_past_its_bound_draws_again() {
+        // The largest uniform, 1 − 2⁻⁵³, is above the mass of every count up
+        // to the bound of a mean of 1, mean + 10 standard deviations.
+        let mut forced = Generator::from_state([0, 0, 0, u64::MAX]);
+        let mut next = forced.clone();
+        assert_eq!(next.uniform(), 1.0 - f64::EPSILON / 2.0);
+
+        let draw = binomial(&mut forced, 1_000, 0.001);
+
+        assert_eq!(draw, binomial(&mut next, 1_000, 0.001));
+    }
+
+    #[test]
     fn binomial_edges_are_exact() {
         let mut generator = Generator::from_seed(SEED);
         assert_eq!(binomial(&mut generator, 0, 0.5), 0);
