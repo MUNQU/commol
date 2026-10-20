@@ -96,8 +96,13 @@ def _guide_calibrator(
     return Calibrator(Simulation(model), problem)
 
 
-def _unread_k3(ode: bool, optimizer: NelderMeadConfig | None = None) -> Calibrator:
-    """``abc_builder`` with ``k3`` emptying C into D, and only B observed."""
+def _unread_k3(
+    ode: bool,
+    optimizer: NelderMeadConfig | None = None,
+    k2: tuple[float, float] = (0.0, 1.0),
+) -> Calibrator:
+    """``abc_builder`` with ``k3`` emptying C into D, and only B observed;
+    `k2` are the bounds of ``k2``."""
     builder = abc_builder(
         parameters={"k1": None, "k2": None, "k3": None},
         amounts={"A": 990, "B": 10, "C": 0, "D": 0},
@@ -113,7 +118,7 @@ def _unread_k3(ode: bool, optimizer: NelderMeadConfig | None = None) -> Calibrat
         observed_data=_noisy_b(0.3),
         parameters=[
             bounded("k1", 0.0, 1.0),
-            bounded("k2", 0.0, 1.0),
+            bounded("k2", *k2),
             bounded("k3", 0.0, 1.0),
         ],
         observation_models={"B": NormalObservations(sd=10.0)},
@@ -348,6 +353,21 @@ class TestStructure:
         assert structural is not None
         assert structural.verdict == "non_identifiable"
         assert RESET in structural.reasons[-1]
+
+    def test_a_flat_profile_beside_a_fit_on_a_bound_gives_no_verdict(self) -> None:
+        # B is drawn with k2 = 0.1, below the bounds of k2: its fit is on 0.2,
+        # and what lies past the bound is not seen.
+        calibrator = _unread_k3(False, k2=(0.2, 1.0))
+
+        result = calibrator.uncertainty(
+            ProfileLikelihood(parameters=["k3"], threshold=Threshold.chi_square(0.95))
+        )
+
+        assert result.fit.best_parameters["k2"] == pytest.approx(0.2)
+        structure = result.structure["k3"]
+        assert structure.verdict is None
+        assert structure.undetermined == "on_bound"
+        assert structure.on_bound == "k2"
 
     def test_a_sum_dominated_by_one_term_conflicts_with_the_rank(self) -> None:
         # The rate reads k1 + k2 with k1 near 0.1 and k2 below 0.005: on the

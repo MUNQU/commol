@@ -374,3 +374,66 @@ class TestResults:
         assert assumption in result.guarantee, result.guarantee
         assert result.intervals.level == 0.5
         assert list(result.scores) == ["B"]
+
+
+def _rate_calibrator(rate: str, flows: list[float]) -> Calibrator:
+    """A flow from A to B at `rate`, fitted by ``c`` from 10 to `flows` at
+    positions 1, 2, …"""
+    model = build(
+        a_to_b_builder(parameters={"c": None}, rate=rate, amounts={"A": 1e6, "B": 0})
+    )
+    problem = CalibrationProblem(
+        observed_data=flow_observations(flows, windowed=True),
+        parameters=[bounded("c", 0.0, 50.0, initial_guess=10.0)],
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-14),
+        seed=1,
+    )
+    return Calibrator(Simulation(model), problem)
+
+
+class TestFailures:
+    def test_a_prediction_that_fails_names_its_parameter_set(self) -> None:
+        # The rate is not a number after 25.5, inside the calibration data.
+        calibrator = _rate_calibrator(
+            "c * A / A + 0 * sqrt(25.5 - t)", [10.0, 11.0, 9.0, 10.5]
+        )
+
+        with pytest.raises(
+            RuntimeError,
+            match="Parameter set 0: Simulation failed: The rate of flow 't_ab' at 26",
+        ):
+            calibrator.uncertainty(
+                SplitConformal(
+                    calibration_data=flow_observations(
+                        [C] * 30, windowed=True, start=5
+                    ),
+                    score="absolute",
+                    by="series",
+                    level=0.5,
+                    positions=[40.0],
+                )
+            )
+
+    def test_every_refit_failing_gives_the_reasons(self) -> None:
+        # The fit of every flow is 11.5; the refit at the origin 2 heads for
+        # 40, past 20, where the rate is not a number.
+        calibrator = _rate_calibrator(
+            "c * A / A + 0 * sqrt(20 - c)", [40.0] * 2 + [C] * 38
+        )
+
+        assert calibrator.run().best_parameters["c"] == pytest.approx(11.5)
+        with pytest.raises(
+            RuntimeError,
+            match=r"Every replicate failed \(1\); the first reasons: replicate 0: "
+            "Optimization failed: Simulation failed",
+        ):
+            calibrator.uncertainty(
+                RollingConformal(
+                    origins=[2.0],
+                    score="absolute",
+                    by="series",
+                    level=0.5,
+                    positions=[41.0],
+                )
+            )

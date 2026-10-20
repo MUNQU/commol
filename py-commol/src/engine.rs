@@ -66,6 +66,8 @@ impl ValuePlan for EngineValuePlan {
     fn infeasibility(&self, excess: f64) -> String {
         match self {
             Self::Aggregate(plan) => plan.infeasibility(excess),
+            // coverage: an arm for the test model kind: its engines apply values with no excess
+            // (test_kind.rs, apply_values), so no infeasibility is asked
             #[cfg(feature = "test-kind")]
             Self::Test(plan) => plan.infeasibility(excess),
         }
@@ -106,6 +108,7 @@ impl Engine {
             (EngineType::TestStochasticEngine, ModelKind::Test) => {
                 TestStochasticEngine::try_from_model(model).map(Self::TestStochastic)
             }
+            // coverage: an invariant, model.check_kind() accepts only the pairs above
             #[allow(unreachable_patterns)]
             _ => unreachable!("check_kind accepts only the pairs above"),
         }
@@ -175,6 +178,8 @@ pub fn compartmental_state(
     let state = compartmental!(engine, engine => engine.state())?;
     match plan {
         EngineValuePlan::Aggregate(plan) => Ok((state, plan.covered_compartments())),
+        // coverage: an arm for the test model kind: compartmental! rejects the engine of a test
+        // plan first
         #[cfg(feature = "test-kind")]
         EngineValuePlan::Test(_) => Err("The plan is not of an aggregate model".to_string()),
     }
@@ -191,6 +196,8 @@ pub fn compartmental_coverage(
 ) -> Result<(Vec<Vec<usize>>, Vec<usize>), String> {
     match plan {
         EngineValuePlan::Aggregate(plan) => Ok(plan.coverage()),
+        // coverage: an arm for the test model kind: only Aggregate asks the coverage (aggregate.py,
+        // initial_condition_coverage)
         #[cfg(feature = "test-kind")]
         EngineValuePlan::Test(_) => Err("The plan is not of an aggregate model".to_string()),
     }
@@ -300,6 +307,8 @@ impl SimulationEngine for Engine {
             (Self::TestStochastic(engine), EngineValuePlan::Test(plan)) => {
                 engine.apply_values(plan, values)
             }
+            // coverage: an arm for the test model kind: an engine applies only the plans of its own
+            // plan_values
             #[cfg(feature = "test-kind")]
             (engine, _) => Err(format!(
                 "The plan of values is not a plan of the {} engine",
@@ -325,6 +334,8 @@ pub struct PyEngine {
     inner: Engine,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyEngine {
     /// Build the engine the model names, and compile the model into it
@@ -511,6 +522,8 @@ pub struct PyEngineType {
     inner: EngineType,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyEngineType {
     /// The entry with a name
@@ -652,6 +665,8 @@ pub struct PyModelKind {
     inner: ModelKind,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyModelKind {
     /// The kind with a name
@@ -701,7 +716,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "InfeasibleStateError",
         m.py().get_type::<InfeasibleStateError>(),
-    )?;
+    )?; // coverage: an error that only PyO3 returns, when the module cannot take it
     Ok(())
 }
 
@@ -747,7 +762,7 @@ mod tests {
         };
         model.engine = ModelEngine::with_settings(EngineSettings::DifferentialEquations(settings));
         let Engine::Differential(engine) = Engine::build(&model).unwrap() else {
-            panic!("expected the differential engine");
+            panic!("expected the differential engine"); // coverage: the failure of a test
         };
         assert_eq!(*engine.settings(), settings);
     }

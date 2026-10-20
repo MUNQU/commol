@@ -162,6 +162,21 @@ class TestStructuralRank:
         # Only the design of the observations speaks for these data.
         assert dense.verdicts["k1"].structural is None
 
+    def test_a_run_that_fails_stops_the_structural_rank(
+        self, truth: dict[str, list[float]]
+    ) -> None:
+        # The rate is not a number after 7.5, before the observation at 10.
+        calibrator = _calibrator(
+            observed(truth, "B", [5, 10]),
+            {"k1": (0.1, 0.6)},
+            ab="k1 * A * B / total + 0 * sqrt(7.5 - t)",
+        )
+
+        with pytest.raises(
+            RuntimeError, match="The rate of flow 'ab' at 8 is not a number"
+        ):
+            calibrator.identifiability(StructuralRank(points=2, design="observations"))
+
     def test_structural_rank_rejects_invalid_settings(self) -> None:
         with pytest.raises(ValidationError, match="points"):
             StructuralRank(points=0, design="observations")

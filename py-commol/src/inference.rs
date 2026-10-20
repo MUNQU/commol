@@ -783,6 +783,8 @@ pub struct PyParameterSample {
     pub(crate) inner: ParameterSample,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyParameterSample {
     #[new]
@@ -856,6 +858,8 @@ pub struct PyPredictive {
     pub(crate) inner: Predictive,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyPredictive {
     /// The trajectory of every draw, `[draw][position][output]`
@@ -905,6 +909,8 @@ pub struct PyObservationDraws {
     pub(crate) inner: ObservationDraws,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyObservationDraws {
     /// `[draw][observation]`

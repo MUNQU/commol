@@ -36,30 +36,27 @@ fn value_error(message: String) -> PyErr {
 }
 
 /// The quantity of `(kind, outputs, positions)`, as the classes of
-/// `commol.context.inference.global_sensitivity` write it.
-fn quantity((kind, outputs, positions): QuantityArgs) -> PyResult<Quantity> {
-    let at = |index: usize| {
-        positions.get(index).copied().ok_or_else(|| {
-            value_error(format!("A quantity '{kind}' needs {} positions", index + 1))
-        })
-    };
-    Ok(match kind.as_str() {
+/// `commol.context.inference.global_sensitivity` write it: one position for
+/// `"value_at"`, the start and the end for `"gain"`.
+fn quantity((kind, outputs, positions): QuantityArgs) -> Quantity {
+    match kind.as_str() {
         "value_at" => Quantity::ValueAt {
-            at: at(0)?,
+            at: positions[0],
             outputs,
         },
         "gain" => Quantity::Gain {
-            start: at(0)?,
-            end: at(1)?,
+            start: positions[0],
+            end: positions[1],
             outputs,
         },
         "peak" => Quantity::Peak { outputs, positions },
         "peak_position" => Quantity::PeakPosition { outputs, positions },
-        other => return Err(value_error(format!("Unknown quantity '{other}'"))),
-    })
+        // coverage: an invariant, the quantity classes of Python write only the kinds above
+        other => unreachable!("a quantity of Python has no kind '{other}'"),
+    }
 }
 
-fn quantities(args: Vec<QuantityArgs>) -> PyResult<Vec<Quantity>> {
+fn quantities(args: Vec<QuantityArgs>) -> Vec<Quantity> {
     args.into_iter().map(quantity).collect()
 }
 
@@ -74,16 +71,13 @@ fn input_space(
         .iter()
         .map(|p| (p.inner.min_bound, p.inner.max_bound))
         .collect();
-    match (distributions, sample) {
-        (Some(given), None) => Ok(InputSpace::Independent(priors(
+    match sample {
+        Some(sample) => Ok(InputSpace::Sample(sample.inner.clone())),
+        None => Ok(InputSpace::Independent(priors(
             &names,
             &bounds,
-            Some(given),
+            distributions,
         )?)),
-        (None, Some(sample)) => Ok(InputSpace::Sample(sample.inner.clone())),
-        _ => Err(value_error(
-            "Give distributions or a sample, not both".to_string(),
-        )),
     }
 }
 
@@ -102,16 +96,17 @@ impl PyForwardAnalysis {
     ///     engine: The simulation engine built from the model
     ///     parameters: The inputs, in order
     ///     distributions: The distribution of each input as
-    ///         `(input, kind, parameters)`, for independent inputs
-    ///     sample: The draws of the inputs, for inputs from a sample
+    ///         `(input, kind, parameters)`, for independent inputs; None is
+    ///         uniform on the bounds
+    ///     sample: The draws of the inputs, for inputs from a sample; it
+    ///         takes the place of `distributions`
     ///     initial_condition_remainder: Compartment or bin that takes what
     ///         the initial conditions leave, if any
     ///     replicates: Replicates at each point, for a stochastic engine
     ///     seed: Seed of every random number of the analysis
     ///
     /// Raises:
-    ///     ValueError: If the inputs are not valid for the engine, or not
-    ///         exactly one of `distributions` and `sample` is given
+    ///     ValueError: If the inputs are not valid for the engine
     #[new]
     #[pyo3(signature = (engine, parameters, distributions=None, sample=None, initial_condition_remainder=None, replicates=None, seed=0))]
     fn new(
@@ -149,7 +144,7 @@ impl PyForwardAnalysis {
         draws: Option<usize>,
         quantities: Vec<QuantityArgs>,
     ) -> PyResult<(Draws, Vec<Vec<f64>>, Vec<f64>)> {
-        let quantities = self::quantities(quantities)?;
+        let quantities = self::quantities(quantities);
         let result = py
             .detach(|| self.inner.propagate(draws, &quantities))
             .map_err(predictive_error)?;
@@ -170,7 +165,7 @@ impl PyForwardAnalysis {
         draws: Option<usize>,
         quantities: Vec<QuantityArgs>,
     ) -> PyResult<PrccValues> {
-        let quantities = self::quantities(quantities)?;
+        let quantities = self::quantities(quantities);
         let (sample, result) = py
             .detach(|| self.inner.prcc(draws, &quantities))
             .map_err(predictive_error)?;
@@ -196,7 +191,7 @@ impl PyForwardAnalysis {
         levels: usize,
         quantities: Vec<QuantityArgs>,
     ) -> PyResult<MorrisValues> {
-        let quantities = self::quantities(quantities)?;
+        let quantities = self::quantities(quantities);
         let (result, runs) = py
             .detach(|| self.inner.morris(trajectories, levels, &quantities))
             .map_err(predictive_error)?;
@@ -218,7 +213,7 @@ impl PyForwardAnalysis {
         confidence_level: f64,
         quantities: Vec<QuantityArgs>,
     ) -> PyResult<SobolValues> {
-        let quantities = self::quantities(quantities)?;
+        let quantities = self::quantities(quantities);
         let (result, runs) = py
             .detach(|| {
                 self.inner
@@ -252,7 +247,7 @@ impl PyForwardAnalysis {
         draws: usize,
         quantities: Vec<QuantityArgs>,
     ) -> PyResult<PyChaosRun> {
-        let quantities = self::quantities(quantities)?;
+        let quantities = self::quantities(quantities);
         let (expansion, runs) = py
             .detach(|| self.inner.chaos(degree, draws, &quantities))
             .map_err(predictive_error)?;

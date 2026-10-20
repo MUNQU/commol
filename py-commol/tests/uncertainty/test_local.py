@@ -16,6 +16,7 @@ import pytest
 from pydantic import BaseModel
 
 from commol import (
+    CalibrationConstraint,
     CalibrationProblem,
     Calibrator,
     EtaCalibration,
@@ -100,6 +101,31 @@ class TestCurvature:
             expected.covariance[0][0], rel=1e-5
         )
         assert observed.notes == []
+
+    def test_a_hessian_that_steps_past_a_constraint_fails(self) -> None:
+        # The flows ask for c = 12; the constraint holds the fit at c = 10,
+        # and a difference of the Hessian steps past it.
+        model = build(
+            a_to_b_builder(
+                parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": 0}
+            )
+        )
+        problem = CalibrationProblem(
+            observed_data=flow_observations([12.0, 13.0, 11.0, 12.5], windowed=True),
+            parameters=[bounded("c", 0.0, 50.0, initial_guess=5.0)],
+            observation_models={"B": NormalObservations(sd=1.0)},
+            constraints=[CalibrationConstraint(id="at_most_10", expression="10 - c")],
+            optimization_config=NelderMeadConfig(max_iterations=1000),
+            seed=1,
+        )
+        calibrator = Calibrator(Simulation(model), problem)
+
+        assert calibrator.run().best_parameters["c"] == pytest.approx(10.0)
+        with pytest.raises(
+            RuntimeError,
+            match="The Hessian of the objective at the fit failed: Infeasible point",
+        ):
+            calibrator.uncertainty(Laplace(draws=10, curvature="hessian"))
 
     def test_an_uncertain_curvature_is_noted(
         self, caplog: pytest.LogCaptureFixture
