@@ -606,3 +606,301 @@ fn the_penalty_of_every_model_is_finite() {
         assert!(base.is_finite() && base >= 1e10, "{base}");
     }
 }
+
+/// The derivatives of `log p(y)` with respect to the arguments `(μ, noise
+/// arguments…)`, by central differences of [`Noise::log_density`].
+fn differenced_scores(noise_of: &impl Fn(&[f64]) -> Noise, arguments: &[f64], y: f64) -> Vec<f64> {
+    (0..arguments.len())
+        .map(|k| {
+            let h = 1e-5 * arguments[k].abs().max(1.0);
+            let mut up = arguments.to_vec();
+            let mut down = arguments.to_vec();
+            up[k] += h;
+            down[k] -= h;
+            (noise_of(&up).log_density(y, up[0]) - noise_of(&down).log_density(y, down[0]))
+                / (2.0 * h)
+        })
+        .collect()
+}
+
+/// `E[s sᵀ]` of a count model, row-major: the sum over the counts of the
+/// probability times the outer product of the differenced scores.
+fn count_information(
+    noise_of: &impl Fn(&[f64]) -> Noise,
+    arguments: &[f64],
+    last: u64,
+) -> Vec<f64> {
+    let k = arguments.len();
+    let mut information = vec![0.0; k * k];
+    for y in 0..=last {
+        let y = y as f64;
+        let probability = noise_of(arguments).log_density(y, arguments[0]).exp();
+        let scores = differenced_scores(noise_of, arguments, y);
+        for a in 0..k {
+            for b in 0..k {
+                information[a * k + b] += probability * scores[a] * scores[b];
+            }
+        }
+    }
+    information
+}
+
+fn close_to(actual: f64, expected: f64, relative: f64) {
+    assert!(
+        (actual - expected).abs() <= relative * expected.abs().max(1e-12),
+        "{actual} differs from {expected}"
+    );
+}
+
+#[test]
+fn fisher_information_of_each_model_has_its_closed_form() {
+    let mean = 3.5;
+    let poisson = Noise::Poisson.information(mean);
+    assert_eq!(poisson.len(), 1);
+    close(poisson[0], 1.0 / mean);
+
+    // The dispersion has no closed form: its oracle is the variance of the
+    // differenced score over the counts.
+    let phi = 0.4;
+    let negative_binomial = |a: &[f64]| Noise::NegativeBinomial {
+        overdispersion: a[1],
+    };
+    let information = negative_binomial(&[mean, phi]).information(mean);
+    let expected = count_information(&negative_binomial, &[mean, phi], 400);
+    close(information[0], 1.0 / (mean + phi * mean * mean));
+    close_to(information[0], expected[0], 1e-7);
+    assert_eq!((information[1], information[2]), (0.0, 0.0));
+    assert!(expected[1].abs() < 1e-7, "{}", expected[1]);
+    close_to(information[3], expected[3], 1e-7);
+
+    // Of the mean of a binomial, not of its probability: n/(p(1−p)) / n².
+    let binomial = Noise::Binomial { trials: 12 }.information(3.0);
+    let p = 3.0 / 12.0;
+    close(binomial[0], 1.0 / (12.0 * p * (1.0 - p)));
+}
+
+/// `∫ p(y) s(y) s(y)ᵀ dy` of a continuous model, row-major, on `y = c + w·tan x`.
+fn continuous_information(
+    noise_of: &impl Fn(&[f64]) -> Noise,
+    arguments: &[f64],
+    center: f64,
+    width: f64,
+    support_above_zero: bool,
+) -> Vec<f64> {
+    let k = arguments.len();
+    let mut information = vec![0.0; k * k];
+    let steps = 200_000;
+    let half = std::f64::consts::FRAC_PI_2;
+    let (low, high) = if support_above_zero {
+        ((-center / width).atan(), half)
+    } else {
+        (-half, half)
+    };
+    let dx = (high - low) / steps as f64;
+    for step in 0..steps {
+        let x = low + (step as f64 + 0.5) * dx;
+        let y = center + width * x.tan();
+        let jacobian = width / (x.cos() * x.cos());
+        let density = noise_of(arguments).log_density(y, arguments[0]).exp();
+        if density == 0.0 || !density.is_finite() {
+            continue;
+        }
+        let scores = differenced_scores(noise_of, arguments, y);
+        for a in 0..k {
+            for b in 0..k {
+                information[a * k + b] += density * jacobian * dx * scores[a] * scores[b];
+            }
+        }
+    }
+    information
+}
+
+#[test]
+fn fisher_information_of_continuous_models_is_the_variance_of_their_scores() {
+    let normal = |a: &[f64]| Noise::Normal { sd: a[1] };
+    let information = normal(&[2.0, 1.5]).information(2.0);
+    assert_eq!(information, vec![1.0 / 2.25, 0.0, 0.0, 2.0 / 2.25]);
+
+    let student = |a: &[f64]| Noise::StudentT {
+        df: a[1],
+        scale: a[2],
+    };
+    let arguments = [1.0, 4.5, 2.0];
+    let information = student(&arguments).information(1.0);
+    let expected = continuous_information(&student, &arguments, 1.0, 2.0, false);
+    for (actual, expected) in information.iter().zip(&expected) {
+        assert!(
+            (actual - expected).abs() < 1e-6,
+            "{information:?} {expected:?}"
+        );
+    }
+
+    for center in [Center::Mean, Center::Median] {
+        let log_normal = |a: &[f64]| Noise::LogNormal {
+            sigma: a[1],
+            center,
+        };
+        let arguments = [4.0, 0.3];
+        let information = log_normal(&arguments).information(4.0);
+        let expected = continuous_information(&log_normal, &arguments, 4.0, 1.0, true);
+        for (actual, expected) in information.iter().zip(&expected) {
+            assert!(
+                (actual - expected).abs() < 1e-6,
+                "{information:?} {expected:?}"
+            );
+        }
+    }
+}
+
+/// The derivative of the discrepancy of one run with respect to the
+/// prediction `i`, or to the parameter value `j`, by central differences.
+fn differenced(f: impl Fn(&[f64]) -> f64, at: &[f64], index: usize) -> f64 {
+    let h = 1e-6 * at[index].abs().max(1.0);
+    let mut up = at.to_vec();
+    let mut down = at.to_vec();
+    up[index] += h;
+    down[index] -= h;
+    (f(&up) - f(&down)) / (2.0 * h)
+}
+
+/// Each term's gradient with respect to its mean equals the difference of
+/// the discrepancy in that prediction, and the gradients of the noise
+/// arguments sum to the difference in their parameter.
+fn assert_scores(problem: &CalibrationProblem<LineEngine>, values: &[f64], predictions: &[f64]) {
+    let discrepancy = problem.discrepancy();
+    let terms = problem.term_derivatives(values, predictions).unwrap();
+    for (i, term) in terms.iter().enumerate() {
+        let expected = differenced(|p| discrepancy.of_run(values, p).unwrap(), predictions, i);
+        close_to(term.gradient[0], expected, 1e-6);
+    }
+    for j in 0..values.len() {
+        let summed: f64 = terms
+            .iter()
+            .flat_map(|term| {
+                term.parameters
+                    .iter()
+                    .zip(&term.gradient[1..])
+                    .filter(move |(parameter, _)| **parameter == Some(j))
+                    .map(|(_, gradient)| *gradient)
+            })
+            .sum();
+        let expected = differenced(|v| discrepancy.of_run(v, predictions).unwrap(), values, j);
+        assert!(
+            (summed - expected).abs() <= 1e-6 * expected.abs().max(1e-3),
+            "parameter {j}: {summed} against {expected}"
+        );
+    }
+}
+
+#[test]
+fn scores_equal_the_differences_of_the_terms() {
+    let data = observed(&[3.0, 4.0, 1.0, 6.0]);
+    let weights = [1.0, 2.0, 0.5, 1.0];
+    let values = [3.0, 4.0, 1.0, 6.0];
+    let predictions = [2.5, 4.4, 1.5, 5.0];
+    for loss in [
+        LossConfig::SumSquaredError,
+        LossConfig::RootMeanSquaredError,
+    ] {
+        let problem = problem(data.clone(), line_parameters(), loss.into())
+            .unwrap()
+            .with_observation_normalization(true)
+            .unwrap()
+            .with_data(&values, &weights)
+            .unwrap();
+        assert_scores(&problem, &[0.0, 0.0], &predictions);
+    }
+
+    let parameter = |id: &str| Argument::Parameter(id.to_string());
+    let cases = [
+        (
+            ObservationModel::Normal { sd: parameter("s") },
+            vec![noise("s", 0.1, 5.0)],
+            vec![0.7],
+        ),
+        (
+            ObservationModel::LogNormal {
+                sigma: parameter("s"),
+                center: Center::Mean,
+            },
+            vec![noise("s", 0.1, 5.0)],
+            vec![0.4],
+        ),
+        (
+            ObservationModel::LogNormal {
+                sigma: parameter("s"),
+                center: Center::Median,
+            },
+            vec![noise("s", 0.1, 5.0)],
+            vec![0.4],
+        ),
+        (
+            ObservationModel::StudentT {
+                df: parameter("df"),
+                scale: parameter("s"),
+            },
+            vec![noise("df", 1.0, 30.0), noise("s", 0.1, 5.0)],
+            vec![3.5, 0.8],
+        ),
+        (ObservationModel::Poisson, vec![], vec![]),
+        (
+            ObservationModel::NegativeBinomial {
+                overdispersion: parameter("s"),
+            },
+            vec![noise("s", 0.0, 5.0)],
+            vec![0.3],
+        ),
+        (
+            ObservationModel::Binomial { trials: Some(8) },
+            vec![],
+            vec![],
+        ),
+    ];
+    for (model, noise_parameters, noise_values) in cases {
+        let problem = problem(
+            data.clone(),
+            [line_parameters(), noise_parameters].concat(),
+            models(model),
+        )
+        .unwrap()
+        .with_data(&values, &weights)
+        .unwrap();
+        let values = [vec![0.0, 0.0], noise_values].concat();
+        assert_scores(&problem, &values, &predictions);
+    }
+}
+
+#[test]
+fn terms_skip_a_weight_of_zero_and_name_a_mean_outside_their_model() {
+    let problem = problem(
+        observed(&[1.0, 2.0]),
+        line_parameters(),
+        models(ObservationModel::Poisson),
+    )
+    .unwrap()
+    .with_data(&[1.0, 2.0], &[1.0, 0.0])
+    .unwrap();
+    // The second mean, −1, is outside the model, but its weight is 0.
+    let terms = problem.term_derivatives(&[0.0, 0.0], &[1.5, -1.0]).unwrap();
+    assert_eq!(
+        (terms[1].gradient.clone(), terms[1].curvature.clone()),
+        (vec![0.0], vec![0.0])
+    );
+
+    let error = problem
+        .term_derivatives(&[0.0, 0.0], &[-1.0, 2.0])
+        .unwrap_err();
+    assert_eq!(
+        error,
+        "Observation 'x' at 0 has the mean -1, outside the means its observation model allows"
+    );
+
+    let rmse = self::problem(
+        observed(&[1.0, 2.0]),
+        line_parameters(),
+        LossConfig::RootMeanSquaredError.into(),
+    )
+    .unwrap();
+    let error = rmse.term_derivatives(&[0.0, 0.0], &[1.0, 2.0]).unwrap_err();
+    assert!(error.contains("no derivative at a perfect fit"), "{error}");
+}

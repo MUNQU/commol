@@ -121,6 +121,38 @@ pub(crate) fn normal_quantile_sf(q: f64) -> f64 {
     -normal_quantile(q)
 }
 
+/// Bisection steps of the Student-t quantile: each halves its bracket.
+const BISECTION_STEPS: usize = 200;
+
+/// The quantile of the Student t with `df > 0` degrees of freedom at
+/// `p` in `(0, 1)`, by bisection on its upper tail
+/// `1 − F(t) = ½ I_{ν/(ν+t²)}(ν/2, ½)` for `t ≥ 0`, and symmetry.
+pub(crate) fn student_t_quantile(p: f64, df: f64) -> f64 {
+    if p < 0.5 {
+        return -student_t_quantile(1.0 - p, df);
+    }
+    let tail = 1.0 - p;
+    let upper_tail = |t: f64| 0.5 * beta_i(0.5 * df, 0.5, df / (df + t * t));
+    let mut low = 0.0;
+    let mut high = 1.0;
+    while upper_tail(high) > tail {
+        low = high;
+        high *= 2.0;
+    }
+    for _ in 0..BISECTION_STEPS {
+        let middle = 0.5 * (low + high);
+        if middle <= low || middle >= high {
+            break;
+        }
+        if upper_tail(middle) > tail {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    0.5 * (low + high)
+}
+
 /// The regularized lower incomplete gamma function `P(a, x)`, `a > 0`.
 pub(crate) fn gamma_p(a: f64, x: f64) -> f64 {
     if x <= 0.0 {
@@ -259,6 +291,19 @@ mod tests {
         }
         assert!(close(normal_sf(normal_quantile_sf(1e-200)), 1e-200, 1e-12));
         assert_eq!(normal_quantile(0.5), 0.0);
+    }
+
+    #[test]
+    fn student_t_quantiles_have_their_closed_forms() {
+        // One degree of freedom is the Cauchy, `tan(π(p − ½))`; two give
+        // `(2p − 1) / √(2p(1 − p))`.
+        for p in [0.05, 0.5, 0.9, 0.975] {
+            let cauchy = (std::f64::consts::PI * (p - 0.5)).tan();
+            assert!((student_t_quantile(p, 1.0) - cauchy).abs() < 1e-12, "{p}");
+            let two = (2.0 * p - 1.0) / (2.0 * p * (1.0 - p)).sqrt();
+            assert!((student_t_quantile(p, 2.0) - two).abs() < 1e-12, "{p}");
+        }
+        assert!((student_t_quantile(0.95, 1e6) - normal_quantile(0.95)).abs() < 1e-5);
     }
 
     #[test]

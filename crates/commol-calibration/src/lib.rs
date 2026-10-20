@@ -52,10 +52,12 @@ pub mod types;
 pub mod values;
 
 pub use calibration_problem::{check_positions, CalibrationProblem};
-pub use discrepancy::{Discrepancy, DiscrepancyConfig};
+pub use discrepancy::{Discrepancy, DiscrepancyConfig, TermError};
 pub use feasibility::{EvaluationError, Feasibility, Violation};
 pub use forward::{ForwardModel, Workspace};
-pub use likelihood::{Argument, Center, Likelihood, Noise, ObservationModel, Term};
+pub use likelihood::{
+    Argument, Center, Likelihood, Noise, ObservationModel, Term, TermDerivatives,
+};
 pub use objective::{OptimizationObjective, Score};
 pub use observation::ObservationOperator;
 pub use optimization::{

@@ -40,6 +40,7 @@ mod core;
 mod engine;
 mod identifiability;
 mod inference;
+mod local;
 mod model;
 pub(crate) mod python_observer;
 mod sensitivity;

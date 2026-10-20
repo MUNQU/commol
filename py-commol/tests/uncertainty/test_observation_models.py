@@ -22,7 +22,6 @@ from commol import (
     CalibrationProblem,
     Calibrator,
     DistributionNoise,
-    EtaCalibration,
     GibbsPosterior,
     LogNormalObservations,
     LossDistance,
@@ -448,14 +447,6 @@ class TestBayesianPosterior:
             windowed=True,
             observation_models={"B": PoissonObservations()},
         )
-        matching = GibbsPosterior(
-            priors=Priors.uniform_on_bounds(),
-            eta=EtaCalibration.information_matching(),
-            particles=10,
-            target_cess=0.5,
-            resample_threshold=0.5,
-            stay_probability=0.05,
-        )
         abc = AbcSmc(
             priors=Priors.uniform_on_bounds(),
             distance=LossDistance(),
@@ -465,8 +456,6 @@ class TestBayesianPosterior:
             stay_probability=0.05,
         )
 
-        with pytest.raises(ValueError, match="the problem has observation models"):
-            calibrator.uncertainty(matching)
         with pytest.raises(ValueError, match="LossDistance\\(\\) needs a loss"):
             calibrator.uncertainty(abc)
 

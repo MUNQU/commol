@@ -160,6 +160,7 @@ nav:
           - Observation Models: guide/uncertainty/observation-models.md
           - Conformal: guide/uncertainty/conformal.md
           - Sensitivity Analysis: guide/uncertainty/sensitivity.md
+          - Local Approximations: guide/uncertainty/local.md
       - Examples: guide/examples.md
   - API Reference:
       - API Overview: api/index.md
@@ -191,6 +192,7 @@ nav:
               - Engines: codebase/decisions/engines.md
               - Calibration: codebase/decisions/calibration.md
               - Uncertainty: codebase/decisions/uncertainty.md
+              - Local approximations: codebase/decisions/local-approximations.md
               - Results: codebase/decisions/results.md
               - Security: codebase/decisions/security.md
           - Conventions: codebase/conventions.md

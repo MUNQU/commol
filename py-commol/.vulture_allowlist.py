@@ -22,6 +22,8 @@ BootstrapRunProtocol
 DistributionProtocol
 SmcRunProtocol
 ConformalRunProtocol
+LocalRunProtocol
+MixtureRunProtocol
 LossConfigProtocol
 ObservationModelProtocol
 OptimizationConfigProtocol

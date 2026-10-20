@@ -624,6 +624,25 @@ class EtaCoverageProtocol(Protocol):
 
 _Priors = list[tuple[str, str, list[float]]] | None
 
+class LocalRunProtocol(Protocol):
+    values: list[list[float]]
+    center: list[float]
+    covariance: list[list[float]]
+    degrees_of_freedom: float | None
+    notes: list[str]
+
+class MixtureRunProtocol(Protocol):
+    values: list[list[float]]
+    log_weights: list[float]
+    centers: list[list[float]]
+    weights: list[float]
+    covariances: list[list[list[float]]]
+    log_evidences: list[float]
+    k_hat: float
+    effective_size: float
+    reliable: bool
+    notes: list[str]
+
 class ConformalRunProtocol(Protocol):
     @property
     def labels(self) -> list[str]: ...
@@ -799,8 +818,47 @@ class InferenceModule(Protocol):
         stay_probability: float,
         seed: int,
     ) -> SmcRunProtocol: ...
+    def laplace(
+        self,
+        problem: CalibrationProblemProtocol,
+        fit: list[float],
+        curvature: str,
+        draws: int,
+        seed: int,
+    ) -> LocalRunProtocol: ...
+    def sandwich(
+        self,
+        problem: CalibrationProblemProtocol,
+        fit: list[float],
+        curvature: str,
+        block_length: int | None,
+        draws: int,
+        seed: int,
+    ) -> tuple[LocalRunProtocol, int, int, list[tuple[str, float]] | None]: ...
+    def laplace_mixture(
+        self,
+        problem: CalibrationProblemProtocol,
+        priors: _Priors,
+        eta: float | None,
+        ends: list[list[float]],
+        draws: int,
+        curvature: str,
+        seed: int,
+    ) -> MixtureRunProtocol: ...
+    def delta_band(
+        self,
+        problem: CalibrationProblemProtocol,
+        fit: list[float],
+        covariance: list[list[float]],
+        degrees_of_freedom: float | None,
+        positions: list[float],
+        confidence_level: float,
+    ) -> tuple[list[str], list[list[float]], list[list[float]], list[list[float]]]: ...
     def information_matching_eta(
-        self, problem: CalibrationProblemProtocol, fit: list[float]
+        self,
+        problem: CalibrationProblemProtocol,
+        fit: list[float],
+        block_length: int | None,
     ) -> float: ...
     def bootstrap_coverage_eta(
         self,

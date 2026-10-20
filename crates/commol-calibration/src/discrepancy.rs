@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 
 use crate::feasibility::Violation;
-use crate::likelihood::{unnamed_noise, Likelihood, ObservationModel};
+use crate::likelihood::{unnamed_noise, Likelihood, ObservationModel, TermDerivatives};
 use crate::types::{
     CalibrationParameter, CalibrationParameterType, LossConfig, ObservedDataPoint, ReplicateSummary,
 };
@@ -28,6 +28,15 @@ impl From<LossConfig> for DiscrepancyConfig {
     fn from(loss: LossConfig) -> Self {
         Self::Loss(loss)
     }
+}
+
+/// Why a discrepancy has no derivatives of its terms at a point.
+#[derive(Debug, Clone, PartialEq)]
+pub enum TermError {
+    /// The discrepancy has no curvature there, in words.
+    NoCurvature(String),
+    /// The mean of this observation lies outside its observation model.
+    MeanOutside(usize),
 }
 
 /// The measure of a discrepancy.
@@ -244,6 +253,91 @@ impl Discrepancy {
             }
             _ => self.of_run(values, predictions),
         }
+    }
+
+    /// The derivatives of each observation's term of the discrepancy of one
+    /// run, at the parameter `values` and the means `predictions`, with
+    /// respect to its arguments ([`TermDerivatives`]).
+    ///
+    /// | Discrepancy | Gradient | Curvature |
+    /// |---|---|---|
+    /// | `SumSquaredError` | `−2 w n² r` | `2 w n²` |
+    /// | `RootMeanSquaredError` | `−2 w n² r · c` | `2 w n² · c`, `c = 1 / (2 √(W · S))` |
+    /// | Observation models | `−w` times the scores ([`crate::Noise::scores`]) | `w` times the Fisher information ([`crate::Noise::information`]) |
+    ///
+    /// `r = y − μ` is the residual, `n` the normalization of the observation,
+    /// `S = Σ w (n r)²` and
+    /// `W = Σ w`: the root mean squared error `√(S / W)` changes by `c` per
+    /// unit of `S`, so its terms are those of the sum of squares times `c`.
+    ///
+    /// # Errors
+    ///
+    /// [`TermError::NoCurvature`] for the mean absolute error, and for the
+    /// root mean squared error of a perfect fit; [`TermError::MeanOutside`]
+    /// when a mean lies outside its observation model.
+    pub fn term_derivatives(
+        &self,
+        values: &[f64],
+        predictions: &[f64],
+    ) -> Result<Vec<TermDerivatives>, TermError> {
+        let loss = match &self.measure {
+            Measure::Likelihood(likelihood) => {
+                return likelihood
+                    .term_derivatives(values, predictions)
+                    .map_err(TermError::MeanOutside);
+            }
+            Measure::Loss(loss) => *loss,
+        };
+        let scale = match loss {
+            LossConfig::SumSquaredError => 1.0,
+            LossConfig::RootMeanSquaredError => {
+                let (sum, weight_sum) = self.squares(predictions);
+                if sum <= 0.0 || weight_sum <= 0.0 {
+                    return Err(TermError::NoCurvature(
+                        "loss_function=\"rmse\" has no derivative at a perfect fit, where \
+                         every residual is 0"
+                            .to_string(),
+                    ));
+                }
+                0.5 / (weight_sum * sum).sqrt()
+            }
+            LossConfig::MeanAbsoluteError => {
+                return Err(TermError::NoCurvature(
+                    "loss_function=\"mae\" has no curvature: the sandwich of the absolute \
+                     error needs a density of the residuals at 0 and a bandwidth. Use a \
+                     bootstrap (BayesianBootstrap, ResidualBootstrap or WildBootstrap)"
+                        .to_string(),
+                ));
+            }
+        };
+        Ok(self
+            .observed
+            .iter()
+            .zip(predictions)
+            .zip(&self.weights)
+            .zip(&self.normalization)
+            .map(|(((&y, &mean), &weight), &normalization)| {
+                let factor = 2.0 * weight * normalization * normalization * scale;
+                TermDerivatives {
+                    parameters: Vec::new(),
+                    gradient: vec![-factor * (y - mean)],
+                    curvature: vec![factor],
+                }
+            })
+            .collect())
+    }
+
+    /// `(Σ w (n r)², Σ w)` of the predictions of one run.
+    fn squares(&self, predictions: &[f64]) -> (f64, f64) {
+        self.observed
+            .iter()
+            .zip(predictions)
+            .zip(&self.weights)
+            .zip(&self.normalization)
+            .fold((0.0, 0.0), |(sum, weights), (((y, mean), &w), n)| {
+                let residual = (y - mean) * n;
+                (sum + w * residual * residual, weights + w)
+            })
     }
 
     /// The base of the penalty of an infeasible point, at least `1e10`: for

@@ -94,6 +94,32 @@ Guide: [Sequential Monte Carlo](../guide/uncertainty/smc.md).
 ::: commol.context.inference.smc.GibbsResult
 
 ::: commol.context.inference.smc.SmcDiagnostics
+
+## Local approximations
+
+Guide: [Local Approximations](../guide/uncertainty/local.md).
+
+::: commol.context.inference.local.Laplace
+
+::: commol.context.inference.local.Sandwich
+
+::: commol.context.inference.local.LaplaceMixture
+
+::: commol.context.inference.local.LikelihoodTarget
+
+::: commol.context.inference.local.GibbsTarget
+
+::: commol.context.inference.local.LocalResult
+
+::: commol.context.inference.local.LaplaceResult
+
+::: commol.context.inference.local.SandwichResult
+
+::: commol.context.inference.local.DeltaBand
+
+::: commol.context.inference.local.ImportanceResult
+
+::: commol.context.inference.local.MixtureComponent
 ## Conformal prediction
 
 Guide: [Conformal Prediction Intervals](../guide/uncertainty/conformal.md).

@@ -1,7 +1,8 @@
 //! Finite differences of the forward model.
 //!
 //! The step of parameter `j` is `h_j = η^{1/3} · max(|θ_j|, w_j)`, at most
-//! `w_j / 8`, where `w_j` is the width of its bounds and `η` the output
+//! `w_j / 8`, where `w_j` is the width of its bounds (1 when a bound is
+//! infinite, so the step stays finite) and `η` the output
 //! accuracy of the engine ([`SimulationEngine::output_accuracy`]): the step
 //! that balances the truncation error of a difference of second order with
 //! the error of the runs. The difference is central when `θ_j ± 2h_j` is
@@ -94,6 +95,35 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
         })
     }
 
+    /// Finite differences of the predictions of `observed_data`, which need
+    /// not be the problem's: the engine, parameters and values of `problem`
+    /// observed there, their values ignored.
+    ///
+    /// # Errors
+    ///
+    /// [`SensitivityError::Stochastic`] when the problem runs replicates of a
+    /// stochastic engine; a failure when the engine rejects a position or an
+    /// observation names an unknown output or factor.
+    pub fn of_observations(
+        problem: &CalibrationProblem<E>,
+        observed_data: Vec<ObservedDataPoint>,
+    ) -> Result<Self, SensitivityError> {
+        if problem.forward().replicates().is_some() {
+            return Err(SensitivityError::Stochastic);
+        }
+        let forward = problem
+            .forward()
+            .with_observations(&observed_data)
+            .map_err(SensitivityError::Failed)?;
+        let accuracy = forward.base_engine().output_accuracy();
+        Ok(Self {
+            forward,
+            observed_data,
+            design: Design::Observations,
+            accuracy,
+        })
+    }
+
     /// The step `h_j` of each parameter at `values`.
     pub fn steps(&self, values: &[f64]) -> Vec<f64> {
         let factor = self.accuracy.cbrt();
@@ -102,7 +132,8 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
             .zip(self.forward.parameters())
             .map(|(&value, parameter)| {
                 let width = parameter.max_bound - parameter.min_bound;
-                (factor * value.abs().max(width)).min(width / 8.0)
+                let scale = if width.is_finite() { width } else { 1.0 };
+                (factor * value.abs().max(scale)).min(width / 8.0)
             })
             .collect()
     }

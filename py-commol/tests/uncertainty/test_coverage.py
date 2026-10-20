@@ -9,6 +9,15 @@ covers ``θ`` in 90 % of the data sets. The Gibbs posterior fits a constant
 flow with Gaussian noise (``flow_calibrator``); ABC fits the probability of a
 chain binomial from the units that moved in one step.
 
+The Laplace approximation fits the same flow with a normal model of known
+``sd``, whose likelihood is exactly normal in ``c``. The sandwich fits a line
+through the origin, ``B(t) = c·t``, whose noise grows with ``t``: a normal
+model of one ``sd`` is wrong there, and so are its Laplace intervals. The
+Laplace mixture fits a flow ``c²``, whose likelihood has the two optima
+``±√ȳ``: with a flat prior its central interval runs from the negative mode
+to the upper quantile of the positive one, so it holds ``c > 0`` when that
+quantile does.
+
 A prediction interval holds a new observation, not a fixed value: a study of
 one shifts the interval by the observation, so it holds 0 when it holds the
 observation. The posterior predictive of a normal observation model, with
@@ -31,6 +40,9 @@ from commol import (
     EtaCalibration,
     GibbsPosterior,
     JackknifePlus,
+    Laplace,
+    LaplaceMixture,
+    LikelihoodTarget,
     LogUniform,
     LossDistance,
     NelderMeadConfig,
@@ -38,6 +50,7 @@ from commol import (
     ObservedDataPoint,
     Predictive,
     Priors,
+    Sandwich,
     Simulation,
     SplitConformal,
     Uniform,
@@ -47,6 +60,7 @@ from commol.context.inference.smc import BootstrapCoverage, InformationMatching
 from tests.support import (
     a_to_b_builder,
     bounded,
+    build,
     build_stochastic,
     flow_calibrator,
     flow_observations,
@@ -106,7 +120,7 @@ class TestGibbsPosterior:
     @pytest.mark.parametrize(
         "eta",
         [
-            EtaCalibration.information_matching(),
+            EtaCalibration.information_matching(block_length=1),
             EtaCalibration.bootstrap_coverage(
                 replicates=20, block_length=1, confidence_level=LEVEL
             ),
@@ -322,5 +336,94 @@ class TestPosteriorPredictive:
             return _held(band.lower[0], band.upper[0], float(values[15]))
 
         study = _conformal_study(make, level)
+
+        assert study.calibrated(), study
+
+
+@pytest.mark.coverage_study
+class TestLaplace:
+    def test_laplace_is_calibrated_near_gaussian(self) -> None:
+        method = Laplace(draws=2000)
+
+        def interval(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+            values = FLOW + rng.normal(0.0, FLOW_NOISE, 20)
+            calibrator = flow_calibrator(
+                values.tolist(),
+                windowed=True,
+                seed=index,
+                observation_models={"B": NormalObservations(sd=FLOW_NOISE)},
+            )
+            return {"c": calibrator.uncertainty(method).sample.interval(LEVEL)["c"]}
+
+        study = coverage_study(interval, {"c": FLOW}, LEVEL, data_sets=200, seed=21)
+
+        assert study.calibrated(), study
+
+
+SLOPE, SLOPE_POSITIONS = 10.0, np.arange(1.0, 31.0)
+
+
+def _changing_noise_study(method: Laplace | Sandwich, models: bool) -> CoverageStudy:
+    def interval(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+        noise = 0.02 * SLOPE_POSITIONS**1.5 * rng.normal(0.0, 1.0, SLOPE_POSITIONS.size)
+        values = SLOPE * SLOPE_POSITIONS + noise
+        calibrator = flow_calibrator(
+            values.tolist(),
+            windowed=False,
+            seed=index,
+            observation_models={"B": NormalObservations(sd="sd")} if models else None,
+            noise=[bounded("sd", 1e-3, 100.0, kind="noise")] if models else (),
+        )
+        return {"c": calibrator.uncertainty(method).sample.interval(LEVEL)["c"]}
+
+    return coverage_study(interval, {"c": SLOPE}, LEVEL, data_sets=300, seed=31)
+
+
+@pytest.mark.coverage_study
+class TestSandwich:
+    def test_sandwich_holds_under_changing_noise(self) -> None:
+        sandwich = _changing_noise_study(
+            Sandwich(block_length=1, draws=2000), models=False
+        )
+        laplace = _changing_noise_study(Laplace(draws=2000), models=True)
+
+        assert sandwich.calibrated(), sandwich
+        assert laplace.coverage("c") < LEVEL - laplace.tolerance, laplace
+
+
+SQUARE_ROOT, SQUARE_COUNT = 2.0, 10
+
+
+@pytest.mark.coverage_study
+class TestLaplaceMixture:
+    def test_laplace_mixture_is_calibrated_with_two_optima(self) -> None:
+        method = LaplaceMixture(
+            starts=8,
+            draws=2000,
+            target=LikelihoodTarget(priors=Priors.uniform_on_bounds()),
+        )
+        model = build(
+            a_to_b_builder(
+                parameters={"c": None}, rate="c * c * A / A", amounts={"A": 1e6, "B": 0}
+            )
+        )
+
+        def interval(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+            values = SQUARE_ROOT**2 + rng.normal(0.0, FLOW_NOISE, SQUARE_COUNT)
+            problem = CalibrationProblem(
+                observed_data=flow_observations(values.tolist(), windowed=True),
+                parameters=[bounded("c", -4.0, 4.0, initial_guess=1.0)],
+                observation_models={"B": NormalObservations(sd=FLOW_NOISE)},
+                optimization_config=NelderMeadConfig(
+                    max_iterations=1000, sd_tolerance=1e-12
+                ),
+                seed=index,
+            )
+            result = Calibrator(Simulation(model), problem).uncertainty(method)
+            return {"c": result.sample.interval(LEVEL)["c"]}
+
+        study = coverage_study(
+            interval, {"c": SQUARE_ROOT}, LEVEL, data_sets=200, seed=41
+        )
 
         assert study.calibrated(), study

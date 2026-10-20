@@ -14,9 +14,9 @@ use nalgebra::DMatrix;
 use super::TemperedTarget;
 use super::kernel::Kernel;
 use super::sampler::{SmcRun, SmcSampler, SmcState, Stop};
+use crate::local::{CurvatureKind, LocalError, block_meat, blocks_at, curvature_at};
 use crate::priors::Priors;
 use crate::resampling::{BayesianBootstrap, BlockScheme};
-use crate::sensitivity::{Design, FiniteDifferences, SensitivitySource};
 use crate::statistics::{interval_levels, normalized_weights, quantiles};
 use crate::target::discrepancy_in_support;
 
@@ -140,71 +140,69 @@ pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcR
 }
 
 /// `η` by information matching (Holmes and Walker 2017; Lyddon, Holmes and
-/// Walker 2019): `η = tr(J I⁻¹ J) / tr(J)` at the fit `θ̂`, with
-/// `J = Σ ∇²lᵢ` the curvature of the loss terms (Gauss–Newton,
-/// `2 wᵢ nᵢ² ∇fᵢ ∇fᵢᵀ`) and `I = Σ ∇lᵢ ∇lᵢᵀ` their variance, where
-/// `lᵢ = wᵢ (nᵢ rᵢ)²` is the term of observation `i` with weight `wᵢ`,
-/// normalization `nᵢ` and residual `rᵢ`. The derivatives `∇fᵢ` come from
-/// [`FiniteDifferences`] on the observations.
+/// Walker 2019): `η = tr(J I⁻¹ J) / tr(J)` at the fit `θ̂`, on the scale of
+/// the parameters. `J` is the Gauss–Newton [`crate::local::Curvature`] of the objective,
+/// and `I` the meat of the sandwich ([`block_meat`]): the outer products of
+/// the gradients of the terms summed over blocks of `block_length`
+/// positions, or of the automatic length for `None`, so `I` holds under
+/// dependence inside blocks. The terms are those of the sum of squares or of
+/// `−log L`; with a correct observation model `I ≈ J` and `η ≈ 1`.
 ///
 /// # Errors
 ///
-/// Returns a message when the problem has observation models or a loss that
-/// is not the sum of squares, the engine is stochastic, the derivatives fail
-/// at the fit, or `I` is singular.
+/// [`LocalError::Refused`] when the loss is not the sum of squares, the
+/// engine is stochastic, the fit is on a bound, or the blocks are not more
+/// than the parameters; [`LocalError::Failed`] when the derivatives fail at
+/// the fit or `I` is singular.
 pub fn information_matching_eta<E>(
     problem: &CalibrationProblem<E>,
     fit: &[f64],
-) -> Result<f64, String>
+    block_length: Option<usize>,
+) -> Result<f64, LocalError>
 where
     E: SimulationEngine + Send + Sync,
 {
-    let discrepancy = problem.discrepancy();
-    let name = match discrepancy.loss() {
-        Some(LossConfig::SumSquaredError) => None,
+    let name = match problem.discrepancy().loss() {
+        Some(LossConfig::SumSquaredError) | None => None,
         Some(LossConfig::RootMeanSquaredError) => Some("the loss is \"rmse\""),
         Some(LossConfig::MeanAbsoluteError) => Some("the loss is \"mae\""),
-        None => Some("the problem has observation models"),
     };
     if let Some(name) = name {
-        return Err(format!(
-            "EtaCalibration.information_matching() needs loss_function=\"sse\", a sum of smooth \
-             terms; {name}. Use EtaCalibration.bootstrap_coverage(...) or a number"
-        ));
+        return Err(LocalError::Refused(format!(
+            "EtaCalibration.information_matching(...) needs loss_function=\"sse\" or \
+             observation models, sums of smooth terms; {name}. Use \
+             EtaCalibration.bootstrap_coverage(...) or a number"
+        )));
     }
     if problem.forward().replicates().is_some() {
-        return Err(
-            "EtaCalibration.information_matching() needs a deterministic engine: the runs of \
-             a stochastic engine have no derivatives. Use EtaCalibration.bootstrap_coverage(...) \
-             or a number"
+        return Err(LocalError::Refused(
+            "EtaCalibration.information_matching(...) needs a deterministic engine: the runs \
+             of a stochastic engine have no derivatives. Use \
+             EtaCalibration.bootstrap_coverage(...) or a number"
                 .to_string(),
-        );
+        ));
     }
-    let source = FiniteDifferences::new(problem, Design::Observations)
-        .expect("finite differences refuse only a stochastic engine, refused above");
-    let sensitivities = source.jacobian(fit).map_err(|error| error.to_string())?;
-    let jacobian = &sensitivities.jacobian;
+    let curvature = curvature_at(problem, fit, CurvatureKind::GaussNewton)?;
+    let (blocks, _) = blocks_at(problem, &curvature, block_length)?;
+    let meat = block_meat(&curvature, &blocks)?;
+    // Back to the scale of the parameters: `X_θ = D⁻¹ X_u D⁻¹`.
+    let derivatives = curvature.derivatives();
     let d = fit.len();
-    let mut curvature = DMatrix::<f64>::zeros(d, d);
-    let mut variance = DMatrix::<f64>::zeros(d, d);
-    for i in 0..jacobian.nrows() {
-        let weight = discrepancy.weights()[i];
-        let normalization = discrepancy.normalization()[i];
-        let residual = discrepancy.observed()[i] - sensitivities.predictions[i];
-        let gradient = jacobian.row(i).transpose();
-        let outer = &gradient * gradient.transpose();
-        let scale = weight * normalization * normalization;
-        curvature += &outer * (2.0 * scale);
-        variance += &outer * (4.0 * scale * scale * residual * residual);
-    }
-    let inverse = variance.clone().try_inverse().ok_or_else(|| {
-        "The variance of the loss terms at the fit is singular: information matching needs \
-         more observations than parameters and residuals that are not all 0"
-            .to_string()
+    let natural = |m: &DMatrix<f64>| {
+        DMatrix::from_fn(d, d, |j, k| m[(j, k)] / (derivatives[j] * derivatives[k]))
+    };
+    let information = natural(curvature.matrix());
+    let variance = natural(&meat);
+    let inverse = variance.try_inverse().ok_or_else(|| {
+        LocalError::Failed(
+            "The variance of the scores of the terms at the fit is singular: information \
+             matching needs every parameter read by the data and scores that are not all 0"
+                .to_string(),
+        )
     })?;
     // With `I` positive definite, some gradient is not 0, so `tr(J) > 0`
     // and `η > 0`.
-    Ok((&curvature * inverse * &curvature).trace() / curvature.trace())
+    Ok((&information * inverse * &information).trace() / information.trace())
 }
 
 /// The outcome of [`bootstrap_coverage_eta`].

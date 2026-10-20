@@ -41,7 +41,7 @@ checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
 [[package]]
 name = "argmin"
 version = "0.11.0"
-source = "git+https://github.com/MUNQU/argmin?branch=development#8a8472ae967c0fc30059ef6bebe30b3c10eeb6cf"
+source = "git+https://github.com/MUNQU/argmin?branch=development#e418a74f34f5ee53429a468b793044dbb41d697c"
 dependencies = [
  "anyhow",
  "argmin-math",
@@ -57,7 +57,7 @@ dependencies = [
 [[package]]
 name = "argmin-math"
 version = "0.5.1"
-source = "git+https://github.com/MUNQU/argmin?branch=development#8a8472ae967c0fc30059ef6bebe30b3c10eeb6cf"
+source = "git+https://github.com/MUNQU/argmin?branch=development#e418a74f34f5ee53429a468b793044dbb41d697c"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -234,12 +234,14 @@ dependencies = [
 name = "commol-inference"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "commol-calibration",
  "commol-core",
  "commol-difference",
  "commol-differential",
  "commol-random",
  "commol-stochastic",
+ "finitediff",
  "libm",
  "nalgebra",
  "rayon",
@@ -719,6 +721,15 @@ name = "find-msvc-tools"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52051878f80a721bb68ebfbc930e07b65ba72f2da88968ea5c06fd6ca3d3a127"
+
+[[package]]
+name = "finitediff"
+version = "0.2.0"
+source = "git+https://github.com/MUNQU/argmin?branch=development#e418a74f34f5ee53429a468b793044dbb41d697c"
+dependencies = [
+ "anyhow",
+ "num",
+]
 
 [[package]]
 name = "fixedbitset"
@@ -1203,6 +1214,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "num"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35bd024e8b2ff75562e5f34e7f4905839deb4b22955ef5e73d2fea1b9813cb23"
+dependencies = [
+ "num-bigint",
+ "num-complex",
+ "num-integer",
+ "num-iter",
+ "num-rational",
+ "num-traits",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1229,6 +1254,16 @@ version = "0.1.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7969661fd2958a5cb096e56c8e1ad0444ac2bbcd0061bd28660485a44879858f"
 dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "num-iter"
+version = "0.1.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c92800bd69a1eac91786bcfe9da64a897eb72911b8dc3095decbd07429e8048b"
+dependencies = [
+ "num-integer",
  "num-traits",
 ]
 

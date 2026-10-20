@@ -64,7 +64,7 @@ knows how its derivatives are made. `FiniteDifferences` is the first: central
 differences, one-sided of second order at a bound, with the step
 `h = η^{1/3} · max(|θ|, w)` (at most `w / 8`), where `η` is the output
 accuracy of the engine (`SimulationEngine::output_accuracy`: machine epsilon,
-or the `rtol` of the ODE engine) and `w` the width of the bounds. Each entry
+or the `rtol` of the ODE engine) and `w` the width of the bounds (1 when infinite). Each entry
 carries an estimated error, from the steps `h` and `2h` and the accuracy of
 the runs; the structural rank counts a singular value only above the norm of
 that error (Weyl's inequality). The scaled sensitivities
@@ -158,7 +158,7 @@ to its parameter's bounds and drawn by inverting its distribution function
 with special functions on `libm`, so a seed gives the same draws on every
 platform. Each sampling method takes `priors` with no default, and `η` of a
 Gibbs posterior has no default either: a number or a calibration.
-Information matching needs the sum of squares and a deterministic engine;
+Information matching reads the curvature and the meat of the sandwich;
 bootstrap coverage interpolates the per-replicate thresholds of `η` at the
 positions `i / (M + 1)`, because the largest `η` that covers at the level is
 an order statistic whose expected coverage is below it.

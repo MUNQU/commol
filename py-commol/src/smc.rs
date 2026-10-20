@@ -6,6 +6,7 @@
 //! built once by a `Calibrator` and returns the run as plain values; Python
 //! builds the result.
 
+use commol_inference::local::LocalError;
 use commol_inference::resampling::{
     BlockDrawing, BlockScheme, ResidualScale, Residuals, automatic_block_length,
 };
@@ -194,7 +195,7 @@ fn sampler(
     .map_err(value_error)
 }
 
-fn problem_priors(
+pub(crate) fn problem_priors(
     problem: &PyCalibrationProblem,
     given: Option<Vec<PriorArgs>>,
 ) -> PyResult<Priors> {
@@ -281,18 +282,27 @@ fn bayesian_posterior(
 
 /// The `η` of information matching at the fit
 ///
+/// Args:
+///     problem: The calibration problem
+///     fit: The fitted values, in problem order
+///     block_length: Positions per block of the scores, or None for the
+///         automatic length
+///
 /// Raises:
-///     ValueError: If the loss is not the sum of squares or the engine is
-///         stochastic
-///     RuntimeError: If the derivatives fail at the fit
+///     ValueError: If the loss is not the sum of squares, the engine is
+///         stochastic, the fit is on a bound, or the blocks are not more
+///         than the parameters
+///     RuntimeError: If the derivatives fail at the fit or the variance of
+///         the scores is singular
 #[pyfunction]
-fn information_matching_eta(problem: &PyCalibrationProblem, fit: Vec<f64>) -> PyResult<f64> {
-    smc::information_matching_eta(&problem.inner, &fit).map_err(|message| {
-        if message.starts_with("EtaCalibration") {
-            value_error(message)
-        } else {
-            PyRuntimeError::new_err(message)
-        }
+fn information_matching_eta(
+    problem: &PyCalibrationProblem,
+    fit: Vec<f64>,
+    block_length: Option<usize>,
+) -> PyResult<f64> {
+    smc::information_matching_eta(&problem.inner, &fit, block_length).map_err(|error| match error {
+        LocalError::Refused(message) => value_error(message),
+        LocalError::Failed(message) => PyRuntimeError::new_err(message),
     })
 }
 

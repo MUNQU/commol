@@ -719,6 +719,8 @@ fn a_calibration_of_eta_needs_a_fit_inside_the_support() {
     )
     .unwrap_err();
     assert_eq!(error, "The fit is outside the support of the problem");
-    let error = information_matching_eta(&problem, &[0.6]).unwrap_err();
+    let error = information_matching_eta(&problem, &[0.6], Some(1))
+        .unwrap_err()
+        .to_string();
     assert!(error.contains("infeasible"), "{error}");
 }

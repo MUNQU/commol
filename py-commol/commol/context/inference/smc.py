@@ -19,7 +19,7 @@ from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
 
 ETA_CHOICES = (
-    "a number above 0, EtaCalibration.information_matching() or "
+    "a number above 0, EtaCalibration.information_matching(block_length) or "
     "EtaCalibration.bootstrap_coverage(replicates, block_length, confidence_level)"
 )
 
@@ -34,20 +34,28 @@ class EtaCalibration(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     @classmethod
-    def information_matching(cls) -> "InformationMatching":
+    def information_matching(cls, block_length: BlockLength) -> "InformationMatching":
         """
-        Match the curvature of the loss to the variance of its terms at the
-        fit (Holmes and Walker 2017).
+        Match the curvature of the objective to the variance of the scores of
+        its terms at the fit (Holmes and Walker 2017).
 
-        It needs ``loss_function="sse"`` and a deterministic engine, and is
-        cheap and local.
+        It needs ``loss_function="sse"`` or observation models and a
+        deterministic engine, and is cheap and local. The variance sums the
+        scores over blocks of positions, so it holds under dependence inside
+        a block.
+
+        Parameters
+        ----------
+        block_length : int | "auto"
+            Positions per block of the scores; there must be more blocks
+            than parameters.
 
         Returns
         -------
         InformationMatching
             The calibration.
         """
-        return InformationMatching()
+        return InformationMatching(block_length=block_length)
 
     @classmethod
     def bootstrap_coverage(
@@ -83,14 +91,23 @@ class EtaCalibration(BaseModel):
 
 class InformationMatching(EtaCalibration):
     """
-    `η = tr(J I⁻¹ J) / tr(J)` at the fit, with ``J`` the curvature of the
-    loss terms and ``I`` their variance (Holmes and Walker 2017; Lyddon,
-    Holmes and Walker 2019). For the sum of squares of a model with Gaussian
-    noise of variance ``σ²`` it estimates ``1/(2σ²)``. It needs
-    ``loss_function="sse"`` and a deterministic engine.
+    `η = tr(J I⁻¹ J) / tr(J)` at the fit, with ``J`` the Gauss–Newton
+    curvature of the objective and ``I`` the variance of the scores of its
+    terms, summed over blocks of positions as the meat of `Sandwich`
+    (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019). For the sum of
+    squares of a model with Gaussian noise of variance ``σ²`` it estimates
+    ``1/(2σ²)``; for a correct observation model, 1. It needs
+    ``loss_function="sse"`` or observation models, and a deterministic
+    engine.
+
+    Attributes
+    ----------
+    block_length : int | "auto"
+        Positions per block of the scores.
     """
 
     kind: Literal["information_matching"] = "information_matching"
+    block_length: BlockLength = Field(description="Positions per block.")
 
 
 class BootstrapCoverage(EtaCalibration):
