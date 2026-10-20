@@ -151,6 +151,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Nelder-Mead with an infinite bound fails with the message `Nelder-Mead
+  needs finite bounds`, instead of a rate that is not a number. The sine
+  transform of the bounds and the root finder of the quantiles come from the
+  argmin fork; calibrations, profiles, quantiles and draws give the same
+  results.
 - **Breaking:** `EtaCalibration.information_matching(block_length)` takes a
   required `block_length`, an `int` or `"auto"`: the variance of the scores
   is summed over blocks of positions, as the meat of `Sandwich`, so it holds

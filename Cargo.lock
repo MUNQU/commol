@@ -41,7 +41,7 @@ checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
 [[package]]
 name = "argmin"
 version = "0.11.0"
-source = "git+https://github.com/MUNQU/argmin?branch=development#e418a74f34f5ee53429a468b793044dbb41d697c"
+source = "git+https://github.com/MUNQU/argmin?branch=development#857174976867ec7405286a4bf490d8294f9f4e47"
 dependencies = [
  "anyhow",
  "argmin-math",
@@ -57,7 +57,7 @@ dependencies = [
 [[package]]
 name = "argmin-math"
 version = "0.5.1"
-source = "git+https://github.com/MUNQU/argmin?branch=development#e418a74f34f5ee53429a468b793044dbb41d697c"
+source = "git+https://github.com/MUNQU/argmin?branch=development#857174976867ec7405286a4bf490d8294f9f4e47"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -235,6 +235,7 @@ name = "commol-inference"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "argmin",
  "commol-calibration",
  "commol-core",
  "commol-difference",
@@ -725,7 +726,7 @@ checksum = "52051878f80a721bb68ebfbc930e07b65ba72f2da88968ea5c06fd6ca3d3a127"
 [[package]]
 name = "finitediff"
 version = "0.2.0"
-source = "git+https://github.com/MUNQU/argmin?branch=development#e418a74f34f5ee53429a468b793044dbb41d697c"
+source = "git+https://github.com/MUNQU/argmin?branch=development#857174976867ec7405286a4bf490d8294f9f4e47"
 dependencies = [
  "anyhow",
  "num",

@@ -50,8 +50,10 @@ process), `LossDistance` of ABC and information matching of `η`.
 The objective clamps values to their bounds, so the loss is flat outside them,
 and a simplex that crosses a bound collapses there. Nelder-Mead therefore
 searches an unbounded `u` and scores `x = lo + (hi − lo)·(sin u + 1)/2`
-(`SineTransform` and `BoundedProblem` in `optimization.rs`). Its evaluations
-and its result are recorded in `x`. `converged` is true only for
+(`SineTransform` and `BoundedProblem` of the argmin fork, in
+`argmin::core::bounds`; `SearchSpace::transform` in `optimization.rs` builds
+the transform and refuses an infinite bound). Its evaluations and its result
+are recorded in `x`. `converged` is true only for
 `SolverConverged` and `TargetCostReached` (`optimization::converged`). An
 error of the model at a vertex of the initial simplex stops the run with its
 message (`NelderMead::init` of the argmin fork returns it).

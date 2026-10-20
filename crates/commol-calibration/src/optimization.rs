@@ -9,8 +9,8 @@ use std::cell::RefCell;
 
 use argmin::core::observers::{Observe, ObserverMode};
 use argmin::core::{
-    CostFunction, Error, Executor, IterState, Operator, PopulationState, State, TerminationReason,
-    TerminationStatus,
+    BoundedProblem, CostFunction, Error, Executor, IterState, Operator, PopulationState,
+    SineTransform, State, TerminationReason, TerminationStatus,
 };
 use argmin::solver::augmentedlagrangian::{AugmentedLagrangian, AugmentedLagrangianState};
 use argmin::solver::neldermead::NelderMead;
@@ -414,6 +414,12 @@ impl SearchSpace {
             .collect()
     }
 
+    /// The sine transform of the bounds, which Nelder-Mead searches through.
+    fn transform(&self) -> Result<SineTransform<f64>, String> {
+        SineTransform::new(self.bounds.clone())
+            .map_err(|e| format!("Nelder-Mead needs finite bounds: {e}"))
+    }
+
     pub(crate) fn check_start(&self, start: &[f64]) -> Result<(), String> {
         if start.len() == self.bounds.len() {
             Ok(())
@@ -548,7 +554,7 @@ where
     };
     let (best, state, cost) = match config {
         OptimizationConfig::NelderMead(nm_config) => {
-            let transform = SineTransform::new(space.bounds.clone());
+            let transform = space.transform()?;
             build_nelder_mead_solver(&transform, start, nm_config)?;
             let factory = |u: &Vec<f64>| {
                 let solver = build_nelder_mead_solver(&transform, &transform.to_x(u), nm_config)
@@ -558,17 +564,14 @@ where
                     NelderMeadState::new().max_iters(nm_config.max_iterations),
                 ))
             };
-            let bounded = BoundedProblem {
-                cost,
-                transform: transform.clone(),
-            };
+            let bounded = BoundedProblem::new(cost, transform.clone());
             let u0 = transform.to_u(start);
             let mut result = Executor::new(bounded, lagrangian(factory, settings)?)
                 .configure(|state| outer(state, u0))
                 .run()
                 .map_err(|e| format!("Optimization failed: {e}"))?;
             let best = transform.to_x(result.state.get_best_param().ok_or(NO_POINT)?);
-            let cost = result.problem.take_problem().ok_or(NO_COST)?.cost;
+            let cost = result.problem.take_problem().ok_or(NO_COST)?.into_inner();
             (best, result.state, cost)
         }
         OptimizationConfig::ParticleSwarm(ps_config) => {
@@ -689,121 +692,9 @@ pub fn converged(status: &TerminationStatus) -> bool {
     )
 }
 
-/// Maps an unbounded coordinate `u` to a value `x` inside its bounds:
-/// `x = lo + (hi − lo)·(sin u + 1)/2` (the MINUIT and lmfit transform).
-///
-/// Nelder-Mead searches `u`, so every point it tries is inside the bounds and
-/// the simplex never collapses on a bound where the clamped loss is flat.
-#[derive(Debug, Clone)]
-pub(crate) struct SineTransform {
-    bounds: Vec<(f64, f64)>,
-}
-
-impl SineTransform {
-    pub(crate) fn new(bounds: Vec<(f64, f64)>) -> Self {
-        Self { bounds }
-    }
-
-    /// Bounded values of the unbounded coordinates `u`.
-    pub(crate) fn to_x(&self, u: &[f64]) -> Vec<f64> {
-        u.iter()
-            .zip(&self.bounds)
-            .map(|(u, (lo, hi))| lo + (hi - lo) * (u.sin() + 1.0) / 2.0)
-            .collect()
-    }
-
-    /// Unbounded coordinates of the values `x`, clamped to the bounds first.
-    pub(crate) fn to_u(&self, x: &[f64]) -> Vec<f64> {
-        x.iter()
-            .zip(&self.bounds)
-            .map(|(x, (lo, hi))| {
-                if hi > lo {
-                    (2.0 * (x.clamp(*lo, *hi) - lo) / (hi - lo) - 1.0).asin()
-                } else {
-                    0.0
-                }
-            })
-            .collect()
-    }
-
-    /// Initial simplex in `u`: the start, and one vertex per parameter that
-    /// moves it by `step × (hi − lo)` in `x`, towards the farther bound.
-    pub(crate) fn initial_simplex(&self, x0: &[f64], step: f64) -> Vec<Vec<f64>> {
-        let x0: Vec<f64> = x0
-            .iter()
-            .zip(&self.bounds)
-            .map(|(x, (lo, hi))| x.clamp(*lo, *hi))
-            .collect();
-        let u0 = self.to_u(&x0);
-        let mut vertices = vec![u0.clone()];
-        for (i, (lo, hi)) in self.bounds.iter().enumerate() {
-            let mut vertex = u0.clone();
-            if hi > lo {
-                let delta = step * (hi - lo);
-                let moved = if hi - x0[i] >= x0[i] - lo {
-                    x0[i] + delta
-                } else {
-                    x0[i] - delta
-                };
-                vertex[i] = self.to_u(&with_value(&x0, i, moved))[i];
-            } else {
-                vertex[i] += 1.0;
-            }
-            vertices.push(vertex);
-        }
-        vertices
-    }
-}
-
-fn with_value(values: &[f64], index: usize, value: f64) -> Vec<f64> {
-    let mut values = values.to_vec();
-    values[index] = value;
-    values
-}
-
-/// A cost function seen through a [`SineTransform`]: the optimizer proposes
-/// `u`, the cost function scores `x`.
-pub(crate) struct BoundedProblem<C> {
-    pub(crate) cost: C,
-    transform: SineTransform,
-}
-
-impl<C: CostFunction<Param = Vec<f64>, Output = f64>> CostFunction for BoundedProblem<C> {
-    type Param = Vec<f64>;
-    type Output = f64;
-
-    fn cost(&self, u: &Self::Param) -> Result<Self::Output, Error> {
-        self.cost.cost(&self.transform.to_x(u))
-    }
-}
-
-impl<C: Operator<Param = Vec<f64>, Output = Vec<f64>>> Operator for BoundedProblem<C> {
-    type Param = Vec<f64>;
-    type Output = Vec<f64>;
-
-    fn apply(&self, u: &Self::Param) -> Result<Self::Output, Error> {
-        self.cost.apply(&self.transform.to_x(u))
-    }
-}
-
-/// A cost function whose NaN costs count as `+∞`. argmin keeps a particle
-/// as the best only when its cost is below the best so far, so a NaN cost
-/// first in the swarm would leave it with no best particle.
-struct NanAsWorst<C>(C);
-
-impl<C: CostFunction<Param = Vec<f64>, Output = f64>> CostFunction for NanAsWorst<C> {
-    type Param = Vec<f64>;
-    type Output = f64;
-
-    fn cost(&self, x: &Self::Param) -> Result<Self::Output, Error> {
-        // `min` returns its other argument when one is NaN.
-        self.0.cost(x).map(|cost| cost.min(f64::INFINITY))
-    }
-}
-
 /// Build Nelder-Mead solver from configuration, with its simplex in `u`
 fn build_nelder_mead_solver(
-    transform: &SineTransform,
+    transform: &SineTransform<f64>,
     initial_params: &[f64],
     config: &NelderMeadConfig,
 ) -> Result<NelderMead<Vec<f64>, f64>, String> {
@@ -860,12 +751,9 @@ where
     C: CostFunction<Param = Vec<f64>, Output = f64>,
     O: Observe<NelderMeadState> + 'static,
 {
-    let transform = SineTransform::new(space.bounds.clone());
+    let transform = space.transform()?;
     let solver = build_nelder_mead_solver(&transform, start, config)?;
-    let bounded = BoundedProblem {
-        cost,
-        transform: transform.clone(),
-    };
+    let bounded = BoundedProblem::new(cost, transform.clone());
     let mut executor = Executor::new(bounded, solver)
         .configure(|state| state.max_iters(config.max_iterations).counting(true))
         .timer(true);
@@ -890,7 +778,10 @@ where
         converged: converged(&state.termination_status),
         termination_reason: format!("{:?}", state.termination_status),
     };
-    let cost = result.problem.take_problem().map(|bounded| bounded.cost);
+    let cost = result
+        .problem
+        .take_problem()
+        .map(BoundedProblem::into_inner);
     Ok((calibration, cost))
 }
 
@@ -906,7 +797,7 @@ where
     O: Observe<ParticleSwarmState> + 'static,
 {
     let solver = build_particle_swarm_solver(&space.bounds, config)?;
-    let mut executor = Executor::new(NanAsWorst(cost), solver)
+    let mut executor = Executor::new(cost, solver)
         .configure(|state| swarm_state(state, config))
         .timer(true);
     if let Some(observer) = observer {
@@ -920,7 +811,7 @@ where
     let best = state
         .best_individual
         .as_ref()
-        .expect("argmin keeps the first particle as the best, as no cost is NaN");
+        .expect("the swarm keeps a best particle, a NaN cost counting as the worst");
     let calibration = CalibrationResult {
         // The values the objective scored, clamped to their bounds.
         best_parameters: space.clamp(&best.position),
@@ -930,10 +821,7 @@ where
         converged: converged(&state.termination_status),
         termination_reason: format!("{:?}", state.termination_status),
     };
-    Ok((
-        calibration,
-        result.problem.take_problem().map(|problem| problem.0),
-    ))
+    Ok((calibration, result.problem.take_problem()))
 }
 
 /// The limits of a swarm run: `max_iterations`, and `target_cost` when set.
@@ -1134,61 +1022,8 @@ mod tests {
     }
 
     #[test]
-    fn the_transform_keeps_every_value_inside_its_bounds() {
-        let transform = SineTransform::new(vec![(0.0, 1.0), (-2.0, 3.0)]);
-        for u in [-10.0, -1.6, 0.0, 0.7, 1.6, 25.0] {
-            let x = transform.to_x(&[u, u]);
-            assert!((0.0..=1.0).contains(&x[0]));
-            assert!((-2.0..=3.0).contains(&x[1]));
-        }
-    }
-
-    #[test]
-    fn the_transform_round_trips_inside_the_bounds() {
-        let transform = SineTransform::new(vec![(0.0, 1.0), (-2.0, 3.0)]);
-        let x = [0.25, 1.5];
-        let back = transform.to_x(&transform.to_u(&x));
-        assert!((back[0] - 0.25).abs() < 1e-12);
-        assert!((back[1] - 1.5).abs() < 1e-12);
-    }
-
-    #[test]
-    fn the_initial_simplex_moves_each_value_by_the_step_of_its_width() {
-        let transform = SineTransform::new(vec![(0.0, 1.0), (0.0, 10.0)]);
-        // A start at the lower bound (0) is not degenerate.
-        let simplex = transform.initial_simplex(&[0.0, 9.5], 0.1);
-        let x: Vec<Vec<f64>> = simplex.iter().map(|u| transform.to_x(u)).collect();
-
-        assert_eq!(x.len(), 3);
-        assert!((x[0][0] - 0.0).abs() < 1e-12 && (x[0][1] - 9.5).abs() < 1e-12);
-        assert!((x[1][0] - 0.1).abs() < 1e-12, "{:?}", x[1]);
-        // 9.5 + 1.0 leaves the bounds, so the vertex moves down.
-        assert!((x[2][1] - 8.5).abs() < 1e-12, "{:?}", x[2]);
-    }
-
-    #[test]
-    fn the_initial_simplex_moves_towards_the_farther_bound() {
-        let transform = SineTransform::new(vec![(-2.0, 3.0)]);
-        // 0.6 is 2.4 from the upper bound and 2.6 from the lower one.
-        let simplex = transform.initial_simplex(&[0.6], 0.1);
-        let moved = transform.to_x(&simplex[1])[0];
-        assert!((moved - 0.1).abs() < 1e-12, "{moved}");
-    }
-
-    #[test]
-    fn a_fixed_value_stays_at_every_vertex_of_a_simplex_that_still_spans_it() {
-        let transform = SineTransform::new(vec![(2.0, 2.0)]);
-        assert_eq!(transform.to_u(&[2.0]), vec![0.0]);
-        let simplex = transform.initial_simplex(&[2.0], 0.1);
-        assert_ne!(simplex[0], simplex[1]);
-        for vertex in &simplex {
-            assert_eq!(transform.to_x(vertex), vec![2.0]);
-        }
-    }
-
-    #[test]
     fn the_initial_simplex_size_is_a_fraction_of_the_width() {
-        let transform = SineTransform::new(vec![(0.0, 1.0)]);
+        let transform = SineTransform::new(vec![(0.0, 1.0)]).unwrap();
         let solver = |size| {
             let config = NelderMeadConfig {
                 initial_simplex_size: size,
@@ -1201,5 +1036,21 @@ mod tests {
             let error = solver(size).err().expect("an invalid size");
             assert!(error.contains("must be in (0, 1]"), "{error}");
         }
+    }
+
+    #[test]
+    fn nelder_mead_refuses_an_infinite_bound() {
+        let space = SearchSpace {
+            bounds: vec![(0.0, f64::INFINITY)],
+            names: vec!["x".to_string()],
+        };
+        let config = NelderMeadConfig::default();
+        let error = optimize_nelder_mead(&space, HalfNan, &[1.0], &config, None::<NoObserver>)
+            .err()
+            .expect("an infinite bound");
+        assert!(
+            error.starts_with("Nelder-Mead needs finite bounds"),
+            "{error}"
+        );
     }
 }

@@ -230,7 +230,12 @@ To add a kind of model, such as an agent network (see
 - [ ] For a major update that needs code changes, open your own pull request
       and close the Dependabot one with a link to it.
 - [ ] The argmin dependency is a fork (`MUNQU/argmin`, branch `development`):
-      change the fork first, then update `Cargo.lock`.
+      change the fork first, then update `Cargo.lock`. The fork keeps the
+      numerical methods that know no model: the solvers, the sine transform
+      of box bounds (`SineTransform`, `BoundedProblem`), the root finder
+      (`NewtonRoot`) and the finite differences (`finitediff`). commol keeps
+      what knows the model: the bounds, the start points, the bracket of a
+      quantile.
 
 ### Releases
 
