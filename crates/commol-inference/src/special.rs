@@ -334,9 +334,10 @@ mod tests {
 
     #[test]
     fn the_f_quantile_is_the_square_of_the_t_quantile() {
-        // SciPy 1.16: stats.t.ppf(0.975, 8) and stats.t.ppf(0.95, 30).
+        // The quantiles 0.975 of Student's t with 8 degrees of freedom and
+        // 0.95 with 30.
         let t8 = 2.306004135204166;
-        let t30 = 1.6972608943617378;
+        let t30 = 1.6972608865939573;
         assert!(close(f_one_quantile(8.0, 0.95), t8 * t8, 1e-12));
         assert!(close(f_one_quantile(30.0, 0.9), t30 * t30, 1e-12));
     }

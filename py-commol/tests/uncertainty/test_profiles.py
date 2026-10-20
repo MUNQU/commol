@@ -5,17 +5,23 @@ from statistics import NormalDist
 
 import pytest
 
+from pydantic import ValidationError
+
 from commol import (
+    BayesianBootstrap,
     CalibrationProblem,
     Calibrator,
+    LogNormalObservations,
     NelderMeadConfig,
     NormalObservations,
+    ParametricBootstrap,
     PredictionProfile,
     PredictionSpec,
     ProfileLikelihood,
     ResidualBootstrap,
     Simulation,
     Threshold,
+    WildBootstrap,
 )
 from commol.commol_rs import _commol_rs as commol_rs
 from tests.support import (
@@ -151,6 +157,72 @@ class TestThresholds:
             calibrator.uncertainty(
                 ProfileLikelihood(parameters=["k"], threshold=Threshold.beale(0.95))
             )
+
+    @pytest.mark.parametrize(
+        ("bootstrap", "models"),
+        [
+            (BayesianBootstrap(replicates=12, block_length=2), None),
+            (WildBootstrap(replicates=12, block_length=2, multipliers="mammen"), None),
+            (
+                ParametricBootstrap(replicates=12),
+                {"B": NormalObservations(sd=1.0)},
+            ),
+        ],
+        ids=["bayesian", "wild", "parametric"],
+    )
+    def test_every_bootstrap_calibrates_a_threshold(
+        self,
+        bootstrap: BayesianBootstrap | WildBootstrap | ParametricBootstrap,
+        models: dict[str, NormalObservations] | None,
+    ) -> None:
+        calibrator = line_calibrator(VALUES, observation_models=models)
+
+        result = calibrator.uncertainty(
+            ProfileLikelihood(
+                parameters=["c"],
+                threshold=Threshold.bootstrap_calibrated(bootstrap, 0.8),
+                max_steps=3,
+            )
+        )
+
+        rises = result.profiles["c"].replicate_rises
+        assert rises is not None and len(rises) == 12
+        assert min(rises) >= 0.0
+        expected = commol_rs.inference.weighted_quantiles(rises, [1.0] * 12, [0.8])
+        assert result.profiles["c"].threshold == pytest.approx(expected[0])
+
+    def test_a_replicate_that_fails_is_reported(self) -> None:
+        # Small values with residuals of their size: the additive bootstrap
+        # makes a value below 0, which a log-normal model cannot read.
+        values = [0.3, 3.2, 0.2, 6.1, 4.0, 9.5, 6.2, 12.0, 9.0, 15.5]
+        calibrator = line_calibrator(
+            values,
+            observation_models={"B": LogNormalObservations(sigma=0.5, center="median")},
+        )
+        bootstrap = ResidualBootstrap(
+            replicates=20, block_length=1, residual_scale="additive", scheme="moving"
+        )
+
+        result = calibrator.uncertainty(
+            ProfileLikelihood(
+                parameters=["c"],
+                threshold=Threshold.bootstrap_calibrated(bootstrap, 0.9),
+                max_steps=3,
+            )
+        )
+
+        failed = result.failed_replicates
+        assert failed and all("needs a value above 0" in reason for reason in failed)
+        rises = result.profiles["c"].replicate_rises
+        assert rises is not None and len(rises) == 20 - len(failed)
+
+    def test_a_bootstrap_goes_only_with_its_threshold(self) -> None:
+        bootstrap = BayesianBootstrap(replicates=5, block_length=1)
+
+        with pytest.raises(ValidationError, match="no other"):
+            Threshold(kind="beale", level=0.9, bootstrap=bootstrap)
+        with pytest.raises(ValidationError, match="no other"):
+            Threshold(kind="bootstrap_calibrated", level=0.9)
 
     @pytest.mark.parametrize("level", [0.0, 1.0])
     def test_a_level_is_strictly_between_0_and_1(self, level: float) -> None:
@@ -352,4 +424,22 @@ class TestResult:
             assert all(
                 (s > profile.threshold) == (not interval.lower <= v <= interval.upper)
                 for v, s in zip(profile.values, profile.statistics, strict=True)
+            )
+
+
+class TestSettings:
+    def test_a_parameter_is_profiled_once(self) -> None:
+        with pytest.raises(ValidationError, match="listed twice"):
+            ProfileLikelihood(
+                parameters=["c", "c"], threshold=Threshold.chi_square(0.9)
+            )
+
+    def test_each_prediction_has_a_label_of_its_own(self) -> None:
+        with pytest.raises(ValidationError, match="label of its own"):
+            PredictionProfile(
+                specs=[
+                    PredictionSpec(at=4, output="B"),
+                    PredictionSpec(at=8, output="B"),
+                ],
+                threshold=Threshold.chi_square(0.9),
             )
