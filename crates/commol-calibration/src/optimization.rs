@@ -9,8 +9,10 @@ use std::cell::RefCell;
 
 use argmin::core::observers::{Observe, ObserverMode};
 use argmin::core::{
-    CostFunction, Error, Executor, IterState, PopulationState, TerminationReason, TerminationStatus,
+    CostFunction, Error, Executor, IterState, Operator, PopulationState, State, TerminationReason,
+    TerminationStatus,
 };
+use argmin::solver::augmentedlagrangian::{AugmentedLagrangian, AugmentedLagrangianState};
 use argmin::solver::neldermead::NelderMead;
 use argmin::solver::particleswarm::{
     InitializationStrategy as ArgminInitializationStrategy,
@@ -18,11 +20,15 @@ use argmin::solver::particleswarm::{
     Particle, ParticleSwarm,
 };
 use commol_core::SimulationEngine;
+use commol_random::replicate_seed;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
 use crate::calibration_problem::CalibrationProblem;
 use crate::objective::{OptimizationObjective, Recorded};
+use crate::subproblem::{
+    ConstraintSettings, Fixed, FixedParameter, PredictionCost, Subproblem, SubproblemResult,
+};
 use crate::types::{CalibrationEvaluation, CalibrationResult, CalibrationResultWithHistory};
 
 /// Configuration for Nelder-Mead optimization
@@ -309,7 +315,15 @@ pub fn optimize_from<E: SimulationEngine>(
     seed: Option<u64>,
 ) -> Result<CalibrationResult, String> {
     let objective = OptimizationObjective::new(problem);
-    run(problem, objective, config, start, seed, None::<NoObserver>).map(|(result, _)| result)
+    run(
+        &SearchSpace::of(problem),
+        objective,
+        config,
+        start,
+        seed,
+        None::<NoObserver>,
+    )
+    .map(|(result, _)| result)
 }
 
 /// Minimize the objective of `problem` from its initial guess, with an
@@ -329,7 +343,15 @@ where
 {
     let objective = OptimizationObjective::new(problem);
     let start = problem.initial_parameters();
-    run(problem, objective, config, &start, None, Some(observer)).map(|(result, _)| result)
+    run(
+        &SearchSpace::of(problem),
+        objective,
+        config,
+        &start,
+        None,
+        Some(observer),
+    )
+    .map(|(result, _)| result)
 }
 
 /// Minimize the objective of `problem` from its initial guess, and keep every
@@ -347,7 +369,14 @@ pub fn optimize_with_history<E: SimulationEngine>(
         evaluations: RefCell::new(Vec::new()),
     };
     let start = problem.initial_parameters();
-    let (result, recorded) = run(problem, recorded, config, &start, None, None::<NoObserver>)?;
+    let (result, recorded) = run(
+        &SearchSpace::of(problem),
+        recorded,
+        config,
+        &start,
+        None,
+        None::<NoObserver>,
+    )?;
     let evaluations: Vec<CalibrationEvaluation> = recorded
         .map(|recorded| recorded.evaluations.into_inner())
         .unwrap_or_default();
@@ -357,10 +386,257 @@ pub fn optimize_with_history<E: SimulationEngine>(
     })
 }
 
-/// Run the optimizer of `config` on `cost` from `start`, and return the
-/// result and the cost function.
-fn run<E, C, O>(
-    problem: &CalibrationProblem<E>,
+/// What an optimizer searches: the bounds and the name of each free value.
+///
+/// It is the problem's parameters, or those a subproblem leaves free
+/// ([`crate::Subproblem`]).
+#[derive(Debug, Clone)]
+pub(crate) struct SearchSpace {
+    pub(crate) bounds: Vec<(f64, f64)>,
+    pub(crate) names: Vec<String>,
+}
+
+impl SearchSpace {
+    /// Every parameter of `problem`.
+    pub(crate) fn of<E: SimulationEngine>(problem: &CalibrationProblem<E>) -> Self {
+        Self {
+            bounds: problem.parameter_bounds(),
+            names: problem.parameter_names(),
+        }
+    }
+
+    /// Each value of `values` clamped to its bounds.
+    pub(crate) fn clamp(&self, values: &[f64]) -> Vec<f64> {
+        values
+            .iter()
+            .zip(&self.bounds)
+            .map(|(value, (lo, hi))| value.clamp(*lo, *hi))
+            .collect()
+    }
+
+    pub(crate) fn check_start(&self, start: &[f64]) -> Result<(), String> {
+        if start.len() == self.bounds.len() {
+            Ok(())
+        } else {
+            Err(format!(
+                "Expected {} start values, got {}",
+                self.bounds.len(),
+                start.len()
+            ))
+        }
+    }
+}
+
+/// Fit the values `subproblem` leaves free with the optimizer of `config`,
+/// from `start`, which holds every parameter of the problem.
+///
+/// A held parameter is left out of the values the optimizer searches, and
+/// its value replaces the one in `start`. A held prediction is an equality
+/// constraint `g(θ) = c`, met by the augmented Lagrangian of the argmin
+/// fork: each outer iteration runs the optimizer of `config` on
+/// `f(θ) + λ (g(θ) − c) + (μ/2)(g(θ) − c)²`, Nelder-Mead from the point of
+/// the iteration before, then updates `λ` and `μ` by the rule of Algencan.
+/// A particle swarm runs to its `max_iterations` in each outer iteration,
+/// so the run stops at the outer limit of the settings.
+///
+/// `seed`, when given, replaces the seed of a particle swarm; outer
+/// iteration `k` of a held prediction takes `replicate_seed(seed, k)`.
+///
+/// # Errors
+///
+/// As [`optimize`], and a message when `start` has the wrong length.
+pub fn optimize_subproblem<E: SimulationEngine>(
+    subproblem: &Subproblem<'_, E>,
+    config: &OptimizationConfig,
+    start: &[f64],
+    seed: Option<u64>,
+) -> Result<SubproblemResult, String> {
+    let problem = subproblem.problem;
+    SearchSpace::of(problem).check_start(start)?;
+    match &subproblem.fixed {
+        Fixed::Parameter { index, value } => {
+            let cost = FixedParameter {
+                objective: OptimizationObjective::new(problem),
+                index: *index,
+                value: *value,
+                evaluations: std::cell::Cell::new(0),
+            };
+            let mut space = SearchSpace::of(problem);
+            space.bounds.remove(*index);
+            space.names.remove(*index);
+            let mut free = start.to_vec();
+            free.remove(*index);
+            let (mut fit, cost) = if space.bounds.is_empty() {
+                let loss = cost.cost(&free).map_err(|e| e.to_string())?;
+                let fit = CalibrationResult {
+                    best_parameters: Vec::new(),
+                    parameter_names: Vec::new(),
+                    final_loss: loss,
+                    iterations: 0,
+                    converged: true,
+                    termination_reason: "No free parameter".to_string(),
+                };
+                (fit, Some(cost))
+            } else {
+                run(&space, cost, config, &free, seed, None::<NoObserver>)?
+            };
+            let cost = cost.ok_or("Optimization failed: the solver kept the cost function")?;
+            fit.best_parameters = cost.full(&fit.best_parameters);
+            fit.parameter_names = problem.parameter_names();
+            Ok(SubproblemResult {
+                fit,
+                prediction: None,
+                multiplier: None,
+                penalty: None,
+                evaluations: cost.evaluations.get(),
+            })
+        }
+        Fixed::Prediction(held) => {
+            let space = SearchSpace::of(problem);
+            let run = run_constrained(
+                &space,
+                PredictionCost::new(held),
+                config,
+                start,
+                seed,
+                &held.settings,
+            )?;
+            let (_, prediction) = run
+                .cost
+                .evaluate(&run.fit.best_parameters)
+                .map_err(|e| e.to_string())?;
+            Ok(SubproblemResult {
+                fit: run.fit,
+                prediction,
+                multiplier: Some(run.multiplier),
+                penalty: Some(run.penalty),
+                evaluations: run.cost.evaluations.get(),
+            })
+        }
+    }
+}
+
+/// The end of a constrained run.
+struct ConstrainedRun<C> {
+    fit: CalibrationResult,
+    multiplier: f64,
+    penalty: f64,
+    cost: C,
+}
+
+/// The state of an augmented Lagrangian run with one constraint.
+type LagrangianState = AugmentedLagrangianState<Vec<f64>, Vec<f64>, f64>;
+
+/// The augmented Lagrangian of `settings` on `cost` and its constraint, over
+/// `space` from `start`, with the optimizer of `config` as its inner solver.
+fn run_constrained<C>(
+    space: &SearchSpace,
+    cost: C,
+    config: &OptimizationConfig,
+    start: &[f64],
+    seed: Option<u64>,
+    settings: &ConstraintSettings,
+) -> Result<ConstrainedRun<C>, String>
+where
+    C: CostFunction<Param = Vec<f64>, Output = f64> + Operator<Param = Vec<f64>, Output = Vec<f64>>,
+{
+    let outer = |state: LagrangianState, param: Vec<f64>| {
+        state
+            .param(param)
+            .max_iters(settings.max_outer_iterations)
+            .counting(true)
+    };
+    let (best, state, cost) = match config {
+        OptimizationConfig::NelderMead(nm_config) => {
+            let transform = SineTransform::new(space.bounds.clone());
+            build_nelder_mead_solver(&transform, start, nm_config)?;
+            let factory = |u: &Vec<f64>| {
+                let solver = build_nelder_mead_solver(&transform, &transform.to_x(u), nm_config)
+                    .map_err(Error::msg)?;
+                Ok((
+                    solver,
+                    NelderMeadState::new().max_iters(nm_config.max_iterations),
+                ))
+            };
+            let bounded = BoundedProblem {
+                cost,
+                transform: transform.clone(),
+            };
+            let u0 = transform.to_u(start);
+            let mut result = Executor::new(bounded, lagrangian(factory, settings)?)
+                .configure(|state| outer(state, u0))
+                .run()
+                .map_err(|e| format!("Optimization failed: {e}"))?;
+            let best = transform.to_x(result.state.get_best_param().ok_or(NO_POINT)?);
+            let cost = result.problem.take_problem().ok_or(NO_COST)?.cost;
+            (best, result.state, cost)
+        }
+        OptimizationConfig::ParticleSwarm(ps_config) => {
+            let base = seed.or(ps_config.seed);
+            let outer_iteration = std::cell::Cell::new(0u64);
+            let factory = |_: &Vec<f64>| {
+                let k = outer_iteration.get();
+                outer_iteration.set(k + 1);
+                let swarm = seeded(ps_config, base.map(|base| replicate_seed(base, k)));
+                let solver =
+                    build_particle_swarm_solver(&space.bounds, &swarm).map_err(Error::msg)?;
+                Ok((solver, swarm_state(ParticleSwarmState::new(), &swarm)))
+            };
+            let mut result = Executor::new(cost, lagrangian(factory, settings)?)
+                .configure(|state| outer(state, space.clamp(start)))
+                .run()
+                .map_err(|e| format!("Optimization failed: {e}"))?;
+            let best = space.clamp(result.state.get_best_param().ok_or(NO_POINT)?);
+            let cost = result.problem.take_problem().ok_or(NO_COST)?;
+            (best, result.state, cost)
+        }
+    };
+    let fit = CalibrationResult {
+        best_parameters: best,
+        parameter_names: space.names.clone(),
+        final_loss: state.get_best_cost(),
+        iterations: state.get_inner_iters_total() as usize,
+        converged: converged(state.get_termination_status()),
+        termination_reason: format!("{:?}", state.get_termination_status()),
+    };
+    Ok(ConstrainedRun {
+        fit,
+        multiplier: state
+            .get_multipliers()
+            .and_then(|multipliers| multipliers.first().copied())
+            .unwrap_or(0.0),
+        penalty: state.get_penalty(),
+        cost,
+    })
+}
+
+/// The augmented Lagrangian of `settings` around the inner solver that
+/// `factory` builds.
+fn lagrangian<B>(
+    factory: B,
+    settings: &ConstraintSettings,
+) -> Result<AugmentedLagrangian<B, Vec<f64>, f64>, String> {
+    let mut solver = AugmentedLagrangian::new(factory)
+        .with_tolerance(settings.tolerance)
+        .map_err(|e| format!("Invalid constraint tolerance: {e}"))?;
+    if let Some(multiplier) = settings.multiplier {
+        solver = solver.with_multipliers(vec![multiplier]);
+    }
+    if let Some(penalty) = settings.penalty {
+        solver = solver
+            .with_penalty(penalty)
+            .map_err(|e| format!("Invalid constraint penalty: {e}"))?;
+    }
+    Ok(solver)
+}
+
+const NO_POINT: &str = "Optimization failed: the solver returned no point";
+const NO_COST: &str = "Optimization failed: the solver kept the cost function";
+
+/// Run the optimizer of `config` on `cost` over `space` from `start`, and
+/// return the result and the cost function.
+pub(crate) fn run<C, O>(
+    space: &SearchSpace,
     cost: C,
     config: &OptimizationConfig,
     start: &[f64],
@@ -368,29 +644,27 @@ fn run<E, C, O>(
     observer: Option<O>,
 ) -> Result<(CalibrationResult, Option<C>), String>
 where
-    E: SimulationEngine,
     C: CostFunction<Param = Vec<f64>, Output = f64>,
     O: Observe<NelderMeadState> + Observe<ParticleSwarmState> + 'static,
 {
-    if start.len() != problem.num_parameters() {
-        return Err(format!(
-            "Expected {} start values, got {}",
-            problem.num_parameters(),
-            start.len()
-        ));
-    }
+    space.check_start(start)?;
     match config {
         OptimizationConfig::NelderMead(nm_config) => {
-            optimize_nelder_mead(problem, cost, start, nm_config, observer)
+            optimize_nelder_mead(space, cost, start, nm_config, observer)
         }
         OptimizationConfig::ParticleSwarm(ps_config) => {
-            let mut ps_config = ps_config.clone();
-            if seed.is_some() {
-                ps_config.seed = seed;
-            }
-            optimize_particle_swarm(problem, cost, start, &ps_config, observer)
+            optimize_particle_swarm(space, cost, start, &seeded(ps_config, seed), observer)
         }
     }
+}
+
+/// The swarm of `config`, with `seed` in place of its own when given.
+pub(crate) fn seeded(config: &ParticleSwarmConfig, seed: Option<u64>) -> ParticleSwarmConfig {
+    let mut config = config.clone();
+    if seed.is_some() {
+        config.seed = seed;
+    }
+    config
 }
 
 /// State of a Nelder-Mead run.
@@ -503,6 +777,15 @@ impl<C: CostFunction<Param = Vec<f64>, Output = f64>> CostFunction for BoundedPr
     }
 }
 
+impl<C: Operator<Param = Vec<f64>, Output = Vec<f64>>> Operator for BoundedProblem<C> {
+    type Param = Vec<f64>;
+    type Output = Vec<f64>;
+
+    fn apply(&self, u: &Self::Param) -> Result<Self::Output, Error> {
+        self.cost.apply(&self.transform.to_x(u))
+    }
+}
+
 /// Build Nelder-Mead solver from configuration, with its simplex in `u`
 fn build_nelder_mead_solver(
     transform: &SineTransform,
@@ -551,19 +834,18 @@ fn build_nelder_mead_solver(
 }
 
 /// Nelder-Mead on `cost` from `start`, with its simplex in `u`.
-fn optimize_nelder_mead<E, C, O>(
-    problem: &CalibrationProblem<E>,
+fn optimize_nelder_mead<C, O>(
+    space: &SearchSpace,
     cost: C,
     start: &[f64],
     config: &NelderMeadConfig,
     observer: Option<O>,
 ) -> Result<(CalibrationResult, Option<C>), String>
 where
-    E: SimulationEngine,
     C: CostFunction<Param = Vec<f64>, Output = f64>,
     O: Observe<NelderMeadState> + 'static,
 {
-    let transform = SineTransform::new(problem.parameter_bounds());
+    let transform = SineTransform::new(space.bounds.clone());
     let solver = build_nelder_mead_solver(&transform, start, config)?;
     let bounded = BoundedProblem {
         cost,
@@ -584,10 +866,10 @@ where
         .best_param
         .as_ref()
         .map(|u| transform.to_x(u))
-        .unwrap_or_else(|| problem.applied_parameter_values(start));
+        .unwrap_or_else(|| space.clamp(start));
     let calibration = CalibrationResult {
         best_parameters: best,
-        parameter_names: problem.parameter_names(),
+        parameter_names: space.names.clone(),
         final_loss: state.best_cost,
         iterations: state.iter as usize,
         converged: converged(&state.termination_status),
@@ -598,19 +880,63 @@ where
 }
 
 /// Particle swarm on `cost`, its population drawn over the bounds.
-fn optimize_particle_swarm<E, C, O>(
-    problem: &CalibrationProblem<E>,
+fn optimize_particle_swarm<C, O>(
+    space: &SearchSpace,
     cost: C,
     start: &[f64],
     config: &ParticleSwarmConfig,
     observer: Option<O>,
 ) -> Result<(CalibrationResult, Option<C>), String>
 where
-    E: SimulationEngine,
     C: CostFunction<Param = Vec<f64>, Output = f64>,
     O: Observe<ParticleSwarmState> + 'static,
 {
-    let bounds = problem.parameter_bounds();
+    let solver = build_particle_swarm_solver(&space.bounds, config)?;
+    let mut executor = Executor::new(cost, solver)
+        .configure(|state| swarm_state(state, config))
+        .timer(true);
+    if let Some(observer) = observer {
+        executor = executor.add_observer(observer, ObserverMode::Always);
+    }
+    let mut result = executor
+        .run()
+        .map_err(|e| format!("Optimization failed: {}", e))?;
+
+    let state = &result.state;
+    let (best, best_cost) = state.best_individual.as_ref().map_or_else(
+        || (start.to_vec(), f64::INFINITY),
+        |particle| (particle.position.clone(), particle.cost),
+    );
+    let calibration = CalibrationResult {
+        // The values the objective scored, clamped to their bounds.
+        best_parameters: space.clamp(&best),
+        parameter_names: space.names.clone(),
+        final_loss: best_cost,
+        iterations: state.iter as usize,
+        converged: converged(&state.termination_status),
+        termination_reason: format!("{:?}", state.termination_status),
+    };
+    Ok((calibration, result.problem.take_problem()))
+}
+
+/// The limits of a swarm run: `max_iterations`, and `target_cost` when set.
+pub(crate) fn swarm_state(
+    state: ParticleSwarmState,
+    config: &ParticleSwarmConfig,
+) -> ParticleSwarmState {
+    let mut state = state.max_iters(config.max_iterations).counting(true);
+    if let Some(target) = config.target_cost {
+        state = state.target_cost(target);
+    }
+    state
+}
+
+/// The swarm of `config` over `bounds`, its random numbers from its seed or,
+/// without one, from the system.
+pub(crate) fn build_particle_swarm_solver(
+    bounds: &[(f64, f64)],
+    config: &ParticleSwarmConfig,
+) -> Result<ParticleSwarm<Vec<f64>, f64, SmallRng>, String> {
     let lower_bound: Vec<f64> = bounds.iter().map(|(min, _)| *min).collect();
     let upper_bound: Vec<f64> = bounds.iter().map(|(_, max)| *max).collect();
 
@@ -701,37 +1027,7 @@ where
             .map_err(|e| format!("Failed to set mutation: {}", e))?;
     }
 
-    let mut executor = Executor::new(cost, solver)
-        .configure(|state| {
-            let mut state = state.max_iters(config.max_iterations).counting(true);
-            if let Some(target) = config.target_cost {
-                state = state.target_cost(target);
-            }
-            state
-        })
-        .timer(true);
-    if let Some(observer) = observer {
-        executor = executor.add_observer(observer, ObserverMode::Always);
-    }
-    let mut result = executor
-        .run()
-        .map_err(|e| format!("Optimization failed: {}", e))?;
-
-    let state = &result.state;
-    let (best, best_cost) = state.best_individual.as_ref().map_or_else(
-        || (start.to_vec(), f64::INFINITY),
-        |particle| (particle.position.clone(), particle.cost),
-    );
-    let calibration = CalibrationResult {
-        // The values the objective scored, clamped to their bounds.
-        best_parameters: problem.applied_parameter_values(&best),
-        parameter_names: problem.parameter_names(),
-        final_loss: best_cost,
-        iterations: state.iter as usize,
-        converged: converged(&state.termination_status),
-        termination_reason: format!("{:?}", state.termination_status),
-    };
-    Ok((calibration, result.problem.take_problem()))
+    Ok(solver)
 }
 
 #[cfg(test)]

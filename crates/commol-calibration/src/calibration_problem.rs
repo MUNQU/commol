@@ -229,6 +229,50 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         Ok(problem)
     }
 
+    /// A copy of the problem whose runs also report at the positions of
+    /// `extra` and the starts of their windows, and the operator that reads
+    /// `extra` from the rows of those runs.
+    ///
+    /// The copy scores every point as the problem does: the observations,
+    /// the discrepancy and the constraints stay. Its runs leave the
+    /// predictions of `extra` in [`Workspace::rows`], which the operator
+    /// reads (with the values of the parameters, which hold the factors).
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when the engine rejects a position of `extra`, or
+    /// an entry of `extra` names an unknown output or factor.
+    pub fn observing(
+        &self,
+        extra: &[ObservedDataPoint],
+    ) -> Result<(Self, ObservationOperator), String> {
+        check_positions(self.forward.base_engine(), extra, &[])?;
+        let mut schedule: Vec<f64> = self.forward.schedule().to_vec();
+        schedule.extend(
+            extra
+                .iter()
+                .flat_map(|obs| std::iter::once(obs.at).chain(obs.window.map(|w| obs.at - w))),
+        );
+        schedule.sort_by(f64::total_cmp);
+        schedule.dedup();
+        let operator = ObservationOperator::new(
+            extra,
+            self.parameters(),
+            &self.forward.base_engine().output_names(),
+            &schedule,
+        )?;
+        let forward = self.forward.on_schedule(&self.observed_data, schedule)?;
+        let feasibility = self.feasibility.on_schedule(forward.schedule());
+        Ok((
+            Self {
+                forward,
+                feasibility,
+                ..self.clone()
+            },
+            operator,
+        ))
+    }
+
     /// The forward model.
     pub fn forward(&self) -> &ForwardModel<E> {
         &self.forward

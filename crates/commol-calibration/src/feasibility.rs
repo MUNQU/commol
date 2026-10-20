@@ -211,6 +211,20 @@ impl Feasibility {
         })
     }
 
+    /// The same feasibility on a run at `positions`, a schedule that holds
+    /// every position of the constraints.
+    pub(crate) fn on_schedule(&self, positions: &[f64]) -> Self {
+        let mut feasibility = self.clone();
+        for constraint in &mut feasibility.position_constraints {
+            for (position, row) in &mut constraint.rows {
+                *row = positions
+                    .binary_search_by(|candidate| candidate.total_cmp(position))
+                    .expect("the schedule holds every constraint position");
+            }
+        }
+        feasibility
+    }
+
     /// Whether some constraint reads the rows of a run.
     pub fn reads_rows(&self) -> bool {
         !self.position_constraints.is_empty()
