@@ -38,3 +38,5 @@ The identifiability methods, the report they return, and its parts. Guide:
 ::: commol.context.inference.identifiability.CorrelatedPair
 
 ::: commol.context.inference.identifiability.StartsSection
+
+::: commol.context.inference.identifiability.ProfileSection

@@ -88,6 +88,7 @@ plugins:
           - guide/uncertainty/observation-models.md: Observation models of each series, noise parameters, maximum likelihood, the Bayesian posterior and its evidence, prediction intervals with noise, the log score and the parametric bootstrap
           - guide/uncertainty/conformal.md: Conformal prediction intervals, the guarantee, scores and pooling, split, rolling origins, jackknife+ and CV+, EnbPI, adaptive conformal, plots and reports
           - guide/uncertainty/sensitivity.md: Forward questions with no data, input spaces, quantities of interest, propagation, PRCC, Morris screening, Sobol indices, polynomial chaos and their plots
+          - guide/uncertainty/profiles.md: Profile likelihood of parameters and predictions, how to read a profile, the chi-square, Beale and bootstrap thresholds, the adaptive step, verdicts, the report and plots
           - guide/reports.md: applied_parameters_report and simulation_report
           - guide/examples.md: Complete models
         API reference:
@@ -161,6 +162,7 @@ nav:
           - Conformal: guide/uncertainty/conformal.md
           - Sensitivity Analysis: guide/uncertainty/sensitivity.md
           - Local Approximations: guide/uncertainty/local.md
+          - Profile Likelihood: guide/uncertainty/profiles.md
       - Examples: guide/examples.md
   - API Reference:
       - API Overview: api/index.md
@@ -193,6 +195,7 @@ nav:
               - Calibration: codebase/decisions/calibration.md
               - Uncertainty: codebase/decisions/uncertainty.md
               - Local approximations: codebase/decisions/local-approximations.md
+              - Profiles: codebase/decisions/profiles.md
               - Results: codebase/decisions/results.md
               - Security: codebase/decisions/security.md
           - Conventions: codebase/conventions.md

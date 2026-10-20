@@ -125,6 +125,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its Sobol indices and `predict` as a surrogate (`ChaosResult`); the number
   of terms is checked before any run.
 - `SimulationPlotter.plot_prcc`, `plot_morris` and `plot_sobol`.
+- `ProfileLikelihood(parameters, threshold, max_steps)`: the profile of each
+  parameter, refitted with the problem's own optimizer at values that step
+  away from the fit by the adaptive step of Raue et al. (2009), its pointwise
+  interval and its verdict (`identifiable`, `practically_non_identifiable`,
+  `structurally_non_identifiable`), in a `ProfileResult`;
+  `ProfileResult.report()` gives the verdicts as an `IdentifiabilityReport`
+  with a `profile` section. See
+  [Profile Likelihood](../guide/uncertainty/profiles.md).
+- `PredictionProfile(specs, threshold)`: the interval of each prediction
+  (`PredictionSpec`), held at each value as an equality constraint by an
+  augmented Lagrangian. See
+  [Prediction profiles](../guide/uncertainty/profiles.md#prediction-profiles).
+- `Threshold.chi_square(level)` (observation models),
+  `Threshold.beale(level)` (a sum of squares of independent Gaussian errors)
+  and `Threshold.bootstrap_calibrated(bootstrap, level)` (any loss, calibrated
+  by the replicates of a bootstrap).
+- `SimulationPlotter.plot_profiles`.
 
 ### Changed
 
