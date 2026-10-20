@@ -3626,7 +3626,12 @@ seed of the analysis (<code>stream_seed</code>).</p>
 <li>[ ] For a major update that needs code changes, open your own pull request
       and close the Dependabot one with a link to it.</li>
 <li>[ ] The argmin dependency is a fork (<code>MUNQU/argmin</code>, branch <code>development</code>):
-      change the fork first, then update <code>Cargo.lock</code>.</li>
+      change the fork first, then update <code>Cargo.lock</code>. The fork keeps the
+      numerical methods that know no model: the solvers, the sine transform
+      of box bounds (<code>SineTransform</code>, <code>BoundedProblem</code>), the root finder
+      (<code>NewtonRoot</code>) and the finite differences (<code>finitediff</code>). commol keeps
+      what knows the model: the bounds, the start points, the bracket of a
+      quantile.</li>
 </ul>
 <h3 id="releases">Releases<a class="headerlink" href="#releases" title="Permanent link">&para;</a></h3>
 <ul>

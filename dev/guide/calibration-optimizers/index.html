@@ -3386,9 +3386,10 @@ with <code>initial_guess</code>.</p>
 <p>The search starts at <code>initial_guess</code>, or at the midpoint of the bounds; a start
 of 0 works. Nelder-Mead searches an unbounded coordinate <code>u</code> and scores
 <code>x = lo + (hi − lo)·(sin u + 1)/2</code> (the transform of MINUIT and lmfit), so every
-value it tries is inside the bounds (<code>SineTransform</code> in
-<code>crates/commol-calibration/src/optimization.rs</code>). An optimum exactly at a bound
-is reached only asymptotically, so it can take more iterations.</p>
+value it tries is inside the bounds (<code>SineTransform</code> of the argmin fork). An
+optimum exactly at a bound is reached only asymptotically, so it can take more
+iterations. Nelder-Mead needs finite bounds: a run with an infinite bound fails
+with the message <code>Nelder-Mead needs finite bounds</code>.</p>
 <h2 id="converged-and-termination_reason"><code>converged</code> and <code>termination_reason</code><a class="headerlink" href="#converged-and-termination_reason" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

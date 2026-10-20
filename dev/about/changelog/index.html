@@ -3928,6 +3928,11 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Nelder-Mead with an infinite bound fails with the message <code>Nelder-Mead
+  needs finite bounds</code>, instead of a rate that is not a number. The sine
+  transform of the bounds and the root finder of the quantiles come from the
+  argmin fork; calibrations, profiles, quantiles and draws give the same
+  results.</li>
 <li><strong>Breaking:</strong> <code>EtaCalibration.information_matching(block_length)</code> takes a
   required <code>block_length</code>, an <code>int</code> or <code>"auto"</code>: the variance of the scores
   is summed over blocks of positions, as the meat of <code>Sandwich</code>, so it holds

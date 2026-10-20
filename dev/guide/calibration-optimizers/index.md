@@ -96,7 +96,7 @@ print(calibrate(nelder_mead))  # {'k1': 0.4, 'k2': 0.1}
 | `verbose`                        | `False`                  | Writes a progress table to `sys.stdout` (a notebook shows it). It shows one start, so it needs `run(starts=1)`.                          |
 | `header_interval`                | `100`                    | With `verbose`, repeats the table header every this many iterations.                                                                     |
 
-The search starts at `initial_guess`, or at the midpoint of the bounds; a start of 0 works. Nelder-Mead searches an unbounded coordinate `u` and scores `x = lo + (hi − lo)·(sin u + 1)/2` (the transform of MINUIT and lmfit), so every value it tries is inside the bounds (`SineTransform` in `crates/commol-calibration/src/optimization.rs`). An optimum exactly at a bound is reached only asymptotically, so it can take more iterations.
+The search starts at `initial_guess`, or at the midpoint of the bounds; a start of 0 works. Nelder-Mead searches an unbounded coordinate `u` and scores `x = lo + (hi − lo)·(sin u + 1)/2` (the transform of MINUIT and lmfit), so every value it tries is inside the bounds (`SineTransform` of the argmin fork). An optimum exactly at a bound is reached only asymptotically, so it can take more iterations. Nelder-Mead needs finite bounds: a run with an infinite bound fails with the message `Nelder-Mead needs finite bounds`.
 
 ## `converged` and `termination_reason`
 

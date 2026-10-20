@@ -37,6 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- Nelder-Mead with an infinite bound fails with the message `Nelder-Mead needs finite bounds`, instead of a rate that is not a number. The sine transform of the bounds and the root finder of the quantiles come from the argmin fork; calibrations, profiles, quantiles and draws give the same results.
 - **Breaking:** `EtaCalibration.information_matching(block_length)` takes a required `block_length`, an `int` or `"auto"`: the variance of the scores is summed over blocks of positions, as the meat of `Sandwich`, so it holds under dependence; `block_length=1` gives the independent version. It also takes a problem with observation models, where a correct model gives `η ≈ 1`.
 - **Breaking:** `Predictive(source, sample, positions)` takes a `Calibrator` or a `SensitivityAnalysis` (any `PredictiveSource`), and its attribute `calibrator` is now `source`. `Predictive.at_observations` of an analysis takes only `NoNoise()`, and `scores.log_score` refuses its predictive.
 - With a stochastic engine, every replicate of every draw of a `Predictive`, of `Predictive.at_observations` and of `scores.log_score` has a seed of its own, derived from the calibrator's seed; before, every draw ran the same replicates of the problem, so a predictive with few replicates showed the same few noise paths for every draw. The bands and scores of a stochastic predictive change; a seed still repeats them.

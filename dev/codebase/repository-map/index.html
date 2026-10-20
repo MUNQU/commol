@@ -3342,7 +3342,7 @@
 <tr>
 <td><code>crates/commol-calibration/src/optimization.rs</code></td>
 <td>Nelder-Mead and particle swarm setup on the argmin fork, from a start point (<code>optimize</code>, <code>optimize_from</code>, <code>optimize_with_history</code>, <code>optimize_with_observer</code>), and on a subproblem (<code>optimize_subproblem</code>: a smaller search space, or the augmented Lagrangian of the fork around the problem's optimizer); no output to the process streams.</td>
-<td>Loss definitions.</td>
+<td>Loss definitions; numerical methods that know no model, such as the sine transform of the bounds or the handling of a NaN cost by the swarm (the argmin fork).</td>
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/subproblem.rs</code></td>
@@ -3411,8 +3411,8 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/distribution.rs</code>, <code>special.rs</code></td>
-<td><code>Family</code> and <code>Distribution</code>, one family truncated to the bounds of a parameter (density, distribution function, quantile, closed-form moments, draws by inversion); the special functions on <code>libm</code>.</td>
-<td>Distributions from a dependency, whose draws change with it.</td>
+<td><code>Family</code> and <code>Distribution</code>, one family truncated to the bounds of a parameter (density, distribution function, quantile, closed-form moments, draws by inversion); the special functions on <code>libm</code>. The quantile sets the bracket of the root and takes the root finder from the argmin fork (<code>NewtonRoot</code>).</td>
+<td>Distributions from a dependency, whose draws change with it; a root finder of its own.</td>
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/priors.rs</code></td>
