@@ -216,21 +216,27 @@ them is not a joint region.
 |---|---|---|
 | `identifiable` | Crosses the threshold on both sides | Practical `determined` |
 | `practically_non_identifiable` | Stays below on at least one side, up to a bound or `max_steps` | Practical `poorly_determined` |
-| `structurally_non_identifiable` | Flat within `tolerance` over its whole range: both sides reach their bounds | Structural `non_identifiable` |
+| `structurally_non_identifiable` | Flat within `tolerance` over its whole range inside the box of the parameters: each side reaches its bound, or rises only where another parameter sits on its bound | Structural `non_identifiable` |
 
 A threshold below `tolerance` gives no verdict: the profile cannot tell a rise
 from numerical error, and `notes` says so. `tolerance` is the `sd_tolerance`
 of Nelder-Mead (at least `1e-9`), or `1e-6` for a particle swarm, times
 `max(1, |objective at the fit|)`.
 
+A refit whose free parameter sits on its bound, within `1e-8` of the width of
+its bounds, and not at the fit, has left the box of the parameters: the bound,
+not the data, makes its rise. The verdict reads only the points inside the
+box, and a note names the parameter and the value where the ridge leaves it.
+
 `ProfileResult.report()` turns the verdicts into an
 [identifiability report](identifiability.md#the-report) with a `profile`
 section, which `merge` joins with the other methods. A rate that reads
-`k1 * s` cannot tell `k1` from `s`: the structural rank says so, and their
-profiles stay below the threshold up to the bounds. They are flat on the
-ridge `k1 · s = constant`, and rise only where the ridge leaves the bounds of
-the other parameter, so they read as `practically_non_identifiable` unless
-the ridge spans both boxes exactly.
+`k1 * s` cannot tell `k1` from `s`: their profiles are flat on the ridge
+`k1 · s = constant`, and rise only where the ridge leaves the box, where the
+other parameter reaches its bound. Merged with the structural rank, which
+says `in_combination`, their structural verdict is `conflicting`, with both
+reasons: the rank names the combination the data determine, the profile says
+that neither parameter alone is.
 
 ```python
 from commol import SimulationPlotter, StructuralRank
@@ -269,12 +275,16 @@ product = Calibrator(Simulation(product_model(None, None, None)), product_proble
 profiles = product.uncertainty(
     ProfileLikelihood(parameters=["k1", "s", "k2"], threshold=Threshold.chi_square(0.95))
 )
+print(profiles.verdicts)
+# {'k1': 'structurally_non_identifiable', 's': 'structurally_non_identifiable', 'k2': 'identifiable'}
+print(profiles.notes[0])
+# 'k1': the ridge leaves the box at 0.8 above the fit, where 's' reaches its
+# bound; the profile is flat inside the box, and its rise past it comes from
+# the bounds, not the data.
 report = product.identifiability(StructuralRank(points=5, design="observations"))
-for name, verdicts in report.merge(profiles.report()).verdicts.items():
-    print(name, verdicts.structural.verdict, verdicts.practical.verdict)
-# k1 in_combination poorly_determined
-# s in_combination poorly_determined
-# k2 identifiable determined
+merged = report.merge(profiles.report())
+print(merged.verdicts["k1"].structural.verdict, merged.verdicts["k2"].practical.verdict)
+# conflicting determined
 ```
 
 ## Plots

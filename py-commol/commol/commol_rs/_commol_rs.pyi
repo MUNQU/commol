@@ -484,6 +484,10 @@ class ProfileProtocol(Protocol):
     def verdict(self) -> str | None: ...
     @property
     def lowest(self) -> float: ...
+    @property
+    def box_exits(
+        self,
+    ) -> tuple[tuple[float, int] | None, tuple[float, int] | None]: ...
 
 class ProfileRunProtocol(Protocol):
     @property

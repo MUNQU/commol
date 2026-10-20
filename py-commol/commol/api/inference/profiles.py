@@ -113,6 +113,19 @@ def _result(
                 f"numerical tolerance {run.tolerance:.3g}, so no rise can be told "
                 "from numerical error; no verdict."
             )
+        exits = [
+            f"at {value:.4g} {side} the fit, where '{parameter_names[index]}' "
+            "reaches its bound"
+            for side, exit in zip(("below", "above"), profile.box_exits, strict=True)
+            if exit is not None
+            for value, index in [exit]
+        ]
+        if profile.verdict == "structurally_non_identifiable" and exits:
+            notes.append(
+                f"'{name}': the ridge leaves the box {' and '.join(exits)}; the "
+                "profile is flat inside the box, and its rise past it comes from "
+                "the bounds, not the data."
+            )
         if profile.lowest < -run.tolerance:
             notes.append(
                 f"'{name}': a refit is {-profile.lowest:.3g} below the fit; the fit "

@@ -3,6 +3,8 @@ intervals and verdicts."""
 
 from statistics import NormalDist
 
+import numpy as np
+
 import pytest
 
 from pydantic import ValidationError
@@ -14,6 +16,7 @@ from commol import (
     LogNormalObservations,
     NelderMeadConfig,
     NormalObservations,
+    ObservedDataPoint,
     ParametricBootstrap,
     PredictionProfile,
     PredictionSpec,
@@ -310,6 +313,59 @@ class TestVerdicts:
         assert practical is not None
         assert practical.verdict == "determined"
         assert report.profile[0].verdicts == result.verdicts
+
+    def test_a_ridge_that_leaves_the_box_is_flat_inside_it(self) -> None:
+        # The model and bounds of the guide: the ridge `k1 · s ≈ 0.4` leaves
+        # the box where `s` reaches 0.5 or 2, and the profiles rise past it.
+        truth = Simulation(build(abc_builder(parameters={"k1": 0.4, "k2": 0.1}))).run(
+            40
+        )
+        rng = np.random.default_rng(3)
+        observations = [
+            ObservedDataPoint(
+                at=step,
+                output="B",
+                value=max(truth["B"][step] + rng.normal(0.0, 10.0), 0.0),
+            )
+            for step in range(4, 41, 4)
+        ]
+        model = build(
+            abc_builder(
+                ab="k1 * s * A * B / total",
+                parameters={"k1": None, "s": None, "k2": None},
+            )
+        )
+        problem = CalibrationProblem(
+            observed_data=observations,
+            parameters=[
+                bounded("k1", 0.2, 0.8),
+                bounded("s", 0.5, 2.0),
+                bounded("k2", 0.0, 1.0),
+            ],
+            observation_models={"B": NormalObservations(sd=10.0)},
+            optimization_config=NelderMeadConfig(
+                max_iterations=4000, sd_tolerance=1e-12
+            ),
+            seed=42,
+        )
+        calibrator = Calibrator(Simulation(model), problem)
+
+        result = calibrator.uncertainty(
+            ProfileLikelihood(
+                parameters=["k1", "s", "k2"], threshold=Threshold.chi_square(0.95)
+            )
+        )
+
+        assert max(result.profiles["k1"].statistics) > result.tolerance
+        assert result.verdicts == {
+            "k1": "structurally_non_identifiable",
+            "s": "structurally_non_identifiable",
+            "k2": "identifiable",
+        }
+        notes = " ".join(result.notes)
+        assert "'k1': the ridge leaves the box" in notes
+        assert "where 's' reaches its bound" in notes
+        assert "where 'k1' reaches its bound" in notes
 
     def test_late_parameter_gives_a_one_sided_profile(self) -> None:
         # B starts to fill at `tau`; the data stop at 10 and see no flow, so

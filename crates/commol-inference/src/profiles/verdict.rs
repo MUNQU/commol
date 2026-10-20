@@ -1,6 +1,6 @@
 //! The verdict of a profile: what its shape says about its quantity.
 
-use crate::profiles::tracer::{Profile, ProfileEnd};
+use crate::profiles::tracer::{Profile, ProfileEnd, ProfilePoint};
 
 /// What the shape of a profile says about its quantity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -11,8 +11,9 @@ pub enum ProfileVerdict {
     /// bound, the end of the reachable predictions or `max_steps`.
     PracticallyNonIdentifiable,
     /// The profile is flat within the numerical tolerance over its whole
-    /// range: both sides reach a bound, or the end of the reachable
-    /// predictions.
+    /// range inside the box of the parameters: each side reaches a bound or
+    /// the end of the reachable predictions, or rises only where a free
+    /// parameter sits on its bound.
     StructurallyNonIdentifiable,
 }
 
@@ -32,25 +33,62 @@ impl Profile {
     /// The verdict of the profile, whose statistic is known to `tolerance`;
     /// `None` when the threshold is below the tolerance, where a rise
     /// cannot be told from numerical error.
+    ///
+    /// A point where a free parameter sits on its bound
+    /// ([`ProfilePoint::on_bound`]) is outside the ridge the data leave
+    /// flat: its rise comes from the box of the parameters. The profile is
+    /// structurally non-identifiable when each side is flat over its points
+    /// inside the box, has one past the fit, and ends at a bound, at the end
+    /// of the reachable predictions, or on a point outside the box.
     pub fn verdict(&self, tolerance: f64) -> Option<ProfileVerdict> {
         if self.threshold < tolerance {
             return None;
         }
-        let whole_range = self
-            .ends
-            .iter()
-            .all(|end| matches!(end, ProfileEnd::Bound | ProfileEnd::Unreachable));
-        let flat = self
-            .points
-            .iter()
-            .all(|point| point.statistic.abs() <= tolerance);
-        Some(if self.ends == [ProfileEnd::Crossed; 2] {
-            ProfileVerdict::Identifiable
-        } else if whole_range && flat {
+        let flat_to_the_end = self.sides().iter().zip(self.ends).all(|(side, end)| {
+            let inside: Vec<&ProfilePoint> = side
+                .iter()
+                .copied()
+                .filter(|p| p.on_bound.is_none())
+                .collect();
+            let ends_outside = match end {
+                ProfileEnd::Bound | ProfileEnd::Unreachable => true,
+                ProfileEnd::Crossed => side.last().is_some_and(|p| p.on_bound.is_some()),
+                ProfileEnd::MaxSteps => false,
+            };
+            let reaches_out = !inside.is_empty() || (side.is_empty() && end == ProfileEnd::Bound);
+            ends_outside && reaches_out && inside.iter().all(|p| p.statistic.abs() <= tolerance)
+        });
+        Some(if flat_to_the_end {
             ProfileVerdict::StructurallyNonIdentifiable
+        } else if self.ends == [ProfileEnd::Crossed; 2] {
+            ProfileVerdict::Identifiable
         } else {
             ProfileVerdict::PracticallyNonIdentifiable
         })
+    }
+
+    /// Where each side leaves the box of the parameters: the value of its
+    /// first point, outward from the fit, with a free parameter on its
+    /// bound, and that parameter; `None` on a side that stays inside.
+    pub fn box_exits(&self) -> [Option<(f64, usize)>; 2] {
+        self.sides().map(|side| {
+            side.iter()
+                .find_map(|p| p.on_bound.map(|index| (p.value, index)))
+        })
+    }
+
+    /// The points of the side below and of the side above the fit, outward
+    /// from it.
+    fn sides(&self) -> [Vec<&ProfilePoint>; 2] {
+        let fit = self
+            .points
+            .iter()
+            .position(|p| p.value == self.center && p.statistic == 0.0)
+            .unwrap_or(0);
+        [
+            self.points[..fit].iter().rev().collect(),
+            self.points[fit + 1..].iter().collect(),
+        ]
     }
 
     /// The lowest statistic of the profile: below `−tolerance`, a refit
@@ -66,11 +104,11 @@ impl Profile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::profiles::tracer::ProfilePoint;
 
+    /// A profile whose fit is its first point of statistic 0.
     fn profile(statistics: &[f64], ends: [ProfileEnd; 2], threshold: f64) -> Profile {
         Profile {
-            center: 0.0,
+            center: statistics.iter().position(|&s| s == 0.0).unwrap_or(0) as f64,
             threshold,
             points: statistics
                 .iter()
@@ -81,12 +119,81 @@ mod tests {
                     parameters: vec![i as f64],
                     multiplier: None,
                     converged: true,
+                    on_bound: None,
                 })
                 .collect(),
             ends,
             interval: [None, None],
             evaluations: 0,
         }
+    }
+
+    /// A profile whose fit is the point at `center`, and whose free
+    /// parameter `on_bound[i]` is on its bound at point `i`.
+    fn boxed(
+        statistics: &[f64],
+        on_bound: &[Option<usize>],
+        center: usize,
+        ends: [ProfileEnd; 2],
+    ) -> Profile {
+        let mut profile = profile(statistics, ends, 2.0);
+        profile.center = center as f64;
+        for (point, &bound) in profile.points.iter_mut().zip(on_bound) {
+            point.on_bound = bound;
+        }
+        profile
+    }
+
+    #[test]
+    fn a_profile_flat_until_the_ridge_leaves_the_box_is_structural() {
+        use ProfileEnd::{Bound, Crossed};
+        let edges = [Some(1), None, None, None, Some(1)];
+        // The rise at both ends comes from parameter 1 on its bound.
+        let below_threshold = boxed(&[0.03, 1e-9, 0.0, -1e-9, 0.03], &edges, 2, [Bound; 2]);
+        assert_eq!(
+            below_threshold.verdict(1e-6),
+            Some(ProfileVerdict::StructurallyNonIdentifiable)
+        );
+        assert_eq!(
+            below_threshold.box_exits(),
+            [Some((0.0, 1)), Some((4.0, 1))]
+        );
+        let past_threshold = boxed(&[3.0, 0.0, 0.0, 0.0, 3.0], &edges, 2, [Crossed; 2]);
+        assert_eq!(
+            past_threshold.verdict(1e-6),
+            Some(ProfileVerdict::StructurallyNonIdentifiable)
+        );
+    }
+
+    #[test]
+    fn a_profile_that_rises_inside_the_box_keeps_its_verdict() {
+        use ProfileEnd::{Bound, Crossed};
+        // A rise before the ridge leaves the box.
+        let rises = boxed(
+            &[0.04, 0.02, 0.0, 1e-9, 0.04],
+            &[Some(1), None, None, None, Some(1)],
+            2,
+            [Bound; 2],
+        );
+        assert_eq!(
+            rises.verdict(1e-6),
+            Some(ProfileVerdict::PracticallyNonIdentifiable)
+        );
+        // No point inside the box below the fit.
+        let no_inside = boxed(
+            &[0.03, 0.0, 1e-9, 0.03],
+            &[Some(1), None, None, Some(1)],
+            1,
+            [Bound; 2],
+        );
+        assert_eq!(
+            no_inside.verdict(1e-6),
+            Some(ProfileVerdict::PracticallyNonIdentifiable)
+        );
+        // Crossing inside the box on both sides.
+        let crosses = boxed(&[3.0, 0.0, 2.5], &[None; 3], 1, [Crossed; 2]);
+        assert_eq!(crosses.verdict(1e-6), Some(ProfileVerdict::Identifiable));
+        assert_eq!(crosses.box_exits(), [None, None]);
     }
 
     #[test]

@@ -57,9 +57,15 @@ the threshold is the quantile `level` of the rises
 ## A verdict needs a threshold above the tolerance
 
 `Profile::verdict` (`verdict.rs`) reads the ends and the statistics of a
-profile: `identifiable` when both sides cross, `structurally_non_identifiable`
-when both sides reach a bound (or an unreachable prediction) and every
-statistic is within the tolerance, `practically_non_identifiable` otherwise.
+profile. A point whose refit has a free parameter on its bound, within
+`ON_BOUND = 1e-8` of the width of its bounds (the tolerance of #133), and not
+at the fit, has left the box of the parameters (`ProfilePoint::on_bound`):
+the bound, not the data, makes its rise. `structurally_non_identifiable`: each
+side is flat within the tolerance over its points inside the box, has one
+past the fit, and ends at a bound, an unreachable prediction or a point
+outside the box; the result notes where the ridge leaves the box
+(`Profile::box_exits`). `identifiable`: otherwise, both sides cross.
+`practically_non_identifiable`: the rest.
 The tolerance is the `sd_tolerance` of Nelder-Mead (at least `1e-9`), or
 `1e-6` for a swarm, times `max(1, |objective at the fit|)`
 (`ProfileTracer::tolerance`). A threshold below it gives no verdict, and the
@@ -71,6 +77,9 @@ result says why. `ProfileResult.report()` maps `identifiable` to the practical
 |---|---|
 | A verdict from a threshold of 0 | A rise of numerical error would read as information. |
 | The structural verdict from every flat stretch | Flat is what the structural rank answers; the profile adds only what holds over the whole range. |
+| Every point, outside the box too | A ridge `k1 · s = c` leaves a box unless its bounds match `c` exactly, so a flat ridge would read as practically non-identifiable. |
+| Any parameter on a bound | A parameter whose fit sits on its bound would put every point outside the box, and any profile would read as flat. |
 
 **Guards:** `verdict::tests`,
-`tests/uncertainty/test_profiles.py` (`TestVerdicts`).
+`tests/uncertainty/test_profiles.py` (`TestVerdicts`, with
+`test_a_ridge_that_leaves_the_box_is_flat_inside_it`).

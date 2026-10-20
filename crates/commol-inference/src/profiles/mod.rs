@@ -18,5 +18,5 @@ pub mod tracer;
 pub mod verdict;
 
 pub use threshold::{BootstrapThresholds, beale, bootstrap_thresholds, chi_square};
-pub use tracer::{Profile, ProfileEnd, ProfilePoint, ProfileTracer, ProfiledQuantity};
+pub use tracer::{ON_BOUND, Profile, ProfileEnd, ProfilePoint, ProfileTracer, ProfiledQuantity};
 pub use verdict::ProfileVerdict;

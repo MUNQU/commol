@@ -77,7 +77,15 @@ pub struct ProfilePoint {
     pub multiplier: Option<f64>,
     /// Whether the refit converged.
     pub converged: bool,
+    /// The first free parameter, by index, that sits on a bound here and
+    /// not at the fit ([`ON_BOUND`]): the ridge of the profile has left the
+    /// box of the parameters, and the bound, not the data, shapes the rise.
+    pub on_bound: Option<usize>,
 }
+
+/// How close to a bound, as a share of the width of the bounds, a value is
+/// on it; the tolerance of #133.
+pub const ON_BOUND: f64 = 1e-8;
 
 /// The profile of one quantity.
 #[derive(Debug, Clone, PartialEq)]
@@ -272,6 +280,7 @@ where
             parameters: self.fit.clone(),
             multiplier: None,
             converged: true,
+            on_bound: None,
         };
         let interval = [&below, &above].map(|side| {
             (side.end == ProfileEnd::Crossed).then(|| crossing(&fit, &side.points, threshold))
@@ -324,6 +333,7 @@ where
             parameters: self.fit.clone(),
             multiplier: matches!(quantity, ProfiledQuantity::Prediction(_)).then_some(0.0),
             converged: true,
+            on_bound: None,
         };
         let mut points = Vec::new();
         let mut evaluations = 0;
@@ -380,9 +390,10 @@ where
             let point = ProfilePoint {
                 value,
                 statistic,
-                parameters: result.fit.best_parameters,
                 multiplier: result.multiplier,
                 converged: result.fit.converged,
+                on_bound: self.on_bound(quantity, &result.fit.best_parameters),
+                parameters: result.fit.best_parameters,
             };
             points.push(point.clone());
             previous = Some(std::mem::replace(&mut current, point));
@@ -400,6 +411,26 @@ where
             points,
             end,
             evaluations,
+        })
+    }
+
+    /// The first free parameter of `parameters` within [`ON_BOUND`] of the
+    /// width of its bounds of a bound, where the fit is not; the held
+    /// parameter of a parameter profile is not free.
+    fn on_bound(&self, quantity: &ProfiledQuantity, parameters: &[f64]) -> Option<usize> {
+        let held = match quantity {
+            ProfiledQuantity::Parameter(index) => Some(*index),
+            ProfiledQuantity::Prediction(_) => None,
+        };
+        let bounds = self.problem.parameter_bounds();
+        let at_bound = |value: f64, (lo, hi): (f64, f64)| {
+            let tolerance = ON_BOUND * (hi - lo);
+            value - lo <= tolerance || hi - value <= tolerance
+        };
+        (0..parameters.len()).find(|&i| {
+            Some(i) != held
+                && at_bound(parameters[i], bounds[i])
+                && !at_bound(self.fit[i], bounds[i])
         })
     }
 
@@ -437,6 +468,7 @@ where
                 .multiplier
                 .map(|now| extrapolate(now, previous.and_then(|p| p.multiplier))),
             converged: false,
+            on_bound: None,
         }
     }
 }

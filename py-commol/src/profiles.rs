@@ -77,6 +77,10 @@ impl PyBootstrapSettings {
     }
 }
 
+/// Where a side leaves the box: the value, and the index of the free
+/// parameter on its bound.
+type BoxExit = (f64, usize);
+
 /// One profile, as the runner returns it
 #[pyclass(name = "Profile", frozen, get_all, skip_from_py_object)]
 #[derive(Clone)]
@@ -109,6 +113,9 @@ pub struct PyProfile {
     verdict: Option<String>,
     /// The lowest statistic
     lowest: f64,
+    /// Where the side below and the side above leave the box: the value and
+    /// the index of the free parameter on its bound, or None
+    box_exits: (Option<BoxExit>, Option<BoxExit>),
 }
 
 fn end_name(end: ProfileEnd) -> String {
@@ -129,6 +136,10 @@ impl PyProfile {
                 .verdict(tolerance)
                 .map(|verdict| verdict.name().to_string()),
             lowest: profile.lowest(),
+            box_exits: {
+                let [below, above] = profile.box_exits();
+                (below, above)
+            },
             center: profile.center,
             threshold: profile.threshold,
             values: profile.points.iter().map(|p| p.value).collect(),
