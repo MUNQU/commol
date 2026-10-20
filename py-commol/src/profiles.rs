@@ -103,6 +103,12 @@ pub struct PyProfile {
     evaluations: usize,
     /// The rise of each kept replicate, with a bootstrap threshold
     rises: Option<Vec<f64>>,
+    /// "identifiable", "practically_non_identifiable" or
+    /// "structurally_non_identifiable"; None when the threshold is below the
+    /// tolerance
+    verdict: Option<String>,
+    /// The lowest statistic
+    lowest: f64,
 }
 
 fn end_name(end: ProfileEnd) -> String {
@@ -116,9 +122,13 @@ fn end_name(end: ProfileEnd) -> String {
 }
 
 impl PyProfile {
-    fn new(profile: Profile, rises: Option<Vec<f64>>) -> Self {
+    fn new(profile: Profile, rises: Option<Vec<f64>>, tolerance: f64) -> Self {
         let [lower, upper] = profile.interval();
         Self {
+            verdict: profile
+                .verdict(tolerance)
+                .map(|verdict| verdict.name().to_string()),
+            lowest: profile.lowest(),
             center: profile.center,
             threshold: profile.threshold,
             values: profile.points.iter().map(|p| p.value).collect(),
@@ -247,7 +257,7 @@ fn trace_profiles(
         let rises = rises
             .as_ref()
             .map(|rises: &Vec<Vec<f64>>| rises[index].clone());
-        profiles.push(PyProfile::new(profile, rises));
+        profiles.push(PyProfile::new(profile, rises, tracer.tolerance()));
     }
     Ok(PyProfileRun {
         profiles,

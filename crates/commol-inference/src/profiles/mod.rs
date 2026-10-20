@@ -6,6 +6,7 @@
 //! |---|---|
 //! | [`tracer`] | [`ProfileTracer`]: one quantity held at values that step away from the fit, the others fitted again |
 //! | [`threshold`] | The thresholds of the statistic: `½ χ²₁`, Beale's F and the bootstrap |
+//! | [`verdict`] | [`ProfileVerdict`]: what the shape of a profile says about its quantity |
 //!
 //! A subproblem of `commol-calibration` ([`commol_calibration::Subproblem`])
 //! holds the quantity: a parameter leaves the values the optimizer searches,
@@ -14,6 +15,8 @@
 
 pub mod threshold;
 pub mod tracer;
+pub mod verdict;
 
 pub use threshold::{BootstrapThresholds, beale, bootstrap_thresholds, chi_square};
 pub use tracer::{Profile, ProfileEnd, ProfilePoint, ProfileTracer, ProfiledQuantity};
+pub use verdict::ProfileVerdict;

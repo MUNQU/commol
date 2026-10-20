@@ -95,6 +95,7 @@ def _trace(
 def _result(
     calibrator: "Calibrator",
     fit: CalibrationResult,
+    quantity: str,
     names: Sequence[str],
     threshold: Threshold,
     run: "ProfileRunProtocol",
@@ -102,7 +103,21 @@ def _result(
     parameter_names = calibrator.parameter_names
     profiles: dict[str, Profile] = {}
     intervals: dict[str, ProfileInterval] = {}
+    verdicts: dict[str, str | None] = {}
+    notes: list[str] = []
     for name, profile in zip(names, run.profiles, strict=True):
+        verdicts[name] = profile.verdict
+        if profile.verdict is None:
+            notes.append(
+                f"'{name}': the threshold {profile.threshold:.3g} is below the "
+                f"numerical tolerance {run.tolerance:.3g}, so no rise can be told "
+                "from numerical error; no verdict."
+            )
+        if profile.lowest < -run.tolerance:
+            notes.append(
+                f"'{name}': a refit is {-profile.lowest:.3g} below the fit; the fit "
+                "is not the optimum, so fit again with more starts."
+            )
         profiles[name] = Profile.model_validate(
             {
                 "center": profile.center,
@@ -125,14 +140,18 @@ def _result(
     failed = [f"Replicate {index} failed: {reason}" for index, reason in run.failed]
     for reason in failed:
         logger.warning(reason)
-    return ProfileResult(
-        fit=fit,
-        threshold=threshold,
-        profiles=profiles,
-        intervals=intervals,
-        verdicts=dict.fromkeys(names),
-        tolerance=run.tolerance,
-        failed_replicates=failed,
+    return ProfileResult.model_validate(
+        {
+            "fit": fit,
+            "quantity": quantity,
+            "threshold": threshold,
+            "profiles": profiles,
+            "intervals": intervals,
+            "verdicts": verdicts,
+            "tolerance": run.tolerance,
+            "notes": notes,
+            "failed_replicates": failed,
+        }
     )
 
 
@@ -176,7 +195,9 @@ def run_profile_likelihood(
         method.threshold,
         method.max_steps,
     )
-    return _result(calibrator, fit, method.parameters, method.threshold, run)
+    return _result(
+        calibrator, fit, "parameter", method.parameters, method.threshold, run
+    )
 
 
 def run_prediction_profile(
@@ -216,6 +237,7 @@ def run_prediction_profile(
     return _result(
         calibrator,
         fit,
+        "prediction",
         [observation.label for observation in observations],
         method.threshold,
         run,

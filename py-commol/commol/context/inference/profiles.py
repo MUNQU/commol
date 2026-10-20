@@ -14,6 +14,14 @@ from typing import Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from commol.context.calibration import CalibrationResult, ObservedDataPoint
+from commol.context.inference.identifiability import (
+    IdentifiabilityReport,
+    ParameterVerdicts,
+    PracticalVerdict,
+    ProfileSection,
+    ProfileVerdictName,
+    StructuralVerdict,
+)
 from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import (
     BayesianBootstrap,
@@ -26,11 +34,6 @@ ProfileEndName = Literal["crossed", "bound", "max_steps", "unreachable"]
 """Why one side of a profile ends: it rose past the threshold, reached a
 bound of the parameter, took `max_steps` points, or met a prediction that no
 values within the bounds give."""
-
-ProfileVerdictName = Literal[
-    "identifiable", "practically_non_identifiable", "structurally_non_identifiable"
-]
-"""What the shape of a profile says about its quantity."""
 
 type ProfileBootstrap = (
     BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap
@@ -363,6 +366,9 @@ class ProfileResult(_Frozen):
     ----------
     fit : CalibrationResult
         The fit every profile starts from.
+    quantity : {"parameter", "prediction"}
+        What the profiles hold fixed: parameters (`ProfileLikelihood`) or
+        predictions (`PredictionProfile`).
     threshold : Threshold
         The threshold the profiles ran with.
     profiles : dict[str, Profile]
@@ -386,6 +392,7 @@ class ProfileResult(_Frozen):
     """
 
     fit: CalibrationResult
+    quantity: Literal["parameter", "prediction"]
     threshold: Threshold
     profiles: dict[str, Profile]
     intervals: dict[str, ProfileInterval]
@@ -393,3 +400,72 @@ class ProfileResult(_Frozen):
     tolerance: float
     notes: list[str] = Field(default_factory=list)
     failed_replicates: list[str] = Field(default_factory=list)
+
+    def report(self) -> IdentifiabilityReport:
+        """
+        The verdicts of the profiled parameters as an identifiability report,
+        with a ``profile`` section.
+
+        ``identifiable`` gives the practical verdict ``determined``,
+        ``practically_non_identifiable`` the practical verdict
+        ``poorly_determined``, and ``structurally_non_identifiable`` the
+        structural verdict ``non_identifiable``. A parameter with no profile,
+        or no verdict, gets neither. `IdentifiabilityReport.merge` joins it
+        with the reports of other methods.
+
+        Returns
+        -------
+        IdentifiabilityReport
+            One entry per parameter of the problem, in problem order.
+
+        Raises
+        ------
+        ValueError
+            If the result holds prediction profiles, which have no verdict
+            on a parameter.
+        """
+        if self.quantity != "parameter":
+            raise ValueError(
+                "Only the profiles of parameters report on identifiability; this "
+                "result holds the profiles of predictions."
+            )
+        parameters = list(self.fit.best_parameters)
+        verdicts: dict[str, ParameterVerdicts] = {}
+        for name in parameters:
+            verdict = self.verdicts.get(name)
+            reason = f"profile likelihood: {verdict}" if verdict else ""
+            if verdict == "structurally_non_identifiable":
+                verdicts[name] = ParameterVerdicts(
+                    structural=StructuralVerdict(
+                        verdict="non_identifiable", reasons=[reason]
+                    )
+                )
+            elif verdict is not None:
+                verdicts[name] = ParameterVerdicts(
+                    practical=PracticalVerdict(
+                        verdict=(
+                            "determined"
+                            if verdict == "identifiable"
+                            else "poorly_determined"
+                        ),
+                        reasons=[reason],
+                    )
+                )
+            else:
+                verdicts[name] = ParameterVerdicts()
+        return IdentifiabilityReport(
+            parameters=parameters,
+            verdicts=verdicts,
+            profile=[
+                ProfileSection(
+                    threshold=self.threshold.kind,
+                    level=self.threshold.level,
+                    tolerance=self.tolerance,
+                    verdicts=self.verdicts,
+                    intervals={
+                        name: (interval.lower, interval.upper)
+                        for name, interval in self.intervals.items()
+                    },
+                )
+            ],
+        )

@@ -287,3 +287,37 @@ class TestVerdicts:
             for note in result.notes
         )
         assert result.report().verdicts["c"].practical is None
+
+    def test_a_refit_below_the_fit_is_noted(self) -> None:
+        # Three iterations of Nelder-Mead leave the fit far from the optimum;
+        # the refits of the profile, which start from it, go below it.
+        calibrator = line_calibrator(
+            VALUES, observation_models={"B": NormalObservations(sd=1.0)}
+        )
+        problem = calibrator.problem.model_copy(
+            update={"optimization_config": NelderMeadConfig(max_iterations=3)}
+        )
+
+        result = Calibrator(calibrator.simulation, problem).uncertainty(
+            ProfileLikelihood(
+                parameters=["c"], threshold=Threshold.chi_square(0.9), max_steps=3
+            )
+        )
+
+        assert min(result.profiles["c"].statistics) < -result.tolerance
+        assert any("below the fit" in note for note in result.notes)
+
+    def test_only_parameter_profiles_report_on_identifiability(self) -> None:
+        calibrator = line_calibrator(
+            VALUES, observation_models={"B": NormalObservations(sd=1.0)}
+        )
+        result = calibrator.uncertainty(
+            PredictionProfile(
+                specs=[PredictionSpec(at=4, output="B")],
+                threshold=Threshold.chi_square(0.9),
+                max_steps=2,
+            )
+        )
+
+        with pytest.raises(ValueError, match="profiles of predictions"):
+            result.report()
