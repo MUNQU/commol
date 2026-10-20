@@ -1,7 +1,8 @@
 //! Finite differences of the forward model.
 //!
 //! The step of parameter `j` is `h_j = η^{1/3} · max(|θ_j|, w_j)`, at most
-//! `w_j / 8`, where `w_j` is the width of its bounds and `η` the output
+//! `w_j / 8`, where `w_j` is the width of its bounds (1 when a bound is
+//! infinite, so the step stays finite) and `η` the output
 //! accuracy of the engine ([`SimulationEngine::output_accuracy`]): the step
 //! that balances the truncation error of a difference of second order with
 //! the error of the runs. The difference is central when `θ_j ± 2h_j` is
@@ -131,7 +132,8 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
             .zip(self.forward.parameters())
             .map(|(&value, parameter)| {
                 let width = parameter.max_bound - parameter.min_bound;
-                (factor * value.abs().max(width)).min(width / 8.0)
+                let scale = if width.is_finite() { width } else { 1.0 };
+                (factor * value.abs().max(scale)).min(width / 8.0)
             })
             .collect()
     }

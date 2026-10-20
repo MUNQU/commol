@@ -64,7 +64,7 @@ knows how its derivatives are made. `FiniteDifferences` is the first: central
 differences, one-sided of second order at a bound, with the step
 `h = η^{1/3} · max(|θ|, w)` (at most `w / 8`), where `η` is the output
 accuracy of the engine (`SimulationEngine::output_accuracy`: machine epsilon,
-or the `rtol` of the ODE engine) and `w` the width of the bounds. Each entry
+or the `rtol` of the ODE engine) and `w` the width of the bounds (1 when infinite). Each entry
 carries an estimated error, from the steps `h` and `2h` and the accuracy of
 the runs; the structural rank counts a singular value only above the norm of
 that error (Weyl's inequality). The scaled sensitivities
