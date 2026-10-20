@@ -72,7 +72,7 @@ laplace = calibrator.uncertainty(Laplace(draws=2000))
 lower, upper = laplace.sample.interval(0.9)["c"]
 print(round(lower, 2), round(upper, 2))  # 9.64 10.25
 
-band = laplace.delta_band([10, 20, 30], 0.9)
+band = calibrator.delta_band(laplace, [10, 20, 30], 0.9)
 print([round(value, 1) for value in band.center["B"]])  # [99.3, 198.7, 298.0]
 
 sandwich = calibrator.uncertainty(Sandwich(block_length=1, draws=2000))
@@ -109,8 +109,10 @@ The Hessian steps are `δ^{1/4} · dθ/du` for a parameter with a bound and
 engine (machine precision, or the `rtol` of the ODE engine): the step that
 balances the truncation error of the differences with the error of the runs,
 and keeps every run inside the bounds. Each entry of either curvature has an
-estimated error; an entry whose error is above 1 % of the scale of its row
-and column is listed in `notes` and logged as a warning.
+estimated error. An entry whose error is above 1 % of `√(H_jj · H_kk)` is
+listed in `notes` and logged as a warning: the error on the scale of a
+correlation, so an off-diagonal entry near 0 is judged against its row and
+column, not against itself. A note changes no result.
 
 Every distribution lives on an **unbounded scale**: the logit of a parameter
 between two bounds, `log(θ − a)` with a lower bound only, `log(b − θ)` with an
@@ -128,14 +130,24 @@ describes it (MUNQU/commol#132).
 `LaplaceResult`: the fit, the covariance `Σ = H⁻¹` of the normal on the
 unbounded scale, the draws mapped back (`sample`, equal weights) and the
 notes. It needs `observation_models`: a loss has no noise scale, so its
-curvature is no inverse variance; `Sandwich` needs none.
+curvature is no inverse variance, and `Laplace` with a loss raises a
+`ValueError`. To get a Laplace approximation, give a model with a noise
+parameter, such as `NormalObservations(sd="sd")` with `sd` calibrated, or
+use `Sandwich`, which needs none.
 
-`result.delta_band(positions, level)` gives the band of every output by the
-delta method: the prediction at the fit plus and minus the quantile of the
-normal times `√(J Σ Jᵀ)`, with `J` the derivatives of the output on the
-unbounded scale. It runs the model a few times per parameter, not once per
-draw, and for a model linear in its parameters it equals the band of the
-draws (`Predictive(calibrator, result.sample, positions).band(level)`).
+With a noise parameter the fit estimates the noise by maximum likelihood:
+for `NormalObservations(sd="sd")`, `σ̂² = SSE/n`, not `SSE/(n − p)`. The
+Laplace intervals are then narrower than the classical ones by
+`√(n/(n − p))`, which is negligible when `n ≫ p`.
+
+`calibrator.delta_band(result, positions, level)` gives the band of every
+output by the delta method: the prediction at the fit plus and minus the
+quantile of the normal times `√(J Σ Jᵀ)`, with `J` the derivatives of the
+output on the unbounded scale. It runs the model a few times per parameter,
+not once per draw, and for a model linear in its parameters it equals the
+band of the draws (`Predictive(calibrator, result.sample, positions).band(level)`).
+It reads only the fields of the result, so a result read back from JSON
+works.
 
 ```python
 widths = [round(high - low, 2) for low, high in zip(band.lower["B"], band.upper["B"])]
@@ -168,7 +180,7 @@ rescaling the objective does not change the sandwich).
 - **A Student t with `G − 1` degrees of freedom.** With few blocks, `B` is a
   noisy estimate; the t widens the intervals by the right amount, instead of
   a warning at an arbitrary number of blocks. Intervals of the draws and
-  `delta_band` both read it.
+  `Calibrator.delta_band` both read it.
 - **`G ≤ p` is refused.** `B` sums `G` outer products whose sum has rank at
   most `G − 1` after the fit, so with no more blocks than parameters some
   directions would get zero variance. The `ValueError` suggests shorter
@@ -232,6 +244,12 @@ far the mixture misses the target.
 | 0.5 to 0.7 | They converge, more slowly: use more draws |
 | Above 0.7 | The mixture misses mass of the target, as for a curved (banana) posterior: `reliable` is false, `notes` and a warning say so, and the sample should not be used |
 
+A start that ends on a bound gives no component, and `notes` says so. When
+its objective is at least as good as that of the worst kept component, the
+mixture leaves out an optimum the data support, whose mass `k_hat` cannot
+see: `reliable` is false too. An end on a bound that fits worse than every
+component only adds the note.
+
 An unreliable sample calls for a method that samples the posterior itself:
 `BayesianPosterior` or `GibbsPosterior` ([Sequential Monte Carlo](smc.md)).
 
@@ -239,7 +257,7 @@ An unreliable sample calls for a method that samples the posterior itself:
 
 | Situation | Good enough? |
 |---|---|
-| A model near linear in its parameters around the fit, a correct noise model | Laplace, with `delta_band` for the outputs |
+| A model near linear in its parameters around the fit, a correct noise model | Laplace, with `Calibrator.delta_band` for the outputs |
 | A wrong or unknown noise model, dependent residuals, a right mean | Sandwich with `"gauss_newton"` and blocks longer than the dependence |
 | A mean that may be wrong, large residuals | Sandwich with `"hessian"` |
 | Several optima of equal or similar loss | Laplace mixture; check `k_hat` |

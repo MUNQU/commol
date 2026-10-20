@@ -16,8 +16,15 @@ curvature of the log Jacobian. Every draw maps back with `from_unbounded`,
 so it lies inside the bounds; every density on that scale, as the importance
 weights of the mixture, adds `log_jacobian`. A fit on a bound, within `1e-8`
 of the width of its bounds (`on_bound`), is refused with a message that
-names the parameter: its variance on that scale is infinite. The mixture
-skips such an end and notes it.
+names the parameter: its variance on that scale is infinite. The tolerance
+comes from the optimizer: Nelder-Mead searches on a sine (`SineTransform`) of the unbounded
+coordinate, which approaches a bound quadratically in `u` and ends about
+`1e-15` of the width from it; `1e-8` of the width is a step `δu ≈ 2e-4`, far
+below any posterior spread. The mixture skips such an end and notes it; when
+the end fits at least as well as the worst kept component (its objective is
+not above), the mixture misses an optimum the data support, and the sample
+is marked unreliable, since `k̂` cannot see mass the proposal never
+reaches.
 
 | Alternative | Why not |
 |---|---|
@@ -25,8 +32,11 @@ skips such an end and notes it.
 | A truncated normal on the scale of the parameters | It biases the mean and breaks the delta method. |
 | Centring on the mode of the density on the unbounded scale, Jacobian included | It moves the centre away from the fit for no gain: importance sampling corrects the difference. |
 | A fit on a bound by exact equality | An optimizer that the bound stops ends a few roundings from it, where the variance on the unbounded scale is huge but finite. |
+| Every skipped end marks the sample unreliable | An end on a bound that fits worse than every component holds little mass; the note is enough. |
 
 **Guards:** `crates/commol-inference/tests/test_local.rs::draws_mapped_back_stay_inside_the_bounds`,
+`crates/commol-inference/tests/test_local.rs::an_end_on_a_bound_better_than_a_component_marks_the_sample_unreliable`,
+`crates/commol-inference/tests/test_local.rs::an_end_on_a_bound_worse_than_every_component_is_only_noted`,
 `tests/uncertainty/test_local.py::TestCurvature::test_a_fit_on_a_bound_is_refused`,
 `tests/uncertainty/test_local.py::TestResults::test_an_end_on_a_bound_gives_no_component`.
 
@@ -42,7 +52,9 @@ Hessian of the objective with given steps of the `finitediff` crate of the
 argmin fork, with steps `δ^{1/4} · dθ/du` (`δ^{1/4} · max(|θ|, 1)` with no
 bound), `δ` the output accuracy of the engine, so `θ ± 2h` stays inside the
 bounds. Each entry of either carries an estimated error; an entry above 1 %
-of `√(H_jj H_kk)` is a note.
+of `√(H_jj H_kk)` is a note. The threshold measures the error on the scale
+of a correlation, so an off-diagonal entry near 0 is judged against its row
+and column; a note changes no result.
 
 | Alternative | Why not |
 |---|---|
@@ -98,14 +110,21 @@ Information matching (`smc/gibbs.rs`) reads the same `H` as `J` and the same
 ## The Laplace approximation needs observation models
 
 `laplace_approximation` (`local/approximation.rs`) refuses a loss: a loss has
-no noise scale, so its curvature is no inverse variance. The sandwich needs no
-noise model.
+no noise scale, so its curvature is no inverse variance. The message names
+`NormalObservations(sd="sd")` with a noise parameter, whose fit estimates
+the scale by maximum likelihood (`SSE/n`, narrower than `SSE/(n − p)` by
+`√(n/(n − p))`), and the sandwich, which needs no noise model. A result
+holds only data: `Calibrator.delta_band(result, positions, level)` reads the
+problem from the calibrator, so a result read back from JSON gives the same
+band.
 
 | Alternative | Why not |
 |---|---|
 | A variance scale `SSE / (n − p)` | It assumes normal, independent noise of one size, which a loss does not state. |
+| `LaplaceResult.delta_band` with a private reference to the problem | A result read back from JSON has none. |
 
-**Guards:** `tests/uncertainty/test_local.py::TestResults::test_each_method_returns_its_result`.
+**Guards:** `tests/uncertainty/test_local.py::TestLaplace::test_laplace_refuses_a_loss`,
+`tests/uncertainty/test_local.py::TestLaplace::test_a_result_read_from_json_gives_the_same_delta_band`.
 
 ## PSIS lives in commol-inference
 

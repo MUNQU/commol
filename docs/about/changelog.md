@@ -14,8 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Local approximations through `Calibrator.uncertainty`, on the unbounded
   scale of the parameters, with a fit on a bound refused: `Laplace(draws)`,
   the normal `N(θ̂, H⁻¹)` of the observation models, and
-  `LaplaceResult.delta_band(positions, level)`, the band of the outputs by
-  the delta method; `Sandwich(block_length, draws)`, the covariance
+  `Calibrator.delta_band(result, positions, level)`, the band of the outputs
+  by the delta method; `Sandwich(block_length, draws)`, the covariance
   `H⁻¹ B H⁻¹` with the scores summed over blocks (CR1) and a Student t with
   `G − 1` degrees of freedom, which needs no noise model and refuses
   `loss_function="mae"` and too few blocks; `LaplaceMixture(starts, draws,
@@ -128,6 +128,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** `EtaCalibration.information_matching(block_length)` takes a
+  required `block_length`, an `int` or `"auto"`: the variance of the scores
+  is summed over blocks of positions, as the meat of `Sandwich`, so it holds
+  under dependence; `block_length=1` gives the independent version. It also
+  takes a problem with observation models, where a correct model gives
+  `η ≈ 1`.
 - **Breaking:** `Predictive(source, sample, positions)` takes a `Calibrator`
   or a `SensitivityAnalysis` (any `PredictiveSource`), and its attribute
   `calibrator` is now `source`. `Predictive.at_observations` of an analysis

@@ -193,7 +193,8 @@ Information matching is cheap and local; it needs a sum of smooth terms, so
 engine raise a `ValueError` that points to the other choices. `J` and `I` are
 the curvature and the meat of the [sandwich](local.md#sandwich): `I` sums the
 scores over blocks, so it holds when the noise depends on its neighbours
-inside a block, and `block_length` has no default. Bootstrap
+inside a block, and `block_length` has no default: `block_length=1` gives
+the independent version, every observation its own block. Bootstrap
 coverage runs one tempered sampler per replicate to a large `η`, reads the
 posterior of every smaller `η` by reweighting, so its search runs no model,
 and finds for each replicate and parameter the `η` where the interval stops
