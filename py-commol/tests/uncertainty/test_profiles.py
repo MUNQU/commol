@@ -7,6 +7,8 @@ import pytest
 
 from commol import (
     NormalObservations,
+    PredictionProfile,
+    PredictionSpec,
     ProfileLikelihood,
     ResidualBootstrap,
     Threshold,
@@ -142,3 +144,29 @@ class TestThresholds:
     def test_a_level_is_strictly_between_0_and_1(self, level: float) -> None:
         with pytest.raises(ValueError, match="level"):
             Threshold.chi_square(level)
+
+
+class TestPredictionProfiles:
+    def test_prediction_profile_of_a_linear_model_is_exact(self) -> None:
+        calibrator = line_calibrator(
+            VALUES, observation_models={"B": NormalObservations(sd=1.0)}
+        )
+        level = 0.9
+        # Inside the data and past them: a band of two positions.
+        specs = [
+            PredictionSpec(at=4, output="B", label="B at 4"),
+            PredictionSpec(at=15, output="B", label="B at 15"),
+        ]
+        result = calibrator.uncertainty(
+            PredictionProfile(specs=specs, threshold=Threshold.chi_square(level))
+        )
+
+        z = NormalDist().inv_cdf((1 + level) / 2)
+        slope, intercept, _ = _least_squares()
+        for spec in specs:
+            mean = intercept + slope * spec.at
+            half_width = z * (1 / N + (spec.at - T_MEAN) ** 2 / STT) ** 0.5
+            interval = result.intervals[spec.label]
+            assert result.profiles[spec.label].center == pytest.approx(mean)
+            assert interval.lower == pytest.approx(mean - half_width, rel=1e-5)
+            assert interval.upper == pytest.approx(mean + half_width, rel=1e-5)

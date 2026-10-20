@@ -4,12 +4,12 @@
 use std::collections::HashMap;
 
 use commol_calibration::{
-    CalibrationConstraint, CalibrationParameter, CalibrationProblem, ConstraintSettings,
-    LossConfig, NelderMeadConfig, ObservedDataPoint, OptimizationConfig, ParticleSwarmConfig,
-    Subproblem, Workspace, optimize, optimize_subproblem,
+    Argument, CalibrationConstraint, CalibrationParameter, CalibrationProblem, ConstraintSettings,
+    DiscrepancyConfig, LossConfig, NelderMeadConfig, ObservationModel, ObservedDataPoint,
+    OptimizationConfig, ParticleSwarmConfig, Subproblem, Workspace, optimize, optimize_subproblem,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
-use commol_inference::profiles::{ProfileEnd, ProfileTracer, ProfiledQuantity};
+use commol_inference::profiles::{PenaltyRule, ProfileEnd, ProfileTracer, ProfiledQuantity};
 
 type Formula = fn(&HashMap<String, f64>, f64) -> f64;
 
@@ -399,4 +399,123 @@ fn profile_of_a_linear_model_is_a_parabola() {
         (upper.unwrap() - (b + half_width)).abs() < 1e-7,
         "{upper:?}"
     );
+}
+
+/// The model of `abc_builder` (`tests/support/models.py`): A → B at
+/// `k1 * A * B / total`, B → C at `k2 * B`, from 990 in A and 10 in B.
+fn abc_engine() -> commol_difference::DifferenceEquations {
+    let json = r#"{"name":"ABC","parameters":[{"id":"k1","value":0.3},{"id":"k2","value":0.1}],
+        "engine":{"type":"DifferenceEquations"},
+        "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"},{"id":"C","name":"C"}],
+        "accumulators":[],"stratifications":[],
+        "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"k1 * A * B / total",
+        "stratified_rates":null,"per_compartment":null},
+        {"id":"bc","source":["B"],"target":["C"],"rate":"k2 * B",
+        "stratified_rates":null,"per_compartment":null}]},
+        "structure":{"kind":"aggregate","bin_amounts":{"A":990.0,"B":10.0,"C":0.0}}}"#;
+    let model: commol_core::Model = serde_json::from_str(json).expect("valid model JSON");
+    commol_difference::DifferenceEquations::try_from_model(&model).unwrap()
+}
+
+/// `k1` and `k2` of the ABC model fitted to B at 4, 8, …, 24 (the truth
+/// with a fixed draw of noise), with a normal model of sd 10.
+fn abc_problem() -> CalibrationProblem<commol_difference::DifferenceEquations> {
+    let mut engine = abc_engine();
+    let positions: Vec<f64> = (1..=6).map(|i| f64::from(4 * i)).collect();
+    let mut rows = Vec::new();
+    engine
+        .run_at_positions_into_buffer(&positions, &mut rows)
+        .unwrap();
+    let noise = [6.0, -9.0, 4.0, 11.0, -7.0, 3.0];
+    CalibrationProblem::new(
+        abc_engine(),
+        positions
+            .iter()
+            .zip(&rows)
+            .zip(noise)
+            .map(|((&at, row), e)| ObservedDataPoint::new(at, "B".to_string(), row[1] + e))
+            .collect(),
+        vec![
+            CalibrationParameter::new("k1".to_string(), 0.05, 1.0),
+            CalibrationParameter::new("k2".to_string(), 0.01, 0.5),
+        ],
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![(
+            "B".to_string(),
+            ObservationModel::Normal {
+                sd: Argument::Value(10.0),
+            },
+        )]),
+    )
+    .unwrap()
+}
+
+/// The comparison of L10: the initial penalty of each point of a prediction
+/// profile from Algencan's default, or `100·|Δλ/Δc|` from the two points
+/// before. It prints the model runs and the error of the multipliers of
+/// each rule, against multipliers of a tight constraint, and checks that
+/// both rules trace the same profile.
+#[test]
+#[ignore = "experiment: cargo test -p commol-inference --release --test test_profiles -- --ignored --nocapture"]
+fn the_penalty_rules_trace_the_same_prediction_profile() {
+    let problem = abc_problem();
+    let config = config();
+    let fit = optimize(&problem, &config).unwrap();
+    let mut table = Vec::new();
+    for (label, spec) in [
+        (
+            "B at 30",
+            ObservedDataPoint::new(30.0, "B".to_string(), 0.0),
+        ),
+        (
+            "C at 24",
+            ObservedDataPoint::new(24.0, "C".to_string(), 0.0),
+        ),
+    ] {
+        let quantity = ProfiledQuantity::Prediction(spec.clone());
+        let mut profiles = Vec::new();
+        for rule in [PenaltyRule::Algencan, PenaltyRule::Curvature(100.0)] {
+            let tracer = ProfileTracer::new(&problem, &config, &fit.best_parameters, 3)
+                .unwrap()
+                .with_penalty_rule(rule);
+            profiles.push(tracer.trace(&quantity, 1.92, 100).unwrap());
+        }
+        for (rule, profile) in ["algencan", "curvature"].iter().zip(&profiles) {
+            // The multiplier of a tight constraint at each point.
+            let mut errors = Vec::new();
+            for point in profile.points.iter().filter(|p| p.multiplier.is_some()) {
+                let held = Subproblem::fix_prediction(&problem, &spec, point.value)
+                    .unwrap()
+                    .with_settings(ConstraintSettings {
+                        tolerance: 1e-10 * point.value.abs().max(1.0),
+                        max_outer_iterations: 200,
+                        multiplier: point.multiplier,
+                        penalty: None,
+                    })
+                    .unwrap();
+                let exact = optimize_subproblem(&held, &config, &point.parameters, None)
+                    .unwrap()
+                    .multiplier
+                    .unwrap();
+                let scale = exact.abs().max(1e-3);
+                errors.push((point.multiplier.unwrap() - exact).abs() / scale);
+            }
+            let mean = errors.iter().sum::<f64>() / errors.len() as f64;
+            let max = errors.iter().copied().fold(0.0, f64::max);
+            table.push(format!(
+                "{label} {rule}: {} points, {} evaluations, multiplier error mean {mean:.2e} max {max:.2e}, interval {:?}",
+                profile.points.len(),
+                profile.evaluations,
+                profile.interval()
+            ));
+        }
+        let [a, b] = [profiles[0].interval(), profiles[1].interval()];
+        for (x, y) in a.iter().zip(&b) {
+            let (x, y) = (x.unwrap(), y.unwrap());
+            assert!((x - y).abs() <= 1e-3 * x.abs().max(1.0), "{x} against {y}");
+        }
+    }
+    for line in table {
+        println!("{line}");
+    }
 }
