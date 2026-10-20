@@ -17,7 +17,7 @@ input reaches is removed, not tested.
 | What | Command | Threshold |
 |---|---|---|
 | Python (`py-commol/commol/`) | `pytest --cov=commol --cov-fail-under=100`, from `py-commol/` | 100 % of the statements, in the job Python Coverage |
-| Rust (`crates/`, `py-commol/src/`) | `.github/scripts/rust_coverage.sh`, from the root, with the virtual environment of `py-commol` active | `RUST_LINES` of the script (98.65 % of the lines), in the job Rust Code Quality |
+| Rust (`crates/`, `py-commol/src/`) | `.github/scripts/rust_coverage.sh`, from the root, with the virtual environment of `py-commol` active | Every line, or a marker `// coverage: <reason>` on it, in the job Rust Code Quality |
 
 The bindings have no Rust tests: `pytest` runs them. So the script builds the
 Rust tests and the extension with the instrumentation of `cargo llvm-cov`,
@@ -26,9 +26,17 @@ runs both, and writes one report. It builds in the debug profile, so
 (`test_slow_tests_are_listed`) stays out, as the job Test of Build times the
 release extension. It puts the release extension back when it ends. It needs `cargo-llvm-cov`
 (`cargo install --locked cargo-llvm-cov`) and the component
-`llvm-tools-preview` (`rustup component add llvm-tools-preview`). Options
-after the script go to `cargo llvm-cov report`, such as `--summary-only` or
-`--lcov --output-path lcov.info`.
+`llvm-tools-preview` (`rustup component add llvm-tools-preview`). It writes
+`lcov.info` at the root, which CI uploads, and checks it with
+`.github/scripts/rust_uncovered.py`. Options after the script go to one more
+`cargo llvm-cov report`, such as `--summary-only` or `--show-missing-lines`.
+
+The check reads each source line once, with the counts of every
+instantiation and every binary joined: a line counts as run when any test
+runs it, through the Rust tests or through `pytest`. The summary of
+`cargo llvm-cov` counts the lines of a generic function by its instantiation
+that runs the most, so it reports as missed a line that only another
+instantiation runs, and it is not the measure.
 
 An instrumented binary that runs while `LLVM_PROFILE_FILE` is not set writes
 `default_<binary>_<pid>.profraw` in the directory it runs in. Git ignores
@@ -36,8 +44,8 @@ An instrumented binary that runs while `LLVM_PROFILE_FILE` is not set writes
 `tests/suite/test_rules.py::test_no_coverage_profile_is_tracked` fails when
 one is tracked.
 
-A threshold is the coverage reached. It rises when coverage rises; a pull
-request that lowers it says why.
+Both rules leave no threshold to move: a line runs in a test, or it says why
+it does not.
 
 ### What Python leaves out
 
@@ -53,18 +61,23 @@ it that says why. `test_every_coverage_exclusion_has_a_reason`
 
 ### What Rust leaves out
 
-`cargo llvm-cov` has no exclusion by line on the stable toolchain, so the
-threshold counts every line of a product file, and these are the kinds of
-line it allows to stay uncovered:
+`cargo llvm-cov` has no exclusion by line on the stable toolchain, so
+`rust_uncovered.py` makes one: a run of lines that no test runs (a comment or
+a blank line in it does not break it; a line that runs does) carries a marker
+`// coverage: <reason>` on one of its lines, or on a comment line just above
+it. The script fails on a run with no marker, on a marker with no reason,
+and on a marker that excuses no line that no test runs, as its code now runs.
+`cargo llvm-cov` measures no file of `tests/`. These are the kinds of line
+that may carry a marker:
 
 | Kind | Example | Why no test runs it |
 |---|---|---|
-| A file of the tests | `py-commol/src/test_kind.rs`, the test model kind (`--ignore-filename-regex` of the script) | It is not part of the product: only the feature `test-kind` builds it. |
+| A file of the tests | `py-commol/src/test_kind.rs`, the test model kind (`--ignore-filename-regex` of the script, so it needs no marker) | It is not part of the product: only the feature `test-kind` builds it. |
 | An arm for the test model kind | The `#[cfg(feature = "test-kind")]` arms of `Engine` and `PyAggregate::from_json` that reject a plan or a structure of the other kind | The kind check runs first, so no model reaches them; they exist so that the `match` covers the kind of the tests. |
 | An invariant | `unreachable!`, as the arm of `evaluate_rate` that no flow of the builder takes; an `expect` with the reason it holds | Only a broken invariant of the code reaches it. |
 | An error that only a dependency returns | The `?` after `add_class`, `add_submodule` or `m.add` of a binding module; the setup of the Cranelift JIT; a step or an interpolation that `diffsol` cannot take | A failed interpreter, JIT or solver, not an input that the engine builds. |
 | Code that a PyO3 attribute generates | A `#[pyclass]` or `#[pymethods]` line whose generated conversion no call uses | The macro writes it; no line of commol does. |
-| The failure of a test | The `panic!` or the message of an `assert!` that reports what went wrong | It runs only when the test fails. |
+| The failure of a test | The `panic!` or the message of an `assert!` of a `#[cfg(test)]` module that reports what went wrong | It runs only when the test fails. |
 
 A `?` or an arm that no input reaches and that is none of these kinds is
 removed: the binding, the engine or the check before it already rules the
