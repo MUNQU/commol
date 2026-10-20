@@ -195,6 +195,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ValueError` with both or neither. Write `loss_function="sse"` where a
   problem relied on the default.
 
+### Fixed
+
+- The finite-difference step of a parameter with an infinite bound was
+  infinite, so its sensitivities, identifiability and curvature failed: the
+  width of its bounds now counts as 1 in the step.
+
 ## [0.5.0] - 2026-10-19
 
 This release replaces the ensemble calibration with uncertainty methods that
