@@ -223,6 +223,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The finite-difference step of a parameter with an infinite bound was
   infinite, so its sensitivities, identifiability and curvature failed: the
   width of its bounds now counts as 1 in the step.
+- The quantile of a distribution hundreds of orders of magnitude below 1,
+  such as `Beta(0.01, 1)` at `1e-3`, was far from it, so a prior or a draw
+  of such a shape was wrong: when its Newton and halving steps run out, the
+  quantile now bisects the floating-point numbers between the two ends.
+- A particle swarm whose first particle had a NaN cost kept no best particle
+  and returned its start point: a NaN cost now counts as the worst.
 
 ## [0.5.0] - 2026-10-19
 
