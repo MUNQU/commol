@@ -29,6 +29,25 @@ use crate::sensitivity::Matrix;
 /// since `B` would have rank below the parameters, or when `H` or the
 /// sandwich is singular.
 pub fn sandwich(curvature: &Curvature, blocks: &BlockScheme) -> Result<Gaussian, LocalError> {
+    let meat = block_meat(curvature, blocks)?;
+    let bread = inverse(curvature.matrix())?;
+    let covariance = &bread * meat * &bread;
+    Gaussian::new(
+        curvature.transform().clone(),
+        curvature.unbounded_fit().to_vec(),
+        covariance,
+        Some((blocks.count() - 1) as f64),
+    )
+}
+
+/// The meat `B = G/(G − 1) · Σ_b s_b s_bᵀ` of the gradients of
+/// `curvature` over the blocks of `blocks`, on the unbounded scale.
+///
+/// # Errors
+///
+/// [`LocalError::Refused`] when there are not more blocks than parameters,
+/// since `B` would have rank below the parameters.
+pub fn block_meat(curvature: &Curvature, blocks: &BlockScheme) -> Result<Matrix, LocalError> {
     let count = blocks.count();
     let p = curvature.fit().len();
     if count <= p {
@@ -40,8 +59,8 @@ pub fn sandwich(curvature: &Curvature, blocks: &BlockScheme) -> Result<Gaussian,
             }
         };
         return Err(LocalError::Refused(format!(
-            "block_length {} makes {} for {}: the sandwich needs more blocks than \
-             parameters, or its meat has rank below the parameters. Use shorter blocks",
+            "block_length {} makes {} for {}: the sum of the scores over blocks needs more \
+             blocks than parameters, or its rank is below the parameters. Use shorter blocks",
             blocks.length(),
             plural(count, "block"),
             plural(p, "parameter")
@@ -63,14 +82,42 @@ pub fn sandwich(curvature: &Curvature, blocks: &BlockScheme) -> Result<Gaussian,
         }
     }
     meat *= count as f64 / (count - 1) as f64;
-    let bread = inverse(curvature.matrix())?;
-    let covariance = &bread * meat * &bread;
-    Gaussian::new(
-        curvature.transform().clone(),
-        curvature.unbounded_fit().to_vec(),
-        covariance,
-        Some((count - 1) as f64),
-    )
+    Ok(meat)
+}
+
+/// The estimate of the automatic block length of each series, by label.
+pub type Estimates = Vec<(String, f64)>;
+
+/// The blocks of `problem` of `block_length` positions, or of the
+/// automatic length of non-overlapping blocks of the residuals at the fit of
+/// `curvature` (Politis and White 2004) for `None`, with the estimate of
+/// each series.
+///
+/// # Errors
+///
+/// [`LocalError::Refused`] when the block length does not fit the
+/// positions.
+pub fn blocks_at<E: SimulationEngine>(
+    problem: &CalibrationProblem<E>,
+    curvature: &Curvature,
+    block_length: Option<usize>,
+) -> Result<(BlockScheme, Option<Estimates>), LocalError> {
+    let observed = problem.observed_data();
+    let (length, estimates) = match block_length {
+        Some(length) => (length, None),
+        None => {
+            let residuals: Vec<f64> = observed
+                .iter()
+                .zip(curvature.predictions())
+                .map(|(obs, prediction)| obs.value - prediction)
+                .collect();
+            let automatic =
+                automatic_block_length(observed, &residuals, BlockDrawing::NonOverlapping);
+            (automatic.length, Some(automatic.estimates))
+        }
+    };
+    let blocks = BlockScheme::new(observed, length).map_err(LocalError::Refused)?;
+    Ok((blocks, estimates))
 }
 
 /// A sandwich and the blocks it summed over.
@@ -85,7 +132,7 @@ pub struct SandwichRun {
     /// The positions per block.
     pub block_length: usize,
     /// With the automatic length, the estimate of each series by label.
-    pub estimates: Option<Vec<(String, f64)>>,
+    pub estimates: Option<Estimates>,
 }
 
 /// The sandwich of `problem` at `fit` with blocks of `block_length`
@@ -106,27 +153,13 @@ where
     E: SimulationEngine + Send + Sync,
 {
     let curvature = curvature_at(problem, fit, kind)?;
-    let observed = problem.observed_data();
-    let (length, estimates) = match block_length {
-        Some(length) => (length, None),
-        None => {
-            let residuals: Vec<f64> = observed
-                .iter()
-                .zip(curvature.predictions())
-                .map(|(obs, prediction)| obs.value - prediction)
-                .collect();
-            let automatic =
-                automatic_block_length(observed, &residuals, BlockDrawing::NonOverlapping);
-            (automatic.length, Some(automatic.estimates))
-        }
-    };
-    let blocks = BlockScheme::new(observed, length).map_err(LocalError::Refused)?;
+    let (blocks, estimates) = blocks_at(problem, &curvature, block_length)?;
     let gaussian = sandwich(&curvature, &blocks)?;
     Ok(SandwichRun {
         curvature,
         gaussian,
         blocks: blocks.count(),
-        block_length: length,
+        block_length: blocks.length(),
         estimates,
     })
 }

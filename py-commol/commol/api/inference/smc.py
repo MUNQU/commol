@@ -10,7 +10,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from commol.api.inference.registry import register
-from commol.api.inference.resampling import fit_values
+from commol.api.inference.resampling import fit_values, rust_block_length
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.sample import ParameterSample, SampleMethod
@@ -106,17 +106,20 @@ def run_gibbs_posterior(
     notes: list[str] = []
     if isinstance(method.eta, InformationMatching):
         fit = calibrator.run()
-        eta = rust.information_matching_eta(problem, fit_values(calibrator, fit))
+        eta = rust.information_matching_eta(
+            problem,
+            fit_values(calibrator, fit),
+            rust_block_length(method.eta.block_length),
+        )
     elif isinstance(method.eta, BootstrapCoverage):
         fit = calibrator.run()
         calibration = method.eta
-        block_length = calibration.block_length
         found = rust.bootstrap_coverage_eta(
             problem,
             priors,
             fit_values(calibrator, fit),
             calibration.replicates,
-            None if block_length == "auto" else block_length,
+            rust_block_length(calibration.block_length),
             calibration.confidence_level,
             *sampler,
             calibrator.seed,

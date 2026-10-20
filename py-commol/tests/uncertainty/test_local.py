@@ -18,6 +18,8 @@ from pydantic import BaseModel
 from commol import (
     CalibrationProblem,
     Calibrator,
+    EtaCalibration,
+    GibbsPosterior,
     GibbsTarget,
     ImportanceResult,
     Laplace,
@@ -258,3 +260,45 @@ class TestResults:
         assert result.components[0].center["c"] == pytest.approx(-2.0, abs=0.1)
         assert any("'c' is on its bound" in note for note in result.notes)
         assert "'c' is on its bound" in caplog.text
+
+
+def _matching(block_length: int) -> GibbsPosterior:
+    return GibbsPosterior(
+        priors=Priors.uniform_on_bounds(),
+        eta=EtaCalibration.information_matching(block_length=block_length),
+        particles=50,
+        target_cess=0.5,
+        resample_threshold=0.5,
+        stay_probability=0.05,
+    )
+
+
+class TestInformationMatching:
+    def test_information_matching_of_a_correct_likelihood_is_one(self) -> None:
+        count = 200
+        calibrator = flow_calibrator(
+            _normal_data(count, 8, sd=2.0),
+            windowed=True,
+            observation_models={"B": NormalObservations(sd=2.0)},
+        )
+
+        result = calibrator.uncertainty(_matching(block_length=1))
+
+        # η = n sd² / Σ r²: its relative error is about √(2/n).
+        assert result.eta == pytest.approx(1.0, rel=3 * math.sqrt(2 / count))
+
+    def test_information_matching_takes_a_likelihood(self) -> None:
+        # The noise parameter sd adds its own information, 2n / sd², and the
+        # variance of its scores.
+        count = 200
+        calibrator = flow_calibrator(
+            _normal_data(count, 9, sd=2.0),
+            windowed=True,
+            observation_models={"B": NormalObservations(sd="sd")},
+            noise=[bounded("sd", 0.1, 10.0, kind="noise")],
+        )
+
+        result = calibrator.uncertainty(_matching(block_length=4))
+
+        assert result.fit is not None
+        assert result.eta == pytest.approx(1.0, rel=6 * math.sqrt(2 / count))

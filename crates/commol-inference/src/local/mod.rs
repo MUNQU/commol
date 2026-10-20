@@ -29,7 +29,7 @@ pub use band::{DeltaBand, delta_band};
 pub use curvature::Curvature;
 pub use gaussian::{Gaussian, laplace};
 pub use mixture::{Component, MixtureRun, laplace_mixture};
-pub use sandwich::{SandwichRun, sandwich, sandwich_approximation};
+pub use sandwich::{SandwichRun, block_meat, blocks_at, sandwich, sandwich_approximation};
 
 /// Why a local approximation could not be made.
 #[derive(Debug, Clone, PartialEq)]

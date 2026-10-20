@@ -120,7 +120,7 @@ class TestGibbsPosterior:
     @pytest.mark.parametrize(
         "eta",
         [
-            EtaCalibration.information_matching(),
+            EtaCalibration.information_matching(block_length=1),
             EtaCalibration.bootstrap_coverage(
                 replicates=20, block_length=1, confidence_level=LEVEL
             ),

@@ -855,7 +855,10 @@ class InferenceModule(Protocol):
         confidence_level: float,
     ) -> tuple[list[str], list[list[float]], list[list[float]], list[list[float]]]: ...
     def information_matching_eta(
-        self, problem: CalibrationProblemProtocol, fit: list[float]
+        self,
+        problem: CalibrationProblemProtocol,
+        fit: list[float],
+        block_length: int | None,
     ) -> float: ...
     def bootstrap_coverage_eta(
         self,

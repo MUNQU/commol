@@ -266,7 +266,7 @@ class TestGibbsPosterior:
     def test_information_matching_recovers_eta(self) -> None:
         count = 200
         result = _flow(_flow_data(count, 5)).uncertainty(
-            _gibbs(eta=EtaCalibration.information_matching())
+            _gibbs(eta=EtaCalibration.information_matching(block_length=1))
         )
 
         # η̂ = 1/(2σ̂²): its relative error is about √(2/n).
@@ -275,11 +275,14 @@ class TestGibbsPosterior:
         )
         assert result.fit is not None
         assert result.coverage is None
-        assert result.sample.method.settings["eta"] == {"kind": "information_matching"}
+        assert result.sample.method.settings["eta"] == {
+            "kind": "information_matching",
+            "block_length": 1,
+        }
 
     def test_eta_is_required_and_positive(self) -> None:
         settings = _gibbs().model_dump(exclude={"eta"})
-        hint = r"eta.*EtaCalibration\.information_matching\(\).*bootstrap_coverage"
+        hint = r"eta.*EtaCalibration\.information_matching\(block_length\).*bootstrap"
         with pytest.raises(ValueError, match=hint):
             GibbsPosterior.model_validate(settings)
         for eta in (0.0, -1.0):
@@ -287,7 +290,7 @@ class TestGibbsPosterior:
                 _gibbs(eta=eta)
 
     def test_information_matching_needs_a_smooth_sum_loss(self) -> None:
-        method = _gibbs(eta=EtaCalibration.information_matching())
+        method = _gibbs(eta=EtaCalibration.information_matching(block_length=1))
         for loss in ("rmse", "mae"):
             with pytest.raises(
                 ValueError,
@@ -322,7 +325,7 @@ class TestGibbsPosterior:
         )
         with pytest.raises(RuntimeError, match="singular"):
             Calibrator(Simulation(model), problem).uncertainty(
-                _gibbs(eta=EtaCalibration.information_matching())
+                _gibbs(eta=EtaCalibration.information_matching(block_length=1))
             )
 
     def test_bootstrap_coverage_needs_a_loss_above_zero_at_the_fit(self) -> None:
