@@ -1,5 +1,5 @@
-"""Plots of simulation results, observations, the bands of a predictive and
-prediction intervals."""
+"""Plots of simulation results, observations, the bands of a predictive,
+prediction intervals, sensitivity results and profiles."""
 
 import logging
 import math
@@ -28,6 +28,7 @@ from commol.context.inference.global_sensitivity import (
     SobolResult,
 )
 from commol.context.inference.noise import NoNoise
+from commol.context.inference.profiles import ProfileResult
 from commol.context.visualization import PlotConfig
 
 logger = logging.getLogger(__name__)
@@ -450,6 +451,51 @@ class SimulationPlotter:
         SimulationPlotter._finalize_plot(
             axes, result.labels, output_file, config, "Sobol"
         )
+        return fig
+
+    @staticmethod
+    def plot_profiles(
+        result: ProfileResult,
+        output_file: str | None = None,
+        config: PlotConfig | None = None,
+    ) -> "Figure":
+        """
+        Plot each profile: one subplot per parameter or prediction, with the
+        statistic of each point, the threshold, and the ends of the interval.
+
+        A profile that stays under the threshold up to a bound is open on that
+        side; a flat one stays near 0 over its whole range.
+
+        Parameters
+        ----------
+        result : ProfileResult
+            The result of `ProfileLikelihood` or `PredictionProfile`.
+        output_file : str | None
+            Path to save the figure. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+
+        Returns
+        -------
+        Figure
+            The matplotlib Figure object.
+        """
+        config = config or PlotConfig()
+        SimulationPlotter._apply_seaborn_style(config)
+        names = list(result.profiles)
+        fig, axes = SimulationPlotter._create_grid(config, len(names))
+        for ax, name in zip(axes, names, strict=False):
+            profile = result.profiles[name]
+            ax.plot(profile.values, profile.statistics, marker="o", markersize=3)
+            ax.axhline(profile.threshold, color="grey", linestyle="--", linewidth=1)
+            interval = result.intervals[name]
+            for end in (interval.lower, interval.upper):
+                if end is not None:
+                    ax.axvline(end, color="grey", linestyle=":", linewidth=1)
+            ax.set_xlabel(name)
+            ax.set_ylabel("Profile statistic")
+            ax.set_title(name)
+        SimulationPlotter._finalize_plot(axes, names, output_file, config, "Profiles")
         return fig
 
     @staticmethod
