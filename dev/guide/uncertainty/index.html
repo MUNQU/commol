@@ -1586,6 +1586,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2579,6 +2607,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/results/" class="md-nav__link">
         
   
@@ -3350,6 +3406,24 @@ coverage guarantee, from the scores of observations the fit did not use.</p>
 <td>Where the next observations fall: a prediction interval of the models</td>
 <td>Yes</td>
 <td><a href="observation-models/#prediction-with-noise">Observation Models</a></td>
+</tr>
+<tr>
+<td><code>Laplace</code></td>
+<td>A normal around the fit from the curvature of <code>−log L</code>, and the band of the outputs by the delta method</td>
+<td>Yes</td>
+<td><a href="local/#laplace-approximation-and-the-delta-method">Local Approximations</a></td>
+</tr>
+<tr>
+<td><code>Sandwich</code></td>
+<td>A covariance around the fit that holds when the noise model is wrong or the noise depends on its neighbours</td>
+<td>No</td>
+<td><a href="local/#sandwich">Local Approximations</a></td>
+</tr>
+<tr>
+<td><code>LaplaceMixture</code></td>
+<td>A posterior from Laplace approximations at the optima of several starts, corrected by importance sampling, with <code>k_hat</code></td>
+<td>With <code>LikelihoodTarget</code></td>
+<td><a href="local/#laplace-mixture-and-importance-sampling">Local Approximations</a></td>
 </tr>
 <tr>
 <td><code>Propagation</code></td>

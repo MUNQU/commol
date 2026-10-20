@@ -1547,6 +1547,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2540,6 +2568,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/results/" class="md-nav__link">
         
   
@@ -3324,7 +3380,7 @@ optimizer gets a penalty, and a sampler a density of 0.</p>
 <tr>
 <td><code>GibbsPosterior(eta=…)</code></td>
 <td>The fractional posterior <code>prior(θ) · L(θ)^η</code>; <code>η = 1</code> is the posterior</td>
-<td><code>η</code> as a number or <code>EtaCalibration.bootstrap_coverage(...)</code>; <code>information_matching()</code> needs a loss</td>
+<td><code>η</code> as a number, <code>EtaCalibration.information_matching(block_length)</code> (<code>η ≈ 1</code> for correct models) or <code>EtaCalibration.bootstrap_coverage(...)</code></td>
 </tr>
 <tr>
 <td><code>ParametricBootstrap(replicates)</code></td>

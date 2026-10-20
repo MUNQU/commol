@@ -1564,6 +1564,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2557,6 +2585,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/results/" class="md-nav__link">
         
   
@@ -3185,14 +3241,14 @@ how the observations scatter.</p>
 </span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a><span class="n">gibbs</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span>
 </span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a>    <span class="n">GibbsPosterior</span><span class="p">(</span>
 </span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a>        <span class="n">priors</span><span class="o">=</span><span class="n">Priors</span><span class="o">.</span><span class="n">uniform_on_bounds</span><span class="p">(),</span>
-</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a>        <span class="n">eta</span><span class="o">=</span><span class="n">EtaCalibration</span><span class="o">.</span><span class="n">information_matching</span><span class="p">(),</span>
+</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a>        <span class="n">eta</span><span class="o">=</span><span class="n">EtaCalibration</span><span class="o">.</span><span class="n">information_matching</span><span class="p">(</span><span class="n">block_length</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
 </span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a>        <span class="n">particles</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
 </span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a>        <span class="n">target_cess</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
 </span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a>        <span class="n">resample_threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
 </span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a>        <span class="n">stay_probability</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
 </span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60" href="#__codelineno-0-60"></a>    <span class="p">)</span>
 </span><span id="__span-0-61"><a id="__codelineno-0-61" name="__codelineno-0-61" href="#__codelineno-0-61"></a><span class="p">)</span>
-</span><span id="__span-0-62"><a id="__codelineno-0-62" name="__codelineno-0-62" href="#__codelineno-0-62"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">gibbs</span><span class="o">.</span><span class="n">eta</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>  <span class="c1"># 0.73: 1/(2σ̂²), with σ̂² the mean squared residual</span>
+</span><span id="__span-0-62"><a id="__codelineno-0-62" name="__codelineno-0-62" href="#__codelineno-0-62"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">gibbs</span><span class="o">.</span><span class="n">eta</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>  <span class="c1"># 0.71: (n − 1)/(2 Σ r²), about 1/(2σ̂²)</span>
 </span><span id="__span-0-63"><a id="__codelineno-0-63" name="__codelineno-0-63" href="#__codelineno-0-63"></a><span class="n">lower</span><span class="p">,</span> <span class="n">upper</span> <span class="o">=</span> <span class="n">gibbs</span><span class="o">.</span><span class="n">sample</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="mf">0.9</span><span class="p">)[</span><span class="s2">&quot;c&quot;</span><span class="p">]</span>
 </span><span id="__span-0-64"><a id="__codelineno-0-64" name="__codelineno-0-64" href="#__codelineno-0-64"></a><span class="nb">print</span><span class="p">(</span><span class="n">lower</span> <span class="o">&lt;</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">flows</span><span class="p">))</span> <span class="o">&lt;</span> <span class="n">upper</span><span class="p">)</span>  <span class="c1"># True</span>
 </span><span id="__span-0-65"><a id="__codelineno-0-65" name="__codelineno-0-65" href="#__codelineno-0-65"></a>
@@ -3358,9 +3414,9 @@ variance <code>σ²</code>, <code>η = 1/(2σ²)</code> makes the Gibbs posterio
 <td>One sampler</td>
 </tr>
 <tr>
-<td><code>EtaCalibration.information_matching()</code></td>
-<td><code>η = tr(J I⁻¹ J) / tr(J)</code> at the fit: the curvature <code>J</code> of the loss terms against their variance <code>I</code> (Holmes and Walker 2017)</td>
-<td><code>loss_function="sse"</code>, a deterministic engine</td>
+<td><code>EtaCalibration.information_matching(block_length)</code></td>
+<td><code>η = tr(J I⁻¹ J) / tr(J)</code> at the fit: the Gauss–Newton curvature <code>J</code> of the objective against the variance <code>I</code> of the scores of its terms, summed over blocks of <code>block_length</code> positions (Holmes and Walker 2017)</td>
+<td><code>loss_function="sse"</code> or observation models, a deterministic engine, more blocks than parameters</td>
 <td>A fit, finite differences and one sampler</td>
 </tr>
 <tr>
@@ -3373,7 +3429,11 @@ variance <code>σ²</code>, <code>η = 1/(2σ²)</code> makes the Gibbs posterio
 </table>
 <p>Information matching is cheap and local; it needs a sum of smooth terms, so
 <code>"rmse"</code> (a square root of a sum), <code>"mae"</code> (no curvature) and a stochastic
-engine raise a <code>ValueError</code> that points to the other choices. Bootstrap
+engine raise a <code>ValueError</code> that points to the other choices. <code>J</code> and <code>I</code> are
+the curvature and the meat of the <a href="../local/#sandwich">sandwich</a>: <code>I</code> sums the
+scores over blocks, so it holds when the noise depends on its neighbours
+inside a block, and <code>block_length</code> has no default: <code>block_length=1</code> gives
+the independent version, every observation its own block. Bootstrap
 coverage runs one tempered sampler per replicate to a large <code>η</code>, reads the
 posterior of every smaller <code>η</code> by reweighting, so its search runs no model,
 and finds for each replicate and parameter the <code>η</code> where the interval stops
@@ -3386,9 +3446,9 @@ parameters.</p>
 <p>With <a href="../observation-models/">observation models</a> the loss is the negative
 log-likelihood, so the Gibbs posterior is the fractional posterior
 <code>prior(θ) · L(θ)^η</code>, and <code>η = 1</code> is the posterior of <code>BayesianPosterior</code>.
-<code>η</code> is a number or <code>EtaCalibration.bootstrap_coverage(...)</code>;
-<code>EtaCalibration.information_matching()</code> needs a loss and raises a
-<code>ValueError</code>.</p>
+With a correct observation model <code>I ≈ J</code>, so information matching gives
+<code>η ≈ 1</code>; an <code>η</code> below 1 says the data are noisier, or more dependent, than
+the models say.</p>
 <h2 id="abc">ABC<a class="headerlink" href="#abc" title="Permanent link">&para;</a></h2>
 <p><code>AbcSmc</code> keeps a particle when the distance between its run and the data is
 at most a tolerance <code>ε</code>, and lowers <code>ε</code> step by step (Del Moral, Doucet and

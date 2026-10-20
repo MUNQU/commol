@@ -3982,35 +3982,38 @@ A **band of the model** is the spread of the model's output across the draws of 
 
 ## Which method answers which question
 
-| Method                                       | Question                                                                                   | Needs a noise model | Page                                                                                                                                       |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Several starts, `Calibrator.run(starts=n)`   | Which parameters fit the data: distinct ends with equal losses                             | No                  | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)                                           |
-| `StructuralRank`                             | Which parameters any data of this design can determine, and which combinations             | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#structural-rank)                                |
-| `Collinearity`                               | Which parameters can be fitted together                                                    | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#collinearity)                                   |
-| `SampleIdentifiability`                      | Which parameters a sample determines: contraction, correlations, modes                     | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)                                       |
-| `StartsIdentifiability`                      | Which parameters differ between starts of equal loss                                       | No                  | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)                                         |
-| `BayesianBootstrap`                          | How far the parameters move when the data are reweighted by blocks                         | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#bayesian-bootstrap)                                       |
-| `ResidualBootstrap`                          | How far the parameters move when the residuals of the fit are resampled by blocks          | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#residual-block-bootstrap)                                 |
-| `WildBootstrap`                              | The same, when the size of the noise changes along the series                              | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#wild-block-bootstrap)                                     |
-| `BlockJackknife`                             | The standard error and bias of each parameter, and which block of data moves it most       | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#block-jackknife)                                          |
-| `ResidualNoise`                              | Where the next observations fall: a prediction interval                                    | No                  | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)                                     |
-| `GibbsPosterior`                             | A posterior of the parameters from the loss and priors, with a scale `η` of the loss       | No                  | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#gibbs-posterior)                                     |
-| `AbcSmc`                                     | A posterior of the parameters whose runs come within a tolerance of the data, with priors  | No                  | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                                                 |
-| `AbcRejection`                               | The same, from the closest draws of the priors                                             | No                  | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                                                 |
-| `SplitConformal`                             | Where new observations fall, with a guaranteed coverage, from held-out observations        | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#split-conformal)                                            |
-| `RollingConformal`                           | Where the next observations fall at each horizon ahead of the data                         | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#rolling-origins)                                            |
-| `JackknifePlus`                              | Where new observations fall, with a guaranteed coverage and no held-out data               | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#jackknife)                                                  |
-| `EnbPI`                                      | Where the next observations of a series with dependent errors fall                         | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#enbpi)                                                      |
-| `AdaptiveConformal`                          | Intervals for observations as they arrive, whose share of misses tends to its level        | No                  | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#adaptive-conformal-inference)                               |
-| `observation_models` with `Calibrator.run()` | The maximum-likelihood fit of the parameters and the noise                                 | Yes                 | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) |
-| `BayesianPosterior`                          | The posterior of the parameters from the likelihood and priors, with its evidence          | Yes                 | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) |
-| `ParametricBootstrap`                        | How far the parameters move in data sets drawn from the models at the fit                  | Yes                 | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) |
-| `DistributionNoise`                          | Where the next observations fall: a prediction interval of the models                      | Yes                 | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#prediction-with-noise)                    |
-| `Propagation`                                | How uncertainty in the inputs moves the outputs, with no data                              | No                  | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#propagation)                                   |
-| `PRCC`                                       | How steadily each output rises or falls with each input, of independent inputs or a sample | No                  | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#prcc)                                          |
-| `Morris`                                     | Which inputs matter, in few runs                                                           | No                  | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#morris-screening)                              |
-| `Sobol`                                      | The share of the variance of an output each input explains, alone and with interactions    | No                  | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#sobol-indices)                                 |
-| `PolynomialChaos`                            | A polynomial surrogate of an output and its Sobol indices, in few runs                     | No                  | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#polynomial-chaos)                              |
+| Method                                       | Question                                                                                                                | Needs a noise model     | Page                                                                                                                                       |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Several starts, `Calibrator.run(starts=n)`   | Which parameters fit the data: distinct ends with equal losses                                                          | No                      | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)                                           |
+| `StructuralRank`                             | Which parameters any data of this design can determine, and which combinations                                          | No                      | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#structural-rank)                                |
+| `Collinearity`                               | Which parameters can be fitted together                                                                                 | No                      | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#collinearity)                                   |
+| `SampleIdentifiability`                      | Which parameters a sample determines: contraction, correlations, modes                                                  | No                      | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample)                                       |
+| `StartsIdentifiability`                      | Which parameters differ between starts of equal loss                                                                    | No                      | [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)                                         |
+| `BayesianBootstrap`                          | How far the parameters move when the data are reweighted by blocks                                                      | No                      | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#bayesian-bootstrap)                                       |
+| `ResidualBootstrap`                          | How far the parameters move when the residuals of the fit are resampled by blocks                                       | No                      | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#residual-block-bootstrap)                                 |
+| `WildBootstrap`                              | The same, when the size of the noise changes along the series                                                           | No                      | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#wild-block-bootstrap)                                     |
+| `BlockJackknife`                             | The standard error and bias of each parameter, and which block of data moves it most                                    | No                      | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#block-jackknife)                                          |
+| `ResidualNoise`                              | Where the next observations fall: a prediction interval                                                                 | No                      | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)                                     |
+| `GibbsPosterior`                             | A posterior of the parameters from the loss and priors, with a scale `η` of the loss                                    | No                      | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#gibbs-posterior)                                     |
+| `AbcSmc`                                     | A posterior of the parameters whose runs come within a tolerance of the data, with priors                               | No                      | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                                                 |
+| `AbcRejection`                               | The same, from the closest draws of the priors                                                                          | No                      | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                                                 |
+| `SplitConformal`                             | Where new observations fall, with a guaranteed coverage, from held-out observations                                     | No                      | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#split-conformal)                                            |
+| `RollingConformal`                           | Where the next observations fall at each horizon ahead of the data                                                      | No                      | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#rolling-origins)                                            |
+| `JackknifePlus`                              | Where new observations fall, with a guaranteed coverage and no held-out data                                            | No                      | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#jackknife)                                                  |
+| `EnbPI`                                      | Where the next observations of a series with dependent errors fall                                                      | No                      | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#enbpi)                                                      |
+| `AdaptiveConformal`                          | Intervals for observations as they arrive, whose share of misses tends to its level                                     | No                      | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#adaptive-conformal-inference)                               |
+| `observation_models` with `Calibrator.run()` | The maximum-likelihood fit of the parameters and the noise                                                              | Yes                     | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) |
+| `BayesianPosterior`                          | The posterior of the parameters from the likelihood and priors, with its evidence                                       | Yes                     | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) |
+| `ParametricBootstrap`                        | How far the parameters move in data sets drawn from the models at the fit                                               | Yes                     | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) |
+| `DistributionNoise`                          | Where the next observations fall: a prediction interval of the models                                                   | Yes                     | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#prediction-with-noise)                    |
+| `Laplace`                                    | A normal around the fit from the curvature of `−log L`, and the band of the outputs by the delta method                 | Yes                     | [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/#laplace-approximation-and-the-delta-method)          |
+| `Sandwich`                                   | A covariance around the fit that holds when the noise model is wrong or the noise depends on its neighbours             | No                      | [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich)                                            |
+| `LaplaceMixture`                             | A posterior from Laplace approximations at the optima of several starts, corrected by importance sampling, with `k_hat` | With `LikelihoodTarget` | [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/#laplace-mixture-and-importance-sampling)             |
+| `Propagation`                                | How uncertainty in the inputs moves the outputs, with no data                                                           | No                      | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#propagation)                                   |
+| `PRCC`                                       | How steadily each output rises or falls with each input, of independent inputs or a sample                              | No                      | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#prcc)                                          |
+| `Morris`                                     | Which inputs matter, in few runs                                                                                        | No                      | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#morris-screening)                              |
+| `Sobol`                                      | The share of the variance of an output each input explains, alone and with interactions                                 | No                      | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#sobol-indices)                                 |
+| `PolynomialChaos`                            | A polynomial surrogate of an output and its Sobol indices, in few runs                                                  | No                      | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#polynomial-chaos)                              |
 
 Each uncertainty method adds its row here when it lands.
 
@@ -4717,14 +4720,14 @@ calibrator = Calibrator(Simulation(flow_model("DifferenceEquations")), problem)
 gibbs = calibrator.uncertainty(
     GibbsPosterior(
         priors=Priors.uniform_on_bounds(),
-        eta=EtaCalibration.information_matching(),
+        eta=EtaCalibration.information_matching(block_length=1),
         particles=500,
         target_cess=0.5,
         resample_threshold=0.5,
         stay_probability=0.05,
     )
 )
-print(round(gibbs.eta, 2))  # 0.73: 1/(2σ̂²), with σ̂² the mean squared residual
+print(round(gibbs.eta, 2))  # 0.71: (n − 1)/(2 Σ r²), about 1/(2σ̂²)
 lower, upper = gibbs.sample.interval(0.9)["c"]
 print(lower < float(np.mean(flows)) < upper)  # True
 
@@ -4797,17 +4800,17 @@ None of them has a default: each sets the cost and the accuracy of the run.
 
 `η` weighs the data against the priors. The loss has no scale of its own, so `η` has no default: with `η` too large the posterior is too narrow, with `η` too small too wide. For the sum of squares of a model with Gaussian noise of variance `σ²`, `η = 1/(2σ²)` makes the Gibbs posterior the Bayesian posterior.
 
-| `eta`                                                                           | How it is chosen                                                                                                              | Needs                                         | Cost                                          |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | --------------------------------------------- |
-| A number above 0                                                                | By you                                                                                                                        | Nothing                                       | One sampler                                   |
-| `EtaCalibration.information_matching()`                                         | `η = tr(J I⁻¹ J) / tr(J)` at the fit: the curvature `J` of the loss terms against their variance `I` (Holmes and Walker 2017) | `loss_function="sse"`, a deterministic engine | A fit, finite differences and one sampler     |
-| `EtaCalibration.bootstrap_coverage(replicates, block_length, confidence_level)` | The posteriors of Bayesian-bootstrap data sets hold the fit at `confidence_level` (Syring and Martin 2019)                    | Any loss and engine                           | A fit and one sampler per replicate, then one |
+| `eta`                                                                           | How it is chosen                                                                                                                                                                                                   | Needs                                                                                            | Cost                                          |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| A number above 0                                                                | By you                                                                                                                                                                                                             | Nothing                                                                                          | One sampler                                   |
+| `EtaCalibration.information_matching(block_length)`                             | `η = tr(J I⁻¹ J) / tr(J)` at the fit: the Gauss–Newton curvature `J` of the objective against the variance `I` of the scores of its terms, summed over blocks of `block_length` positions (Holmes and Walker 2017) | `loss_function="sse"` or observation models, a deterministic engine, more blocks than parameters | A fit, finite differences and one sampler     |
+| `EtaCalibration.bootstrap_coverage(replicates, block_length, confidence_level)` | The posteriors of Bayesian-bootstrap data sets hold the fit at `confidence_level` (Syring and Martin 2019)                                                                                                         | Any loss and engine                                                                              | A fit and one sampler per replicate, then one |
 
-Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. Bootstrap coverage runs one tempered sampler per replicate to a large `η`, reads the posterior of every smaller `η` by reweighting, so its search runs no model, and finds for each replicate and parameter the `η` where the interval stops holding the fit. `η` interpolates those thresholds at the level, so the expected coverage is the level; it needs at least `1/(1 − c) − 1` replicates times parameters.
+Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. `J` and `I` are the curvature and the meat of the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich): `I` sums the scores over blocks, so it holds when the noise depends on its neighbours inside a block, and `block_length` has no default: `block_length=1` gives the independent version, every observation its own block. Bootstrap coverage runs one tempered sampler per replicate to a large `η`, reads the posterior of every smaller `η` by reweighting, so its search runs no model, and finds for each replicate and parameter the `η` where the interval stops holding the fit. `η` interpolates those thresholds at the level, so the expected coverage is the level; it needs at least `1/(1 − c) − 1` replicates times parameters.
 
 With a stochastic engine the loss reads the problem's `replicates` with common random numbers, as the optimizers do, so it is a function of the parameters.
 
-With [observation models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md) the loss is the negative log-likelihood, so the Gibbs posterior is the fractional posterior `prior(θ) · L(θ)^η`, and `η = 1` is the posterior of `BayesianPosterior`. `η` is a number or `EtaCalibration.bootstrap_coverage(...)`; `EtaCalibration.information_matching()` needs a loss and raises a `ValueError`.
+With [observation models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md) the loss is the negative log-likelihood, so the Gibbs posterior is the fractional posterior `prior(θ) · L(θ)^η`, and `η = 1` is the posterior of `BayesianPosterior`. With a correct observation model `I ≈ J`, so information matching gives `η ≈ 1`; an `η` below 1 says the data are noisier, or more dependent, than the models say.
 
 ## ABC
 
@@ -5012,12 +5015,12 @@ A prediction outside the means a model allows, such as a negative count or a bin
 
 ## Maximum likelihood against the posterior
 
-| Method                            | Gives                                                                                                                                                               | Needs                                                                                              |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `Calibrator.run()`                | The maximum-likelihood fit; `final_loss` is `−log L`                                                                                                                | Nothing more                                                                                       |
-| `BayesianPosterior(priors, …)`    | The posterior `prior(θ) · L(θ)` and its log evidence, on the core of [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md) | A prior for every parameter, the noise parameters too                                              |
-| `GibbsPosterior(eta=…)`           | The fractional posterior `prior(θ) · L(θ)^η`; `η = 1` is the posterior                                                                                              | `η` as a number or `EtaCalibration.bootstrap_coverage(...)`; `information_matching()` needs a loss |
-| `ParametricBootstrap(replicates)` | Fits to data sets drawn from the models at the fit                                                                                                                  | Models that hold: the observations of a replicate are independent given the fit                    |
+| Method                            | Gives                                                                                                                                                               | Needs                                                                                                                                         |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Calibrator.run()`                | The maximum-likelihood fit; `final_loss` is `−log L`                                                                                                                | Nothing more                                                                                                                                  |
+| `BayesianPosterior(priors, …)`    | The posterior `prior(θ) · L(θ)` and its log evidence, on the core of [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md) | A prior for every parameter, the noise parameters too                                                                                         |
+| `GibbsPosterior(eta=…)`           | The fractional posterior `prior(θ) · L(θ)^η`; `η = 1` is the posterior                                                                                              | `η` as a number, `EtaCalibration.information_matching(block_length)` (`η ≈ 1` for correct models) or `EtaCalibration.bootstrap_coverage(...)` |
+| `ParametricBootstrap(replicates)` | Fits to data sets drawn from the models at the fit                                                                                                                  | Models that hold: the observations of a replicate are independent given the fit                                                               |
 
 A posterior answers "what do the data and the priors say about the parameters"; the fit and the parametric bootstrap answer "what would another data set of this design give". With little data or a parameter near a bound, they differ; with much data and flat priors they agree.
 
@@ -7587,6 +7590,63 @@ class Calibrator:
         """
         return self._rust_problem.predictive(sample.rust_sample, positions, self.seed)
 
+    def delta_band(
+        self, result: LocalResult, positions: Sequence[float], confidence_level: float
+    ) -> DeltaBand:
+        """
+        The band of every output of a local approximation by the delta method.
+
+        The model is linearized at the fit of `result`: the variance of an
+        output is ``J Σ Jᵀ``, with ``J`` its derivatives on the unbounded
+        scale and ``Σ`` the covariance of `result`. The band is the
+        prediction at the fit plus and minus the quantile of a normal, or of
+        the Student t of a `SandwichResult`, times its standard deviation. It
+        runs the model a few times per parameter, not once per draw, and reads
+        only the fields of `result`, so a result read back from JSON works.
+
+        Parameters
+        ----------
+        result : LaplaceResult | SandwichResult
+            A local approximation of this calibration problem.
+        positions : Sequence[float]
+            Positions to report at.
+        confidence_level : float
+            Strictly between 0 and 1.
+
+        Returns
+        -------
+        DeltaBand
+            The prediction at the fit and the ends of the interval of each
+            output at each position.
+
+        Raises
+        ------
+        ValueError
+            If the result's parameters are not the problem's, the level is not
+            strictly between 0 and 1, or the engine rejects a position.
+        """
+        if result.sample.names != self.parameter_names:
+            raise ValueError(
+                f"The result has the parameters {result.sample.names}; the problem "
+                f"has {self.parameter_names}."
+            )
+        points = [float(position) for position in positions]
+        outputs, center, lower, upper = commol_rs.inference.delta_band(
+            self._rust_problem,
+            [result.fit.best_parameters[name] for name in self.parameter_names],
+            result.covariance,
+            result.degrees_of_freedom(),
+            points,
+            confidence_level,
+        )
+        return DeltaBand(
+            confidence_level=confidence_level,
+            positions=points,
+            center=dict(zip(outputs, center, strict=True)),
+            lower=dict(zip(outputs, lower, strict=True)),
+            upper=dict(zip(outputs, upper, strict=True)),
+        )
+
     def rust_observation_draws(
         self,
         sample: ParameterSample,
@@ -8252,6 +8312,97 @@ def rust_predictive(
         The runs, computed in Rust.
     """
     return self._rust_problem.predictive(sample.rust_sample, positions, self.seed)
+```
+
+#### delta_band
+
+```python
+delta_band(result: LocalResult, positions: Sequence[float], confidence_level: float) -> DeltaBand
+```
+
+The band of every output of a local approximation by the delta method.
+
+The model is linearized at the fit of `result`: the variance of an output is `J Σ Jᵀ`, with `J` its derivatives on the unbounded scale and `Σ` the covariance of `result`. The band is the prediction at the fit plus and minus the quantile of a normal, or of the Student t of a `SandwichResult`, times its standard deviation. It runs the model a few times per parameter, not once per draw, and reads only the fields of `result`, so a result read back from JSON works.
+
+Parameters:
+
+| Name               | Type              | Description               | Default                                            |
+| ------------------ | ----------------- | ------------------------- | -------------------------------------------------- |
+| `result`           | \`LaplaceResult   | SandwichResult\`          | A local approximation of this calibration problem. |
+| `positions`        | `Sequence[float]` | Positions to report at.   | *required*                                         |
+| `confidence_level` | `float`           | Strictly between 0 and 1. | *required*                                         |
+
+Returns:
+
+| Type        | Description                                                                             |
+| ----------- | --------------------------------------------------------------------------------------- |
+| `DeltaBand` | The prediction at the fit and the ends of the interval of each output at each position. |
+
+Raises:
+
+| Type         | Description                                                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `ValueError` | If the result's parameters are not the problem's, the level is not strictly between 0 and 1, or the engine rejects a position. |
+
+Source code in `commol/api/calibrator.py`
+
+```python
+def delta_band(
+    self, result: LocalResult, positions: Sequence[float], confidence_level: float
+) -> DeltaBand:
+    """
+    The band of every output of a local approximation by the delta method.
+
+    The model is linearized at the fit of `result`: the variance of an
+    output is ``J Σ Jᵀ``, with ``J`` its derivatives on the unbounded
+    scale and ``Σ`` the covariance of `result`. The band is the
+    prediction at the fit plus and minus the quantile of a normal, or of
+    the Student t of a `SandwichResult`, times its standard deviation. It
+    runs the model a few times per parameter, not once per draw, and reads
+    only the fields of `result`, so a result read back from JSON works.
+
+    Parameters
+    ----------
+    result : LaplaceResult | SandwichResult
+        A local approximation of this calibration problem.
+    positions : Sequence[float]
+        Positions to report at.
+    confidence_level : float
+        Strictly between 0 and 1.
+
+    Returns
+    -------
+    DeltaBand
+        The prediction at the fit and the ends of the interval of each
+        output at each position.
+
+    Raises
+    ------
+    ValueError
+        If the result's parameters are not the problem's, the level is not
+        strictly between 0 and 1, or the engine rejects a position.
+    """
+    if result.sample.names != self.parameter_names:
+        raise ValueError(
+            f"The result has the parameters {result.sample.names}; the problem "
+            f"has {self.parameter_names}."
+        )
+    points = [float(position) for position in positions]
+    outputs, center, lower, upper = commol_rs.inference.delta_band(
+        self._rust_problem,
+        [result.fit.best_parameters[name] for name in self.parameter_names],
+        result.covariance,
+        result.degrees_of_freedom(),
+        points,
+        confidence_level,
+    )
+    return DeltaBand(
+        confidence_level=confidence_level,
+        positions=points,
+        center=dict(zip(outputs, center, strict=True)),
+        lower=dict(zip(outputs, lower, strict=True)),
+        upper=dict(zip(outputs, upper, strict=True)),
+    )
 ```
 
 #### rust_observation_draws
@@ -28373,20 +28524,28 @@ class EtaCalibration(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     @classmethod
-    def information_matching(cls) -> "InformationMatching":
+    def information_matching(cls, block_length: BlockLength) -> "InformationMatching":
         """
-        Match the curvature of the loss to the variance of its terms at the
-        fit (Holmes and Walker 2017).
+        Match the curvature of the objective to the variance of the scores of
+        its terms at the fit (Holmes and Walker 2017).
 
-        It needs ``loss_function="sse"`` and a deterministic engine, and is
-        cheap and local.
+        It needs ``loss_function="sse"`` or observation models and a
+        deterministic engine, and is cheap and local. The variance sums the
+        scores over blocks of positions, so it holds under dependence inside
+        a block.
+
+        Parameters
+        ----------
+        block_length : int | "auto"
+            Positions per block of the scores; there must be more blocks
+            than parameters.
 
         Returns
         -------
         InformationMatching
             The calibration.
         """
-        return InformationMatching()
+        return InformationMatching(block_length=block_length)
 
     @classmethod
     def bootstrap_coverage(
@@ -28425,12 +28584,18 @@ class EtaCalibration(BaseModel):
 #### information_matching
 
 ```python
-information_matching() -> InformationMatching
+information_matching(block_length: BlockLength) -> InformationMatching
 ```
 
-Match the curvature of the loss to the variance of its terms at the fit (Holmes and Walker 2017).
+Match the curvature of the objective to the variance of the scores of its terms at the fit (Holmes and Walker 2017).
 
-It needs `loss_function="sse"` and a deterministic engine, and is cheap and local.
+It needs `loss_function="sse"` or observation models and a deterministic engine, and is cheap and local. The variance sums the scores over blocks of positions, so it holds under dependence inside a block.
+
+Parameters:
+
+| Name           | Type  | Description | Default                                                                       |
+| -------------- | ----- | ----------- | ----------------------------------------------------------------------------- |
+| `block_length` | \`int | auto\`      | Positions per block of the scores; there must be more blocks than parameters. |
 
 Returns:
 
@@ -28442,20 +28607,28 @@ Source code in `commol/context/inference/smc.py`
 
 ```python
 @classmethod
-def information_matching(cls) -> "InformationMatching":
+def information_matching(cls, block_length: BlockLength) -> "InformationMatching":
     """
-    Match the curvature of the loss to the variance of its terms at the
-    fit (Holmes and Walker 2017).
+    Match the curvature of the objective to the variance of the scores of
+    its terms at the fit (Holmes and Walker 2017).
 
-    It needs ``loss_function="sse"`` and a deterministic engine, and is
-    cheap and local.
+    It needs ``loss_function="sse"`` or observation models and a
+    deterministic engine, and is cheap and local. The variance sums the
+    scores over blocks of positions, so it holds under dependence inside
+    a block.
+
+    Parameters
+    ----------
+    block_length : int | "auto"
+        Positions per block of the scores; there must be more blocks
+        than parameters.
 
     Returns
     -------
     InformationMatching
         The calibration.
     """
-    return InformationMatching()
+    return InformationMatching(block_length=block_length)
 ```
 
 #### bootstrap_coverage
@@ -28521,21 +28694,36 @@ def bootstrap_coverage(
 
 Bases: `EtaCalibration`
 
-`η = tr(J I⁻¹ J) / tr(J)` at the fit, with `J` the curvature of the loss terms and `I` their variance (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019). For the sum of squares of a model with Gaussian noise of variance `σ²` it estimates `1/(2σ²)`. It needs `loss_function="sse"` and a deterministic engine.
+`η = tr(J I⁻¹ J) / tr(J)` at the fit, with `J` the Gauss–Newton curvature of the objective and `I` the variance of the scores of its terms, summed over blocks of positions as the meat of `Sandwich` (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019). For the sum of squares of a model with Gaussian noise of variance `σ²` it estimates `1/(2σ²)`; for a correct observation model, 1. It needs `loss_function="sse"` or observation models, and a deterministic engine.
+
+Attributes:
+
+| Name           | Type  | Description |
+| -------------- | ----- | ----------- |
+| `block_length` | \`int | auto\`      |
 
 Source code in `commol/context/inference/smc.py`
 
 ```python
 class InformationMatching(EtaCalibration):
     """
-    `η = tr(J I⁻¹ J) / tr(J)` at the fit, with ``J`` the curvature of the
-    loss terms and ``I`` their variance (Holmes and Walker 2017; Lyddon,
-    Holmes and Walker 2019). For the sum of squares of a model with Gaussian
-    noise of variance ``σ²`` it estimates ``1/(2σ²)``. It needs
-    ``loss_function="sse"`` and a deterministic engine.
+    `η = tr(J I⁻¹ J) / tr(J)` at the fit, with ``J`` the Gauss–Newton
+    curvature of the objective and ``I`` the variance of the scores of its
+    terms, summed over blocks of positions as the meat of `Sandwich`
+    (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019). For the sum of
+    squares of a model with Gaussian noise of variance ``σ²`` it estimates
+    ``1/(2σ²)``; for a correct observation model, 1. It needs
+    ``loss_function="sse"`` or observation models, and a deterministic
+    engine.
+
+    Attributes
+    ----------
+    block_length : int | "auto"
+        Positions per block of the scores.
     """
 
     kind: Literal["information_matching"] = "information_matching"
+    block_length: BlockLength = Field(description="Positions per block.")
 ```
 
 ## BootstrapCoverage
@@ -28891,6 +29079,596 @@ class SmcDiagnostics(BaseModel):
     evaluations: int
     stop_reason: str | None
     notes: list[str]
+```
+
+## Local approximations
+
+Guide: [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/index.md).
+
+## Laplace
+
+Bases: `UncertaintyMethod[LaplaceResult]`
+
+The Laplace approximation of the problem's observation models: the normal `N(θ̂, H⁻¹)` on the unbounded scale of the parameters, centred on the fit, with `H` the curvature of `−log L` there.
+
+It needs `observation_models`: a loss has no noise scale, so its curvature is no inverse variance (use `Sandwich`). A fit on a bound of its parameter is refused: on the unbounded scale its variance is infinite there.
+
+Attributes:
+
+| Name        | Type                      | Description                                |
+| ----------- | ------------------------- | ------------------------------------------ |
+| `draws`     | `int`                     | Number of draws of the normal, at least 1. |
+| `curvature` | `{gauss_newton, hessian}` | The curvature (default "gauss_newton").    |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class Laplace(UncertaintyMethod[LaplaceResult]):
+    """
+    The Laplace approximation of the problem's observation models: the normal
+    ``N(θ̂, H⁻¹)`` on the unbounded scale of the parameters, centred on the
+    fit, with ``H`` the curvature of ``−log L`` there.
+
+    It needs ``observation_models``: a loss has no noise scale, so its
+    curvature is no inverse variance (use `Sandwich`). A fit on a bound of
+    its parameter is refused: on the unbounded scale its variance is
+    infinite there.
+
+    Attributes
+    ----------
+    draws : int
+        Number of draws of the normal, at least 1.
+    curvature : {"gauss_newton", "hessian"}
+        The curvature (default ``"gauss_newton"``).
+    """
+
+    draws: int = Field(ge=1, description="Number of draws.")
+    curvature: CurvatureName = Field(
+        default="gauss_newton", description="The curvature."
+    )
+```
+
+## Sandwich
+
+Bases: `UncertaintyMethod[SandwichResult]`
+
+The sandwich covariance `H⁻¹ B H⁻¹` at the fit, with the meat `B` summed over blocks of positions (the clustered estimator CR1): `B = G/(G − 1) · Σ_b s_b s_bᵀ`, with `s_b` the sum of the gradients of the terms of the observations of block `b`.
+
+It needs no noise model: with a loss, `H` is the curvature of the loss; with observation models, of `−log L`. It holds when the noise depends on its neighbours inside a block, when its size changes, and when the noise model is wrong but the mean is right. Intervals and draws read a Student t with `G − 1` degrees of freedom; with `G` blocks not above the parameters it is refused, since `B` would have rank below them. `loss_function="mae"` is refused: its sandwich needs a density of the residuals at 0 and a bandwidth (use a bootstrap).
+
+Attributes:
+
+| Name           | Type                      | Description                                                                                                 |
+| -------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `block_length` | \`int                     | auto\`                                                                                                      |
+| `draws`        | `int`                     | Number of draws of the Student t, at least 1.                                                               |
+| `curvature`    | `{gauss_newton, hessian}` | The curvature H (default "gauss_newton"). With the Hessian, the sandwich also holds when the mean is wrong. |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class Sandwich(UncertaintyMethod[SandwichResult]):
+    """
+    The sandwich covariance ``H⁻¹ B H⁻¹`` at the fit, with the meat ``B``
+    summed over blocks of positions (the clustered estimator CR1):
+    ``B = G/(G − 1) · Σ_b s_b s_bᵀ``, with ``s_b`` the sum of the gradients
+    of the terms of the observations of block ``b``.
+
+    It needs no noise model: with a loss, ``H`` is the curvature of the loss;
+    with observation models, of ``−log L``. It holds when the noise depends
+    on its neighbours inside a block, when its size changes, and when the
+    noise model is wrong but the mean is right. Intervals and draws read a
+    Student t with ``G − 1`` degrees of freedom; with ``G`` blocks not above
+    the parameters it is refused, since ``B`` would have rank below them.
+    ``loss_function="mae"`` is refused: its sandwich needs a density of the
+    residuals at 0 and a bandwidth (use a bootstrap).
+
+    Attributes
+    ----------
+    block_length : int | "auto"
+        Positions per block; ``"auto"`` is the rule of Politis and White
+        (2004) for non-overlapping blocks on the residuals of the fit.
+    draws : int
+        Number of draws of the Student t, at least 1.
+    curvature : {"gauss_newton", "hessian"}
+        The curvature ``H`` (default ``"gauss_newton"``). With the Hessian,
+        the sandwich also holds when the mean is wrong.
+    """
+
+    block_length: BlockLength = Field(description="Positions per block.")
+    draws: int = Field(ge=1, description="Number of draws.")
+    curvature: CurvatureName = Field(
+        default="gauss_newton", description="The curvature."
+    )
+```
+
+## LaplaceMixture
+
+Bases: `UncertaintyMethod[ImportanceResult]`
+
+The Laplace mixture: a Laplace approximation at each distinct optimum of a multi-start fit, weighted by its Laplace evidence, as the proposal of importance sampling of a posterior, with the largest weights smoothed (Pareto-smoothed importance sampling, Vehtari et al. 2024).
+
+The ends of the starts merge into a component when they are closer than one Mahalanobis unit to it. Every draw is weighted by the target over the mixture, on the unbounded scale. `k_hat` says whether the mixture covers the target: above 0.7 the sample is marked unreliable.
+
+Attributes:
+
+| Name        | Type                      | Description                                                                                       |
+| ----------- | ------------------------- | ------------------------------------------------------------------------------------------------- |
+| `starts`    | `int`                     | Starts of the fit, at least 1: the initial guess, then rows of a Latin hypercube over the bounds. |
+| `draws`     | `int`                     | Number of draws of the mixture, at least 25, so that the tail of the weights has 5.               |
+| `target`    | \`LikelihoodTarget        | GibbsTarget\`                                                                                     |
+| `curvature` | `{gauss_newton, hessian}` | The curvature of each component (default "gauss_newton").                                         |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
+    """
+    The Laplace mixture: a Laplace approximation at each distinct optimum of
+    a multi-start fit, weighted by its Laplace evidence, as the proposal of
+    importance sampling of a posterior, with the largest weights smoothed
+    (Pareto-smoothed importance sampling, Vehtari et al. 2024).
+
+    The ends of the starts merge into a component when they are closer than
+    one Mahalanobis unit to it. Every draw is weighted by the target over
+    the mixture, on the unbounded scale. ``k_hat`` says whether the mixture
+    covers the target: above 0.7 the sample is marked unreliable.
+
+    Attributes
+    ----------
+    starts : int
+        Starts of the fit, at least 1: the initial guess, then rows of a
+        Latin hypercube over the bounds.
+    draws : int
+        Number of draws of the mixture, at least 25, so that the tail of the
+        weights has 5.
+    target : LikelihoodTarget | GibbsTarget
+        The posterior of the observation models with priors, or the Gibbs
+        posterior of the loss with priors and ``eta``.
+    curvature : {"gauss_newton", "hessian"}
+        The curvature of each component (default ``"gauss_newton"``).
+    """
+
+    starts: int = Field(ge=1, description="Starts of the fit.")
+    draws: int = Field(ge=25, description="Number of draws.")
+    target: MixtureTarget = Field(description="The posterior to sample.")
+    curvature: CurvatureName = Field(
+        default="gauss_newton", description="The curvature."
+    )
+```
+
+## LikelihoodTarget
+
+Bases: `WithPriors`
+
+The posterior of the problem's observation models, `π(θ) ∝ prior(θ) · L(θ)`, as the target of a `LaplaceMixture`.
+
+Attributes:
+
+| Name     | Type     | Description               |
+| -------- | -------- | ------------------------- |
+| `priors` | \`Priors | dict[str, Distribution]\` |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class LikelihoodTarget(WithPriors):
+    """
+    The posterior of the problem's observation models,
+    ``π(θ) ∝ prior(θ) · L(θ)``, as the target of a `LaplaceMixture`.
+
+    Attributes
+    ----------
+    priors : Priors | dict[str, Distribution]
+        The prior of each calibrated parameter, or
+        ``Priors.uniform_on_bounds()``.
+    """
+
+    kind: Literal["likelihood"] = "likelihood"
+```
+
+## GibbsTarget
+
+Bases: `WithPriors`
+
+The Gibbs posterior of the problem's loss, `π(θ) ∝ prior(θ) · exp(−η · loss(θ))`, as the target of a `LaplaceMixture`.
+
+Attributes:
+
+| Name     | Type     | Description                     |
+| -------- | -------- | ------------------------------- |
+| `priors` | \`Priors | dict[str, Distribution]\`       |
+| `eta`    | `float`  | The scale of the loss, above 0. |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class GibbsTarget(WithPriors):
+    """
+    The Gibbs posterior of the problem's loss,
+    ``π(θ) ∝ prior(θ) · exp(−η · loss(θ))``, as the target of a
+    `LaplaceMixture`.
+
+    Attributes
+    ----------
+    priors : Priors | dict[str, Distribution]
+        The prior of each calibrated parameter, or
+        ``Priors.uniform_on_bounds()``.
+    eta : float
+        The scale of the loss, above 0.
+    """
+
+    kind: Literal["gibbs"] = "gibbs"
+    eta: float = Field(gt=0.0, allow_inf_nan=False, description="Scale of the loss.")
+```
+
+## LocalResult
+
+Bases: `BaseModel`
+
+What every local approximation returns: a distribution on the unbounded scale of the parameters, centred on the fit.
+
+Attributes:
+
+| Name         | Type                | Description                                                                                                            |
+| ------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run().                                                             |
+| `covariance` | `list[list[float]]` | The covariance of the distribution on the unbounded scale of the parameters, in the order of the problem's parameters. |
+| `sample`     | `ParameterSample`   | Draws of the distribution, mapped back to the parameters, with equal weights.                                          |
+| `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale; each is also logged as a warning. |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class LocalResult(BaseModel):
+    """
+    What every local approximation returns: a distribution on the unbounded
+    scale of the parameters, centred on the fit.
+
+    Attributes
+    ----------
+    fit : CalibrationResult
+        The fit the approximation is centred on: ``Calibrator.run()``.
+    covariance : list[list[float]]
+        The covariance of the distribution on the unbounded scale of the
+        parameters, in the order of the problem's parameters.
+    sample : ParameterSample
+        Draws of the distribution, mapped back to the parameters, with equal
+        weights.
+    notes : list[str]
+        The entries of the curvature whose estimated error is not small
+        against their scale; each is also logged as a warning.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    fit: CalibrationResult
+    covariance: list[list[float]]
+    sample: ParameterSample
+    notes: list[str]
+
+    def degrees_of_freedom(self) -> float | None:
+        """
+        The degrees of freedom of the distribution.
+
+        Returns
+        -------
+        float | None
+            Those of a Student t, or None for a normal.
+        """
+        return None
+```
+
+### Methods:
+
+#### degrees_of_freedom
+
+```python
+degrees_of_freedom() -> float | None
+```
+
+The degrees of freedom of the distribution.
+
+Returns:
+
+| Type    | Description |
+| ------- | ----------- |
+| \`float | None\`      |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+def degrees_of_freedom(self) -> float | None:
+    """
+    The degrees of freedom of the distribution.
+
+    Returns
+    -------
+    float | None
+        Those of a Student t, or None for a normal.
+    """
+    return None
+```
+
+## LaplaceResult
+
+Bases: `LocalResult`
+
+The result of a Laplace approximation: the normal `N(θ̂, Σ)` on the unbounded scale, `Σ = H⁻¹`.
+
+Attributes:
+
+| Name         | Type                | Description                                                                          |
+| ------------ | ------------------- | ------------------------------------------------------------------------------------ |
+| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run().                           |
+| `covariance` | `list[list[float]]` | Σ = H⁻¹ on the unbounded scale of the parameters.                                    |
+| `sample`     | `ParameterSample`   | Draws of the normal, mapped back to the parameters, with equal weights.              |
+| `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class LaplaceResult(LocalResult):
+    """
+    The result of a Laplace approximation: the normal ``N(θ̂, Σ)`` on the
+    unbounded scale, ``Σ = H⁻¹``.
+
+    Attributes
+    ----------
+    fit : CalibrationResult
+        The fit the approximation is centred on: ``Calibrator.run()``.
+    covariance : list[list[float]]
+        ``Σ = H⁻¹`` on the unbounded scale of the parameters.
+    sample : ParameterSample
+        Draws of the normal, mapped back to the parameters, with equal
+        weights.
+    notes : list[str]
+        The entries of the curvature whose estimated error is not small
+        against their scale.
+    """
+```
+
+## SandwichResult
+
+Bases: `LocalResult`
+
+The result of a sandwich: a Student t on the unbounded scale of the parameters, centred on the fit, of covariance `H⁻¹ B H⁻¹` and `blocks − 1` degrees of freedom.
+
+Attributes:
+
+| Name                     | Type                | Description                                                                          |
+| ------------------------ | ------------------- | ------------------------------------------------------------------------------------ |
+| `fit`                    | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run().                                |
+| `covariance`             | `list[list[float]]` | H⁻¹ B H⁻¹ on the unbounded scale of the parameters.                                  |
+| `sample`                 | `ParameterSample`   | Draws of the Student t, mapped back to the parameters, with equal weights.           |
+| `notes`                  | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
+| `blocks`                 | `int`               | The number of blocks G; intervals read a Student t with G − 1 degrees of freedom.    |
+| `block_length`           | `int`               | The positions per block.                                                             |
+| `block_length_estimates` | \`dict[str, float]  | None\`                                                                               |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class SandwichResult(LocalResult):
+    """
+    The result of a sandwich: a Student t on the unbounded scale of the
+    parameters, centred on the fit, of covariance ``H⁻¹ B H⁻¹`` and
+    ``blocks − 1`` degrees of freedom.
+
+    Attributes
+    ----------
+    fit : CalibrationResult
+        The fit the sandwich is centred on: ``Calibrator.run()``.
+    covariance : list[list[float]]
+        ``H⁻¹ B H⁻¹`` on the unbounded scale of the parameters.
+    sample : ParameterSample
+        Draws of the Student t, mapped back to the parameters, with equal
+        weights.
+    notes : list[str]
+        The entries of the curvature whose estimated error is not small
+        against their scale.
+    blocks : int
+        The number of blocks ``G``; intervals read a Student t with
+        ``G − 1`` degrees of freedom.
+    block_length : int
+        The positions per block.
+    block_length_estimates : dict[str, float] | None
+        With ``block_length="auto"``, the estimate of each series, by label;
+        otherwise None.
+    """
+
+    blocks: int
+    block_length: int
+    block_length_estimates: dict[str, float] | None
+
+    def degrees_of_freedom(self) -> float | None:
+        """
+        The degrees of freedom of the Student t.
+
+        Returns
+        -------
+        float | None
+            ``blocks − 1``.
+        """
+        return float(self.blocks - 1)
+```
+
+### Methods:
+
+#### degrees_of_freedom
+
+```python
+degrees_of_freedom() -> float | None
+```
+
+The degrees of freedom of the Student t.
+
+Returns:
+
+| Type    | Description |
+| ------- | ----------- |
+| \`float | None\`      |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+def degrees_of_freedom(self) -> float | None:
+    """
+    The degrees of freedom of the Student t.
+
+    Returns
+    -------
+    float | None
+        ``blocks − 1``.
+    """
+    return float(self.blocks - 1)
+```
+
+## DeltaBand
+
+Bases: `BaseModel`
+
+The band of every output by the delta method (`Calibrator.delta_band`): the prediction at the fit plus and minus a quantile times the standard deviation of the linearized model, `J Σ Jᵀ`, with no run of the draws.
+
+Attributes:
+
+| Name                   | Type                     | Description                                                                                      |
+| ---------------------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
+| `confidence_level`     | `float`                  | The level of the central interval.                                                               |
+| `positions`            | `list[float]`            | Where the values are.                                                                            |
+| `center, lower, upper` | `dict[str, list[float]]` | For each output, one value per position: the prediction at the fit and the ends of the interval. |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class DeltaBand(BaseModel):
+    """
+    The band of every output by the delta method (``Calibrator.delta_band``):
+    the prediction at the fit
+    plus and minus a quantile times the standard deviation of the
+    linearized model, ``J Σ Jᵀ``, with no run of the draws.
+
+    Attributes
+    ----------
+    confidence_level : float
+        The level of the central interval.
+    positions : list[float]
+        Where the values are.
+    center, lower, upper : dict[str, list[float]]
+        For each output, one value per position: the prediction at the fit
+        and the ends of the interval.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    confidence_level: float
+    positions: list[float]
+    center: dict[str, list[float]] = Field(description="Prediction at the fit")
+    lower: dict[str, list[float]] = Field(description="Lower end")
+    upper: dict[str, list[float]] = Field(description="Upper end")
+```
+
+## ImportanceResult
+
+Bases: `BaseModel`
+
+The result of a Laplace mixture: draws of the mixture weighted by the target over the mixture, smoothed by Pareto-smoothed importance sampling.
+
+Attributes:
+
+| Name             | Type                     | Description                                                                                                                      |
+| ---------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`            | `CalibrationResult`      | The multi-start fit whose ends made the components: Calibrator.run(starts).                                                      |
+| `sample`         | `ParameterSample`        | The draws with their smoothed weights.                                                                                           |
+| `components`     | `list[MixtureComponent]` | The components, in order of their objective.                                                                                     |
+| `k_hat`          | `float`                  | The Pareto shape of the tail of the weights. Up to 0.5 the weights have a finite variance; above 0.7 the estimate is unreliable. |
+| `effective_size` | `float`                  | Kish's effective size of the smoothed weights.                                                                                   |
+| `reliable`       | `bool`                   | Whether k_hat is at most 0.7. An unreliable sample is also logged as a warning.                                                  |
+| `notes`          | `list[str]`              | Ends that gave no component, and an unreliable sample, in words.                                                                 |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class ImportanceResult(BaseModel):
+    """
+    The result of a Laplace mixture: draws of the mixture weighted by the
+    target over the mixture, smoothed by Pareto-smoothed importance
+    sampling.
+
+    Attributes
+    ----------
+    fit : CalibrationResult
+        The multi-start fit whose ends made the components:
+        ``Calibrator.run(starts)``.
+    sample : ParameterSample
+        The draws with their smoothed weights.
+    components : list[MixtureComponent]
+        The components, in order of their objective.
+    k_hat : float
+        The Pareto shape of the tail of the weights. Up to 0.5 the weights
+        have a finite variance; above 0.7 the estimate is unreliable.
+    effective_size : float
+        Kish's effective size of the smoothed weights.
+    reliable : bool
+        Whether ``k_hat`` is at most 0.7. An unreliable sample is also
+        logged as a warning.
+    notes : list[str]
+        Ends that gave no component, and an unreliable sample, in words.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    fit: CalibrationResult
+    sample: ParameterSample
+    components: list[MixtureComponent]
+    k_hat: float
+    effective_size: float
+    reliable: bool
+    notes: list[str]
+```
+
+## MixtureComponent
+
+Bases: `BaseModel`
+
+One component of a Laplace mixture: the Laplace approximation at one optimum of the starts.
+
+Attributes:
+
+| Name           | Type                | Description                                                   |
+| -------------- | ------------------- | ------------------------------------------------------------- |
+| `center`       | `dict[str, float]`  | The optimum, by parameter.                                    |
+| `weight`       | `float`             | Its weight in the mixture: its Laplace evidence over the sum. |
+| `covariance`   | `list[list[float]]` | Its covariance on the unbounded scale of the parameters.      |
+| `log_evidence` | `float`             | The log of its Laplace evidence, log p(θ̂) + log               |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class MixtureComponent(BaseModel):
+    """
+    One component of a Laplace mixture: the Laplace approximation at one
+    optimum of the starts.
+
+    Attributes
+    ----------
+    center : dict[str, float]
+        The optimum, by parameter.
+    weight : float
+        Its weight in the mixture: its Laplace evidence over the sum.
+    covariance : list[list[float]]
+        Its covariance on the unbounded scale of the parameters.
+    log_evidence : float
+        The log of its Laplace evidence,
+        ``log p(θ̂) + log |dθ/du| + (d/2) log 2π + ½ log |Σ|``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    center: dict[str, float]
+    weight: float
+    covariance: list[list[float]]
+    log_evidence: float
 ```
 
 ## Conformal prediction
@@ -32229,7 +33007,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-- `GibbsPosterior`: the Gibbs posterior `prior(θ) · exp(−η · loss(θ))` of the problem's loss, sampled by sequential Monte Carlo from the priors to the posterior; it returns a `GibbsResult` with the `η` it ran with. `eta` is required: a number above 0, `EtaCalibration.information_matching()` (the sum of squares and a deterministic engine) or `EtaCalibration.bootstrap_coverage(replicates, block_length, confidence_level)` (any loss). See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#gibbs-posterior).
+- Local approximations through `Calibrator.uncertainty`, on the unbounded scale of the parameters, with a fit on a bound refused: `Laplace(draws)`, the normal `N(θ̂, H⁻¹)` of the observation models, and `Calibrator.delta_band(result, positions, level)`, the band of the outputs by the delta method; `Sandwich(block_length, draws)`, the covariance `H⁻¹ B H⁻¹` with the scores summed over blocks (CR1) and a Student t with `G − 1` degrees of freedom, which needs no noise model and refuses `loss_function="mae"` and too few blocks; `LaplaceMixture(starts, draws, target)`, a Laplace approximation at each optimum of a multi-start fit as the proposal of Pareto-smoothed importance sampling of a `LikelihoodTarget(priors)` or `GibbsTarget(priors, eta)`, which reports `k_hat` and marks a sample with `k_hat > 0.7` as unreliable. `curvature` is `"gauss_newton"` (the expected Fisher information of each observation model, by default) or `"hessian"`. See [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/index.md).
+- `GibbsPosterior`: the Gibbs posterior `prior(θ) · exp(−η · loss(θ))` of the problem's loss, sampled by sequential Monte Carlo from the priors to the posterior; it returns a `GibbsResult` with the `η` it ran with. `eta` is required: a number above 0, `EtaCalibration.information_matching(block_length)` (the curvature of the sum of squares or of observation models against the variance of the scores of its terms summed over blocks, with a deterministic engine) or `EtaCalibration.bootstrap_coverage(replicates, block_length, confidence_level)` (any loss). See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#gibbs-posterior).
 - `AbcSmc` and `AbcRejection`: approximate Bayesian computation on a required distance, `LossDistance()` or `SeriesDistance(metric)`. With a stochastic engine each distance reads one fresh replicate of its particle, so the problem's `replicates` and `replicate_summary` do not apply, and the result says so. See [ABC](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc).
 - `SmcResult`: the sample, the level of each step, the log evidence, the value each particle keeps and the diagnostics of each step (`SmcDiagnostics`: effective size, resampling, acceptance rate and move count).
 - Priors: `Uniform()`, `LogUniform()`, `Beta(a, b)`, `Normal(mean, sd)`, `LogNormal(mu, sigma)` and `Gamma(shape, rate)`, each truncated to the bounds of its parameter, and `Priors` (a mapping of parameter to distribution, or `Priors.uniform_on_bounds()`). Every sampling method takes `priors` with no default, and a prior whose bounds do not fit raises a `ValueError` that names the distributions that fit them. Their draws are the same on every platform. See [Priors](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#priors).
@@ -32251,6 +33030,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- **Breaking:** `EtaCalibration.information_matching(block_length)` takes a required `block_length`, an `int` or `"auto"`: the variance of the scores is summed over blocks of positions, as the meat of `Sandwich`, so it holds under dependence; `block_length=1` gives the independent version. It also takes a problem with observation models, where a correct model gives `η ≈ 1`.
 - **Breaking:** `Predictive(source, sample, positions)` takes a `Calibrator` or a `SensitivityAnalysis` (any `PredictiveSource`), and its attribute `calibrator` is now `source`. `Predictive.at_observations` of an analysis takes only `NoNoise()`, and `scores.log_score` refuses its predictive.
 - With a stochastic engine, every replicate of every draw of a `Predictive`, of `Predictive.at_observations` and of `scores.log_score` has a seed of its own, derived from the calibrator's seed; before, every draw ran the same replicates of the problem, so a predictive with few replicates showed the same few noise paths for every draw. The bands and scores of a stochastic predictive change; a seed still repeats them.
 - **Breaking:** `ModelStructure.check_calibration_values(model, engine, parameters, remainder)` takes the values and the remainder instead of a calibration problem; a model kind that implements it changes its signature.
@@ -32273,6 +33053,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Breaking:** the description of an aggregate model shows the bin amounts and their units, and the initial state with the unit of each compartment.
 - **Breaking (Rust):** `InitialConditions` has `bin_amounts` and `compartment_amounts` in place of `total`, `bin_fractions` and `compartment_fractions`; `CompartmentalEngine::total` is the sum of the amounts the model states; `check_model_values` returns the plan it resolves, and `InitialConditionPlan::coverage` gives the compartments each value sets.
 - **Breaking:** `CalibrationProblem.loss_function` has no default: a problem needs `loss_function` or `observation_models`, exactly one, and raises a `ValueError` with both or neither. Write `loss_function="sse"` where a problem relied on the default.
+
+### Fixed
+
+- The finite-difference step of a parameter with an infinite bound was infinite, so its sensitivities, identifiability and curvature failed: the width of its bounds now counts as 1 in the step.
 
 ## [0.5.0] - 2026-10-19
 

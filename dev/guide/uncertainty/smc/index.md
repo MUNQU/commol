@@ -61,14 +61,14 @@ calibrator = Calibrator(Simulation(flow_model("DifferenceEquations")), problem)
 gibbs = calibrator.uncertainty(
     GibbsPosterior(
         priors=Priors.uniform_on_bounds(),
-        eta=EtaCalibration.information_matching(),
+        eta=EtaCalibration.information_matching(block_length=1),
         particles=500,
         target_cess=0.5,
         resample_threshold=0.5,
         stay_probability=0.05,
     )
 )
-print(round(gibbs.eta, 2))  # 0.73: 1/(2σ̂²), with σ̂² the mean squared residual
+print(round(gibbs.eta, 2))  # 0.71: (n − 1)/(2 Σ r²), about 1/(2σ̂²)
 lower, upper = gibbs.sample.interval(0.9)["c"]
 print(lower < float(np.mean(flows)) < upper)  # True
 
@@ -141,17 +141,17 @@ None of them has a default: each sets the cost and the accuracy of the run.
 
 `η` weighs the data against the priors. The loss has no scale of its own, so `η` has no default: with `η` too large the posterior is too narrow, with `η` too small too wide. For the sum of squares of a model with Gaussian noise of variance `σ²`, `η = 1/(2σ²)` makes the Gibbs posterior the Bayesian posterior.
 
-| `eta`                                                                           | How it is chosen                                                                                                              | Needs                                         | Cost                                          |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | --------------------------------------------- |
-| A number above 0                                                                | By you                                                                                                                        | Nothing                                       | One sampler                                   |
-| `EtaCalibration.information_matching()`                                         | `η = tr(J I⁻¹ J) / tr(J)` at the fit: the curvature `J` of the loss terms against their variance `I` (Holmes and Walker 2017) | `loss_function="sse"`, a deterministic engine | A fit, finite differences and one sampler     |
-| `EtaCalibration.bootstrap_coverage(replicates, block_length, confidence_level)` | The posteriors of Bayesian-bootstrap data sets hold the fit at `confidence_level` (Syring and Martin 2019)                    | Any loss and engine                           | A fit and one sampler per replicate, then one |
+| `eta`                                                                           | How it is chosen                                                                                                                                                                                                   | Needs                                                                                            | Cost                                          |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| A number above 0                                                                | By you                                                                                                                                                                                                             | Nothing                                                                                          | One sampler                                   |
+| `EtaCalibration.information_matching(block_length)`                             | `η = tr(J I⁻¹ J) / tr(J)` at the fit: the Gauss–Newton curvature `J` of the objective against the variance `I` of the scores of its terms, summed over blocks of `block_length` positions (Holmes and Walker 2017) | `loss_function="sse"` or observation models, a deterministic engine, more blocks than parameters | A fit, finite differences and one sampler     |
+| `EtaCalibration.bootstrap_coverage(replicates, block_length, confidence_level)` | The posteriors of Bayesian-bootstrap data sets hold the fit at `confidence_level` (Syring and Martin 2019)                                                                                                         | Any loss and engine                                                                              | A fit and one sampler per replicate, then one |
 
-Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. Bootstrap coverage runs one tempered sampler per replicate to a large `η`, reads the posterior of every smaller `η` by reweighting, so its search runs no model, and finds for each replicate and parameter the `η` where the interval stops holding the fit. `η` interpolates those thresholds at the level, so the expected coverage is the level; it needs at least `1/(1 − c) − 1` replicates times parameters.
+Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. `J` and `I` are the curvature and the meat of the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich): `I` sums the scores over blocks, so it holds when the noise depends on its neighbours inside a block, and `block_length` has no default: `block_length=1` gives the independent version, every observation its own block. Bootstrap coverage runs one tempered sampler per replicate to a large `η`, reads the posterior of every smaller `η` by reweighting, so its search runs no model, and finds for each replicate and parameter the `η` where the interval stops holding the fit. `η` interpolates those thresholds at the level, so the expected coverage is the level; it needs at least `1/(1 − c) − 1` replicates times parameters.
 
 With a stochastic engine the loss reads the problem's `replicates` with common random numbers, as the optimizers do, so it is a function of the parameters.
 
-With [observation models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md) the loss is the negative log-likelihood, so the Gibbs posterior is the fractional posterior `prior(θ) · L(θ)^η`, and `η = 1` is the posterior of `BayesianPosterior`. `η` is a number or `EtaCalibration.bootstrap_coverage(...)`; `EtaCalibration.information_matching()` needs a loss and raises a `ValueError`.
+With [observation models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md) the loss is the negative log-likelihood, so the Gibbs posterior is the fractional posterior `prior(θ) · L(θ)^η`, and `η = 1` is the posterior of `BayesianPosterior`. With a correct observation model `I ≈ J`, so information matching gives `η ≈ 1`; an `η` below 1 says the data are noisier, or more dependent, than the models say.
 
 ## ABC
 

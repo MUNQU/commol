@@ -112,6 +112,63 @@ class Calibrator:
         """
         return self._rust_problem.predictive(sample.rust_sample, positions, self.seed)
 
+    def delta_band(
+        self, result: LocalResult, positions: Sequence[float], confidence_level: float
+    ) -> DeltaBand:
+        """
+        The band of every output of a local approximation by the delta method.
+
+        The model is linearized at the fit of `result`: the variance of an
+        output is ``J Σ Jᵀ``, with ``J`` its derivatives on the unbounded
+        scale and ``Σ`` the covariance of `result`. The band is the
+        prediction at the fit plus and minus the quantile of a normal, or of
+        the Student t of a `SandwichResult`, times its standard deviation. It
+        runs the model a few times per parameter, not once per draw, and reads
+        only the fields of `result`, so a result read back from JSON works.
+
+        Parameters
+        ----------
+        result : LaplaceResult | SandwichResult
+            A local approximation of this calibration problem.
+        positions : Sequence[float]
+            Positions to report at.
+        confidence_level : float
+            Strictly between 0 and 1.
+
+        Returns
+        -------
+        DeltaBand
+            The prediction at the fit and the ends of the interval of each
+            output at each position.
+
+        Raises
+        ------
+        ValueError
+            If the result's parameters are not the problem's, the level is not
+            strictly between 0 and 1, or the engine rejects a position.
+        """
+        if result.sample.names != self.parameter_names:
+            raise ValueError(
+                f"The result has the parameters {result.sample.names}; the problem "
+                f"has {self.parameter_names}."
+            )
+        points = [float(position) for position in positions]
+        outputs, center, lower, upper = commol_rs.inference.delta_band(
+            self._rust_problem,
+            [result.fit.best_parameters[name] for name in self.parameter_names],
+            result.covariance,
+            result.degrees_of_freedom(),
+            points,
+            confidence_level,
+        )
+        return DeltaBand(
+            confidence_level=confidence_level,
+            positions=points,
+            center=dict(zip(outputs, center, strict=True)),
+            lower=dict(zip(outputs, lower, strict=True)),
+            upper=dict(zip(outputs, upper, strict=True)),
+        )
+
     def rust_observation_draws(
         self,
         sample: ParameterSample,
@@ -777,6 +834,97 @@ def rust_predictive(
         The runs, computed in Rust.
     """
     return self._rust_problem.predictive(sample.rust_sample, positions, self.seed)
+```
+
+#### delta_band
+
+```python
+delta_band(result: LocalResult, positions: Sequence[float], confidence_level: float) -> DeltaBand
+```
+
+The band of every output of a local approximation by the delta method.
+
+The model is linearized at the fit of `result`: the variance of an output is `J Σ Jᵀ`, with `J` its derivatives on the unbounded scale and `Σ` the covariance of `result`. The band is the prediction at the fit plus and minus the quantile of a normal, or of the Student t of a `SandwichResult`, times its standard deviation. It runs the model a few times per parameter, not once per draw, and reads only the fields of `result`, so a result read back from JSON works.
+
+Parameters:
+
+| Name               | Type              | Description               | Default                                            |
+| ------------------ | ----------------- | ------------------------- | -------------------------------------------------- |
+| `result`           | \`LaplaceResult   | SandwichResult\`          | A local approximation of this calibration problem. |
+| `positions`        | `Sequence[float]` | Positions to report at.   | *required*                                         |
+| `confidence_level` | `float`           | Strictly between 0 and 1. | *required*                                         |
+
+Returns:
+
+| Type        | Description                                                                             |
+| ----------- | --------------------------------------------------------------------------------------- |
+| `DeltaBand` | The prediction at the fit and the ends of the interval of each output at each position. |
+
+Raises:
+
+| Type         | Description                                                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `ValueError` | If the result's parameters are not the problem's, the level is not strictly between 0 and 1, or the engine rejects a position. |
+
+Source code in `commol/api/calibrator.py`
+
+```python
+def delta_band(
+    self, result: LocalResult, positions: Sequence[float], confidence_level: float
+) -> DeltaBand:
+    """
+    The band of every output of a local approximation by the delta method.
+
+    The model is linearized at the fit of `result`: the variance of an
+    output is ``J Σ Jᵀ``, with ``J`` its derivatives on the unbounded
+    scale and ``Σ`` the covariance of `result`. The band is the
+    prediction at the fit plus and minus the quantile of a normal, or of
+    the Student t of a `SandwichResult`, times its standard deviation. It
+    runs the model a few times per parameter, not once per draw, and reads
+    only the fields of `result`, so a result read back from JSON works.
+
+    Parameters
+    ----------
+    result : LaplaceResult | SandwichResult
+        A local approximation of this calibration problem.
+    positions : Sequence[float]
+        Positions to report at.
+    confidence_level : float
+        Strictly between 0 and 1.
+
+    Returns
+    -------
+    DeltaBand
+        The prediction at the fit and the ends of the interval of each
+        output at each position.
+
+    Raises
+    ------
+    ValueError
+        If the result's parameters are not the problem's, the level is not
+        strictly between 0 and 1, or the engine rejects a position.
+    """
+    if result.sample.names != self.parameter_names:
+        raise ValueError(
+            f"The result has the parameters {result.sample.names}; the problem "
+            f"has {self.parameter_names}."
+        )
+    points = [float(position) for position in positions]
+    outputs, center, lower, upper = commol_rs.inference.delta_band(
+        self._rust_problem,
+        [result.fit.best_parameters[name] for name in self.parameter_names],
+        result.covariance,
+        result.degrees_of_freedom(),
+        points,
+        confidence_level,
+    )
+    return DeltaBand(
+        confidence_level=confidence_level,
+        positions=points,
+        center=dict(zip(outputs, center, strict=True)),
+        lower=dict(zip(outputs, lower, strict=True)),
+        upper=dict(zip(outputs, upper, strict=True)),
+    )
 ```
 
 #### rust_observation_draws

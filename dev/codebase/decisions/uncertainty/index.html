@@ -18,7 +18,7 @@
         <link rel="prev" href="../calibration/">
       
       
-        <link rel="next" href="../results/">
+        <link rel="next" href="../local-approximations/">
       
       
         
@@ -1398,6 +1398,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2549,6 +2577,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../results/" class="md-nav__link">
         
   
@@ -3189,7 +3245,7 @@ knows how its derivatives are made. <code>FiniteDifferences</code> is the first:
 differences, one-sided of second order at a bound, with the step
 <code>h = η^{1/3} · max(|θ|, w)</code> (at most <code>w / 8</code>), where <code>η</code> is the output
 accuracy of the engine (<code>SimulationEngine::output_accuracy</code>: machine epsilon,
-or the <code>rtol</code> of the ODE engine) and <code>w</code> the width of the bounds. Each entry
+or the <code>rtol</code> of the ODE engine) and <code>w</code> the width of the bounds (1 when infinite). Each entry
 carries an estimated error, from the steps <code>h</code> and <code>2h</code> and the accuracy of
 the runs; the structural rank counts a singular value only above the norm of
 that error (Weyl's inequality). The scaled sensitivities
@@ -3327,7 +3383,7 @@ to its parameter's bounds and drawn by inverting its distribution function
 with special functions on <code>libm</code>, so a seed gives the same draws on every
 platform. Each sampling method takes <code>priors</code> with no default, and <code>η</code> of a
 Gibbs posterior has no default either: a number or a calibration.
-Information matching needs the sum of squares and a deterministic engine;
+Information matching reads the curvature and the meat of the sandwich;
 bootstrap coverage interpolates the per-replicate thresholds of <code>η</code> at the
 positions <code>i / (M + 1)</code>, because the largest <code>η</code> that covers at the level is
 an order statistic whose expected coverage is below it.</p>

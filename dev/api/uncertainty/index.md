@@ -3088,20 +3088,28 @@ class EtaCalibration(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     @classmethod
-    def information_matching(cls) -> "InformationMatching":
+    def information_matching(cls, block_length: BlockLength) -> "InformationMatching":
         """
-        Match the curvature of the loss to the variance of its terms at the
-        fit (Holmes and Walker 2017).
+        Match the curvature of the objective to the variance of the scores of
+        its terms at the fit (Holmes and Walker 2017).
 
-        It needs ``loss_function="sse"`` and a deterministic engine, and is
-        cheap and local.
+        It needs ``loss_function="sse"`` or observation models and a
+        deterministic engine, and is cheap and local. The variance sums the
+        scores over blocks of positions, so it holds under dependence inside
+        a block.
+
+        Parameters
+        ----------
+        block_length : int | "auto"
+            Positions per block of the scores; there must be more blocks
+            than parameters.
 
         Returns
         -------
         InformationMatching
             The calibration.
         """
-        return InformationMatching()
+        return InformationMatching(block_length=block_length)
 
     @classmethod
     def bootstrap_coverage(
@@ -3140,12 +3148,18 @@ class EtaCalibration(BaseModel):
 #### information_matching
 
 ```python
-information_matching() -> InformationMatching
+information_matching(block_length: BlockLength) -> InformationMatching
 ```
 
-Match the curvature of the loss to the variance of its terms at the fit (Holmes and Walker 2017).
+Match the curvature of the objective to the variance of the scores of its terms at the fit (Holmes and Walker 2017).
 
-It needs `loss_function="sse"` and a deterministic engine, and is cheap and local.
+It needs `loss_function="sse"` or observation models and a deterministic engine, and is cheap and local. The variance sums the scores over blocks of positions, so it holds under dependence inside a block.
+
+Parameters:
+
+| Name           | Type  | Description | Default                                                                       |
+| -------------- | ----- | ----------- | ----------------------------------------------------------------------------- |
+| `block_length` | \`int | auto\`      | Positions per block of the scores; there must be more blocks than parameters. |
 
 Returns:
 
@@ -3157,20 +3171,28 @@ Source code in `commol/context/inference/smc.py`
 
 ```python
 @classmethod
-def information_matching(cls) -> "InformationMatching":
+def information_matching(cls, block_length: BlockLength) -> "InformationMatching":
     """
-    Match the curvature of the loss to the variance of its terms at the
-    fit (Holmes and Walker 2017).
+    Match the curvature of the objective to the variance of the scores of
+    its terms at the fit (Holmes and Walker 2017).
 
-    It needs ``loss_function="sse"`` and a deterministic engine, and is
-    cheap and local.
+    It needs ``loss_function="sse"`` or observation models and a
+    deterministic engine, and is cheap and local. The variance sums the
+    scores over blocks of positions, so it holds under dependence inside
+    a block.
+
+    Parameters
+    ----------
+    block_length : int | "auto"
+        Positions per block of the scores; there must be more blocks
+        than parameters.
 
     Returns
     -------
     InformationMatching
         The calibration.
     """
-    return InformationMatching()
+    return InformationMatching(block_length=block_length)
 ```
 
 #### bootstrap_coverage
@@ -3236,21 +3258,36 @@ def bootstrap_coverage(
 
 Bases: `EtaCalibration`
 
-`η = tr(J I⁻¹ J) / tr(J)` at the fit, with `J` the curvature of the loss terms and `I` their variance (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019). For the sum of squares of a model with Gaussian noise of variance `σ²` it estimates `1/(2σ²)`. It needs `loss_function="sse"` and a deterministic engine.
+`η = tr(J I⁻¹ J) / tr(J)` at the fit, with `J` the Gauss–Newton curvature of the objective and `I` the variance of the scores of its terms, summed over blocks of positions as the meat of `Sandwich` (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019). For the sum of squares of a model with Gaussian noise of variance `σ²` it estimates `1/(2σ²)`; for a correct observation model, 1. It needs `loss_function="sse"` or observation models, and a deterministic engine.
+
+Attributes:
+
+| Name           | Type  | Description |
+| -------------- | ----- | ----------- |
+| `block_length` | \`int | auto\`      |
 
 Source code in `commol/context/inference/smc.py`
 
 ```python
 class InformationMatching(EtaCalibration):
     """
-    `η = tr(J I⁻¹ J) / tr(J)` at the fit, with ``J`` the curvature of the
-    loss terms and ``I`` their variance (Holmes and Walker 2017; Lyddon,
-    Holmes and Walker 2019). For the sum of squares of a model with Gaussian
-    noise of variance ``σ²`` it estimates ``1/(2σ²)``. It needs
-    ``loss_function="sse"`` and a deterministic engine.
+    `η = tr(J I⁻¹ J) / tr(J)` at the fit, with ``J`` the Gauss–Newton
+    curvature of the objective and ``I`` the variance of the scores of its
+    terms, summed over blocks of positions as the meat of `Sandwich`
+    (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019). For the sum of
+    squares of a model with Gaussian noise of variance ``σ²`` it estimates
+    ``1/(2σ²)``; for a correct observation model, 1. It needs
+    ``loss_function="sse"`` or observation models, and a deterministic
+    engine.
+
+    Attributes
+    ----------
+    block_length : int | "auto"
+        Positions per block of the scores.
     """
 
     kind: Literal["information_matching"] = "information_matching"
+    block_length: BlockLength = Field(description="Positions per block.")
 ```
 
 ## BootstrapCoverage
@@ -3606,6 +3643,596 @@ class SmcDiagnostics(BaseModel):
     evaluations: int
     stop_reason: str | None
     notes: list[str]
+```
+
+## Local approximations
+
+Guide: [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/index.md).
+
+## Laplace
+
+Bases: `UncertaintyMethod[LaplaceResult]`
+
+The Laplace approximation of the problem's observation models: the normal `N(θ̂, H⁻¹)` on the unbounded scale of the parameters, centred on the fit, with `H` the curvature of `−log L` there.
+
+It needs `observation_models`: a loss has no noise scale, so its curvature is no inverse variance (use `Sandwich`). A fit on a bound of its parameter is refused: on the unbounded scale its variance is infinite there.
+
+Attributes:
+
+| Name        | Type                      | Description                                |
+| ----------- | ------------------------- | ------------------------------------------ |
+| `draws`     | `int`                     | Number of draws of the normal, at least 1. |
+| `curvature` | `{gauss_newton, hessian}` | The curvature (default "gauss_newton").    |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class Laplace(UncertaintyMethod[LaplaceResult]):
+    """
+    The Laplace approximation of the problem's observation models: the normal
+    ``N(θ̂, H⁻¹)`` on the unbounded scale of the parameters, centred on the
+    fit, with ``H`` the curvature of ``−log L`` there.
+
+    It needs ``observation_models``: a loss has no noise scale, so its
+    curvature is no inverse variance (use `Sandwich`). A fit on a bound of
+    its parameter is refused: on the unbounded scale its variance is
+    infinite there.
+
+    Attributes
+    ----------
+    draws : int
+        Number of draws of the normal, at least 1.
+    curvature : {"gauss_newton", "hessian"}
+        The curvature (default ``"gauss_newton"``).
+    """
+
+    draws: int = Field(ge=1, description="Number of draws.")
+    curvature: CurvatureName = Field(
+        default="gauss_newton", description="The curvature."
+    )
+```
+
+## Sandwich
+
+Bases: `UncertaintyMethod[SandwichResult]`
+
+The sandwich covariance `H⁻¹ B H⁻¹` at the fit, with the meat `B` summed over blocks of positions (the clustered estimator CR1): `B = G/(G − 1) · Σ_b s_b s_bᵀ`, with `s_b` the sum of the gradients of the terms of the observations of block `b`.
+
+It needs no noise model: with a loss, `H` is the curvature of the loss; with observation models, of `−log L`. It holds when the noise depends on its neighbours inside a block, when its size changes, and when the noise model is wrong but the mean is right. Intervals and draws read a Student t with `G − 1` degrees of freedom; with `G` blocks not above the parameters it is refused, since `B` would have rank below them. `loss_function="mae"` is refused: its sandwich needs a density of the residuals at 0 and a bandwidth (use a bootstrap).
+
+Attributes:
+
+| Name           | Type                      | Description                                                                                                 |
+| -------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `block_length` | \`int                     | auto\`                                                                                                      |
+| `draws`        | `int`                     | Number of draws of the Student t, at least 1.                                                               |
+| `curvature`    | `{gauss_newton, hessian}` | The curvature H (default "gauss_newton"). With the Hessian, the sandwich also holds when the mean is wrong. |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class Sandwich(UncertaintyMethod[SandwichResult]):
+    """
+    The sandwich covariance ``H⁻¹ B H⁻¹`` at the fit, with the meat ``B``
+    summed over blocks of positions (the clustered estimator CR1):
+    ``B = G/(G − 1) · Σ_b s_b s_bᵀ``, with ``s_b`` the sum of the gradients
+    of the terms of the observations of block ``b``.
+
+    It needs no noise model: with a loss, ``H`` is the curvature of the loss;
+    with observation models, of ``−log L``. It holds when the noise depends
+    on its neighbours inside a block, when its size changes, and when the
+    noise model is wrong but the mean is right. Intervals and draws read a
+    Student t with ``G − 1`` degrees of freedom; with ``G`` blocks not above
+    the parameters it is refused, since ``B`` would have rank below them.
+    ``loss_function="mae"`` is refused: its sandwich needs a density of the
+    residuals at 0 and a bandwidth (use a bootstrap).
+
+    Attributes
+    ----------
+    block_length : int | "auto"
+        Positions per block; ``"auto"`` is the rule of Politis and White
+        (2004) for non-overlapping blocks on the residuals of the fit.
+    draws : int
+        Number of draws of the Student t, at least 1.
+    curvature : {"gauss_newton", "hessian"}
+        The curvature ``H`` (default ``"gauss_newton"``). With the Hessian,
+        the sandwich also holds when the mean is wrong.
+    """
+
+    block_length: BlockLength = Field(description="Positions per block.")
+    draws: int = Field(ge=1, description="Number of draws.")
+    curvature: CurvatureName = Field(
+        default="gauss_newton", description="The curvature."
+    )
+```
+
+## LaplaceMixture
+
+Bases: `UncertaintyMethod[ImportanceResult]`
+
+The Laplace mixture: a Laplace approximation at each distinct optimum of a multi-start fit, weighted by its Laplace evidence, as the proposal of importance sampling of a posterior, with the largest weights smoothed (Pareto-smoothed importance sampling, Vehtari et al. 2024).
+
+The ends of the starts merge into a component when they are closer than one Mahalanobis unit to it. Every draw is weighted by the target over the mixture, on the unbounded scale. `k_hat` says whether the mixture covers the target: above 0.7 the sample is marked unreliable.
+
+Attributes:
+
+| Name        | Type                      | Description                                                                                       |
+| ----------- | ------------------------- | ------------------------------------------------------------------------------------------------- |
+| `starts`    | `int`                     | Starts of the fit, at least 1: the initial guess, then rows of a Latin hypercube over the bounds. |
+| `draws`     | `int`                     | Number of draws of the mixture, at least 25, so that the tail of the weights has 5.               |
+| `target`    | \`LikelihoodTarget        | GibbsTarget\`                                                                                     |
+| `curvature` | `{gauss_newton, hessian}` | The curvature of each component (default "gauss_newton").                                         |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
+    """
+    The Laplace mixture: a Laplace approximation at each distinct optimum of
+    a multi-start fit, weighted by its Laplace evidence, as the proposal of
+    importance sampling of a posterior, with the largest weights smoothed
+    (Pareto-smoothed importance sampling, Vehtari et al. 2024).
+
+    The ends of the starts merge into a component when they are closer than
+    one Mahalanobis unit to it. Every draw is weighted by the target over
+    the mixture, on the unbounded scale. ``k_hat`` says whether the mixture
+    covers the target: above 0.7 the sample is marked unreliable.
+
+    Attributes
+    ----------
+    starts : int
+        Starts of the fit, at least 1: the initial guess, then rows of a
+        Latin hypercube over the bounds.
+    draws : int
+        Number of draws of the mixture, at least 25, so that the tail of the
+        weights has 5.
+    target : LikelihoodTarget | GibbsTarget
+        The posterior of the observation models with priors, or the Gibbs
+        posterior of the loss with priors and ``eta``.
+    curvature : {"gauss_newton", "hessian"}
+        The curvature of each component (default ``"gauss_newton"``).
+    """
+
+    starts: int = Field(ge=1, description="Starts of the fit.")
+    draws: int = Field(ge=25, description="Number of draws.")
+    target: MixtureTarget = Field(description="The posterior to sample.")
+    curvature: CurvatureName = Field(
+        default="gauss_newton", description="The curvature."
+    )
+```
+
+## LikelihoodTarget
+
+Bases: `WithPriors`
+
+The posterior of the problem's observation models, `π(θ) ∝ prior(θ) · L(θ)`, as the target of a `LaplaceMixture`.
+
+Attributes:
+
+| Name     | Type     | Description               |
+| -------- | -------- | ------------------------- |
+| `priors` | \`Priors | dict[str, Distribution]\` |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class LikelihoodTarget(WithPriors):
+    """
+    The posterior of the problem's observation models,
+    ``π(θ) ∝ prior(θ) · L(θ)``, as the target of a `LaplaceMixture`.
+
+    Attributes
+    ----------
+    priors : Priors | dict[str, Distribution]
+        The prior of each calibrated parameter, or
+        ``Priors.uniform_on_bounds()``.
+    """
+
+    kind: Literal["likelihood"] = "likelihood"
+```
+
+## GibbsTarget
+
+Bases: `WithPriors`
+
+The Gibbs posterior of the problem's loss, `π(θ) ∝ prior(θ) · exp(−η · loss(θ))`, as the target of a `LaplaceMixture`.
+
+Attributes:
+
+| Name     | Type     | Description                     |
+| -------- | -------- | ------------------------------- |
+| `priors` | \`Priors | dict[str, Distribution]\`       |
+| `eta`    | `float`  | The scale of the loss, above 0. |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class GibbsTarget(WithPriors):
+    """
+    The Gibbs posterior of the problem's loss,
+    ``π(θ) ∝ prior(θ) · exp(−η · loss(θ))``, as the target of a
+    `LaplaceMixture`.
+
+    Attributes
+    ----------
+    priors : Priors | dict[str, Distribution]
+        The prior of each calibrated parameter, or
+        ``Priors.uniform_on_bounds()``.
+    eta : float
+        The scale of the loss, above 0.
+    """
+
+    kind: Literal["gibbs"] = "gibbs"
+    eta: float = Field(gt=0.0, allow_inf_nan=False, description="Scale of the loss.")
+```
+
+## LocalResult
+
+Bases: `BaseModel`
+
+What every local approximation returns: a distribution on the unbounded scale of the parameters, centred on the fit.
+
+Attributes:
+
+| Name         | Type                | Description                                                                                                            |
+| ------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run().                                                             |
+| `covariance` | `list[list[float]]` | The covariance of the distribution on the unbounded scale of the parameters, in the order of the problem's parameters. |
+| `sample`     | `ParameterSample`   | Draws of the distribution, mapped back to the parameters, with equal weights.                                          |
+| `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale; each is also logged as a warning. |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class LocalResult(BaseModel):
+    """
+    What every local approximation returns: a distribution on the unbounded
+    scale of the parameters, centred on the fit.
+
+    Attributes
+    ----------
+    fit : CalibrationResult
+        The fit the approximation is centred on: ``Calibrator.run()``.
+    covariance : list[list[float]]
+        The covariance of the distribution on the unbounded scale of the
+        parameters, in the order of the problem's parameters.
+    sample : ParameterSample
+        Draws of the distribution, mapped back to the parameters, with equal
+        weights.
+    notes : list[str]
+        The entries of the curvature whose estimated error is not small
+        against their scale; each is also logged as a warning.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    fit: CalibrationResult
+    covariance: list[list[float]]
+    sample: ParameterSample
+    notes: list[str]
+
+    def degrees_of_freedom(self) -> float | None:
+        """
+        The degrees of freedom of the distribution.
+
+        Returns
+        -------
+        float | None
+            Those of a Student t, or None for a normal.
+        """
+        return None
+```
+
+### Methods:
+
+#### degrees_of_freedom
+
+```python
+degrees_of_freedom() -> float | None
+```
+
+The degrees of freedom of the distribution.
+
+Returns:
+
+| Type    | Description |
+| ------- | ----------- |
+| \`float | None\`      |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+def degrees_of_freedom(self) -> float | None:
+    """
+    The degrees of freedom of the distribution.
+
+    Returns
+    -------
+    float | None
+        Those of a Student t, or None for a normal.
+    """
+    return None
+```
+
+## LaplaceResult
+
+Bases: `LocalResult`
+
+The result of a Laplace approximation: the normal `N(θ̂, Σ)` on the unbounded scale, `Σ = H⁻¹`.
+
+Attributes:
+
+| Name         | Type                | Description                                                                          |
+| ------------ | ------------------- | ------------------------------------------------------------------------------------ |
+| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run().                           |
+| `covariance` | `list[list[float]]` | Σ = H⁻¹ on the unbounded scale of the parameters.                                    |
+| `sample`     | `ParameterSample`   | Draws of the normal, mapped back to the parameters, with equal weights.              |
+| `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class LaplaceResult(LocalResult):
+    """
+    The result of a Laplace approximation: the normal ``N(θ̂, Σ)`` on the
+    unbounded scale, ``Σ = H⁻¹``.
+
+    Attributes
+    ----------
+    fit : CalibrationResult
+        The fit the approximation is centred on: ``Calibrator.run()``.
+    covariance : list[list[float]]
+        ``Σ = H⁻¹`` on the unbounded scale of the parameters.
+    sample : ParameterSample
+        Draws of the normal, mapped back to the parameters, with equal
+        weights.
+    notes : list[str]
+        The entries of the curvature whose estimated error is not small
+        against their scale.
+    """
+```
+
+## SandwichResult
+
+Bases: `LocalResult`
+
+The result of a sandwich: a Student t on the unbounded scale of the parameters, centred on the fit, of covariance `H⁻¹ B H⁻¹` and `blocks − 1` degrees of freedom.
+
+Attributes:
+
+| Name                     | Type                | Description                                                                          |
+| ------------------------ | ------------------- | ------------------------------------------------------------------------------------ |
+| `fit`                    | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run().                                |
+| `covariance`             | `list[list[float]]` | H⁻¹ B H⁻¹ on the unbounded scale of the parameters.                                  |
+| `sample`                 | `ParameterSample`   | Draws of the Student t, mapped back to the parameters, with equal weights.           |
+| `notes`                  | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
+| `blocks`                 | `int`               | The number of blocks G; intervals read a Student t with G − 1 degrees of freedom.    |
+| `block_length`           | `int`               | The positions per block.                                                             |
+| `block_length_estimates` | \`dict[str, float]  | None\`                                                                               |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class SandwichResult(LocalResult):
+    """
+    The result of a sandwich: a Student t on the unbounded scale of the
+    parameters, centred on the fit, of covariance ``H⁻¹ B H⁻¹`` and
+    ``blocks − 1`` degrees of freedom.
+
+    Attributes
+    ----------
+    fit : CalibrationResult
+        The fit the sandwich is centred on: ``Calibrator.run()``.
+    covariance : list[list[float]]
+        ``H⁻¹ B H⁻¹`` on the unbounded scale of the parameters.
+    sample : ParameterSample
+        Draws of the Student t, mapped back to the parameters, with equal
+        weights.
+    notes : list[str]
+        The entries of the curvature whose estimated error is not small
+        against their scale.
+    blocks : int
+        The number of blocks ``G``; intervals read a Student t with
+        ``G − 1`` degrees of freedom.
+    block_length : int
+        The positions per block.
+    block_length_estimates : dict[str, float] | None
+        With ``block_length="auto"``, the estimate of each series, by label;
+        otherwise None.
+    """
+
+    blocks: int
+    block_length: int
+    block_length_estimates: dict[str, float] | None
+
+    def degrees_of_freedom(self) -> float | None:
+        """
+        The degrees of freedom of the Student t.
+
+        Returns
+        -------
+        float | None
+            ``blocks − 1``.
+        """
+        return float(self.blocks - 1)
+```
+
+### Methods:
+
+#### degrees_of_freedom
+
+```python
+degrees_of_freedom() -> float | None
+```
+
+The degrees of freedom of the Student t.
+
+Returns:
+
+| Type    | Description |
+| ------- | ----------- |
+| \`float | None\`      |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+def degrees_of_freedom(self) -> float | None:
+    """
+    The degrees of freedom of the Student t.
+
+    Returns
+    -------
+    float | None
+        ``blocks − 1``.
+    """
+    return float(self.blocks - 1)
+```
+
+## DeltaBand
+
+Bases: `BaseModel`
+
+The band of every output by the delta method (`Calibrator.delta_band`): the prediction at the fit plus and minus a quantile times the standard deviation of the linearized model, `J Σ Jᵀ`, with no run of the draws.
+
+Attributes:
+
+| Name                   | Type                     | Description                                                                                      |
+| ---------------------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
+| `confidence_level`     | `float`                  | The level of the central interval.                                                               |
+| `positions`            | `list[float]`            | Where the values are.                                                                            |
+| `center, lower, upper` | `dict[str, list[float]]` | For each output, one value per position: the prediction at the fit and the ends of the interval. |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class DeltaBand(BaseModel):
+    """
+    The band of every output by the delta method (``Calibrator.delta_band``):
+    the prediction at the fit
+    plus and minus a quantile times the standard deviation of the
+    linearized model, ``J Σ Jᵀ``, with no run of the draws.
+
+    Attributes
+    ----------
+    confidence_level : float
+        The level of the central interval.
+    positions : list[float]
+        Where the values are.
+    center, lower, upper : dict[str, list[float]]
+        For each output, one value per position: the prediction at the fit
+        and the ends of the interval.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    confidence_level: float
+    positions: list[float]
+    center: dict[str, list[float]] = Field(description="Prediction at the fit")
+    lower: dict[str, list[float]] = Field(description="Lower end")
+    upper: dict[str, list[float]] = Field(description="Upper end")
+```
+
+## ImportanceResult
+
+Bases: `BaseModel`
+
+The result of a Laplace mixture: draws of the mixture weighted by the target over the mixture, smoothed by Pareto-smoothed importance sampling.
+
+Attributes:
+
+| Name             | Type                     | Description                                                                                                                      |
+| ---------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`            | `CalibrationResult`      | The multi-start fit whose ends made the components: Calibrator.run(starts).                                                      |
+| `sample`         | `ParameterSample`        | The draws with their smoothed weights.                                                                                           |
+| `components`     | `list[MixtureComponent]` | The components, in order of their objective.                                                                                     |
+| `k_hat`          | `float`                  | The Pareto shape of the tail of the weights. Up to 0.5 the weights have a finite variance; above 0.7 the estimate is unreliable. |
+| `effective_size` | `float`                  | Kish's effective size of the smoothed weights.                                                                                   |
+| `reliable`       | `bool`                   | Whether k_hat is at most 0.7. An unreliable sample is also logged as a warning.                                                  |
+| `notes`          | `list[str]`              | Ends that gave no component, and an unreliable sample, in words.                                                                 |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class ImportanceResult(BaseModel):
+    """
+    The result of a Laplace mixture: draws of the mixture weighted by the
+    target over the mixture, smoothed by Pareto-smoothed importance
+    sampling.
+
+    Attributes
+    ----------
+    fit : CalibrationResult
+        The multi-start fit whose ends made the components:
+        ``Calibrator.run(starts)``.
+    sample : ParameterSample
+        The draws with their smoothed weights.
+    components : list[MixtureComponent]
+        The components, in order of their objective.
+    k_hat : float
+        The Pareto shape of the tail of the weights. Up to 0.5 the weights
+        have a finite variance; above 0.7 the estimate is unreliable.
+    effective_size : float
+        Kish's effective size of the smoothed weights.
+    reliable : bool
+        Whether ``k_hat`` is at most 0.7. An unreliable sample is also
+        logged as a warning.
+    notes : list[str]
+        Ends that gave no component, and an unreliable sample, in words.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    fit: CalibrationResult
+    sample: ParameterSample
+    components: list[MixtureComponent]
+    k_hat: float
+    effective_size: float
+    reliable: bool
+    notes: list[str]
+```
+
+## MixtureComponent
+
+Bases: `BaseModel`
+
+One component of a Laplace mixture: the Laplace approximation at one optimum of the starts.
+
+Attributes:
+
+| Name           | Type                | Description                                                   |
+| -------------- | ------------------- | ------------------------------------------------------------- |
+| `center`       | `dict[str, float]`  | The optimum, by parameter.                                    |
+| `weight`       | `float`             | Its weight in the mixture: its Laplace evidence over the sum. |
+| `covariance`   | `list[list[float]]` | Its covariance on the unbounded scale of the parameters.      |
+| `log_evidence` | `float`             | The log of its Laplace evidence, log p(θ̂) + log               |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class MixtureComponent(BaseModel):
+    """
+    One component of a Laplace mixture: the Laplace approximation at one
+    optimum of the starts.
+
+    Attributes
+    ----------
+    center : dict[str, float]
+        The optimum, by parameter.
+    weight : float
+        Its weight in the mixture: its Laplace evidence over the sum.
+    covariance : list[list[float]]
+        Its covariance on the unbounded scale of the parameters.
+    log_evidence : float
+        The log of its Laplace evidence,
+        ``log p(θ̂) + log |dθ/du| + (d/2) log 2π + ½ log |Σ|``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    center: dict[str, float]
+    weight: float
+    covariance: list[list[float]]
+    log_evidence: float
 ```
 
 ## Conformal prediction
