@@ -6,15 +6,27 @@ from statistics import NormalDist
 import pytest
 
 from commol import (
+    CalibrationProblem,
+    Calibrator,
+    NelderMeadConfig,
     NormalObservations,
     PredictionProfile,
     PredictionSpec,
     ProfileLikelihood,
     ResidualBootstrap,
+    Simulation,
     Threshold,
 )
 from commol.commol_rs import _commol_rs as commol_rs
-from tests.support import line_calibrator
+from tests.support import (
+    a_to_b_builder,
+    abc_builder,
+    bounded,
+    build,
+    build_ode,
+    line_calibrator,
+    observed,
+)
 
 # ``5 + 2 t`` at t = 1, …, 10 plus a fixed draw of unit noise.
 VALUES = [7.4, 8.6, 11.3, 12.8, 15.1, 16.4, 19.9, 20.6, 23.5, 24.7]
@@ -170,3 +182,108 @@ class TestPredictionProfiles:
             assert result.profiles[spec.label].center == pytest.approx(mean)
             assert interval.lower == pytest.approx(mean - half_width, rel=1e-5)
             assert interval.upper == pytest.approx(mean + half_width, rel=1e-5)
+
+
+class TestVerdicts:
+    def test_product_model_gives_flat_profiles(self) -> None:
+        # The model of the fixture `product` of test_identifiability.py: the
+        # rate reads `k1 * s`. The bounds of `k1` start at 0.15, so that the
+        # ridge `k1 · s = 0.3` crosses the whole box of both, and the data
+        # are scored by a normal model, so the threshold is above 0.
+        truth = Simulation(build(abc_builder(parameters={"k1": 0.3, "k2": 0.1}))).run(
+            50
+        )
+        model = build(
+            abc_builder(
+                ab="k1 * s * A * B / total",
+                parameters={"k1": None, "s": None, "k2": None},
+            )
+        )
+        problem = CalibrationProblem(
+            observed_data=observed(truth, "B", range(5, 51, 5)),
+            parameters=[
+                bounded("k1", 0.15, 0.6),
+                bounded("s", 0.5, 2.0),
+                bounded("k2", 0.02, 0.3),
+            ],
+            observation_models={"B": NormalObservations(sd=1.0)},
+            optimization_config=NelderMeadConfig(
+                max_iterations=4000, sd_tolerance=1e-13
+            ),
+            seed=3,
+        )
+        calibrator = Calibrator(Simulation(model), problem)
+
+        result = calibrator.uncertainty(
+            ProfileLikelihood(
+                parameters=["k1", "s", "k2"], threshold=Threshold.chi_square(0.95)
+            )
+        )
+
+        for name in ("k1", "s"):
+            profile = result.profiles[name]
+            assert profile.ends == ("bound", "bound")
+            assert max(abs(v) for v in profile.statistics) <= result.tolerance
+            assert result.verdicts[name] == "structurally_non_identifiable"
+        assert result.verdicts["k2"] == "identifiable"
+        report = result.report()
+        assert report.parameters == ["k1", "s", "k2"]
+        for name in ("k1", "s"):
+            structural = report.verdicts[name].structural
+            assert structural is not None
+            assert structural.verdict == "non_identifiable"
+            assert report.verdicts[name].practical is None
+        practical = report.verdicts["k2"].practical
+        assert practical is not None
+        assert practical.verdict == "determined"
+        assert report.profile[0].verdicts == result.verdicts
+
+    def test_late_parameter_gives_a_one_sided_profile(self) -> None:
+        # B starts to fill at `tau`; the data stop at 10 and see no flow, so
+        # every `tau` past 10 fits them, and an earlier one does not.
+        model = build_ode(
+            a_to_b_builder(
+                parameters={"tau": None},
+                rate="if(t > tau, 0.2, 0)",
+            )
+        )
+        problem = CalibrationProblem(
+            observed_data=observed({"B": [0.0] * 11}, "B", range(1, 11)),
+            parameters=[bounded("tau", 0.0, 30.0, initial_guess=20.0)],
+            observation_models={"B": NormalObservations(sd=1.0)},
+            optimization_config=NelderMeadConfig(max_iterations=500),
+            seed=3,
+        )
+        calibrator = Calibrator(Simulation(model), problem)
+
+        result = calibrator.uncertainty(
+            ProfileLikelihood(parameters=["tau"], threshold=Threshold.chi_square(0.95))
+        )
+
+        assert result.profiles["tau"].ends == ("crossed", "bound")
+        assert result.intervals["tau"].upper is None
+        lower = result.intervals["tau"].lower
+        assert lower is not None and 9.0 < lower < 10.0
+        assert result.verdicts["tau"] == "practically_non_identifiable"
+        practical = result.report().verdicts["tau"].practical
+        assert practical is not None
+        assert practical.verdict == "poorly_determined"
+
+    def test_a_threshold_below_the_tolerance_gives_no_verdict(self) -> None:
+        # Values on the line: the sum of squares of the fit, and Beale's
+        # threshold with it, are 0.
+        calibrator = line_calibrator([5.0 + 2.0 * t for t in range(1, 11)])
+
+        result = calibrator.uncertainty(
+            ProfileLikelihood(
+                parameters=["c"], threshold=Threshold.beale(0.95), max_steps=5
+            )
+        )
+
+        assert result.profiles["c"].threshold < result.tolerance
+        assert result.verdicts["c"] is None
+        assert any(
+            "'c'" in note and "below the numerical tolerance" in note
+            for note in result.notes
+        )
+        assert result.report().verdicts["c"].practical is None
