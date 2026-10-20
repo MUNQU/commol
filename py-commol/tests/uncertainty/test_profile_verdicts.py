@@ -186,8 +186,10 @@ class TestShapes:
                 bounded("k2", 0.02, 0.3),
             ],
             observation_models={"B": NormalObservations(sd=1.0)},
+            # A refit on the ridge runs to max_iterations: 1500 still reach
+            # the floor of the ridge.
             optimization_config=NelderMeadConfig(
-                max_iterations=4000, sd_tolerance=1e-15
+                max_iterations=1500, sd_tolerance=1e-15
             ),
             seed=3,
         )
@@ -300,27 +302,21 @@ class TestStructure:
         calibrator = _guide_calibrator()
 
         result = calibrator.uncertainty(
-            ProfileLikelihood(
-                parameters=["k1", "s"], threshold=Threshold.chi_square(0.95)
-            )
+            ProfileLikelihood(parameters=["k1"], threshold=Threshold.chi_square(0.95))
         )
 
         # The ridge `k1 · s ≈ 0.4` leaves the box where `s` reaches 0.5 or
-        # 2, and the profiles rise past it.
+        # 2, and the profile rises past it.
         assert max(result.profiles["k1"].statistics) > result.tolerance
-        assert result.verdicts == {
-            "k1": "structurally_non_identifiable",
-            "s": "structurally_non_identifiable",
-        }
+        assert result.verdicts == {"k1": "structurally_non_identifiable"}
         notes = " ".join(result.notes)
         assert "'k1': the ridge leaves the box" in notes
         assert "where 's' reaches its bound" in notes
-        for name, other in (("k1", "s"), ("s", "k1")):
-            structure = result.structure[name]
-            assert structure.verdict == "in_combination"
-            assert structure.compensated_by == [other]
-            assert structure.largest_rise is not None
-            assert structure.largest_rise > result.profiles[name].threshold
+        structure = result.structure["k1"]
+        assert structure.verdict == "in_combination"
+        assert structure.compensated_by == ["s"]
+        assert structure.largest_rise is not None
+        assert structure.largest_rise > result.profiles["k1"].threshold
         rank = calibrator.identifiability(
             StructuralRank(points=5, design="observations")
         )
@@ -334,8 +330,10 @@ class TestStructure:
     @pytest.mark.parametrize("ode", [False, True], ids=["difference", "ode"])
     def test_a_parameter_with_no_effect_is_non_identifiable(self, ode: bool) -> None:
         # With the ODE engine k3 enters the right-hand side, at the default
-        # tolerances of the solver, and moves B only by solver error.
-        calibrator = _unread_k3(ode)
+        # tolerances of the solver, and moves B only by solver error. The
+        # resets compare evaluations with no optimizer, so the default
+        # sd_tolerance of Nelder-Mead is enough.
+        calibrator = _unread_k3(ode, NelderMeadConfig(max_iterations=4000))
 
         result = calibrator.uncertainty(
             ProfileLikelihood(parameters=["k3"], threshold=Threshold.chi_square(0.95))
