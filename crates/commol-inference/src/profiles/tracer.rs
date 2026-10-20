@@ -656,8 +656,9 @@ fn floors<E: SimulationEngine>(problem: &CalibrationProblem<E>, fit: &[f64]) -> 
 /// `Σᵢ |ℓᵢ|`, the terms of the objective at `fit`: the weighted log
 /// densities with their constants for observation models; for a loss, the
 /// weighted squares, times the derivative of the root for the root mean
-/// squared error. `None` for the mean absolute error, which the evaluation
-/// floor does not cover.
+/// squared error. `None` when the log densities cannot be computed. Only
+/// [`floors`] calls it, after the term derivatives, which the mean absolute
+/// error has not.
 fn term_magnitude<E: SimulationEngine>(
     problem: &CalibrationProblem<E>,
     fit: &[f64],
@@ -686,7 +687,10 @@ fn term_magnitude<E: SimulationEngine>(
             let weights: f64 = discrepancy.weights().iter().sum();
             Some(0.5 * squares / (weights * squares).sqrt())
         }
-        LossConfig::MeanAbsoluteError => None,
+        // coverage: invariant, floors returns first, as this loss has no term derivatives
+        LossConfig::MeanAbsoluteError => {
+            unreachable!("the mean absolute error has no term derivatives")
+        }
     }
 }
 

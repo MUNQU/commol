@@ -415,7 +415,27 @@ impl Distribution {
             }
             x = next;
         }
-        x
+        // The quantile lies many orders of magnitude from the first guess,
+        // as for a shape far below 1, where the Newton steps leave the
+        // bracket and each halving gains one bit.
+        self.bisect_order(p, low, high)
+    }
+
+    /// The smallest `x` between `low` and `high` with `cdf(x) ≥ p`, by
+    /// bisection of the floating-point numbers between them in their order:
+    /// each step halves their count, so it ends within 64 steps at any
+    /// scale.
+    fn bisect_order(&self, p: f64, low: f64, high: f64) -> f64 {
+        let (mut below, mut above) = (order(low), order(high));
+        while above - below > 1 {
+            let middle = below + (above - below) / 2;
+            if self.cdf(from_order(middle)) < p {
+                below = middle;
+            } else {
+                above = middle;
+            }
+        }
+        from_order(above)
     }
 
     /// The mean of the truncated distribution.
@@ -505,6 +525,19 @@ impl Distribution {
 /// `c · ln y`, 0 when `c` is 0, also at `y = 0`.
 fn x_log_y(c: f64, y: f64) -> f64 {
     if c == 0.0 { 0.0 } else { c * libm::log(y) }
+}
+
+/// The place of `x` among the floating-point numbers, as an integer that
+/// grows with `x`: the order of [`f64::total_cmp`], shifted to start at 0.
+fn order(x: f64) -> u64 {
+    let bits = x.to_bits() as i64;
+    ((bits ^ (((bits >> 63) as u64) >> 1) as i64) as u64) ^ (1 << 63)
+}
+
+/// The floating-point number at the place `key` of [`order`].
+fn from_order(key: u64) -> f64 {
+    let bits = (key ^ (1 << 63)) as i64;
+    f64::from_bits((bits ^ (((bits >> 63) as u64) >> 1) as i64) as u64)
 }
 
 /// A uniform number strictly between 0 and 1: the 53 high bits of the

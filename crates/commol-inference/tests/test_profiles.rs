@@ -45,6 +45,10 @@ impl SimulationEngine for ClosedForm {
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), SimulationError> {
+        // An engine that fails past z = 0.9, for the refits that fail.
+        if self.parameters.get("z").is_some_and(|&z| z > 0.9) {
+            return Err(SimulationError::Failed("z above 0.9".to_string()));
+        }
         buffer.clear();
         buffer.extend(
             positions
@@ -683,4 +687,55 @@ fn a_bootstrap_threshold_of_a_prediction_reads_the_rise_of_each_replicate() {
         run.thresholds[0],
         commol_inference::statistics::quantiles(&run.rises[0], &weights, &[0.9])[0]
     );
+}
+
+fn curved_line(p: &HashMap<String, f64>, t: f64) -> f64 {
+    p["a"] + p["b"] * t + p["z"] * t * t / 100.0
+}
+
+/// The data of the problem, unchanged.
+struct Unchanged;
+
+impl Resampler for Unchanged {
+    fn replicate(&self, _: &mut Generator) -> Perturbation {
+        Perturbation::Values(VALUES.to_vec())
+    }
+}
+
+#[test]
+fn thresholds_fail_when_every_refit_fails() {
+    // The fit of each replicate keeps z near 0; held at 0.95, every run of
+    // the refit fails.
+    let parameters = [("a", -10.0, 10.0), ("b", -5.0, 5.0), ("z", 0.0, 1.0)];
+    let problem = CalibrationProblem::new(
+        ClosedForm {
+            formula: curved_line,
+            parameters: parameters
+                .iter()
+                .map(|(id, min, _)| (id.to_string(), *min))
+                .collect(),
+        },
+        VALUES
+            .iter()
+            .enumerate()
+            .map(|(t, &value)| ObservedDataPoint::new(t as f64, "x".to_string(), value))
+            .collect(),
+        parameters
+            .iter()
+            .map(|(id, min, max)| CalibrationParameter::new(id.to_string(), *min, *max))
+            .collect(),
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .unwrap();
+    let config = config();
+    let runner = ReplicateRunner::new(&problem, &config, &[1.0, 0.5, 0.1], 1, 0).unwrap();
+    let perturbation = Unchanged.replicate(&mut Generator::from_seed(0));
+    assert!(runner.fit_one(0, &perturbation).is_ok());
+
+    let quantity = [ProfiledQuantity::Parameter(2)];
+    let error = bootstrap_thresholds(&runner, &Unchanged, 2, &quantity, &[0.95], 0.9).unwrap_err();
+
+    assert!(error.starts_with("Every replicate failed (2)"), "{error}");
+    assert!(error.contains("z above 0.9"), "{error}");
 }

@@ -253,15 +253,10 @@ where
             }
             let displacement =
                 |p: &&&ProfilePoint| (transform.to_unbounded(&p.parameters)[i] - fit[i]).abs();
-            let Some(point) = inside
+            let point = inside
                 .iter()
                 .max_by(|a, b| displacement(a).total_cmp(&displacement(b)))
-            else {
-                continue;
-            };
-            if displacement(&point) == 0.0 {
-                continue;
-            }
+                .expect("a reset inside the box rises above the threshold");
             let reset = rise(point, &[i]);
             if reset.is_finite() && reset > threshold {
                 structure.compensating.push(i);

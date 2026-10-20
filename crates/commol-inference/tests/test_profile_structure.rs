@@ -691,3 +691,65 @@ fn a_noise_parameter_is_never_named() {
     assert_eq!(structure.verdict, Ok(StructuralReading::InCombination));
     assert_eq!(structure.compensating, vec![1]);
 }
+
+#[test]
+fn a_reset_that_is_not_feasible_names_no_parameter() {
+    // 0.8 ≤ a · s ≤ 1.2 holds along the ridge, but s reset to its fit where
+    // s is nearest a bound, at a ≈ 0.5 or a ≈ 2, breaks it: s is not named,
+    // and resetting it at the outermost points is not feasible either.
+    let problem = problem(
+        product,
+        &[("a", 0.1, 10.0), ("s", 0.5, 2.0)],
+        |t| t,
+        1.0,
+        vec![
+            CalibrationConstraint::new("cap".to_string(), "1.2 - a * s".to_string()),
+            CalibrationConstraint::new("floor".to_string(), "a * s - 0.8".to_string()),
+        ],
+        sse(),
+    );
+    let (_, verdict, structure, _) = traced(&problem, &config(), None, 0, 2.0);
+
+    assert_eq!(verdict, Some(ProfileVerdict::StructurallyNonIdentifiable));
+    assert_eq!(structure.verdict, Ok(StructuralReading::InCombination));
+    assert!(structure.compensating.is_empty());
+    assert_eq!(structure.joint_rise, Some(f64::INFINITY));
+}
+
+#[test]
+fn the_floor_of_the_root_mean_squared_error_scales_the_squares() {
+    // The root mean squared error √(S / W) has the term derivatives of the
+    // sum of squares times c = 1 / (2 √(W S)), and the terms ½ S / √(W S).
+    let problem = problem(
+        product,
+        &[("a", 0.1, 10.0), ("s", 0.5, 2.0)],
+        |t| t,
+        1.0,
+        vec![],
+        LossConfig::RootMeanSquaredError.into(),
+    );
+    let config = config();
+    let fit = optimize(&problem, &config).unwrap().best_parameters;
+    let tracer = ProfileTracer::new(&problem, &config, &fit, 0).unwrap();
+
+    let (mut squares, mut first, mut second) = (0.0, 0.0, 0.0);
+    for (i, e) in NOISE.iter().enumerate() {
+        let t = (i + 1) as f64;
+        let mean = fit[0] * fit[1] * t;
+        let error = f64::EPSILON * mean.abs();
+        squares += (t + e - mean).powi(2);
+        first += 2.0 * (t + e - mean).abs() * error;
+        second += error * error;
+    }
+    let c = 0.5 / (10.0 * squares).sqrt();
+    let unit = f64::EPSILON / 2.0;
+    let gamma = 10.0 * unit / (1.0 - 10.0 * unit);
+    let floor = 2.0 * c * (first + second) + 2.0 * gamma * 0.5 * squares / (10.0 * squares).sqrt();
+
+    assert!((tracer.noise_floor() - c * first).abs() <= 1e-6 * c * first);
+    let computed = tracer.evaluation_floor().unwrap();
+    assert!(
+        (computed - floor).abs() <= 1e-6 * floor,
+        "{computed} against {floor}"
+    );
+}

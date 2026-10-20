@@ -2,8 +2,8 @@
 //! and the methods of independent and dependent inputs.
 
 use commol_calibration::{
-    CalibrationParameter, CalibrationProblem, ForwardModel, LossConfig, ObservedDataPoint,
-    Workspace,
+    CalibrationParameter, CalibrationProblem, EvaluationError, ForwardModel, LossConfig,
+    ObservedDataPoint, Violation, Workspace,
 };
 use commol_core::{Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
@@ -12,7 +12,7 @@ use commol_inference::batch::BatchRunner;
 use commol_inference::design::InputSpace;
 use commol_inference::global_sensitivity::{ChaosExpansion, ForwardAnalysis, morris, prcc, sobol};
 use commol_inference::quantity::{Quantities, Quantity};
-use commol_inference::{ParameterSample, Predictive};
+use commol_inference::{ParameterSample, Predictive, PredictiveError};
 use commol_stochastic::StochasticSteps;
 use nalgebra::{DMatrix, DVector};
 
@@ -68,6 +68,8 @@ fn quantities_equal_hand_computations() {
         &engine.output_names(),
     )
     .unwrap();
+    assert_eq!(quantities.len(), 5);
+    assert!(!quantities.is_empty());
     let runner = BatchRunner::new(&forward, &quantities).unwrap();
 
     let values = runner.means(&[vec![0.2]]).unwrap();
@@ -347,6 +349,13 @@ const ISHIGAMI_FIRST: [f64; 3] = [0.3139, 0.4424, 0.0];
 const ISHIGAMI_TOTAL: [f64; 3] = [0.5576, 0.4424, 0.2437];
 
 #[test]
+fn a_saltelli_design_needs_two_base_draws() {
+    let error = ishigami_inputs().saltelli("Sobol", 1, 21).unwrap_err();
+
+    assert_eq!(error, "Sobol needs at least 2 base draws, got 1");
+}
+
+#[test]
 fn sobol_indices_of_ishigami() {
     let design = ishigami_inputs().saltelli("Sobol", 8192, 21).unwrap();
     let outputs: Vec<Vec<f64>> = design.points.iter().map(|x| vec![ishigami(x)]).collect();
@@ -510,6 +519,51 @@ fn an_analysis_takes_draws_by_its_inputs() {
     .err()
     .unwrap();
     assert!(other.contains("the parameters are"), "{other}");
+}
+
+#[test]
+fn an_analysis_of_no_replicates_is_refused() {
+    let engine = StochasticSteps::try_from_model(&decay("StochasticSteps")).unwrap();
+
+    let error = ForwardAnalysis::new(engine, k(), None, Some(0), decay_inputs(), 5)
+        .err()
+        .unwrap();
+
+    assert_eq!(error, "A stochastic engine needs at least one replicate");
+}
+
+#[test]
+fn a_propagation_names_the_draw_that_has_no_run() {
+    // With k = 1.5 the first step takes 1500 from A, which holds 1000.
+    let engine = DifferenceEquations::try_from_model(&decay("DifferenceEquations")).unwrap();
+    let parameters = vec![CalibrationParameter::new("k".to_string(), 0.0, 2.0)];
+    let sample = ParameterSample::new(
+        vec!["k".to_string()],
+        vec![(0.0, 2.0)],
+        vec![vec![0.5], vec![1.5]],
+        &[0.0, 0.0],
+        None,
+    )
+    .unwrap();
+    let analysis = ForwardAnalysis::new(
+        engine,
+        parameters,
+        None,
+        None,
+        InputSpace::Sample(sample),
+        5,
+    )
+    .unwrap();
+
+    let error = analysis.propagate(None, &a_at(3.0)).unwrap_err();
+
+    assert_eq!(
+        error,
+        PredictiveError::Draw {
+            draw: 1,
+            error: EvaluationError::Violation(Violation::InfeasibleRun),
+        }
+    );
 }
 
 #[test]

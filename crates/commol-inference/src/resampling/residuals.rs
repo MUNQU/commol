@@ -199,6 +199,7 @@ impl SeriesResiduals {
             }
             (Some((_, early)), None) => early,
             (None, Some(&(_, late))) => late,
+            // coverage: invariant, new gives a series only with the residual that names it
             (None, None) => unreachable!("a series has at least one residual"),
         }
     }

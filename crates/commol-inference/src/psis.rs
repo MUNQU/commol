@@ -162,9 +162,6 @@ fn generalized_pareto_fit(x: &[f64]) -> (f64, f64) {
     let k = mean_log(b_post);
     let sigma = -k / b_post;
     let k = (size * k + PRIOR_WEIGHT * PRIOR_CENTER) / (size + PRIOR_WEIGHT);
-    if k.is_nan() {
-        return (f64::INFINITY, f64::NAN);
-    }
     (k, sigma)
 }
 
