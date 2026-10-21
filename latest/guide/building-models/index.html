@@ -3712,8 +3712,11 @@ the series reads <code>step</code> or <code>t</code> (<code>SeriesParameter::eva
 </tr>
 </tbody>
 </table>
-<p>The engine decides which positions its model type accepts, and names the
-parameter in its error:</p>
+<p>The engine decides which positions its model type accepts.
+<code>ModelBuilder.build</code> and <code>Model.update_parameters</code> reject a position the engine
+cannot run with <code>ValueError</code>, whose message names the parameter
+(<code>check_model</code> in <code>crates/commol-model/src/builder.rs</code>). A rejected update
+leaves the model unchanged.</p>
 <table>
 <thead>
 <tr>
@@ -3723,12 +3726,12 @@ parameter in its error:</p>
 </thead>
 <tbody>
 <tr>
-<td><code>DifferenceEquations</code></td>
+<td><code>DifferenceEquations</code>, <code>StochasticSteps</code></td>
 <td>Integer steps only, for every mode. <code>t</code> equals <code>step</code>, so <code>"linear"</code> is read at each step.</td>
 </tr>
 <tr>
-<td><code>DifferentialEquations</code></td>
-<td>Any non-negative position for <code>"step_function"</code> and <code>"linear"</code>; the engine restarts its integration at each point. A <code>"pulse"</code> keeps integer positions: it is a rate on one unit step (<a href="../simulations/#time-inside-a-step">Time inside a step</a>).</td>
+<td><code>DifferentialEquations</code>, <code>StochasticEvents</code></td>
+<td>Any non-negative position for <code>"step_function"</code> and <code>"linear"</code>; the engine stops and restarts at each point. A <code>"pulse"</code> keeps integer positions: it is a rate on one unit step (<a href="../simulations/#time-inside-a-step">Time inside a step</a>).</td>
 </tr>
 </tbody>
 </table>

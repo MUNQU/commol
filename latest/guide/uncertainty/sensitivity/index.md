@@ -91,7 +91,7 @@ A quantity reduces each run to a scalar, in Rust, through the observation operat
 | `PeakPosition(outputs, positions)` | The first of the positions where the value is largest                                                                                |
 | `Trajectory(outputs, positions)`   | One `ValueAt` per position, for an analysis over the axis                                                                            |
 
-Each quantity has a `label`, by default what it reads, such as `"B at 10"`.
+Each quantity has a `label`, by default what it reads, such as `"B at 10"`. The default label writes each position in full, as Python reads it back, so two positions give two labels: `"B at 1000000"` and `"B at 1000001"`.
 
 ## Which method for which budget
 
@@ -131,6 +131,8 @@ print([round(value) for value in band.median["B"]])  # [10, 293, 53]
 `PRCC` (Marino et al. 2008) ranks the inputs and each quantity, and gives the correlation of the rank of an input with the rank of the quantity once the other inputs are accounted for. A coefficient near 1 or −1 says the quantity rises or falls steadily with the input; near 0, that it does not. `p_values` test each coefficient against 0.
 
 With inputs from a sample, the sample is the design, and the ranks, the correlations and the test read its weights: a rank is the weight below a value plus half the weight at it, and the test counts Kish's effective size in place of the draws. Equal weights give the usual PRCC. A `Trajectory` gives the coefficients over the axis; a quantity with one value in every run, such as a state at position 0, has NaN coefficients.
+
+A NaN has no rank, so a quantity that is NaN at a draw raises a `ValueError` before PRCC ranks any value. The message gives the index of the quantity, in the order of the labels, and the draws where it is NaN; a `Propagation` with the same inputs and seed gives the value of each run.
 
 ```python
 from commol import Trajectory

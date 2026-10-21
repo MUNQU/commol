@@ -795,8 +795,11 @@ class ModelBuilder:
             example a fraction names no bin, or a rate reads ``neighbors_<bin>``
             and the structure has no ``neighbors``), the engine is unknown or
             does not run the kind of the structure, the settings are not
-            settings of that engine, or a per-compartment override names an
-            unknown compartment or makes the initial amounts exceed the total.
+            settings of that engine, a series point or an impulse position is
+            one the engine cannot run (a position between two steps for an
+            engine that steps only at integers, or a ``"pulse"`` point between
+            two steps), or a per-compartment override names an unknown
+            compartment or makes the initial amounts exceed the total.
         """
         model: Model[StructureT] = Model(
             name=self._name,
@@ -1608,9 +1611,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ValueError` | If validation fails, the structure does not fit the process (for example a fraction names no bin, or a rate reads neighbors\_<bin> and the structure has no neighbors), the engine is unknown or does not run the kind of the structure, the settings are not settings of that engine, or a per-compartment override names an unknown compartment or makes the initial amounts exceed the total. |
+| Type         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If validation fails, the structure does not fit the process (for example a fraction names no bin, or a rate reads neighbors\_<bin> and the structure has no neighbors), the engine is unknown or does not run the kind of the structure, the settings are not settings of that engine, a series point or an impulse position is one the engine cannot run (a position between two steps for an engine that steps only at integers, or a "pulse" point between two steps), or a per-compartment override names an unknown compartment or makes the initial amounts exceed the total. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -1655,8 +1658,11 @@ def build(
         example a fraction names no bin, or a rate reads ``neighbors_<bin>``
         and the structure has no ``neighbors``), the engine is unknown or
         does not run the kind of the structure, the settings are not
-        settings of that engine, or a per-compartment override names an
-        unknown compartment or makes the initial amounts exceed the total.
+        settings of that engine, a series point or an impulse position is
+        one the engine cannot run (a position between two steps for an
+        engine that steps only at integers, or a ``"pulse"`` point between
+        two steps), or a per-compartment override names an unknown
+        compartment or makes the initial amounts exceed the total.
     """
     model: Model[StructureT] = Model(
         name=self._name,

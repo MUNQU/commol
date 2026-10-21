@@ -874,12 +874,12 @@ A series gives a parameter its value from `(position, value)` points on the axis
 | `"step_function"` | `t`    | 0                      | the value                   | the value of the last point | the value of the last point |
 | `"linear"`        | `t`    | 0                      | the value                   | linear interpolation in `t` | 0                           |
 
-The engine decides which positions its model type accepts, and names the parameter in its error:
+The engine decides which positions its model type accepts. `ModelBuilder.build` and `Model.update_parameters` reject a position the engine cannot run with `ValueError`, whose message names the parameter (`check_model` in `crates/commol-model/src/builder.rs`). A rejected update leaves the model unchanged.
 
-| Model                   | Accepted positions                                                                                                                                                                                                                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DifferenceEquations`   | Integer steps only, for every mode. `t` equals `step`, so `"linear"` is read at each step.                                                                                                                                                                                                 |
-| `DifferentialEquations` | Any non-negative position for `"step_function"` and `"linear"`; the engine restarts its integration at each point. A `"pulse"` keeps integer positions: it is a rate on one unit step ([Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step)). |
+| Model                                       | Accepted positions                                                                                                                                                                                                                                                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DifferenceEquations`, `StochasticSteps`    | Integer steps only, for every mode. `t` equals `step`, so `"linear"` is read at each step.                                                                                                                                                                                           |
+| `DifferentialEquations`, `StochasticEvents` | Any non-negative position for `"step_function"` and `"linear"`; the engine stops and restarts at each point. A `"pulse"` keeps integer positions: it is a rate on one unit step ([Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step)). |
 
 ```python
 import numpy as np
@@ -1500,13 +1500,13 @@ print([round(a, 1) for a in jumped["A"]])  # [1000.0, 675.0, 607.5]
 print(jumped["moved"][2])  # 225.0: a quarter of the 900 left at step 1
 ```
 
-| Rule                         | In both engines                                                                                                                                                                                                    |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Order                        | At step `n` the state jumps first; then the flows of the step run from the new state. The output at `n` shows the state after the jump (`CompiledModel::apply_impulses` in `crates/commol-model/src/system.rs`).   |
-| Several impulses at one step | Every jump is computed from the state before any of them.                                                                                                                                                          |
-| Steps                        | A `DifferentialEquations` model takes any steps, such as `0.5`: the engine stops there, applies the jump and restarts. A `DifferenceEquations` model needs integer steps (`ValidationError` names the transition). |
-| Units                        | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units](https://munqu.github.io/commol/latest/guide/units-and-equations/#impulses)).                                                       |
-| `describe()`                 | Lists impulses apart from the equations, with their steps ([Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/#the-equations)).                                                    |
+| Rule                         | In both engines                                                                                                                                                                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Order                        | At step `n` the state jumps first; then the flows of the step run from the new state. The output at `n` shows the state after the jump (`CompiledModel::apply_impulses` in `crates/commol-model/src/system.rs`).                                                          |
+| Several impulses at one step | Every jump is computed from the state before any of them.                                                                                                                                                                                                                 |
+| Steps                        | A `DifferentialEquations` model takes any steps, such as `0.5`: the engine stops there, applies the jump and restarts. A `DifferenceEquations` or `StochasticSteps` model needs integer steps: `ModelBuilder.build` raises `ValidationError`, which names the transition. |
+| Units                        | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units](https://munqu.github.io/commol/latest/guide/units-and-equations/#impulses)).                                                                                                              |
+| `describe()`                 | Lists impulses apart from the equations, with their steps ([Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/#the-equations)).                                                                                                           |
 
 An impulse is not a pulse rate. A [`AxisPattern.pulse`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) is a rate: a difference model applies it for one step with the other flows, and a differential model applies it as a constant rate for one unit of the axis, so it moves `1 − e^(−p)` of its source. An impulse moves exactly `p` of its source in both engines.
 
@@ -2720,17 +2720,17 @@ plotter.plot_series(
 )
 ```
 
-| Argument                                  | Default                                        | Meaning                                                                                                                                                                                                                                                                                                                   |
-| ----------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `output_file`                             | `None`                                         | Where to save the figure. `None` only returns it.                                                                                                                                                                                                                                                                         |
-| `series`                                  | `None` (every output)                          | What to plot, one subplot each: an output name (`B_g1`) or a bin or accumulator id (`B`), which plots the sum of its outputs (`Simulation.outputs_for`). An exact output name wins. An unknown entry raises `ValueError`.                                                                                                 |
-| `observed_data`                           | `None`                                         | `ObservedDataPoint`s to draw on the subplot of their `label`, at their positions (a differential model may observe between integers). An observation with a `window` draws the windowed line, which reads the results at every window end and start (`ValueError` when the results do not hold one).                      |
-| `calibration_result`                      | `None`                                         | A `CalibrationResult` gives the factor values that scale the model. A [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive) draws the weighted median of its draws and their band of `confidence_level`, each draw read through the observation operator (sums, windows, factors).      |
-| `prediction_intervals`                    | `None`                                         | `plot_series` only. The `PredictionIntervals` of a [conformal method](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md): the subplot of each of their series, by label, shows the band from `lower` to `upper` and the point prediction, dashed. An unbounded interval is left out of the band. |
-| `config`                                  | `PlotConfig()`                                 | Figure size, dpi, layout and seaborn style.                                                                                                                                                                                                                                                                               |
-| `show_legend`                             | `True`                                         | `plot_series` only.                                                                                                                                                                                                                                                                                                       |
-| `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot_series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`.                                                                                                                                                                                                                         |
-| other keyword arguments                   | —                                              | Passed to `seaborn.lineplot`, such as `linewidth` or `alpha`.                                                                                                                                                                                                                                                             |
+| Argument                                  | Default                                        | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`                             | `None`                                         | Where to save the figure. `None` only returns it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `series`                                  | `None` (every output)                          | What to plot, one subplot each: an output name (`B_g1`) or a bin or accumulator id (`B`), which plots the sum of its outputs (`Simulation.outputs_for`). An exact output name wins. An unknown entry raises `ValueError`.                                                                                                                                                                                                                                                                                                    |
+| `observed_data`                           | `None`                                         | `ObservedDataPoint`s to draw on the subplot of their `label`, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs and one factor and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, `window` and factor as the loss reads it (`ValueError` when the results have no value at a position or a window start). |
+| `calibration_result`                      | `None`                                         | A `CalibrationResult` gives the factor values that scale the model. A [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive) draws the weighted median of its draws and their band of `confidence_level`, each draw read through the observation operator (sums, windows, factors), at the position of each observation when the line of `observed_data` is.                                                                                                                                |
+| `prediction_intervals`                    | `None`                                         | `plot_series` only. The `PredictionIntervals` of a [conformal method](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md): the subplot of each of their series, by label, shows the band from `lower` to `upper` and the point prediction, dashed. An unbounded interval is left out of the band.                                                                                                                                                                                                    |
+| `config`                                  | `PlotConfig()`                                 | Figure size, dpi, layout and seaborn style.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `show_legend`                             | `True`                                         | `plot_series` only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot_series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`.                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| other keyword arguments                   | —                                              | Passed to `seaborn.lineplot`, such as `linewidth` or `alpha`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 | `PlotConfig` field | Default            | Values                                                      |
 | ------------------ | ------------------ | ----------------------------------------------------------- |
@@ -2740,6 +2740,8 @@ plotter.plot_series(
 | `style`            | `None`             | `"darkgrid"`, `"whitegrid"`, `"dark"`, `"white"`, `"ticks"` |
 | `palette`          | `None`             | A seaborn palette or matplotlib colormap, such as `"Set2"`  |
 | `context`          | `None`             | `"paper"`, `"notebook"`, `"talk"`, `"poster"`               |
+
+`style`, `palette` and `context` apply to the figure of one plot only. Each method of `SimulationPlotter` draws in a copy of `matplotlib.rcParams` (`_scoped_style` in `py-commol/commol/api/plotter.py`), so the figures that you draw with matplotlib after a plot of commol keep your own style.
 
 To compare with observations:
 
@@ -4165,7 +4167,7 @@ print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75
 
 ## The predictive
 
-`Predictive(source, sample, positions)` runs every draw at `positions`, in parallel in Rust, through the forward model of its source: a `Calibrator`, or a `SensitivityAnalysis` of the inputs of the sample. With a stochastic engine every replicate of a draw is a draw of the predictive, with an equal share of its weight and a seed of its own, derived from the seed of the source, so every draw shows fresh noise and the predictive repeats from that seed. The positions are sorted and unique, and each one is a position the engine reports at; otherwise `Predictive` raises `ValueError` before any draw runs.
+`Predictive(source, sample, positions)` runs every draw at `positions`, in parallel in Rust, through the forward model of its source: a `Calibrator`, or a `SensitivityAnalysis` of the inputs of the sample. With a stochastic engine every replicate of a draw is a draw of the predictive, with an equal share of its weight and a seed of its own, derived from the seed of the source, so every draw shows fresh noise and the predictive repeats from that seed. The positions are sorted and unique, and each one is a position the engine reports at; otherwise `Predictive` raises `ValueError` before any draw runs. A draw whose run leaves the values its model allows raises `InfeasibleStateError` with the index of its parameter set and the message of the run: the compartment, the step and the flows, as `Simulation.run` reports them ([Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)). A draw whose initial amounts leave the remainder below zero raises `InfeasibleStateError` with the index of its parameter set and the message a calibration gives for the same values: the remainder and the excess ([Calibrating initial conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md)).
 
 | Member                                                     | Returns                                                                                                                                                                                                                                                 |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -5438,7 +5440,7 @@ A quantity reduces each run to a scalar, in Rust, through the observation operat
 | `PeakPosition(outputs, positions)` | The first of the positions where the value is largest                                                                                |
 | `Trajectory(outputs, positions)`   | One `ValueAt` per position, for an analysis over the axis                                                                            |
 
-Each quantity has a `label`, by default what it reads, such as `"B at 10"`.
+Each quantity has a `label`, by default what it reads, such as `"B at 10"`. The default label writes each position in full, as Python reads it back, so two positions give two labels: `"B at 1000000"` and `"B at 1000001"`.
 
 ## Which method for which budget
 
@@ -5478,6 +5480,8 @@ print([round(value) for value in band.median["B"]])  # [10, 293, 53]
 `PRCC` (Marino et al. 2008) ranks the inputs and each quantity, and gives the correlation of the rank of an input with the rank of the quantity once the other inputs are accounted for. A coefficient near 1 or −1 says the quantity rises or falls steadily with the input; near 0, that it does not. `p_values` test each coefficient against 0.
 
 With inputs from a sample, the sample is the design, and the ranks, the correlations and the test read its weights: a rank is the weight below a value plus half the weight at it, and the test counts Kish's effective size in place of the draws. Equal weights give the usual PRCC. A `Trajectory` gives the coefficients over the axis; a quantity with one value in every run, such as a state at position 0, has NaN coefficients.
+
+A NaN has no rank, so a quantity that is NaN at a draw raises a `ValueError` before PRCC ranks any value. The message gives the index of the quantity, in the order of the labels, and the draws where it is NaN; a `Propagation` with the same inputs and seed gives the value of each run.
 
 ```python
 from commol import Trajectory
@@ -13098,8 +13102,11 @@ class ModelBuilder:
             example a fraction names no bin, or a rate reads ``neighbors_<bin>``
             and the structure has no ``neighbors``), the engine is unknown or
             does not run the kind of the structure, the settings are not
-            settings of that engine, or a per-compartment override names an
-            unknown compartment or makes the initial amounts exceed the total.
+            settings of that engine, a series point or an impulse position is
+            one the engine cannot run (a position between two steps for an
+            engine that steps only at integers, or a ``"pulse"`` point between
+            two steps), or a per-compartment override names an unknown
+            compartment or makes the initial amounts exceed the total.
         """
         model: Model[StructureT] = Model(
             name=self._name,
@@ -13911,9 +13918,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ValueError` | If validation fails, the structure does not fit the process (for example a fraction names no bin, or a rate reads neighbors\_<bin> and the structure has no neighbors), the engine is unknown or does not run the kind of the structure, the settings are not settings of that engine, or a per-compartment override names an unknown compartment or makes the initial amounts exceed the total. |
+| Type         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If validation fails, the structure does not fit the process (for example a fraction names no bin, or a rate reads neighbors\_<bin> and the structure has no neighbors), the engine is unknown or does not run the kind of the structure, the settings are not settings of that engine, a series point or an impulse position is one the engine cannot run (a position between two steps for an engine that steps only at integers, or a "pulse" point between two steps), or a per-compartment override names an unknown compartment or makes the initial amounts exceed the total. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -13958,8 +13965,11 @@ def build(
         example a fraction names no bin, or a rate reads ``neighbors_<bin>``
         and the structure has no ``neighbors``), the engine is unknown or
         does not run the kind of the structure, the settings are not
-        settings of that engine, or a per-compartment override names an
-        unknown compartment or makes the initial amounts exceed the total.
+        settings of that engine, a series point or an impulse position is
+        one the engine cannot run (a position between two steps for an
+        engine that steps only at integers, or a ``"pulse"`` point between
+        two steps), or a per-compartment override names an unknown
+        compartment or makes the initial amounts exceed the total.
     """
     model: Model[StructureT] = Model(
         name=self._name,
@@ -17755,10 +17765,10 @@ An empirical series for a parameter value.
 
 Attributes:
 
-| Name   | Type                        | Description                                                                                                                                                                                                                                                                                                                                             |
-| ------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data` | `list[tuple[float, float]]` | (position, value) points on the axis. Need not be pre-sorted; the engine sorts them.                                                                                                                                                                                                                                                                    |
-| `mode` | `str`                       | How the series is read between its points: "pulse" (the value on the step of a point, 0 on every other step; integer positions only), "step_function" (the value of the last point at or before t), or "linear" (linear interpolation in t). The engine decides which positions its model type accepts: a DifferenceEquations model only integer steps. |
+| Name   | Type                        | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `data` | `list[tuple[float, float]]` | (position, value) points on the axis. Need not be pre-sorted; the engine sorts them.                                                                                                                                                                                                                                                                                                                                                                                     |
+| `mode` | `str`                       | How the series is read between its points: "pulse" (the value on the step of a point, 0 on every other step; integer positions only), "step_function" (the value of the last point at or before t), or "linear" (linear interpolation in t). The engine decides which positions its model type accepts: a DifferenceEquations or StochasticSteps model only integer steps. The model rejects a position its engine cannot run when it is built or its parameters change. |
 
 Source code in `commol/context/parameter.py`
 
@@ -17777,8 +17787,10 @@ class SeriesValue(BaseModel):
         the step of a point, 0 on every other step; integer positions only),
         ``"step_function"`` (the value of the last point at or before ``t``),
         or ``"linear"`` (linear interpolation in ``t``). The engine decides
-        which positions its model type accepts: a DifferenceEquations model
-        only integer steps.
+        which positions its model type accepts: a DifferenceEquations or
+        StochasticSteps model only integer steps. The model rejects a
+        position its engine cannot run when it is built or its parameters
+        change.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -18791,6 +18803,7 @@ class SimulationPlotter:
             f"and {len(results.positions)} positions"
         )
 
+    @_scoped_style
     def plot_series(
         self,
         output_file: str | None = None,
@@ -18822,14 +18835,20 @@ class SimulationPlotter:
             Optional observed data points to overlay on corresponding bin subplots.
             Model predictions with a factor_id will be scaled for plotting using
             factor values from the calibration_result, so observed values remain in
-            their original units.
+            their original units. When the points of a series share one sum of
+            outputs and one factor and have no window, the model line covers
+            every position of the results. Otherwise the model of each point is
+            read through its own operator (outputs, window, factor) at its own
+            position, as the loss reads it, and the line joins these values.
         calibration_result : CalibrationResult | Predictive | None
             Optional calibration result. A `CalibrationResult` gives the factor
             values (``best_parameters``) that multiply model predictions. A
             `Predictive` plots the band of its draws instead of the simulation
             line; each draw's series is read through the observation operator
             of the problem (sums, windows and factors of the observations of
-            the series), then the draws are reduced with their weights.
+            the series, each at its own position when they do not share one
+            operator with no window), then the draws are reduced with their
+            weights.
         config : PlotConfig | None
             Configuration for plot layout and styling (figsize, dpi, layout,
             style, palette, context). If None, uses defaults.
@@ -18868,7 +18887,8 @@ class SimulationPlotter:
         ------
         ValueError
             If an entry of ``series`` is neither an output name nor a bin or
-            accumulator id.
+            accumulator id, or the results have no value at the position of
+            an observation read on its own or at the start of its window.
         """
         logger.info("Starting plot_series")
 
@@ -18902,6 +18922,7 @@ class SimulationPlotter:
 
         return fig
 
+    @_scoped_style
     def plot_cumulative(
         self,
         output_file: str | None = None,
@@ -18975,6 +18996,7 @@ class SimulationPlotter:
         return fig
 
     @staticmethod
+    @_scoped_style
     def plot_prcc(
         result: PRCCResult,
         output_file: str | None = None,
@@ -19037,6 +19059,7 @@ class SimulationPlotter:
         return fig
 
     @staticmethod
+    @_scoped_style
     def plot_morris(
         result: MorrisResult,
         output_file: str | None = None,
@@ -19081,6 +19104,7 @@ class SimulationPlotter:
         return fig
 
     @staticmethod
+    @_scoped_style
     def plot_sobol(
         result: SobolResult | ChaosResult,
         output_file: str | None = None,
@@ -19152,6 +19176,7 @@ class SimulationPlotter:
         return fig
 
     @staticmethod
+    @_scoped_style
     def plot_profiles(
         result: ProfileResult,
         output_file: str | None = None,
@@ -19206,7 +19231,12 @@ class SimulationPlotter:
 
     @staticmethod
     def _apply_seaborn_style(config: PlotConfig) -> None:
-        """Apply Seaborn styling configuration from PlotConfig."""
+        """
+        Apply the seaborn style, palette and context of `config`.
+
+        It sets `matplotlib.rcParams`, so only a method under `_scoped_style`
+        calls it: the style stays in the figure of that method.
+        """
         if config.style:
             sns.set_style(config.style)
             logger.debug(f"Applied Seaborn style: {config.style}")
@@ -19230,10 +19260,9 @@ class SimulationPlotter:
         Label the x axis at the plotted positions `tick_every` apart.
 
         The tick grid is phased to the first plotted position rather than to
-        position 0: for a windowed series the plotted positions are window
-        ends, so anchoring at 0 would put ticks on positions that carry no
-        plotted point and hand `position_label` a position outside the
-        series' convention.
+        position 0: a series read at its observations is plotted at their
+        positions, so anchoring at 0 would put ticks on positions that carry
+        no plotted point.
         """
         if tick_every is not None and positions:
             anchor = positions[0]
@@ -19270,32 +19299,51 @@ class SimulationPlotter:
             return (rows, cols)
 
     @staticmethod
-    def _apply_windows(
-        series: list[float],
-        positions: Sequence[float],
-        observed: list[ObservedDataPoint],
-    ) -> tuple[list[float], list[float]] | None:
+    def _reads_each_observation(observed: list[ObservedDataPoint]) -> bool:
         """
-        Return (ends, values) where each value is the increment of `series`
-        over the window that closes at its end (:func:`commol.windowed_totals`).
+        Whether the model of a series is read at each observation: when one
+        has a window, or the observations differ in outputs or factor.
 
-        The simulation line covers every window end across the full series
-        (:func:`commol.window_ends`), so the plot starts at the first window
-        end rather than at the first observation.
+        Otherwise one operator reads every observation, and the model line
+        covers every position of the results.
+        """
+        operators = {
+            (tuple(point.outputs or ()), point.factor_id) for point in observed
+        }
+        return any(point.window for point in observed) or len(operators) > 1
 
-        Returns None if no observed point has a window set.
+    def _observation_values(
+        self,
+        results: SimulationResults,
+        bin_id: str,
+        observed: list[ObservedDataPoint],
+        factor_values: dict[str, float],
+    ) -> list[float]:
+        """
+        The model value of each observation, read through its own operator as
+        the loss reads it: the sum of its outputs at its position, its
+        increment over its window (:func:`commol.windowed_totals`), times its
+        factor.
 
         Raises
         ------
         ValueError
-            If the series has no value at a window end or start, such as a
-            window of 2.5 on the integer positions of ``Simulation.run``.
+            If the results have no value at the position of an observation or
+            at the start of its window, such as a window of 2.5 on the integer
+            positions of ``Simulation.run``.
         """
-        window = next((p.window for p in observed if p.window), None)
-        if window is None:
-            return None
-        ends = window_ends(window, positions[-1] if positions else 0.0)
-        return ends, windowed_totals(series, positions, window, ends)
+        values = []
+        for point in observed:
+            series = self._sum_series(
+                results, point.outputs or self._series_components(bin_id)
+            )
+            value = (
+                windowed_totals(series, results.positions, point.window, [point.at])[0]
+                if point.window
+                else series[index_at(results.positions, point.at)]
+            )
+            values.append(value * self._factor_value(point.factor_id, factor_values))
+        return values
 
     def _group_observed_data(
         self, observed_data: list[ObservedDataPoint] | None
@@ -19351,9 +19399,9 @@ class SimulationPlotter:
         bin_id: str,
         observed: list[ObservedDataPoint],
     ) -> list[str]:
-        for point in observed:
-            if point.outputs:
-                return point.outputs
+        """The outputs of the one operator of the observations of a series."""
+        if observed and observed[0].outputs:
+            return observed[0].outputs
         return self._series_components(bin_id)
 
     @staticmethod
@@ -19397,21 +19445,10 @@ class SimulationPlotter:
         }
 
     @staticmethod
-    def _model_factor_for_observed(
-        observed: list[ObservedDataPoint],
-        factor_values: dict[str, float],
-    ) -> float:
-        factor_ids = {point.factor_id for point in observed if point.factor_id}
-        if not factor_ids:
+    def _factor_value(factor_id: str | None, factor_values: dict[str, float]) -> float:
+        """The value of a factor, or 1 for none or one the result lacks."""
+        if factor_id is None:
             return 1.0
-        if len(factor_ids) > 1:
-            logger.warning(
-                "Multiple factor_id values found for one plotted series; leaving "
-                "model predictions unscaled."
-            )
-            return 1.0
-
-        factor_id = next(iter(factor_ids))
         if factor_id not in factor_values:
             logger.warning(
                 f"Factor parameter '{factor_id}' not found in calibration result; "
@@ -19593,21 +19630,17 @@ class SimulationPlotter:
         """
         Plot the series of a single bin on given axes.
         """
-        component_ids = self._observed_component_ids(bin_id, observed)
-        series = self._sum_series(self.results, component_ids)
-        windowed = self._apply_windows(series, self.results.positions, observed)
-        if windowed is not None:
-            positions, values = windowed
-        else:
-            positions = self.results.positions
-            values = series
-        factor = self._model_factor_for_observed(observed, factor_values)
-        values = self._apply_factor_to_series(values, factor)
+        positions, values = self._model_line(
+            self.results, bin_id, observed, factor_values
+        )
 
         # Build parameters for lineplot
         params = {
             "x": positions,
             "y": values,
+            # Each point is drawn as it is: observations at one position with
+            # different windows are never averaged.
+            "estimator": None,
             "ax": ax,
             "label": "Simulation"
             if self.replicates is None
@@ -19619,7 +19652,7 @@ class SimulationPlotter:
         # Plot simulation results as line
         sns.lineplot(**params)
         if self.replicates is not None:
-            self._plot_replicate_band(ax, component_ids, observed, factor)
+            self._plot_replicate_band(ax, bin_id, observed, factor_values)
 
         # Overlay observed data if available
         if observed:
@@ -19651,12 +19684,39 @@ class SimulationPlotter:
             ax.legend()
         ax.grid(True, alpha=0.3)
 
+    def _model_line(
+        self,
+        results: SimulationResults,
+        bin_id: str,
+        observed: list[ObservedDataPoint],
+        factor_values: dict[str, float],
+    ) -> tuple[list[float], list[float]]:
+        """
+        The positions and values of the model of one series in one run.
+
+        When the observations of the series do not share one operator with no
+        window, the model value of each observation at its position
+        (`_observation_values`). Otherwise the sum of the outputs of their
+        operator at every position of the results, times its factor.
+        """
+        if self._reads_each_observation(observed):
+            return [point.at for point in observed], self._observation_values(
+                results, bin_id, observed, factor_values
+            )
+        series = self._sum_series(
+            results, self._observed_component_ids(bin_id, observed)
+        )
+        factor = self._factor_value(
+            observed[0].factor_id if observed else None, factor_values
+        )
+        return results.positions, self._apply_factor_to_series(series, factor)
+
     def _plot_replicate_band(
         self,
         ax: "Axes",
-        component_ids: list[str],
+        bin_id: str,
         observed: list[ObservedDataPoint],
-        factor: float,
+        factor_values: dict[str, float],
     ) -> None:
         """
         The band of the replicates: each replicate reduced to the plotted
@@ -19666,11 +19726,10 @@ class SimulationPlotter:
         per_replicate = []
         positions: list[float] = self.results.positions
         for replicate in self.replicates:
-            series = self._sum_series(replicate, component_ids)
-            windowed = self._apply_windows(series, replicate.positions, observed)
-            if windowed is not None:
-                positions, series = windowed
-            per_replicate.append(self._apply_factor_to_series(series, factor))
+            positions, series = self._model_line(
+                replicate, bin_id, observed, factor_values
+            )
+            per_replicate.append(series)
         statistics = member_statistics(per_replicate, self.confidence_level)
         ax.fill_between(
             positions,
@@ -19689,37 +19748,40 @@ class SimulationPlotter:
         """
         The band of one series of a predictive.
 
-        Without a window or factor in the observations of the series, the band
-        of the sum of its outputs. With one, each draw is read through the
-        observation operator at every window end, as the loss reads it.
+        When the observations of the series do not share one operator with no
+        window, each draw is read through the operator of each observation at
+        its position, as the loss reads it. With one operator and a factor,
+        each draw is read through it at every position of the predictive.
+        Otherwise, the band of the sum of the outputs.
         """
-        component_ids = self._observed_component_ids(bin_id, observed)
-        window = next((p.window for p in observed if p.window), None)
-        factor_ids = {p.factor_id for p in observed if p.factor_id}
-        if window is None and not factor_ids:
-            return predictive.series_band(component_ids, self.confidence_level)
-        if len(factor_ids) > 1:
-            raise ValueError(
-                f"Series '{bin_id}' has observations with several factors "
-                f"{sorted(factor_ids)}; a band reads one."
+        if self._reads_each_observation(observed):
+            points = [
+                ObservedDataPoint(
+                    at=point.at,
+                    outputs=point.outputs or self._series_components(bin_id),
+                    label=bin_id,
+                    value=0.0,
+                    window=point.window,
+                    factor_id=point.factor_id,
+                )
+                for point in observed
+            ]
+            return predictive.at_observations(points, NoNoise()).band(
+                self.confidence_level
             )
-        first = predictive.positions[0]
-        last = predictive.positions[-1]
-        ends = (
-            [at for at in window_ends(window, last) if at - window >= first]
-            if window is not None
-            else predictive.positions
-        )
+        component_ids = self._observed_component_ids(bin_id, observed)
+        factor_id = observed[0].factor_id if observed else None
+        if factor_id is None:
+            return predictive.series_band(component_ids, self.confidence_level)
         points = [
             ObservedDataPoint(
                 at=at,
                 outputs=component_ids,
                 label=bin_id,
                 value=0.0,
-                window=window,
-                factor_id=next(iter(factor_ids), None),
+                factor_id=factor_id,
             )
-            for at in ends
+            for at in predictive.positions
         ]
         return predictive.at_observations(points, NoNoise()).band(self.confidence_level)
 
@@ -19998,19 +20060,19 @@ Creates a figure with subplots arranged in a grid, where each subplot shows the 
 
 Parameters:
 
-| Name                   | Type                       | Description                                               | Default                                                                                                                                                                                                                                              |
-| ---------------------- | -------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `output_file`          | \`str                      | None\`                                                    | Path to save the figure. If None, figure is not saved (only returned).                                                                                                                                                                               |
-| `observed_data`        | \`list[ObservedDataPoint]  | None\`                                                    | Optional observed data points to overlay on corresponding bin subplots. Model predictions with a factor_id will be scaled for plotting using factor values from the calibration_result, so observed values remain in their original units.           |
-| `calibration_result`   | \`CalibrationResult        | Predictive                                                | None\`                                                                                                                                                                                                                                               |
-| `config`               | \`PlotConfig               | None\`                                                    | Configuration for plot layout and styling (figsize, dpi, layout, style, palette, context). If None, uses defaults.                                                                                                                                   |
-| `series`               | \`list[str]                | None\`                                                    | What to plot, one subplot each. An entry is an output name (an expanded compartment or accumulator, such as A_g1) or a bin or accumulator id, which plots the sum of its outputs. An exact output name wins over an id. If None, plots every output. |
-| `show_legend`          | `bool`                     | Whether to show the legend on each subplot. Default True. | `True`                                                                                                                                                                                                                                               |
-| `position_label`       | \`Callable\[[float], str\] | None\`                                                    | Turns a position on the axis into an x-axis tick label, such as a date. If None, the ticks show the position.                                                                                                                                        |
-| `tick_every`           | \`float                    | None\`                                                    | Labels the plotted positions tick_every apart on the axis, counted from the first plotted position. If None, labels every plotted position.                                                                                                          |
-| `x_label`              | `str`                      | The x-axis label. Default "Step".                         | `'Step'`                                                                                                                                                                                                                                             |
-| `prediction_intervals` | \`PredictionIntervals      | None\`                                                    | Prediction intervals of a conformal method (ConformalResult.intervals). The subplot of each of their series, by label, shows the band between their lower and upper ends and their point prediction; an unbounded interval is left out of the band.  |
-| `**kwargs`             | \`str                      | int                                                       | float                                                                                                                                                                                                                                                |
+| Name                   | Type                       | Description                                               | Default                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------- | -------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`          | \`str                      | None\`                                                    | Path to save the figure. If None, figure is not saved (only returned).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `observed_data`        | \`list[ObservedDataPoint]  | None\`                                                    | Optional observed data points to overlay on corresponding bin subplots. Model predictions with a factor_id will be scaled for plotting using factor values from the calibration_result, so observed values remain in their original units. When the points of a series share one sum of outputs and one factor and have no window, the model line covers every position of the results. Otherwise the model of each point is read through its own operator (outputs, window, factor) at its own position, as the loss reads it, and the line joins these values. |
+| `calibration_result`   | \`CalibrationResult        | Predictive                                                | None\`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `config`               | \`PlotConfig               | None\`                                                    | Configuration for plot layout and styling (figsize, dpi, layout, style, palette, context). If None, uses defaults.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `series`               | \`list[str]                | None\`                                                    | What to plot, one subplot each. An entry is an output name (an expanded compartment or accumulator, such as A_g1) or a bin or accumulator id, which plots the sum of its outputs. An exact output name wins over an id. If None, plots every output.                                                                                                                                                                                                                                                                                                             |
+| `show_legend`          | `bool`                     | Whether to show the legend on each subplot. Default True. | `True`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `position_label`       | \`Callable\[[float], str\] | None\`                                                    | Turns a position on the axis into an x-axis tick label, such as a date. If None, the ticks show the position.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `tick_every`           | \`float                    | None\`                                                    | Labels the plotted positions tick_every apart on the axis, counted from the first plotted position. If None, labels every plotted position.                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `x_label`              | `str`                      | The x-axis label. Default "Step".                         | `'Step'`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `prediction_intervals` | \`PredictionIntervals      | None\`                                                    | Prediction intervals of a conformal method (ConformalResult.intervals). The subplot of each of their series, by label, shows the band between their lower and upper ends and their point prediction; an unbounded interval is left out of the band.                                                                                                                                                                                                                                                                                                              |
+| `**kwargs`             | \`str                      | int                                                       | float                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 Returns:
 
@@ -20020,13 +20082,14 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                  |
-| ------------ | ---------------------------------------------------------------------------- |
-| `ValueError` | If an entry of series is neither an output name nor a bin or accumulator id. |
+| Type         | Description                                                                                                                                                                                |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ValueError` | If an entry of series is neither an output name nor a bin or accumulator id, or the results have no value at the position of an observation read on its own or at the start of its window. |
 
 Source code in `commol/api/plotter.py`
 
 ```python
+@_scoped_style
 def plot_series(
     self,
     output_file: str | None = None,
@@ -20058,14 +20121,20 @@ def plot_series(
         Optional observed data points to overlay on corresponding bin subplots.
         Model predictions with a factor_id will be scaled for plotting using
         factor values from the calibration_result, so observed values remain in
-        their original units.
+        their original units. When the points of a series share one sum of
+        outputs and one factor and have no window, the model line covers
+        every position of the results. Otherwise the model of each point is
+        read through its own operator (outputs, window, factor) at its own
+        position, as the loss reads it, and the line joins these values.
     calibration_result : CalibrationResult | Predictive | None
         Optional calibration result. A `CalibrationResult` gives the factor
         values (``best_parameters``) that multiply model predictions. A
         `Predictive` plots the band of its draws instead of the simulation
         line; each draw's series is read through the observation operator
         of the problem (sums, windows and factors of the observations of
-        the series), then the draws are reduced with their weights.
+        the series, each at its own position when they do not share one
+        operator with no window), then the draws are reduced with their
+        weights.
     config : PlotConfig | None
         Configuration for plot layout and styling (figsize, dpi, layout,
         style, palette, context). If None, uses defaults.
@@ -20104,7 +20173,8 @@ def plot_series(
     ------
     ValueError
         If an entry of ``series`` is neither an output name nor a bin or
-        accumulator id.
+        accumulator id, or the results have no value at the position of
+        an observation read on its own or at the start of its window.
     """
     logger.info("Starting plot_series")
 
@@ -20175,6 +20245,7 @@ Raises:
 Source code in `commol/api/plotter.py`
 
 ```python
+@_scoped_style
 def plot_cumulative(
     self,
     output_file: str | None = None,
@@ -20277,6 +20348,7 @@ Source code in `commol/api/plotter.py`
 
 ```python
 @staticmethod
+@_scoped_style
 def plot_prcc(
     result: PRCCResult,
     output_file: str | None = None,
@@ -20367,6 +20439,7 @@ Source code in `commol/api/plotter.py`
 
 ```python
 @staticmethod
+@_scoped_style
 def plot_morris(
     result: MorrisResult,
     output_file: str | None = None,
@@ -20437,6 +20510,7 @@ Source code in `commol/api/plotter.py`
 
 ```python
 @staticmethod
+@_scoped_style
 def plot_sobol(
     result: SobolResult | ChaosResult,
     output_file: str | None = None,
@@ -20536,6 +20610,7 @@ Source code in `commol/api/plotter.py`
 
 ```python
 @staticmethod
+@_scoped_style
 def plot_profiles(
     result: ProfileResult,
     output_file: str | None = None,
@@ -20598,6 +20673,10 @@ Attributes:
 | `palette` | \`str                 | None\`                                 |
 | `context` | \`str                 | None\`                                 |
 
+Notes
+
+`style`, `palette` and `context` apply to the figure of one call of `SimulationPlotter` only: after the call, `matplotlib.rcParams` is as it was before it, so the figures that you draw with matplotlib keep your style.
+
 Examples:
 
 ```pycon
@@ -20640,6 +20719,12 @@ class PlotConfig(BaseModel):
         Seaborn context for scaling plot elements. Must be a valid seaborn context:
         "paper", "notebook", "talk", or "poster".
         See: https://seaborn.pydata.org/generated/seaborn.set_context.html
+
+    Notes
+    -----
+    ``style``, ``palette`` and ``context`` apply to the figure of one call of
+    `SimulationPlotter` only: after the call, ``matplotlib.rcParams`` is as it
+    was before it, so the figures that you draw with matplotlib keep your style.
 
     Examples
     --------
@@ -23194,7 +23279,7 @@ class ValueAt(_OneScalar):
 
     def default_label(self) -> str:
         """`outputs` at `at`."""
-        return f"{self.output_name} at {self.at:g}"
+        return f"{self.output_name} at {_position_text(self.at)}"
 
     def rust_quantity(self) -> RustQuantity:
         """The kind, the outputs and the position."""
@@ -23216,7 +23301,7 @@ Source code in `commol/context/inference/global_sensitivity.py`
 ```python
 def default_label(self) -> str:
     """`outputs` at `at`."""
-    return f"{self.output_name} at {self.at:g}"
+    return f"{self.output_name} at {_position_text(self.at)}"
 ```
 
 #### rust_quantity
@@ -23282,7 +23367,8 @@ class Gain(_OneScalar):
 
     def default_label(self) -> str:
         """The gain of `outputs` over the window."""
-        return f"{self.output_name} gain over ({self.start:g}, {self.end:g}]"
+        start, end = _position_text(self.start), _position_text(self.end)
+        return f"{self.output_name} gain over ({start}, {end}]"
 
     def rust_quantity(self) -> RustQuantity:
         """The kind, the outputs, the start and the end."""
@@ -23326,7 +23412,8 @@ Source code in `commol/context/inference/global_sensitivity.py`
 ```python
 def default_label(self) -> str:
     """The gain of `outputs` over the window."""
-    return f"{self.output_name} gain over ({self.start:g}, {self.end:g}]"
+    start, end = _position_text(self.start), _position_text(self.end)
+    return f"{self.output_name} gain over ({start}, {end}]"
 ```
 
 #### rust_quantity
@@ -23489,7 +23576,10 @@ class Trajectory(_AtPositions):
         """One `ValueAt` per position."""
         name = self.label or self.output_name
         return [
-            (f"{name} at {at:g}", (self.rust_kind, self.output_list, [at]))
+            (
+                f"{name} at {_position_text(at)}",
+                (self.rust_kind, self.output_list, [at]),
+            )
             for at in self.positions
         ]
 ```
@@ -23528,7 +23618,10 @@ def expand(self) -> list[tuple[str, RustQuantity]]:
     """One `ValueAt` per position."""
     name = self.label or self.output_name
     return [
-        (f"{name} at {at:g}", (self.rust_kind, self.output_list, [at]))
+        (
+            f"{name} at {_position_text(at)}",
+            (self.rust_kind, self.output_list, [at]),
+        )
         for at in self.positions
     ]
 ```
@@ -27106,7 +27199,9 @@ class Predictive:
             does not report at one of them (a difference engine reports only
             at integer steps).
         InfeasibleStateError
-            If a draw leaves the values its model allows.
+            If a draw leaves the values its model allows. The message names
+            the parameter set, then says what the run says (the compartment,
+            the step and the flows), or what the initial amounts exceed.
         """
         self.source: PredictiveSource = source
         self.sample: ParameterSample = sample
@@ -27257,7 +27352,9 @@ class Predictive:
             has a loss; or the noise is not `NoNoise()` and the source is an
             analysis.
         InfeasibleStateError
-            If a draw leaves the values its model allows.
+            If a draw leaves the values its model allows. The message names
+            the parameter set, then says what the run says (the compartment,
+            the step and the flows), or what the initial amounts exceed.
         """
         draws = self.source.rust_observation_draws(
             self.sample, list(observed_data), noise
@@ -27298,7 +27395,7 @@ Raises:
 | Type                   | Description                                                                                                                                                                                                         |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError`           | Before any draw runs: if the sample's parameters are not the source's, or the positions are not sorted and unique or the engine does not report at one of them (a difference engine reports only at integer steps). |
-| `InfeasibleStateError` | If a draw leaves the values its model allows.                                                                                                                                                                       |
+| `InfeasibleStateError` | If a draw leaves the values its model allows. The message names the parameter set, then says what the run says (the compartment, the step and the flows), or what the initial amounts exceed.                       |
 
 Source code in `commol/api/inference/predictive.py`
 
@@ -27330,7 +27427,9 @@ def __init__(
         does not report at one of them (a difference engine reports only
         at integer steps).
     InfeasibleStateError
-        If a draw leaves the values its model allows.
+        If a draw leaves the values its model allows. The message names
+        the parameter set, then says what the run says (the compartment,
+        the step and the flows), or what the initial amounts exceed.
     """
     self.source: PredictiveSource = source
     self.sample: ParameterSample = sample
@@ -27549,7 +27648,7 @@ Raises:
 | Type                   | Description                                                                                                                                                                                                                                                       |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError`           | If an observation names an unknown output or factor, a series the residual noise has no residuals of, or a series with no observation model; DistributionNoise comes with a problem that has a loss; or the noise is not NoNoise() and the source is an analysis. |
-| `InfeasibleStateError` | If a draw leaves the values its model allows.                                                                                                                                                                                                                     |
+| `InfeasibleStateError` | If a draw leaves the values its model allows. The message names the parameter set, then says what the run says (the compartment, the step and the flows), or what the initial amounts exceed.                                                                     |
 
 Source code in `commol/api/inference/predictive.py`
 
@@ -27592,7 +27691,9 @@ def at_observations(
         has a loss; or the noise is not `NoNoise()` and the source is an
         analysis.
     InfeasibleStateError
-        If a draw leaves the values its model allows.
+        If a draw leaves the values its model allows. The message names
+        the parameter set, then says what the run says (the compartment,
+        the step and the flows), or what the initial amounts exceed.
     """
     draws = self.source.rust_observation_draws(
         self.sample, list(observed_data), noise
@@ -34659,6 +34760,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-22
+
+This release fixes bugs of 0.6.0 and changes no API. A series point or an impulse that the engine cannot run now fails at `ModelBuilder.build` and `Model.update_parameters`, not at `Simulation`. Errors of a `Predictive` draw say what was not feasible. A PRCC analysis with a NaN value raises a `ValueError` and no longer runs forever. The quantities of a sensitivity analysis read a gain at its start and give different labels to close positions. A windowed series is plotted at the position of each observation, and a figure no longer changes the global style of matplotlib.
+
+### Fixed
+
+- The default label of a quantity of interest wrote each position with 6 significant digits, so two positions close together gave one label and the analysis raised `ValueError`: `Trajectory(outputs="A", positions=[1000000, 1000001])` gave `"A at 1e+06"` twice. The label now writes each position in full (`"A at 1000000"`, `"A at 1000001"`).
+- `ModelBuilder.build` and `Model.update_parameters` accepted a series point or an impulse position that the engine cannot run, such as a point or an `impulse_at` of 1.5 under `DifferenceEquations` or `StochasticSteps`, or a `"pulse"` point at 1.5 under any engine; the error came only at `Simulation(model)`, as `RuntimeError`. Both now raise `ValueError` with the message of the engine, and a rejected update leaves the model unchanged.
+- The `InfeasibleStateError` of a draw of a `Predictive` said only `InfeasibleRun`. It now gives the message of the run after the index of the parameter set: the compartment, the step and the flows, as `Simulation.run` reports them.
+- The `InfeasibleStateError` of a draw of a `Predictive` whose initial amounts leave the remainder below zero said only `InfeasibleStart { excess: ... }`. It now gives the message a calibration gives for the same values after the index of the parameter set: what the amounts exceed, the remainder and by how much.
+- A `Gain(start, end)` quantity read its start at `end - (end - start)`, which can round away from `start`: `Gain(start=0.1, end=0.4)` read it at `0.09999999999999998`, so on the `DifferentialEquations` engine the gain did not start where `ValueAt(0.1)` reads. A gain now reads its start at exactly `start`.
+- `SimulationPlotter.plot_series` read the model of a windowed series with the first window it found, at the window ends of a grid from 0, so with observations at 7.5 and 17.5 no model value sat on an observation and the windows of the other observations were ignored. When the observations of a series have a window, or differ in outputs or factor, the model line, the band of the replicates and the band of a `Predictive` now read each observation through its own operator at its own position, as the loss reads it. Observations with several factors no longer leave the line unscaled or raise `ValueError` with a `Predictive`.
+- A figure of `SimulationPlotter` with a `PlotConfig` `style`, `palette` or `context` changed the global style of matplotlib, so every figure drawn with matplotlib after it had the style of commol. The style now applies to the figure of that plot only, and `matplotlib.rcParams` is as it was before the call.
+- `PRCC` never returned when a quantity was NaN at a draw. It now raises `ValueError` that gives the index of the quantity and the draws where it is NaN, before it ranks any value.
+
 ## [0.6.0] - 2026-10-22
 
 This release adds the first uncertainty methods with a stated model of the data: observation models and their likelihood, the Bayesian posterior and the Gibbs posterior by sequential Monte Carlo, approximate Bayesian computation, priors, local approximations (Laplace, the sandwich and the Laplace mixture), conformal intervals, the profile likelihood and sensitivity analysis with no data. Before you upgrade, read the **Breaking** entries: an `Aggregate` states the initial amount of each bin in the unit of that bin, a `CalibrationProblem` needs a `loss_function`, a `Predictive` takes a `Calibrator`, and public class names write every letter of an acronym in capitals. See [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
@@ -35087,6 +35203,7 @@ ______________________________________________________________________
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.6.1** - Fixes of 0.6.0: checks at build, messages of infeasible draws, PRCC with NaN, quantity labels and starts, plots
 - **0.6.0** - Uncertainty methods with a model of the data: likelihood, posteriors, local approximations, conformal intervals, profiles and sensitivity analysis
 - **0.5.0** - Uncertainty by resampling the data, identifiability of parameters and the removal of the ensemble calibration
 - **0.4.0** - One process under several structures and engines, stochastic engines and model descriptions

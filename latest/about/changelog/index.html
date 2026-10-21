@@ -2958,6 +2958,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#061-2026-10-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.6.1] - 2026-10-22
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.6.1] - 2026-10-22">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#060-2026-10-22" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2992,7 +3020,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed" class="md-nav__link">
+  <a href="#fixed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -3042,7 +3070,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_1" class="md-nav__link">
+  <a href="#fixed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -3103,7 +3131,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_2" class="md-nav__link">
+  <a href="#fixed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -3175,7 +3203,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_3" class="md-nav__link">
+  <a href="#fixed_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -3236,7 +3264,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_4" class="md-nav__link">
+  <a href="#fixed_5" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -3394,6 +3422,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#061-2026-10-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.6.1] - 2026-10-22
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.6.1] - 2026-10-22">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#060-2026-10-22" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3428,7 +3484,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed" class="md-nav__link">
+  <a href="#fixed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -3478,7 +3534,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_1" class="md-nav__link">
+  <a href="#fixed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -3539,7 +3595,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_2" class="md-nav__link">
+  <a href="#fixed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -3611,7 +3667,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_3" class="md-nav__link">
+  <a href="#fixed_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -3672,7 +3728,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_4" class="md-nav__link">
+  <a href="#fixed_5" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -3802,6 +3858,60 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h2 id="061-2026-10-22">[0.6.1] - 2026-10-22<a class="headerlink" href="#061-2026-10-22" title="Permanent link">&para;</a></h2>
+<p>This release fixes bugs of 0.6.0 and changes no API. A series point or an
+impulse that the engine cannot run now fails at <code>ModelBuilder.build</code> and
+<code>Model.update_parameters</code>, not at <code>Simulation</code>. Errors of a <code>Predictive</code> draw
+say what was not feasible. A PRCC analysis with a NaN value raises a
+<code>ValueError</code> and no longer runs forever. The quantities of a sensitivity
+analysis read a gain at its start and give different labels to close
+positions. A windowed series is plotted at the position of each observation,
+and a figure no longer changes the global style of matplotlib.</p>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The default label of a quantity of interest wrote each position with 6
+  significant digits, so two positions close together gave one label and the
+  analysis raised <code>ValueError</code>: <code>Trajectory(outputs="A", positions=[1000000,
+  1000001])</code> gave <code>"A at 1e+06"</code> twice. The label now writes each position in
+  full (<code>"A at 1000000"</code>, <code>"A at 1000001"</code>).</li>
+<li><code>ModelBuilder.build</code> and <code>Model.update_parameters</code> accepted a series point
+  or an impulse position that the engine cannot run, such as a point or an
+  <code>impulse_at</code> of 1.5 under <code>DifferenceEquations</code> or <code>StochasticSteps</code>, or a
+  <code>"pulse"</code> point at 1.5 under any engine; the error came only at
+  <code>Simulation(model)</code>, as <code>RuntimeError</code>. Both now raise <code>ValueError</code> with the
+  message of the engine, and a rejected update leaves the model unchanged.</li>
+<li>The <code>InfeasibleStateError</code> of a draw of a <code>Predictive</code> said only
+  <code>InfeasibleRun</code>. It now gives the message of the run after the index of the
+  parameter set: the compartment, the step and the flows, as
+  <code>Simulation.run</code> reports them.</li>
+<li>The <code>InfeasibleStateError</code> of a draw of a <code>Predictive</code> whose initial
+  amounts leave the remainder below zero said only
+  <code>InfeasibleStart { excess: ... }</code>. It now gives the message a calibration
+  gives for the same values after the index of the parameter set: what the
+  amounts exceed, the remainder and by how much.</li>
+<li>A <code>Gain(start, end)</code> quantity read its start at <code>end - (end - start)</code>,
+  which can round away from <code>start</code>: <code>Gain(start=0.1, end=0.4)</code> read it at
+  <code>0.09999999999999998</code>, so on the <code>DifferentialEquations</code> engine the gain
+  did not start where <code>ValueAt(0.1)</code> reads. A gain now reads its start at
+  exactly <code>start</code>.</li>
+<li><code>SimulationPlotter.plot_series</code> read the model of a windowed series with
+  the first window it found, at the window ends of a grid from 0, so with
+  observations at 7.5 and 17.5 no model value sat on an observation and the
+  windows of the other observations were ignored. When the observations of a
+  series have a window, or differ in outputs or factor, the model line, the
+  band of the replicates and the band of a <code>Predictive</code> now read each
+  observation through its own operator at its own position, as the loss
+  reads it. Observations with several factors no longer leave the line
+  unscaled or raise <code>ValueError</code> with a <code>Predictive</code>.</li>
+<li>A figure of <code>SimulationPlotter</code> with a <code>PlotConfig</code> <code>style</code>, <code>palette</code> or
+  <code>context</code> changed the global style of matplotlib, so every figure drawn with
+  matplotlib after it had the style of commol. The style now applies to the
+  figure of that plot only, and <code>matplotlib.rcParams</code> is as it was before the
+  call.</li>
+<li><code>PRCC</code> never returned when a quantity was NaN at a draw. It now raises
+  <code>ValueError</code> that gives the index of the quantity and the draws where it
+  is NaN, before it ranks any value.</li>
+</ul>
 <h2 id="060-2026-10-22">[0.6.0] - 2026-10-22<a class="headerlink" href="#060-2026-10-22" title="Permanent link">&para;</a></h2>
 <p>This release adds the first uncertainty methods with a stated model of the
 data: observation models and their likelihood, the Bayesian posterior and the
@@ -4062,7 +4172,7 @@ capitals. See <a href="../../guide/uncertainty/">Uncertainty</a>.</p>
   spelling of its authors. See
   <a href="../../codebase/conventions/#python">Conventions</a>.</li>
 </ul>
-<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>A <code>DifferentialEquations</code> run with <code>method="tsit45"</code> whose solution blows
   up returned NaN with no error. A step that leaves the state not finite now
@@ -4208,7 +4318,7 @@ place), and every interval uses one quantile, so the intervals of
   missing and extra keys of the fractions of an <code>Aggregate</code>) list them in
   sorted order.</li>
 </ul>
-<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Several starts of Nelder-Mead began at the same point: each start now comes
   from the run seed.</li>
@@ -4400,7 +4510,7 @@ place), and every interval uses one quantile, so the intervals of
   equations.</li>
 <li>Python names follow PEP 8: ruff checks them (<code>N</code> rules).</li>
 </ul>
-<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li>The unit check reads the flows the engine plans, so a proportional rate is
   checked as its flow, the rate times its source: <code>k2</code> in <code>1/day</code> from a bin in
@@ -4978,7 +5088,7 @@ place), and every interval uses one quantile, so the intervals of
   other methods of a compartmental model on <code>Model</code>: they are on
   <code>model.structure</code> (see Changed).</li>
 </ul>
-<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Examples 6 to 9 of the guide (<code>examples.md</code>) no longer go below zero.
   Example 6 writes the rate it describes, <code>k2_max * B * max(0, 1 - C /
@@ -5127,7 +5237,7 @@ place), and every interval uses one quantile, so the intervals of
   built from output labels, so a bin <code>A</code> no longer sums the outputs of a bin
   <code>A_x</code>.</li>
 </ul>
-<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_5">Fixed<a class="headerlink" href="#fixed_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li>A transition between bins no longer moves bins whose id starts with the
   source bin id: <code>A -&gt; B</code> moved <code>AB -&gt; BB</code> as well.</li>
@@ -5214,6 +5324,7 @@ the details of these versions.</p>
 <h2 id="version-history">Version History<a class="headerlink" href="#version-history" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Unreleased</strong> - Current development version</li>
+<li><strong>0.6.1</strong> - Fixes of 0.6.0: checks at build, messages of infeasible draws, PRCC with NaN, quantity labels and starts, plots</li>
 <li><strong>0.6.0</strong> - Uncertainty methods with a model of the data: likelihood, posteriors, local approximations, conformal intervals, profiles and sensitivity analysis</li>
 <li><strong>0.5.0</strong> - Uncertainty by resampling the data, identifiability of parameters and the removal of the ensemble calibration</li>
 <li><strong>0.4.0</strong> - One process under several structures and engines, stochastic engines and model descriptions</li>

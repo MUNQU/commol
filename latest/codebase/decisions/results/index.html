@@ -2608,6 +2608,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-plot-keeps-the-global-style" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A plot keeps the global style
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#model-files-are-written-in-full" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3088,6 +3099,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-plot-keeps-the-global-style" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A plot keeps the global style
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#model-files-are-written-in-full" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3243,6 +3265,17 @@ model kind: <code>initial_conditions</code> for an aggregate model).</p>
   vocabulary.</li>
 </ul>
 <p><strong>Guard:</strong> <code>tests/reporting/</code>.</p>
+<h2 id="a-plot-keeps-the-global-style">A plot keeps the global style<a class="headerlink" href="#a-plot-keeps-the-global-style" title="Permanent link">&para;</a></h2>
+<p>A <code>PlotConfig</code> sets its seaborn style, palette and context through
+<code>matplotlib.rcParams</code>, which is global to the process. Each public method of
+<code>SimulationPlotter</code> is under <code>_scoped_style</code> (<code>api/plotter.py</code>): it draws in a
+copy of <code>rcParams</code> (<code>matplotlib.rc_context</code>), so the style is in its figure and
+<code>rcParams</code> is as it was when the method returns or raises. A new plot method
+takes the same decorator; <code>_apply_seaborn_style</code> outside it changes the style
+of every later figure of the user.</p>
+<p><strong>Guard:</strong> <code>tests/plotting/test_plotter.py::test_a_figure_leaves_the_global_style</code>,
+<code>tests/plotting/test_sensitivity.py::test_a_sensitivity_figure_leaves_the_global_style</code>
+and <code>tests/plotting/test_profiles.py::test_a_profile_figure_leaves_the_global_style</code>.</p>
 <h2 id="model-files-are-written-in-full">Model files are written in full<a class="headerlink" href="#model-files-are-written-in-full" title="Permanent link">&para;</a></h2>
 <p><code>Model.to_json</code> writes every field, nulls included. Dropping nulls is not
 round-trip safe: an uncalibrated <code>Parameter.value</code> or <code>BinFraction.fraction</code>

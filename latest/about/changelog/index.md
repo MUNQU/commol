@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-22
+
+This release fixes bugs of 0.6.0 and changes no API. A series point or an impulse that the engine cannot run now fails at `ModelBuilder.build` and `Model.update_parameters`, not at `Simulation`. Errors of a `Predictive` draw say what was not feasible. A PRCC analysis with a NaN value raises a `ValueError` and no longer runs forever. The quantities of a sensitivity analysis read a gain at its start and give different labels to close positions. A windowed series is plotted at the position of each observation, and a figure no longer changes the global style of matplotlib.
+
+### Fixed
+
+- The default label of a quantity of interest wrote each position with 6 significant digits, so two positions close together gave one label and the analysis raised `ValueError`: `Trajectory(outputs="A", positions=[1000000, 1000001])` gave `"A at 1e+06"` twice. The label now writes each position in full (`"A at 1000000"`, `"A at 1000001"`).
+- `ModelBuilder.build` and `Model.update_parameters` accepted a series point or an impulse position that the engine cannot run, such as a point or an `impulse_at` of 1.5 under `DifferenceEquations` or `StochasticSteps`, or a `"pulse"` point at 1.5 under any engine; the error came only at `Simulation(model)`, as `RuntimeError`. Both now raise `ValueError` with the message of the engine, and a rejected update leaves the model unchanged.
+- The `InfeasibleStateError` of a draw of a `Predictive` said only `InfeasibleRun`. It now gives the message of the run after the index of the parameter set: the compartment, the step and the flows, as `Simulation.run` reports them.
+- The `InfeasibleStateError` of a draw of a `Predictive` whose initial amounts leave the remainder below zero said only `InfeasibleStart { excess: ... }`. It now gives the message a calibration gives for the same values after the index of the parameter set: what the amounts exceed, the remainder and by how much.
+- A `Gain(start, end)` quantity read its start at `end - (end - start)`, which can round away from `start`: `Gain(start=0.1, end=0.4)` read it at `0.09999999999999998`, so on the `DifferentialEquations` engine the gain did not start where `ValueAt(0.1)` reads. A gain now reads its start at exactly `start`.
+- `SimulationPlotter.plot_series` read the model of a windowed series with the first window it found, at the window ends of a grid from 0, so with observations at 7.5 and 17.5 no model value sat on an observation and the windows of the other observations were ignored. When the observations of a series have a window, or differ in outputs or factor, the model line, the band of the replicates and the band of a `Predictive` now read each observation through its own operator at its own position, as the loss reads it. Observations with several factors no longer leave the line unscaled or raise `ValueError` with a `Predictive`.
+- A figure of `SimulationPlotter` with a `PlotConfig` `style`, `palette` or `context` changed the global style of matplotlib, so every figure drawn with matplotlib after it had the style of commol. The style now applies to the figure of that plot only, and `matplotlib.rcParams` is as it was before the call.
+- `PRCC` never returned when a quantity was NaN at a draw. It now raises `ValueError` that gives the index of the quantity and the draws where it is NaN, before it ranks any value.
+
 ## [0.6.0] - 2026-10-22
 
 This release adds the first uncertainty methods with a stated model of the data: observation models and their likelihood, the Bayesian posterior and the Gibbs posterior by sequential Monte Carlo, approximate Bayesian computation, priors, local approximations (Laplace, the sandwich and the Laplace mixture), conformal intervals, the profile likelihood and sensitivity analysis with no data. Before you upgrade, read the **Breaking** entries: an `Aggregate` states the initial amount of each bin in the unit of that bin, a `CalibrationProblem` needs a `loss_function`, a `Predictive` takes a `Calibrator`, and public class names write every letter of an acronym in capitals. See [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
@@ -436,6 +451,7 @@ ______________________________________________________________________
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.6.1** - Fixes of 0.6.0: checks at build, messages of infeasible draws, PRCC with NaN, quantity labels and starts, plots
 - **0.6.0** - Uncertainty methods with a model of the data: likelihood, posteriors, local approximations, conformal intervals, profiles and sensitivity analysis
 - **0.5.0** - Uncertainty by resampling the data, identifiability of parameters and the removal of the ensemble calibration
 - **0.4.0** - One process under several structures and engines, stochastic engines and model descriptions

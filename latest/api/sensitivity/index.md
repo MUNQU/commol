@@ -1994,7 +1994,7 @@ class ValueAt(_OneScalar):
 
     def default_label(self) -> str:
         """`outputs` at `at`."""
-        return f"{self.output_name} at {self.at:g}"
+        return f"{self.output_name} at {_position_text(self.at)}"
 
     def rust_quantity(self) -> RustQuantity:
         """The kind, the outputs and the position."""
@@ -2016,7 +2016,7 @@ Source code in `commol/context/inference/global_sensitivity.py`
 ```python
 def default_label(self) -> str:
     """`outputs` at `at`."""
-    return f"{self.output_name} at {self.at:g}"
+    return f"{self.output_name} at {_position_text(self.at)}"
 ```
 
 #### rust_quantity
@@ -2082,7 +2082,8 @@ class Gain(_OneScalar):
 
     def default_label(self) -> str:
         """The gain of `outputs` over the window."""
-        return f"{self.output_name} gain over ({self.start:g}, {self.end:g}]"
+        start, end = _position_text(self.start), _position_text(self.end)
+        return f"{self.output_name} gain over ({start}, {end}]"
 
     def rust_quantity(self) -> RustQuantity:
         """The kind, the outputs, the start and the end."""
@@ -2126,7 +2127,8 @@ Source code in `commol/context/inference/global_sensitivity.py`
 ```python
 def default_label(self) -> str:
     """The gain of `outputs` over the window."""
-    return f"{self.output_name} gain over ({self.start:g}, {self.end:g}]"
+    start, end = _position_text(self.start), _position_text(self.end)
+    return f"{self.output_name} gain over ({start}, {end}]"
 ```
 
 #### rust_quantity
@@ -2289,7 +2291,10 @@ class Trajectory(_AtPositions):
         """One `ValueAt` per position."""
         name = self.label or self.output_name
         return [
-            (f"{name} at {at:g}", (self.rust_kind, self.output_list, [at]))
+            (
+                f"{name} at {_position_text(at)}",
+                (self.rust_kind, self.output_list, [at]),
+            )
             for at in self.positions
         ]
 ```
@@ -2328,7 +2333,10 @@ def expand(self) -> list[tuple[str, RustQuantity]]:
     """One `ValueAt` per position."""
     name = self.label or self.output_name
     return [
-        (f"{name} at {at:g}", (self.rust_kind, self.output_list, [at]))
+        (
+            f"{name} at {_position_text(at)}",
+            (self.rust_kind, self.output_list, [at]),
+        )
         for at in self.positions
     ]
 ```

@@ -3960,12 +3960,12 @@ series first:</p>
 <tr>
 <td><code>observed_data</code></td>
 <td><code>None</code></td>
-<td><code>ObservedDataPoint</code>s to draw on the subplot of their <code>label</code>, at their positions (a differential model may observe between integers). An observation with a <code>window</code> draws the windowed line, which reads the results at every window end and start (<code>ValueError</code> when the results do not hold one).</td>
+<td><code>ObservedDataPoint</code>s to draw on the subplot of their <code>label</code>, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs and one factor and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, <code>window</code> and factor as the loss reads it (<code>ValueError</code> when the results have no value at a position or a window start).</td>
 </tr>
 <tr>
 <td><code>calibration_result</code></td>
 <td><code>None</code></td>
-<td>A <code>CalibrationResult</code> gives the factor values that scale the model. A <a href="../uncertainty/#the-predictive"><code>Predictive</code></a> draws the weighted median of its draws and their band of <code>confidence_level</code>, each draw read through the observation operator (sums, windows, factors).</td>
+<td>A <code>CalibrationResult</code> gives the factor values that scale the model. A <a href="../uncertainty/#the-predictive"><code>Predictive</code></a> draws the weighted median of its draws and their band of <code>confidence_level</code>, each draw read through the observation operator (sums, windows, factors), at the position of each observation when the line of <code>observed_data</code> is.</td>
 </tr>
 <tr>
 <td><code>prediction_intervals</code></td>
@@ -4035,6 +4035,10 @@ series first:</p>
 </tr>
 </tbody>
 </table>
+<p><code>style</code>, <code>palette</code> and <code>context</code> apply to the figure of one plot only. Each
+method of <code>SimulationPlotter</code> draws in a copy of <code>matplotlib.rcParams</code>
+(<code>_scoped_style</code> in <code>py-commol/commol/api/plotter.py</code>), so the figures that
+you draw with matplotlib after a plot of commol keep your own style.</p>
 <p>To compare with observations:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ObservedDataPoint</span>
 </span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
