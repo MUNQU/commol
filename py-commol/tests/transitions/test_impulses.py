@@ -101,10 +101,8 @@ class TestDefinition:
         assert transition.is_impulse
 
     def test_a_difference_engine_names_an_impulse_between_steps(self) -> None:
-        model = _impulse_model(ode=False, impulse_at=[0.5])
-
-        with pytest.raises(RuntimeError, match="'jump' acts at 0.5"):
-            Simulation(model)
+        with pytest.raises(ValidationError, match="'jump' acts at 0.5"):
+            _impulse_model(ode=False, impulse_at=[0.5])
 
     def test_impulse_at_and_impulse_every_exclude_each_other(self) -> None:
         with pytest.raises(ValidationError, match="not both"):

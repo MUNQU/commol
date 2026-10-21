@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `ModelBuilder.build` and `Model.update_parameters` accepted a series point
+  or an impulse position that the engine cannot run, such as a point or an
+  `impulse_at` of 1.5 under `DifferenceEquations` or `StochasticSteps`, or a
+  `"pulse"` point at 1.5 under any engine; the error came only at
+  `Simulation(model)`, as `RuntimeError`. Both now raise `ValueError` with the
+  message of the engine, and a rejected update leaves the model unchanged.
+
 ## [0.6.0] - 2026-10-22
 
 This release adds the first uncertainty methods with a stated model of the

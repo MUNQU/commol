@@ -144,16 +144,6 @@ impl ImpulseSchedule {
             }
         }
     }
-
-    /// The first position that is not an integer, if any.
-    pub(crate) fn first_non_integer(&self) -> Option<f64> {
-        match self {
-            Self::At(positions) => positions.iter().copied().find(|p| p.fract() != 0.0),
-            Self::Every { period, offset } => [*offset, *period]
-                .into_iter()
-                .find(|value| value.fract() != 0.0),
-        }
-    }
 }
 
 /// A transition that moves its rate at once at the positions of a schedule.
@@ -180,9 +170,9 @@ impl SeriesParameter {
     /// # Errors
     ///
     /// Returns a message that names the parameter when a position is not
-    /// finite and non-negative, two positions are the same, or a `"pulse"`
-    /// series has a position that is not an integer: a pulse is a rate on
-    /// one unit step.
+    /// finite and non-negative, or two positions are the same. The check of
+    /// the model ([`crate::check_model`]) rejects a `"pulse"` series with a
+    /// position that is not an integer.
     pub(crate) fn new(
         parameter_name: String,
         parameter_index: usize,
@@ -193,14 +183,6 @@ impl SeriesParameter {
             return Err(format!(
                 "Series parameter '{parameter_name}' has a point at {position}; a \
                  position must be finite and not negative"
-            ));
-        }
-        if mode == SeriesMode::Pulse
-            && let Some(&(position, _)) = data.iter().find(|(p, _)| p.fract() != 0.0)
-        {
-            return Err(format!(
-                "Series parameter '{parameter_name}' is a pulse at {position}, which is \
-                 not an integer step; a pulse acts on one whole step"
             ));
         }
         data.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
@@ -227,14 +209,6 @@ impl SeriesParameter {
     /// Whether the series is read at `step` rather than at `t`.
     pub(crate) fn reads_step(&self) -> bool {
         self.mode == SeriesMode::Pulse
-    }
-
-    /// The first position that is not an integer, if any.
-    pub(crate) fn first_non_integer(&self) -> Option<f64> {
-        self.data
-            .iter()
-            .map(|&(position, _)| position)
-            .find(|position| position.fract() != 0.0)
     }
 
     /// Positions in `(from, to)` where the series jumps or bends, for a
@@ -507,14 +481,6 @@ mod tests {
         assert_eq!(series.evaluate(2.0, 2.5), 2.5);
         assert_eq!(series.evaluate(10.0, 10.0), 10.0);
         assert_eq!(series.evaluate(11.0, 11.0), 0.0);
-    }
-
-    #[test]
-    fn a_pulse_between_steps_names_its_parameter() {
-        let error = SeriesParameter::new("x".to_string(), 0, vec![(1.5, 1.0)], SeriesMode::Pulse)
-            .err()
-            .unwrap();
-        assert!(error.contains("'x' is a pulse at 1.5"), "{error}");
     }
 
     #[test]

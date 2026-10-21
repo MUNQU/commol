@@ -16,8 +16,8 @@ use commol_core::math_expression::preprocessing::{
     SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX,
 };
 use commol_core::{
-    Aggregate, MathExpression, MathExpressionContext, Model, NEIGHBORS, NEIGHBORS_PREFIX, Process,
-    RateMathExpression, Rounding,
+    Aggregate, EngineType, MathExpression, MathExpressionContext, Model, NEIGHBORS,
+    NEIGHBORS_PREFIX, ParameterValue, Process, RateMathExpression, Rounding, SeriesMode,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -385,6 +385,88 @@ fn check_whole_units(model: &Model, aggregate: &Aggregate) -> Result<(), String>
         Rounding::LargestRemainder.name(),
         Rounding::Random.name(),
     ))
+}
+
+/// How the message of an engine that steps only at integers names it, or
+/// `None` when the engine runs at any position.
+fn integer_stepper(engine: EngineType) -> Option<&'static str> {
+    match engine {
+        EngineType::DifferenceEquations => Some("a difference-equations model"),
+        EngineType::StochasticSteps => Some("the StochasticSteps engine"),
+        _ => None,
+    }
+}
+
+/// Whether `position` is a valid position that is not an integer. A
+/// position that is not finite or is negative is not one: the compilation of
+/// the model rejects it with its own message.
+fn between_integers(position: f64) -> bool {
+    position.is_finite() && position >= 0.0 && position.fract() != 0.0
+}
+
+/// The smallest position of `positions` that is between two integers.
+fn first_between_integers(positions: impl Iterator<Item = f64>) -> Option<f64> {
+    positions
+        .filter(|&position| between_integers(position))
+        .min_by(f64::total_cmp)
+}
+
+/// Check the series points and the impulse positions against the engine.
+///
+/// A `"pulse"` series acts on one whole step, so each of its points must be
+/// an integer, whatever the engine. An engine that steps only at integers
+/// ([`integer_stepper`]) cannot run a series point or an impulse between two
+/// steps either.
+fn check_positions_of_engine(model: &Model) -> Result<(), String> {
+    let series = || {
+        model
+            .parameters
+            .iter()
+            .filter_map(|parameter| match &parameter.value {
+                Some(ParameterValue::Series { data, mode }) => {
+                    Some((parameter.id.as_str(), data, mode))
+                }
+                _ => None,
+            })
+    };
+    for (id, data, mode) in series() {
+        if *mode == SeriesMode::Pulse
+            && let Some(position) = first_between_integers(data.iter().map(|&(p, _)| p))
+        {
+            return Err(format!(
+                "Series parameter '{id}' is a pulse at {position}, which is not an \
+                 integer step; a pulse acts on one whole step"
+            ));
+        }
+    }
+    let Some(stepper) = integer_stepper(model.engine.engine_type()) else {
+        return Ok(());
+    };
+    for transition in &model.process.transitions {
+        let position = match (&transition.impulse_at, transition.impulse_every) {
+            (Some(positions), None) => first_between_integers(positions.iter().copied()),
+            (None, Some((period, offset))) => [offset, period]
+                .into_iter()
+                .find(|&value| between_integers(value)),
+            _ => None,
+        };
+        if let Some(position) = position {
+            return Err(format!(
+                "Impulse transition '{}' acts at {position}, which is not an integer \
+                 step; {stepper} steps only at integers",
+                transition.id
+            ));
+        }
+    }
+    for (id, data, _) in series() {
+        if let Some(position) = first_between_integers(data.iter().map(|&(p, _)| p)) {
+            return Err(format!(
+                "Series parameter '{id}' has a point at {position}, which is not an \
+                 integer step; {stepper} steps only at integers"
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// The impulse schedule of each impulse transition, by transition id.
@@ -828,6 +910,9 @@ pub fn subgroup_total_names(process: &Process) -> Vec<String> {
 /// This function returns an error when:
 ///
 /// - the variant or the neighbors of the structure do not fit the process;
+/// - a `"pulse"` series has a point that is not an integer, or the engine
+///   steps only at integers (`DifferenceEquations`, `StochasticSteps`) and a
+///   series point or an impulse position is not an integer;
 /// - a parameter, bin or accumulator id is a variable the engine provides in
 ///   every expression ([`ENGINE_VARIABLES`]: `total`, `step`, `t`, `pi`, `e`),
 ///   because the engine variable would hide it, or it is `neighbors` or
@@ -859,6 +944,7 @@ pub fn check_model(model: &Model) -> Result<(), String> {
     check_engine_variable_ids(model, process)?;
     check_neighbor_terms(model, aggregate)?;
     check_whole_units(model, aggregate)?;
+    check_positions_of_engine(model)?;
     let layout = CompartmentLayout::new(process);
     check_bin_names_against_subgroup_totals(&layout, process)?;
     let compartments: HashSet<&str> = layout.names().iter().map(String::as_str).collect();

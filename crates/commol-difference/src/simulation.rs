@@ -54,7 +54,9 @@ impl DifferenceEquations {
     /// # Errors
     ///
     /// Returns a message when the model is not a difference-equations model,
-    /// or when [`CompiledModel::try_from_model`] fails.
+    /// or when [`CompiledModel::try_from_model`] fails: among its checks
+    /// ([`commol_model::check_model`]), an impulse or a series point that is
+    /// not at an integer step.
     pub fn try_from_model(model: &commol_core::Model) -> Result<Self, String> {
         let engine_type = model.engine.engine_type();
         if engine_type != commol_core::EngineType::DifferenceEquations {
@@ -63,29 +65,7 @@ impl DifferenceEquations {
                 engine_type.name()
             ));
         }
-        Self::from_compiled(CompiledModel::try_from_model(model)?)
-    }
-
-    /// Step a compiled model in discrete time, whatever its engine.
-    ///
-    /// # Errors
-    ///
-    /// Returns a message that names the impulse transition or the series
-    /// parameter when one of its positions is not an integer, because the
-    /// engine only steps at integers.
-    pub fn from_compiled(model: CompiledModel) -> Result<Self, String> {
-        if let Some((transition, position)) = model.first_non_integer_impulse() {
-            return Err(format!(
-                "Impulse transition '{transition}' acts at {position}, which is not an \
-                 integer step; a difference-equations model steps only at integers"
-            ));
-        }
-        if let Some((parameter, position)) = model.first_non_integer_series_point() {
-            return Err(format!(
-                "Series parameter '{parameter}' has a point at {position}, which is not \
-                 an integer step; a difference-equations model steps only at integers"
-            ));
-        }
+        let model = CompiledModel::try_from_model(model)?;
         let state = model.initial_state().to_vec();
         let rates = vec![0.0; state.len()];
         Ok(Self {

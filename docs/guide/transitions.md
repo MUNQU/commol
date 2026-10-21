@@ -385,7 +385,7 @@ print(jumped["moved"][2])  # 225.0: a quarter of the 900 left at step 1
 |---|---|
 | Order | At step `n` the state jumps first; then the flows of the step run from the new state. The output at `n` shows the state after the jump (`CompiledModel::apply_impulses` in `crates/commol-model/src/system.rs`). |
 | Several impulses at one step | Every jump is computed from the state before any of them. |
-| Steps | A `DifferentialEquations` model takes any steps, such as `0.5`: the engine stops there, applies the jump and restarts. A `DifferenceEquations` model needs integer steps (`ValidationError` names the transition). |
+| Steps | A `DifferentialEquations` model takes any steps, such as `0.5`: the engine stops there, applies the jump and restarts. A `DifferenceEquations` or `StochasticSteps` model needs integer steps: `ModelBuilder.build` raises `ValidationError`, which names the transition. |
 | Units | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units](units-and-equations.md#impulses)). |
 | `describe()` | Lists impulses apart from the equations, with their steps ([Describing a Model](describing-models.md#the-equations)). |
 

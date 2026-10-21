@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from commol import ModelBuilder, SeriesValue, Simulation
+from commol.context.engine import EngineName
 from commol.context.parameter import Parameter, ParameterUpdate
 from tests.support import (
     ENGINE_REL,
@@ -104,6 +105,47 @@ class TestUncalibratedParameters:
         assert "not found" in str(error.value).lower()
 
 
+STEPPERS = {
+    "DifferenceEquations": "a difference-equations model",
+    "StochasticSteps": "the StochasticSteps engine",
+}
+"""The engines that step only at integers, as their messages name them."""
+
+
+@pytest.mark.parametrize("engine", ["DifferenceEquations", "StochasticSteps"])
+def test_a_point_the_engine_cannot_run_is_rejected_at_build_and_update(
+    engine: EngineName,
+) -> None:
+    between = SeriesValue(data=[(0, 0.1), (1.5, 0.2)], mode="step_function")
+    point = (
+        r"Series parameter 'k' has a point at 1\.5, which is not an integer step; "
+        f"{STEPPERS[engine]} steps only at integers"
+    )
+    with_point = a_to_b_builder(parameters={}, rate="k")
+    with_point.add_parameter("k", between.data, mode=between.mode)
+    with_impulse = a_to_b_builder(parameters={"k": 0.1})
+    with_impulse.add_transition(
+        id="jump", source=["A"], target=["B"], rate="0.5", impulse_at=[1.5]
+    )
+
+    with pytest.raises(ValueError, match=point):
+        with_point.build(with_point.structure, engine=engine)
+    with pytest.raises(ValueError, match=r"Impulse transition 'jump' acts at 1\.5"):
+        with_impulse.build(with_impulse.structure, engine=engine)
+
+    valid = a_to_b_builder(parameters={"k": 0.1})
+    model = valid.build(valid.structure, engine=engine)
+    saved = model.model_dump()
+    with pytest.raises(ValueError, match=point):
+        model.update_parameters({"k": between})
+    assert model.model_dump() == saved
+    Simulation(model)
+
+    ode = build_ode(a_to_b_builder(parameters={"k": 0.1}))
+    ode.update_parameters({"k": between})
+    assert Simulation(ode).run_at([1.5])["A"][0] < 1000
+
+
 class TestSeriesParameters:
     def test_a_difference_model_reads_a_linear_series_at_each_step(self) -> None:
         # k(n) = n / 10, so one step moves k(n) A(n).
@@ -116,13 +158,6 @@ class TestSeriesParameters:
         for n in range(4):
             expected.append(expected[-1] * (1 - n / 10))
         assert_close(a, expected, rel=ENGINE_REL)
-
-    def test_a_difference_engine_names_a_point_between_steps(self) -> None:
-        builder = a_to_b_builder(parameters={}, rate="k")
-        builder.add_parameter("k", [(2.5, 0.1)], mode="step_function")
-
-        with pytest.raises(RuntimeError, match="'k' has a point at 2.5"):
-            Simulation(build(builder))
 
     def test_a_linear_series_is_a_ramp_in_a_differential_model(self) -> None:
         # k(t) = t / 10 on [0, 10]: A(10) = 1000 exp(-5), not the staircase
@@ -138,8 +173,8 @@ class TestSeriesParameters:
         builder = a_to_b_builder(parameters={}, rate="k")
         builder.add_parameter("k", [(1.5, 0.1)], mode="pulse")
 
-        with pytest.raises(RuntimeError, match="'k' is a pulse at 1.5"):
-            Simulation(build_ode(builder))
+        with pytest.raises(ValueError, match="'k' is a pulse at 1.5"):
+            build_ode(builder)
 
     def test_update_parameters_replaces_a_series(self) -> None:
         # A pulse moves its value times A on the step of its point only; a

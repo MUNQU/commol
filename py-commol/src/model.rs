@@ -127,15 +127,17 @@ fn transition_flows(
         .collect())
 }
 
-/// Check an aggregate model: its variant and neighbors, the variables its
-/// rates read, and its names against the names the engine provides
+/// Check an aggregate model: its variant and neighbors, the positions of its
+/// series and impulses, the variables its rates read, and its names against
+/// the names the engine provides
 ///
 /// Args:
 ///     model: An aggregate model
 ///
 /// Raises:
 ///     ValueError: If the model is not aggregate, its variant or neighbors
-///         do not fit the process, a parameter id is an expanded compartment,
+///         do not fit the process, a series point or an impulse position is
+///         one the engine cannot run, a parameter id is an expanded compartment,
 ///         a subgroup total or a name of the neighbors, a rate uses a
 ///         `total_…` name that is not a subgroup total of the model, or a
 ///         rate reads neighbors the model cannot resolve
