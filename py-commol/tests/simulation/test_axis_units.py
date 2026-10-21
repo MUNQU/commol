@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 import commol
 from commol import Aggregate, AxisUnits, Simulation
-from commol.api import windows
+from commol.context import _windows as windows
 from commol.utils.equations import UnitConsistencyError
 
 from tests.support import (

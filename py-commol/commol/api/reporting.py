@@ -9,7 +9,8 @@ from commol.api.inference.intervals import member_statistics
 from commol.api.inference.predictive import Predictive
 from commol.api.results import SimulationResults, sample
 from commol.api.simulation import Simulation
-from commol.api.windows import window_end, window_index, windowed_totals
+from commol.api.windows import windowed_totals
+from commol.context._windows import window_end, window_index
 from commol.context.calibration import (
     CalibrationProblem,
     CalibrationResult,

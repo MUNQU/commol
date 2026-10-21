@@ -10,7 +10,7 @@ from commol import (
     Simulation,
     windowed_totals,
 )
-from commol.api.windows import window_end, window_ends, window_index, window_start
+from commol.context._windows import window_end, window_ends, window_index, window_start
 from tests.support import a_to_b_builder, bounded, build
 
 SEED = 42

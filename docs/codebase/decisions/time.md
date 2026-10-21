@@ -19,11 +19,12 @@ be whole is the engine's check, not the converter's.
 The axis owns the window grid: `AxisUnits.window_start`, `window_end`,
 `window_index` and `window_ends` take the width as a span and a unit, as
 `steps` does, and check that it is a positive whole number of steps. They call
-the grid in steps of `api/windows.py`, the one grid that `windowed_totals` and
-`observed_report` read; those two take a `window` of any positive length,
-because the window of an observation of a differential model need not be
-whole. No public function takes a width in steps: a width of `n` steps is the
-span `n` in the step unit.
+the grid in steps of `context/_windows.py`, private, the one grid that
+`windowed_totals` and `observed_report` read; those two take a `window` of any
+positive length, because the window of an observation of a differential model
+need not be whole. No public function takes a width in steps: a width of `n`
+steps is the span `n` in the step unit. The grid is in the context layer, so
+`AxisUnits` does not import `api/`.
 
 The rate conversions (`rate_from_mean_span`, `rate_from_probability`) ask the
 engine: `RateMeaning::rate_from_mean_span` and `rate_from_probability`

@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from commol.api import windows
 from commol.commol_rs import _commol_rs as commol_rs
 
+from commol.context import _windows as windows
 from commol.context._model.units import DEFAULT_STEP_UNIT, check_step_unit
 from commol.utils.equations import define_units, ureg
 
