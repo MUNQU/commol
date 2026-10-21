@@ -3137,7 +3137,13 @@ unit does not enter. A bin left <code>None</code> counts as 0, so the model stat
 on the remainder (<code>{"A": 1000, "B": None}</code>). Without a remainder every state is
 feasible, because the engine rejects a negative amount. With one, a remainder
 below zero is infeasible by its share of the amounts the values set, a number
-with no unit that is never a division by zero.</p>
+with no unit that is never a division by zero.
+<code>ForwardModel::configure</code> (<code>forward.rs</code>) puts the message of the plan of
+values (<code>ValuePlan::infeasibility</code>) in the <code>Violation::InfeasibleStart</code> it
+returns, so a calibration (<code>CalibrationProblem::configured_engine</code>) and a
+predictive draw (<code>prediction_error</code> in <code>py-commol/src/inference.rs</code>) give the
+same message, and the binding needs no access to the problem
+(<code>tests/uncertainty/test_predictive.py::TestBands::test_a_draw_with_an_infeasible_start_names_its_set</code>).</p>
 <p>Units live only in Python (the Rust <code>Bin</code> has none), so
 <code>Aggregate.check_calibration_values</code> rejects a remainder whose unit is not the
 unit of every compartment a value sets, from the coverage the engine resolves

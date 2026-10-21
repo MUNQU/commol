@@ -4165,7 +4165,7 @@ print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75
 
 ## The predictive
 
-`Predictive(source, sample, positions)` runs every draw at `positions`, in parallel in Rust, through the forward model of its source: a `Calibrator`, or a `SensitivityAnalysis` of the inputs of the sample. With a stochastic engine every replicate of a draw is a draw of the predictive, with an equal share of its weight and a seed of its own, derived from the seed of the source, so every draw shows fresh noise and the predictive repeats from that seed. The positions are sorted and unique, and each one is a position the engine reports at; otherwise `Predictive` raises `ValueError` before any draw runs. A draw whose run leaves the values its model allows raises `InfeasibleStateError` with the index of its parameter set and the message of the run: the compartment, the step and the flows, as `Simulation.run` reports them ([Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)).
+`Predictive(source, sample, positions)` runs every draw at `positions`, in parallel in Rust, through the forward model of its source: a `Calibrator`, or a `SensitivityAnalysis` of the inputs of the sample. With a stochastic engine every replicate of a draw is a draw of the predictive, with an equal share of its weight and a seed of its own, derived from the seed of the source, so every draw shows fresh noise and the predictive repeats from that seed. The positions are sorted and unique, and each one is a position the engine reports at; otherwise `Predictive` raises `ValueError` before any draw runs. A draw whose run leaves the values its model allows raises `InfeasibleStateError` with the index of its parameter set and the message of the run: the compartment, the step and the flows, as `Simulation.run` reports them ([Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)). A draw whose initial amounts leave the remainder below zero raises `InfeasibleStateError` with the index of its parameter set and the message a calibration gives for the same values: the remainder and the excess ([Calibrating initial conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md)).
 
 | Member                                                     | Returns                                                                                                                                                                                                                                                 |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -27115,8 +27115,8 @@ class Predictive:
             at integer steps).
         InfeasibleStateError
             If a draw leaves the values its model allows. The message names
-            the parameter set, then says what the run says: the compartment,
-            the step and the flows.
+            the parameter set, then says what the run says (the compartment,
+            the step and the flows), or what the initial amounts exceed.
         """
         self.source: PredictiveSource = source
         self.sample: ParameterSample = sample
@@ -27268,8 +27268,8 @@ class Predictive:
             analysis.
         InfeasibleStateError
             If a draw leaves the values its model allows. The message names
-            the parameter set, then says what the run says: the compartment,
-            the step and the flows.
+            the parameter set, then says what the run says (the compartment,
+            the step and the flows), or what the initial amounts exceed.
         """
         draws = self.source.rust_observation_draws(
             self.sample, list(observed_data), noise
@@ -27310,7 +27310,7 @@ Raises:
 | Type                   | Description                                                                                                                                                                                                         |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError`           | Before any draw runs: if the sample's parameters are not the source's, or the positions are not sorted and unique or the engine does not report at one of them (a difference engine reports only at integer steps). |
-| `InfeasibleStateError` | If a draw leaves the values its model allows. The message names the parameter set, then says what the run says: the compartment, the step and the flows.                                                            |
+| `InfeasibleStateError` | If a draw leaves the values its model allows. The message names the parameter set, then says what the run says (the compartment, the step and the flows), or what the initial amounts exceed.                       |
 
 Source code in `commol/api/inference/predictive.py`
 
@@ -27343,8 +27343,8 @@ def __init__(
         at integer steps).
     InfeasibleStateError
         If a draw leaves the values its model allows. The message names
-        the parameter set, then says what the run says: the compartment,
-        the step and the flows.
+        the parameter set, then says what the run says (the compartment,
+        the step and the flows), or what the initial amounts exceed.
     """
     self.source: PredictiveSource = source
     self.sample: ParameterSample = sample
@@ -27563,7 +27563,7 @@ Raises:
 | Type                   | Description                                                                                                                                                                                                                                                       |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError`           | If an observation names an unknown output or factor, a series the residual noise has no residuals of, or a series with no observation model; DistributionNoise comes with a problem that has a loss; or the noise is not NoNoise() and the source is an analysis. |
-| `InfeasibleStateError` | If a draw leaves the values its model allows. The message names the parameter set, then says what the run says: the compartment, the step and the flows.                                                                                                          |
+| `InfeasibleStateError` | If a draw leaves the values its model allows. The message names the parameter set, then says what the run says (the compartment, the step and the flows), or what the initial amounts exceed.                                                                     |
 
 Source code in `commol/api/inference/predictive.py`
 
@@ -27607,8 +27607,8 @@ def at_observations(
         analysis.
     InfeasibleStateError
         If a draw leaves the values its model allows. The message names
-        the parameter set, then says what the run says: the compartment,
-        the step and the flows.
+        the parameter set, then says what the run says (the compartment,
+        the step and the flows), or what the initial amounts exceed.
     """
     draws = self.source.rust_observation_draws(
         self.sample, list(observed_data), noise
@@ -34679,6 +34679,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - `ModelBuilder.build` and `Model.update_parameters` accepted a series point or an impulse position that the engine cannot run, such as a point or an `impulse_at` of 1.5 under `DifferenceEquations` or `StochasticSteps`, or a `"pulse"` point at 1.5 under any engine; the error came only at `Simulation(model)`, as `RuntimeError`. Both now raise `ValueError` with the message of the engine, and a rejected update leaves the model unchanged.
 - The `InfeasibleStateError` of a draw of a `Predictive` said only `InfeasibleRun`. It now gives the message of the run after the index of the parameter set: the compartment, the step and the flows, as `Simulation.run` reports them.
+- The `InfeasibleStateError` of a draw of a `Predictive` whose initial amounts leave the remainder below zero said only `InfeasibleStart { excess: ... }`. It now gives the message a calibration gives for the same values after the index of the parameter set: what the amounts exceed, the remainder and by how much.
 
 ## [0.6.0] - 2026-10-22
 

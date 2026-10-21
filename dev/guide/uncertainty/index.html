@@ -3707,7 +3707,11 @@ reports at; otherwise <code>Predictive</code> raises <code>ValueError</code> bef
 A draw whose run leaves the values its model allows raises
 <code>InfeasibleStateError</code> with the index of its parameter set and the message of
 the run: the compartment, the step and the flows, as <code>Simulation.run</code> reports
-them (<a href="../transitions/#amounts-below-zero">Amounts below zero</a>).</p>
+them (<a href="../transitions/#amounts-below-zero">Amounts below zero</a>).
+A draw whose initial amounts leave the remainder below zero raises
+<code>InfeasibleStateError</code> with the index of its parameter set and the message a
+calibration gives for the same values: the remainder and the excess
+(<a href="../calibration-initial-conditions/">Calibrating initial conditions</a>).</p>
 <table>
 <thead>
 <tr>

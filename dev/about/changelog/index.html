@@ -3848,6 +3848,11 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>InfeasibleRun</code>. It now gives the message of the run after the index of the
   parameter set: the compartment, the step and the flows, as
   <code>Simulation.run</code> reports them.</li>
+<li>The <code>InfeasibleStateError</code> of a draw of a <code>Predictive</code> whose initial
+  amounts leave the remainder below zero said only
+  <code>InfeasibleStart { excess: ... }</code>. It now gives the message a calibration
+  gives for the same values after the index of the parameter set: what the
+  amounts exceed, the remainder and by how much.</li>
 </ul>
 <h2 id="060-2026-10-22">[0.6.0] - 2026-10-22<a class="headerlink" href="#060-2026-10-22" title="Permanent link">&para;</a></h2>
 <p>This release adds the first uncertainty methods with a stated model of the
