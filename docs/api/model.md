@@ -4,7 +4,8 @@
 
 The validated model that `ModelBuilder.build` returns: a header, the process
 written once, the structure that lays it out (`Aggregate`, with its neighbors
-`Complete` and `Groups`), and the entries of `Aggregate.initial_state()`.
+`Complete` and `Groups`), the entries of `Aggregate.initial_state()`, and the
+`SeriesValue` of a series parameter.
 Guide: [Core Concepts](../guide/core-concepts.md),
 [Building Models](../guide/building-models.md#the-structure-aggregate),
 [Describing a Model](../guide/describing-models.md),
@@ -24,6 +25,8 @@ Guide: [Core Concepts](../guide/core-concepts.md),
 ::: commol.context.neighbors.Groups
 
 ::: commol.context._model.engine_state.InitialCompartment
+
+::: commol.context.parameter.SeriesValue
 
 ## Descriptions
 

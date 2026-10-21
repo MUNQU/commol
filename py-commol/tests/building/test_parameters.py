@@ -1,13 +1,14 @@
 """Parameters: numbers, formulas, series, and values left for calibration."""
 
 import math
+import warnings
 
 import pytest
 
 from pydantic import ValidationError
 
-from commol import ModelBuilder, Simulation
-from commol.context.parameter import Parameter
+from commol import ModelBuilder, SeriesValue, Simulation
+from commol.context.parameter import Parameter, ParameterUpdate
 from tests.support import (
     ENGINE_REL,
     a_to_b_builder,
@@ -139,6 +140,50 @@ class TestSeriesParameters:
 
         with pytest.raises(RuntimeError, match="'k' is a pulse at 1.5"):
             Simulation(build_ode(builder))
+
+    def test_update_parameters_replaces_a_series(self) -> None:
+        # A pulse moves its value times A on the step of its point only; a
+        # step function moves it on every step from its point on.
+        builder = a_to_b_builder(parameters={}, rate="d")
+        builder.add_parameter("d", [(1, 0.5)], mode="pulse")
+        model = build(builder)
+
+        model.update_parameters({"d": [(2, 0.25)]})
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            pulse = Simulation(model).run(4)["B"]
+        model.update_parameters(
+            {"d": SeriesValue(data=[(3, 0.5)], mode="step_function")}
+        )
+        model.update_parameters({"d": [(2, 0.25)]})
+        step_function = Simulation(model).run(4)["B"]
+
+        assert_close(pulse, [0, 0, 0, 250, 250], rel=ENGINE_REL)
+        assert_close(step_function, [0, 0, 0, 250, 437.5], rel=ENGINE_REL)
+
+    @pytest.mark.parametrize(
+        ("values", "message"),
+        [
+            ({"k": [(1, 0.5)]}, "Parameter 'k' is not a series"),
+            ({"d": []}, "Parameter 'd' cannot take .* at least one point"),
+            ({"k": 0.3, "d": [(-1, 0.5)]}, "Parameter 'd' cannot take .*non-negative"),
+            ({"k": "  "}, "Parameter 'k' cannot take .* Formula cannot be empty"),
+            ({"d": [1.0]}, "Parameter 'd' cannot take .* valid tuple"),
+            ({"k": "total_g1"}, "Unknown subgroup total.*'total_g1'"),
+        ],
+    )
+    def test_update_parameters_rejects_a_value_it_cannot_take(
+        self, values: dict[str, ParameterUpdate], message: str
+    ) -> None:
+        builder = a_to_b_builder(parameters={"k": 0.1}, rate="k * d")
+        builder.add_parameter("d", [(1, 1.0)], mode="pulse")
+        model = build(builder)
+        saved = model.model_dump()
+
+        with pytest.raises(ValueError, match=message):
+            model.update_parameters(values)
+
+        assert model.model_dump() == saved
 
 
 class TestValues:

@@ -26,7 +26,7 @@ from commol.context.calibration import (
 from commol.context.constants import CalibrationParameterType
 from commol.context.description import Layout, ModelDescription
 from commol.context.engine import ModelEngine
-from commol.context.parameter import Parameter
+from commol.context.parameter import Parameter, ParameterUpdate
 from commol.context.process import Process
 from commol.context.structure import ModelStructure
 
@@ -182,31 +182,45 @@ class Model(BaseModel, Generic[StructureT]):
         self.structure.check_model(self)
         return self
 
-    def update_parameters(self, parameter_values: Mapping[str, float | None]) -> None:
+    def update_parameters(
+        self, parameter_values: Mapping[str, ParameterUpdate]
+    ) -> None:
         """
         Update parameter values in the model.
 
+        The model takes every value or none: the values pass the checks of
+        `Parameter` and of the model, as when the model is made, before any is
+        written.
+
         Parameters
         ----------
-        parameter_values : Mapping[str, float | None]
-            Dictionary mapping parameter IDs to their new values.
+        parameter_values : Mapping[str, ParameterUpdate]
+            Each parameter id mapped to its new value: a number, a formula, a
+            `SeriesValue`, or None to leave it for calibration. A list of
+            (position, value) points replaces the points of a series parameter
+            and keeps its mode; a `SeriesValue` sets the points and the mode.
 
         Raises
         ------
         ValueError
-            If a parameter ID in the dictionary doesn't exist in the model.
+            If an id is not a parameter of the model, a list is given for a
+            parameter that is not a series, a value is not valid (the message
+            names the parameter), or the model rejects the new values.
         """
-        param_dict = {param.id: param for param in self.parameters}
-
+        current = {param.id: param for param in self.parameters}
+        updated = dict(current)
         for param_id, value in parameter_values.items():
-            if param_id not in param_dict:
+            if param_id not in current:
                 raise ValueError(
                     (
                         f"Parameter '{param_id}' not found in model. "
-                        f"Available parameters: {', '.join(param_dict.keys())}"
+                        f"Available parameters: {', '.join(current.keys())}"
                     )
                 )
-            param_dict[param_id].value = value
+            updated[param_id] = current[param_id].with_value(value)
+        parameters = list(updated.values())
+        self.structure.check_model(self.model_copy(update={"parameters": parameters}))
+        self.parameters = parameters
 
     def get_uncalibrated_parameters(self) -> list[str]:
         """

@@ -250,6 +250,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   state of the run, so its fit, its uncertainty and its `Predictive` started
   from a wrong split: they now share it in the proportions of the initial
   state.
+- `Model.update_parameters` wrote each value with no check, so a list of
+  points for a series parameter left a model that `Simulation` could not
+  read, with an error that named no parameter. It now takes a list of points
+  for a series parameter and keeps its mode, or a `SeriesValue` (now in
+  `commol`) with a new mode, and it runs the checks of a new model: a value
+  it cannot take raises `ValueError` at the call, with the id of the
+  parameter, and leaves the model unchanged.
 
 ## [0.5.0] - 2026-10-19
 

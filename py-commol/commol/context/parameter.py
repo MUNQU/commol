@@ -2,7 +2,7 @@
 
 import math
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 
 class SeriesValue(BaseModel):
@@ -49,6 +49,10 @@ class SeriesValue(BaseModel):
             raise ValueError("Series positions must be unique")
 
         return value
+
+
+type ParameterUpdate = float | str | list[tuple[float, float]] | SeriesValue | None
+"""A new value of a parameter: a value it takes, or the points of its series."""
 
 
 class Parameter(BaseModel):
@@ -117,3 +121,42 @@ class Parameter(BaseModel):
             True if the parameter has a value, False if it needs calibration.
         """
         return self.value is not None
+
+    def with_value(self, value: ParameterUpdate) -> "Parameter":
+        """
+        This parameter with another value.
+
+        Parameters
+        ----------
+        value : ParameterUpdate
+            The new value, as `Parameter.value` takes it. A list of
+            (position, value) points replaces the points of a series and keeps
+            its mode; a `SeriesValue` sets both.
+
+        Returns
+        -------
+        Parameter
+            A new parameter with the same id, description and unit.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is a list and this parameter is not a series, or
+            ``value`` is not a valid value; the message names the parameter.
+        """
+        try:
+            if isinstance(value, list):
+                if not isinstance(self.value, SeriesValue):
+                    raise ValueError(
+                        f"Parameter '{self.id}' is not a series, so a list of "
+                        "points has no mode: pass a SeriesValue(data=..., mode=...)"
+                    )
+                value = SeriesValue(data=value, mode=self.value.mode)
+            return Parameter(
+                id=self.id, value=value, description=self.description, unit=self.unit
+            )
+        except ValidationError as error:
+            reasons = "; ".join(detail["msg"] for detail in error.errors())
+            raise ValueError(
+                f"Parameter '{self.id}' cannot take {value!r}: {reasons}"
+            ) from None

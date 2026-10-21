@@ -82,7 +82,8 @@ structure, and loads back as its own class
 
 ::: commol.context.parameter.Parameter
 
-::: commol.context.parameter.SeriesValue
+The value of a series parameter, `SeriesValue`, is documented in
+[Model API](../api/model.md).
 
 ## Transitions
 
