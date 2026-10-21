@@ -3838,6 +3838,11 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>The default label of a quantity of interest wrote each position with 6
+  significant digits, so two positions close together gave one label and the
+  analysis raised <code>ValueError</code>: <code>Trajectory(outputs="A", positions=[1000000,
+  1000001])</code> gave <code>"A at 1e+06"</code> twice. The label now writes each position in
+  full (<code>"A at 1000000"</code>, <code>"A at 1000001"</code>).</li>
 <li><code>ModelBuilder.build</code> and <code>Model.update_parameters</code> accepted a series point
   or an impulse position that the engine cannot run, such as a point or an
   <code>impulse_at</code> of 1.5 under <code>DifferenceEquations</code> or <code>StochasticSteps</code>, or a

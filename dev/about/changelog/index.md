@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- The default label of a quantity of interest wrote each position with 6 significant digits, so two positions close together gave one label and the analysis raised `ValueError`: `Trajectory(outputs="A", positions=[1000000, 1000001])` gave `"A at 1e+06"` twice. The label now writes each position in full (`"A at 1000000"`, `"A at 1000001"`).
 - `ModelBuilder.build` and `Model.update_parameters` accepted a series point or an impulse position that the engine cannot run, such as a point or an `impulse_at` of 1.5 under `DifferenceEquations` or `StochasticSteps`, or a `"pulse"` point at 1.5 under any engine; the error came only at `Simulation(model)`, as `RuntimeError`. Both now raise `ValueError` with the message of the engine, and a rejected update leaves the model unchanged.
 - The `InfeasibleStateError` of a draw of a `Predictive` said only `InfeasibleRun`. It now gives the message of the run after the index of the parameter set: the compartment, the step and the flows, as `Simulation.run` reports them.
 - The `InfeasibleStateError` of a draw of a `Predictive` whose initial amounts leave the remainder below zero said only `InfeasibleStart { excess: ... }`. It now gives the message a calibration gives for the same values after the index of the parameter set: what the amounts exceed, the remainder and by how much.
