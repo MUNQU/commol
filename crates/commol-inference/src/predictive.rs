@@ -189,7 +189,9 @@ fn gamma(shape: f64, rate: f64, generator: &mut Generator) -> f64 {
 /// Why a predictive could not be built.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PredictiveError {
-    /// The sample is not a sample of the forward model's parameters.
+    /// An input does not fit the forward model, before any draw runs: the
+    /// sample is not a sample of its parameters, a position is one its
+    /// engine rejects, or an observation is one it cannot read.
     Mismatch(String),
     /// A draw has no run; `draw` is its index in the sample.
     Draw {
@@ -260,8 +262,11 @@ impl Predictive {
     ///
     /// # Errors
     ///
-    /// Returns an error when the sample's parameters are not the forward
-    /// model's, or a draw has no run.
+    /// [`PredictiveError::Mismatch`], before any draw runs, when the
+    /// sample's parameters are not the forward model's, or the positions are
+    /// not sorted and unique or one is a position the engine rejects
+    /// ([`commol_core::check_positions`]); [`PredictiveError::Draw`] when a
+    /// draw has no run.
     pub fn new<E>(
         forward: &ForwardModel<E>,
         sample: &ParameterSample,
@@ -272,6 +277,9 @@ impl Predictive {
         E: SimulationEngine + Send + Sync,
     {
         check_names(forward, sample)?;
+        let engine = forward.base_engine();
+        commol_core::check_positions(positions, 0.0, |position| engine.check_position(position))
+            .map_err(PredictiveError::Mismatch)?;
         let runs = run_sets(forward, sample.values(), positions, Some(seed))?;
         let mut trajectories = Vec::new();
         let mut weights = Vec::new();

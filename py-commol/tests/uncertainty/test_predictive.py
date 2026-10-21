@@ -142,6 +142,14 @@ class TestBands:
         with pytest.raises(ValueError, match="in this order"):
             Predictive(calibrator, sample, POSITIONS)
 
+    def test_a_predictive_rejects_positions_out_of_order(
+        self, calibrator: Calibrator
+    ) -> None:
+        sample = _sample([[0.1, 0.05], [0.2, 0.05]])
+
+        with pytest.raises(ValueError, match="sorted and unique, got 1 before 1$"):
+            Predictive(calibrator, sample, [0, 1, 1])
+
 
 class TestObservations:
     def test_the_replicates_of_a_draw_share_its_weight(self) -> None:

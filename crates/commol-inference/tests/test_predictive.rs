@@ -106,6 +106,27 @@ fn a_sample_of_other_parameters_is_named_in_the_error() {
 }
 
 #[test]
+fn positions_the_engine_cannot_run_are_rejected_before_any_draw() {
+    let problem = problem();
+    let draws = sample(vec![vec![0.1], vec![0.2]]);
+    let cases: [(&[f64], &str); 3] = [
+        (&[0.0, 1.0, 1.0], "sorted and unique, got 1 before 1"),
+        (&[2.0, 1.0], "sorted and unique, got 2 before 1"),
+        (&[0.5], "integer steps; 0.5 is not one"),
+    ];
+
+    for (positions, message) in cases {
+        let error = Predictive::new(problem.forward(), &draws, positions, 0)
+            .expect_err("the engine cannot run these positions");
+
+        assert!(
+            matches!(&error, PredictiveError::Mismatch(text) if text.contains(message)),
+            "{positions:?}: {error:?}"
+        );
+    }
+}
+
+#[test]
 fn a_draw_without_a_run_is_named_with_its_reason() {
     let failed = PredictiveError::Draw {
         draw: 1,
