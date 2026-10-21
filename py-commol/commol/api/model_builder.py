@@ -404,11 +404,14 @@ class ModelBuilder:
             - "rate": Rate expression string
 
         per_compartment : bool | None, default=None
-            When True, base compartment names in the rate
-            expression are automatically replaced with the specific stratified
-            compartment name for each expanded transition flow. This ensures
-            each subgroup transitions based on its own compartment value
-            rather than the total across all subgroups.
+            When True, each id of a source or target bin in a rate reads the
+            compartment of the flow (``A_g1``) instead of the total of the bin.
+            Any other bin keeps its total: in a transition from ``A`` to ``B``,
+            ``k * A * (C + D) / total`` reads ``A_g1`` and the totals of ``C``
+            and ``D``. It applies to the fallback rate, to every stratified
+            rate, and to every transition that ``$compartment`` expands to,
+            where ``$compartment`` reads the compartment that flows. A
+            transition between categories ignores it.
 
         accumulators : list[str] | None, default=None
             Ids of accumulators that add up the flow of this transition.
@@ -485,26 +488,19 @@ class ModelBuilder:
         if rate and "$compartment" in rate:
             self._validate_compartment_placeholder(id, source, target)
             self._expand_compartment_transition(
-                id, source, target, rate, stratified_rates, impulse_at, impulse_every
+                id,
+                source,
+                target,
+                rate,
+                stratified_rates,
+                per_compartment,
+                accumulators,
+                impulse_at,
+                impulse_every,
             )
             return self
 
-        # Convert stratified rates dicts to Pydantic objects
-        stratified_rates_objects: list[StratifiedRate] | None = None
-        if stratified_rates:
-            stratified_rates_objects = []
-            for rate_dict in stratified_rates:
-                conditions = [
-                    StratificationCondition(**cond) for cond in rate_dict["conditions"]
-                ]
-                stratified_rates_objects.append(
-                    StratifiedRate(
-                        conditions=conditions,
-                        rate=str(rate_dict["rate"]),
-                        absolute=rate_dict.get("absolute"),
-                    )
-                )
-
+        stratified_rates_objects = _stratified_rate_objects(stratified_rates)
         self._transitions.append(
             Transition(
                 id=id,
@@ -589,8 +585,10 @@ class ModelBuilder:
         target: list[str],
         rate: str,
         stratified_rates: list[StratifiedRateDict] | None,
-        impulse_at: list[float] | None = None,
-        impulse_every: tuple[float, float] | None = None,
+        per_compartment: bool | None,
+        accumulators: list[str] | None,
+        impulse_at: list[float] | None,
+        impulse_every: tuple[float, float] | None,
     ) -> None:
         """
         Expand a transition with $compartment placeholder into multiple transitions.
@@ -609,8 +607,9 @@ class ModelBuilder:
             Rate formula containing $compartment
         stratified_rates : list[StratifiedRateDict] | None
             Stratified rates (can contain $compartment which will be expanded)
-        impulse_at, impulse_every : optional
-            Impulse schedule of every expanded transition
+        per_compartment, accumulators, impulse_at, impulse_every : optional
+            The arguments of `add_transition` that every expanded transition
+            keeps
         """
         # Determine if we're expanding over sources or targets
         has_multiple_sources = len(source) > 1
@@ -634,32 +633,9 @@ class ModelBuilder:
             # Replace $compartment with actual compartment name in base rate
             expanded_rate = rate.replace("$compartment", compartment)
 
-            # Expand stratified rates if present
-            expanded_stratified_rates: list[StratifiedRate] | None = None
-            if stratified_rates:
-                expanded_stratified_rates = []
-                for rate_dict in stratified_rates:
-                    # Replace $compartment in stratified rate expression
-                    strat_rate_value = rate_dict["rate"]
-                    # Convert to string if it's a number
-                    if isinstance(strat_rate_value, (int, float)):
-                        strat_rate_str = str(strat_rate_value)
-                    else:
-                        strat_rate_str = strat_rate_value
-
-                    expanded_strat_rate = strat_rate_str.replace(
-                        "$compartment", compartment
-                    )
-
-                    # Convert conditions to Pydantic objects
-                    conditions = [
-                        StratificationCondition(**cond)
-                        for cond in rate_dict["conditions"]
-                    ]
-
-                    expanded_stratified_rates.append(
-                        StratifiedRate(conditions=conditions, rate=expanded_strat_rate)
-                    )
+            expanded_stratified_rates = _stratified_rate_objects(
+                stratified_rates, compartment
+            )
 
             # Generate unique ID for this expanded transition
             expanded_id = f"{id}__{compartment}"
@@ -677,8 +653,10 @@ class ModelBuilder:
                     id=expanded_id,
                     source=expanded_source,
                     target=expanded_target,
+                    accumulators=accumulators or [],
                     rate=expanded_rate,
                     stratified_rates=expanded_stratified_rates,
+                    per_compartment=per_compartment,
                     impulse_at=impulse_at,
                     impulse_every=impulse_every,
                 )
@@ -837,3 +815,28 @@ class ModelBuilder:
         logger.info(f"Model '{self._name}' successfully built for the {engine} engine.")
 
         return model
+
+
+def _stratified_rate_objects(
+    stratified_rates: list[StratifiedRateDict] | None,
+    compartment: str | None = None,
+) -> list[StratifiedRate] | None:
+    """The stratified rates as models, with ``$compartment`` set to ``compartment``."""
+    if not stratified_rates:
+        return None
+    objects: list[StratifiedRate] = []
+    for rate_dict in stratified_rates:
+        rate = str(rate_dict["rate"])
+        if compartment is not None:
+            rate = rate.replace("$compartment", compartment)
+        objects.append(
+            StratifiedRate(
+                conditions=[
+                    StratificationCondition(**condition)
+                    for condition in rate_dict["conditions"]
+                ],
+                rate=rate,
+                absolute=rate_dict.get("absolute"),
+            )
+        )
+    return objects

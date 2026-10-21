@@ -234,6 +234,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   quantile now bisects the floating-point numbers between the two ends.
 - A particle swarm whose first particle had a NaN cost kept no best particle
   and returned its start point: a NaN cost now counts as the worst.
+- A transition whose rate holds `$compartment` dropped `per_compartment`,
+  `accumulators` and the `absolute` of its stratified rates: each transition it
+  expands to now keeps them, so with `per_compartment=True` `$compartment`
+  reads the compartment that flows, and its accumulators count the flow.
 
 ## [0.5.0] - 2026-10-19
 

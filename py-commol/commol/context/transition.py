@@ -143,9 +143,9 @@ class Transition(BaseModel):
     per_compartment: bool | None = Field(
         default=None,
         description=(
-            "When True, base compartment names in the rate expression "
-            "are replaced with the specific stratified compartment name "
-            "for each expanded transition flow."
+            "When True, the id of each source and target bin in a rate reads "
+            "the compartment of each flow; any other bin keeps its total. A "
+            "transition between categories ignores it."
         ),
     )
 
