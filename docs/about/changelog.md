@@ -50,6 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   matplotlib after it had the style of commol. The style now applies to the
   figure of that plot only, and `matplotlib.rcParams` is as it was before the
   call.
+- `PRCC` never returned when a quantity was NaN at a draw. It now raises
+  `ValueError` that gives the index of the quantity and the draws where it
+  is NaN, before it ranks any value.
 
 ## [0.6.0] - 2026-10-22
 

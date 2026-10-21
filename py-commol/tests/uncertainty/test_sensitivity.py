@@ -42,7 +42,7 @@ from commol import (
 from commol.context.inference.global_sensitivity import Quantity, expand_quantities
 from tests.support import abc_builder, bounded, build
 from tests.support.kinds import decay, decay_model
-from tests.support.models import build_stochastic
+from tests.support.models import a_to_b_builder, build_stochastic
 
 
 @pytest.fixture
@@ -471,6 +471,25 @@ class TestPRCC:
             analysis.run(PRCC(draws=3, quantities=[ValueAt(outputs="B", at=5)]))
         with pytest.raises(ValueError, match=r"PRCC of independent inputs needs draws"):
             analysis.run(PRCC(quantities=[ValueAt(outputs="B", at=5)]))
+
+    def test_a_quantity_that_is_nan_is_an_error(self) -> None:
+        # The sum of A, B and acc is above the largest float from position 1,
+        # so the gain is inf − inf, NaN, at every draw.
+        simulation = Simulation(
+            build(
+                a_to_b_builder(amounts={"A": 0.9e308, "B": 0.85e308}, accumulator="acc")
+            )
+        )
+        inputs = InputSpace.uniform_on_bounds([bounded("k", 0.1, 0.5)])
+        analysis = SensitivityAnalysis(simulation, inputs, seed=1)
+        gain = Gain(outputs=["A", "B", "acc"], start=1, end=5)
+
+        values = analysis.run(Propagation(draws=3, quantities=[gain])).values
+        assert all(math.isnan(row[0]) for row in values)
+        with pytest.raises(
+            ValueError, match=r"quantity 1 .* NaN at the points \[0, 1, 2, 3, 4\]"
+        ):
+            analysis.run(PRCC(draws=5, quantities=[ValueAt(outputs="B", at=5), gain]))
 
 
 class TestMorris:

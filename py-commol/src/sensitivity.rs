@@ -157,7 +157,8 @@ impl PyForwardAnalysis {
     ///
     /// Raises:
     ///     ValueError: If the draws do not fit the inputs, a quantity does not
-    ///         fit the model, or the ranks of the inputs are collinear
+    ///         fit the model or is NaN at a draw, or the ranks of the inputs
+    ///         are collinear
     ///     InfeasibleStateError: If a point leaves the values its model allows
     fn prcc(
         &self,

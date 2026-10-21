@@ -12,9 +12,13 @@
 //! other inputs; and the significance uses Kish's
 //! effective size in place of the number of draws. Equal weights give the
 //! unweighted PRCC and its usual test.
+//!
+//! A NaN has no rank, so PRCC refuses a NaN input or quantity before it
+//! ranks any value.
 
 use nalgebra::DMatrix;
 
+use crate::predictive::PredictiveError;
 use crate::special::beta_i;
 use crate::statistics::effective_size;
 
@@ -38,33 +42,54 @@ pub struct Prcc {
 ///
 /// # Errors
 ///
-/// Returns a message when the draws, the outputs and the weights differ in
-/// number, there is no input, a weight is negative or every weight is zero,
-/// the effective size is not above one more than the number of inputs, or
-/// the ranks of the inputs are collinear.
-pub fn prcc(inputs: &[Vec<f64>], outputs: &[Vec<f64>], weights: &[f64]) -> Result<Prcc, String> {
+/// [`PredictiveError::NotANumber`] with the first quantity that is NaN at a
+/// draw, and every draw where it is, before any value is ranked;
+/// [`PredictiveError::Mismatch`] when the draws, the outputs and the weights
+/// differ in number, there is no input, an input is NaN, a weight is
+/// negative or every weight is zero, the effective size is not above one
+/// more than the number of inputs, or the ranks of the inputs are collinear.
+pub fn prcc(
+    inputs: &[Vec<f64>],
+    outputs: &[Vec<f64>],
+    weights: &[f64],
+) -> Result<Prcc, PredictiveError> {
     let draws = inputs.len();
     if outputs.len() != draws || weights.len() != draws {
-        return Err(format!(
+        return Err(PredictiveError::Mismatch(format!(
             "PRCC needs one row of outputs and one weight per draw: {draws} draws, {} rows of \
              outputs and {} weights",
             outputs.len(),
             weights.len()
-        ));
+        )));
     }
+    let quantities = outputs.first().map_or(0, Vec::len);
+    if let Some(quantity) = (0..quantities).find(|&q| outputs.iter().any(|row| row[q].is_nan())) {
+        return Err(PredictiveError::NotANumber {
+            quantity,
+            points: (0..draws)
+                .filter(|&draw| outputs[draw][quantity].is_nan())
+                .collect(),
+        });
+    }
+    let invalid = |message: String| Err(PredictiveError::Mismatch(message));
     let count = inputs.first().map_or(0, Vec::len);
     if count == 0 {
-        return Err("PRCC needs at least one input".to_string());
+        return invalid("PRCC needs at least one input".to_string());
+    }
+    if let Some(draw) = inputs.iter().position(|row| row.iter().any(|v| v.is_nan())) {
+        return invalid(format!(
+            "PRCC ranks numbers: an input of draw {draw} is NaN"
+        ));
     }
     let total: f64 = weights.iter().sum();
     if weights.iter().any(|w| w.is_nan() || *w < 0.0) || total.is_nan() || total <= 0.0 {
-        return Err("The weights of PRCC are not negative, and some are above 0".to_string());
+        return invalid("The weights of PRCC are not negative, and some are above 0".to_string());
     }
     let weights: Vec<f64> = weights.iter().map(|w| w / total).collect();
     let size = effective_size(&weights);
     let freedom = size - count as f64 - 1.0;
     if freedom.is_nan() || freedom <= 0.0 {
-        return Err(format!(
+        return invalid(format!(
             "PRCC of {count} inputs needs an effective size above {}, got {size}",
             count + 1
         ));
@@ -78,12 +103,11 @@ pub fn prcc(inputs: &[Vec<f64>], outputs: &[Vec<f64>], weights: &[f64]) -> Resul
     // 1e-12 of the largest: the relative test of polynomial chaos.
     let eigenvalues = covariance(&input_ranks, &weights).symmetric_eigenvalues();
     if eigenvalues.min() <= 1e-12 * eigenvalues.max() {
-        return Err(
+        return invalid(
             "The ranks of the inputs are collinear: PRCC needs inputs that vary on their own"
                 .to_string(),
         );
     }
-    let quantities = outputs.first().map_or(0, Vec::len);
     let mut coefficients = Vec::with_capacity(quantities);
     let mut p_values = Vec::with_capacity(quantities);
     for q in 0..quantities {
@@ -143,7 +167,8 @@ fn partial_correlation(full: &DMatrix<f64>, a: usize, b: usize) -> f64 {
 
 /// The weighted mid-rank of each value, in `[0, 1]`: the weight of the
 /// values below it plus half the weight of the values equal to it. With
-/// equal weights it is `(r − ½) / n` for the usual mid-rank `r`.
+/// equal weights it is `(r − ½) / n` for the usual mid-rank `r`. No value is
+/// NaN, as [`prcc()`] checks: a NaN is equal to no value, itself included.
 fn weighted_ranks(values: &[f64], weights: &[f64]) -> Vec<f64> {
     let mut order: Vec<usize> = (0..values.len()).collect();
     order.sort_by(|&a, &b| values[a].total_cmp(&values[b]));
@@ -229,7 +254,50 @@ mod tests {
         assert!(prcc(&inputs, &outputs, &[1.0, -1.0, 1.0]).is_err());
         assert!(prcc(&inputs, &outputs, &[0.0; 3]).is_err());
         let error = prcc(&inputs[..2], &outputs[..2], &[1.0; 2]).unwrap_err();
-        assert!(error.contains("effective size above 2"), "{error}");
+        assert!(
+            error.to_string().contains("effective size above 2"),
+            "{error}"
+        );
+        let nan_input = vec![vec![0.0], vec![f64::NAN], vec![2.0]];
+        let error = prcc(&nan_input, &outputs, &[1.0; 3]).unwrap_err();
+        assert!(error.to_string().contains("draw 1 is NaN"), "{error}");
+    }
+
+    /// `prcc` on another thread, with the time it may take before the test
+    /// fails as a hang.
+    fn within_a_second(
+        inputs: Vec<Vec<f64>>,
+        outputs: Vec<Vec<f64>>,
+    ) -> Result<Prcc, PredictiveError> {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let weights = vec![1.0; inputs.len()];
+            sender.send(prcc(&inputs, &outputs, &weights)).ok();
+        });
+        receiver
+            .recv_timeout(std::time::Duration::from_secs(1))
+            .expect("PRCC returns within a second")
+    }
+
+    #[test]
+    fn a_nan_value_is_an_error_not_a_hang() {
+        let inputs: Vec<Vec<f64>> = (0..5).map(|i| vec![i as f64]).collect();
+        let outputs: Vec<Vec<f64>> = (0..5)
+            .map(|i| vec![i as f64, if i % 2 == 1 { f64::NAN } else { 1.0 }])
+            .collect();
+        let error = within_a_second(inputs, outputs).unwrap_err();
+        assert_eq!(
+            error,
+            PredictiveError::NotANumber {
+                quantity: 1,
+                points: vec![1, 3]
+            }
+        );
+        let message = error.to_string();
+        assert!(
+            message.contains("quantity 1") && message.contains("[1, 3]"),
+            "{message}"
+        );
     }
 
     #[test]
@@ -260,7 +328,7 @@ mod tests {
             .collect();
         let outputs: Vec<Vec<f64>> = (0..6).map(|i| vec![(i * i) as f64]).collect();
         let error = prcc(&inputs, &outputs, &[1.0; 6]).unwrap_err();
-        assert!(error.contains("collinear"), "{error}");
+        assert!(error.to_string().contains("collinear"), "{error}");
     }
 
     #[test]
@@ -268,6 +336,6 @@ mod tests {
         let inputs: Vec<Vec<f64>> = (0..6).map(|i| vec![i as f64, 2.0 * i as f64]).collect();
         let outputs: Vec<Vec<f64>> = (0..6).map(|i| vec![(i * i) as f64]).collect();
         let error = prcc(&inputs, &outputs, &[1.0; 6]).unwrap_err();
-        assert!(error.contains("collinear"), "{error}");
+        assert!(error.to_string().contains("collinear"), "{error}");
     }
 }

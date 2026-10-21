@@ -778,8 +778,8 @@ pub(crate) fn value_error(message: String) -> PyErr {
 
 pub(crate) fn predictive_error(error: PredictiveError) -> PyErr {
     match error {
-        PredictiveError::Mismatch(message) => value_error(message),
         PredictiveError::Draw { draw, error } => prediction_error(draw, error),
+        error => value_error(error.to_string()),
     }
 }
 
