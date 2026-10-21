@@ -234,3 +234,37 @@ class TestAgreementWithTheCalibrationLoss:
         result = Calibrator(_model(None), problem).run()
 
         assert result.final_loss > 1.0
+
+
+def test_windowed_totals_take_output_names() -> None:
+    """
+    An output name stands for itself, so some strata of an accumulator sum.
+
+    The three strata start equal and move at one rate, so two of them gain
+    two thirds of what the whole accumulator gains.
+    """
+    builder = a_to_b_builder(
+        parameters={"k1": 0.1},
+        rate="k1",
+        per_compartment=True,
+        accumulator="moved",
+        amounts={"A": 90, "B": 0},
+        stratifications={"g": {"g1": 1 / 3, "g2": 1 / 3, "g3": 1 / 3}},
+    )
+    simulation = Simulation(build(builder))
+    results = simulation.run(4)
+
+    some = simulation.windowed_totals(results, ["moved_g2", "moved_g3"], 2)
+    whole = simulation.windowed_totals(results, ["moved"], 2)
+    by_hand = windowed_totals(
+        [
+            g2 + g3
+            for g2, g3 in zip(results["moved_g2"], results["moved_g3"], strict=True)
+        ],
+        results.positions,
+        2,
+    )
+
+    assert some == pytest.approx(by_hand)
+    assert some == pytest.approx([2 / 3 * value for value in whole])
+    assert all(value > 0 for value in some)

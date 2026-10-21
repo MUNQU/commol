@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Added #255 -->
 
+- `Simulation.total_series` and `Simulation.windowed_totals` take output names
+  as well as bin and accumulator ids. An output name stands for itself, so
+  `simulation.windowed_totals(results, ["moved_g2", "moved_g3"], 2)` sums two
+  strata of the accumulator `moved`; a bin or accumulator id still stands for
+  all its outputs. An id that is neither raises `KeyError` with the bins,
+  accumulators and outputs of the model.
+
 <!-- Added #256 -->
 
 - The window grid on the axis: `AxisUnits.window_start(index, span, unit)`,

@@ -144,12 +144,34 @@ class TestTotalSeries:
         with pytest.raises(KeyError, match="Missing output series"):
             simulation.total_series(results, ["A"])
 
-    def test_unknown_source_is_rejected(self) -> None:
+    def test_an_output_name_stands_for_itself(self) -> None:
         simulation = _model()
         results = simulation.run(10)
 
-        with pytest.raises(KeyError, match="not a bin or accumulator"):
+        total = simulation.total_series(results, ["A_group1", "B"])
+        expected = [
+            a1 + b1 + b2
+            for a1, b1, b2 in zip(
+                results["A_group1"],
+                results["B_group1"],
+                results["B_group2"],
+                strict=True,
+            )
+        ]
+
+        assert total == pytest.approx(expected)
+
+    def test_unknown_id_is_rejected_with_what_it_could_be(self) -> None:
+        simulation = _model()
+        results = simulation.run(10)
+
+        with pytest.raises(KeyError, match="not a bin, accumulator or output") as error:
             simulation.total_series(results, ["nope"])
+
+        message = str(error.value)
+        assert "Bins and accumulators: ['A', 'B', 'events']" in message
+        assert "Outputs: ['A_group1', 'A_group2', 'B_group1'" in message
+        assert "'events_group2']" in message
 
 
 class TestSubgroupTotal:

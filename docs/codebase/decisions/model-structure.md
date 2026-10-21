@@ -93,11 +93,15 @@ compartments exist and what they are named.
 `Aggregate.outputs_by_source(model)` maps each bin or accumulator id to its
 output names in engine order. It uses the engine expansion (`expanded_outputs`), so
 `Simulation.outputs_for`, `group_outputs` and `total_series` group outputs by
-label, not by name.
+label, not by name. `total_series` and `windowed_totals` also take output
+names: an id that is a source stands for all its outputs, and any other id
+must be an output name, which stands for itself.
 
 **Guards:** `tests/simulation/test_outputs.py::TestOutputsBySource::test_expansion_matches_the_engine_output_names`
-(order) and `TestSourceIdSharingAPrefix` (a bin and an accumulator that share
-a prefix).
+(order), `TestSourceIdSharingAPrefix` (a bin and an accumulator that share
+a prefix), `TestTotalSeries::test_an_output_name_stands_for_itself` and
+`tests/simulation/test_windows.py::test_windowed_totals_take_output_names`
+(output names).
 
 ## The engine owns the variable names
 
