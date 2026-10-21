@@ -135,12 +135,17 @@ predictive reads windows through the observation operator
 ([One observation operator](calibration.md#one-observation-operator)). Window `w`
 covers `(w · W, (w + 1) · W]`; `window_index` places a position with
 `max(ceil(at / W) − 1, 0)`, and `observed_report` calls it.
+`SimulationPlotter.plot_series` reads the model of a windowed observation the
+same way, through its own window at its own position, never on a grid of
+windows from 0: an observation at 10.5 with a window of 7 falls on no window
+end of that grid.
 
 **Guards:** `tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss` (the loss at
 the generating parameters is zero),
 `tests/reporting/test_simulation_report.py::test_observed_report_places_each_observation_by_window_index`
+`tests/plotting/test_plotter.py::TestPredictiveSeries::test_a_windowed_band_of_one_draw_is_its_windowed_run`
 and
-`tests/plotting/test_plotter.py::TestPredictiveSeries::test_a_windowed_band_of_one_draw_is_its_windowed_run`.
+`tests/plotting/test_plotter.py::test_each_observed_point_is_read_through_its_own_window_and_position`.
 
 ## The engine owns positions
 

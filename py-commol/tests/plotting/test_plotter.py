@@ -308,8 +308,8 @@ class TestSimulationPlotter:
         """Ticks follow the series' own grid, not the absolute step 0."""
         _fig, ax = plt.subplots()
 
-        # A windowed series: plotted steps are window ends, starting at the
-        # window width rather than at 0.
+        # A series read at its observations: the plotted steps are their
+        # positions, which start at 7 rather than at 0.
         window = 7
         positions = list(range(window, 8 * window + 1, window))
         plotter._apply_x_labels(ax, positions, str, tick_every=2 * window)
@@ -437,11 +437,33 @@ class TestPredictiveSeries:
             observed_data=observed, calibration_result=predictive, series=["events"]
         )
 
-        ends = list(range(5, 41, 5))
+        ends = [10, 25, 40]
         line = figure.axes[0].lines[0]
         assert np.asarray(line.get_xdata(), dtype=float).tolist() == ends
         assert np.asarray(line.get_ydata(), dtype=float).tolist() == pytest.approx(
             [run["events"][end] - run["events"][end - 5] for end in ends]
+        )
+
+    def test_a_band_reads_each_point_through_its_own_window(self) -> None:
+        predictive = self._predictive([0.05])
+        run = predictive.runs()[0]
+        observed = [
+            ObservedDataPoint(at=at, output="events", value=1.0, window=window)
+            for at, window in ((10, 5), (30, 20))
+        ]
+        plotter = SimulationPlotter(predictive.source.simulation, run)
+
+        figure = plotter.plot_series(
+            observed_data=observed, calibration_result=predictive, series=["events"]
+        )
+
+        line = figure.axes[0].lines[0]
+        assert np.asarray(line.get_xdata(), dtype=float).tolist() == [10, 30]
+        assert np.asarray(line.get_ydata(), dtype=float).tolist() == pytest.approx(
+            [
+                run["events"][10] - run["events"][5],
+                run["events"][30] - run["events"][10],
+            ]
         )
 
     def test_the_band_of_two_draws_spans_their_runs(self) -> None:
@@ -456,18 +478,66 @@ class TestPredictiveSeries:
         assert band.min() == pytest.approx(min(low["B"]))
         assert band.max() == pytest.approx(max(high["B"]))
 
-    def test_a_band_reads_one_factor(self) -> None:
-        predictive = self._predictive([0.05])
-        observed = [
-            ObservedDataPoint(at=at, output="B", value=1.0, factor_id=factor_id)
-            for at, factor_id in ((10, "f1"), (20, "f2"))
-        ]
-        plotter = SimulationPlotter(predictive.source.simulation, predictive.runs()[0])
+    @staticmethod
+    def _factor_predictive(observed: list[ObservedDataPoint]) -> Predictive:
+        """A predictive of one draw, ``k1 = 0.05`` and the factor ``f1 = 0.5``."""
+        model = build(a_to_b_builder(parameters={"k1": None}, rate="k1"))
+        problem = CalibrationProblem(
+            observed_data=observed,
+            parameters=[
+                bounded("k1", 0.0, 0.5),
+                bounded("f1", 0.1, 1.0, kind="factor"),
+            ],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=1),
+        )
+        sample = ParameterSample.equally_weighted(
+            ["k1", "f1"],
+            [(0.0, 0.5), (0.1, 1.0)],
+            [[0.05, 0.5]],
+            SampleMethod(name="t"),
+        )
+        return Predictive(
+            Calibrator(Simulation(model), problem), sample, list(range(41))
+        )
 
-        with pytest.raises(ValueError, match=r"several factors \['f1', 'f2'\]"):
-            plotter.plot_series(
-                observed_data=observed, calibration_result=predictive, series=["B"]
-            )
+    def test_a_band_reads_each_point_through_its_own_factor(self) -> None:
+        observed = [
+            ObservedDataPoint(at=10, output="B", value=1.0, factor_id="f1"),
+            ObservedDataPoint(at=20, output="B", value=1.0),
+        ]
+        predictive = self._factor_predictive(observed)
+        run = predictive.runs()[0]
+        plotter = SimulationPlotter(predictive.source.simulation, run)
+
+        figure = plotter.plot_series(
+            observed_data=observed, calibration_result=predictive, series=["B"]
+        )
+
+        line = figure.axes[0].lines[0]
+        assert np.asarray(line.get_xdata(), dtype=float).tolist() == [10, 20]
+        assert np.asarray(line.get_ydata(), dtype=float).tolist() == pytest.approx(
+            [0.5 * run["B"][10], run["B"][20]]
+        )
+
+    def test_a_band_of_one_factor_covers_every_position(self) -> None:
+        observed = [
+            ObservedDataPoint(at=at, output="B", value=1.0, factor_id="f1")
+            for at in (10, 20)
+        ]
+        predictive = self._factor_predictive(observed)
+        run = predictive.runs()[0]
+        plotter = SimulationPlotter(predictive.source.simulation, run)
+
+        figure = plotter.plot_series(
+            observed_data=observed, calibration_result=predictive, series=["B"]
+        )
+
+        line = figure.axes[0].lines[0]
+        assert np.asarray(line.get_xdata(), dtype=float).tolist() == run.positions
+        assert np.asarray(line.get_ydata(), dtype=float).tolist() == pytest.approx(
+            [0.5 * value for value in run["B"]]
+        )
 
     def test_a_band_labels_its_positions(self) -> None:
         predictive = self._predictive([0.05])
@@ -529,26 +599,14 @@ class TestObservationOperator:
         with pytest.raises(KeyError, match=r"aggregate components: \['Z'\]"):
             plotter.plot_series(observed_data=observed, series=["B"])
 
-    @pytest.mark.parametrize(
-        ("factor_ids", "message"),
-        [
-            (["f1", "f2"], "Multiple factor_id values"),
-            (["f3"], "Factor parameter 'f3' not found"),
-        ],
-    )
     def test_a_factor_it_cannot_read_leaves_the_line_unscaled(
         self,
         plotter: SimulationPlotter,
         caplog: pytest.LogCaptureFixture,
-        factor_ids: list[str],
-        message: str,
     ) -> None:
-        observed = [
-            ObservedDataPoint(at=10 * i, output="B", value=1.0, factor_id=factor_id)
-            for i, factor_id in enumerate(factor_ids, start=1)
-        ]
+        observed = [ObservedDataPoint(at=10, output="B", value=1.0, factor_id="f3")]
         result = CalibrationResult(
-            best_parameters={"f1": 0.5, "f2": 0.5},
+            best_parameters={"f1": 0.5},
             final_loss=0.0,
             iterations=1,
             converged=True,
@@ -562,24 +620,58 @@ class TestObservationOperator:
         np.testing.assert_allclose(
             fig.axes[0].lines[0].get_ydata(), plotter.results["B"]
         )
-        assert message in caplog.text
+        assert "Factor parameter 'f3' not found" in caplog.text
+
+    def test_points_of_different_factors_are_each_read_through_their_own(
+        self, plotter: SimulationPlotter
+    ) -> None:
+        observed = [
+            ObservedDataPoint(at=10, output="B", value=1.0, factor_id="f1"),
+            ObservedDataPoint(at=20, output="B", value=1.0, factor_id="f2"),
+            ObservedDataPoint(at=30, outputs=["B", "C"], label="B", value=1.0),
+        ]
+        result = CalibrationResult(
+            best_parameters={"f1": 0.5, "f2": 2.0},
+            final_loss=0.0,
+            iterations=1,
+            converged=True,
+            termination_reason="Test",
+        )
+
+        fig = plotter.plot_series(
+            observed_data=observed, calibration_result=result, series=["B"]
+        )
+
+        line = fig.axes[0].lines[0]
+        results = plotter.results
+        np.testing.assert_allclose(line.get_xdata(), [10, 20, 30])
+        np.testing.assert_allclose(
+            line.get_ydata(),
+            [
+                0.5 * results["B"][10],
+                2.0 * results["B"][20],
+                results["B"][30] + results["C"][30],
+            ],
+        )
 
     def test_the_band_of_windowed_replicates_spans_their_window_totals(self) -> None:
         simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
         replicates = simulation.replicates(5, seed=2).run(20)
-        observed = [ObservedDataPoint(at=10, output="B", value=1.0, window=5)]
+        observed = [
+            ObservedDataPoint(at=at, output="B", value=1.0, window=5) for at in (10, 20)
+        ]
 
         fig = SimulationPlotter(simulation, replicates).plot_series(
             observed_data=observed, series=["B"]
         )
 
         totals = [
-            [run["B"][end] - run["B"][end - 5] for end in (5, 10, 15, 20)]
+            [run["B"][end] - run["B"][end - 5] for end in (10, 20)]
             for run in replicates
         ]
         band = [c for c in fig.axes[0].collections if c.get_paths()][0]
         vertices = band.get_paths()[0].vertices
-        assert sorted({float(x) for x, _ in vertices}) == [5.0, 10.0, 15.0, 20.0]
+        assert sorted({float(x) for x, _ in vertices}) == [10.0, 20.0]
         assert vertices[:, 1].min() >= np.min(totals) - 1e-9
         assert vertices[:, 1].max() <= np.max(totals) + 1e-9
 
@@ -653,7 +745,11 @@ class TestDifferentialModel:
 
     def test_a_window_of_non_whole_steps_draws_its_increments(self) -> None:
         simulation = self._events()
-        observed = [ObservedDataPoint(at=5, output="events", value=1.0, window=2.5)]
+        ends = [5.0, 12.5, 20.0]
+        observed = [
+            ObservedDataPoint(at=end, output="events", value=1.0, window=2.5)
+            for end in ends
+        ]
         results = simulation.run_at([2.5 * j for j in range(9)])
 
         fig = SimulationPlotter(simulation, results).plot_series(
@@ -661,7 +757,6 @@ class TestDifferentialModel:
         )
 
         line = fig.axes[0].lines[0]
-        ends = [2.5 * j for j in range(1, 9)]
         np.testing.assert_allclose(line.get_xdata(), ends)
         np.testing.assert_allclose(
             line.get_ydata(),
@@ -676,3 +771,34 @@ class TestDifferentialModel:
             SimulationPlotter(simulation, simulation.run(20)).plot_series(
                 observed_data=observed
             )
+
+
+def test_each_observed_point_is_read_through_its_own_window_and_position() -> None:
+    """
+    The model line of a series sits on each observation: its value there is
+    the observation read through its own window, as the loss reads it.
+    """
+    simulation = Simulation(
+        build_ode(
+            a_to_b_builder(parameters={"k1": 0.05}, rate="k1", accumulator="events")
+        )
+    )
+    run_at_half_steps = simulation.run_at([0.5 * j for j in range(41)])
+    observed = [
+        ObservedDataPoint(at=7.5, output="events", value=10.0, window=7),
+        ObservedDataPoint(at=17.5, output="events", value=12.0, window=14),
+    ]
+
+    fig = SimulationPlotter(simulation, run_at_half_steps).plot_series(
+        observed_data=observed, series=["events"]
+    )
+
+    line = fig.axes[0].lines[0]
+    np.testing.assert_allclose(line.get_xdata(), [7.5, 17.5])
+    np.testing.assert_allclose(
+        line.get_ydata(),
+        [
+            simulation.windowed_totals(run_at_half_steps, ["events"], 7, [7.5])[0],
+            simulation.windowed_totals(run_at_half_steps, ["events"], 14, [17.5])[0],
+        ],
+    )
