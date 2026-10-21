@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `InfeasibleStart { excess: ... }`. It now gives the message a calibration
   gives for the same values after the index of the parameter set: what the
   amounts exceed, the remainder and by how much.
+- A `Gain(start, end)` quantity read its start at `end - (end - start)`,
+  which can round away from `start`: `Gain(start=0.1, end=0.4)` read it at
+  `0.09999999999999998`, so on the `DifferentialEquations` engine the gain
+  did not start where `ValueAt(0.1)` reads. A gain now reads its start at
+  exactly `start`.
 - `SimulationPlotter.plot_series` read the model of a windowed series with
   the first window it found, at the window ends of a grid from 0, so with
   observations at 7.5 and 17.5 no model value sat on an observation and the

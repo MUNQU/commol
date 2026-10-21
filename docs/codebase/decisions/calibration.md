@@ -98,9 +98,16 @@ helpers that present results already computed, such as `windowed_totals`
 must agree with the operator, which
 `tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss` checks.
 
+An observation is given by `at` and `window`, so its window starts at
+`at − window`. A quantity given by its start, `Gain(start, end)`, passes the
+start itself (`ObservationOperator::with_starts`): `end − (end − start)` can
+round away from `start`, as `0.4 − (0.4 − 0.1)` is `0.09999999999999998`.
+
 **Guards:** `observation::tests`,
 `crates/commol-inference/tests/test_predictive.rs::observation_draws_are_the_predictions_the_loss_compares`,
-`tests/uncertainty/test_predictive.py::TestObservations`.
+`tests/uncertainty/test_predictive.py::TestObservations`,
+`crates/commol-inference/tests/test_global_sensitivity.rs::a_gain_reads_its_start_exactly`,
+`tests/uncertainty/test_sensitivity.py::TestPropagation::test_a_gain_reads_its_start_exactly`.
 
 ## Constraints bound the support
 

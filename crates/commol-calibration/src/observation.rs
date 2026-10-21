@@ -44,6 +44,39 @@ impl ObservationOperator {
         output_names: &[String],
         positions: &[f64],
     ) -> Result<Self, String> {
+        let starts: Vec<Option<f64>> = observed_data
+            .iter()
+            .map(|obs| obs.window.map(|window| obs.at - window))
+            .collect();
+        Self::with_starts(observed_data, &starts, parameters, output_names, positions)
+    }
+
+    /// The operator of `observed_data` whose windows start at `starts`, one
+    /// entry per observation and `None` for an observation without a window.
+    ///
+    /// An observation given by the start of its window reads it here, not at
+    /// `at − window`, which can round away from the start. The `window` of
+    /// each observation is not read. `positions` holds every start.
+    ///
+    /// # Errors
+    ///
+    /// See [`Self::new`].
+    ///
+    /// # Panics
+    ///
+    /// Panics when `starts` does not hold one entry per observation.
+    pub fn with_starts(
+        observed_data: &[ObservedDataPoint],
+        starts: &[Option<f64>],
+        parameters: &[CalibrationParameter],
+        output_names: &[String],
+        positions: &[f64],
+    ) -> Result<Self, String> {
+        assert_eq!(
+            starts.len(),
+            observed_data.len(),
+            "one start per observation"
+        );
         let output_map: HashMap<&str, usize> = output_names
             .iter()
             .enumerate()
@@ -112,10 +145,7 @@ impl ObservationOperator {
         Ok(Self {
             outputs,
             rows: observed_data.iter().map(|obs| row_of(obs.at)).collect(),
-            window_rows: observed_data
-                .iter()
-                .map(|obs| obs.window.map(|window| row_of(obs.at - window)))
-                .collect(),
+            window_rows: starts.iter().map(|start| start.map(row_of)).collect(),
             factors,
         })
     }
