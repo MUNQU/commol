@@ -3501,8 +3501,11 @@
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Versions before 1.0.0</p>
-<p>While Commol is at <code>0.x</code>, a breaking change increments the MINOR version
-(<code>0.1.3</code> → <code>0.2.0</code>) and everything else increments the PATCH version.</p>
+<p>While Commol is at <code>0.x</code>, a minor release (<code>0.X.0</code>) ships one theme of new
+features, the one that its milestone names, and it may break the API: the
+changelog marks each break <strong>Breaking</strong>. A patch release (<code>0.X.Y</code>) ships
+fixes only. So a breaking change waits for the next minor release, and a
+new feature never goes into a patch release.</p>
 </div>
 <h2 id="where-the-version-comes-from">Where the Version Comes From<a class="headerlink" href="#where-the-version-comes-from" title="Permanent link">&para;</a></h2>
 <p>The version is not stored in the repository. <code>Cargo.toml</code> keeps a placeholder

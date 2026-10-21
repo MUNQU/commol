@@ -3851,8 +3851,8 @@ merges. <code>In Progress</code> is set when the work starts, by <code>.github/s
 release checklist asks for it:</p>
 <ul>
 <li><strong>A new bug</strong> gets, when it is opened, the milestone of the nearest release
-  it fits: the next one, unless its fix is breaking and that release must not
-  break. A bug with no milestone is in no checklist, and <code>next.sh</code> lists it
+  it fits: the next one, unless its fix is breaking and that release is a
+  patch release, which never breaks (<a href="../release/#version-guidelines">Version Guidelines</a>). A bug with no milestone is in no checklist, and <code>next.sh</code> lists it
   after every issue that has one. To find the bugs that break this rule:</li>
 </ul>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>gh<span class="w"> </span>issue<span class="w"> </span>list<span class="w"> </span>--state<span class="w"> </span>open<span class="w"> </span>--label<span class="w"> </span>change<span class="w"> </span>--search<span class="w"> </span><span class="s2">&quot;no:milestone&quot;</span>
