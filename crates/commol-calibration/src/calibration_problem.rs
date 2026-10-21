@@ -468,9 +468,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         self.forward
             .configure(&self.applied_parameter_values(values))
             .map_err(|error| match error {
-                EvaluationError::Violation(Violation::InfeasibleStart { excess }) => {
-                    self.forward.plan_infeasibility(excess)
-                }
+                EvaluationError::Violation(Violation::InfeasibleStart { message, .. }) => message,
                 error => error.to_string(),
             })
     }

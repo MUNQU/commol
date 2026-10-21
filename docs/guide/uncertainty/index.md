@@ -214,6 +214,10 @@ A draw whose run leaves the values its model allows raises
 `InfeasibleStateError` with the index of its parameter set and the message of
 the run: the compartment, the step and the flows, as `Simulation.run` reports
 them ([Amounts below zero](../transitions.md#amounts-below-zero)).
+A draw whose initial amounts leave the remainder below zero raises
+`InfeasibleStateError` with the index of its parameter set and the message a
+calibration gives for the same values: the remainder and the excess
+([Calibrating initial conditions](../calibration-initial-conditions.md)).
 
 | Member | Returns |
 |---|---|

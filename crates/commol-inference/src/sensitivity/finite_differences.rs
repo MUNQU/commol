@@ -254,7 +254,7 @@ impl<E: SimulationEngine + Send + Sync> SensitivitySource for FiniteDifferences<
 /// Why a run of the forward model is infeasible, in words.
 fn reason(violation: &Violation) -> String {
     match violation {
-        Violation::InfeasibleStart { excess } => {
+        Violation::InfeasibleStart { excess, .. } => {
             format!("the starting state is infeasible (excess {excess})")
         }
         Violation::InfeasibleRun { .. } => "the run leaves the values the model allows".to_string(),

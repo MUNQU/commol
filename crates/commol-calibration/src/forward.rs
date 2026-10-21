@@ -200,20 +200,14 @@ impl<E: SimulationEngine> ForwardModel<E> {
         self.replicates.as_ref().map_or(1, |r| r.seeds.len())
     }
 
-    /// The engine's message for a starting state `excess` away from
-    /// feasible.
-    pub(crate) fn plan_infeasibility(&self, excess: f64) -> String {
-        self.values.plan().infeasibility(excess)
-    }
-
     /// A clone of the base engine, reset, with `values` written into it.
     ///
     /// The values are written as given: callers check or clamp the bounds.
     ///
     /// # Errors
     ///
-    /// [`Violation::InfeasibleStart`] when the values make the starting
-    /// state infeasible, or a failure when the engine rejects a value or the
+    /// [`Violation::InfeasibleStart`], with the plan of values' message, when
+    /// the values make the starting state infeasible, or a failure when the engine rejects a value or the
     /// number of values is wrong.
     pub fn configure(&self, values: &[f64]) -> Result<E, EvaluationError> {
         if values.len() != self.parameters.len() {
@@ -230,7 +224,8 @@ impl<E: SimulationEngine> ForwardModel<E> {
             .apply(&mut engine, &self.parameters, values)
             .map_err(EvaluationError::Failed)?;
         if excess > 0.0 {
-            return Err(Violation::InfeasibleStart { excess }.into());
+            let message = self.values.plan().infeasibility(excess);
+            return Err(Violation::InfeasibleStart { excess, message }.into());
         }
         Ok(engine)
     }

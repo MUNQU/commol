@@ -62,6 +62,12 @@ on the remainder (`{"A": 1000, "B": None}`). Without a remainder every state is
 feasible, because the engine rejects a negative amount. With one, a remainder
 below zero is infeasible by its share of the amounts the values set, a number
 with no unit that is never a division by zero.
+`ForwardModel::configure` (`forward.rs`) puts the message of the plan of
+values (`ValuePlan::infeasibility`) in the `Violation::InfeasibleStart` it
+returns, so a calibration (`CalibrationProblem::configured_engine`) and a
+predictive draw (`prediction_error` in `py-commol/src/inference.rs`) give the
+same message, and the binding needs no access to the problem
+(`tests/uncertainty/test_predictive.py::TestBands::test_a_draw_with_an_infeasible_start_names_its_set`).
 
 Units live only in Python (the Rust `Bin` has none), so
 `Aggregate.check_calibration_values` rejects a remainder whose unit is not the

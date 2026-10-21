@@ -117,10 +117,14 @@ class TestBands:
             ["A"], [(0.0, 1e6)], [[500.0], [1500.0]], SampleMethod(name="t")
         )
 
-        with pytest.raises(
-            InfeasibleStateError, match="^Parameter set 1 is not feasible"
-        ):
+        with pytest.raises(InfeasibleStateError) as raised:
             Predictive(calibrator, sample, [0, 1, 2])
+
+        assert str(raised.value) == (
+            "Parameter set 1 is not feasible: Invalid initial conditions: the "
+            "calibrated amounts exceed the sum the remainder 'B' keeps by "
+            "0.333333 of them"
+        )
 
     def test_a_band_of_an_unknown_output_names_the_outputs(
         self, calibrator: Calibrator
