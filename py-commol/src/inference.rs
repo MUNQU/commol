@@ -379,7 +379,9 @@ impl PyCalibrationProblem {
     /// replicate of a stochastic engine seeded from `seed`
     ///
     /// Raises:
-    ///     ValueError: If the sample's parameters are not the problem's
+    ///     ValueError: Before any draw runs, if the sample's parameters are
+    ///         not the problem's, or the positions are not sorted and unique
+    ///         or one is a position the engine rejects
     ///     InfeasibleStateError: If a draw leaves the values its model allows
     fn predictive(
         &self,

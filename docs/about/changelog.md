@@ -257,6 +257,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `commol`) with a new mode, and it runs the checks of a new model: a value
   it cannot take raises `ValueError` at the call, with the id of the
   parameter, and leaves the model unchanged.
+- A `Predictive` at positions out of order failed inside a draw with a
+  `RuntimeError` that named a parameter set: it now raises `ValueError`
+  before any draw runs, with the first pair out of order, as it does for a
+  position the engine rejects.
 
 ## [0.5.0] - 2026-10-19
 

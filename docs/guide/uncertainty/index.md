@@ -208,6 +208,8 @@ a `SensitivityAnalysis` of the inputs of the sample. With a stochastic engine
 every replicate of a draw is a draw of the predictive, with an equal share of
 its weight and a seed of its own, derived from the seed of the source, so
 every draw shows fresh noise and the predictive repeats from that seed.
+The positions are sorted and unique, and each one is a position the engine
+reports at; otherwise `Predictive` raises `ValueError` before any draw runs.
 
 | Member | Returns |
 |---|---|

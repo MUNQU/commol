@@ -211,12 +211,15 @@ class Predictive:
         sample : ParameterSample
             Its parameters, in the order of the problem or the analysis.
         positions : Sequence[float]
-            Positions to report at, ascending.
+            Positions to report at, sorted and unique.
 
         Raises
         ------
         ValueError
-            If the sample's parameters are not the source's.
+            Before any draw runs: if the sample's parameters are not the
+            source's, or the positions are not sorted and unique or the engine
+            does not report at one of them (a difference engine reports only
+            at integer steps).
         InfeasibleStateError
             If a draw leaves the values its model allows.
         """

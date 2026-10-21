@@ -138,7 +138,7 @@ class SensitivityAnalysis:
         sample : ParameterSample
             The draws, in the order of the inputs.
         positions : list[float]
-            Positions to report at, ascending.
+            Positions to report at, sorted and unique.
 
         Returns
         -------
