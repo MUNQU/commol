@@ -3781,7 +3781,9 @@ open blockers (an open blocker of another repository counts as level 0). The
 view "By precedence" groups the open issues by <code>Level</code>, so each group can
 start when the groups above it close. GitHub Projects cannot group by
 "blocked by" links, and its hierarchy view follows sub-issues only, so the
-script writes the field. It writes only the levels that change, through REST,
+script writes the field. First it adds to the project each open proposal,
+change and release that is not an item of it, so that every one gets its
+level. It writes only the levels that change, through REST,
 with your own <code>gh</code> login: no workflow and no stored token. If it cannot write
 them (no write access to the project, a rate limit), it says so in one line
 and lists the next issues all the same. <code>start.sh</code> writes
@@ -3793,7 +3795,11 @@ them too, and so does, at any time:</p>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>gh<span class="w"> </span>issue<span class="w"> </span>list<span class="w"> </span>--milestone<span class="w"> </span><span class="m">0</span>.5.0
 </span></code></pre></div>
 <p>An issue is ready when every issue that blocks it is closed.</p>
-<p>The project adds a new issue as <code>Todo</code> and moves it to <code>Done</code> when it closes.
+<p>The project adds a new issue of the repository (its workflow "Auto-add to
+project", with the filter <code>is:issue</code>), sets it to <code>Todo</code> (workflow "Item added
+to project") and moves it to <code>Done</code> when it closes. An open issue that the
+workflow misses gets its item from <code>parallel.py --levels</code>, which <code>next.sh</code> and
+<code>start.sh</code> run.
 A pull request that says <code>Closes #N</code> links to its issue and closes it when it
 merges. <code>In Progress</code> is set when the work starts, by <code>.github/scripts/start.sh</code>
 (see below), or by hand from the project or a terminal:</p>
