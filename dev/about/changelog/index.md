@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 - `ModelBuilder.build` and `Model.update_parameters` accepted a series point or an impulse position that the engine cannot run, such as a point or an `impulse_at` of 1.5 under `DifferenceEquations` or `StochasticSteps`, or a `"pulse"` point at 1.5 under any engine; the error came only at `Simulation(model)`, as `RuntimeError`. Both now raise `ValueError` with the message of the engine, and a rejected update leaves the model unchanged.
+- The `InfeasibleStateError` of a draw of a `Predictive` said only `InfeasibleRun`. It now gives the message of the run after the index of the parameter set: the compartment, the step and the flows, as `Simulation.run` reports them.
 
 ## [0.6.0] - 2026-10-22
 

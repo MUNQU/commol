@@ -1087,7 +1087,9 @@ class Predictive:
             does not report at one of them (a difference engine reports only
             at integer steps).
         InfeasibleStateError
-            If a draw leaves the values its model allows.
+            If a draw leaves the values its model allows. The message names
+            the parameter set, then says what the run says: the compartment,
+            the step and the flows.
         """
         self.source: PredictiveSource = source
         self.sample: ParameterSample = sample
@@ -1238,7 +1240,9 @@ class Predictive:
             has a loss; or the noise is not `NoNoise()` and the source is an
             analysis.
         InfeasibleStateError
-            If a draw leaves the values its model allows.
+            If a draw leaves the values its model allows. The message names
+            the parameter set, then says what the run says: the compartment,
+            the step and the flows.
         """
         draws = self.source.rust_observation_draws(
             self.sample, list(observed_data), noise
@@ -1279,7 +1283,7 @@ Raises:
 | Type                   | Description                                                                                                                                                                                                         |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError`           | Before any draw runs: if the sample's parameters are not the source's, or the positions are not sorted and unique or the engine does not report at one of them (a difference engine reports only at integer steps). |
-| `InfeasibleStateError` | If a draw leaves the values its model allows.                                                                                                                                                                       |
+| `InfeasibleStateError` | If a draw leaves the values its model allows. The message names the parameter set, then says what the run says: the compartment, the step and the flows.                                                            |
 
 Source code in `commol/api/inference/predictive.py`
 
@@ -1311,7 +1315,9 @@ def __init__(
         does not report at one of them (a difference engine reports only
         at integer steps).
     InfeasibleStateError
-        If a draw leaves the values its model allows.
+        If a draw leaves the values its model allows. The message names
+        the parameter set, then says what the run says: the compartment,
+        the step and the flows.
     """
     self.source: PredictiveSource = source
     self.sample: ParameterSample = sample
@@ -1530,7 +1536,7 @@ Raises:
 | Type                   | Description                                                                                                                                                                                                                                                       |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError`           | If an observation names an unknown output or factor, a series the residual noise has no residuals of, or a series with no observation model; DistributionNoise comes with a problem that has a loss; or the noise is not NoNoise() and the source is an analysis. |
-| `InfeasibleStateError` | If a draw leaves the values its model allows.                                                                                                                                                                                                                     |
+| `InfeasibleStateError` | If a draw leaves the values its model allows. The message names the parameter set, then says what the run says: the compartment, the step and the flows.                                                                                                          |
 
 Source code in `commol/api/inference/predictive.py`
 
@@ -1573,7 +1579,9 @@ def at_observations(
         has a loss; or the noise is not `NoNoise()` and the source is an
         analysis.
     InfeasibleStateError
-        If a draw leaves the values its model allows.
+        If a draw leaves the values its model allows. The message names
+        the parameter set, then says what the run says: the compartment,
+        the step and the flows.
     """
     draws = self.source.rust_observation_draws(
         self.sample, list(observed_data), noise

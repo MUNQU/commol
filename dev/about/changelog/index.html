@@ -3844,6 +3844,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>"pulse"</code> point at 1.5 under any engine; the error came only at
   <code>Simulation(model)</code>, as <code>RuntimeError</code>. Both now raise <code>ValueError</code> with the
   message of the engine, and a rejected update leaves the model unchanged.</li>
+<li>The <code>InfeasibleStateError</code> of a draw of a <code>Predictive</code> said only
+  <code>InfeasibleRun</code>. It now gives the message of the run after the index of the
+  parameter set: the compartment, the step and the flows, as
+  <code>Simulation.run</code> reports them.</li>
 </ul>
 <h2 id="060-2026-10-22">[0.6.0] - 2026-10-22<a class="headerlink" href="#060-2026-10-22" title="Permanent link">&para;</a></h2>
 <p>This release adds the first uncertainty methods with a stated model of the
