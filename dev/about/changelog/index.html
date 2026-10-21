@@ -3943,6 +3943,14 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Added #255 -->
 
+<ul>
+<li><code>Simulation.total_series</code> and <code>Simulation.windowed_totals</code> take output names
+  as well as bin and accumulator ids. An output name stands for itself, so
+  <code>simulation.windowed_totals(results, ["moved_g2", "moved_g3"], 2)</code> sums two
+  strata of the accumulator <code>moved</code>; a bin or accumulator id still stands for
+  all its outputs. An id that is neither raises <code>KeyError</code> with the bins,
+  accumulators and outputs of the model.</li>
+</ul>
 <!-- Added #256 -->
 
 <ul>

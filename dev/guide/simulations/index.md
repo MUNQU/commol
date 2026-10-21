@@ -48,8 +48,8 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | `simulation_outputs`                             | `list[str]`            | The output names, in engine order: compartments first, then accumulators.                                                                                                                                                                                                                                                                                                                                                        |
 | `outputs_for(id)`                                | `list[str]`            | The outputs of one bin or accumulator.                                                                                                                                                                                                                                                                                                                                                                                           |
 | `group_outputs(ids)`                             | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id.                                                                                                                                                                                                                                                                                                                                                                        |
-| `total_series(results, ids)`                     | `list[float]`          | The sum of all outputs of the given ids, at each position of the results.                                                                                                                                                                                                                                                                                                                                                        |
-| `windowed_totals(results, ids, window, at=None)` | `list[float]`          | What the given accumulators gained in each window.                                                                                                                                                                                                                                                                                                                                                                               |
+| `total_series(results, ids)`                     | `list[float]`          | The sum of the given outputs at each position of the results. A bin or accumulator id stands for all its outputs; an output name stands for itself.                                                                                                                                                                                                                                                                              |
+| `windowed_totals(results, ids, window, at=None)` | `list[float]`          | What the given accumulators, or outputs of them, gained in each window.                                                                                                                                                                                                                                                                                                                                                          |
 | `engine`                                         | engine                 | The underlying Rust engine, for the model as it is now: the engine `model.engine.type` names (`engine.engine_type`). `engine.step()` advances it one step; `engine.reset()` returns it to the initial state.                                                                                                                                                                                                                     |
 
 Every `run` starts again from the initial state, so two calls with the same model give the same result (`Simulation.run` resets the engine first). To continue a run step by step, use the engine:
@@ -195,7 +195,7 @@ print(stratified_simulation.group_outputs(["A", "cum_ab"])["cum_ab"])
 
 ### Totals by bin
 
-`total_series` sums every output of the ids you give, at each position:
+`total_series` sums every output of the bin and accumulator ids you give, at each position:
 
 ```python
 total_b = stratified_simulation.total_series(stratified_results, ["B"])
@@ -209,7 +209,7 @@ Do not select outputs by name prefix
 
 ### Totals by category
 
-To select compartments by category, use their labels from `model.structure.initial_state(model.process)`: each entry has `name`, `bin` and `categories`.
+`total_series` also takes output names, and each one stands for itself. To select compartments by category, use their labels from `model.structure.initial_state(model.process)`: each entry has `name`, `bin` and `categories`.
 
 ```python
 in_g1 = [
@@ -219,10 +219,7 @@ in_g1 = [
 ]
 print(in_g1)  # ['A_g1_t1', 'A_g1_t2', 'B_g1_t1', 'B_g1_t2']
 
-total_g1 = [
-    sum(stratified_results[name][step] for name in in_g1)
-    for step in range(len(stratified_results[in_g1[0]]))
-]
+total_g1 = stratified_simulation.total_series(stratified_results, in_g1)
 print(round(total_g1[-1]))  # 500: g1 started with half of every bin
 ```
 
@@ -237,11 +234,11 @@ per_week = stratified_simulation.windowed_totals(
 print(len(per_week))  # 7: the complete windows of a 50-step run
 ```
 
-| Argument | Meaning                                                                                                                                                           |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ids`    | Accumulator ids; their outputs are summed first.                                                                                                                  |
-| `window` | The window length on the axis. Must be positive.                                                                                                                  |
-| `at`     | The positions where windows close. By default, every complete window of the results. Pass observation positions to get the values a calibration compares against. |
+| Argument | Meaning                                                                                                                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ids`    | Accumulator ids, each for all its outputs, and output names, each for itself, such as some strata of an accumulator. Their outputs are summed first. An id that is neither raises `KeyError`, with the bins, accumulators and outputs of the model. |
+| `window` | The window length on the axis. Must be positive.                                                                                                                                                                                                    |
+| `at`     | The positions where windows close. By default, every complete window of the results. Pass observation positions to get the values a calibration compares against.                                                                                   |
 
 The axis of a model gives the window grid of a width in a unit (`Model.axis_units()`; [Units of the axis](https://munqu.github.io/commol/latest/guide/core-concepts/#units-of-the-axis)), and `windowed_totals` of `py-commol/commol/api/windows.py` gives the same reduction for any series:
 

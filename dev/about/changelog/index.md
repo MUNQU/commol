@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- `Simulation.total_series` and `Simulation.windowed_totals` take output names as well as bin and accumulator ids. An output name stands for itself, so `simulation.windowed_totals(results, ["moved_g2", "moved_g3"], 2)` sums two strata of the accumulator `moved`; a bin or accumulator id still stands for all its outputs. An id that is neither raises `KeyError` with the bins, accumulators and outputs of the model.
+
 - The window grid on the axis: `AxisUnits.window_start(index, span, unit)`, `window_end(index, span, unit)`, `window_index(at, span, unit)` and `window_ends(span, unit, end)`, for a window of a span in a unit, such as one week. The width must be a whole number of steps.
 
 ### Changed
