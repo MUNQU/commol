@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   observation through its own operator at its own position, as the loss
   reads it. Observations with several factors no longer leave the line
   unscaled or raise `ValueError` with a `Predictive`.
+- A figure of `SimulationPlotter` with a `PlotConfig` `style`, `palette` or
+  `context` changed the global style of matplotlib, so every figure drawn with
+  matplotlib after it had the style of commol. The style now applies to the
+  figure of that plot only, and `matplotlib.rcParams` is as it was before the
+  call.
 
 ## [0.6.0] - 2026-10-22
 

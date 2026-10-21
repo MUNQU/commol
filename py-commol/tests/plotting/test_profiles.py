@@ -1,10 +1,14 @@
 """SimulationPlotter draws profiles: one panel per profile, with its trace,
 its threshold and its interval."""
 
+import matplotlib as mpl
 import numpy as np
+from matplotlib.colors import to_rgba
+from seaborn import axes_style
 
 from commol import (
     CalibrationResult,
+    PlotConfig,
     Profile,
     ProfileInterval,
     ProfileResult,
@@ -28,8 +32,8 @@ def _profile(center: float, threshold: float) -> Profile:
     )
 
 
-def test_plotter_draws_each_profile_and_threshold() -> None:
-    result = ProfileResult(
+def _result() -> ProfileResult:
+    return ProfileResult(
         fit=CalibrationResult(
             best_parameters={"k1": 1.0, "k2": 3.0},
             final_loss=0.5,
@@ -47,6 +51,10 @@ def test_plotter_draws_each_profile_and_threshold() -> None:
         verdicts={"k1": "identifiable", "k2": "practically_non_identifiable"},
         tolerance=1e-9,
     )
+
+
+def test_plotter_draws_each_profile_and_threshold() -> None:
+    result = _result()
 
     figure = SimulationPlotter.plot_profiles(result)
 
@@ -71,3 +79,17 @@ def test_plotter_draws_each_profile_and_threshold() -> None:
         ]
         assert [line.get_xdata()[0] for line in interval] == ends
         assert ax.get_xlabel() == name
+
+
+def test_a_profile_figure_leaves_the_global_style(
+    default_style: dict[str, object],
+) -> None:
+    """The style is in the figure, and ``matplotlib.rcParams`` is unchanged."""
+    config = PlotConfig(style="darkgrid", context="poster")
+
+    figure = SimulationPlotter.plot_profiles(_result(), config=config)
+
+    assert {k for k, v in default_style.items() if mpl.rcParams[k] != v} == set()
+    assert figure.axes[0].get_facecolor() == to_rgba(
+        axes_style("darkgrid")["axes.facecolor"]
+    )

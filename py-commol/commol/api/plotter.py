@@ -1,12 +1,14 @@
 """Plots of simulation results, observations, the bands of a predictive,
 prediction intervals, sensitivity results and profiles."""
 
+import functools
 import logging
 import math
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -37,6 +39,23 @@ from commol.context.inference.profiles import ProfileResult
 from commol.context.visualization import PlotConfig
 
 logger = logging.getLogger(__name__)
+
+
+def _scoped_style[**P, R](draw: Callable[P, R]) -> Callable[P, R]:
+    """
+    Run `draw` in a copy of `matplotlib.rcParams`.
+
+    The style, palette and context of a `PlotConfig` apply to the figure that
+    `draw` makes, and `matplotlib.rcParams` is as it was before the call when
+    `draw` returns or raises.
+    """
+
+    @functools.wraps(draw)
+    def scoped(*args: P.args, **kwargs: P.kwargs) -> R:
+        with mpl.rc_context():
+            return draw(*args, **kwargs)
+
+    return scoped
 
 
 class SimulationPlotter:
@@ -98,6 +117,7 @@ class SimulationPlotter:
             f"and {len(results.positions)} positions"
         )
 
+    @_scoped_style
     def plot_series(
         self,
         output_file: str | None = None,
@@ -216,6 +236,7 @@ class SimulationPlotter:
 
         return fig
 
+    @_scoped_style
     def plot_cumulative(
         self,
         output_file: str | None = None,
@@ -289,6 +310,7 @@ class SimulationPlotter:
         return fig
 
     @staticmethod
+    @_scoped_style
     def plot_prcc(
         result: PRCCResult,
         output_file: str | None = None,
@@ -351,6 +373,7 @@ class SimulationPlotter:
         return fig
 
     @staticmethod
+    @_scoped_style
     def plot_morris(
         result: MorrisResult,
         output_file: str | None = None,
@@ -395,6 +418,7 @@ class SimulationPlotter:
         return fig
 
     @staticmethod
+    @_scoped_style
     def plot_sobol(
         result: SobolResult | ChaosResult,
         output_file: str | None = None,
@@ -466,6 +490,7 @@ class SimulationPlotter:
         return fig
 
     @staticmethod
+    @_scoped_style
     def plot_profiles(
         result: ProfileResult,
         output_file: str | None = None,
@@ -520,7 +545,12 @@ class SimulationPlotter:
 
     @staticmethod
     def _apply_seaborn_style(config: PlotConfig) -> None:
-        """Apply Seaborn styling configuration from PlotConfig."""
+        """
+        Apply the seaborn style, palette and context of `config`.
+
+        It sets `matplotlib.rcParams`, so only a method under `_scoped_style`
+        calls it: the style stays in the figure of that method.
+        """
         if config.style:
             sns.set_style(config.style)
             logger.debug(f"Applied Seaborn style: {config.style}")
