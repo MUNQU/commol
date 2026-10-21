@@ -3776,10 +3776,10 @@ An empirical series for a parameter value.
 
 Attributes:
 
-| Name   | Type                        | Description                                                                                                                                                                                                                                                                                                                                             |
-| ------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data` | `list[tuple[float, float]]` | (position, value) points on the axis. Need not be pre-sorted; the engine sorts them.                                                                                                                                                                                                                                                                    |
-| `mode` | `str`                       | How the series is read between its points: "pulse" (the value on the step of a point, 0 on every other step; integer positions only), "step_function" (the value of the last point at or before t), or "linear" (linear interpolation in t). The engine decides which positions its model type accepts: a DifferenceEquations model only integer steps. |
+| Name   | Type                        | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `data` | `list[tuple[float, float]]` | (position, value) points on the axis. Need not be pre-sorted; the engine sorts them.                                                                                                                                                                                                                                                                                                                                                                                     |
+| `mode` | `str`                       | How the series is read between its points: "pulse" (the value on the step of a point, 0 on every other step; integer positions only), "step_function" (the value of the last point at or before t), or "linear" (linear interpolation in t). The engine decides which positions its model type accepts: a DifferenceEquations or StochasticSteps model only integer steps. The model rejects a position its engine cannot run when it is built or its parameters change. |
 
 Source code in `commol/context/parameter.py`
 
@@ -3798,8 +3798,10 @@ class SeriesValue(BaseModel):
         the step of a point, 0 on every other step; integer positions only),
         ``"step_function"`` (the value of the last point at or before ``t``),
         or ``"linear"`` (linear interpolation in ``t``). The engine decides
-        which positions its model type accepts: a DifferenceEquations model
-        only integer steps.
+        which positions its model type accepts: a DifferenceEquations or
+        StochasticSteps model only integer steps. The model rejects a
+        position its engine cannot run when it is built or its parameters
+        change.
     """
 
     model_config = ConfigDict(extra="forbid")

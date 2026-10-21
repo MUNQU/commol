@@ -147,12 +147,12 @@ A series gives a parameter its value from `(position, value)` points on the axis
 | `"step_function"` | `t`    | 0                      | the value                   | the value of the last point | the value of the last point |
 | `"linear"`        | `t`    | 0                      | the value                   | linear interpolation in `t` | 0                           |
 
-The engine decides which positions its model type accepts, and names the parameter in its error:
+The engine decides which positions its model type accepts. `ModelBuilder.build` and `Model.update_parameters` reject a position the engine cannot run with `ValueError`, whose message names the parameter (`check_model` in `crates/commol-model/src/builder.rs`). A rejected update leaves the model unchanged.
 
-| Model                   | Accepted positions                                                                                                                                                                                                                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DifferenceEquations`   | Integer steps only, for every mode. `t` equals `step`, so `"linear"` is read at each step.                                                                                                                                                                                                 |
-| `DifferentialEquations` | Any non-negative position for `"step_function"` and `"linear"`; the engine restarts its integration at each point. A `"pulse"` keeps integer positions: it is a rate on one unit step ([Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step)). |
+| Model                                       | Accepted positions                                                                                                                                                                                                                                                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DifferenceEquations`, `StochasticSteps`    | Integer steps only, for every mode. `t` equals `step`, so `"linear"` is read at each step.                                                                                                                                                                                           |
+| `DifferentialEquations`, `StochasticEvents` | Any non-negative position for `"step_function"` and `"linear"`; the engine stops and restarts at each point. A `"pulse"` keeps integer positions: it is a rate on one unit step ([Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step)). |
 
 ```python
 import numpy as np

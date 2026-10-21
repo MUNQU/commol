@@ -3948,7 +3948,7 @@ stratified rates and accumulators as any transition.</p>
 </tr>
 <tr>
 <td>Steps</td>
-<td>A <code>DifferentialEquations</code> model takes any steps, such as <code>0.5</code>: the engine stops there, applies the jump and restarts. A <code>DifferenceEquations</code> model needs integer steps (<code>ValidationError</code> names the transition).</td>
+<td>A <code>DifferentialEquations</code> model takes any steps, such as <code>0.5</code>: the engine stops there, applies the jump and restarts. A <code>DifferenceEquations</code> or <code>StochasticSteps</code> model needs integer steps: <code>ModelBuilder.build</code> raises <code>ValidationError</code>, which names the transition.</td>
 </tr>
 <tr>
 <td>Units</td>

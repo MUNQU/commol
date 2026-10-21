@@ -874,12 +874,12 @@ A series gives a parameter its value from `(position, value)` points on the axis
 | `"step_function"` | `t`    | 0                      | the value                   | the value of the last point | the value of the last point |
 | `"linear"`        | `t`    | 0                      | the value                   | linear interpolation in `t` | 0                           |
 
-The engine decides which positions its model type accepts, and names the parameter in its error:
+The engine decides which positions its model type accepts. `ModelBuilder.build` and `Model.update_parameters` reject a position the engine cannot run with `ValueError`, whose message names the parameter (`check_model` in `crates/commol-model/src/builder.rs`). A rejected update leaves the model unchanged.
 
-| Model                   | Accepted positions                                                                                                                                                                                                                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DifferenceEquations`   | Integer steps only, for every mode. `t` equals `step`, so `"linear"` is read at each step.                                                                                                                                                                                                 |
-| `DifferentialEquations` | Any non-negative position for `"step_function"` and `"linear"`; the engine restarts its integration at each point. A `"pulse"` keeps integer positions: it is a rate on one unit step ([Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step)). |
+| Model                                       | Accepted positions                                                                                                                                                                                                                                                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DifferenceEquations`, `StochasticSteps`    | Integer steps only, for every mode. `t` equals `step`, so `"linear"` is read at each step.                                                                                                                                                                                           |
+| `DifferentialEquations`, `StochasticEvents` | Any non-negative position for `"step_function"` and `"linear"`; the engine stops and restarts at each point. A `"pulse"` keeps integer positions: it is a rate on one unit step ([Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step)). |
 
 ```python
 import numpy as np
@@ -1500,13 +1500,13 @@ print([round(a, 1) for a in jumped["A"]])  # [1000.0, 675.0, 607.5]
 print(jumped["moved"][2])  # 225.0: a quarter of the 900 left at step 1
 ```
 
-| Rule                         | In both engines                                                                                                                                                                                                    |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Order                        | At step `n` the state jumps first; then the flows of the step run from the new state. The output at `n` shows the state after the jump (`CompiledModel::apply_impulses` in `crates/commol-model/src/system.rs`).   |
-| Several impulses at one step | Every jump is computed from the state before any of them.                                                                                                                                                          |
-| Steps                        | A `DifferentialEquations` model takes any steps, such as `0.5`: the engine stops there, applies the jump and restarts. A `DifferenceEquations` model needs integer steps (`ValidationError` names the transition). |
-| Units                        | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units](https://munqu.github.io/commol/latest/guide/units-and-equations/#impulses)).                                                       |
-| `describe()`                 | Lists impulses apart from the equations, with their steps ([Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/#the-equations)).                                                    |
+| Rule                         | In both engines                                                                                                                                                                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Order                        | At step `n` the state jumps first; then the flows of the step run from the new state. The output at `n` shows the state after the jump (`CompiledModel::apply_impulses` in `crates/commol-model/src/system.rs`).                                                          |
+| Several impulses at one step | Every jump is computed from the state before any of them.                                                                                                                                                                                                                 |
+| Steps                        | A `DifferentialEquations` model takes any steps, such as `0.5`: the engine stops there, applies the jump and restarts. A `DifferenceEquations` or `StochasticSteps` model needs integer steps: `ModelBuilder.build` raises `ValidationError`, which names the transition. |
+| Units                        | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units](https://munqu.github.io/commol/latest/guide/units-and-equations/#impulses)).                                                                                                              |
+| `describe()`                 | Lists impulses apart from the equations, with their steps ([Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/#the-equations)).                                                                                                           |
 
 An impulse is not a pulse rate. A [`AxisPattern.pulse`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) is a rate: a difference model applies it for one step with the other flows, and a differential model applies it as a constant rate for one unit of the axis, so it moves `1 − e^(−p)` of its source. An impulse moves exactly `p` of its source in both engines.
 
@@ -13098,8 +13098,11 @@ class ModelBuilder:
             example a fraction names no bin, or a rate reads ``neighbors_<bin>``
             and the structure has no ``neighbors``), the engine is unknown or
             does not run the kind of the structure, the settings are not
-            settings of that engine, or a per-compartment override names an
-            unknown compartment or makes the initial amounts exceed the total.
+            settings of that engine, a series point or an impulse position is
+            one the engine cannot run (a position between two steps for an
+            engine that steps only at integers, or a ``"pulse"`` point between
+            two steps), or a per-compartment override names an unknown
+            compartment or makes the initial amounts exceed the total.
         """
         model: Model[StructureT] = Model(
             name=self._name,
@@ -13911,9 +13914,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ValueError` | If validation fails, the structure does not fit the process (for example a fraction names no bin, or a rate reads neighbors\_<bin> and the structure has no neighbors), the engine is unknown or does not run the kind of the structure, the settings are not settings of that engine, or a per-compartment override names an unknown compartment or makes the initial amounts exceed the total. |
+| Type         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If validation fails, the structure does not fit the process (for example a fraction names no bin, or a rate reads neighbors\_<bin> and the structure has no neighbors), the engine is unknown or does not run the kind of the structure, the settings are not settings of that engine, a series point or an impulse position is one the engine cannot run (a position between two steps for an engine that steps only at integers, or a "pulse" point between two steps), or a per-compartment override names an unknown compartment or makes the initial amounts exceed the total. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -13958,8 +13961,11 @@ def build(
         example a fraction names no bin, or a rate reads ``neighbors_<bin>``
         and the structure has no ``neighbors``), the engine is unknown or
         does not run the kind of the structure, the settings are not
-        settings of that engine, or a per-compartment override names an
-        unknown compartment or makes the initial amounts exceed the total.
+        settings of that engine, a series point or an impulse position is
+        one the engine cannot run (a position between two steps for an
+        engine that steps only at integers, or a ``"pulse"`` point between
+        two steps), or a per-compartment override names an unknown
+        compartment or makes the initial amounts exceed the total.
     """
     model: Model[StructureT] = Model(
         name=self._name,
@@ -17755,10 +17761,10 @@ An empirical series for a parameter value.
 
 Attributes:
 
-| Name   | Type                        | Description                                                                                                                                                                                                                                                                                                                                             |
-| ------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data` | `list[tuple[float, float]]` | (position, value) points on the axis. Need not be pre-sorted; the engine sorts them.                                                                                                                                                                                                                                                                    |
-| `mode` | `str`                       | How the series is read between its points: "pulse" (the value on the step of a point, 0 on every other step; integer positions only), "step_function" (the value of the last point at or before t), or "linear" (linear interpolation in t). The engine decides which positions its model type accepts: a DifferenceEquations model only integer steps. |
+| Name   | Type                        | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `data` | `list[tuple[float, float]]` | (position, value) points on the axis. Need not be pre-sorted; the engine sorts them.                                                                                                                                                                                                                                                                                                                                                                                     |
+| `mode` | `str`                       | How the series is read between its points: "pulse" (the value on the step of a point, 0 on every other step; integer positions only), "step_function" (the value of the last point at or before t), or "linear" (linear interpolation in t). The engine decides which positions its model type accepts: a DifferenceEquations or StochasticSteps model only integer steps. The model rejects a position its engine cannot run when it is built or its parameters change. |
 
 Source code in `commol/context/parameter.py`
 
@@ -17777,8 +17783,10 @@ class SeriesValue(BaseModel):
         the step of a point, 0 on every other step; integer positions only),
         ``"step_function"`` (the value of the last point at or before ``t``),
         or ``"linear"`` (linear interpolation in ``t``). The engine decides
-        which positions its model type accepts: a DifferenceEquations model
-        only integer steps.
+        which positions its model type accepts: a DifferenceEquations or
+        StochasticSteps model only integer steps. The model rejects a
+        position its engine cannot run when it is built or its parameters
+        change.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -34658,6 +34666,10 @@ All notable changes to Commol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Fixed
+
+- `ModelBuilder.build` and `Model.update_parameters` accepted a series point or an impulse position that the engine cannot run, such as a point or an `impulse_at` of 1.5 under `DifferenceEquations` or `StochasticSteps`, or a `"pulse"` point at 1.5 under any engine; the error came only at `Simulation(model)`, as `RuntimeError`. Both now raise `ValueError` with the message of the engine, and a rejected update leaves the model unchanged.
 
 ## [0.6.0] - 2026-10-22
 
