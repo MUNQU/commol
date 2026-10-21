@@ -30,7 +30,8 @@ The precedence level (``--levels``) of an open proposal, change or release is
 0 when no open issue blocks it, else one more than the highest level of its
 blockers; an open blocker of another repository counts as level 0. The
 script writes it into the number field ``Level`` of the project, only where
-it changes, and empties the field of an issue that is no longer open.
+it changes, and empties the field of an issue that is no longer open. First
+it adds to the project each open issue that is not an item of it.
 
 An open proposal, change or release waits for the release before its
 milestone (``--releases``): the open release issue of the nearest milestone
@@ -653,6 +654,34 @@ def level_changes(
     return changes
 
 
+def add_missing_items(
+    path: str,
+    issues: dict[int, Proposal],
+    current: dict[int, tuple[int, Level]],
+) -> dict[int, tuple[int, Level]]:
+    """Add to the project each open issue that is not an item of it.
+
+    The workflow of the project adds a new issue; this adds one that the
+    workflow missed, as ``start.sh`` does when it starts an issue. Returns
+    ``current`` with the new items, which have no Level yet.
+    """
+    found = dict(current)
+    for number, issue in sorted(issues.items()):
+        if number in found:
+            continue
+        item = rest(
+            f"{path}/items",
+            method="POST",
+            data={"type": "Issue", "id": issue.issue_id},
+        )
+        item_id = item.get("id") if isinstance(item, dict) else None
+        if not isinstance(item_id, int):
+            raise SystemExit(f"GitHub: #{number} was added, but no item id came back")
+        found[number] = (item_id, None)
+        print(f"Project: #{number} added")
+    return found
+
+
 def write_levels(issues: dict[int, Proposal]) -> None:
     """Write the precedence level of each open issue into the field Level."""
     found = project_field(repository(), "Level")
@@ -661,7 +690,8 @@ def write_levels(issues: dict[int, Proposal]) -> None:
         return
     path, field_id = found
     items = rest(f"{path}/items?per_page=100&fields={field_id}", every_page=True)
-    changes = level_changes(levels(issues), levels_of(items, repository()))
+    current = add_missing_items(path, issues, levels_of(items, repository()))
+    changes = level_changes(levels(issues), current)
     for item_id, level in changes:
         rest(
             f"{path}/items/{item_id}",
