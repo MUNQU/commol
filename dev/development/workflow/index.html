@@ -3773,7 +3773,8 @@ come by:</p>
 <p>The dependencies set what must come first; <code>Priority</code> is set only to move an
 issue ahead of (<code>Now</code>) or behind (<code>Later</code>) its milestone.</p>
 <p>Before it lists them, <code>next.sh</code> links each open issue to the release before
-its milestone (<a href="#milestones">Milestones</a>), and then writes the precedence level of each open
+its milestone, and each open release to the issues of its milestone
+(<a href="#milestones">Milestones</a>), and then writes the precedence level of each open
 proposal, change and release into the number field <code>Level</code> of the project:
 0 when no open issue blocks it, else one more than the highest level of its
 open blockers (an open blocker of another repository counts as level 0). The
@@ -3859,17 +3860,32 @@ release checklist asks for it:</p>
   nearest milestone before its own, by the versions that the titles of the
   milestones name: an issue of 0.10.0 waits for release 0.9.0, and release
   0.10.0 waits for it too. When a new milestone comes in between (0.9.1), its
-  release takes the place of the old blocker. <code>next.sh</code> and <code>start.sh</code> write
-  these links before they read the blockers, and so does, at any time:</li>
+  release takes the place of the old blocker.</li>
+<li><strong>A release waits for the issues of its milestone.</strong> Each open release is
+  "blocked by" every open proposal and change of its own milestone, so its
+  field <code>Level</code> and the view "By precedence" count all of them. An issue moved
+  to another milestone leaves the release it no longer ships, and blocks the
+  release of its new milestone.</li>
 </ul>
+<p><code>next.sh</code> and <code>start.sh</code> write these links before they read the blockers, and
+so does, at any time:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>python<span class="w"> </span>.github/scripts/parallel.py<span class="w"> </span>--releases
 </span></code></pre></div>
-<p>The script owns the links from a release to an issue whose milestone names
-  a version: it adds the one that is missing and removes the others. It
-  refuses a link that closes a cycle, such as an issue of 0.10.0 that release
-  0.9.0 waits for, and names it: move that issue to the earlier milestone, or
-  remove the link. A failure to write the links stops <code>next.sh</code> and
-  <code>start.sh</code>, since the blockers they read would be wrong.</p>
+<p>The script owns the links between a release and an issue whose milestone
+names a version: it adds the one that is missing and removes the others. A
+link from a release to an issue with no version in its milestone, or of
+another repository, stays, and so do the links between releases other than
+the release before. The script refuses a link that closes a cycle, and names
+the issue to move: an issue of 0.10.0 that release 0.9.0 waits for moves to
+the earlier milestone, and an issue of 0.9.0 that waits, through its blockers,
+for release 0.9.0 moves to a later one; or remove the link that makes the
+cycle. When the link of a release to an issue it ships and a link to the
+release before close a cycle together, the first one stays: a release needs
+its issues, and the release before only orders the work. So the issue that
+the release needs through a chain of links is not held back by the release,
+and the script names it to move to that milestone. A failure to write the
+links stops <code>next.sh</code> and <code>start.sh</code>, since the blockers they read would be
+wrong.</p>
 <p>An experiment, such as a benchmark, is not a bug and may have no milestone.</p>
 <h3 id="parallel-work">Parallel work<a class="headerlink" href="#parallel-work" title="Permanent link">&para;</a></h3>
 <p>Two proposals can run at the same time when no chain of "blocked by" links
