@@ -221,7 +221,9 @@ class Predictive:
             does not report at one of them (a difference engine reports only
             at integer steps).
         InfeasibleStateError
-            If a draw leaves the values its model allows.
+            If a draw leaves the values its model allows. The message names
+            the parameter set, then says what the run says: the compartment,
+            the step and the flows.
         """
         self.source: PredictiveSource = source
         self.sample: ParameterSample = sample
@@ -372,7 +374,9 @@ class Predictive:
             has a loss; or the noise is not `NoNoise()` and the source is an
             analysis.
         InfeasibleStateError
-            If a draw leaves the values its model allows.
+            If a draw leaves the values its model allows. The message names
+            the parameter set, then says what the run says: the compartment,
+            the step and the flows.
         """
         draws = self.source.rust_observation_draws(
             self.sample, list(observed_data), noise

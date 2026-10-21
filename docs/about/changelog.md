@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `"pulse"` point at 1.5 under any engine; the error came only at
   `Simulation(model)`, as `RuntimeError`. Both now raise `ValueError` with the
   message of the engine, and a rejected update leaves the model unchanged.
+- The `InfeasibleStateError` of a draw of a `Predictive` said only
+  `InfeasibleRun`. It now gives the message of the run after the index of the
+  parameter set: the compartment, the step and the flows, as
+  `Simulation.run` reports them.
 
 ## [0.6.0] - 2026-10-22
 

@@ -557,12 +557,16 @@ fn a_propagation_names_the_draw_that_has_no_run() {
 
     let error = analysis.propagate(None, &a_at(3.0)).unwrap_err();
 
-    assert_eq!(
-        error,
-        PredictiveError::Draw {
-            draw: 1,
-            error: EvaluationError::Violation(Violation::InfeasibleRun),
-        }
+    let PredictiveError::Draw {
+        draw: 1,
+        error: EvaluationError::Violation(Violation::InfeasibleRun { message }),
+    } = error
+    else {
+        panic!("{error:?}");
+    };
+    assert!(
+        message.contains("leave compartment 'A'") && message.contains("step 0"),
+        "{message}"
     );
 }
 

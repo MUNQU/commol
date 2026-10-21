@@ -257,7 +257,7 @@ fn reason(violation: &Violation) -> String {
         Violation::InfeasibleStart { excess } => {
             format!("the starting state is infeasible (excess {excess})")
         }
-        Violation::InfeasibleRun => "the run leaves the values the model allows".to_string(),
+        Violation::InfeasibleRun { .. } => "the run leaves the values the model allows".to_string(),
         Violation::NonFinite => "a value of the run is not finite".to_string(),
         Violation::OutOfBounds { .. }
         | Violation::Constraint { .. }

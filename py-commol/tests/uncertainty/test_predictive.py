@@ -20,7 +20,13 @@ from commol import (
     member_statistics,
     simulation_report,
 )
-from tests.support import a_to_b_builder, bounded, build, build_stochastic
+from tests.support import (
+    a_to_b_builder,
+    bounded,
+    build,
+    build_stochastic,
+    initial_condition_problem,
+)
 
 POSITIONS = list(range(51))
 
@@ -74,6 +80,46 @@ class TestBands:
         )
 
         with pytest.raises(error, match=message):
+            Predictive(calibrator, sample, [0, 1, 2])
+
+    def test_an_infeasible_draw_of_a_predictive_names_the_compartment_and_step(
+        self,
+    ) -> None:
+        # With k = 1.5 the first step moves 1500 out of A, which holds 1000.
+        model = build(a_to_b_builder(parameters={"k": None}))
+        problem = CalibrationProblem(
+            observed_data=[ObservedDataPoint(at=1, output="A", value=900.0)],
+            parameters=[bounded("k", 0.0, 2.0)],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=1),
+        )
+        calibrator = Calibrator(Simulation(model), problem)
+        sample = ParameterSample.equally_weighted(
+            ["k"], [(0.0, 2.0)], [[0.1], [1.5]], SampleMethod(name="t")
+        )
+
+        with pytest.raises(InfeasibleStateError) as raised:
+            Predictive(calibrator, sample, [0, 1, 2])
+
+        assert str(raised.value).startswith(
+            "Parameter set 1 is not feasible: The flows of step 0 leave "
+            "compartment 'A' at -500, below zero: it held 1000, and the flows "
+            "out of it move 't_ab' 1500."
+        )
+
+    def test_a_draw_with_an_infeasible_start_names_its_set(self) -> None:
+        # A = 1500 leaves the remainder B below zero: the total is 1000.
+        model = build(a_to_b_builder())
+        calibrator = Calibrator(
+            Simulation(model), initial_condition_problem("A", remainder="B")
+        )
+        sample = ParameterSample.equally_weighted(
+            ["A"], [(0.0, 1e6)], [[500.0], [1500.0]], SampleMethod(name="t")
+        )
+
+        with pytest.raises(
+            InfeasibleStateError, match="^Parameter set 1 is not feasible"
+        ):
             Predictive(calibrator, sample, [0, 1, 2])
 
     def test_a_band_of_an_unknown_output_names_the_outputs(

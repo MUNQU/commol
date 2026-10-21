@@ -393,7 +393,7 @@ fn simulation_error(error: SimulationError) -> EvaluationError {
     match error {
         // The parameters leave the values the model allows: a point to
         // avoid, not a reason to stop.
-        SimulationError::Infeasible { .. } => Violation::InfeasibleRun.into(),
+        SimulationError::Infeasible { message, .. } => Violation::InfeasibleRun { message }.into(),
         SimulationError::Failed(error) => {
             EvaluationError::Failed(format!("Simulation failed: {error}"))
         }
