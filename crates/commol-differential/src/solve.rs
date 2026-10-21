@@ -205,6 +205,11 @@ struct Plan<'p> {
     positions: &'p [f64],
 }
 
+/// Whether every component of `y` is finite.
+fn is_finite<V: Vector<T = f64>>(y: &V) -> bool {
+    (0..y.len()).all(|index| y.get_index(index).is_finite())
+}
+
 /// Integrate every piece of `plan` with `solver`, restarting it at the start
 /// of each piece from the state after the jumps.
 fn drive<'a, Eqn, S>(
@@ -245,6 +250,7 @@ where
             .set_stop_time(end)
             .map_err(|error| format!("Cannot stop the ODE solver at {end}: {error}"))?;
         loop {
+            let before = solver.state().t;
             let reason = solver.step();
             if let Some(error) = rhs.take_error() {
                 return Err(error);
@@ -256,6 +262,12 @@ where
                 )
             })?;
             let reached = solver.state().t;
+            // An explicit method accepts a step whose error estimate is NaN.
+            if !is_finite(solver.state().y) {
+                return Err(format!(
+                    "The ODE solver failed after t = {before}: the state is not finite"
+                ));
+            }
             while next < positions.len()
                 && positions[next] <= reached
                 && !same_position(positions[next], end)
