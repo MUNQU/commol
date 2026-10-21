@@ -2,6 +2,7 @@
 
 import copy
 import logging
+from datetime import date
 from typing import Self, TypeVar
 
 from commol.api.patterns import (
@@ -62,6 +63,7 @@ class ModelBuilder:
         version: str | None = None,
         bin_unit: str | None = None,
         step_unit: str | None = None,
+        origin: date | None = None,
     ):
         """
         Initialize the ModelBuilder.
@@ -84,12 +86,22 @@ class ModelBuilder:
             ``<bin unit>/<step_unit>``, and ``Model.axis_units()`` converts
             values to steps of it. None means ``step``, the default increment
             of any axis.
+        origin : date | None, default=None
+            Calendar moment of position 0: a `datetime.datetime` with no time
+            zone, or a `datetime.date`, read as its midnight. With it,
+            ``Model.axis_units()`` converts between dates and positions, and
+            ``SimulationPlotter.plot_series`` labels its ticks with dates. It
+            needs a ``step_unit`` of time whose length is a whole number of
+            days or a whole fraction of a day, such as ``"hour"`` or
+            ``"day"``; `build` raises ``ValueError`` otherwise, or for a
+            moment with a time zone.
         """
         self._name: str = name
         self._description: str | None = description
         self._version: str | None = version
         self._bin_unit: str | None = bin_unit
         self._step_unit: str | None = step_unit
+        self._origin: date | None = origin
 
         self._bins: list[Bin] = []
         self._accumulators: list[Accumulator] = []
@@ -801,8 +813,10 @@ class ModelBuilder:
             settings of that engine, a series point or an impulse position is
             one the engine cannot run (a position between two steps for an
             engine that steps only at integers, or a ``"pulse"`` point between
-            two steps), or a per-compartment override names an unknown
-            compartment or makes the initial amounts exceed the total.
+            two steps), a per-compartment override names an unknown
+            compartment or makes the initial amounts exceed the total, or the
+            origin has a time zone or a step unit that is not of fixed
+            calendar length.
         """
         model: Model[StructureT] = Model(
             name=self._name,
@@ -813,6 +827,7 @@ class ModelBuilder:
             process=self.process(),
             structure=structure,
             step_unit=self._step_unit,
+            origin=self._origin,
         )
 
         logger.info(f"Model '{self._name}' successfully built for the {engine} engine.")

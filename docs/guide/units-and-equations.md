@@ -182,6 +182,61 @@ To pass a quantity to a function, make it dimensionless first, for example
 `"dimensionless"`, or `sin(2 * pi * t / period)` with `period` in the step
 unit.
 
+## Dates on the axis
+
+An axis of time can start at a calendar moment: `ModelBuilder(origin=...)`
+takes a `datetime.date` (read as its midnight) or a `datetime.datetime` with
+no time zone. `Model.axis_units()` then converts between dates and positions,
+and gives the positions where calendar days and weeks end.
+
+```python
+import calendar
+from datetime import date, datetime
+
+dated = (
+    ModelBuilder(name="Dated", step_unit="hour", origin=date(2020, 1, 1))
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_parameter(id="k1", value=0.01)
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A")
+    .build(Aggregate(bin_amounts={"A": 1000, "B": 0}), engine="DifferenceEquations")
+)
+axis = dated.axis_units()
+
+print(axis.position_of(date(2020, 1, 2)))         # 24.0
+print(axis.position_of(datetime(2020, 1, 1, 6)))  # 6.0
+print(axis.moment_of(36))                         # 2020-01-02 12:00:00
+print(axis.day_ends(6, 72))                       # [24.0, 48.0, 72.0]
+# 2020-01-01 is a Wednesday: the first week that starts on Sunday ends on 5 January.
+print(axis.week_ends(0, 400, first_weekday=calendar.SUNDAY))  # [96.0, 264.0]
+```
+
+| Method | Gives |
+|---|---|
+| `position_of(moment)` | `(moment - origin)` in steps; negative before the origin. |
+| `moment_of(position)` | `origin + position` steps, a `datetime` with no time zone. The inverse of `position_of`. |
+| `day_ends(start, end)` | The positions of the midnights in `(start, end]`. |
+| `week_ends(start, end, first_weekday)` | The positions in `(start, end]` where a week starts, at midnight of `first_weekday`: 0 (Monday) to 6 (Sunday), as `date.weekday()` and `calendar.SUNDAY` number them. |
+
+A period ends where the next one starts, so its end is the midnight that
+starts the next day or week. The range `(start, end]` is the range of a
+[window](calibration-observations.md#counts-per-period-windows): a period that
+ends at `start` is not in it, and the first end can close a partial period
+that starts before `start`. The number of a period (a week number of a
+national rule) is not part of the axis: label a period from its end with your
+own function.
+
+Rules of the origin, each a `ValueError`:
+
+| Rule | Why |
+|---|---|
+| A conversion needs an origin. | An axis without one has no dates. |
+| The moment has no time zone. | A step has no time zone, so `(moment - origin) / step` stays exact through a change of summer time. Convert an aware moment with `moment.astimezone(zone).replace(tzinfo=None)`. |
+| The step unit is a unit of time whose length is a whole number of days or a whole fraction of a day, such as `hour`, `day` or `week`. | `month` and `year` are units of a fixed length (a month is 1/12 of a year, about 30.44 days), not the length of a calendar month or year, so their positions would not fall on calendar dates. |
+
+With an origin, [`SimulationPlotter.plot_series`](simulations.md#plotting)
+labels its ticks with dates when it has no `position_label`.
+
 ## Next steps
 
 | To learn | Read |

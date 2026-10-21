@@ -15,7 +15,7 @@ structure changes between kinds and is tagged in JSON by `kind`, and by
 amounts per compartment.
 
 ```text
-Model                      name, description, version, step_unit
+Model                      name, description, version, step_unit, origin
 ├── parameters: [Parameter]                (a value may be a SeriesValue)
 ├── engine: ModelEngine
 │   ├── type: "DifferenceEquations", "DifferentialEquations",
@@ -54,7 +54,8 @@ fields of its class:
     "compartment_amounts": {},
     "neighbors": null
   },
-  "step_unit": null
+  "step_unit": null,
+  "origin": null
 }
 ```
 

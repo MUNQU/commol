@@ -35,6 +35,7 @@ class TestToJson:
             "process",
             "structure",
             "step_unit",
+            "origin",
         ]
         assert data["structure"]["kind"] == "aggregate"
         assert data["structure"]["variant"] is None

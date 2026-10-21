@@ -41,6 +41,45 @@ steps for `n = 10`). `r = 1/n` keeps the mean and loses the survival.
 `tests/simulation/test_windows.py::TestWindowGrid`,
 `tests/simulation/test_axis_units.py::TestWindowGrid`.
 
+## An origin puts the axis on the calendar
+
+`AxisUnits.origin` (`context/axis_units.py`) is the calendar moment of
+position 0. It belongs to the axis, so `ModelBuilder` declares it next to
+`step_unit`, `Model.origin` keeps it and `Model.axis_units()` passes it on. On
+a `Simulation`, two runs of one model could read one position as two dates.
+The engines never see it: it converts at the edges, as the step unit does.
+
+The origin and every moment are naive (`naive_moment`): a `date` is its
+midnight, and a moment with a time zone raises `ValueError` with the way to
+convert it. A step has no time zone, so `position = (moment - origin) / step`
+stays exact; converting to UTC would move the end of a day with summer time,
+and dropping the zone would lose information.
+
+An origin needs a step unit of time whose length is a whole number of days or
+a whole fraction of a day (`seconds_per_step`). `pint` defines `month` and
+`year` with a fixed length (a month is 1/12 of a year), so with an origin on
+1 January, `moment_of(1)` in months would be 31 January 10:30, not
+1 February. The test of a whole number of days, or of days per step, rejects
+them and every unit made from them without a list of names.
+
+A day or a week ends at the midnight that starts the next one. `day_ends` and
+`week_ends` give these ends in `(start, end]`, the interval of a window, from
+the first midnight after `start`; the first end can close a partial period.
+`first_weekday` numbers days as `date.weekday` does and has no default: which
+day starts a week is the user's choice. The number of a period is not on the
+axis.
+
+`SimulationPlotter.plot_series` labels the ticks with `_date_label` (the date,
+and the time when it is not midnight) when the model has an origin and the
+call has no `position_label`. With no `tick_every`, it formats the ticks that
+matplotlib places, so a long run does not get one label per position.
+
+**Rule:** a conversion between dates and positions goes through `AxisUnits`;
+an application keeps no origin of its own.
+
+**Guards:** `tests/units/test_calendar_axis.py`,
+`tests/plotting/test_plotter.py::test_an_axis_with_origin_labels_ticks_with_dates`.
+
 ## One step unit in the unit check
 
 The engine converts no value between units. So `UnitChecker._step_unit`

@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Added #254 -->
 
+- An axis of time can start at a calendar date: `ModelBuilder(origin=...)`
+  takes a `date` or a `datetime` with no time zone, and `Model.axis_units()`
+  gives `position_of`, `moment_of`, `day_ends` and `week_ends` (weeks that
+  start on a weekday of the caller). `SimulationPlotter.plot_series` labels the
+  ticks of such a model with dates when it has no `position_label`. An origin
+  needs a step unit of time of a whole number of days or a whole fraction of a
+  day: `month` and `year` raise `ValueError`.
+
 <!-- Added #255 -->
 
 - `Simulation.total_series` and `Simulation.windowed_totals` take output names
