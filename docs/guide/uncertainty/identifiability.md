@@ -41,7 +41,6 @@ from commol import (
     Simulation,
     StartsIdentifiability,
     StructuralRank,
-    identifiability_report,
 )
 
 
@@ -255,11 +254,11 @@ other parameters to their fitted values breaks it, and `non_identifiable`
 when nothing the data read depends on the parameter
 ([Profile Likelihood](profiles.md#verdicts-and-the-identifiability-report)). `merge` joins reports: a
 verdict the reports agree on stays, with every reason; one they disagree on is
-`conflicting`, with both reasons. `identifiability_report` gives it as plain
-data.
+`conflicting`, with both reasons. `report.report()` gives it as plain data
+([Reports](../reports.md#the-report-of-an-identifiability-analysis)).
 
 ```python
-data = identifiability_report(report)
+data = report.report()
 print(data["parameters"]["k2"]["practical"]["verdict"])  # determined
 ```
 

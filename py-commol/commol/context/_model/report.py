@@ -116,7 +116,7 @@ def initial_amounts_report(
     """
     The amount of every bin and of every overridden compartment.
 
-    The ``initial_amounts`` section of :func:`commol.applied_parameters_report`
+    The ``initial_amounts`` section of `Model.applied_parameters`
     for an aggregate model. Each row gives its amount in the unit of its bin,
     and no row is a share of a total, so bins of different units, such as
     people and a concentration, are reported side by side.
@@ -169,7 +169,7 @@ def category_splits_report(
     """
     The split of every category within the group its stratification splits.
 
-    The ``category_splits`` section of :func:`commol.applied_parameters_report`
+    The ``category_splits`` section of `Model.applied_parameters`
     for an aggregate model. A category has no amount of its own, because it
     can split bins of different units; its row gives the declared fraction
     and ``group``, the categories that select the subgroup a conditional

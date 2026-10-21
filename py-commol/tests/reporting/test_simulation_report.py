@@ -1,4 +1,7 @@
-"""``observed_report`` and ``simulation_report``: series on a window grid."""
+"""``SimulationResults.report`` and the reports of an ensemble: series on a
+window grid."""
+
+from collections.abc import Sequence
 
 import pytest
 
@@ -7,8 +10,10 @@ from commol import (
     PredictionIntervals,
     SeriesIntervals,
     Simulation,
+    SimulationReplicates,
+    SimulationResults,
 )
-from commol.api.reporting import observed_report, simulation_report
+from commol.api.reporting import ObservedSeries
 from commol.context._windows import window_index
 from tests.support import a_to_b_builder, build, build_ode
 
@@ -21,6 +26,18 @@ def _accumulator_model() -> Simulation:
 WINDOW = 5
 WINDOWS = 8
 STEPS = [(w + 1) * WINDOW for w in range(WINDOWS)]
+
+
+def observed_report(
+    observed: Sequence[ObservedDataPoint], window: float, windows: int
+) -> dict[str, ObservedSeries]:
+    """The ``observed`` block of a report, which reads no run."""
+    return SimulationResults([]).report([], window, windows, observed)["observed"]
+
+
+def _replicates(*runs: SimulationResults) -> SimulationReplicates:
+    """Runs of a deterministic model as replicates, with their model."""
+    return SimulationReplicates(runs, 0, runs[0].positions, model=runs[0].model)
 
 
 class TestObservedReport:
@@ -39,12 +56,9 @@ class TestObservedReport:
         builder = a_to_b_builder(
             parameters={"k1": 0.05}, rate="k1", accumulator="events"
         )
-        simulation = Simulation(build_ode(builder))
-        results = simulation.run(WINDOW * WINDOWS)
+        results = Simulation(build_ode(builder)).run(WINDOW * WINDOWS)
 
-        report = simulation_report(
-            simulation, results, STEPS, WINDOW, WINDOWS, accumulators=["events"]
-        )
+        report = results.report(STEPS, WINDOW, WINDOWS, accumulators=["events"])
 
         assert set(report) >= {"observed", "series", "accumulators"}
 
@@ -103,33 +117,32 @@ class TestObservedReport:
 
 class TestRunReport:
     def test_series_exclude_accumulator_outputs(self) -> None:
-        simulation = _accumulator_model()
-        results = simulation.run(max(STEPS))
+        results = _accumulator_model().run(max(STEPS))
 
-        report = simulation_report(
-            simulation, results, STEPS, WINDOW, WINDOWS, accumulators=["events"]
-        )
+        report = results.report(STEPS, WINDOW, WINDOWS, accumulators=["events"])
 
         assert set(report["series"]) == {"A", "B"}
         assert set(report["accumulators"]) == {"events"}
 
-    def test_series_are_sampled_at_the_given_steps(self) -> None:
-        simulation = _accumulator_model()
-        results = simulation.run(max(STEPS))
+    def test_an_unknown_accumulator_names_the_sources(self) -> None:
+        results = _accumulator_model().run(max(STEPS))
 
-        report = simulation_report(simulation, results, STEPS, WINDOW, WINDOWS)
+        with pytest.raises(KeyError, match="'C' is not a bin or accumulator"):
+            results.report(STEPS, WINDOW, WINDOWS, accumulators=["C"])
+
+    def test_series_are_sampled_at_the_given_steps(self) -> None:
+        results = _accumulator_model().run(max(STEPS))
+
+        report = results.report(STEPS, WINDOW, WINDOWS)
 
         assert report["series"]["A"] == pytest.approx(
             [results["A"][step] for step in STEPS]
         )
 
     def test_windowed_accumulator_is_the_increment_per_window(self) -> None:
-        simulation = _accumulator_model()
-        results = simulation.run(max(STEPS))
+        results = _accumulator_model().run(max(STEPS))
 
-        report = simulation_report(
-            simulation, results, STEPS, WINDOW, WINDOWS, accumulators=["events"]
-        )
+        report = results.report(STEPS, WINDOW, WINDOWS, accumulators=["events"])
 
         windowed = report["accumulators"]["events"]["windowed"]["total"]
         assert isinstance(windowed, list)
@@ -141,12 +154,9 @@ class TestRunReport:
         )
 
     def test_windowed_increments_sum_to_the_cumulative_total(self) -> None:
-        simulation = _accumulator_model()
-        results = simulation.run(max(STEPS))
+        results = _accumulator_model().run(max(STEPS))
 
-        report = simulation_report(
-            simulation, results, STEPS, WINDOW, WINDOWS, accumulators=["events"]
-        )
+        report = results.report(STEPS, WINDOW, WINDOWS, accumulators=["events"])
         windowed = report["accumulators"]["events"]["windowed"]["total"]
         cumulative = report["accumulators"]["events"]["cumulative"]["total"]
         assert isinstance(windowed, list) and isinstance(cumulative, list)
@@ -154,20 +164,10 @@ class TestRunReport:
         assert sum(windowed) == pytest.approx(cumulative[-1])
 
     def test_ensemble_leaves_become_statistics(self) -> None:
-        simulation = _accumulator_model()
-        results = simulation.run(max(STEPS))
-        members = [results, results, results]
+        results = _accumulator_model().run(max(STEPS))
+        members = _replicates(results, results, results)
 
-        report = simulation_report(
-            simulation,
-            results,
-            STEPS,
-            WINDOW,
-            WINDOWS,
-            accumulators=["events"],
-            ensemble_runs=members,
-            confidence_level=0.95,
-        )
+        report = members.report(0.95, STEPS, WINDOW, WINDOWS, accumulators=["events"])
 
         leaf = report["series"]["A"]
         assert isinstance(leaf, dict)
@@ -176,42 +176,16 @@ class TestRunReport:
         assert leaf["ci_lower"] == pytest.approx(leaf["ci_upper"])
         assert leaf["median"] == pytest.approx([results["A"][s] for s in STEPS])
 
-    def test_an_empty_ensemble_reports_the_run(self) -> None:
-        simulation = _accumulator_model()
-        results = simulation.run(max(STEPS))
-
-        plain = simulation_report(
-            simulation, results, STEPS, WINDOW, WINDOWS, accumulators=["events"]
-        )
-        empty = simulation_report(
-            simulation,
-            results,
-            STEPS,
-            WINDOW,
-            WINDOWS,
-            accumulators=["events"],
-            ensemble_runs=[],
-            confidence_level=0.95,
-        )
-
-        assert empty == plain
+    def test_no_replicates_are_an_error(self) -> None:
+        with pytest.raises(ValueError, match="There are no replicates."):
+            SimulationReplicates([], 0, STEPS).report(0.95, STEPS, WINDOW, WINDOWS)
 
     def test_layout_is_the_same_with_and_without_an_ensemble(self) -> None:
-        simulation = _accumulator_model()
-        results = simulation.run(max(STEPS))
+        results = _accumulator_model().run(max(STEPS))
 
-        plain = simulation_report(
-            simulation, results, STEPS, WINDOW, WINDOWS, accumulators=["events"]
-        )
-        ensemble = simulation_report(
-            simulation,
-            results,
-            STEPS,
-            WINDOW,
-            WINDOWS,
-            accumulators=["events"],
-            ensemble_runs=[results],
-            confidence_level=0.95,
+        plain = results.report(STEPS, WINDOW, WINDOWS, accumulators=["events"])
+        ensemble = _replicates(results).report(
+            0.95, STEPS, WINDOW, WINDOWS, accumulators=["events"]
         )
 
         assert list(plain) == list(ensemble)
@@ -236,9 +210,7 @@ class TestNonIntegerPositions:
         simulation = self._simulation()
         results = simulation.run_at([0.0, *self.ENDS])
 
-        report = simulation_report(
-            simulation, results, self.ENDS, self.WINDOW, 4, accumulators=["events"]
-        )
+        report = results.report(self.ENDS, self.WINDOW, 4, accumulators=["events"])
 
         at = simulation.run_at(self.ENDS)
         assert report["series"]["A"] == pytest.approx(at["A"], rel=1e-9)
@@ -248,11 +220,10 @@ class TestNonIntegerPositions:
         )
 
     def test_a_position_the_results_do_not_hold_is_an_error(self) -> None:
-        simulation = self._simulation()
-        results = simulation.run(10)
+        results = self._simulation().run(10)
 
         with pytest.raises(ValueError, match="no value at 2.5"):
-            simulation_report(simulation, results, self.ENDS, self.WINDOW, 4)
+            results.report(self.ENDS, self.WINDOW, 4)
 
 
 @pytest.mark.parametrize("window", [5, 2.5, 0.1])
@@ -276,8 +247,7 @@ def test_observed_report_places_each_observation_by_window_index(
 
 class TestPredictionIntervals:
     def test_a_report_holds_prediction_intervals(self) -> None:
-        simulation = _accumulator_model()
-        results = simulation.run(WINDOW * WINDOWS)
+        results = _accumulator_model().run(WINDOW * WINDOWS)
         intervals = PredictionIntervals(
             level=0.8,
             series={
@@ -291,9 +261,7 @@ class TestPredictionIntervals:
             unbounded={"B": [42.0]},
         )
 
-        report = simulation_report(
-            simulation, results, STEPS, WINDOW, WINDOWS, prediction_intervals=intervals
-        )
+        report = results.report(STEPS, WINDOW, WINDOWS, prediction_intervals=intervals)
 
         assert list(report) == [
             "observed",

@@ -17,7 +17,6 @@ from commol import (
     ObservedDataPoint,
     Quantile,
     Simulation,
-    simulation_report,
 )
 from commol.api.plotter import SimulationPlotter
 from commol.api.results import SimulationReplicates
@@ -151,15 +150,12 @@ class TestLayers:
         simulation = _stochastic()
         replicates = simulation.replicates(30, seed=5).run(4)
 
-        report = simulation_report(
-            simulation,
-            replicates.mean(),
-            at=[2.0, 4.0],
+        report = replicates.report(
+            0.9,
+            positions=[2.0, 4.0],
             window=2.0,
-            num_windows=2,
+            windows=2,
             observed_data=[ObservedDataPoint(at=2.0, output="x", value=370.0)],
-            ensemble_runs=replicates,
-            confidence_level=0.9,
         )
 
         leaf = report["series"]["x"]

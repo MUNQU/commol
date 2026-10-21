@@ -290,7 +290,7 @@ class Aggregate(ModelStructure, InitialConditions):
         """
         The ``initial_amounts`` and ``category_splits`` sections of a report.
 
-        See :func:`commol.applied_parameters_report`.
+        See `Model.applied_parameters`.
 
         Parameters
         ----------

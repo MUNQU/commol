@@ -13,7 +13,6 @@ from commol import (
     NelderMeadConfig,
     ObservedDataPoint,
     Simulation,
-    applied_parameters_report,
 )
 from commol.api.plotter import SimulationPlotter
 from tests.support import assert_close
@@ -73,7 +72,7 @@ class TestReport:
     def test_the_report_has_the_sections_of_the_kind(self) -> None:
         model = decay_model(rate=0.3)
 
-        report = applied_parameters_report(model, {"k": 0.3})
+        report = model.applied_parameters({"k": 0.3})
 
         assert report["parameters"] == {"k": {"value": 0.3, "calibrated": True}}
         assert dict(report) == {

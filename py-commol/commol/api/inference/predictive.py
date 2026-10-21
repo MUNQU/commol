@@ -1,6 +1,6 @@
 """The predictive of a parameter sample: the run of every draw and its bands."""
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -11,7 +11,9 @@ from commol.context.inference.noise import ObservationNoise
 from commol.context.inference.sample import ParameterSample
 
 if TYPE_CHECKING:
+    from commol.api.reporting import SimulationReport
     from commol.api.simulation import Simulation
+    from commol.context.inference.conformal import PredictionIntervals
     from commol.commol_rs._commol_rs import (
         ObservationDrawsProtocol,
         PredictiveProtocol,
@@ -243,12 +245,85 @@ class Predictive:
         Returns
         -------
         list[SimulationResults]
-            One run per draw, at `positions`.
+            One run per draw, at `positions`, with the model of the source.
         """
+        model = self.source.simulation.model_definition
         return [
-            SimulationResults.from_rows(self.positions, self.output_names, rows)
+            SimulationResults.from_rows(
+                self.positions, self.output_names, rows, model=model
+            )
             for rows in self._rust.trajectories
         ]
+
+    def report(
+        self,
+        confidence_level: float,
+        positions: Sequence[float],
+        window: float,
+        windows: int,
+        observed_data: Iterable[ObservedDataPoint] = (),
+        accumulators: Iterable[str] = (),
+        prediction_intervals: "PredictionIntervals | None" = None,
+    ) -> "SimulationReport":
+        """
+        Report the runs of the draws as `SimulationResults.report` reports one.
+
+        Every number becomes a ``{mean, median, ci_lower, ci_upper, min,
+        max}`` block, reduced draw by draw with the weights of the draws; the
+        layout is the one of the report of a run. Each leaf comes from the
+        draws only, so the report takes no point estimate. The outputs of an
+        accumulator come from the model of the source.
+
+        Parameters
+        ----------
+        confidence_level : float
+            Confidence level of the reported intervals, strictly between 0
+            and 1.
+        positions : Sequence[float]
+            Positions the series and cumulative accumulators are sampled at;
+            each must be one of `positions` of the predictive.
+        window : float
+            Length of one window on the axis.
+        windows : int
+            Number of windows on the observed and windowed axes.
+        observed_data : Iterable[ObservedDataPoint], optional
+            The calibration targets to report alongside the draws.
+        accumulators : Iterable[str], optional
+            Accumulator ids to report.
+        prediction_intervals : PredictionIntervals | None, optional
+            Prediction intervals of a conformal method
+            (``ConformalResult.intervals``), reported as they are.
+
+        Returns
+        -------
+        SimulationReport
+            Keys ``observed``, ``series`` and ``accumulators``, then
+            ``prediction_intervals`` when they are given.
+
+        Raises
+        ------
+        ValueError
+            If the confidence level is out of range, or the predictive has no
+            value at a position the report reads.
+        KeyError
+            If an accumulator is not a bin or accumulator of the model.
+        """
+        from commol.api.reporting import _ReportRuns, _simulation_report
+
+        return _simulation_report(
+            _ReportRuns(
+                model=self.source.simulation.model_definition,
+                runs=self.runs(),
+                confidence_level=confidence_level,
+                weights=self.weights,
+            ),
+            positions,
+            window,
+            windows,
+            observed_data,
+            accumulators,
+            prediction_intervals,
+        )
 
     def band(self, confidence_level: float) -> PredictiveBand:
         """

@@ -225,12 +225,12 @@ calibration gives for the same values: the remainder and the excess
 | `series_band(outputs, confidence_level, cumulative=False)` | The band of the sum of some outputs, or of its running total; each draw is reduced first |
 | `at_observations(observed_data, noise)` | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with `noise` drawn from the calibrator's seed: `NoNoise()`, `ResidualNoise(...)` or `DistributionNoise()` (`ObservationDraws`) |
 | `runs()`, `weights` | The trajectory and weight of every draw |
+| `report(confidence_level, positions, window, windows, observed_data=(), accumulators=())` | The report of a run, with each number reduced across the draws with their weights ([Reports](../reports.md#the-report-of-an-ensemble)) |
 
 `SimulationPlotter.plot_series` and `plot_cumulative` draw the band of a
-predictive when it is the `calibration_result`, and `simulation_report` reduces
-its draws with their weights when it is the `ensemble_runs`.
-`applied_parameters_report` takes the sample itself (`sample=`, with a
-`confidence_level`).
+predictive when it is the `calibration_result`, and `Predictive.report`
+reduces its draws with their weights. `Model.applied_parameters` takes the
+sample itself (`sample=`, with a `confidence_level`).
 
 ## Scores
 

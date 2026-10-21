@@ -94,6 +94,8 @@ The positions the values were read at are in `results.positions`.
 | `results[name]` | `[value at positions[0], …]` | Reading one output, plotting |
 | `results.positions` | `[0.0, 1.0, …, n]` for `run(n)`; the requested positions for `run_at` | Reading a value at a position, windows, reports |
 | `results.rows()` | `[[every output at positions[0]], …]`, in `simulation_outputs` order | Matrix operations, export |
+| `results.model` | The `Model` of the run, which `run` and `run_at` set; `None` for results built by hand | The outputs of each bin and accumulator, read by reports |
+| `results.report(positions, window, windows, …)` | The report of the run, as plain data ([Reports](reports.md#the-report-of-a-run)) | JSON export next to the observations |
 
 `run(num_steps)` holds `num_steps + 1` positions: position 0 is the initial
 state.
@@ -138,10 +140,11 @@ replicate gives the same run however many replicates run, and
 | Member | Returns |
 |---|---|
 | `replicates[i]`, `len(replicates)` | One run, with its `seed`; the number of runs |
-| `seed`, `seeds`, `positions` | The seed the replicate seeds derive from, the seed of each replicate, the positions |
+| `seed`, `seeds`, `positions`, `model` | The seed the replicate seeds derive from, the seed of each replicate, the positions, the `Model` of the replicates |
 | `mean()` | `SimulationResults` of the mean of every output at each position |
 | `quantiles(levels)` | `{level: SimulationResults}`, at each position, by [the one quantile](../codebase/decisions/results.md#one-confidence-interval-convention) (NumPy's `method="hazen"`) |
 | `member_statistics(output, confidence_level)` | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate with [the one quantile](../codebase/decisions/results.md#one-confidence-interval-convention) |
+| `report(confidence_level, positions, window, windows, …)` | The report of a run, with each number reduced replicate by replicate ([Reports](reports.md#the-report-of-an-ensemble)) |
 
 ```python
 from commol.api.plotter import SimulationPlotter

@@ -2,10 +2,15 @@
 
 [Back to API Reference](index.md)
 
-Plain-dictionary reports of a calibrated model and of a run. Guide: [Reports](../guide/reports.md).
+Plain-dictionary reports, each a method of the object whose data it
+describes. Guide: [Reports](../guide/reports.md).
 
-::: commol.api.reporting.applied_parameters_report
+::: commol.context.model.Model.applied_parameters
 
-::: commol.api.reporting.simulation_report
+::: commol.api.results.SimulationResults.report
 
-::: commol.api.reporting.identifiability_report
+::: commol.api.results.SimulationReplicates.report
+
+::: commol.api.inference.predictive.Predictive.report
+
+::: commol.context.inference.identifiability.IdentifiabilityReport.report

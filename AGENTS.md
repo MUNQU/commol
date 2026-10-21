@@ -97,7 +97,7 @@ run `pytest`; uv never builds it (`package = false`).
 | Change the Python API | `py-commol/commol/api/` | `docs/api/`, the guide page of that feature |
 | Expose a Rust function to Python | `py-commol/src/`; `py-commol/src/engine.rs` for a function that takes an engine | `py-commol/commol/commol_rs/_commol_rs.pyi`, `py-commol/commol/context/_model/engine_state.py` (the only Python caller of the engine queries) |
 | Change how a model is described | `py-commol/commol/context/description.py` (blocks), `context/_model/describe.py` (layouts) | `ModelStructure.describe`, `context/_model/aggregate_description.py`, `api/description.py` (renderers), `docs/guide/describing-models.md` |
-| Change reports | `py-commol/commol/api/reporting.py` | `ModelStructure.report_sections`, `context/_model/report.py`, `docs/codebase/decisions/results.md` (Reports) |
+| Change reports | `py-commol/commol/api/reporting.py` (the blocks) | the methods that call it (`api/results.py`: `SimulationResults.report`, `SimulationReplicates.report`; `api/inference/predictive.py`: `Predictive.report`; `context/model.py`: `Model.applied_parameters`; `context/inference/identifiability.py`: `IdentifiabilityReport.report`), `ModelStructure.report_sections`, `context/_model/report.py`, `docs/codebase/decisions/results.md` (Reports) |
 <!-- --8<-- [end:tasks] -->
 
 ## Documentation map

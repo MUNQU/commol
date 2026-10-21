@@ -62,10 +62,21 @@ with `latexmk` when they are installed), `tests/building/test_engine.py`
 
 ## Reports
 
-`api/reporting.py` returns blocks of data, not documents:
-`simulation_report` (observed values, series, accumulators) and
-`applied_parameters_report` (calibrated parameters, and the sections of the
-model kind: `initial_conditions` for an aggregate model).
+A report is a method of the object of results whose data it describes:
+`SimulationResults.report` (one run), `SimulationReplicates.report` (the
+replicates of a stochastic engine), `Predictive.report` (the draws of a
+sample), `Model.applied_parameters` (calibrated parameters, and the sections
+of the model kind: `initial_amounts` and `category_splits` for an aggregate
+model) and `IdentifiabilityReport.report`. The private functions of
+`api/reporting.py` build the blocks, which are data, not documents. No module
+function reports anything.
+
+| Rule | Why, against the alternative |
+|---|---|
+| The report of a run is on the results, not on `Simulation` | `Simulation.report(results, ...)` puts the report on the object that produces the data and takes the data as an argument; `results.report(simulation, ...)` takes two objects that must agree. |
+| `SimulationResults` and `SimulationReplicates` hold a reference to their `Model`, which `Simulation.run`, `run_at` and `replicates` set; `Predictive` reads it through `source.simulation` | A report reads the outputs of each bin and accumulator (`ModelStructure.outputs_by_source`); a copy of that map would be a second source of truth, and the figures also need `series_label`. A report reads only the structure, never the values of the parameters, so a later `update_parameters` does not change it. `Model` holds no Rust object, so results still pickle. Results built by hand have no model, and a report that needs one raises `ValueError` that names the bin or accumulator. |
+| `Predictive.report` takes no point estimate | Each leaf of an ensemble comes from its members only; the mean of the draws is not a run of the model. |
+| `Model.applied_parameters` is on the model | Most of the block is data of the model (one row per parameter, the sections of its structure); the values and the problem only add what calibration set. |
 
 - A single run and an ensemble (replicates or a `Predictive`) differ only at
   the leaves (`ReportLeaf`); a predictive's members carry their weights.
@@ -74,7 +85,8 @@ model kind: `initial_conditions` for an aggregate model).
 - Labels and summary figures belong to the caller, because they carry domain
   vocabulary.
 
-**Guard:** `tests/reporting/`.
+**Guard:** `tests/reporting/` (`test_reports.py` checks that each method
+gives the block of its definition, with its key order).
 
 ## A plot keeps the global style
 

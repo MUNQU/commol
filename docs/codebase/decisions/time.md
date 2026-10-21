@@ -144,7 +144,7 @@ An observation at `at` with `window = W` is compared with
 predictive reads windows through the observation operator
 ([One observation operator](calibration.md#one-observation-operator)). Window `w`
 covers `(w · W, (w + 1) · W]`; `window_index` places a position with
-`max(ceil(at / W) − 1, 0)`, and `observed_report` calls it.
+`max(ceil(at / W) − 1, 0)`, and the `observed` block of a report (`_observed_report` in `api/reporting.py`) calls it.
 `SimulationPlotter.plot_series` reads the model of a windowed observation the
 same way, through its own window at its own position, never on a grid of
 windows from 0: an observation at 10.5 with a window of 7 falls on no window
