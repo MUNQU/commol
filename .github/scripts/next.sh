@@ -7,8 +7,9 @@
 # number. It prints the priority and where an inherited one comes from, and
 # names each issue it skips and the issue it would touch
 # (.github/scripts/parallel.py). First it links each open issue to the release
-# before its milestone (--releases), then it writes the precedence level of
-# each open issue into the field Level of the project (--levels).
+# before its milestone, and each open release to the issues of its milestone
+# (--releases), then it writes the precedence level of each open issue into
+# the field Level of the project (--levels).
 #
 # Usage, from anywhere in the repository: .github/scripts/next.sh [count]   (default 1)
 set -euo pipefail

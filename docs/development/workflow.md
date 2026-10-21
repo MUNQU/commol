@@ -87,7 +87,8 @@ The dependencies set what must come first; `Priority` is set only to move an
 issue ahead of (`Now`) or behind (`Later`) its milestone.
 
 Before it lists them, `next.sh` links each open issue to the release before
-its milestone ([Milestones](#milestones)), and then writes the precedence level of each open
+its milestone, and each open release to the issues of its milestone
+([Milestones](#milestones)), and then writes the precedence level of each open
 proposal, change and release into the number field `Level` of the project:
 0 when no open issue blocks it, else one more than the highest level of its
 open blockers (an open blocker of another repository counts as level 0). The
@@ -191,19 +192,35 @@ release checklist asks for it:
   nearest milestone before its own, by the versions that the titles of the
   milestones name: an issue of 0.10.0 waits for release 0.9.0, and release
   0.10.0 waits for it too. When a new milestone comes in between (0.9.1), its
-  release takes the place of the old blocker. `next.sh` and `start.sh` write
-  these links before they read the blockers, and so does, at any time:
+  release takes the place of the old blocker.
+- **A release waits for the issues of its milestone.** Each open release is
+  "blocked by" every open proposal and change of its own milestone, so its
+  field `Level` and the view "By precedence" count all of them. An issue moved
+  to another milestone leaves the release it no longer ships, and blocks the
+  release of its new milestone.
 
-  ```bash
-  python .github/scripts/parallel.py --releases
-  ```
+`next.sh` and `start.sh` write these links before they read the blockers, and
+so does, at any time:
 
-  The script owns the links from a release to an issue whose milestone names
-  a version: it adds the one that is missing and removes the others. It
-  refuses a link that closes a cycle, such as an issue of 0.10.0 that release
-  0.9.0 waits for, and names it: move that issue to the earlier milestone, or
-  remove the link. A failure to write the links stops `next.sh` and
-  `start.sh`, since the blockers they read would be wrong.
+```bash
+python .github/scripts/parallel.py --releases
+```
+
+The script owns the links between a release and an issue whose milestone
+names a version: it adds the one that is missing and removes the others. A
+link from a release to an issue with no version in its milestone, or of
+another repository, stays, and so do the links between releases other than
+the release before. The script refuses a link that closes a cycle, and names
+the issue to move: an issue of 0.10.0 that release 0.9.0 waits for moves to
+the earlier milestone, and an issue of 0.9.0 that waits, through its blockers,
+for release 0.9.0 moves to a later one; or remove the link that makes the
+cycle. When the link of a release to an issue it ships and a link to the
+release before close a cycle together, the first one stays: a release needs
+its issues, and the release before only orders the work. So the issue that
+the release needs through a chain of links is not held back by the release,
+and the script names it to move to that milestone. A failure to write the
+links stops `next.sh` and `start.sh`, since the blockers they read would be
+wrong.
 
 An experiment, such as a benchmark, is not a bug and may have no milestone.
 

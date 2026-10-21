@@ -338,7 +338,14 @@ def test_an_issue_is_blocked_by_the_release_of_the_milestone_before() -> None:
 
     added, removed, refused = parallel.release_links(issues)
 
-    assert added == [(186, 140), (187, 186), (190, 187), (191, 187)]
+    assert added == [
+        (140, 137),
+        (186, 140),
+        (187, 186),
+        (190, 187),
+        (191, 187),
+        (191, 190),
+    ]
     assert removed == []
     assert refused == []
     assert issues[190].blocked_by == {187}
@@ -426,9 +433,10 @@ def test_the_links_are_written_through_rest(capsys) -> None:
 def test_a_refused_link_names_the_issue_to_move(capsys) -> None:
     issues = {
         145: an_issue(145, version="0.10.0"),
+        150: an_issue(150, version="0.9.0", blocked_by=frozenset({145})),
         187: an_issue(187, kind="release", version="0.9.0"),
     }
-    issues[187].blocked_by = {145}
+    issues[187].blocked_by = {150}
 
     with (
         patch.object(parallel, "repository", return_value="o/a"),
@@ -438,6 +446,98 @@ def test_a_refused_link_names_the_issue_to_move(capsys) -> None:
 
     assert rest.call_args_list == []
     assert "#145 is in a later milestone than #187" in capsys.readouterr().out
+
+
+# The issues of the milestone of a release
+
+
+def test_a_release_is_blocked_by_the_issues_of_its_milestone() -> None:
+    issues = {
+        140: an_issue(140, kind="release", version="0.6.0"),
+        220: an_issue(220, version="0.6.0"),
+        225: an_issue(225, kind="proposal", version="0.6.0"),
+        239: an_issue(239, kind="proposal", version="0.6.2"),
+    }
+    issues[140].blocked_by = {220}
+
+    added, removed, refused = parallel.release_links(issues)
+
+    assert added == [(140, 225), (239, 140)]
+    assert (removed, refused) == ([], [])
+    assert issues[140].blocked_by == {220, 225}
+
+
+def test_a_release_loses_the_link_to_an_issue_moved_to_another_milestone() -> None:
+    issues = {
+        240: an_issue(240, kind="release", version="0.6.2"),
+        244: an_issue(244, version="0.6.1"),
+        248: an_issue(248, kind="release", version="0.6.1"),
+    }
+    issues[240].blocked_by = {244, 248}
+
+    added, removed, refused = parallel.release_links(issues)
+
+    assert added == [(248, 244)]
+    assert removed == [(240, 244)]
+    assert refused == []
+    assert issues[240].blocked_by == {248}
+
+
+def test_a_release_keeps_its_links_to_issues_without_a_version_and_to_releases() -> (
+    None
+):
+    issues = {
+        5: an_issue(5),
+        6: an_issue(6, version="Backlog"),
+        187: an_issue(187, kind="release", version="0.9.0"),
+        191: an_issue(191, kind="release", version="0.10.0"),
+    }
+    # 999 is not an open issue of the repository: the link stays.
+    issues[191].blocked_by = {5, 6, 187, 999}
+
+    assert parallel.release_links(issues) == ([], [], [])
+    assert issues[191].blocked_by == {5, 6, 187, 999}
+
+
+@pytest.mark.parametrize(
+    ("release", "inner", "later"), [(140, 241, 245), (187, 146, 150)]
+)
+def test_a_release_keeps_the_issue_it_ships_over_the_release_before(
+    release: int, inner: int, later: int
+) -> None:
+    # inner is in 0.9.0 and waits for later, of 0.10.0: the release waits for
+    # inner whatever the numbers, and later does not wait for the release.
+    issues = {
+        release: an_issue(release, kind="release", version="0.9.0"),
+        inner: an_issue(inner, version="0.9.0", blocked_by=frozenset({later})),
+        later: an_issue(later, version="0.10.0"),
+    }
+
+    added, removed, refused = parallel.release_links(issues)
+
+    assert (added, removed, refused) == ([(release, inner)], [], [(later, release)])
+
+
+def test_a_release_link_that_closes_a_cycle_names_the_issue_to_move(capsys) -> None:
+    # 150 is in 0.9.0, but it waits for 145, of 0.10.0, which waits for 187.
+    issues = {
+        145: an_issue(145, version="0.10.0", blocked_by=frozenset({187})),
+        150: an_issue(150, version="0.9.0", blocked_by=frozenset({145})),
+        187: an_issue(187, kind="release", version="0.9.0"),
+    }
+
+    with (
+        patch.object(parallel, "repository", return_value="o/a"),
+        patch.object(parallel, "rest") as rest,
+    ):
+        parallel.write_release_links(issues)
+
+    assert rest.call_args_list == []
+    assert issues[187].blocked_by == set()
+    assert (
+        "#150 waits for #187 through its blockers: move #150 to a later milestone"
+        in capsys.readouterr().out
+    )
 
 
 def run_main(*arguments: str) -> dict[str, list[tuple]]:

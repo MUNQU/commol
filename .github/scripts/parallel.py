@@ -37,9 +37,17 @@ milestone (``--releases``): the open release issue of the nearest milestone
 before its own, by the version that the titles of the milestones name. The
 script writes that "blocked by" link, and removes the links from the issue to
 every other open release, so that a new milestone in between (0.9.1 before
-0.10.0) takes the place of the old blocker. It owns these links: an issue with
-no version in its milestone keeps its links. It refuses a link that closes a
-cycle, and names the issue to move.
+0.10.0) takes the place of the old blocker. Each open release also waits for
+the open proposals and changes of its own milestone: the script writes those
+links, and removes the links from the release to a proposal or change whose
+milestone names another version, so that an issue moved to another milestone
+leaves the release it no longer ships. It owns these links: an issue with no
+version in its milestone keeps its links, and so does a release to an issue
+with no version in its milestone or of another repository. It refuses a link
+that closes a cycle, and names the issue to move. When a link of a release to
+an issue it ships and a link to the release before close a cycle together, the
+first one stays, whatever the numbers of the issues: a release needs its
+issues, and the release before only orders the work.
 
 The script reads the repository from the git remote, and the project is the
 one of the organization with the name of the repository. Usage, from the root
@@ -353,20 +361,17 @@ def reaches(issues: dict[int, Proposal], start: int, target: int) -> bool:
     return False
 
 
-def release_links(
-    issues: dict[int, Proposal],
-) -> tuple[list[Link], list[Link], list[Link]]:
-    """Return the links to add and to remove, and the ones refused.
+def links_to_release_before(
+    issues: dict[int, Proposal], releases: list[Proposal]
+) -> tuple[list[Link], list[Link]]:
+    """Return the links to the release before each issue; remove the others.
 
-    A link ``(issue, release)`` says that the release blocks the issue. Each
-    issue with a version in its milestone waits for ``release_before``, and
-    for no other open release. A link that would close a chain of links back
-    to its issue is refused. The ``blocked_by`` of the issues change to what
-    the links give.
+    Each issue with a version in its milestone waits for ``release_before``,
+    and for no other open release; its links to other releases leave its
+    ``blocked_by`` and come back as the links removed.
     """
-    releases = [issue for issue in issues.values() if issue.kind == "release"]
     numbers = {release.number for release in releases}
-    wanted: dict[int, int] = {}
+    wanted: list[Link] = []
     removed: list[Link] = []
     for number, issue in sorted(issues.items()):
         if issue.version is None:
@@ -374,41 +379,100 @@ def release_links(
         release = release_before(issue, releases)
         keep = release.number if release is not None else None
         if keep is not None:
-            wanted[number] = keep
+            wanted.append((number, keep))
         for old in sorted(n for n in issue.blocked_by & numbers if n != keep):
             issue.blocked_by.discard(old)
             removed.append((number, old))
+    return wanted, removed
+
+
+def links_to_shipped_issues(
+    issues: dict[int, Proposal], releases: list[Proposal]
+) -> tuple[list[Link], list[Link]]:
+    """Return the links of each release to the issues it ships; remove the others.
+
+    Each release with a version waits for the open proposals and changes of
+    its own milestone. Its links to proposals and changes whose milestone names
+    another version leave its ``blocked_by`` and come back as the links
+    removed; its links to releases, and to issues with no version in their
+    milestone, stay.
+    """
+    numbers = {release.number for release in releases}
+    wanted: list[Link] = []
+    removed: list[Link] = []
+    for release in sorted(releases, key=lambda r: r.number):
+        if release.version is None:
+            continue
+        for number in sorted(release.blocked_by - numbers):
+            issue = issues.get(number)
+            if issue is not None and issue.version not in (None, release.version):
+                release.blocked_by.discard(number)
+                removed.append((release.number, number))
+        wanted.extend(
+            (release.number, number)
+            for number, issue in sorted(issues.items())
+            if issue.kind != "release" and issue.version == release.version
+        )
+    return wanted, removed
+
+
+def release_links(
+    issues: dict[int, Proposal],
+) -> tuple[list[Link], list[Link], list[Link]]:
+    """Return the links to add and to remove, and the ones refused.
+
+    A link ``(issue, blocker)`` says that the blocker blocks the issue: the
+    links of ``links_to_shipped_issues`` and ``links_to_release_before``. A
+    link that would close a chain of links back to its issue is refused. The
+    links of a release to the issues it ships come first: a release needs its
+    issues, while the release before only orders the work. So when the two
+    kinds of link close a cycle together, the link to the release before is
+    the one refused, whatever the numbers of the issues, and the issue it
+    names moves to the milestone of the release that needs it. The
+    ``blocked_by`` of the issues change to what the links give.
+    """
+    releases = [issue for issue in issues.values() if issue.kind == "release"]
+    shipped, removed_shipped = links_to_shipped_issues(issues, releases)
+    before, removed_before = links_to_release_before(issues, releases)
     added: list[Link] = []
     refused: list[Link] = []
-    for number, release in sorted(wanted.items()):
-        if release in issues[number].blocked_by:
+    for number, blocker in shipped + before:
+        if blocker in issues[number].blocked_by:
             continue
-        if reaches(issues, release, number):
-            refused.append((number, release))
+        if reaches(issues, blocker, number):
+            refused.append((number, blocker))
             continue
-        issues[number].blocked_by.add(release)
-        added.append((number, release))
-    return added, removed, refused
+        issues[number].blocked_by.add(blocker)
+        added.append((number, blocker))
+    return sorted(added), sorted(removed_shipped + removed_before), refused
 
 
 def write_release_links(issues: dict[int, Proposal]) -> None:
-    """Write the links that make each issue wait for the release before it."""
+    """Write the links of each release to the issues it precedes and ships."""
     added, removed, refused = release_links(issues)
     path = f"repos/{repository()}/issues"
-    for number, release in removed:
-        blocker = issues[release].issue_id
-        rest(f"{path}/{number}/dependencies/blocked_by/{blocker}", method="DELETE")
-    for number, release in added:
+    for number, blocker in removed:
+        blocker_id = issues[blocker].issue_id
+        rest(f"{path}/{number}/dependencies/blocked_by/{blocker_id}", method="DELETE")
+    for number, blocker in added:
         rest(
             f"{path}/{number}/dependencies/blocked_by",
             method="POST",
-            data={"issue_id": issues[release].issue_id},
+            data={"issue_id": issues[blocker].issue_id},
         )
-    for number, release in refused:
-        print(
-            f"Releases: #{number} is in a later milestone than #{release}, which"
-            f" waits for it: move #{number} to that milestone, or remove the link"
-        )
+    for number, blocker in refused:
+        if issues[blocker].kind == "release":
+            print(
+                f"Releases: #{number} is in a later milestone than #{blocker},"
+                f" which waits for it: move #{number} to that milestone, or"
+                " remove the link"
+            )
+        else:
+            print(
+                f"Releases: #{blocker} waits for #{number} through its blockers:"
+                f" move #{blocker} to a later milestone, or remove the link that"
+                " makes it wait"
+            )
     print(f"Releases: {len(added)} links added, {len(removed)} removed")
 
 
