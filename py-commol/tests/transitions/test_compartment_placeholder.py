@@ -282,3 +282,94 @@ class TestRuns:
             Simulation(build(by_hand)).run(100),
             rel=ENGINE_REL,
         )
+
+
+def _two_bins_in_two_groups(parameters: dict[str, float]) -> FactoryBuilder:
+    """A and B hold 100 each, split 90 and 10 by ``g``; C starts empty."""
+    return abc_builder(
+        ab=None,
+        bc=None,
+        parameters=parameters,
+        amounts={"A": 100, "B": 100, "C": 0},
+        stratifications={"g": {"g1": 0.9, "g2": 0.1}},
+    )
+
+
+def test_a_placeholder_with_per_compartment_reads_the_compartment_that_flows() -> None:
+    model = build(
+        _two_bins_in_two_groups({"k1": 0.1, "k2": 0.5}).add_transition(
+            id="out",
+            source=["A", "B"],
+            target=[],
+            rate="k1 * $compartment",
+            per_compartment=True,
+            stratified_rates=[
+                {
+                    "conditions": [{"stratification": "g", "category": "g2"}],
+                    "rate": "k2 * $compartment",
+                }
+            ],
+        )
+    )
+
+    results = Simulation(model).run(1)
+
+    # Each compartment loses its own rate times its own amount.
+    assert_close(
+        {name: results[name] for name in ("A_g1", "A_g2", "B_g1", "B_g2")},
+        {
+            "A_g1": [90.0, 90.0 * 0.9],
+            "A_g2": [10.0, 10.0 * 0.5],
+            "B_g1": [90.0, 90.0 * 0.9],
+            "B_g2": [10.0, 10.0 * 0.5],
+        },
+        rel=ENGINE_REL,
+    )
+
+
+def test_a_placeholder_keeps_the_accumulators_of_its_transition() -> None:
+    model = build(
+        abc_builder(
+            ab=None,
+            bc=None,
+            parameters={"k1": 0.1},
+            amounts={"A": 100, "B": 100, "C": 0},
+            accumulator="out",
+        ).add_transition(
+            id="t",
+            source=["A", "B"],
+            target=["C"],
+            rate="k1 * $compartment",
+            accumulators=["out"],
+        )
+    )
+
+    results = Simulation(model).run(3)
+
+    # Only t fills C, so the accumulator of t counts every amount C gains.
+    assert_close(results["out"], [0.0, 20.0, 38.0, 54.2], rel=ENGINE_REL)
+    assert_close(results["out"], results["C"], rel=ENGINE_REL)
+
+
+def test_a_placeholder_keeps_the_absolute_flag_of_a_stratified_rate() -> None:
+    model = build(
+        _two_bins_in_two_groups({"k1": 0.1, "k2": 2.0}).add_transition(
+            id="out",
+            source=["A", "B"],
+            target=[],
+            rate="k1 * $compartment",
+            stratified_rates=[
+                {
+                    "conditions": [{"stratification": "g", "category": "g2"}],
+                    "rate": "k2",
+                    "absolute": True,
+                }
+            ],
+        )
+    )
+
+    results = Simulation(model).run(1)
+
+    # g2 loses the amount k2; g1 loses k1 times the total of its bin.
+    assert_close(results["A_g2"], [10.0, 8.0], rel=ENGINE_REL)
+    assert_close(results["A_g1"], [90.0, 90.0 - 0.1 * 100.0], rel=ENGINE_REL)

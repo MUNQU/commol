@@ -169,7 +169,10 @@ for transition in outflow.process.transitions:
 | A `rate` is given | `ValueError` |
 
 `stratified_rates` may also use `$compartment`; each generated transition gets
-its own copy.
+its own copy. Each generated transition keeps `per_compartment`,
+`accumulators` and the impulse schedule of the call. With
+`per_compartment=True`, `$compartment` reads the compartment that flows: in a
+flow from `A_g1`, `"k * $compartment"` is `k * A_g1`.
 
 ## Transitions between categories
 
@@ -234,7 +237,8 @@ print(own_compartment.describe().render("text"))
 ```
 
 It applies to the fallback rate and to every stratified rate, and only to
-transitions between bins.
+transitions between bins. Any other bin in the rate keeps its total: in the
+flow `A_g1 -> B_g1`, `"k * A * C / total"` reads `A_g1` and the total of `C`.
 
 ## Stratified rates
 

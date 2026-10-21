@@ -53,8 +53,9 @@ pub struct Transition {
     pub rate: Option<String>,
     /// Rates for compartments with some categories.
     pub stratified_rates: Option<Vec<StratifiedRate>>,
-    /// When true, base compartment names in the rate expression are replaced
-    /// with the specific stratified compartment name for each expanded flow.
+    /// When true, the id of each source and target bin in a rate is replaced
+    /// with the compartment of each flow; any other bin keeps its total. A
+    /// transition between categories ignores it.
     pub per_compartment: Option<bool>,
     /// Positions on the axis where the transition is an impulse: at each one,
     /// the rate is a fraction (proportional) or an amount (absolute) moved at
