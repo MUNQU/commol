@@ -76,6 +76,20 @@ model kind: `initial_conditions` for an aggregate model).
 
 **Guard:** `tests/reporting/`.
 
+## A plot keeps the global style
+
+A `PlotConfig` sets its seaborn style, palette and context through
+`matplotlib.rcParams`, which is global to the process. Each public method of
+`SimulationPlotter` is under `_scoped_style` (`api/plotter.py`): it draws in a
+copy of `rcParams` (`matplotlib.rc_context`), so the style is in its figure and
+`rcParams` is as it was when the method returns or raises. A new plot method
+takes the same decorator; `_apply_seaborn_style` outside it changes the style
+of every later figure of the user.
+
+**Guard:** `tests/plotting/test_plotter.py::test_a_figure_leaves_the_global_style`,
+`tests/plotting/test_sensitivity.py::test_a_sensitivity_figure_leaves_the_global_style`
+and `tests/plotting/test_profiles.py::test_a_profile_figure_leaves_the_global_style`.
+
 ## Model files are written in full
 
 `Model.to_json` writes every field, nulls included. Dropping nulls is not

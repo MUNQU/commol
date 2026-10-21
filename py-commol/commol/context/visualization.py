@@ -32,6 +32,12 @@ class PlotConfig(BaseModel):
         "paper", "notebook", "talk", or "poster".
         See: https://seaborn.pydata.org/generated/seaborn.set_context.html
 
+    Notes
+    -----
+    ``style``, ``palette`` and ``context`` apply to the figure of one call of
+    `SimulationPlotter` only: after the call, ``matplotlib.rcParams`` is as it
+    was before it, so the figures that you draw with matplotlib keep your style.
+
     Examples
     --------
     >>> # Direct configuration

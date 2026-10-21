@@ -2,9 +2,12 @@
 
 from pathlib import Path
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
+import seaborn as sns
+from matplotlib.colors import to_rgba
 from matplotlib.figure import Figure
 
 from commol import (
@@ -394,6 +397,26 @@ class TestSimulationPlotter:
 
         assert config == expected
         assert fig.dpi == expected.dpi
+
+
+@pytest.mark.parametrize("draw", ["plot_series", "plot_cumulative"])
+def test_a_figure_leaves_the_global_style(
+    plotter: SimulationPlotter, default_style: dict[str, object], draw: str
+) -> None:
+    """
+    The style, palette and context of the configuration are in the figure,
+    and ``matplotlib.rcParams`` is as it was before the call.
+    """
+    config = PlotConfig(style="darkgrid", palette="Set2", context="poster")
+
+    fig = getattr(plotter, draw)(config=config)
+
+    assert {k for k, v in default_style.items() if mpl.rcParams[k] != v} == set()
+    ax = _visible(fig)[0]
+    assert ax.get_facecolor() == to_rgba(sns.axes_style("darkgrid")["axes.facecolor"])
+    assert to_rgba(ax.lines[0].get_color()) == to_rgba(sns.color_palette("Set2")[0])
+    poster = sns.plotting_context("poster")["axes.titlesize"]
+    assert ax.title.get_fontsize() == poster
 
 
 class TestPredictiveSeries:
