@@ -176,8 +176,8 @@ Every issue that ships in a release has the milestone of that release, so the
 release checklist asks for it:
 
 - **A new bug** gets, when it is opened, the milestone of the nearest release
-  it fits: the next one, unless its fix is breaking and that release must not
-  break. A bug with no milestone is in no checklist, and `next.sh` lists it
+  it fits: the next one, unless its fix is breaking and that release is a
+  patch release, which never breaks ([Version Guidelines](release.md#version-guidelines)). A bug with no milestone is in no checklist, and `next.sh` lists it
   after every issue that has one. To find the bugs that break this rule:
 
   ```bash
