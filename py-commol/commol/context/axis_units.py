@@ -1,9 +1,10 @@
 """Values in units, converted to steps of a model axis, and rates in steps."""
 
 import math
-from typing import TYPE_CHECKING, Self
+from datetime import date, datetime, time, timedelta
+from typing import TYPE_CHECKING, Annotated, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from commol.commol_rs import _commol_rs as commol_rs
 
@@ -16,6 +17,95 @@ if TYPE_CHECKING:
 
 WHOLE_STEP_TOLERANCE = 1e-9
 """A number of steps this close to an integer is that integer."""
+
+SECONDS_PER_DAY = 86400.0
+"""Length of a calendar day with no time zone."""
+
+
+def naive_moment(moment: date) -> datetime:
+    """
+    A calendar moment with no time zone: a `datetime`, or a `date` at midnight.
+
+    Parameters
+    ----------
+    moment : date
+        A `datetime.datetime` with no time zone, or a `datetime.date`.
+
+    Returns
+    -------
+    datetime
+        The moment; a `date` is its midnight.
+
+    Raises
+    ------
+    ValueError
+        If the moment has a time zone. A step has no time zone, so the
+        message says to convert it to the local zone and drop the zone.
+    """
+    if not isinstance(moment, datetime):
+        return datetime.combine(moment, time())
+    if moment.utcoffset() is not None:
+        raise ValueError(
+            f"A moment on the axis has no time zone, got {moment.isoformat()}. "
+            "Convert it to the zone of the axis and drop the zone: "
+            "moment.astimezone(zone).replace(tzinfo=None)."
+        )
+    return moment
+
+
+Origin = Annotated[datetime, AfterValidator(naive_moment)]
+"""The calendar moment of position 0: a naive `datetime`, or a `date` at midnight."""
+
+
+def seconds_per_step(step_unit: str) -> float:
+    """
+    Length of one step in seconds, for an axis with an origin.
+
+    Parameters
+    ----------
+    step_unit : str
+        The unit of one step.
+
+    Returns
+    -------
+    float
+        Seconds in one step.
+
+    Raises
+    ------
+    ValueError
+        If the step unit is not a unit of time, or its length is not a whole
+        number of days or a whole fraction of a day: a month and a year are
+        units of a fixed length (a month is 1/12 of a year, about 30.44
+        days), not the length of a calendar month or year.
+    """
+    try:
+        seconds = float(
+            ureg.Quantity(1.0, ureg.parse_units(step_unit)).to("second").magnitude
+        )
+    except Exception as error:
+        message = (
+            f"An origin puts the axis on the calendar, so its step unit must "
+            f"be a unit of time, got '{step_unit}'."
+        )
+        if step_unit == DEFAULT_STEP_UNIT:
+            message += " Declare the unit of a step (step_unit in ModelBuilder)."
+        raise ValueError(message) from error
+    days = seconds / SECONDS_PER_DAY
+    if not (_is_whole(days) or _is_whole(1.0 / days)):
+        raise ValueError(
+            f"An origin needs a step of fixed calendar length, a whole number "
+            f"of days or a whole fraction of a day (such as 'hour', 'day' or "
+            f"'week'). '{step_unit}' is {days:g} days: a month or a year is a "
+            f"unit of fixed length, not the length of a calendar month or "
+            f"year, so its positions would not fall on calendar dates."
+        )
+    return seconds
+
+
+def _is_whole(value: float) -> bool:
+    """Whether `value` is an integer within ``1e-9``."""
+    return math.isclose(value, round(value), rel_tol=0.0, abs_tol=WHOLE_STEP_TOLERANCE)
 
 
 class AxisUnits(BaseModel):
@@ -31,8 +121,13 @@ class AxisUnits(BaseModel):
     one width, a span in a unit: window ``w`` covers the positions
     ``(w * width, (w + 1) * width]``.
 
-    `Model.axis_units` builds the one of a model: its ``step_unit`` and its
-    engine.
+    An axis of time with an `origin` is on the calendar: `position_of` and
+    `moment_of` convert between calendar moments and positions, and
+    `day_ends` and `week_ends` give the positions where calendar days and
+    weeks end.
+
+    `Model.axis_units` builds the one of a model: its ``step_unit``, its
+    ``origin`` and its engine.
 
     Attributes
     ----------
@@ -42,6 +137,11 @@ class AxisUnits(BaseModel):
     engine : str | None
         Name of the engine that reads the rates, such as
         ``"DifferenceEquations"``. None allows only `steps`.
+    origin : datetime | None
+        Calendar moment of position 0, with no time zone; a `date` is its
+        midnight. It needs a step unit of time whose length is a whole number
+        of days or a whole fraction of a day, such as ``"hour"`` or
+        ``"day"``. None means the axis has no dates.
 
     Examples
     --------
@@ -53,6 +153,12 @@ class AxisUnits(BaseModel):
     0.07142857142857142
     >>> hours.window_end(2, 1, "week")
     504.0
+    >>> from datetime import date
+    >>> dated = AxisUnits(step_unit="hour", origin=date(2020, 1, 1))
+    >>> dated.position_of(date(2020, 1, 2))
+    24.0
+    >>> dated.moment_of(36)
+    datetime.datetime(2020, 1, 2, 12, 0)
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -63,15 +169,168 @@ class AxisUnits(BaseModel):
     engine: str | None = Field(
         default=None, description="Name of the engine that reads the rates."
     )
+    origin: Origin | None = Field(
+        default=None,
+        description="Calendar moment of position 0, with no time zone.",
+    )
 
     @model_validator(mode="after")
     def check_units_and_engine(self) -> Self:
-        """Check the step unit, and ask the engine's list for the engine."""
+        """Check the step unit and the origin, and ask for the engine."""
         define_units(self.step_unit)
         check_step_unit(self.step_unit)
+        if self.origin is not None:
+            seconds_per_step(self.step_unit)
         if self.engine is not None:
             commol_rs.engine.EngineType(self.engine)
         return self
+
+    def position_of(self, moment: date) -> float:
+        """
+        Position of a calendar moment on the axis, in steps from the origin.
+
+        The inverse of `moment_of`. A result within ``1e-9`` of an integer is
+        that integer, as in `steps`.
+
+        Parameters
+        ----------
+        moment : date
+            A `datetime.datetime` with no time zone, or a `datetime.date`,
+            read as its midnight.
+
+        Returns
+        -------
+        float
+            ``(moment - origin)`` in steps; negative before the origin.
+
+        Raises
+        ------
+        ValueError
+            If the axis has no origin, or `moment` has a time zone.
+        """
+        elapsed = naive_moment(moment) - self._origin()
+        return self.steps(elapsed.total_seconds(), "second")
+
+    def moment_of(self, position: float) -> datetime:
+        """
+        Calendar moment of a position on the axis.
+
+        The inverse of `position_of`, to the microsecond.
+
+        Parameters
+        ----------
+        position : float
+            A finite position, in steps from the origin.
+
+        Returns
+        -------
+        datetime
+            ``origin + position`` steps, with no time zone.
+
+        Raises
+        ------
+        ValueError
+            If the axis has no origin, or `position` is not finite.
+        """
+        origin = self._origin()
+        if not math.isfinite(position):
+            raise ValueError(f"A position on the axis is finite, got {position}.")
+        return origin + timedelta(seconds=position * seconds_per_step(self.step_unit))
+
+    def day_ends(self, start: float, end: float) -> list[float]:
+        """
+        Positions where calendar days end, after `start` and up to `end`.
+
+        A day ends at midnight, where the next starts. The positions cover
+        ``(start, end]``, the interval of a window: the first is the first
+        midnight after `start`, so a day that starts before `start` ends
+        inside the range.
+
+        Parameters
+        ----------
+        start : float
+            First position of the range; a day that ends there is not in it.
+        end : float
+            Last position of the range.
+
+        Returns
+        -------
+        list[float]
+            The positions of the midnights in ``(start, end]``, ascending.
+
+        Raises
+        ------
+        ValueError
+            If the axis has no origin, or `start` or `end` is not finite.
+        """
+        return self._period_ends(end, self._next_midnight(start), 1)
+
+    def week_ends(self, start: float, end: float, first_weekday: int) -> list[float]:
+        """
+        Positions where calendar weeks end, after `start` and up to `end`.
+
+        A week starts at midnight of `first_weekday` and ends where the next
+        starts, 7 days later. The positions cover ``(start, end]``, as
+        `day_ends`.
+
+        Parameters
+        ----------
+        start : float
+            First position of the range; a week that ends there is not in it.
+        end : float
+            Last position of the range.
+        first_weekday : int
+            Day on which a week starts, from 0 (Monday) to 6 (Sunday), as
+            `datetime.date.weekday` and the constants of the `calendar`
+            module (``calendar.SUNDAY``) number them.
+
+        Returns
+        -------
+        list[float]
+            The positions of the week starts in ``(start, end]``, ascending.
+
+        Raises
+        ------
+        ValueError
+            If the axis has no origin, `start` or `end` is not finite, or
+            `first_weekday` is not an integer from 0 to 6.
+        """
+        if first_weekday not in range(7):
+            raise ValueError(
+                "first_weekday is an integer from 0 (Monday) to 6 (Sunday), "
+                f"got {first_weekday!r}."
+            )
+        midnight = self._next_midnight(start)
+        first = midnight + timedelta(days=(first_weekday - midnight.weekday()) % 7)
+        return self._period_ends(end, first, 7)
+
+    def _next_midnight(self, start: float) -> datetime:
+        """The first midnight after the moment of `start`."""
+        moment = self.moment_of(start)
+        return datetime.combine(moment.date(), time()) + timedelta(days=1)
+
+    def _period_ends(self, end: float, first: datetime, days: int) -> list[float]:
+        """Positions of `first` and every `days` days after it, up to `end`."""
+        if not math.isfinite(end):
+            raise ValueError(f"A position on the axis is finite, got {end}.")
+        ends: list[float] = []
+        moment = first
+        position = self.position_of(moment)
+        while position < end or math.isclose(
+            position, end, rel_tol=WHOLE_STEP_TOLERANCE, abs_tol=WHOLE_STEP_TOLERANCE
+        ):
+            ends.append(position)
+            moment += timedelta(days=days)
+            position = self.position_of(moment)
+        return ends
+
+    def _origin(self) -> datetime:
+        if self.origin is None:
+            raise ValueError(
+                "This axis has no origin, so it has no dates: give AxisUnits "
+                "an origin, or declare origin in ModelBuilder."
+            )
+        return self.origin
 
     def steps(self, value: float, unit: str) -> float:
         """

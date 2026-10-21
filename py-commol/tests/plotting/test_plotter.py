@@ -1,5 +1,6 @@
 """SimulationPlotter draws the series, observations and bands it is given."""
 
+from datetime import date, timedelta
 from pathlib import Path
 
 import matplotlib as mpl
@@ -417,6 +418,64 @@ def test_a_figure_leaves_the_global_style(
     assert to_rgba(ax.lines[0].get_color()) == to_rgba(sns.color_palette("Set2")[0])
     poster = sns.plotting_context("poster")["axes.titlesize"]
     assert ax.title.get_fontsize() == poster
+
+
+def _dated_plotter(step_unit: str, steps: int) -> SimulationPlotter:
+    """A plotter of `steps` steps of a model whose axis starts on 2020-01-01."""
+    model = build(abc_builder(step_unit=step_unit, origin=date(2020, 1, 1)))
+    simulation = Simulation(model)
+    return SimulationPlotter(simulation, simulation.run(steps))
+
+
+def _tick_labels(fig: Figure) -> dict[float, str]:
+    """The labelled ticks of the first subplot, after the figure is drawn."""
+    fig.canvas.draw()
+    ax = fig.axes[0]
+    return {
+        float(tick): label.get_text()
+        for tick, label in zip(ax.get_xticks(), ax.get_xticklabels(), strict=True)
+        if label.get_text()
+    }
+
+
+def test_an_axis_with_origin_labels_ticks_with_dates() -> None:
+    fig = _dated_plotter("day", 40).plot_series(series=["B"])
+
+    labels = _tick_labels(fig)
+    assert labels
+    for tick, label in labels.items():
+        assert label == (date(2020, 1, 1) + timedelta(days=tick)).isoformat()
+
+
+def test_dates_label_the_plotted_positions_tick_every_apart() -> None:
+    fig = _dated_plotter("day", 20).plot_series(series=["B"], tick_every=7)
+
+    assert _tick_labels(fig) == {
+        0.0: "2020-01-01",
+        7.0: "2020-01-08",
+        14.0: "2020-01-15",
+    }
+
+
+def test_a_date_label_shows_the_time_away_from_midnight() -> None:
+    fig = _dated_plotter("hour", 30).plot_series(series=["B"], tick_every=6)
+
+    assert _tick_labels(fig) == {
+        0.0: "2020-01-01",
+        6.0: "2020-01-01 06:00:00",
+        12.0: "2020-01-01 12:00:00",
+        18.0: "2020-01-01 18:00:00",
+        24.0: "2020-01-02",
+        30.0: "2020-01-02 06:00:00",
+    }
+
+
+def test_a_position_label_wins_over_the_dates() -> None:
+    fig = _dated_plotter("day", 20).plot_series(
+        series=["B"], position_label=lambda at: f"p{at:g}", tick_every=10
+    )
+
+    assert _tick_labels(fig) == {0.0: "p0", 10.0: "p10", 20.0: "p20"}
 
 
 class TestPredictiveSeries:

@@ -17,7 +17,7 @@ from commol.commol_rs import _commol_rs as commol_rs
 
 from commol.context._model.serialization import render_json
 from commol.context._model.units import DEFAULT_STEP_UNIT
-from commol.context.axis_units import AxisUnits
+from commol.context.axis_units import AxisUnits, Origin, seconds_per_step
 from commol.context.calibration import (
     CalibrationProblem,
     CalibrationResult,
@@ -67,6 +67,11 @@ class Model(BaseModel, Generic[StructureT]):
         Unit of one step on the axis, of any single dimension (``"day"``,
         ``"meter"``). The unit check and `axis_units` use it; None means
         ``step``, the default increment of any axis.
+    origin : datetime | None
+        Calendar moment of position 0, with no time zone, for the dates of
+        `axis_units`. It needs a ``step_unit`` of time whose length is a
+        whole number of days or a whole fraction of a day. None means the
+        axis has no dates.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -90,6 +95,20 @@ class Model(BaseModel, Generic[StructureT]):
             "None means 'step', the default increment of any axis."
         ),
     )
+    origin: Origin | None = Field(
+        None,
+        description=(
+            "Calendar moment of position 0, with no time zone, for the dates "
+            "of axis_units. None means the axis has no dates."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def check_origin_unit(self) -> Self:
+        """Check that an origin has a step unit of fixed calendar length."""
+        if self.origin is not None:
+            seconds_per_step(self.step_unit or DEFAULT_STEP_UNIT)
+        return self
 
     @field_validator("structure", mode="before")
     @classmethod
@@ -335,8 +354,9 @@ class Model(BaseModel, Generic[StructureT]):
         The unit of one step of the model, and its engine, to convert values.
 
         The step unit is ``step_unit`` or, when the model declares none,
-        ``step``, the default increment of any axis. The engine is the one of
-        the model, so the rates of `AxisUnits` mean what this engine reads.
+        ``step``, the default increment of any axis. The origin is
+        ``origin``, for the dates of the axis. The engine is the one of the
+        model, so the rates of `AxisUnits` mean what this engine reads.
 
         Returns
         -------
@@ -351,7 +371,9 @@ class Model(BaseModel, Generic[StructureT]):
         >>> gamma = units.rate_from_mean_span(5, "day")
         """
         return AxisUnits(
-            step_unit=self.step_unit or DEFAULT_STEP_UNIT, engine=self.engine.type
+            step_unit=self.step_unit or DEFAULT_STEP_UNIT,
+            engine=self.engine.type,
+            origin=self.origin,
         )
 
     def check_unit_consistency(self, verbose: bool = False) -> None:

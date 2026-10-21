@@ -458,7 +458,7 @@ plotter.plot_series(
 | `prediction_intervals` | `None` | `plot_series` only. The `PredictionIntervals` of a [conformal method](uncertainty/conformal.md): the subplot of each of their series, by label, shows the band from `lower` to `upper` and the point prediction, dashed. An unbounded interval is left out of the band. |
 | `config` | `PlotConfig()` | Figure size, dpi, layout and seaborn style. |
 | `show_legend` | `True` | `plot_series` only. |
-| `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot_series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`. |
+| `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot_series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`. With no `position_label`, a model with an [origin](units-and-equations.md#dates-on-the-axis) labels each tick with its date (`2020-01-08`, with the time when it is not midnight): at the plotted positions `tick_every` apart, or at the ticks matplotlib places when `tick_every` is `None`. |
 | other keyword arguments | — | Passed to `seaborn.lineplot`, such as `linewidth` or `alpha`. |
 
 | `PlotConfig` field | Default | Values |

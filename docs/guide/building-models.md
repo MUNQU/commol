@@ -67,6 +67,7 @@ builder = ModelBuilder(
 | `description` | `str \| None` | `None` | A free-text description. |
 | `version` | `str \| None` | `None` | A version label for your own tracking. |
 | `bin_unit` | `str \| None` | `None` | The default unit of every bin. It enables [unit checking](units-and-equations.md#unit-checking). |
+| `origin` | `date \| datetime \| None` | `None` | The calendar moment of position 0, with no time zone, for an axis of time. See [Dates on the axis](units-and-equations.md#dates-on-the-axis). |
 
 Every `add_*` method returns the builder, so calls chain. The other methods:
 

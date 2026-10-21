@@ -26,6 +26,7 @@ what it changes. The factories share these keywords:
 """
 
 from collections.abc import Mapping
+from datetime import date
 from typing import Self
 
 from commol import (
@@ -161,15 +162,21 @@ def abc_builder(
     step_unit: str | None = None,
     units: Mapping[str, str] | None = None,
     accumulator: str | None = None,
+    origin: date | None = None,
 ) -> FactoryBuilder:
     """
     A → B → C: ``ab`` at ``k1 * A * B / total``, ``bc`` at ``k2 * B``.
 
-    The defaults are ``k1 = 0.3``, ``k2 = 0.1``, 990 in A and 10 in B. See the
-    module docstring for the keywords.
+    The defaults are ``k1 = 0.3``, ``k2 = 0.1``, 990 in A and 10 in B.
+    ``origin`` is the calendar moment of position 0. See the module docstring
+    for the other keywords.
     """
     builder = FactoryBuilder(
-        name=name, version="1.0", bin_unit=bin_unit, step_unit=step_unit
+        name=name,
+        version="1.0",
+        bin_unit=bin_unit,
+        step_unit=step_unit,
+        origin=origin,
     )
     builder.add_bin(id="A", name="State A")
     builder.add_bin(id="B", name="State B")

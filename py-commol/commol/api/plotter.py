@@ -4,6 +4,7 @@ prediction intervals, sensitivity results and profiles."""
 import functools
 import logging
 import math
+from datetime import time
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING
@@ -11,6 +12,7 @@ from typing import TYPE_CHECKING
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
+from matplotlib.ticker import FuncFormatter
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
@@ -26,6 +28,7 @@ from commol.api.results import (
 )
 from commol.api.simulation import Simulation
 from commol.api.windows import windowed_totals
+from commol.context.axis_units import AxisUnits
 from commol.context.calibration import CalibrationResult, ObservedDataPoint
 from commol.context.inference.conformal import PredictionIntervals
 from commol.context.inference.global_sensitivity import (
@@ -174,8 +177,10 @@ class SimulationPlotter:
         show_legend : bool
             Whether to show the legend on each subplot. Default True.
         position_label : Callable[[float], str] | None
-            Turns a position on the axis into an x-axis tick label, such as a
-            date. If None, the ticks show the position.
+            Turns a position on the axis into an x-axis tick label. If None,
+            the ticks show the date of their position when the model has an
+            origin (``ModelBuilder(origin=...)``): ``2020-01-02``, with the
+            time when it is not midnight. Otherwise they show the position.
         tick_every : float | None
             Labels the plotted positions `tick_every` apart on the axis,
             counted from the first plotted position. If None, labels every
@@ -562,6 +567,35 @@ class SimulationPlotter:
         if config.context:
             sns.set_context(config.context)
             logger.debug(f"Applied Seaborn context: {config.context}")
+
+    def _label_positions(
+        self,
+        ax: "Axes",
+        positions: Sequence[float],
+        position_label: Callable[[float], str] | None,
+        tick_every: float | None,
+    ) -> None:
+        """
+        Label the x axis with `position_label`, or with dates on a dated axis.
+
+        With no `position_label` and a model with an origin, a tick shows the
+        date of its position: at the plotted positions `tick_every` apart, or
+        at the ticks matplotlib places when `tick_every` is None. With
+        neither, the ticks show the position.
+        """
+        if position_label is None:
+            model = self.simulation.model_definition
+            if model.origin is None:
+                return
+            axis = model.axis_units()
+            if tick_every is None:
+                ax.xaxis.set_major_formatter(
+                    FuncFormatter(lambda at, _: _date_label(axis, at))
+                )
+                ax.tick_params(axis="x", labelrotation=45)
+                return
+            position_label = functools.partial(_date_label, axis)
+        self._apply_x_labels(ax, positions, position_label, tick_every)
 
     @staticmethod
     def _apply_x_labels(
@@ -992,8 +1026,7 @@ class SimulationPlotter:
         ax.set_xlabel(x_label)
         ax.set_ylabel(f"{unit_str}")
         ax.set_title(f"{bin_name}")
-        if position_label:
-            self._apply_x_labels(ax, positions, position_label, tick_every)
+        self._label_positions(ax, positions, position_label, tick_every)
         if show_legend:
             ax.legend()
         ax.grid(True, alpha=0.3)
@@ -1159,8 +1192,7 @@ class SimulationPlotter:
         ax.set_xlabel(x_label)
         ax.set_ylabel(f"{unit_str}")
         ax.set_title(f"{bin_name}")
-        if position_label:
-            self._apply_x_labels(ax, positions, position_label, tick_every)
+        self._label_positions(ax, positions, position_label, tick_every)
         if show_legend:
             ax.legend()
         ax.grid(True, alpha=0.3)
@@ -1299,3 +1331,11 @@ class SimulationPlotter:
         ax.set_title(label.name)
         ax.legend()
         ax.grid(True, alpha=0.3)
+
+
+def _date_label(axis: AxisUnits, position: float) -> str:
+    """The date of a position, with its time when it is not midnight."""
+    moment = axis.moment_of(position)
+    if moment.time() == time():
+        return moment.date().isoformat()
+    return moment.isoformat(sep=" ")
