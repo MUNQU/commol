@@ -373,6 +373,8 @@ print(differential.rate_from_probability(0.3, 1, "week"))
 
 With either rate, one outflow moves `p` of its bin over the period, and the bin keeps `exp(-n / span)` at each step `n`. In the difference model the mean residence is then `1 / rate` steps (`4.52` for a span of 4), not the span: a per-step rate cannot keep both the survival and the mean of the continuous process, and these conversions keep the survival.
 
+An axis of time with an origin also converts between dates and positions, and gives the ends of calendar days and weeks; see [Dates on the axis](https://munqu.github.io/commol/latest/guide/units-and-equations/#dates-on-the-axis).
+
 The axis also gives the window grid. A window has a width, a span in a unit, which must be a whole number of steps; any other width raises `ValueError`, naming the span, its unit and the step unit. A width in steps is the span in the step unit, such as `(7, "day")` for 7 steps of a day, or `(7, "step")` when the model declares no step unit.
 
 | Method                                                     | Returns                                                                                                                                   |

@@ -10,13 +10,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- An axis of time can start at a calendar date: `ModelBuilder(origin=...)` takes a `date` or a `datetime` with no time zone, and `Model.axis_units()` gives `position_of`, `moment_of`, `day_ends` and `week_ends` (weeks that start on a weekday of the caller). `SimulationPlotter.plot_series` labels the ticks of such a model with dates when it has no `position_label`. An origin needs a step unit of time of a whole number of days or a whole fraction of a day: `month` and `year` raise `ValueError`.
+
 - `Simulation.total_series` and `Simulation.windowed_totals` take output names as well as bin and accumulator ids. An output name stands for itself, so `simulation.windowed_totals(results, ["moved_g2", "moved_g3"], 2)` sums two strata of the accumulator `moved`; a bin or accumulator id still stands for all its outputs. An id that is neither raises `KeyError` with the bins, accumulators and outputs of the model.
 
 - The window grid on the axis: `AxisUnits.window_start(index, span, unit)`, `window_end(index, span, unit)`, `window_index(at, span, unit)` and `window_ends(span, unit, end)`, for a window of a span in a unit, such as one week. The width must be a whole number of steps.
 
+- `SimulationResults.model` and `SimulationReplicates.model`: the results of `Simulation.run`, `run_at` and `replicates` hold a reference to their `Model`, and the runs of `Predictive.runs()` the model of its source. A report reads the outputs of each bin and accumulator from it; results with their model still pickle. See [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md).
+
 ### Changed
 
 - **Breaking:** the module functions `window_start`, `window_end`, `window_index` and `window_ends` are removed from `commol`. Use the methods of `AxisUnits` (`Model.axis_units()`), with the width as a span and a unit: `window_end(2, 168)` on an axis of hours is `units.window_end(2, 1, "week")`, and a width of 7 steps is `(7, "day")`, or `(7, "step")` when the model declares no step unit.
+
+- **Breaking:** each report is a method of the object whose data it describes, and `commol` exports no report function. The private functions of `api/reporting.py` build the blocks, with the same keys in the same order. See [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md).
+
+| Before                                                                         | Now                                                                                    |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `simulation_report(simulation, results, at, window, num_windows, …)`           | `results.report(positions, window, windows, …)`                                        |
+| `simulation_report(…, ensemble_runs=replicates, confidence_level=c)`           | `replicates.report(c, positions, window, windows, …)`                                  |
+| `simulation_report(…, ensemble_runs=predictive, confidence_level=c)`           | `predictive.report(c, positions, window, windows, …)`, with no run of a point estimate |
+| `applied_parameters_report(model, result, problem, …)`                         | `model.applied_parameters(result, problem, …)`                                         |
+| `identifiability_report(report)`                                               | `report.report()`                                                                      |
+| `commol.api.reporting.observed_report`, `series_report`, `accumulators_report` | The blocks `observed`, `series` and `accumulators` of a report                         |
 
 ### Fixed
 

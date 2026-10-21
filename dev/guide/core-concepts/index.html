@@ -3929,6 +3929,9 @@ keeps <code>exp(-n / span)</code> at each step <code>n</code>. In the difference
 residence is then <code>1 / rate</code> steps (<code>4.52</code> for a span of 4), not the span: a
 per-step rate cannot keep both the survival and the mean of the continuous
 process, and these conversions keep the survival.</p>
+<p>An axis of time with an origin also converts between dates and positions,
+and gives the ends of calendar days and weeks; see
+<a href="../units-and-equations/#dates-on-the-axis">Dates on the axis</a>.</p>
 <p>The axis also gives the window grid. A window has a width, a span in a unit,
 which must be a whole number of steps; any other width raises <code>ValueError</code>,
 naming the span, its unit and the step unit. A width in steps is the span in

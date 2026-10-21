@@ -59,6 +59,7 @@ class ModelBuilder:
         version: str | None = None,
         bin_unit: str | None = None,
         step_unit: str | None = None,
+        origin: date | None = None,
     ):
         """
         Initialize the ModelBuilder.
@@ -81,12 +82,22 @@ class ModelBuilder:
             ``<bin unit>/<step_unit>``, and ``Model.axis_units()`` converts
             values to steps of it. None means ``step``, the default increment
             of any axis.
+        origin : date | None, default=None
+            Calendar moment of position 0: a `datetime.datetime` with no time
+            zone, or a `datetime.date`, read as its midnight. With it,
+            ``Model.axis_units()`` converts between dates and positions, and
+            ``SimulationPlotter.plot_series`` labels its ticks with dates. It
+            needs a ``step_unit`` of time whose length is a whole number of
+            days or a whole fraction of a day, such as ``"hour"`` or
+            ``"day"``; `build` raises ``ValueError`` otherwise, or for a
+            moment with a time zone.
         """
         self._name: str = name
         self._description: str | None = description
         self._version: str | None = version
         self._bin_unit: str | None = bin_unit
         self._step_unit: str | None = step_unit
+        self._origin: date | None = origin
 
         self._bins: list[Bin] = []
         self._accumulators: list[Accumulator] = []
@@ -798,8 +809,10 @@ class ModelBuilder:
             settings of that engine, a series point or an impulse position is
             one the engine cannot run (a position between two steps for an
             engine that steps only at integers, or a ``"pulse"`` point between
-            two steps), or a per-compartment override names an unknown
-            compartment or makes the initial amounts exceed the total.
+            two steps), a per-compartment override names an unknown
+            compartment or makes the initial amounts exceed the total, or the
+            origin has a time zone or a step unit that is not of fixed
+            calendar length.
         """
         model: Model[StructureT] = Model(
             name=self._name,
@@ -810,6 +823,7 @@ class ModelBuilder:
             process=self.process(),
             structure=structure,
             step_unit=self._step_unit,
+            origin=self._origin,
         )
 
         logger.info(f"Model '{self._name}' successfully built for the {engine} engine.")
@@ -822,20 +836,21 @@ class ModelBuilder:
 #### __init__
 
 ```python
-__init__(name: str, description: str | None = None, version: str | None = None, bin_unit: str | None = None, step_unit: str | None = None)
+__init__(name: str, description: str | None = None, version: str | None = None, bin_unit: str | None = None, step_unit: str | None = None, origin: date | None = None)
 ```
 
 Initialize the ModelBuilder.
 
 Parameters:
 
-| Name          | Type  | Description                                | Default                                                                                                                                                                                                                                                            |
-| ------------- | ----- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `name`        | `str` | The unique name that identifies the model. | *required*                                                                                                                                                                                                                                                         |
-| `description` | \`str | None\`                                     | A human-readable description of the model's purpose and function.                                                                                                                                                                                                  |
-| `version`     | \`str | None\`                                     | The version number of the model.                                                                                                                                                                                                                                   |
-| `bin_unit`    | \`str | None\`                                     | The default unit for all bins. Individual bins can override this with their own unit parameter. Units are optional but required for model.check_unit_consistency().                                                                                                |
-| `step_unit`   | \`str | None\`                                     | Unit of one step on the axis, of any single dimension (for example "day" or "meter"). The unit check requires every flow to be <bin unit>/\<step_unit>, and Model.axis_units() converts values to steps of it. None means step, the default increment of any axis. |
+| Name          | Type   | Description                                | Default                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------- | ------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`        | `str`  | The unique name that identifies the model. | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `description` | \`str  | None\`                                     | A human-readable description of the model's purpose and function.                                                                                                                                                                                                                                                                                                                                                                                |
+| `version`     | \`str  | None\`                                     | The version number of the model.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `bin_unit`    | \`str  | None\`                                     | The default unit for all bins. Individual bins can override this with their own unit parameter. Units are optional but required for model.check_unit_consistency().                                                                                                                                                                                                                                                                              |
+| `step_unit`   | \`str  | None\`                                     | Unit of one step on the axis, of any single dimension (for example "day" or "meter"). The unit check requires every flow to be <bin unit>/\<step_unit>, and Model.axis_units() converts values to steps of it. None means step, the default increment of any axis.                                                                                                                                                                               |
+| `origin`      | \`date | None\`                                     | Calendar moment of position 0: a datetime.datetime with no time zone, or a datetime.date, read as its midnight. With it, Model.axis_units() converts between dates and positions, and SimulationPlotter.plot_series labels its ticks with dates. It needs a step_unit of time whose length is a whole number of days or a whole fraction of a day, such as "hour" or "day"; build raises ValueError otherwise, or for a moment with a time zone. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -847,6 +862,7 @@ def __init__(
     version: str | None = None,
     bin_unit: str | None = None,
     step_unit: str | None = None,
+    origin: date | None = None,
 ):
     """
     Initialize the ModelBuilder.
@@ -869,12 +885,22 @@ def __init__(
         ``<bin unit>/<step_unit>``, and ``Model.axis_units()`` converts
         values to steps of it. None means ``step``, the default increment
         of any axis.
+    origin : date | None, default=None
+        Calendar moment of position 0: a `datetime.datetime` with no time
+        zone, or a `datetime.date`, read as its midnight. With it,
+        ``Model.axis_units()`` converts between dates and positions, and
+        ``SimulationPlotter.plot_series`` labels its ticks with dates. It
+        needs a ``step_unit`` of time whose length is a whole number of
+        days or a whole fraction of a day, such as ``"hour"`` or
+        ``"day"``; `build` raises ``ValueError`` otherwise, or for a
+        moment with a time zone.
     """
     self._name: str = name
     self._description: str | None = description
     self._version: str | None = version
     self._bin_unit: str | None = bin_unit
     self._step_unit: str | None = step_unit
+    self._origin: date | None = origin
 
     self._bins: list[Bin] = []
     self._accumulators: list[Accumulator] = []
@@ -1611,9 +1637,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If validation fails, the structure does not fit the process (for example a fraction names no bin, or a rate reads neighbors\_<bin> and the structure has no neighbors), the engine is unknown or does not run the kind of the structure, the settings are not settings of that engine, a series point or an impulse position is one the engine cannot run (a position between two steps for an engine that steps only at integers, or a "pulse" point between two steps), or a per-compartment override names an unknown compartment or makes the initial amounts exceed the total. |
+| Type         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If validation fails, the structure does not fit the process (for example a fraction names no bin, or a rate reads neighbors\_<bin> and the structure has no neighbors), the engine is unknown or does not run the kind of the structure, the settings are not settings of that engine, a series point or an impulse position is one the engine cannot run (a position between two steps for an engine that steps only at integers, or a "pulse" point between two steps), a per-compartment override names an unknown compartment or makes the initial amounts exceed the total, or the origin has a time zone or a step unit that is not of fixed calendar length. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -1661,8 +1687,10 @@ def build(
         settings of that engine, a series point or an impulse position is
         one the engine cannot run (a position between two steps for an
         engine that steps only at integers, or a ``"pulse"`` point between
-        two steps), or a per-compartment override names an unknown
-        compartment or makes the initial amounts exceed the total.
+        two steps), a per-compartment override names an unknown
+        compartment or makes the initial amounts exceed the total, or the
+        origin has a time zone or a step unit that is not of fixed
+        calendar length.
     """
     model: Model[StructureT] = Model(
         name=self._name,
@@ -1673,6 +1701,7 @@ def build(
         process=self.process(),
         structure=structure,
         step_unit=self._step_unit,
+        origin=self._origin,
     )
 
     logger.info(f"Model '{self._name}' successfully built for the {engine} engine.")

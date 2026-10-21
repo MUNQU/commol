@@ -3525,6 +3525,16 @@ The positions the values were read at are in <code>results.positions</code>.</p>
 <td><code>[[every output at positions[0]], …]</code>, in <code>simulation_outputs</code> order</td>
 <td>Matrix operations, export</td>
 </tr>
+<tr>
+<td><code>results.model</code></td>
+<td>The <code>Model</code> of the run, which <code>run</code> and <code>run_at</code> set; <code>None</code> for results built by hand</td>
+<td>The outputs of each bin and accumulator, read by reports</td>
+</tr>
+<tr>
+<td><code>results.report(positions, window, windows, …)</code></td>
+<td>The report of the run, as plain data (<a href="../reports/#the-report-of-a-run">Reports</a>)</td>
+<td>JSON export next to the observations</td>
+</tr>
 </tbody>
 </table>
 <p><code>run(num_steps)</code> holds <code>num_steps + 1</code> positions: position 0 is the initial
@@ -3592,8 +3602,8 @@ replicate gives the same run however many replicates run, and
 <td>One run, with its <code>seed</code>; the number of runs</td>
 </tr>
 <tr>
-<td><code>seed</code>, <code>seeds</code>, <code>positions</code></td>
-<td>The seed the replicate seeds derive from, the seed of each replicate, the positions</td>
+<td><code>seed</code>, <code>seeds</code>, <code>positions</code>, <code>model</code></td>
+<td>The seed the replicate seeds derive from, the seed of each replicate, the positions, the <code>Model</code> of the replicates</td>
 </tr>
 <tr>
 <td><code>mean()</code></td>
@@ -3606,6 +3616,10 @@ replicate gives the same run however many replicates run, and
 <tr>
 <td><code>member_statistics(output, confidence_level)</code></td>
 <td><code>mean</code>, <code>median</code>, <code>ci_lower</code>, <code>ci_upper</code>, <code>min</code>, <code>max</code> of one output at each position, reduced replicate by replicate with <a href="../../codebase/decisions/results/#one-confidence-interval-convention">the one quantile</a></td>
+</tr>
+<tr>
+<td><code>report(confidence_level, positions, window, windows, …)</code></td>
+<td>The report of a run, with each number reduced replicate by replicate (<a href="../reports/#the-report-of-an-ensemble">Reports</a>)</td>
 </tr>
 </tbody>
 </table>
@@ -3962,7 +3976,7 @@ series first:</p>
 <tr>
 <td><code>x_label</code>, <code>tick_every</code>, <code>position_label</code></td>
 <td><code>"Step"</code>, every plotted position, the position</td>
-<td><code>plot_series</code> only. Label the x axis, for example in weeks. The x axis shows <code>results.positions</code>.</td>
+<td><code>plot_series</code> only. Label the x axis, for example in weeks. The x axis shows <code>results.positions</code>. With no <code>position_label</code>, a model with an <a href="../units-and-equations/#dates-on-the-axis">origin</a> labels each tick with its date (<code>2020-01-08</code>, with the time when it is not midnight): at the plotted positions <code>tick_every</code> apart, or at the ticks matplotlib places when <code>tick_every</code> is <code>None</code>.</td>
 </tr>
 <tr>
 <td>other keyword arguments</td>

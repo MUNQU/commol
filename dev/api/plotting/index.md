@@ -138,8 +138,10 @@ class SimulationPlotter:
         show_legend : bool
             Whether to show the legend on each subplot. Default True.
         position_label : Callable[[float], str] | None
-            Turns a position on the axis into an x-axis tick label, such as a
-            date. If None, the ticks show the position.
+            Turns a position on the axis into an x-axis tick label. If None,
+            the ticks show the date of their position when the model has an
+            origin (``ModelBuilder(origin=...)``): ``2020-01-02``, with the
+            time when it is not midnight. Otherwise they show the position.
         tick_every : float | None
             Labels the plotted positions `tick_every` apart on the axis,
             counted from the first plotted position. If None, labels every
@@ -526,6 +528,35 @@ class SimulationPlotter:
         if config.context:
             sns.set_context(config.context)
             logger.debug(f"Applied Seaborn context: {config.context}")
+
+    def _label_positions(
+        self,
+        ax: "Axes",
+        positions: Sequence[float],
+        position_label: Callable[[float], str] | None,
+        tick_every: float | None,
+    ) -> None:
+        """
+        Label the x axis with `position_label`, or with dates on a dated axis.
+
+        With no `position_label` and a model with an origin, a tick shows the
+        date of its position: at the plotted positions `tick_every` apart, or
+        at the ticks matplotlib places when `tick_every` is None. With
+        neither, the ticks show the position.
+        """
+        if position_label is None:
+            model = self.simulation.model_definition
+            if model.origin is None:
+                return
+            axis = model.axis_units()
+            if tick_every is None:
+                ax.xaxis.set_major_formatter(
+                    FuncFormatter(lambda at, _: _date_label(axis, at))
+                )
+                ax.tick_params(axis="x", labelrotation=45)
+                return
+            position_label = functools.partial(_date_label, axis)
+        self._apply_x_labels(ax, positions, position_label, tick_every)
 
     @staticmethod
     def _apply_x_labels(
@@ -956,8 +987,7 @@ class SimulationPlotter:
         ax.set_xlabel(x_label)
         ax.set_ylabel(f"{unit_str}")
         ax.set_title(f"{bin_name}")
-        if position_label:
-            self._apply_x_labels(ax, positions, position_label, tick_every)
+        self._label_positions(ax, positions, position_label, tick_every)
         if show_legend:
             ax.legend()
         ax.grid(True, alpha=0.3)
@@ -1123,8 +1153,7 @@ class SimulationPlotter:
         ax.set_xlabel(x_label)
         ax.set_ylabel(f"{unit_str}")
         ax.set_title(f"{bin_name}")
-        if position_label:
-            self._apply_x_labels(ax, positions, position_label, tick_every)
+        self._label_positions(ax, positions, position_label, tick_every)
         if show_legend:
             ax.legend()
         ax.grid(True, alpha=0.3)
@@ -1346,7 +1375,7 @@ Parameters:
 | `config`               | \`PlotConfig               | None\`                                                    | Configuration for plot layout and styling (figsize, dpi, layout, style, palette, context). If None, uses defaults.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `series`               | \`list[str]                | None\`                                                    | What to plot, one subplot each. An entry is an output name (an expanded compartment or accumulator, such as A_g1) or a bin or accumulator id, which plots the sum of its outputs. An exact output name wins over an id. If None, plots every output.                                                                                                                                                                                                                                                                                                             |
 | `show_legend`          | `bool`                     | Whether to show the legend on each subplot. Default True. | `True`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `position_label`       | \`Callable\[[float], str\] | None\`                                                    | Turns a position on the axis into an x-axis tick label, such as a date. If None, the ticks show the position.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `position_label`       | \`Callable\[[float], str\] | None\`                                                    | Turns a position on the axis into an x-axis tick label. If None, the ticks show the date of their position when the model has an origin (ModelBuilder(origin=...)): 2020-01-02, with the time when it is not midnight. Otherwise they show the position.                                                                                                                                                                                                                                                                                                         |
 | `tick_every`           | \`float                    | None\`                                                    | Labels the plotted positions tick_every apart on the axis, counted from the first plotted position. If None, labels every plotted position.                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `x_label`              | `str`                      | The x-axis label. Default "Step".                         | `'Step'`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `prediction_intervals` | \`PredictionIntervals      | None\`                                                    | Prediction intervals of a conformal method (ConformalResult.intervals). The subplot of each of their series, by label, shows the band between their lower and upper ends and their point prediction; an unbounded interval is left out of the band.                                                                                                                                                                                                                                                                                                              |
@@ -1424,8 +1453,10 @@ def plot_series(
     show_legend : bool
         Whether to show the legend on each subplot. Default True.
     position_label : Callable[[float], str] | None
-        Turns a position on the axis into an x-axis tick label, such as a
-        date. If None, the ticks show the position.
+        Turns a position on the axis into an x-axis tick label. If None,
+        the ticks show the date of their position when the model has an
+        origin (``ModelBuilder(origin=...)``): ``2020-01-02``, with the
+        time when it is not midnight. Otherwise they show the position.
     tick_every : float | None
         Labels the plotted positions `tick_every` apart on the axis,
         counted from the first plotted position. If None, labels every

@@ -7,7 +7,7 @@ A `Model` is a tree of Pydantic models. `ModelBuilder` creates it, `Model.to_jso
 A model has a header, a **process** written once, a **structure** that lays the process out, and an **engine** that runs it. The process (bins, accumulators, stratifications, transitions) is the same for every kind of model; the structure changes between kinds and is tagged in JSON by `kind`, and by `variant` for a narrower form of a structure. The kind today is `aggregate`: amounts per compartment.
 
 ```text
-Model                      name, description, version, step_unit
+Model                      name, description, version, step_unit, origin
 ├── parameters: [Parameter]                (a value may be a SeriesValue)
 ├── engine: ModelEngine
 │   ├── type: "DifferenceEquations", "DifferentialEquations",
@@ -45,7 +45,8 @@ In JSON the structure is an object with its `kind`, its `variant` and the fields
     "compartment_amounts": {},
     "neighbors": null
   },
-  "step_unit": null
+  "step_unit": null,
+  "origin": null
 }
 ```
 

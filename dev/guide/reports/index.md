@@ -2,7 +2,17 @@
 
 [Back to Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)
 
-Two functions turn a calibrated model and a run into plain dictionaries, ready for JSON: `applied_parameters_report` (what the model holds and what calibration set) and `simulation_report` (what a run produced, next to the observations). Both work for a single calibration and for a sample of the parameters, with the same layout. A third, `identifiability_report`, gives the verdicts of an `IdentifiabilityReport` as plain data ([Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#the-report)).
+A report turns the data of an object into plain dictionaries, ready for JSON. Each report is a method of the object whose data it describes:
+
+| Method                                                    | Reports                                                                                                                                              |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Model.applied_parameters(values, problem=None, …)`       | What the model holds and what calibration set                                                                                                        |
+| `SimulationResults.report(positions, window, windows, …)` | What a run produced, next to the observations                                                                                                        |
+| `SimulationReplicates.report(confidence_level, …)`        | The same, with each number reduced across the replicates of a stochastic engine                                                                      |
+| `Predictive.report(confidence_level, …)`                  | The same, with each number reduced across the draws of a sample, with their weights                                                                  |
+| `IdentifiabilityReport.report()`                          | The verdicts of an identifiability analysis ([Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#the-report)) |
+
+A single run and an ensemble give the same layout.
 
 ## Quick path
 
@@ -18,8 +28,6 @@ from commol import (
     NelderMeadConfig,
     ObservedDataPoint,
     Simulation,
-    applied_parameters_report,
-    simulation_report,
     windowed_totals,
 )
 
@@ -63,26 +71,23 @@ calibrated = model(None)
 result = Calibrator(Simulation(calibrated), problem).run()
 calibrated.apply_calibration_parameters(result, problem)
 
-applied = applied_parameters_report(calibrated, result, problem)
+applied = calibrated.applied_parameters(result, problem)
 print(json.dumps(applied["parameters"]["k2"]))  # {"value": 0.1, "calibrated": false}
 
-simulation = Simulation(calibrated)
-results = simulation.run(num_steps=28)
-run_report = simulation_report(
-    simulation,
-    results,
-    at=ends,
+results = Simulation(calibrated).run(num_steps=28)
+run_report = results.report(
+    positions=ends,
     window=7,
-    num_windows=4,
+    windows=4,
     observed_data=observed_data,
     accumulators=["cum_ab"],
 )
 print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 ```
 
-## `applied_parameters_report`
+## The applied parameters of a model
 
-`applied_parameters_report(model, result, problem=None, parameter_statistics=None, confidence_level=None)` lists every number the calibrated model holds, and whether calibration set it. The `parameters` section is the same for every kind of model; the structure of the model adds the sections of its kind (`ModelStructure.report_sections`). An aggregate model adds `initial_amounts` and `category_splits`:
+`Model.applied_parameters(values, problem=None, sample=None, confidence_level=None)` lists every number the calibrated model holds, and whether calibration set it. The `parameters` section is the same for every kind of model; the structure of the model adds the sections of its kind (`ModelStructure.report_sections`). An aggregate model adds `initial_amounts` and `category_splits`:
 
 ```json
 {
@@ -104,8 +109,8 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 
 | Argument                     | Meaning                                                                                                                                 |
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `model`                      | The model **after** `apply_calibration_parameters`.                                                                                     |
-| `result`                     | A `CalibrationResult`, or an `{id: value}` mapping such as one of `sample.draws()`.                                                     |
+| The model                    | Call the method on the model **after** `apply_calibration_parameters`.                                                                  |
+| `values`                     | A `CalibrationResult`, or an `{id: value}` mapping such as one of `sample.draws()`.                                                     |
 | `problem`                    | Optional. Adds the `factor` parameters, which the model does not hold.                                                                  |
 | `sample`, `confidence_level` | Optional. A `ParameterSample`: each entry gains its weighted statistics (`ParameterSample.summary`). A sample needs a confidence level. |
 
@@ -120,25 +125,23 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 
 The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `amount`, `unit`, `calibrated`, then `interval`; `group`, `fraction`, `calibrated`, then `interval`), so saved JSON files stay comparable. An interval is in the unit of its entry: an amount in the unit of its bin, a split as a fraction of its group.
 
-## `simulation_report`
+## The report of a run
 
-`simulation_report(simulation, results, at, window, num_windows, observed_data=(), accumulators=(), ensemble_runs=None, confidence_level=None)` reports a run on one axis of windows. It reads each value at a position of the results (`results.positions`), so it works for any model type: a differential model reports at non-integer positions once the results hold them ([Reporting at any position](https://munqu.github.io/commol/latest/guide/simulations/#reporting-at-any-position)).
+`SimulationResults.report(positions, window, windows, observed_data=(), accumulators=(), prediction_intervals=None)` reports a run on one axis of windows. It reads each value at a position of the results (`results.positions`), so it works for any model type: a differential model reports at non-integer positions once the results hold them ([Reporting at any position](https://munqu.github.io/commol/latest/guide/simulations/#reporting-at-any-position)).
 
-| Block          | Content                                                                                                                                                                                                                                                                               |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `observed`     | For each observation label: `values`, padded to `num_windows`, so it lines up with `windowed` index for index. An observation goes to the window that holds its position (the rule of `AxisUnits.window_index`). `weights`, `outputs` and `factor_id` appear when a series uses them. |
-| `series`       | Each compartment output sampled at `at`                                                                                                                                                                                                                                               |
-| `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window that ends within the results, as the loss compares it) and `cumulative` (sampled at `at`); each reading as a `total` and `by_output`                                                             |
+| Block          | Content                                                                                                                                                                                                                                                                           |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `observed`     | For each observation label: `values`, padded to `windows`, so it lines up with `windowed` index for index. An observation goes to the window that holds its position (the rule of `AxisUnits.window_index`). `weights`, `outputs` and `factor_id` appear when a series uses them. |
+| `series`       | Each compartment output sampled at `positions`                                                                                                                                                                                                                                    |
+| `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window that ends within the results, as the loss compares it) and `cumulative` (sampled at `positions`); each reading as a `total` and `by_output`                                                  |
 
-| Argument                            | Meaning                                                                                                                                                                                                                                                                                                                                                                   |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `results`                           | `SimulationResults` of `run` or `run_at`.                                                                                                                                                                                                                                                                                                                                 |
-| `at`                                | The positions where series and cumulative readings are sampled; each must be a position of the results (`ValueError` otherwise).                                                                                                                                                                                                                                          |
-| `window`, `num_windows`             | The window axis of `observed` and `windowed`.                                                                                                                                                                                                                                                                                                                             |
-| `observed_data`                     | The observations to report next to the run.                                                                                                                                                                                                                                                                                                                               |
-| `accumulators`                      | The accumulator ids to report.                                                                                                                                                                                                                                                                                                                                            |
-| `ensemble_runs`, `confidence_level` | The `SimulationReplicates` of a stochastic engine, one `SimulationResults` per member, or a [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive), whose draws carry their weights. Every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block, reduced member by member with the weights; the layout does not change. |
-| `prediction_intervals`              | The `PredictionIntervals` of a [conformal method](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) (`ConformalResult.intervals`). The report gains a last block, `prediction_intervals`: its `level`, `series` (by label: `positions`, `prediction`, `lower`, `upper`) and `unbounded`.                                                        |
+| Argument               | Meaning                                                                                                                                                                                                                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `positions`            | The positions where series and cumulative readings are sampled; each must be a position of the results (`ValueError` otherwise).                                                                                                                                                                                   |
+| `window`, `windows`    | The window axis of `observed` and `windowed`: the length of one window and how many.                                                                                                                                                                                                                               |
+| `observed_data`        | The observations to report next to the run.                                                                                                                                                                                                                                                                        |
+| `accumulators`         | The accumulator ids to report. The results read the outputs of each one from their model (`results.model`, which `Simulation.run`, `run_at` and `replicates` set); results built by hand have no model, and reporting an accumulator raises `ValueError` that names it.                                            |
+| `prediction_intervals` | The `PredictionIntervals` of a [conformal method](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) (`ConformalResult.intervals`). The report gains a last block, `prediction_intervals`: its `level`, `series` (by label: `positions`, `prediction`, `lower`, `upper`) and `unbounded`. |
 
 The report holds only these blocks, and `prediction_intervals` when it is given. Add your own envelope around them, such as a run label or summary figures in your domain's terms:
 
@@ -147,15 +150,34 @@ document = {"kind": "calibration", "at": ends, **run_report}
 print(json.dumps(document)[:30])
 ```
 
-## `identifiability_report`
+The results hold a reference to their model, not a copy, and a report reads only its structure (the outputs of each bin and accumulator), never the values of its parameters, so a later `update_parameters` does not change the report of a run. Results with their model still pickle.
 
-`identifiability_report(report)` takes the result of `Calibrator.identifiability`, or of `IdentifiabilityReport.merge`, and returns `parameters` (each parameter, in problem order, with its `structural` and `practical` verdicts, their reasons and combinations, or `None`) and `sections` (the evidence of each method that ran, by section name).
+## The report of an ensemble
+
+`SimulationReplicates.report(confidence_level, positions, window, windows, observed_data=(), accumulators=(), prediction_intervals=None)` reports the replicates of a stochastic engine, and `Predictive.report` with the same arguments reports the draws of a [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive). The layout is the one of the report of a run; every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block, computed per member and then reduced across the members with their weights (equal for replicates). A predictive takes no point estimate: each number comes from the draws only.
+
+```python
+from commol import ParameterSample, Predictive, SampleMethod
+
+sample = ParameterSample.equally_weighted(
+    ["k1"], [(0.0, 1.0)], [[0.35], [0.4], [0.45]], SampleMethod(name="draws")
+)
+predictive = Predictive(Calibrator(Simulation(model(None)), problem), sample, range(29))
+band_report = predictive.report(
+    0.9, positions=ends, window=7, windows=4, accumulators=["cum_ab"]
+)
+print(list(band_report["series"]["A"]))  # ['mean', 'median', 'ci_lower', 'ci_upper', 'min', 'max']
+```
+
+## The report of an identifiability analysis
+
+`IdentifiabilityReport.report()` gives the result of `Calibrator.identifiability`, or of `IdentifiabilityReport.merge`, as `parameters` (each parameter, in problem order, with its `structural` and `practical` verdicts, their reasons and combinations, or `None`) and `sections` (the evidence of each method that ran, by section name).
 
 ## Checklist
 
-- [ ] The model passed to `applied_parameters_report` already has the calibrated values.
+- [ ] The model reports `applied_parameters` after `apply_calibration_parameters`.
 - [ ] `problem` is passed when there are `factor` parameters.
-- [ ] `at`, `window` and `num_windows` match the observations, and the results hold every position the report reads.
+- [ ] `positions`, `window` and `windows` match the observations, and the results hold every position the report reads.
 
 ## Next steps
 

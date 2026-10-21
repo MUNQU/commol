@@ -3941,6 +3941,15 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Added #254 -->
 
+<ul>
+<li>An axis of time can start at a calendar date: <code>ModelBuilder(origin=...)</code>
+  takes a <code>date</code> or a <code>datetime</code> with no time zone, and <code>Model.axis_units()</code>
+  gives <code>position_of</code>, <code>moment_of</code>, <code>day_ends</code> and <code>week_ends</code> (weeks that
+  start on a weekday of the caller). <code>SimulationPlotter.plot_series</code> labels the
+  ticks of such a model with dates when it has no <code>position_label</code>. An origin
+  needs a step unit of time of a whole number of days or a whole fraction of a
+  day: <code>month</code> and <code>year</code> raise <code>ValueError</code>.</li>
+</ul>
 <!-- Added #255 -->
 
 <ul>
@@ -3961,6 +3970,13 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <!-- Added #257 -->
 
+<ul>
+<li><code>SimulationResults.model</code> and <code>SimulationReplicates.model</code>: the results of
+  <code>Simulation.run</code>, <code>run_at</code> and <code>replicates</code> hold a reference to their
+  <code>Model</code>, and the runs of <code>Predictive.runs()</code> the model of its source. A
+  report reads the outputs of each bin and accumulator from it; results with
+  their model still pickle. See <a href="../../guide/reports/">Reports</a>.</li>
+</ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <!-- Changed #245 -->
 
@@ -3980,6 +3996,46 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <!-- Changed #257 -->
 
+<ul>
+<li><strong>Breaking:</strong> each report is a method of the object whose data it
+  describes, and <code>commol</code> exports no report function. The private functions of
+  <code>api/reporting.py</code> build the blocks, with the same keys in the same order.
+  See <a href="../../guide/reports/">Reports</a>.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Before</th>
+<th>Now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>simulation_report(simulation, results, at, window, num_windows, …)</code></td>
+<td><code>results.report(positions, window, windows, …)</code></td>
+</tr>
+<tr>
+<td><code>simulation_report(…, ensemble_runs=replicates, confidence_level=c)</code></td>
+<td><code>replicates.report(c, positions, window, windows, …)</code></td>
+</tr>
+<tr>
+<td><code>simulation_report(…, ensemble_runs=predictive, confidence_level=c)</code></td>
+<td><code>predictive.report(c, positions, window, windows, …)</code>, with no run of a point estimate</td>
+</tr>
+<tr>
+<td><code>applied_parameters_report(model, result, problem, …)</code></td>
+<td><code>model.applied_parameters(result, problem, …)</code></td>
+</tr>
+<tr>
+<td><code>identifiability_report(report)</code></td>
+<td><code>report.report()</code></td>
+</tr>
+<tr>
+<td><code>commol.api.reporting.observed_report</code>, <code>series_report</code>, <code>accumulators_report</code></td>
+<td>The blocks <code>observed</code>, <code>series</code> and <code>accumulators</code> of a report</td>
+</tr>
+</tbody>
+</table>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <!-- Fixed #245 -->
 
