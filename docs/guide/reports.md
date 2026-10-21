@@ -146,7 +146,7 @@ model reports at non-integer positions once the results hold them
 
 | Block | Content |
 |---|---|
-| `observed` | For each observation label: `values`, padded to `num_windows`, so it lines up with `windowed` index for index. An observation goes to the window that holds its position (`window_index`). `weights`, `outputs` and `factor_id` appear when a series uses them. |
+| `observed` | For each observation label: `values`, padded to `num_windows`, so it lines up with `windowed` index for index. An observation goes to the window that holds its position (the rule of `AxisUnits.window_index`). `weights`, `outputs` and `factor_id` appear when a series uses them. |
 | `series` | Each compartment output sampled at `at` |
 | `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window that ends within the results, as the loss compares it) and `cumulative` (sampled at `at`); each reading as a `total` and `by_output` |
 

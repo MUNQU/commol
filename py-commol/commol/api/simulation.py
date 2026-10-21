@@ -428,9 +428,8 @@ class Simulation:
             Length of one window on the axis.
         at : Iterable[float] | None, optional
             Positions at which windows close. Defaults to every complete
-            window of the results (:func:`commol.window_ends`). Pass the
-            observation positions to reproduce exactly the values a
-            calibration used.
+            window of the results. Pass the observation positions to
+            reproduce exactly the values a calibration used.
 
         Returns
         -------
