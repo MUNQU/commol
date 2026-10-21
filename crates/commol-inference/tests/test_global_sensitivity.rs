@@ -100,6 +100,44 @@ fn quantities_equal_hand_computations() {
 }
 
 #[test]
+fn a_gain_reads_its_start_exactly() {
+    let outputs = names(&["A", "B"]);
+    let gain = Quantities::new(
+        &[Quantity::Gain {
+            outputs: names(&["B"]),
+            start: 0.1,
+            end: 0.4,
+        }],
+        &outputs,
+    )
+    .unwrap();
+    let with_value = Quantities::new(
+        &[
+            Quantity::ValueAt {
+                outputs: names(&["B"]),
+                at: 0.1,
+            },
+            Quantity::Gain {
+                outputs: names(&["B"]),
+                start: 0.1,
+                end: 0.4,
+            },
+        ],
+        &outputs,
+    )
+    .unwrap();
+
+    // 0.4 − (0.4 − 0.1) is not 0.1.
+    assert_ne!(0.4 - (0.4 - 0.1), 0.1);
+    assert_eq!(gain.schedule(), [0.1, 0.4]);
+    assert_eq!(with_value.schedule(), [0.1, 0.4]);
+    // B is 2 at 0.1 and 7 at 0.4.
+    let rows = [vec![0.0, 2.0], vec![0.0, 7.0]];
+    assert_eq!(gain.evaluate(&rows), [5.0]);
+    assert_eq!(with_value.evaluate(&rows), [2.0, 5.0]);
+}
+
+#[test]
 fn stochastic_points_average_replicates_with_common_seeds() {
     let engine = StochasticSteps::try_from_model(&decay("StochasticSteps")).unwrap();
     let forward = ForwardModel::unobserved(engine.clone(), k(), None, Some(4), 9).unwrap();

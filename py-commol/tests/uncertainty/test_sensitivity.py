@@ -41,6 +41,7 @@ from commol import (
 )
 from commol.context.inference.global_sensitivity import Quantity, expand_quantities
 from tests.support import abc_builder, bounded, build
+from tests.support.kinds import decay, decay_model
 from tests.support.models import build_stochastic
 
 
@@ -296,6 +297,31 @@ class TestPropagation:
             # B + C gains what A loses.
             assert gain == pytest.approx(run["A"][5] - run["A"][20])
             assert peak_position == positions[run["B"].index(max(run["B"]))]
+
+    def test_a_gain_reads_its_start_exactly(self) -> None:
+        # x = 10 exp(-k t) changes by several units of the last place between
+        # 0.1 and 0.4 - (0.4 - 0.1), the start read from the window.
+        analysis = SensitivityAnalysis(
+            Simulation(decay_model()),
+            InputSpace.uniform_on_bounds([bounded("k", 40, 60)]),
+            seed=3,
+        )
+        result = analysis.run(
+            Propagation(
+                draws=4,
+                quantities=[
+                    ValueAt(outputs="x", at=0.1),
+                    ValueAt(outputs="x", at=0.4),
+                    Gain(outputs="x", start=0.1, end=0.4),
+                ],
+            )
+        )
+
+        for (at_start, at_end, gain), (k,) in zip(
+            result.values, result.sample.values, strict=True
+        ):
+            assert at_start == decay(10, k, 0.1)
+            assert gain == at_end - at_start
 
     def test_quantity_outside_the_model_is_rejected(
         self, simulation: Simulation

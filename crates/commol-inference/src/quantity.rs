@@ -24,8 +24,8 @@ pub enum Quantity {
         at: f64,
     },
     /// The value at `end` minus the value at `start`, as an observation with
-    /// the window `end − start`: what entered a cumulative output over
-    /// `(start, end]`.
+    /// the window `end − start` that starts at exactly `start`: what entered
+    /// a cumulative output over `(start, end]`.
     Gain {
         /// The outputs summed.
         outputs: Vec<String>,
@@ -82,6 +82,7 @@ impl Quantities {
             return Err("No quantities of interest given".to_string());
         }
         let mut points = Vec::new();
+        let mut starts = Vec::new();
         let mut reductions = Vec::with_capacity(quantities.len());
         for (index, quantity) in quantities.iter().enumerate() {
             if outputs(quantity).is_empty() {
@@ -95,6 +96,7 @@ impl Quantities {
                     check_position(index, *at)?;
                     reductions.push(Reduction::One(points.len()));
                     points.push(point(*at, outputs));
+                    starts.push(None);
                 }
                 Quantity::Gain {
                     outputs,
@@ -109,10 +111,9 @@ impl Quantities {
                              and end {end}"
                         ));
                     }
-                    let mut gain = point(*end, outputs);
-                    gain.window = Some(end - start);
                     reductions.push(Reduction::One(points.len()));
-                    points.push(gain);
+                    points.push(point(*end, outputs));
+                    starts.push(Some(*start));
                 }
                 Quantity::Peak { outputs, positions }
                 | Quantity::PeakPosition { outputs, positions } => {
@@ -124,6 +125,7 @@ impl Quantities {
                     }
                     let range = points.len()..points.len() + positions.len();
                     points.extend(positions.iter().map(|&at| point(at, outputs)));
+                    starts.resize(points.len(), None);
                     reductions.push(match quantity {
                         Quantity::Peak { .. } => Reduction::Max(range),
                         _ => Reduction::ArgMax(range, positions.clone()),
@@ -133,11 +135,13 @@ impl Quantities {
         }
         let mut schedule: Vec<f64> = points
             .iter()
-            .flat_map(|point| std::iter::once(point.at).chain(point.window.map(|w| point.at - w)))
+            .map(|point| point.at)
+            .chain(starts.iter().flatten().copied())
             .collect();
         schedule.sort_by(f64::total_cmp);
         schedule.dedup();
-        let operator = ObservationOperator::new(&points, &[], output_names, &schedule)?;
+        let operator =
+            ObservationOperator::with_starts(&points, &starts, &[], output_names, &schedule)?;
         Ok(Self {
             schedule,
             operator,
