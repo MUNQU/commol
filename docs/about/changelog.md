@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-22
+
+This release adds the first uncertainty methods with a stated model of the
+data: observation models and their likelihood, the Bayesian posterior and the
+Gibbs posterior by sequential Monte Carlo, approximate Bayesian computation,
+priors, local approximations (Laplace, the sandwich and the Laplace mixture),
+conformal intervals, the profile likelihood and sensitivity analysis with no
+data. Before you upgrade, read the **Breaking** entries: an `Aggregate` states
+the initial amount of each bin in the unit of that bin, a
+`CalibrationProblem` needs a `loss_function`, a `Predictive` takes a
+`Calibrator`, and public class names write every letter of an acronym in
+capitals. See [Uncertainty](../guide/uncertainty/index.md).
+
 ### Added
 
 - Local approximations through `Calibrator.uncertainty`, on the unbounded
@@ -1083,6 +1096,7 @@ the details of these versions.
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.6.0** - Uncertainty methods with a model of the data: likelihood, posteriors, local approximations, conformal intervals, profiles and sensitivity analysis
 - **0.5.0** - Uncertainty by resampling the data, identifiability of parameters and the removal of the ensemble calibration
 - **0.4.0** - One process under several structures and engines, stochastic engines and model descriptions
 - **0.3.0** - ODE engine, positions on the axis and one interface for every model kind
