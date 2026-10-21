@@ -132,6 +132,8 @@ print([round(value) for value in band.median["B"]])  # [10, 293, 53]
 
 With inputs from a sample, the sample is the design, and the ranks, the correlations and the test read its weights: a rank is the weight below a value plus half the weight at it, and the test counts Kish's effective size in place of the draws. Equal weights give the usual PRCC. A `Trajectory` gives the coefficients over the axis; a quantity with one value in every run, such as a state at position 0, has NaN coefficients.
 
+A NaN has no rank, so a quantity that is NaN at a draw raises a `ValueError` before PRCC ranks any value. The message gives the index of the quantity, in the order of the labels, and the draws where it is NaN; a `Propagation` with the same inputs and seed gives the value of each run.
+
 ```python
 from commol import Trajectory
 

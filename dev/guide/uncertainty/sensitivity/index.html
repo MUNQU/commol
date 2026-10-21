@@ -3562,6 +3562,10 @@ value plus half the weight at it, and the test counts Kish's effective size
 in place of the draws. Equal weights give the usual PRCC. A <code>Trajectory</code> gives
 the coefficients over the axis; a quantity with one value in every run, such
 as a state at position 0, has NaN coefficients.</p>
+<p>A NaN has no rank, so a quantity that is NaN at a draw raises a <code>ValueError</code>
+before PRCC ranks any value. The message gives the index of the quantity, in
+the order of the labels, and the draws where it is NaN; a <code>Propagation</code> with
+the same inputs and seed gives the value of each run.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Trajectory</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">over_axis</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>

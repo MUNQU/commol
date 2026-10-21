@@ -3877,6 +3877,9 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   matplotlib after it had the style of commol. The style now applies to the
   figure of that plot only, and <code>matplotlib.rcParams</code> is as it was before the
   call.</li>
+<li><code>PRCC</code> never returned when a quantity was NaN at a draw. It now raises
+  <code>ValueError</code> that gives the index of the quantity and the draws where it
+  is NaN, before it ranks any value.</li>
 </ul>
 <h2 id="060-2026-10-22">[0.6.0] - 2026-10-22<a class="headerlink" href="#060-2026-10-22" title="Permanent link">&para;</a></h2>
 <p>This release adds the first uncertainty methods with a stated model of the

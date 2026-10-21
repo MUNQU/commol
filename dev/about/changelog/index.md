@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - A `Gain(start, end)` quantity read its start at `end - (end - start)`, which can round away from `start`: `Gain(start=0.1, end=0.4)` read it at `0.09999999999999998`, so on the `DifferentialEquations` engine the gain did not start where `ValueAt(0.1)` reads. A gain now reads its start at exactly `start`.
 - `SimulationPlotter.plot_series` read the model of a windowed series with the first window it found, at the window ends of a grid from 0, so with observations at 7.5 and 17.5 no model value sat on an observation and the windows of the other observations were ignored. When the observations of a series have a window, or differ in outputs or factor, the model line, the band of the replicates and the band of a `Predictive` now read each observation through its own operator at its own position, as the loss reads it. Observations with several factors no longer leave the line unscaled or raise `ValueError` with a `Predictive`.
 - A figure of `SimulationPlotter` with a `PlotConfig` `style`, `palette` or `context` changed the global style of matplotlib, so every figure drawn with matplotlib after it had the style of commol. The style now applies to the figure of that plot only, and `matplotlib.rcParams` is as it was before the call.
+- `PRCC` never returned when a quantity was NaN at a draw. It now raises `ValueError` that gives the index of the quantity and the draws where it is NaN, before it ranks any value.
 
 ## [0.6.0] - 2026-10-22
 
