@@ -109,8 +109,8 @@ def run_prcc(analysis: "SensitivityAnalysis", method: PRCC) -> PRCCResult:
     ------
     ValueError
         If the draws do not fit the inputs, a quantity does not fit the
-        model, there are too few draws for the inputs, or their ranks are
-        collinear.
+        model or is NaN at a draw, there are too few draws for the inputs, or
+        their ranks are collinear.
     """
     labels, quantities = expand_quantities(method.quantities)
     draws, coefficients, p_values, effective_size = analysis.rust_analysis.prcc(

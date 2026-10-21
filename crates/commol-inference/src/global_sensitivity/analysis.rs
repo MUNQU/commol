@@ -200,8 +200,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
     ) -> Result<(ParameterSample, Prcc), PredictiveError> {
         let sample = self.draws("PRCC", draws)?;
         let outputs = self.means(sample.values(), quantities)?;
-        let result =
-            prcc(sample.values(), &outputs, sample.weights()).map_err(PredictiveError::Mismatch)?;
+        let result = prcc(sample.values(), &outputs, sample.weights())?;
         Ok((sample, result))
     }
 

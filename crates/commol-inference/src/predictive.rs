@@ -200,6 +200,15 @@ pub enum PredictiveError {
         /// Why it has no run.
         error: EvaluationError,
     },
+    /// A quantity is NaN at some points of a design, so a method that
+    /// reduces it across the points has no value for it.
+    NotANumber {
+        /// Index of the quantity, in the order of the quantities of the
+        /// method.
+        quantity: usize,
+        /// Index of each point where it is NaN, in the order of the design.
+        points: Vec<usize>,
+    },
 }
 
 impl std::fmt::Display for PredictiveError {
@@ -207,6 +216,13 @@ impl std::fmt::Display for PredictiveError {
         match self {
             Self::Mismatch(message) => f.write_str(message),
             Self::Draw { draw, error } => write!(f, "Draw {draw}: {error}"),
+            Self::NotANumber { quantity, points } => write!(
+                f,
+                "The quantity {quantity} (counted from 0, in the order of the labels) is NaN at \
+                 the points {points:?} of the design, and a method that reduces it across the \
+                 points needs a number at each; a Propagation of the same inputs and seed gives \
+                 the value of each run"
+            ),
         }
     }
 }
