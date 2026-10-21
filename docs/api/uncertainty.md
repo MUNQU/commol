@@ -101,19 +101,19 @@ Guide: [Sequential Monte Carlo](../guide/uncertainty/smc.md).
 
 ::: commol.context.inference.smc.BootstrapCoverage
 
-::: commol.context.inference.smc.AbcSmc
+::: commol.context.inference.smc.ABCSMC
 
-::: commol.context.inference.smc.AbcRejection
+::: commol.context.inference.smc.ABCRejection
 
 ::: commol.context.inference.smc.LossDistance
 
 ::: commol.context.inference.smc.SeriesDistance
 
-::: commol.context.inference.smc.SmcResult
+::: commol.context.inference.smc.SMCResult
 
 ::: commol.context.inference.smc.GibbsResult
 
-::: commol.context.inference.smc.SmcDiagnostics
+::: commol.context.inference.smc.SMCDiagnostics
 
 ## Local approximations
 

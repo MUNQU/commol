@@ -15,22 +15,22 @@ from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.sample import ParameterSample, SampleMethod
 from commol.context.inference.smc import (
-    AbcDistance,
-    AbcRejection,
-    AbcSmc,
+    ABCDistance,
+    ABCRejection,
+    ABCSMC,
     BayesianPosterior,
     BootstrapCoverage,
     GibbsPosterior,
     GibbsResult,
     InformationMatching,
     LossDistance,
-    SmcDiagnostics,
-    SmcResult,
+    SMCDiagnostics,
+    SMCResult,
 )
 
 if TYPE_CHECKING:
     from commol.api.calibrator import Calibrator
-    from commol.commol_rs._commol_rs import SmcRunProtocol
+    from commol.commol_rs._commol_rs import SMCRunProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ ONE_REPLICATE = (
 
 
 def _sample(
-    calibrator: "Calibrator", run: "SmcRunProtocol", method: SampleMethod
+    calibrator: "Calibrator", run: "SMCRunProtocol", method: SampleMethod
 ) -> ParameterSample:
     parameters = calibrator.problem.parameters
     return ParameterSample(
@@ -56,10 +56,10 @@ def _sample(
     )
 
 
-def _diagnostics(run: "SmcRunProtocol", notes: list[str]) -> SmcDiagnostics:
+def _diagnostics(run: "SMCRunProtocol", notes: list[str]) -> SMCDiagnostics:
     if run.stop_reason is not None:
         logger.info(run.stop_reason)
-    return SmcDiagnostics(
+    return SMCDiagnostics(
         effective_sizes=run.effective_sizes,
         resampled=run.resampled,
         acceptance_rates=run.acceptance_rates,
@@ -70,7 +70,7 @@ def _diagnostics(run: "SmcRunProtocol", notes: list[str]) -> SmcDiagnostics:
     )
 
 
-def _metric(distance: AbcDistance) -> str | None:
+def _metric(distance: ABCDistance) -> str | None:
     """The metric of the series, or None for the problem's loss."""
     return None if isinstance(distance, LossDistance) else distance.metric
 
@@ -151,7 +151,7 @@ def run_gibbs_posterior(
 
 def run_bayesian_posterior(
     calibrator: "Calibrator", method: BayesianPosterior
-) -> SmcResult:
+) -> SMCResult:
     """
     Sample the posterior of the problem's observation models.
 
@@ -164,7 +164,7 @@ def run_bayesian_posterior(
 
     Returns
     -------
-    SmcResult
+    SMCResult
         The sample, the temperatures, the log evidence and the diagnostics.
     """
     run = rust.bayesian_posterior(
@@ -176,7 +176,7 @@ def run_bayesian_posterior(
         method.stay_probability,
         calibrator.seed,
     )
-    return SmcResult(
+    return SMCResult(
         sample=_sample(
             calibrator,
             run,
@@ -191,7 +191,7 @@ def run_bayesian_posterior(
     )
 
 
-def run_abc_smc(calibrator: "Calibrator", method: AbcSmc) -> SmcResult:
+def run_abc_smc(calibrator: "Calibrator", method: ABCSMC) -> SMCResult:
     """
     Sample ABC by sequential Monte Carlo.
 
@@ -199,12 +199,12 @@ def run_abc_smc(calibrator: "Calibrator", method: AbcSmc) -> SmcResult:
     ----------
     calibrator : Calibrator
         The calibration problem.
-    method : AbcSmc
+    method : ABCSMC
         The settings.
 
     Returns
     -------
-    SmcResult
+    SMCResult
         The sample, the tolerances, the log evidence and the diagnostics.
     """
     run, stochastic = rust.abc_smc(
@@ -217,7 +217,7 @@ def run_abc_smc(calibrator: "Calibrator", method: AbcSmc) -> SmcResult:
         method.stay_probability,
         calibrator.seed,
     )
-    return SmcResult(
+    return SMCResult(
         sample=_sample(
             calibrator,
             run,
@@ -230,7 +230,7 @@ def run_abc_smc(calibrator: "Calibrator", method: AbcSmc) -> SmcResult:
     )
 
 
-def run_abc_rejection(calibrator: "Calibrator", method: AbcRejection) -> SmcResult:
+def run_abc_rejection(calibrator: "Calibrator", method: ABCRejection) -> SMCResult:
     """
     Run ABC rejection.
 
@@ -238,12 +238,12 @@ def run_abc_rejection(calibrator: "Calibrator", method: AbcRejection) -> SmcResu
     ----------
     calibrator : Calibrator
         The calibration problem.
-    method : AbcRejection
+    method : ABCRejection
         The settings.
 
     Returns
     -------
-    SmcResult
+    SMCResult
         The kept draws, the tolerance, the log evidence and the diagnostics.
     """
     run, stochastic = rust.abc_rejection(
@@ -254,7 +254,7 @@ def run_abc_rejection(calibrator: "Calibrator", method: AbcRejection) -> SmcResu
         method.quantile,
         calibrator.seed,
     )
-    return SmcResult(
+    return SMCResult(
         sample=_sample(
             calibrator,
             run,
@@ -269,5 +269,5 @@ def run_abc_rejection(calibrator: "Calibrator", method: AbcRejection) -> SmcResu
 
 register(GibbsPosterior, run_gibbs_posterior)
 register(BayesianPosterior, run_bayesian_posterior)
-register(AbcSmc, run_abc_smc)
-register(AbcRejection, run_abc_rejection)
+register(ABCSMC, run_abc_smc)
+register(ABCRejection, run_abc_rejection)

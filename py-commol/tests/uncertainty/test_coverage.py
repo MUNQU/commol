@@ -31,7 +31,7 @@ import numpy as np
 import pytest
 
 from commol import (
-    AbcSmc,
+    ABCSMC,
     BayesianPosterior,
     CalibrationProblem,
     Calibrator,
@@ -153,9 +153,9 @@ UNITS, PROBABILITY = 200, 0.3
 
 
 @pytest.mark.coverage_study
-class TestAbcSmc:
+class TestABCSMC:
     def test_abc_smc_with_a_stochastic_engine_is_calibrated(self) -> None:
-        method = AbcSmc(
+        method = ABCSMC(
             priors=Priors.uniform_on_bounds(),
             distance=LossDistance(),
             particles=300,

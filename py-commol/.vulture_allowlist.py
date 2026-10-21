@@ -20,7 +20,7 @@ CalibrationResultProtocol
 ObservationDrawsProtocol
 BootstrapRunProtocol
 DistributionProtocol
-SmcRunProtocol
+SMCRunProtocol
 ConformalRunProtocol
 LocalRunProtocol
 MixtureRunProtocol

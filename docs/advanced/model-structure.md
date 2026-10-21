@@ -20,7 +20,7 @@ Model                      name, description, version, step_unit
 ├── engine: ModelEngine
 │   ├── type: "DifferenceEquations", "DifferentialEquations",
 │   │         "StochasticEvents" or "StochasticSteps"
-│   └── settings: OdeSolver | StochasticEventsSettings | StochasticStepsSettings | None
+│   └── settings: ODESolver | StochasticEventsSettings | StochasticStepsSettings | None
 │                                           (settings of that engine; None: its defaults)
 ├── process: Process
 │   ├── bins: [Bin]
@@ -94,7 +94,7 @@ structure, and loads back as its own class
 
 The engine's list of engines (`crates/commol-core/src/types/engine.rs`)
 validates the settings: settings of another engine raise an error that names
-both. `OdeSolver` is documented in [Simulation API](../api/simulation.md).
+both. `ODESolver` is documented in [Simulation API](../api/simulation.md).
 
 ::: commol.context.engine.ModelEngine
 

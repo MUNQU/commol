@@ -48,8 +48,8 @@ coverage guarantee, from the scores of observations the fit did not use.
 | `BlockJackknife` | The standard error and bias of each parameter, and which block of data moves it most | No | [Resampling](resampling.md#block-jackknife) |
 | `ResidualNoise` | Where the next observations fall: a prediction interval | No | [Resampling](resampling.md#prediction-intervals) |
 | `GibbsPosterior` | A posterior of the parameters from the loss and priors, with a scale `η` of the loss | No | [Sequential Monte Carlo](smc.md#gibbs-posterior) |
-| `AbcSmc` | A posterior of the parameters whose runs come within a tolerance of the data, with priors | No | [Sequential Monte Carlo](smc.md#abc) |
-| `AbcRejection` | The same, from the closest draws of the priors | No | [Sequential Monte Carlo](smc.md#abc) |
+| `ABCSMC` | A posterior of the parameters whose runs come within a tolerance of the data, with priors | No | [Sequential Monte Carlo](smc.md#abc) |
+| `ABCRejection` | The same, from the closest draws of the priors | No | [Sequential Monte Carlo](smc.md#abc) |
 | `SplitConformal` | Where new observations fall, with a guaranteed coverage, from held-out observations | No | [Conformal](conformal.md#split-conformal) |
 | `RollingConformal` | Where the next observations fall at each horizon ahead of the data | No | [Conformal](conformal.md#rolling-origins) |
 | `JackknifePlus` | Where new observations fall, with a guaranteed coverage and no held-out data | No | [Conformal](conformal.md#jackknife) |

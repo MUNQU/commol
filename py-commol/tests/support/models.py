@@ -31,7 +31,7 @@ from typing import Self
 from commol import (
     Aggregate,
     ModelBuilder,
-    OdeSolver,
+    ODESolver,
     StochasticEventsSettings,
     StochasticStepsSettings,
 )
@@ -40,7 +40,7 @@ from commol.api.patterns import AxisPattern
 from commol.context.model import Model
 from commol.context.neighbors import Neighbors
 
-TIGHT = OdeSolver(rtol=1e-10, atol=1e-8)
+TIGHT = ODESolver(rtol=1e-10, atol=1e-8)
 """Tolerances tight enough for closed-form checks."""
 
 Parameters = Mapping[str, float | str | None]
@@ -68,7 +68,7 @@ def build(builder: FactoryBuilder) -> Model[Aggregate]:
 
 
 def build_ode(
-    builder: FactoryBuilder, settings: OdeSolver | None = TIGHT
+    builder: FactoryBuilder, settings: ODESolver | None = TIGHT
 ) -> Model[Aggregate]:
     """Build a differential-equation model with `settings`."""
     return builder.build(

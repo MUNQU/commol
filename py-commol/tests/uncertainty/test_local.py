@@ -37,7 +37,7 @@ from commol import (
     UncertaintyMethod,
 )
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.engine import OdeSolver
+from commol.context.engine import ODESolver
 from tests.support import (
     a_to_b_builder,
     bounded,
@@ -136,7 +136,7 @@ class TestCurvature:
             a_to_b_builder(
                 parameters={"c": None}, rate="c * A / 1000", amounts={"A": 1000, "B": 0}
             ),
-            OdeSolver(rtol=1e-2, atol=1e-2),
+            ODESolver(rtol=1e-2, atol=1e-2),
         )
         values = [1000 * (1 - math.exp(-0.1 * t)) for t in range(1, 11)]
         problem = CalibrationProblem(

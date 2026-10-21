@@ -310,7 +310,7 @@ calibration, reports and plots. Only the way the engine advances changes.
 ```python
 import math
 
-from commol import OdeSolver
+from commol import ODESolver
 
 ode_model = (
     ModelBuilder(name="Decay")
@@ -324,7 +324,7 @@ ode_model = (
             bin_amounts={"A": 1000, "B": 0},
         ),
         engine="DifferentialEquations",
-        settings=OdeSolver(method="tsit45", rtol=1e-8, atol=1e-8),
+        settings=ODESolver(method="tsit45", rtol=1e-8, atol=1e-8),
     )
 )
 
@@ -336,7 +336,7 @@ print(round(ode.run(num_steps=10)["moved"][10], 1))  # 632.1: the integral of th
 
 ### Solver settings
 
-`OdeSolver` holds the settings of the `DifferentialEquations` engine. They
+`ODESolver` holds the settings of the `DifferentialEquations` engine. They
 are part of the model (`Model.engine.settings`), so a saved model reproduces
 its runs. Pass them where you choose the engine,
 `build(engine="DifferentialEquations", settings=...)`, so one builder can

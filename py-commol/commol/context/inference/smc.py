@@ -173,11 +173,11 @@ class SeriesDistance(BaseModel):
     metric: Literal["rmse", "mae"] = Field(description="The metric of a series.")
 
 
-type AbcDistance = Annotated[LossDistance | SeriesDistance, Field(discriminator="kind")]
+type ABCDistance = Annotated[LossDistance | SeriesDistance, Field(discriminator="kind")]
 """How far a run is from the observations."""
 
 
-class SmcDiagnostics(BaseModel):
+class SMCDiagnostics(BaseModel):
     """
     What happened at each step of a sequential Monte Carlo run.
 
@@ -215,7 +215,7 @@ class SmcDiagnostics(BaseModel):
     notes: list[str]
 
 
-class SmcResult(BaseModel):
+class SMCResult(BaseModel):
     """
     The result of a sequential Monte Carlo method.
 
@@ -236,7 +236,7 @@ class SmcResult(BaseModel):
         Bayesian posterior, the log marginal likelihood
         ``log ∫ prior(θ) L(θ) dθ``; for ABC, the log of the prior probability
         of the last tolerance.
-    diagnostics : SmcDiagnostics
+    diagnostics : SMCDiagnostics
         The effective sizes, acceptance rates and move counts of each step.
     """
 
@@ -246,10 +246,10 @@ class SmcResult(BaseModel):
     levels: list[float]
     kept: list[float | None]
     log_evidence: float
-    diagnostics: SmcDiagnostics
+    diagnostics: SMCDiagnostics
 
 
-class GibbsResult(SmcResult):
+class GibbsResult(SMCResult):
     """
     The result of a Gibbs posterior.
 
@@ -329,7 +329,7 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult]):
         return data
 
 
-class BayesianPosterior(WithPriors, UncertaintyMethod[SmcResult]):
+class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult]):
     """
     The posterior ``π(θ) ∝ prior(θ) · L(θ)`` of the problem's observation
     models, sampled by sequential Monte Carlo from the priors (temperature
@@ -369,7 +369,7 @@ class BayesianPosterior(WithPriors, UncertaintyMethod[SmcResult]):
     )
 
 
-class AbcSmc(WithPriors, UncertaintyMethod[SmcResult]):
+class ABCSMC(WithPriors, UncertaintyMethod[SMCResult]):
     """
     Approximate Bayesian computation by sequential Monte Carlo (Del Moral,
     Doucet and Jasra 2012): the tolerance ``ε`` falls step by step, and a
@@ -402,7 +402,7 @@ class AbcSmc(WithPriors, UncertaintyMethod[SmcResult]):
         between 0 and 1.
     """
 
-    distance: AbcDistance = Field(description="The distance.")
+    distance: ABCDistance = Field(description="The distance.")
     particles: int = Field(ge=2, description="Number of particles.")
     target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
     min_acceptance: float = Field(
@@ -413,10 +413,10 @@ class AbcSmc(WithPriors, UncertaintyMethod[SmcResult]):
     )
 
 
-class AbcRejection(WithPriors, UncertaintyMethod[SmcResult]):
+class ABCRejection(WithPriors, UncertaintyMethod[SMCResult]):
     """
     ABC rejection: `draws` draws of the priors, of which the closest share
-    `quantile` is kept, with equal weights. It is one step of `AbcSmc` with
+    `quantile` is kept, with equal weights. It is one step of `ABCSMC` with
     no move. With a stochastic engine each distance reads one fresh
     replicate.
 
@@ -433,6 +433,6 @@ class AbcRejection(WithPriors, UncertaintyMethod[SmcResult]):
         The share of the draws kept, strictly between 0 and 1.
     """
 
-    distance: AbcDistance = Field(description="The distance.")
+    distance: ABCDistance = Field(description="The distance.")
     draws: int = Field(ge=2, description="Number of draws.")
     quantile: float = Field(gt=0.0, lt=1.0, description="The share of draws kept.")

@@ -16,8 +16,8 @@ import pytest
 from pydantic import ValidationError
 
 from commol import (
-    AbcRejection,
-    AbcSmc,
+    ABCRejection,
+    ABCSMC,
     Beta,
     CalibrationConstraint,
     CalibrationParameter,
@@ -34,7 +34,7 @@ from commol import (
     Priors,
     SeriesDistance,
     Simulation,
-    SmcResult,
+    SMCResult,
     Uniform,
 )
 from commol.api.inference import smc
@@ -100,7 +100,7 @@ class TestPriors:
         with pytest.raises(ValueError, match=r"priors.*Priors\.uniform_on_bounds\(\)"):
             GibbsPosterior.model_validate(settings)
         with pytest.raises(ValueError, match=r"priors.*Priors\.uniform_on_bounds\(\)"):
-            AbcSmc.model_validate(
+            ABCSMC.model_validate(
                 {
                     "distance": LossDistance(),
                     "particles": 100,
@@ -218,7 +218,7 @@ def _binomial(
     return Calibrator(Simulation(model), problem)
 
 
-def _abc(**settings: object) -> AbcSmc:
+def _abc(**settings: object) -> ABCSMC:
     defaults: dict[str, object] = {
         "priors": Priors.uniform_on_bounds(),
         "distance": LossDistance(),
@@ -227,10 +227,10 @@ def _abc(**settings: object) -> AbcSmc:
         "min_acceptance": 0.02,
         "stay_probability": 0.05,
     }
-    return AbcSmc.model_validate(defaults | settings)
+    return ABCSMC.model_validate(defaults | settings)
 
 
-def _mean_and_sd(result: SmcResult, name: str) -> tuple[float, float]:
+def _mean_and_sd(result: SMCResult, name: str) -> tuple[float, float]:
     mean = result.sample.mean()[name]
     index = result.sample.names.index(name)
     return mean, math.sqrt(result.sample.covariance()[index][index])
@@ -243,7 +243,7 @@ class TestSampler:
             GibbsPosterior.model_validate(settings)
         abc_settings = _abc().model_dump(exclude={"stay_probability"})
         with pytest.raises(ValidationError, match="stay_probability"):
-            AbcSmc.model_validate(abc_settings)
+            ABCSMC.model_validate(abc_settings)
         for value in (0.0, 1.0, -0.5, 1.5):
             with pytest.raises(ValidationError, match="stay_probability"):
                 _gibbs(stay_probability=value)
@@ -399,7 +399,7 @@ class TestGibbsPosterior:
         assert result.eta == 0.1
 
 
-class TestAbc:
+class TestABC:
     def test_abc_approaches_the_posterior_as_tolerance_falls(self) -> None:
         observed = 300
         calibrator = _binomial(observed)
@@ -430,7 +430,7 @@ class TestAbc:
         # |B − observed|, a whole number.
         calibrator = _binomial(300, replicates=50)
         result = calibrator.uncertainty(
-            AbcRejection(
+            ABCRejection(
                 priors=Priors.uniform_on_bounds(),
                 distance=LossDistance(),
                 draws=200,
@@ -476,7 +476,7 @@ class TestAbc:
                 seed=1,
             )
             result = Calibrator(Simulation(model), problem).uncertainty(
-                AbcRejection(
+                ABCRejection(
                     priors=Priors.uniform_on_bounds(),
                     distance=kind,
                     draws=4,
@@ -507,7 +507,7 @@ class TestAbc:
             seed=1,
         )
         result = Calibrator(Simulation(model), problem).uncertainty(
-            AbcRejection(
+            ABCRejection(
                 priors=Priors.uniform_on_bounds(),
                 distance=SeriesDistance(metric="mae"),
                 draws=200,
@@ -523,7 +523,7 @@ class TestAbc:
 
     def test_abc_rejection_keeps_the_closest_draws(self) -> None:
         result = _binomial(300).uncertainty(
-            AbcRejection(
+            ABCRejection(
                 priors=Priors.uniform_on_bounds(),
                 distance=LossDistance(),
                 draws=400,

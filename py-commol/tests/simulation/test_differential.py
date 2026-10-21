@@ -5,7 +5,7 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from commol import OdeSolver, Simulation, AxisPattern
+from commol import ODESolver, Simulation, AxisPattern
 from commol.context.model import Model
 from tests.support import (
     a_to_b_builder,
@@ -38,7 +38,7 @@ class TestRun:
     def test_both_methods_agree(self) -> None:
         tsit45 = Simulation(_decay()).run(20)
         bdf = Simulation(
-            build_ode(a_to_b_builder(), OdeSolver(method="bdf", rtol=1e-10, atol=1e-8))
+            build_ode(a_to_b_builder(), ODESolver(method="bdf", rtol=1e-10, atol=1e-8))
         ).run(20)
 
         assert_close(bdf["A"][20], tsit45["A"][20], rel=1e-6)
@@ -134,4 +134,4 @@ class TestSolverSettings:
     @pytest.mark.parametrize("field", ["rtol", "atol"])
     def test_a_tolerance_must_be_positive(self, field: str) -> None:
         with pytest.raises(ValidationError):
-            OdeSolver(**{field: 0.0})
+            ODESolver(**{field: 0.0})

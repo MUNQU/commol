@@ -806,7 +806,7 @@ class ModelBuilder:
             ``"DifferentialEquations"`` (continuous time).
         settings : EngineSettings | None, default=None
             Settings of that engine; None uses its defaults. Only
-            ``"DifferentialEquations"`` takes settings (`OdeSolver`).
+            ``"DifferentialEquations"`` takes settings (`ODESolver`).
 
         Returns
         -------
