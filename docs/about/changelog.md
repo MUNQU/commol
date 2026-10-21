@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-22
+
+This release fixes bugs of 0.6.0 and changes no API. A series point or an
+impulse that the engine cannot run now fails at `ModelBuilder.build` and
+`Model.update_parameters`, not at `Simulation`. Errors of a `Predictive` draw
+say what was not feasible. A PRCC analysis with a NaN value raises a
+`ValueError` and no longer runs forever. The quantities of a sensitivity
+analysis read a gain at its start and give different labels to close
+positions. A windowed series is plotted at the position of each observation,
+and a figure no longer changes the global style of matplotlib.
+
 ### Fixed
 
 - The default label of a quantity of interest wrote each position with 6
@@ -1141,6 +1152,7 @@ the details of these versions.
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.6.1** - Fixes of 0.6.0: checks at build, messages of infeasible draws, PRCC with NaN, quantity labels and starts, plots
 - **0.6.0** - Uncertainty methods with a model of the data: likelihood, posteriors, local approximations, conformal intervals, profiles and sensitivity analysis
 - **0.5.0** - Uncertainty by resampling the data, identifiability of parameters and the removal of the ensemble calibration
 - **0.4.0** - One process under several structures and engines, stochastic engines and model descriptions
