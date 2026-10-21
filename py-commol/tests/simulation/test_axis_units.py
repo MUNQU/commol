@@ -1,11 +1,13 @@
-"""Tests for converting values in units to steps, and rates per engine."""
+"""Tests for values in units as steps, rates per engine, and the window grid."""
 
 import math
 
 import pytest
 from pydantic import ValidationError
 
+import commol
 from commol import Aggregate, AxisUnits, Simulation
+from commol.api import windows
 from commol.utils.equations import UnitConsistencyError
 
 from tests.support import (
@@ -85,6 +87,67 @@ class TestModelAxisUnits:
         units = build(a_to_b_builder()).axis_units()
 
         assert units == AxisUnits(step_unit="step", engine="DifferenceEquations")
+
+
+class TestWindowGrid:
+    """The axis gives the window grid of a width in a unit, in steps."""
+
+    def test_the_window_grid_of_the_axis_is_in_its_unit(self) -> None:
+        hours = AxisUnits(step_unit="hour")
+        week = 168
+
+        assert hours.window_end(2, 1, "week") == 504
+        assert hours.window_end(2, 1, "week") == windows.window_end(2, week)
+        assert hours.window_start(2, 1, "week") == windows.window_start(2, week)
+        assert hours.window_start(2, 7, "day") == 336
+        assert [hours.window_index(at, 1, "week") for at in [0, 168, 168.5, 504]] == [
+            0,
+            0,
+            1,
+            2,
+        ]
+        assert hours.window_ends(1, "week", 600) == [168, 336, 504]
+        assert hours.window_ends(1, "week", 600) == windows.window_ends(week, 600)
+
+    def test_a_width_in_steps_is_the_span_in_the_step_unit(self) -> None:
+        assert AxisUnits().window_ends(5, "step", 20) == [5, 10, 15, 20]
+        assert AxisUnits(step_unit="day").window_index(14, 7, "day") == 1
+
+    @pytest.mark.parametrize(
+        ("step_unit", "span", "unit", "steps"),
+        [
+            ("day", 12, "hour", "0.5"),
+            ("step", 2.5, "step", "2.5"),
+            ("day", 0, "day", "0"),
+        ],
+    )
+    def test_a_window_must_be_whole_steps(
+        self, step_unit: str, span: float, unit: str, steps: str
+    ) -> None:
+        with pytest.raises(ValueError) as error:
+            AxisUnits(step_unit=step_unit).window_end(0, span, unit)
+
+        assert str(error.value) == (
+            f"A window must be a positive whole number of steps: {span} {unit} "
+            f"is {steps} steps of '{step_unit}'."
+        )
+
+    def test_a_window_in_another_dimension_names_both_units(self) -> None:
+        with pytest.raises(ValueError, match=r"'meter'.*'day'"):
+            AxisUnits(step_unit="day").window_ends(1, "meter", 10)
+
+    def test_a_negative_index_or_position_is_rejected(self) -> None:
+        days = AxisUnits(step_unit="day")
+
+        with pytest.raises(ValueError, match="index must not be negative"):
+            days.window_start(-1, 7, "day")
+        with pytest.raises(ValueError, match="at must not be negative"):
+            days.window_index(-1, 7, "day")
+
+    def test_the_window_grid_is_only_on_the_axis(self) -> None:
+        for name in ["window_start", "window_end", "window_index", "window_ends"]:
+            assert not hasattr(commol, name)
+            assert name not in commol.__all__
 
 
 DAILY_DIFFERENCE = AxisUnits(step_unit="day", engine="DifferenceEquations")

@@ -1,7 +1,9 @@
-"""Windows on the axis, and the increments of cumulative series over them.
+"""The window grid in steps, and the increments of cumulative series over it.
 
 Window ``w`` of length ``window`` covers ``(w * window, (w + 1) * window]``:
 a quantity observed over it is the change between its start and its end.
+`AxisUnits` gives the grid of a width in a unit; reports and
+`windowed_totals` read it in steps.
 """
 
 import math

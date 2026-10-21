@@ -165,9 +165,9 @@ predicted(at) = output(at) - output(at - window)
 ```
 
 ```python
-from commol import window_ends, windowed_totals
+from commol import windowed_totals
 
-ends = window_ends(window=7, end=70)
+ends = model(0.4).axis_units().window_ends(7, "step", 70)
 counts = windowed_totals(truth["cum_ab"], truth.positions, 7, ends)
 
 windowed = [

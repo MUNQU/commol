@@ -7,9 +7,9 @@ from commol import (
     PredictionIntervals,
     SeriesIntervals,
     Simulation,
-    window_index,
 )
 from commol.api.reporting import observed_report, simulation_report
+from commol.api.windows import window_index
 from tests.support import a_to_b_builder, build, build_ode
 
 

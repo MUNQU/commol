@@ -275,7 +275,7 @@ def observed_report(
     Each series becomes one array of `num_windows` entries, padded with null
     where there is no observation, so it lines up index for index with the
     windowed accumulator series. An observation goes to the window that holds
-    its position (:func:`commol.window_index`). ``weights``, ``outputs``
+    its position (`AxisUnits.window_index`). ``weights``, ``outputs``
     and ``factor_id`` appear only on series that use them; a series whose
     weights are all 1.0 omits them.
 

@@ -19,10 +19,6 @@ from commol.api import (
     simulation_report,
     member_statistics,
     weighted_quantiles,
-    window_end,
-    window_ends,
-    window_index,
-    window_start,
     windowed_totals,
 )
 from commol.commol_rs._commol_rs import engine as _engine
@@ -315,10 +311,6 @@ __all__ = [
     "ci_percentiles",
     "member_statistics",
     "simulation_report",
-    "window_end",
-    "window_ends",
-    "window_index",
-    "window_start",
     "weighted_quantiles",
     "windowed_totals",
 ]
