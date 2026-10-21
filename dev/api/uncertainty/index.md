@@ -4142,7 +4142,7 @@ Attributes:
 | Name                 | Type     | Description                                                                                                                                                   |
 | -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `priors`             | \`Priors | dict[str, Distribution]\`                                                                                                                                     |
-| `eta`                | \`float  | InformationMatching                                                                                                                                           |
+| `eta`                | \`float  | InformationMatchingEta                                                                                                                                        |
 | `particles`          | `int`    | Number of particles, at least 2.                                                                                                                              |
 | `target_cess`        | `float`  | The conditional effective sample size of each step, as a share of the particles, strictly between 0 and 1: the next temperature is the highest that keeps it. |
 | `resample_threshold` | `float`  | Resample when the effective size falls below this share of the particles, in (0, 1\].                                                                         |
@@ -4166,9 +4166,9 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult]):
     priors : Priors | dict[str, Distribution]
         The prior of each calibrated parameter, or
         ``Priors.uniform_on_bounds()``.
-    eta : float | InformationMatching | BootstrapCoverage
-        A number above 0, ``EtaCalibration.information_matching()`` or
-        ``EtaCalibration.bootstrap_coverage(...)``.
+    eta : float | InformationMatchingEta | BootstrapCoverageEta
+        A number above 0, ``InformationMatchingEta(block_length=...)`` or
+        ``BootstrapCoverageEta(...)``.
     particles : int
         Number of particles, at least 2.
     target_cess : float
@@ -4292,198 +4292,13 @@ class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult]):
     )
 ```
 
-## EtaCalibration
+## InformationMatchingEta
 
 Bases: `BaseModel`
 
-A rule that chooses the scale `η` of a Gibbs posterior from the data.
+Calibrate `η` by information matching: `η = tr(J I⁻¹ J) / tr(J)` at the fit, with `J` the Gauss–Newton curvature of the objective and `I` the variance of the scores of its terms, summed over blocks of positions as the meat of `Sandwich` (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019). For the sum of squares of a model with Gaussian noise of variance `σ²` it estimates `1/(2σ²)`; for a correct observation model, 1.
 
-Use `information_matching` or `bootstrap_coverage`.
-
-Source code in `commol/context/inference/smc.py`
-
-```python
-class EtaCalibration(BaseModel):
-    """
-    A rule that chooses the scale `η` of a Gibbs posterior from the data.
-
-    Use `information_matching` or `bootstrap_coverage`.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    @classmethod
-    def information_matching(cls, block_length: BlockLength) -> "InformationMatching":
-        """
-        Match the curvature of the objective to the variance of the scores of
-        its terms at the fit (Holmes and Walker 2017).
-
-        It needs ``loss_function="sse"`` or observation models and a
-        deterministic engine, and is cheap and local. The variance sums the
-        scores over blocks of positions, so it holds under dependence inside
-        a block.
-
-        Parameters
-        ----------
-        block_length : int | "auto"
-            Positions per block of the scores; there must be more blocks
-            than parameters.
-
-        Returns
-        -------
-        InformationMatching
-            The calibration.
-        """
-        return InformationMatching(block_length=block_length)
-
-    @classmethod
-    def bootstrap_coverage(
-        cls, replicates: int, block_length: BlockLength, confidence_level: float
-    ) -> "BootstrapCoverage":
-        """
-        Choose `η` so that the posterior intervals of Bayesian-bootstrap data
-        sets cover the fit at their level (Syring and Martin 2019).
-
-        It works with any loss and engine, and costs one sampler per
-        replicate.
-
-        Parameters
-        ----------
-        replicates : int
-            Number of Bayesian-bootstrap data sets, at least 1.
-        block_length : int | "auto"
-            Positions per block of the bootstrap.
-        confidence_level : float
-            The level of the intervals, strictly between 0 and 1.
-
-        Returns
-        -------
-        BootstrapCoverage
-            The calibration.
-        """
-        return BootstrapCoverage(
-            replicates=replicates,
-            block_length=block_length,
-            confidence_level=confidence_level,
-        )
-```
-
-### Methods:
-
-#### information_matching
-
-```python
-information_matching(block_length: BlockLength) -> InformationMatching
-```
-
-Match the curvature of the objective to the variance of the scores of its terms at the fit (Holmes and Walker 2017).
-
-It needs `loss_function="sse"` or observation models and a deterministic engine, and is cheap and local. The variance sums the scores over blocks of positions, so it holds under dependence inside a block.
-
-Parameters:
-
-| Name           | Type  | Description | Default                                                                       |
-| -------------- | ----- | ----------- | ----------------------------------------------------------------------------- |
-| `block_length` | \`int | auto\`      | Positions per block of the scores; there must be more blocks than parameters. |
-
-Returns:
-
-| Type                  | Description      |
-| --------------------- | ---------------- |
-| `InformationMatching` | The calibration. |
-
-Source code in `commol/context/inference/smc.py`
-
-```python
-@classmethod
-def information_matching(cls, block_length: BlockLength) -> "InformationMatching":
-    """
-    Match the curvature of the objective to the variance of the scores of
-    its terms at the fit (Holmes and Walker 2017).
-
-    It needs ``loss_function="sse"`` or observation models and a
-    deterministic engine, and is cheap and local. The variance sums the
-    scores over blocks of positions, so it holds under dependence inside
-    a block.
-
-    Parameters
-    ----------
-    block_length : int | "auto"
-        Positions per block of the scores; there must be more blocks
-        than parameters.
-
-    Returns
-    -------
-    InformationMatching
-        The calibration.
-    """
-    return InformationMatching(block_length=block_length)
-```
-
-#### bootstrap_coverage
-
-```python
-bootstrap_coverage(replicates: int, block_length: BlockLength, confidence_level: float) -> BootstrapCoverage
-```
-
-Choose `η` so that the posterior intervals of Bayesian-bootstrap data sets cover the fit at their level (Syring and Martin 2019).
-
-It works with any loss and engine, and costs one sampler per replicate.
-
-Parameters:
-
-| Name               | Type    | Description                                           | Default                               |
-| ------------------ | ------- | ----------------------------------------------------- | ------------------------------------- |
-| `replicates`       | `int`   | Number of Bayesian-bootstrap data sets, at least 1.   | *required*                            |
-| `block_length`     | \`int   | auto\`                                                | Positions per block of the bootstrap. |
-| `confidence_level` | `float` | The level of the intervals, strictly between 0 and 1. | *required*                            |
-
-Returns:
-
-| Type                | Description      |
-| ------------------- | ---------------- |
-| `BootstrapCoverage` | The calibration. |
-
-Source code in `commol/context/inference/smc.py`
-
-```python
-@classmethod
-def bootstrap_coverage(
-    cls, replicates: int, block_length: BlockLength, confidence_level: float
-) -> "BootstrapCoverage":
-    """
-    Choose `η` so that the posterior intervals of Bayesian-bootstrap data
-    sets cover the fit at their level (Syring and Martin 2019).
-
-    It works with any loss and engine, and costs one sampler per
-    replicate.
-
-    Parameters
-    ----------
-    replicates : int
-        Number of Bayesian-bootstrap data sets, at least 1.
-    block_length : int | "auto"
-        Positions per block of the bootstrap.
-    confidence_level : float
-        The level of the intervals, strictly between 0 and 1.
-
-    Returns
-    -------
-    BootstrapCoverage
-        The calibration.
-    """
-    return BootstrapCoverage(
-        replicates=replicates,
-        block_length=block_length,
-        confidence_level=confidence_level,
-    )
-```
-
-## InformationMatching
-
-Bases: `EtaCalibration`
-
-`η = tr(J I⁻¹ J) / tr(J)` at the fit, with `J` the Gauss–Newton curvature of the objective and `I` the variance of the scores of its terms, summed over blocks of positions as the meat of `Sandwich` (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019). For the sum of squares of a model with Gaussian noise of variance `σ²` it estimates `1/(2σ²)`; for a correct observation model, 1. It needs `loss_function="sse"` or observation models, and a deterministic engine.
+It needs `loss_function="sse"` or observation models, and a deterministic engine, and is cheap and local. The variance sums the scores over blocks of positions, so it holds under dependence inside a block.
 
 Attributes:
 
@@ -4494,32 +4309,40 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class InformationMatching(EtaCalibration):
+class InformationMatchingEta(BaseModel):
     """
-    `η = tr(J I⁻¹ J) / tr(J)` at the fit, with ``J`` the Gauss–Newton
-    curvature of the objective and ``I`` the variance of the scores of its
-    terms, summed over blocks of positions as the meat of `Sandwich`
-    (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019). For the sum of
-    squares of a model with Gaussian noise of variance ``σ²`` it estimates
-    ``1/(2σ²)``; for a correct observation model, 1. It needs
-    ``loss_function="sse"`` or observation models, and a deterministic
-    engine.
+    Calibrate `η` by information matching: `η = tr(J I⁻¹ J) / tr(J)` at the
+    fit, with ``J`` the Gauss–Newton curvature of the objective and ``I`` the
+    variance of the scores of its terms, summed over blocks of positions as
+    the meat of `Sandwich` (Holmes and Walker 2017; Lyddon, Holmes and Walker
+    2019). For the sum of squares of a model with Gaussian noise of variance
+    ``σ²`` it estimates ``1/(2σ²)``; for a correct observation model, 1.
+
+    It needs ``loss_function="sse"`` or observation models, and a
+    deterministic engine, and is cheap and local. The variance sums the
+    scores over blocks of positions, so it holds under dependence inside a
+    block.
 
     Attributes
     ----------
     block_length : int | "auto"
-        Positions per block of the scores.
+        Positions per block of the scores; there must be more blocks than
+        parameters.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["information_matching"] = "information_matching"
     block_length: BlockLength = Field(description="Positions per block.")
 ```
 
-## BootstrapCoverage
+## BootstrapCoverageEta
 
-Bases: `EtaCalibration`
+Bases: `BaseModel`
 
-The `η` at which the central intervals of `confidence_level` of the Gibbs posteriors of Bayesian-bootstrap data sets hold the fit at that rate, over the replicates and the parameters (Syring and Martin 2019).
+Calibrate `η` by bootstrap coverage: the `η` at which the central intervals of `confidence_level` of the Gibbs posteriors of Bayesian-bootstrap data sets hold the fit at that rate, over the replicates and the parameters (Syring and Martin 2019).
+
+It works with any loss and engine, and costs one sampler per replicate.
 
 Attributes:
 
@@ -4532,11 +4355,14 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class BootstrapCoverage(EtaCalibration):
+class BootstrapCoverageEta(BaseModel):
     """
-    The `η` at which the central intervals of `confidence_level` of the Gibbs
-    posteriors of Bayesian-bootstrap data sets hold the fit at that rate,
-    over the replicates and the parameters (Syring and Martin 2019).
+    Calibrate `η` by bootstrap coverage: the `η` at which the central
+    intervals of `confidence_level` of the Gibbs posteriors of
+    Bayesian-bootstrap data sets hold the fit at that rate, over the
+    replicates and the parameters (Syring and Martin 2019).
+
+    It works with any loss and engine, and costs one sampler per replicate.
 
     Attributes
     ----------
@@ -4547,6 +4373,8 @@ class BootstrapCoverage(EtaCalibration):
     confidence_level : float
         The level of the intervals, strictly between 0 and 1.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["bootstrap_coverage"] = "bootstrap_coverage"
     replicates: int = Field(ge=1, description="Number of bootstrap data sets.")
@@ -4802,7 +4630,7 @@ class GibbsResult(SMCResult):
     fit : CalibrationResult | None
         The fit a calibration of `η` read; None when `η` is a number.
     coverage : float | None
-        With `BootstrapCoverage`, the coverage of the fit by the intervals of
+        With `BootstrapCoverageEta`, the coverage of the fit by the intervals of
         the bootstrap posteriors at `η`; otherwise None.
     """
 

@@ -3803,12 +3803,11 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <p><code>GibbsPosterior</code>: the Gibbs posterior <code>prior(θ) · exp(−η · loss(θ))</code> of the
   problem's loss, sampled by sequential Monte Carlo from the priors to the
   posterior; it returns a <code>GibbsResult</code> with the <code>η</code> it ran with. <code>eta</code> is
-  required: a number above 0, <code>EtaCalibration.information_matching(block_length)</code>
-  (the curvature of the sum of squares or of observation models against the
+  required: a number above 0, <code>InformationMatchingEta(block_length)</code> (the
+  curvature of the sum of squares or of observation models against the
   variance of the scores of its terms summed over blocks, with a
-  deterministic engine) or
-  <code>EtaCalibration.bootstrap_coverage(replicates, block_length,
-  confidence_level)</code> (any loss). See
+  deterministic engine) or <code>BootstrapCoverageEta(replicates, block_length,
+  confidence_level)</code> (any loss), joined in the union <code>Eta</code>. See
   <a href="../../guide/uncertainty/smc/#gibbs-posterior">Sequential Monte Carlo</a>.</p>
 </li>
 <li><code>ABCSMC</code> and <code>ABCRejection</code>: approximate Bayesian computation on a required
@@ -3933,7 +3932,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   transform of the bounds and the root finder of the quantiles come from the
   argmin fork; calibrations, profiles, quantiles and draws give the same
   results.</li>
-<li><strong>Breaking:</strong> <code>EtaCalibration.information_matching(block_length)</code> takes a
+<li><strong>Breaking:</strong> <code>InformationMatchingEta(block_length)</code> takes a
   required <code>block_length</code>, an <code>int</code> or <code>"auto"</code>: the variance of the scores
   is summed over blocks of positions, as the meat of <code>Sandwich</code>, so it holds
   under dependence; <code>block_length=1</code> gives the independent version. It also

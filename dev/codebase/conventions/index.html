@@ -3356,6 +3356,14 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
   one word (<code>OdeSolver</code>, <code>SmcSampler</code>).
   <code>tests/docs/test_reference.py::test_public_names_capitalize_acronyms</code>
   checks the known acronyms of <code>commol.__all__</code>.</li>
+<li>A family of configurations is one class per member, joined in a union:
+  <code>ABCDistance</code> (<code>LossDistance</code>, <code>SeriesDistance</code>), <code>ObservationNoise</code>,
+  <code>Eta</code> (<code>InformationMatchingEta</code>, <code>BootstrapCoverageEta</code>). The user builds
+  a member from its class, so each configuration has one spelling. A
+  classmethod is only an alternative constructor or a preset of its own
+  class (<code>Priors.uniform_on_bounds()</code>, <code>PlotConfig.publication()</code>,
+  <code>ParameterSample.equally_weighted(...)</code>, <code>AxisPattern.pulse(...)</code>); it
+  never returns an instance of another class, such as a subclass.</li>
 <li>Context data structures are Pydantic v2 models.</li>
 <li><code>ModelBuilder</code> methods return <code>Self</code>, so calls chain.</li>
 <li>Log with the standard <code>logging</code> module. Library code never writes to the
