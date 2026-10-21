@@ -2955,7 +2955,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#061-2026-10-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.6.1] - 2026-10-22
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.6.1] - 2026-10-22">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3408,7 +3419,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#061-2026-10-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.6.1] - 2026-10-22
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.6.1] - 2026-10-22">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3836,6 +3858,15 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h2 id="061-2026-10-22">[0.6.1] - 2026-10-22<a class="headerlink" href="#061-2026-10-22" title="Permanent link">&para;</a></h2>
+<p>This release fixes bugs of 0.6.0 and changes no API. A series point or an
+impulse that the engine cannot run now fails at <code>ModelBuilder.build</code> and
+<code>Model.update_parameters</code>, not at <code>Simulation</code>. Errors of a <code>Predictive</code> draw
+say what was not feasible. A PRCC analysis with a NaN value raises a
+<code>ValueError</code> and no longer runs forever. The quantities of a sensitivity
+analysis read a gain at its start and give different labels to close
+positions. A windowed series is plotted at the position of each observation,
+and a figure no longer changes the global style of matplotlib.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
 <li>The default label of a quantity of interest wrote each position with 6
@@ -5293,6 +5324,7 @@ the details of these versions.</p>
 <h2 id="version-history">Version History<a class="headerlink" href="#version-history" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Unreleased</strong> - Current development version</li>
+<li><strong>0.6.1</strong> - Fixes of 0.6.0: checks at build, messages of infeasible draws, PRCC with NaN, quantity labels and starts, plots</li>
 <li><strong>0.6.0</strong> - Uncertainty methods with a model of the data: likelihood, posteriors, local approximations, conformal intervals, profiles and sensitivity analysis</li>
 <li><strong>0.5.0</strong> - Uncertainty by resampling the data, identifiability of parameters and the removal of the ensemble calibration</li>
 <li><strong>0.4.0</strong> - One process under several structures and engines, stochastic engines and model descriptions</li>
