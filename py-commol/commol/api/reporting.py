@@ -1,14 +1,20 @@
-"""Structured reports of a calibrated model."""
+"""
+The blocks of the reports: plain data, built for the methods that report.
+
+`SimulationResults.report`, `SimulationReplicates.report`,
+`Predictive.report`, `Model.applied_parameters` and
+`IdentifiabilityReport.report` call the private functions of this module; the
+key order of each block is part of the contract.
+"""
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from typing import NotRequired, TypedDict, cast
 
 import numpy as np
 
 from commol.api.inference.intervals import member_statistics
-from commol.api.inference.predictive import Predictive
 from commol.api.results import SimulationResults, sample
-from commol.api.simulation import Simulation
 from commol.api.windows import windowed_totals
 from commol.context._windows import window_end, window_index
 from commol.context.calibration import (
@@ -78,67 +84,17 @@ def _sample_statistics(
     return sample.summary(confidence_level)
 
 
-def applied_parameters_report(
+def _applied_parameters_report(
     model: Model,
     result: CalibrationResult | Mapping[str, float],
-    problem: CalibrationProblem | None = None,
-    sample: ParameterSample | None = None,
-    confidence_level: float | None = None,
+    problem: CalibrationProblem | None,
+    sample: ParameterSample | None,
+    confidence_level: float | None,
 ) -> AppliedParametersReport:
     """
-    Report every parameter of a calibrated model, and the values of its kind.
+    Every parameter of a calibrated model, and the values of its kind.
 
-    Each entry carries the value the model holds and whether calibration set
-    it, so entries the calibration left alone appear alongside the fitted ones.
-    The structure of the model adds the sections of its kind
-    (`ModelStructure.report_sections`); an aggregate model adds
-    ``initial_amounts`` and ``category_splits``.
-
-    Parameters that are not a single number, such as a formula or a
-    series, are omitted: they are inputs rather than fitted values.
-    ``factor`` and ``noise`` parameters have no place in the model, so they are
-    reported from `problem` when it is given.
-
-    ``initial_amounts`` gives each bin and each overridden compartment of an
-    aggregate model its ``amount`` the engine builds and the ``unit`` of its
-    bin, so bins of different units are reported side by side; no row is a
-    share of a total. A bin left uncalibrated keeps a ``None`` amount as its
-    "needs calibration" marker even when overrides touch some of its
-    compartments. ``category_splits`` gives each category its ``fraction`` of
-    the group it splits, and that ``group``: the categories a conditional
-    stratification is conditioned on, empty when it splits every bin.
-
-    With a `sample` each entry gains an ``interval`` holding the weighted
-    statistics of its draws (`ParameterSample.summary`). Every entry is in
-    the unit it was calibrated in: a parameter in its own, an amount in the
-    unit of its bin, and a category split as a fraction of its group.
-
-    Parameters
-    ----------
-    model : Model
-        The model carrying the applied values.
-    result : CalibrationResult | Mapping
-        The calibration result, or a mapping of parameter id to value such as
-        one draw of a sample.
-    problem : CalibrationProblem | None, optional
-        The problem the result came from, used to report factor and noise
-        parameters.
-    sample : ParameterSample | None, optional
-        Draws of the parameters, such as the sample of an uncertainty method.
-    confidence_level : float | None, optional
-        Confidence level of the intervals; required with a sample.
-
-    Returns
-    -------
-    AppliedParametersReport
-        Key ``parameters`` and the sections of the kind (``initial_amounts``
-        and ``category_splits`` for an aggregate model), preceded by
-        ``confidence_level`` when there is one.
-
-    Raises
-    ------
-    ValueError
-        If a sample is given without a confidence level.
+    The block of `Model.applied_parameters`, which documents it.
     """
     calibrated = calibrated_values(result)
     parameter_statistics = _sample_statistics(sample, confidence_level)
@@ -240,32 +196,56 @@ class SimulationReport(TypedDict):
     prediction_intervals: NotRequired[PredictionIntervalsReport]
 
 
-def _reduce(
-    reduce_fn: Callable[[SimulationResults], float | list[float]],
-    results: SimulationResults,
-    ensemble_runs: "Sequence[SimulationResults] | Predictive | None",
-    confidence_level: float | None,
-) -> ReportLeaf:
+@dataclass(frozen=True)
+class _ReportRuns:
     """
-    One reported value, as a quantity or as the spread of that quantity.
+    The runs a report reads, and the model whose outputs they hold.
 
-    A single run yields the quantity itself. An ensemble yields the same
-    quantity computed per member and reduced to statistics, so both layouts
-    differ only in what sits at the leaves.
+    `runs` holds at least one run, and the outputs of the first name the
+    series. Without a confidence level the report reads the one run in
+    `runs`; with one, each leaf is computed per member of `runs` and reduced
+    to statistics with `weights`, so both layouts differ only at the leaves.
     """
-    if ensemble_runs is None or confidence_level is None:
-        return reduce_fn(results)
-    if isinstance(ensemble_runs, Predictive):
-        runs, weights = ensemble_runs.runs(), ensemble_runs.weights
-    else:
-        runs, weights = list(ensemble_runs), None
-    if not runs:
-        return reduce_fn(results)
-    members = np.asarray([reduce_fn(run) for run in runs], dtype=float)
-    return member_statistics(members, confidence_level, weights)
+
+    model: Model | None
+    runs: Sequence[SimulationResults]
+    confidence_level: float | None = None
+    weights: Sequence[float] | None = None
+
+    def leaf(
+        self, reduce_fn: Callable[[SimulationResults], float | list[float]]
+    ) -> ReportLeaf:
+        """One reported value, as a quantity or as the spread of that quantity."""
+        if self.confidence_level is None:
+            return reduce_fn(self.runs[0])
+        members = np.asarray([reduce_fn(run) for run in self.runs], dtype=float)
+        return member_statistics(members, self.confidence_level, self.weights)
+
+    def outputs_for(self, id: str) -> list[str]:
+        """The outputs of a bin or accumulator, from the structure of the model."""
+        model = self.model
+        if model is None:
+            raise ValueError(
+                f"The results know no model, so they cannot report '{id}': "
+                "report the results of Simulation.run, run_at or replicates."
+            )
+        outputs = model.structure.outputs_by_source(model)
+        if id not in outputs:
+            raise KeyError(
+                f"'{id}' is not a bin or accumulator of model '{model.name}'. "
+                f"Available: {sorted(outputs)}"
+            )
+        return outputs[id]
 
 
-def observed_report(
+def _total_series(run: SimulationResults, outputs: Sequence[str]) -> list[float]:
+    """The sum of some outputs of a run at each position."""
+    return [
+        sum(values) for values in zip(*(run[name] for name in outputs), strict=True)
+    ]
+
+
+def _observed_report(
     observed_data: Iterable[ObservedDataPoint],
     window: float,
     num_windows: int,
@@ -279,20 +259,6 @@ def observed_report(
     its position (`AxisUnits.window_index`). ``weights``, ``outputs``
     and ``factor_id`` appear only on series that use them; a series whose
     weights are all 1.0 omits them.
-
-    Parameters
-    ----------
-    observed_data : Iterable[ObservedDataPoint]
-        The observations to report.
-    window : float
-        Length of one window on the axis.
-    num_windows : int
-        Number of windows on the reported axis.
-
-    Returns
-    -------
-    dict[str, ObservedSeries]
-        One entry per observed series.
     """
     series: dict[str, ObservedSeries] = {}
     for point in observed_data:
@@ -319,113 +285,45 @@ def observed_report(
     return series
 
 
-def series_report(
-    simulation: Simulation,
-    results: SimulationResults,
+def _series_report(
+    runs: _ReportRuns,
     at: Sequence[float],
-    accumulators: Iterable[str] = (),
-    ensemble_runs: "Sequence[SimulationResults] | Predictive | None" = None,
-    confidence_level: float | None = None,
+    accumulators: Iterable[str],
 ) -> dict[str, ReportLeaf]:
     """
     Report every compartment series, sampled at the given positions.
 
-    Outputs belonging to the named accumulators are excluded, since they are
-    reported separately by :func:`accumulators_report`.
-
-    Parameters
-    ----------
-    simulation : Simulation
-        The simulation the results came from.
-    results : SimulationResults
-        Results of a run, with their positions.
-    at : Sequence[float]
-        Positions the series are sampled at; each must be a position of the
-        results.
-    accumulators : Iterable[str], optional
-        Accumulator ids whose outputs are left out.
-    ensemble_runs : Sequence[SimulationResults] | Predictive | None, optional
-        One results mapping per member, such as the replicates of a stochastic
-        engine, or a `Predictive`, whose draws carry their weights.
-    confidence_level : float | None, optional
-        Confidence level of the reported intervals.
-
-    Returns
-    -------
-    dict[str, ReportLeaf]
-        One entry per compartment output, sorted by name.
-
-    Raises
-    ------
-    ValueError
-        If the results have no value at a position of `at`.
+    Outputs of the named accumulators are left out, since
+    `_accumulators_report` reports them. Each entry is one output, sorted by
+    name.
     """
     excluded = {
         name
         for accumulator_id in accumulators
-        for name in simulation.outputs_for(accumulator_id)
+        for name in runs.outputs_for(accumulator_id)
     }
     return {
-        name: _reduce(
-            lambda run, output=name: sample(run[output], run.positions, at),
-            results,
-            ensemble_runs,
-            confidence_level,
-        )
-        for name in sorted(results)
+        name: runs.leaf(lambda run, output=name: sample(run[output], run.positions, at))
+        for name in sorted(runs.runs[0])
         if name not in excluded
     }
 
 
-def accumulators_report(
-    simulation: Simulation,
-    results: SimulationResults,
+def _accumulators_report(
+    runs: _ReportRuns,
     accumulators: Iterable[str],
     at: Sequence[float],
     window: float,
     num_windows: int,
-    ensemble_runs: "Sequence[SimulationResults] | Predictive | None" = None,
-    confidence_level: float | None = None,
 ) -> dict[str, AccumulatorReport]:
     """
     Report both readings of each accumulator.
 
     ``windowed`` is the per-window increment the loss compares observations
     against, so it stays on the window axis whatever positions `at` samples
-    and lines up with :func:`observed_report`. It holds the windows that end
-    within the results. ``cumulative`` follows `at` like the compartment
-    series do. Both are given as a total and per output.
-
-    Parameters
-    ----------
-    simulation : Simulation
-        The simulation the results came from.
-    results : SimulationResults
-        Results of a run, with their positions.
-    accumulators : Iterable[str]
-        Accumulator ids to report.
-    at : Sequence[float]
-        Positions the cumulative series are sampled at.
-    window : float
-        Length of one window on the axis.
-    num_windows : int
-        Number of windows on the reported axis.
-    ensemble_runs : Sequence[SimulationResults] | Predictive | None, optional
-        One results mapping per member, such as the replicates of a stochastic
-        engine, or a `Predictive`, whose draws carry their weights.
-    confidence_level : float | None, optional
-        Confidence level of the reported intervals.
-
-    Returns
-    -------
-    dict[str, AccumulatorReport]
-        One entry per accumulator.
-
-    Raises
-    ------
-    ValueError
-        If the results have no value at a position of `at`, or at the start
-        or the end of a window that ends within them.
+    and lines up with `_observed_report`. It holds the windows that end
+    within each run. ``cumulative`` follows `at` like the compartment series
+    do. Both are given as a total and per output.
     """
     ends = [window_end(index, window) for index in range(num_windows)]
 
@@ -437,36 +335,32 @@ def accumulators_report(
 
     block: dict[str, AccumulatorReport] = {}
     for accumulator_id in accumulators:
-        outputs = simulation.outputs_for(accumulator_id)
-
-        def leaf(
-            reduce_fn: Callable[[SimulationResults], float | list[float]],
-        ) -> ReportLeaf:
-            return _reduce(reduce_fn, results, ensemble_runs, confidence_level)
-
+        outputs = runs.outputs_for(accumulator_id)
         entry: AccumulatorReport = {
-            "total": leaf(lambda run, ids=outputs: sum(run[name][-1] for name in ids)),
+            "total": runs.leaf(
+                lambda run, ids=outputs: sum(run[name][-1] for name in ids)
+            ),
             "windowed": {
-                "total": leaf(
-                    lambda run, acc=accumulator_id: windowed(
-                        simulation.total_series(run, [acc]), run.positions
+                "total": runs.leaf(
+                    lambda run, ids=outputs: windowed(
+                        _total_series(run, ids), run.positions
                     )
                 ),
                 "by_output": {
-                    name: leaf(
+                    name: runs.leaf(
                         lambda run, output=name: windowed(run[output], run.positions)
                     )
                     for name in outputs
                 },
             },
             "cumulative": {
-                "total": leaf(
-                    lambda run, acc=accumulator_id: sample(
-                        simulation.total_series(run, [acc]), run.positions, at
+                "total": runs.leaf(
+                    lambda run, ids=outputs: sample(
+                        _total_series(run, ids), run.positions, at
                     )
                 ),
                 "by_output": {
-                    name: leaf(
+                    name: runs.leaf(
                         lambda run, output=name: sample(run[output], run.positions, at)
                     )
                     for name in outputs
@@ -477,86 +371,31 @@ def accumulators_report(
     return block
 
 
-def simulation_report(
-    simulation: Simulation,
-    results: SimulationResults,
+def _simulation_report(
+    runs: _ReportRuns,
     at: Sequence[float],
     window: float,
     num_windows: int,
-    observed_data: Iterable[ObservedDataPoint] = (),
-    accumulators: Iterable[str] = (),
-    ensemble_runs: "Sequence[SimulationResults] | Predictive | None" = None,
-    confidence_level: float | None = None,
-    prediction_intervals: PredictionIntervals | None = None,
+    observed_data: Iterable[ObservedDataPoint],
+    accumulators: Iterable[str],
+    prediction_intervals: PredictionIntervals | None,
 ) -> SimulationReport:
     """
-    Report the observed data, compartment series and accumulators of a run.
+    The observed data, compartment series and accumulators of some runs.
 
-    The three blocks share one window axis, so the observed values, the
-    windowed accumulator increments and the sampled series can be read against
-    each other. With `ensemble_runs` every leaf becomes a
-    ``{mean, median, ci_lower, ci_upper, min, max}`` block computed across
-    members, and the layout is otherwise unchanged.
-
-    Callers add whatever envelope they need around these blocks, such as a run
-    label, axis labels or domain-specific summary figures.
-
-    Parameters
-    ----------
-    simulation : Simulation
-        The simulation the results came from.
-    results : SimulationResults
-        Results of a run, with their positions.
-    at : Sequence[float]
-        Positions the series and cumulative accumulators are sampled at.
-    window : float
-        Length of one window on the axis.
-    num_windows : int
-        Number of windows on the observed and windowed axes.
-    observed_data : Iterable[ObservedDataPoint], optional
-        The calibration targets to report alongside the run.
-    accumulators : Iterable[str], optional
-        Accumulator ids to report.
-    ensemble_runs : Sequence[SimulationResults] | Predictive | None, optional
-        One results mapping per member, such as the replicates of a stochastic
-        engine, or a `Predictive`, whose draws carry their weights.
-    confidence_level : float | None, optional
-        Confidence level of the reported intervals.
-    prediction_intervals : PredictionIntervals | None, optional
-        Prediction intervals of a conformal method
-        (``ConformalResult.intervals``), reported as they are.
-
-    Returns
-    -------
-    SimulationReport
-        Keys ``observed``, ``series`` and ``accumulators``, then
-        ``prediction_intervals`` when they are given.
-
-    Raises
-    ------
-    ValueError
-        If the results have no value at a position the report reads.
+    `SimulationResults.report`, `SimulationReplicates.report` and
+    `Predictive.report` build their block here. The three blocks share one
+    window axis; with a confidence level every leaf becomes a ``{mean,
+    median, ci_lower, ci_upper, min, max}`` block computed across the runs,
+    and the layout is otherwise unchanged. The key order is part of the
+    contract.
     """
     accumulator_ids = list(accumulators)
     report: SimulationReport = {
-        "observed": observed_report(observed_data, window, num_windows),
-        "series": series_report(
-            simulation,
-            results,
-            at,
-            accumulator_ids,
-            ensemble_runs,
-            confidence_level,
-        ),
-        "accumulators": accumulators_report(
-            simulation,
-            results,
-            accumulator_ids,
-            at,
-            window,
-            num_windows,
-            ensemble_runs,
-            confidence_level,
+        "observed": _observed_report(observed_data, window, num_windows),
+        "series": _series_report(runs, at, accumulator_ids),
+        "accumulators": _accumulators_report(
+            runs, accumulator_ids, at, window, num_windows
         ),
     }
     if prediction_intervals is not None:
@@ -600,23 +439,8 @@ class IdentifiabilityReportData(TypedDict):
     sections: dict[str, list[dict[str, object]]]
 
 
-def identifiability_report(report: IdentifiabilityReport) -> IdentifiabilityReportData:
-    """
-    Report the identifiability of each parameter as plain data.
-
-    Parameters
-    ----------
-    report : IdentifiabilityReport
-        The result of ``Calibrator.identifiability``, or of
-        `IdentifiabilityReport.merge`.
-
-    Returns
-    -------
-    IdentifiabilityReportData
-        ``parameters``: each parameter, in problem order, with its structural
-        and practical verdicts; ``sections``: the evidence of each method that
-        ran.
-    """
+def _identifiability_report(report: IdentifiabilityReport) -> IdentifiabilityReportData:
+    """The block of `IdentifiabilityReport.report`, which documents it."""
     parameters: dict[str, VerdictsEntry] = {}
     for name in report.parameters:
         verdicts = report.verdicts[name]

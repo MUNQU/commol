@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Generic, Self, TypeVar
+from typing import TYPE_CHECKING, Generic, Self, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -29,6 +29,10 @@ from commol.context.engine import ModelEngine
 from commol.context.parameter import Parameter, ParameterUpdate
 from commol.context.process import Process
 from commol.context.structure import ModelStructure
+
+if TYPE_CHECKING:
+    from commol.api.reporting import AppliedParametersReport
+    from commol.context.inference.sample import ParameterSample
 
 StructureT = TypeVar("StructureT", bound=ModelStructure)
 """The structure class of a model, which sets its kind."""
@@ -287,6 +291,75 @@ class Model(BaseModel, Generic[StructureT]):
         if parameters:
             self.update_parameters(parameters)
         self.structure = structure
+
+    def applied_parameters(
+        self,
+        values: CalibrationResult | Mapping[str, float],
+        problem: CalibrationProblem | None = None,
+        sample: "ParameterSample | None" = None,
+        confidence_level: float | None = None,
+    ) -> "AppliedParametersReport":
+        """
+        Report every parameter of the model, and the values of its kind.
+
+        Call it on the model **after** `apply_calibration_parameters`. Each
+        entry carries the value the model holds and whether calibration set
+        it, so entries the calibration left alone appear alongside the fitted
+        ones. The structure of the model adds the sections of its kind
+        (`ModelStructure.report_sections`); an aggregate model adds
+        ``initial_amounts`` and ``category_splits``.
+
+        Parameters that are not a single number, such as a formula or a
+        series, are omitted: they are inputs rather than fitted values.
+        ``factor`` and ``noise`` parameters have no place in the model, so
+        they are reported from `problem` when it is given.
+
+        ``initial_amounts`` gives each bin and each overridden compartment of
+        an aggregate model its ``amount`` the engine builds and the ``unit``
+        of its bin, so bins of different units are reported side by side; no
+        row is a share of a total. A bin left uncalibrated keeps a ``None``
+        amount as its "needs calibration" marker even when overrides touch
+        some of its compartments. ``category_splits`` gives each category its
+        ``fraction`` of the group it splits, and that ``group``: the
+        categories a conditional stratification is conditioned on, empty when
+        it splits every bin.
+
+        With a `sample` each entry gains an ``interval`` holding the weighted
+        statistics of its draws (`ParameterSample.summary`). Every entry is in
+        the unit it was calibrated in: a parameter in its own, an amount in
+        the unit of its bin, and a category split as a fraction of its group.
+
+        Parameters
+        ----------
+        values : CalibrationResult | Mapping
+            The calibration result, or a mapping of parameter id to value such
+            as one draw of a sample.
+        problem : CalibrationProblem | None, optional
+            The problem the values came from, used to report factor and noise
+            parameters.
+        sample : ParameterSample | None, optional
+            Draws of the parameters, such as the sample of an uncertainty
+            method.
+        confidence_level : float | None, optional
+            Confidence level of the intervals; required with a sample.
+
+        Returns
+        -------
+        AppliedParametersReport
+            Key ``parameters`` and the sections of the kind
+            (``initial_amounts`` and ``category_splits`` for an aggregate
+            model), preceded by ``confidence_level`` when there is one.
+
+        Raises
+        ------
+        ValueError
+            If a sample is given without a confidence level.
+        """
+        from commol.api.reporting import _applied_parameters_report
+
+        return _applied_parameters_report(
+            self, values, problem, sample, confidence_level
+        )
 
     def describe(self, layout: Layout = "default") -> ModelDescription:
         """

@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Added #257 -->
 
+- `SimulationResults.model` and `SimulationReplicates.model`: the results of
+  `Simulation.run`, `run_at` and `replicates` hold a reference to their
+  `Model`, and the runs of `Predictive.runs()` the model of its source. A
+  report reads the outputs of each bin and accumulator from it; results with
+  their model still pickle. See [Reports](../guide/reports.md).
+
 ### Changed
 
 <!-- Changed #245 -->
@@ -51,6 +57,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or `(7, "step")` when the model declares no step unit.
 
 <!-- Changed #257 -->
+
+- **Breaking:** each report is a method of the object whose data it
+  describes, and `commol` exports no report function. The private functions of
+  `api/reporting.py` build the blocks, with the same keys in the same order.
+  See [Reports](../guide/reports.md).
+
+  | Before | Now |
+  |---|---|
+  | `simulation_report(simulation, results, at, window, num_windows, …)` | `results.report(positions, window, windows, …)` |
+  | `simulation_report(…, ensemble_runs=replicates, confidence_level=c)` | `replicates.report(c, positions, window, windows, …)` |
+  | `simulation_report(…, ensemble_runs=predictive, confidence_level=c)` | `predictive.report(c, positions, window, windows, …)`, with no run of a point estimate |
+  | `applied_parameters_report(model, result, problem, …)` | `model.applied_parameters(result, problem, …)` |
+  | `identifiability_report(report)` | `report.report()` |
+  | `commol.api.reporting.observed_report`, `series_report`, `accumulators_report` | The blocks `observed`, `series` and `accumulators` of a report |
 
 ### Fixed
 

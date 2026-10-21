@@ -187,8 +187,8 @@ class Simulation:
         Returns
         -------
         SimulationResults
-            One value per position for each output, the positions, and the
-            seed of a stochastic run.
+            One value per position for each output, the positions, the seed
+            of a stochastic run, and the model.
 
         Raises
         ------
@@ -211,7 +211,11 @@ class Simulation:
         positions, rows = self._engine.run(num_steps)
         logger.info(f"Simulation complete. It took {time.time() - start} seconds.")
         return SimulationResults.from_rows(
-            positions, self._simulation_outputs, rows, seed=used_seed
+            positions,
+            self._simulation_outputs,
+            rows,
+            seed=used_seed,
+            model=self.model_definition,
         )
 
     def run_at(
@@ -236,8 +240,8 @@ class Simulation:
         Returns
         -------
         SimulationResults
-            One value per position for each output, the positions, and the
-            seed of a stochastic run.
+            One value per position for each output, the positions, the seed
+            of a stochastic run, and the model.
 
         Raises
         ------
@@ -259,7 +263,11 @@ class Simulation:
         self._engine.reset()
         rows = self._engine.run_at(positions)
         return SimulationResults.from_rows(
-            positions, self._simulation_outputs, rows, seed=used_seed
+            positions,
+            self._simulation_outputs,
+            rows,
+            seed=used_seed,
+            model=self.model_definition,
         )
 
     def replicates(self, n: int, *, seed: int | None = None) -> "ReplicateRuns":
@@ -520,15 +528,17 @@ class ReplicateRuns:
         engine = simulation.engine
         positions, seeds, runs = engine.run_replicates(self.seed, self.n, grid)
         outputs = simulation.simulation_outputs
+        model = simulation.model_definition
         return SimulationReplicates(
             (
                 SimulationResults.from_rows(
-                    positions, outputs, rows, seed=replicate_seed
+                    positions, outputs, rows, seed=replicate_seed, model=model
                 )
                 for replicate_seed, rows in zip(seeds, runs, strict=True)
             ),
             seed=self.seed,
             positions=positions,
+            model=model,
         )
 
     def run(self, num_steps: int) -> SimulationReplicates:

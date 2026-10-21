@@ -217,6 +217,8 @@ To add a kind of model, such as an agent network (see
 
 ### Reports
 
+- [ ] Make a report a method of the object of results whose data it
+      describes; its block is a private function of `api/reporting.py`.
 - [ ] Keep the key order of existing entries.
 - [ ] Put a section that only one model kind has in its
       `ModelStructure.report_sections`, not in `api/reporting.py`.

@@ -20,7 +20,7 @@ verdict per parameter, and the evidence of its section.
 """
 
 from collections.abc import Mapping
-from typing import Literal, Self
+from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -28,6 +28,9 @@ from commol.context.calibration import CalibrationResult
 from commol.context.inference.distributions import Priors, coerce_priors
 from commol.context.inference.method import IdentifiabilityMethod
 from commol.context.inference.sample import ParameterSample
+
+if TYPE_CHECKING:
+    from commol.api.reporting import IdentifiabilityReportData
 
 StructuralVerdictName = Literal[
     "identifiable", "in_combination", "non_identifiable", "conflicting"
@@ -398,6 +401,21 @@ class IdentifiabilityReport(_Frozen):
                 f"order, got {list(self.verdicts)}."
             )
         return self
+
+    def report(self) -> "IdentifiabilityReportData":
+        """
+        Report the identifiability of each parameter as plain data.
+
+        Returns
+        -------
+        IdentifiabilityReportData
+            ``parameters``: each parameter, in problem order, with its
+            structural and practical verdicts; ``sections``: the evidence of
+            each method that ran.
+        """
+        from commol.api.reporting import _identifiability_report
+
+        return _identifiability_report(self)
 
     def merge(self, *others: "IdentifiabilityReport") -> "IdentifiabilityReport":
         """

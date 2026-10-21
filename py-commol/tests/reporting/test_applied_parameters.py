@@ -1,4 +1,4 @@
-"""``applied_parameters_report``: the values a calibration applied to a model."""
+"""``Model.applied_parameters``: the values a calibration applied to a model."""
 
 import time
 
@@ -14,7 +14,6 @@ from commol import (
     ObservedDataPoint,
     ParameterSample,
     SampleMethod,
-    applied_parameters_report,
 )
 from tests.support import (
     FactoryBuilder,
@@ -68,12 +67,12 @@ def _sample(entry_id: str, values: list[float]) -> ParameterSample:
 
 class TestParameters:
     def test_reports_every_numeric_parameter(self) -> None:
-        report = applied_parameters_report(_model(), {"k1": 0.3})
+        report = _model().applied_parameters({"k1": 0.3})
 
         assert report["parameters"]["k1"] == {"value": 0.3, "calibrated": True}
 
     def test_flags_parameters_the_calibration_did_not_set(self) -> None:
-        report = applied_parameters_report(_model(), {"k1": 0.3})
+        report = _model().applied_parameters({"k1": 0.3})
 
         assert report["parameters"]["k1"]["calibrated"] is True
         assert "k2" not in report["parameters"]
@@ -81,14 +80,14 @@ class TestParameters:
     def test_formula_parameters_are_omitted(self) -> None:
         model = _model()
 
-        report = applied_parameters_report(model, {})
+        report = model.applied_parameters({})
 
         assert "k2" not in report["parameters"]
         assert any(p.id == "k2" for p in model.parameters)
 
     def test_scale_parameters_come_from_the_problem(self) -> None:
-        report = applied_parameters_report(
-            _model(), {"k1": 0.3, "reporting_rate": 0.5}, _problem(scale=True)
+        report = _model().applied_parameters(
+            {"k1": 0.3, "reporting_rate": 0.5}, _problem(scale=True)
         )
 
         assert report["parameters"]["reporting_rate"] == {
@@ -97,8 +96,7 @@ class TestParameters:
         }
 
     def test_a_scale_parameter_gains_the_statistics_of_a_sample(self) -> None:
-        report = applied_parameters_report(
-            _model(),
+        report = _model().applied_parameters(
             {"k1": 0.3, "reporting_rate": 0.5},
             _problem(scale=True),
             sample=_sample("reporting_rate", [0.4, 0.6]),
@@ -109,7 +107,7 @@ class TestParameters:
         assert interval["mean"] == pytest.approx(0.5)
 
     def test_scale_parameters_are_absent_without_the_problem(self) -> None:
-        report = applied_parameters_report(_model(), {"k1": 0.3, "reporting_rate": 0.5})
+        report = _model().applied_parameters({"k1": 0.3, "reporting_rate": 0.5})
 
         assert "reporting_rate" not in report["parameters"]
 
@@ -134,7 +132,7 @@ class TestInitialAmounts:
             )
         )
 
-        report = applied_parameters_report(model, {})
+        report = model.applied_parameters({})
 
         assert report["initial_amounts"] == {
             "A": {"amount": 990, "unit": "item", "calibrated": False},
@@ -148,7 +146,7 @@ class TestInitialAmounts:
         }
 
     def test_a_bin_reports_its_declared_amount(self) -> None:
-        report = applied_parameters_report(_model(), {})
+        report = _model().applied_parameters({})
 
         assert report["initial_amounts"]["A"] == {
             "amount": 900,
@@ -157,14 +155,14 @@ class TestInitialAmounts:
         }
 
     def test_an_uncalibrated_amount_reports_none(self) -> None:
-        report = applied_parameters_report(_model(a_amount=None), {})
+        report = _model(a_amount=None).applied_parameters({})
 
         assert report["initial_amounts"]["A"]["amount"] is None
 
 
 class TestCategorySplits:
     def test_an_unconditional_category_splits_every_bin(self) -> None:
-        report = applied_parameters_report(_model(), {})
+        report = _model().applied_parameters({})
 
         assert report["category_splits"]["group1"] == {
             "group": [],
@@ -173,7 +171,7 @@ class TestCategorySplits:
         }
 
     def test_a_conditional_category_reports_its_split_of_its_group(self) -> None:
-        report = applied_parameters_report(_model(conditional=True), {})
+        report = _model(conditional=True).applied_parameters({})
 
         assert report["category_splits"]["s1"] == {
             "group": ["group1"],
@@ -197,7 +195,7 @@ class TestCategorySplits:
             )
         )
 
-        report = applied_parameters_report(model, {})["category_splits"]
+        report = model.applied_parameters({})["category_splits"]
 
         assert report["d1"]["group"] == ["group1", "s1"]
         assert report["d1"]["fraction"] == 0.5
@@ -205,7 +203,7 @@ class TestCategorySplits:
     def test_shared_category_rows_are_qualified(self) -> None:
         model = build(shared_category_builder(group=(0.3, 0.7), level=(0.6, 0.4)))
 
-        report = applied_parameters_report(model, {"level:c1": 0.6})
+        report = model.applied_parameters({"level:c1": 0.6})
         rows = report["category_splits"]
 
         assert rows["group:c1"]["fraction"] == pytest.approx(0.3)
@@ -219,7 +217,7 @@ class TestCompartmentOverrides:
     """``override_builder``: A_g1 is set, A_g2 keeps its uniform 500."""
 
     def test_declared_compartment_overrides_are_reported(self) -> None:
-        report = applied_parameters_report(build(override_builder(200)), {})
+        report = build(override_builder(200)).applied_parameters({})
 
         assert report["initial_amounts"]["A_g1"] == {
             "amount": 200,
@@ -228,7 +226,7 @@ class TestCompartmentOverrides:
         }
 
     def test_bin_rows_report_the_effective_amount(self) -> None:
-        report = applied_parameters_report(build(override_builder(300)), {})
+        report = build(override_builder(300)).applied_parameters({})
 
         assert report["initial_amounts"]["A"]["amount"] == pytest.approx(800.0)
 
@@ -242,7 +240,7 @@ class TestCompartmentOverrides:
             )
         )
 
-        report = applied_parameters_report(model, {})
+        report = model.applied_parameters({})
 
         assert report["initial_amounts"]["A"]["amount"] is None
         # The override row still carries its own number.
@@ -254,7 +252,7 @@ class TestCompartmentOverrides:
         values = {"A_g1": 300, "A_g2": 700}
 
         model.apply_calibration_parameters(values, problem)
-        report = applied_parameters_report(model, values, problem)
+        report = model.applied_parameters(values, problem)
 
         entry = report["initial_amounts"]["A_g1"]
         assert entry["amount"] == pytest.approx(300)
@@ -269,7 +267,7 @@ class TestCompartmentOverrides:
         # A = 600 over the override A_g1 = 300 and A_g2 = 500 is shared
         # 0.375 / 0.625, so the engine scores 225 and 375.
         model.apply_calibration_parameters({"A": 600}, problem)
-        report = applied_parameters_report(model, {"A": 600}, problem)
+        report = model.applied_parameters({"A": 600}, problem)
         rows = report["initial_amounts"]
 
         assert rows["A"]["calibrated"] is True
@@ -283,8 +281,8 @@ class TestCompartmentOverrides:
     ) -> None:
         model = build(override_builder(300))
 
-        report = applied_parameters_report(
-            model, {category_id: 0.5}, initial_condition_problem(category_id)
+        report = model.applied_parameters(
+            {category_id: 0.5}, initial_condition_problem(category_id)
         )
 
         assert report["initial_amounts"]["A_g1"]["calibrated"] is True
@@ -302,8 +300,7 @@ class TestCompartmentOverrides:
 
 class TestIntervals:
     def test_entries_gain_the_statistics_of_a_sample(self) -> None:
-        report = applied_parameters_report(
-            _model(),
+        report = _model().applied_parameters(
             {"k1": 0.3},
             sample=_sample("k1", [0.8, 1.0, 1.2]),
             confidence_level=0.95,
@@ -326,17 +323,14 @@ class TestIntervals:
 
     def test_a_sample_needs_a_confidence_level(self) -> None:
         with pytest.raises(ValueError) as error:
-            applied_parameters_report(
-                _model(), {"k1": 0.3}, sample=_sample("k1", [0.8, 1.2])
-            )
+            _model().applied_parameters({"k1": 0.3}, sample=_sample("k1", [0.8, 1.2]))
 
         assert str(error.value) == "A report of a sample needs a confidence_level."
 
     def test_a_conditional_category_interval_is_in_the_split_it_reports(
         self,
     ) -> None:
-        report = applied_parameters_report(
-            _model(conditional=True),
+        report = _model(conditional=True).applied_parameters(
             {},
             sample=_sample("s1", [0.2, 0.25, 0.3]),
             confidence_level=0.95,
@@ -357,8 +351,8 @@ class TestIntervals:
             SampleMethod(name="test"),
         )
 
-        report = applied_parameters_report(
-            build(override_builder(300)), {}, sample=sample, confidence_level=0.95
+        report = build(override_builder(300)).applied_parameters(
+            {}, sample=sample, confidence_level=0.95
         )
 
         assert report["initial_amounts"]["A"]["interval"]["mean"] == pytest.approx(300)
@@ -368,8 +362,7 @@ class TestIntervals:
         )
 
     def test_entries_without_statistics_have_no_interval(self) -> None:
-        report = applied_parameters_report(
-            _model(),
+        report = _model().applied_parameters(
             {"k1": 0.3},
             sample=_sample("k1", [0.8, 1.2]),
             confidence_level=0.95,
@@ -379,13 +372,13 @@ class TestIntervals:
         assert "interval" not in report["category_splits"]["group1"]
 
     def test_confidence_level_leads_the_report(self) -> None:
-        report = applied_parameters_report(_model(), {}, confidence_level=0.95)
+        report = _model().applied_parameters({}, confidence_level=0.95)
 
         assert list(report)[0] == "confidence_level"
         assert report["confidence_level"] == 0.95
 
     def test_no_confidence_level_key_without_one(self) -> None:
-        report = applied_parameters_report(_model(), {})
+        report = _model().applied_parameters({})
 
         assert "confidence_level" not in report
         assert list(report) == ["parameters", "initial_amounts", "category_splits"]
@@ -401,7 +394,7 @@ class TestResultObjects:
             termination_reason="done",
         )
 
-        report = applied_parameters_report(_model(), result)
+        report = _model().applied_parameters(result)
 
         # The value is the one the model holds; the result marks it calibrated.
         assert report["parameters"]["k1"] == {"value": 0.3, "calibrated": True}
@@ -438,7 +431,7 @@ class TestReportPerformance:
         )
 
         start = time.perf_counter()
-        report = applied_parameters_report(model, {"g0a": 0.5})
+        report = model.applied_parameters({"g0a": 0.5})
         elapsed = time.perf_counter() - start
 
         assert report["category_splits"]["g0a"]["calibrated"] is True

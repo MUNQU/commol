@@ -18,7 +18,6 @@ from commol import (
     SampleMethod,
     SimulationPlotter,
     member_statistics,
-    simulation_report,
 )
 from tests.support import (
     a_to_b_builder,
@@ -281,14 +280,8 @@ class TestReaders:
         )
         runs = predictive.runs()
 
-        report = simulation_report(
-            calibrator.simulation,
-            runs[0],
-            at=[10, 20, 30, 40, 50],
-            window=10,
-            num_windows=5,
-            ensemble_runs=predictive,
-            confidence_level=0.9,
+        report = predictive.report(
+            0.9, positions=[10, 20, 30, 40, 50], window=10, windows=5
         )
 
         leaf = report["series"]["B"]

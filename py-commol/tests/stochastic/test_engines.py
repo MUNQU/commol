@@ -16,7 +16,6 @@ from commol import (
     Simulation,
     SimulationReplicates,
     SimulationResults,
-    simulation_report,
 )
 from commol.api.plotter import SimulationPlotter
 from commol.context.engine import EngineName
@@ -87,15 +86,7 @@ class TestOneProcess:
         replicates = simulation.replicates(30, seed=5).run(10)
 
         figure = SimulationPlotter(simulation, replicates).plot_series()
-        report = simulation_report(
-            simulation,
-            replicates.mean(),
-            at=[5.0, 10.0],
-            window=5.0,
-            num_windows=2,
-            ensemble_runs=replicates,
-            confidence_level=0.9,
-        )
+        report = replicates.report(0.9, positions=[5.0, 10.0], window=5.0, windows=2)
 
         line = figure.get_axes()[0].get_lines()[0]
         assert line.get_ydata().tolist() == replicates.mean()["A"]

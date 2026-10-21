@@ -39,7 +39,6 @@ from commol import (
     SampleMethod,
     Simulation,
     StudentTObservations,
-    applied_parameters_report,
     scores,
 )
 from commol.commol_rs import _commol_rs as commol_rs
@@ -251,7 +250,7 @@ class TestModels:
         model = calibrator.simulation.model_definition
 
         model.apply_calibration_parameters(fit, calibrator.problem)
-        report = applied_parameters_report(model, fit, calibrator.problem)
+        report = model.applied_parameters(fit, calibrator.problem)
 
         assert {p.id for p in model.parameters} == {"c"}
         assert report["parameters"]["p"]["value"] == fit.best_parameters["p"]

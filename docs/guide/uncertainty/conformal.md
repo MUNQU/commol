@@ -308,7 +308,7 @@ Every variant returns a `ConformalResult(intervals, scores, guarantee)`.
 series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`.
 `SimulationPlotter.plot_series(prediction_intervals=...)` draws the band of
 each series on its subplot, and
-`simulation_report(..., prediction_intervals=...)` adds it under the key
+`SimulationResults.report(..., prediction_intervals=...)` adds it under the key
 `prediction_intervals`.
 
 ```python
