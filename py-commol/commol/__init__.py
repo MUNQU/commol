@@ -36,6 +36,7 @@ from commol.context import (
 )
 from commol.context.axis_units import AxisUnits
 from commol.context.description import ModelDescription
+from commol.context.parameter import SeriesValue
 from commol.context.engine import (
     ODESolver,
     StochasticEventsSettings,
@@ -297,6 +298,7 @@ __all__ = [
     "Predictive",
     "PredictiveBand",
     "Process",
+    "SeriesValue",
     "Quantile",
     "SampleMethod",
     "SeriesBand",

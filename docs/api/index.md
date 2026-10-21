@@ -8,7 +8,7 @@ explain how to use them; these pages list every argument, attribute and error.
 | Page | Names |
 |---|---|
 | [ModelBuilder](model-builder.md) | `ModelBuilder` |
-| [Model](model.md) | `Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete`, `Groups`, `ModelDescription`, `InitialCompartment`, `UnitConsistencyError` |
+| [Model](model.md) | `Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete`, `Groups`, `ModelDescription`, `InitialCompartment`, `SeriesValue`, `UnitConsistencyError` |
 | [Simulation](simulation.md) | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `ODESolver`, `StochasticEventsSettings`, `StochasticStepsSettings`, `InfeasibleStateError`, `window_start`, `window_end`, `window_index`, `window_ends`, `windowed_totals` |
 | [Plotting](plotting.md) | `SimulationPlotter`, `PlotConfig` |
 | [AxisPattern](axis-patterns.md) | `AxisPattern` |
