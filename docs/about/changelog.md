@@ -30,12 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GibbsPosterior`: the Gibbs posterior `prior(θ) · exp(−η · loss(θ))` of the
   problem's loss, sampled by sequential Monte Carlo from the priors to the
   posterior; it returns a `GibbsResult` with the `η` it ran with. `eta` is
-  required: a number above 0, `EtaCalibration.information_matching(block_length)`
-  (the curvature of the sum of squares or of observation models against the
+  required: a number above 0, `InformationMatchingEta(block_length)` (the
+  curvature of the sum of squares or of observation models against the
   variance of the scores of its terms summed over blocks, with a
-  deterministic engine) or
-  `EtaCalibration.bootstrap_coverage(replicates, block_length,
-  confidence_level)` (any loss). See
+  deterministic engine) or `BootstrapCoverageEta(replicates, block_length,
+  confidence_level)` (any loss), joined in the union `Eta`. See
   [Sequential Monte Carlo](../guide/uncertainty/smc.md#gibbs-posterior).
 - `ABCSMC` and `ABCRejection`: approximate Bayesian computation on a required
   distance, `LossDistance()` or `SeriesDistance(metric)`. With a stochastic
@@ -156,7 +155,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   transform of the bounds and the root finder of the quantiles come from the
   argmin fork; calibrations, profiles, quantiles and draws give the same
   results.
-- **Breaking:** `EtaCalibration.information_matching(block_length)` takes a
+- **Breaking:** `InformationMatchingEta(block_length)` takes a
   required `block_length`, an `int` or `"auto"`: the variance of the scores
   is summed over blocks of positions, as the meat of `Sandwich`, so it holds
   under dependence; `block_length=1` gives the independent version. It also

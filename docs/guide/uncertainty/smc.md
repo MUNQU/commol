@@ -23,8 +23,8 @@ from commol import (
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
-    EtaCalibration,
     GibbsPosterior,
+    InformationMatchingEta,
     LossDistance,
     ModelBuilder,
     NelderMeadConfig,
@@ -69,7 +69,7 @@ calibrator = Calibrator(Simulation(flow_model("DifferenceEquations")), problem)
 gibbs = calibrator.uncertainty(
     GibbsPosterior(
         priors=Priors.uniform_on_bounds(),
-        eta=EtaCalibration.information_matching(block_length=1),
+        eta=InformationMatchingEta(block_length=1),
         particles=500,
         target_cess=0.5,
         resample_threshold=0.5,
@@ -185,8 +185,8 @@ variance `σ²`, `η = 1/(2σ²)` makes the Gibbs posterior the Bayesian posteri
 | `eta` | How it is chosen | Needs | Cost |
 |---|---|---|---|
 | A number above 0 | By you | Nothing | One sampler |
-| `EtaCalibration.information_matching(block_length)` | `η = tr(J I⁻¹ J) / tr(J)` at the fit: the Gauss–Newton curvature `J` of the objective against the variance `I` of the scores of its terms, summed over blocks of `block_length` positions (Holmes and Walker 2017) | `loss_function="sse"` or observation models, a deterministic engine, more blocks than parameters | A fit, finite differences and one sampler |
-| `EtaCalibration.bootstrap_coverage(replicates, block_length, confidence_level)` | The posteriors of Bayesian-bootstrap data sets hold the fit at `confidence_level` (Syring and Martin 2019) | Any loss and engine | A fit and one sampler per replicate, then one |
+| `InformationMatchingEta(block_length)` | `η = tr(J I⁻¹ J) / tr(J)` at the fit: the Gauss–Newton curvature `J` of the objective against the variance `I` of the scores of its terms, summed over blocks of `block_length` positions (Holmes and Walker 2017) | `loss_function="sse"` or observation models, a deterministic engine, more blocks than parameters | A fit, finite differences and one sampler |
+| `BootstrapCoverageEta(replicates, block_length, confidence_level)` | The posteriors of Bayesian-bootstrap data sets hold the fit at `confidence_level` (Syring and Martin 2019) | Any loss and engine | A fit and one sampler per replicate, then one |
 
 Information matching is cheap and local; it needs a sum of smooth terms, so
 `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic

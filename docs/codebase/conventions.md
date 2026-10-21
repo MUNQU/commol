@@ -35,6 +35,14 @@ check some of these rules. The rest depend on the author and the reviewer.
   one word (`OdeSolver`, `SmcSampler`).
   `tests/docs/test_reference.py::test_public_names_capitalize_acronyms`
   checks the known acronyms of `commol.__all__`.
+- A family of configurations is one class per member, joined in a union:
+  `ABCDistance` (`LossDistance`, `SeriesDistance`), `ObservationNoise`,
+  `Eta` (`InformationMatchingEta`, `BootstrapCoverageEta`). The user builds
+  a member from its class, so each configuration has one spelling. A
+  classmethod is only an alternative constructor or a preset of its own
+  class (`Priors.uniform_on_bounds()`, `PlotConfig.publication()`,
+  `ParameterSample.equally_weighted(...)`, `AxisPattern.pulse(...)`); it
+  never returns an instance of another class, such as a subclass.
 - Context data structures are Pydantic v2 models.
 - `ModelBuilder` methods return `Self`, so calls chain.
 - Log with the standard `logging` module. Library code never writes to the

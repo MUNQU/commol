@@ -95,11 +95,9 @@ Guide: [Sequential Monte Carlo](../guide/uncertainty/smc.md).
 
 ::: commol.context.inference.smc.BayesianPosterior
 
-::: commol.context.inference.smc.EtaCalibration
+::: commol.context.inference.smc.InformationMatchingEta
 
-::: commol.context.inference.smc.InformationMatching
-
-::: commol.context.inference.smc.BootstrapCoverage
+::: commol.context.inference.smc.BootstrapCoverageEta
 
 ::: commol.context.inference.smc.ABCSMC
 

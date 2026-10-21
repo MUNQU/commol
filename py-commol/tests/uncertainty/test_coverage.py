@@ -31,13 +31,14 @@ import numpy as np
 import pytest
 
 from commol import (
+    BootstrapCoverageEta,
+    InformationMatchingEta,
     ABCSMC,
     BayesianPosterior,
     CalibrationProblem,
     Calibrator,
     DistributionNoise,
     EnbPI,
-    EtaCalibration,
     GibbsPosterior,
     JackknifePlus,
     Laplace,
@@ -56,7 +57,6 @@ from commol import (
     Uniform,
     weighted_quantiles,
 )
-from commol.context.inference.smc import BootstrapCoverage, InformationMatching
 from tests.support import (
     a_to_b_builder,
     bounded,
@@ -120,15 +120,13 @@ class TestGibbsPosterior:
     @pytest.mark.parametrize(
         "eta",
         [
-            EtaCalibration.information_matching(block_length=1),
-            EtaCalibration.bootstrap_coverage(
-                replicates=20, block_length=1, confidence_level=LEVEL
-            ),
+            InformationMatchingEta(block_length=1),
+            BootstrapCoverageEta(replicates=20, block_length=1, confidence_level=LEVEL),
         ],
         ids=["information_matching", "bootstrap_coverage"],
     )
     def test_gibbs_posterior_is_calibrated(
-        self, eta: InformationMatching | BootstrapCoverage
+        self, eta: InformationMatchingEta | BootstrapCoverageEta
     ) -> None:
         method = GibbsPosterior(
             priors=Priors.uniform_on_bounds(),

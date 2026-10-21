@@ -169,16 +169,16 @@ where
     };
     if let Some(name) = name {
         return Err(LocalError::Refused(format!(
-            "EtaCalibration.information_matching(...) needs loss_function=\"sse\" or \
+            "InformationMatchingEta(...) needs loss_function=\"sse\" or \
              observation models, sums of smooth terms; {name}. Use \
-             EtaCalibration.bootstrap_coverage(...) or a number"
+             BootstrapCoverageEta(...) or a number"
         )));
     }
     if problem.forward().replicates().is_some() {
         return Err(LocalError::Refused(
-            "EtaCalibration.information_matching(...) needs a deterministic engine: the runs \
+            "InformationMatchingEta(...) needs a deterministic engine: the runs \
              of a stochastic engine have no derivatives. Use \
-             EtaCalibration.bootstrap_coverage(...) or a number"
+             BootstrapCoverageEta(...) or a number"
                 .to_string(),
         ));
     }
