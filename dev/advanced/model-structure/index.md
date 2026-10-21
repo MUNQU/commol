@@ -12,7 +12,7 @@ Model                      name, description, version, step_unit
 ├── engine: ModelEngine
 │   ├── type: "DifferenceEquations", "DifferentialEquations",
 │   │         "StochasticEvents" or "StochasticSteps"
-│   └── settings: OdeSolver | StochasticEventsSettings | StochasticStepsSettings | None
+│   └── settings: ODESolver | StochasticEventsSettings | StochasticStepsSettings | None
 │                                           (settings of that engine; None: its defaults)
 ├── process: Process
 │   ├── bins: [Bin]
@@ -1020,7 +1020,7 @@ def validate_rate(cls, value: str) -> str:
 
 ## Engine
 
-The engine's list of engines (`crates/commol-core/src/types/engine.rs`) validates the settings: settings of another engine raise an error that names both. `OdeSolver` is documented in [Simulation API](https://munqu.github.io/commol/latest/api/simulation/index.md).
+The engine's list of engines (`crates/commol-core/src/types/engine.rs`) validates the settings: settings of another engine raise an error that names both. `ODESolver` is documented in [Simulation API](https://munqu.github.io/commol/latest/api/simulation/index.md).
 
 ## ModelEngine
 
@@ -1051,7 +1051,7 @@ class ModelEngine(BaseModel):
         kind of the structure of the model.
     settings : EngineSettings | None
         Settings of that engine; None uses its defaults.
-        ``DifferentialEquations`` takes `OdeSolver`, ``StochasticEvents``
+        ``DifferentialEquations`` takes `ODESolver`, ``StochasticEvents``
         takes `StochasticEventsSettings` and ``StochasticSteps`` takes
         `StochasticStepsSettings`.
     """

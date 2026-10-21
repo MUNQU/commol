@@ -803,7 +803,7 @@ class ModelBuilder:
             ``"DifferentialEquations"`` (continuous time).
         settings : EngineSettings | None, default=None
             Settings of that engine; None uses its defaults. Only
-            ``"DifferentialEquations"`` takes settings (`OdeSolver`).
+            ``"DifferentialEquations"`` takes settings (`ODESolver`).
 
         Returns
         -------
@@ -1624,7 +1624,7 @@ Parameters:
 | ----------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `structure` | `ModelStructure` | How the process is laid out, such as Aggregate (amounts per compartment). The model is a Model of its class.                                                  | *required*                                                                                                |
 | `engine`    | `EngineName`     | The engine that runs the model, which must run the kind of the structure: "DifferenceEquations" (discrete time) or "DifferentialEquations" (continuous time). | *required*                                                                                                |
-| `settings`  | \`EngineSettings | None\`                                                                                                                                                        | Settings of that engine; None uses its defaults. Only "DifferentialEquations" takes settings (OdeSolver). |
+| `settings`  | \`EngineSettings | None\`                                                                                                                                                        | Settings of that engine; None uses its defaults. Only "DifferentialEquations" takes settings (ODESolver). |
 
 Returns:
 
@@ -1667,7 +1667,7 @@ def build(
         ``"DifferentialEquations"`` (continuous time).
     settings : EngineSettings | None, default=None
         Settings of that engine; None uses its defaults. Only
-        ``"DifferentialEquations"`` takes settings (`OdeSolver`).
+        ``"DifferentialEquations"`` takes settings (`ODESolver`).
 
     Returns
     -------

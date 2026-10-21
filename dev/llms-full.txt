@@ -791,7 +791,7 @@ Every `add_*` method returns the builder, so calls chain. The other methods:
 
 | Method                                    | Returns                             | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | ----------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `build(structure, engine, settings=None)` | `Model` of the class of `structure` | Joins the process with a [structure](#the-structure-aggregate) and an engine, validates the model and returns it. The engine must run the kind of the structure: `"DifferenceEquations"` (discrete time), `"DifferentialEquations"` (continuous time), `"StochasticEvents"` and `"StochasticSteps"` ([at random](https://munqu.github.io/commol/latest/guide/stochastic/index.md)) run `Aggregate`. `settings` are the settings of that engine (`OdeSolver` for `"DifferentialEquations"`, `StochasticEventsSettings` and `StochasticStepsSettings` for the stochastic engines); None uses its defaults. One builder builds the model for each engine and each structure. See [Differential equations](https://munqu.github.io/commol/latest/guide/simulations/#differential-equations). |
+| `build(structure, engine, settings=None)` | `Model` of the class of `structure` | Joins the process with a [structure](#the-structure-aggregate) and an engine, validates the model and returns it. The engine must run the kind of the structure: `"DifferenceEquations"` (discrete time), `"DifferentialEquations"` (continuous time), `"StochasticEvents"` and `"StochasticSteps"` ([at random](https://munqu.github.io/commol/latest/guide/stochastic/index.md)) run `Aggregate`. `settings` are the settings of that engine (`ODESolver` for `"DifferentialEquations"`, `StochasticEventsSettings` and `StochasticStepsSettings` for the stochastic engines); None uses its defaults. One builder builds the model for each engine and each structure. See [Differential equations](https://munqu.github.io/commol/latest/guide/simulations/#differential-equations). |
 | `process()`                               | `Process`                           | The bins, accumulators, stratifications and transitions written so far.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `clone()`                                 | `ModelBuilder`                      | A deep copy of everything, accumulators included, to build variants of one model.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `reset()`                                 | `ModelBuilder`                      | Removes bins, accumulators, stratifications, transitions and parameters; keeps the name, description, version and `bin_unit`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -2597,7 +2597,7 @@ A model built with `engine="DifferentialEquations"` runs in continuous time. The
 ```python
 import math
 
-from commol import OdeSolver
+from commol import ODESolver
 
 ode_model = (
     ModelBuilder(name="Decay")
@@ -2611,7 +2611,7 @@ ode_model = (
             bin_amounts={"A": 1000, "B": 0},
         ),
         engine="DifferentialEquations",
-        settings=OdeSolver(method="tsit45", rtol=1e-8, atol=1e-8),
+        settings=ODESolver(method="tsit45", rtol=1e-8, atol=1e-8),
     )
 )
 
@@ -2623,7 +2623,7 @@ print(round(ode.run(num_steps=10)["moved"][10], 1))  # 632.1: the integral of th
 
 ### Solver settings
 
-`OdeSolver` holds the settings of the `DifferentialEquations` engine. They are part of the model (`Model.engine.settings`), so a saved model reproduces its runs. Pass them where you choose the engine, `build(engine="DifferentialEquations", settings=...)`, so one builder can build the model for each engine with its own settings; without them the defaults apply. The `DifferenceEquations` engine takes no settings: the engine rejects settings of another engine with an error that names both (`ValidationError`).
+`ODESolver` holds the settings of the `DifferentialEquations` engine. They are part of the model (`Model.engine.settings`), so a saved model reproduces its runs. Pass them where you choose the engine, `build(engine="DifferentialEquations", settings=...)`, so one builder can build the model for each engine with its own settings; without them the defaults apply. The `DifferenceEquations` engine takes no settings: the engine rejects settings of another engine with an error that names both (`ValidationError`).
 
 | Field    | Default    | Meaning                                                                                                                                                     |
 | -------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -3995,8 +3995,8 @@ A **band of the model** is the spread of the model's output across the draws of 
 | `BlockJackknife`                             | The standard error and bias of each parameter, and which block of data moves it most                                    | No                                                                              | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#block-jackknife)                                          |
 | `ResidualNoise`                              | Where the next observations fall: a prediction interval                                                                 | No                                                                              | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#prediction-intervals)                                     |
 | `GibbsPosterior`                             | A posterior of the parameters from the loss and priors, with a scale `η` of the loss                                    | No                                                                              | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#gibbs-posterior)                                     |
-| `AbcSmc`                                     | A posterior of the parameters whose runs come within a tolerance of the data, with priors                               | No                                                                              | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                                                 |
-| `AbcRejection`                               | The same, from the closest draws of the priors                                                                          | No                                                                              | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                                                 |
+| `ABCSMC`                                     | A posterior of the parameters whose runs come within a tolerance of the data, with priors                               | No                                                                              | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                                                 |
+| `ABCRejection`                               | The same, from the closest draws of the priors                                                                          | No                                                                              | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc)                                                 |
 | `SplitConformal`                             | Where new observations fall, with a guaranteed coverage, from held-out observations                                     | No                                                                              | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#split-conformal)                                            |
 | `RollingConformal`                           | Where the next observations fall at each horizon ahead of the data                                                      | No                                                                              | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#rolling-origins)                                            |
 | `JackknifePlus`                              | Where new observations fall, with a guaranteed coverage and no held-out data                                            | No                                                                              | [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#jackknife)                                                  |
@@ -4672,7 +4672,7 @@ These methods give a posterior of the parameters with no noise model. The **Gibb
 import numpy as np
 
 from commol import (
-    AbcSmc,
+    ABCSMC,
     Aggregate,
     CalibrationParameter,
     CalibrationProblem,
@@ -4737,7 +4737,7 @@ print(lower < float(np.mean(flows)) < upper)  # True
 # ABC on the same data, from the chain binomial: each run draws its own flows.
 stochastic = problem.model_copy(update={"replicates": 1, "replicate_summary": "mean"})
 abc = Calibrator(Simulation(flow_model("StochasticSteps")), stochastic).uncertainty(
-    AbcSmc(
+    ABCSMC(
         priors=Priors.uniform_on_bounds(),
         distance=LossDistance(),
         particles=300,
@@ -4817,7 +4817,7 @@ With [observation models](https://munqu.github.io/commol/latest/guide/uncertaint
 
 ## ABC
 
-`AbcSmc` keeps a particle when the distance between its run and the data is at most a tolerance `ε`, and lowers `ε` step by step (Del Moral, Doucet and Jasra 2012). With weights of 0 or 1, the share of the particles that a tolerance keeps is its conditional effective sample size, so each next tolerance is the weighted quantile of the current distances at `target_cess`: the smallest distance whose share of the weight at or below it reaches it. The run stops when the first move of a step accepts less than `min_acceptance`, and keeps the sample of the tolerance before; it also stops when no lower tolerance keeps `target_cess` of the particles, as with whole numbers that tie. `diagnostics.stop_reason` says which.
+`ABCSMC` keeps a particle when the distance between its run and the data is at most a tolerance `ε`, and lowers `ε` step by step (Del Moral, Doucet and Jasra 2012). With weights of 0 or 1, the share of the particles that a tolerance keeps is its conditional effective sample size, so each next tolerance is the weighted quantile of the current distances at `target_cess`: the smallest distance whose share of the weight at or below it reaches it. The run stops when the first move of a step accepts less than `min_acceptance`, and keeps the sample of the tolerance before; it also stops when no lower tolerance keeps `target_cess` of the particles, as with whole numbers that tie. `diagnostics.stop_reason` says which.
 
 | `distance`                                 | Value                                                                                                                                                 |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -4828,13 +4828,13 @@ With [observation models](https://munqu.github.io/commol/latest/guide/uncertaint
 
 With a stochastic engine each distance runs one fresh replicate, seeded from its particle's stream, and the particle keeps that distance until a move replaces it: that is what makes ABC sample its target. The problem's `replicates` and `replicate_summary` do not apply, and `diagnostics.notes` says so. The problem still needs them, since every calibration of a stochastic engine does.
 
-`AbcRejection(priors, distance, draws, quantile)` is one step of the same code with no move: it draws from the priors and keeps the closest share `quantile` of the draws.
+`ABCRejection(priors, distance, draws, quantile)` is one step of the same code with no move: it draws from the priors and keeps the closest share `quantile` of the draws.
 
 ```python
-from commol import AbcRejection
+from commol import ABCRejection
 
 rejection = calibrator.uncertainty(
-    AbcRejection(
+    ABCRejection(
         priors=Priors.uniform_on_bounds(), distance=LossDistance(), draws=400, quantile=0.1
     )
 )
@@ -6546,7 +6546,7 @@ Every public name of `commol`, generated from the docstrings. The guide pages ex
 | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md)      | `ModelBuilder`                                                                                                                                                                                                                                                                               |
 | [Model](https://munqu.github.io/commol/latest/api/model/index.md)                     | `Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete`, `Groups`, `ModelDescription`, `InitialCompartment`, `UnitConsistencyError`                                                                                                                                                    |
-| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)           | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `OdeSolver`, `StochasticEventsSettings`, `StochasticStepsSettings`, `InfeasibleStateError`, `window_start`, `window_end`, `window_index`, `window_ends`, `windowed_totals`                                       |
+| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)           | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `ODESolver`, `StochasticEventsSettings`, `StochasticStepsSettings`, `InfeasibleStateError`, `window_start`, `window_end`, `window_index`, `window_ends`, `windowed_totals`                                       |
 | [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)               | `SimulationPlotter`, `PlotConfig`                                                                                                                                                                                                                                                            |
 | [AxisPattern](https://munqu.github.io/commol/latest/api/axis-patterns/index.md)       | `AxisPattern`                                                                                                                                                                                                                                                                                |
 | [AxisUnits](https://munqu.github.io/commol/latest/api/axis-units/index.md)            | `AxisUnits`                                                                                                                                                                                                                                                                                  |
@@ -13081,7 +13081,7 @@ class ModelBuilder:
             ``"DifferentialEquations"`` (continuous time).
         settings : EngineSettings | None, default=None
             Settings of that engine; None uses its defaults. Only
-            ``"DifferentialEquations"`` takes settings (`OdeSolver`).
+            ``"DifferentialEquations"`` takes settings (`ODESolver`).
 
         Returns
         -------
@@ -13902,7 +13902,7 @@ Parameters:
 | ----------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `structure` | `ModelStructure` | How the process is laid out, such as Aggregate (amounts per compartment). The model is a Model of its class.                                                  | *required*                                                                                                |
 | `engine`    | `EngineName`     | The engine that runs the model, which must run the kind of the structure: "DifferenceEquations" (discrete time) or "DifferentialEquations" (continuous time). | *required*                                                                                                |
-| `settings`  | \`EngineSettings | None\`                                                                                                                                                        | Settings of that engine; None uses its defaults. Only "DifferentialEquations" takes settings (OdeSolver). |
+| `settings`  | \`EngineSettings | None\`                                                                                                                                                        | Settings of that engine; None uses its defaults. Only "DifferentialEquations" takes settings (ODESolver). |
 
 Returns:
 
@@ -13945,7 +13945,7 @@ def build(
         ``"DifferentialEquations"`` (continuous time).
     settings : EngineSettings | None, default=None
         Settings of that engine; None uses its defaults. Only
-        ``"DifferentialEquations"`` takes settings (`OdeSolver`).
+        ``"DifferentialEquations"`` takes settings (`ODESolver`).
 
     Returns
     -------
@@ -25417,7 +25417,7 @@ def __repr__(self) -> str:
     )
 ```
 
-## OdeSolver
+## ODESolver
 
 Bases: `BaseModel`
 
@@ -25434,7 +25434,7 @@ Attributes:
 Source code in `commol/context/engine.py`
 
 ```python
-class OdeSolver(BaseModel):
+class ODESolver(BaseModel):
     """
     Settings of the ``DifferentialEquations`` engine.
 
@@ -30125,7 +30125,7 @@ def require_eta(cls, data: object) -> object:
 
 ## BayesianPosterior
 
-Bases: `WithPriors`, `UncertaintyMethod[SmcResult]`
+Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`
 
 The posterior `π(θ) ∝ prior(θ) · L(θ)` of the problem's observation models, sampled by sequential Monte Carlo from the priors (temperature 0) to the posterior (temperature 1), with its log evidence.
 
@@ -30144,7 +30144,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class BayesianPosterior(WithPriors, UncertaintyMethod[SmcResult]):
+class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult]):
     """
     The posterior ``π(θ) ∝ prior(θ) · L(θ)`` of the problem's observation
     models, sampled by sequential Monte Carlo from the priors (temperature
@@ -30448,9 +30448,9 @@ class BootstrapCoverage(EtaCalibration):
     )
 ```
 
-## AbcSmc
+## ABCSMC
 
-Bases: `WithPriors`, `UncertaintyMethod[SmcResult]`
+Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`
 
 Approximate Bayesian computation by sequential Monte Carlo (Del Moral, Doucet and Jasra 2012): the tolerance `ε` falls step by step, and a particle is inside when the distance of its run is at most `ε`.
 
@@ -30470,7 +30470,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class AbcSmc(WithPriors, UncertaintyMethod[SmcResult]):
+class ABCSMC(WithPriors, UncertaintyMethod[SMCResult]):
     """
     Approximate Bayesian computation by sequential Monte Carlo (Del Moral,
     Doucet and Jasra 2012): the tolerance ``ε`` falls step by step, and a
@@ -30503,7 +30503,7 @@ class AbcSmc(WithPriors, UncertaintyMethod[SmcResult]):
         between 0 and 1.
     """
 
-    distance: AbcDistance = Field(description="The distance.")
+    distance: ABCDistance = Field(description="The distance.")
     particles: int = Field(ge=2, description="Number of particles.")
     target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
     min_acceptance: float = Field(
@@ -30514,11 +30514,11 @@ class AbcSmc(WithPriors, UncertaintyMethod[SmcResult]):
     )
 ```
 
-## AbcRejection
+## ABCRejection
 
-Bases: `WithPriors`, `UncertaintyMethod[SmcResult]`
+Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`
 
-ABC rejection: `draws` draws of the priors, of which the closest share `quantile` is kept, with equal weights. It is one step of `AbcSmc` with no move. With a stochastic engine each distance reads one fresh replicate.
+ABC rejection: `draws` draws of the priors, of which the closest share `quantile` is kept, with equal weights. It is one step of `ABCSMC` with no move. With a stochastic engine each distance reads one fresh replicate.
 
 Attributes:
 
@@ -30532,10 +30532,10 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class AbcRejection(WithPriors, UncertaintyMethod[SmcResult]):
+class ABCRejection(WithPriors, UncertaintyMethod[SMCResult]):
     """
     ABC rejection: `draws` draws of the priors, of which the closest share
-    `quantile` is kept, with equal weights. It is one step of `AbcSmc` with
+    `quantile` is kept, with equal weights. It is one step of `ABCSMC` with
     no move. With a stochastic engine each distance reads one fresh
     replicate.
 
@@ -30552,7 +30552,7 @@ class AbcRejection(WithPriors, UncertaintyMethod[SmcResult]):
         The share of the draws kept, strictly between 0 and 1.
     """
 
-    distance: AbcDistance = Field(description="The distance.")
+    distance: ABCDistance = Field(description="The distance.")
     draws: int = Field(ge=2, description="Number of draws.")
     quantile: float = Field(gt=0.0, lt=1.0, description="The share of draws kept.")
 ```
@@ -30613,7 +30613,7 @@ class SeriesDistance(BaseModel):
     metric: Literal["rmse", "mae"] = Field(description="The metric of a series.")
 ```
 
-## SmcResult
+## SMCResult
 
 Bases: `BaseModel`
 
@@ -30627,12 +30627,12 @@ Attributes:
 | `levels`       | `list[float]`     | The level of each step: the temperature of a Gibbs posterior, from above 0 to 1, or the tolerance of ABC, falling.                                                                                                                                                      |
 | `kept`         | \`list\[float     | None\]\`                                                                                                                                                                                                                                                                |
 | `log_evidence` | `float`           | The log of the product of the mean incremental weights: for a Gibbs posterior, the log of ∫ prior(θ) exp(−η loss(θ)) dθ; for a Bayesian posterior, the log marginal likelihood log ∫ prior(θ) L(θ) dθ; for ABC, the log of the prior probability of the last tolerance. |
-| `diagnostics`  | `SmcDiagnostics`  | The effective sizes, acceptance rates and move counts of each step.                                                                                                                                                                                                     |
+| `diagnostics`  | `SMCDiagnostics`  | The effective sizes, acceptance rates and move counts of each step.                                                                                                                                                                                                     |
 
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class SmcResult(BaseModel):
+class SMCResult(BaseModel):
     """
     The result of a sequential Monte Carlo method.
 
@@ -30653,7 +30653,7 @@ class SmcResult(BaseModel):
         Bayesian posterior, the log marginal likelihood
         ``log ∫ prior(θ) L(θ) dθ``; for ABC, the log of the prior probability
         of the last tolerance.
-    diagnostics : SmcDiagnostics
+    diagnostics : SMCDiagnostics
         The effective sizes, acceptance rates and move counts of each step.
     """
 
@@ -30663,12 +30663,12 @@ class SmcResult(BaseModel):
     levels: list[float]
     kept: list[float | None]
     log_evidence: float
-    diagnostics: SmcDiagnostics
+    diagnostics: SMCDiagnostics
 ```
 
 ## GibbsResult
 
-Bases: `SmcResult`
+Bases: `SMCResult`
 
 The result of a Gibbs posterior.
 
@@ -30683,7 +30683,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class GibbsResult(SmcResult):
+class GibbsResult(SMCResult):
     """
     The result of a Gibbs posterior.
 
@@ -30703,7 +30703,7 @@ class GibbsResult(SmcResult):
     coverage: float | None
 ```
 
-## SmcDiagnostics
+## SMCDiagnostics
 
 Bases: `BaseModel`
 
@@ -30724,7 +30724,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class SmcDiagnostics(BaseModel):
+class SMCDiagnostics(BaseModel):
     """
     What happened at each step of a sequential Monte Carlo run.
 
@@ -32769,7 +32769,7 @@ Model                      name, description, version, step_unit
 ├── engine: ModelEngine
 │   ├── type: "DifferenceEquations", "DifferentialEquations",
 │   │         "StochasticEvents" or "StochasticSteps"
-│   └── settings: OdeSolver | StochasticEventsSettings | StochasticStepsSettings | None
+│   └── settings: ODESolver | StochasticEventsSettings | StochasticStepsSettings | None
 │                                           (settings of that engine; None: its defaults)
 ├── process: Process
 │   ├── bins: [Bin]
@@ -33777,7 +33777,7 @@ def validate_rate(cls, value: str) -> str:
 
 ## Engine
 
-The engine's list of engines (`crates/commol-core/src/types/engine.rs`) validates the settings: settings of another engine raise an error that names both. `OdeSolver` is documented in [Simulation API](https://munqu.github.io/commol/latest/api/simulation/index.md).
+The engine's list of engines (`crates/commol-core/src/types/engine.rs`) validates the settings: settings of another engine raise an error that names both. `ODESolver` is documented in [Simulation API](https://munqu.github.io/commol/latest/api/simulation/index.md).
 
 ## ModelEngine
 
@@ -33808,7 +33808,7 @@ class ModelEngine(BaseModel):
         kind of the structure of the model.
     settings : EngineSettings | None
         Settings of that engine; None uses its defaults.
-        ``DifferentialEquations`` takes `OdeSolver`, ``StochasticEvents``
+        ``DifferentialEquations`` takes `ODESolver`, ``StochasticEvents``
         takes `StochasticEventsSettings` and ``StochasticSteps`` takes
         `StochasticStepsSettings`.
     """
@@ -34690,8 +34690,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Local approximations through `Calibrator.uncertainty`, on the unbounded scale of the parameters, with a fit on a bound refused: `Laplace(draws)`, the normal `N(θ̂, H⁻¹)` of the observation models, and `Calibrator.delta_band(result, positions, level)`, the band of the outputs by the delta method; `Sandwich(block_length, draws)`, the covariance `H⁻¹ B H⁻¹` with the scores summed over blocks (CR1) and a Student t with `G − 1` degrees of freedom, which needs no noise model and refuses `loss_function="mae"` and too few blocks; `LaplaceMixture(starts, draws, target)`, a Laplace approximation at each optimum of a multi-start fit as the proposal of Pareto-smoothed importance sampling of a `LikelihoodTarget(priors)` or `GibbsTarget(priors, eta)`, which reports `k_hat` and marks a sample with `k_hat > 0.7` as unreliable. `curvature` is `"gauss_newton"` (the expected Fisher information of each observation model, by default) or `"hessian"`. See [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/index.md).
 - `GibbsPosterior`: the Gibbs posterior `prior(θ) · exp(−η · loss(θ))` of the problem's loss, sampled by sequential Monte Carlo from the priors to the posterior; it returns a `GibbsResult` with the `η` it ran with. `eta` is required: a number above 0, `EtaCalibration.information_matching(block_length)` (the curvature of the sum of squares or of observation models against the variance of the scores of its terms summed over blocks, with a deterministic engine) or `EtaCalibration.bootstrap_coverage(replicates, block_length, confidence_level)` (any loss). See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#gibbs-posterior).
-- `AbcSmc` and `AbcRejection`: approximate Bayesian computation on a required distance, `LossDistance()` or `SeriesDistance(metric)`. With a stochastic engine each distance reads one fresh replicate of its particle, so the problem's `replicates` and `replicate_summary` do not apply, and the result says so. See [ABC](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc).
-- `SmcResult`: the sample, the level of each step, the log evidence, the value each particle keeps and the diagnostics of each step (`SmcDiagnostics`: effective size, resampling, acceptance rate and move count).
+- `ABCSMC` and `ABCRejection`: approximate Bayesian computation on a required distance, `LossDistance()` or `SeriesDistance(metric)`. With a stochastic engine each distance reads one fresh replicate of its particle, so the problem's `replicates` and `replicate_summary` do not apply, and the result says so. See [ABC](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#abc).
+- `SMCResult`: the sample, the level of each step, the log evidence, the value each particle keeps and the diagnostics of each step (`SMCDiagnostics`: effective size, resampling, acceptance rate and move count).
 - Priors: `Uniform()`, `LogUniform()`, `Beta(a, b)`, `Normal(mean, sd)`, `LogNormal(mu, sigma)` and `Gamma(shape, rate)`, each truncated to the bounds of its parameter, and `Priors` (a mapping of parameter to distribution, or `Priors.uniform_on_bounds()`). Every sampling method takes `priors` with no default, and a prior whose bounds do not fit raises a `ValueError` that names the distributions that fit them. Their draws are the same on every platform. See [Priors](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#priors).
 - `SampleIdentifiability(reference="prior", priors=...)`: the contraction of each parameter against its prior. See [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#a-sample).
 - Conformal prediction intervals through `Calibrator.uncertainty`: intervals for observations with a coverage guarantee that needs no noise model, no prior and no correct model. `SplitConformal` scores held-out observations; `RollingConformal` gives intervals ahead of the data, one quantile per horizon (the `k`-th observation after an origin); `JackknifePlus` refits once per block left out, with the CV+ bound for blocks of more than one observation; `EnbPI` draws its own replicates of blocks for series with dependent errors; `AdaptiveConformal` walks a stream of new observations with a working level that moves with each miss. Each takes a required `score` (`"absolute"`, `"normalized"` or `"spread"`), `by` (`"series"` or `"all"`) and `level`, and returns a `ConformalResult` (`PredictionIntervals`, the scores and the guarantee). See [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md).
@@ -34739,6 +34739,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Breaking:** the description of an aggregate model shows the bin amounts and their units, and the initial state with the unit of each compartment.
 - **Breaking (Rust):** `InitialConditions` has `bin_amounts` and `compartment_amounts` in place of `total`, `bin_fractions` and `compartment_fractions`; `CompartmentalEngine::total` is the sum of the amounts the model states; `check_model_values` returns the plan it resolves, and `InitialConditionPlan::coverage` gives the compartments each value sets.
 - **Breaking:** `CalibrationProblem.loss_function` has no default: a problem needs `loss_function` or `observation_models`, exactly one, and raises a `ValueError` with both or neither. Write `loss_function="sse"` where a problem relied on the default.
+- **Breaking:** public class names write every letter of an acronym in capitals, as PEP 8 asks: `OdeSolver` is `ODESolver`. `EnbPI` keeps the spelling of its authors. See [Conventions](https://munqu.github.io/commol/latest/codebase/conventions/#python).
 
 ### Fixed
 

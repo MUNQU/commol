@@ -4233,7 +4233,7 @@ def require_eta(cls, data: object) -> object:
 
 ## BayesianPosterior
 
-Bases: `WithPriors`, `UncertaintyMethod[SmcResult]`
+Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`
 
 The posterior `π(θ) ∝ prior(θ) · L(θ)` of the problem's observation models, sampled by sequential Monte Carlo from the priors (temperature 0) to the posterior (temperature 1), with its log evidence.
 
@@ -4252,7 +4252,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class BayesianPosterior(WithPriors, UncertaintyMethod[SmcResult]):
+class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult]):
     """
     The posterior ``π(θ) ∝ prior(θ) · L(θ)`` of the problem's observation
     models, sampled by sequential Monte Carlo from the priors (temperature
@@ -4556,9 +4556,9 @@ class BootstrapCoverage(EtaCalibration):
     )
 ```
 
-## AbcSmc
+## ABCSMC
 
-Bases: `WithPriors`, `UncertaintyMethod[SmcResult]`
+Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`
 
 Approximate Bayesian computation by sequential Monte Carlo (Del Moral, Doucet and Jasra 2012): the tolerance `ε` falls step by step, and a particle is inside when the distance of its run is at most `ε`.
 
@@ -4578,7 +4578,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class AbcSmc(WithPriors, UncertaintyMethod[SmcResult]):
+class ABCSMC(WithPriors, UncertaintyMethod[SMCResult]):
     """
     Approximate Bayesian computation by sequential Monte Carlo (Del Moral,
     Doucet and Jasra 2012): the tolerance ``ε`` falls step by step, and a
@@ -4611,7 +4611,7 @@ class AbcSmc(WithPriors, UncertaintyMethod[SmcResult]):
         between 0 and 1.
     """
 
-    distance: AbcDistance = Field(description="The distance.")
+    distance: ABCDistance = Field(description="The distance.")
     particles: int = Field(ge=2, description="Number of particles.")
     target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
     min_acceptance: float = Field(
@@ -4622,11 +4622,11 @@ class AbcSmc(WithPriors, UncertaintyMethod[SmcResult]):
     )
 ```
 
-## AbcRejection
+## ABCRejection
 
-Bases: `WithPriors`, `UncertaintyMethod[SmcResult]`
+Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`
 
-ABC rejection: `draws` draws of the priors, of which the closest share `quantile` is kept, with equal weights. It is one step of `AbcSmc` with no move. With a stochastic engine each distance reads one fresh replicate.
+ABC rejection: `draws` draws of the priors, of which the closest share `quantile` is kept, with equal weights. It is one step of `ABCSMC` with no move. With a stochastic engine each distance reads one fresh replicate.
 
 Attributes:
 
@@ -4640,10 +4640,10 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class AbcRejection(WithPriors, UncertaintyMethod[SmcResult]):
+class ABCRejection(WithPriors, UncertaintyMethod[SMCResult]):
     """
     ABC rejection: `draws` draws of the priors, of which the closest share
-    `quantile` is kept, with equal weights. It is one step of `AbcSmc` with
+    `quantile` is kept, with equal weights. It is one step of `ABCSMC` with
     no move. With a stochastic engine each distance reads one fresh
     replicate.
 
@@ -4660,7 +4660,7 @@ class AbcRejection(WithPriors, UncertaintyMethod[SmcResult]):
         The share of the draws kept, strictly between 0 and 1.
     """
 
-    distance: AbcDistance = Field(description="The distance.")
+    distance: ABCDistance = Field(description="The distance.")
     draws: int = Field(ge=2, description="Number of draws.")
     quantile: float = Field(gt=0.0, lt=1.0, description="The share of draws kept.")
 ```
@@ -4721,7 +4721,7 @@ class SeriesDistance(BaseModel):
     metric: Literal["rmse", "mae"] = Field(description="The metric of a series.")
 ```
 
-## SmcResult
+## SMCResult
 
 Bases: `BaseModel`
 
@@ -4735,12 +4735,12 @@ Attributes:
 | `levels`       | `list[float]`     | The level of each step: the temperature of a Gibbs posterior, from above 0 to 1, or the tolerance of ABC, falling.                                                                                                                                                      |
 | `kept`         | \`list\[float     | None\]\`                                                                                                                                                                                                                                                                |
 | `log_evidence` | `float`           | The log of the product of the mean incremental weights: for a Gibbs posterior, the log of ∫ prior(θ) exp(−η loss(θ)) dθ; for a Bayesian posterior, the log marginal likelihood log ∫ prior(θ) L(θ) dθ; for ABC, the log of the prior probability of the last tolerance. |
-| `diagnostics`  | `SmcDiagnostics`  | The effective sizes, acceptance rates and move counts of each step.                                                                                                                                                                                                     |
+| `diagnostics`  | `SMCDiagnostics`  | The effective sizes, acceptance rates and move counts of each step.                                                                                                                                                                                                     |
 
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class SmcResult(BaseModel):
+class SMCResult(BaseModel):
     """
     The result of a sequential Monte Carlo method.
 
@@ -4761,7 +4761,7 @@ class SmcResult(BaseModel):
         Bayesian posterior, the log marginal likelihood
         ``log ∫ prior(θ) L(θ) dθ``; for ABC, the log of the prior probability
         of the last tolerance.
-    diagnostics : SmcDiagnostics
+    diagnostics : SMCDiagnostics
         The effective sizes, acceptance rates and move counts of each step.
     """
 
@@ -4771,12 +4771,12 @@ class SmcResult(BaseModel):
     levels: list[float]
     kept: list[float | None]
     log_evidence: float
-    diagnostics: SmcDiagnostics
+    diagnostics: SMCDiagnostics
 ```
 
 ## GibbsResult
 
-Bases: `SmcResult`
+Bases: `SMCResult`
 
 The result of a Gibbs posterior.
 
@@ -4791,7 +4791,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class GibbsResult(SmcResult):
+class GibbsResult(SMCResult):
     """
     The result of a Gibbs posterior.
 
@@ -4811,7 +4811,7 @@ class GibbsResult(SmcResult):
     coverage: float | None
 ```
 
-## SmcDiagnostics
+## SMCDiagnostics
 
 Bases: `BaseModel`
 
@@ -4832,7 +4832,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class SmcDiagnostics(BaseModel):
+class SMCDiagnostics(BaseModel):
     """
     What happened at each step of a sequential Monte Carlo run.
 

@@ -3349,6 +3349,13 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
 <li>Public functions and methods have a NumPy-style docstring: a one-line
   summary, then <code>Parameters</code>, <code>Returns</code> and <code>Raises</code> as needed. Private helpers
   may use a one-line docstring.</li>
+<li>A public class name writes every letter of an acronym in capitals, as PEP 8
+  asks: <code>ABCSMC</code>, <code>SMCResult</code>, <code>ODESolver</code>, <code>PRCC</code>. A method keeps the
+  spelling of the authors who named it, so <code>EnbPI</code> (Xu and Xie 2021) stays
+  as written. Rust names follow the Rust guidelines, in which an acronym is
+  one word (<code>OdeSolver</code>, <code>SmcSampler</code>).
+  <code>tests/docs/test_reference.py::test_public_names_capitalize_acronyms</code>
+  checks the known acronyms of <code>commol.__all__</code>.</li>
 <li>Context data structures are Pydantic v2 models.</li>
 <li><code>ModelBuilder</code> methods return <code>Self</code>, so calls chain.</li>
 <li>Log with the standard <code>logging</code> module. Library code never writes to the

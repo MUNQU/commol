@@ -3811,13 +3811,13 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   confidence_level)</code> (any loss). See
   <a href="../../guide/uncertainty/smc/#gibbs-posterior">Sequential Monte Carlo</a>.</p>
 </li>
-<li><code>AbcSmc</code> and <code>AbcRejection</code>: approximate Bayesian computation on a required
+<li><code>ABCSMC</code> and <code>ABCRejection</code>: approximate Bayesian computation on a required
   distance, <code>LossDistance()</code> or <code>SeriesDistance(metric)</code>. With a stochastic
   engine each distance reads one fresh replicate of its particle, so the
   problem's <code>replicates</code> and <code>replicate_summary</code> do not apply, and the result
   says so. See <a href="../../guide/uncertainty/smc/#abc">ABC</a>.</li>
-<li><code>SmcResult</code>: the sample, the level of each step, the log evidence, the
-  value each particle keeps and the diagnostics of each step (<code>SmcDiagnostics</code>:
+<li><code>SMCResult</code>: the sample, the level of each step, the log evidence, the
+  value each particle keeps and the diagnostics of each step (<code>SMCDiagnostics</code>:
   effective size, resampling, acceptance rate and move count).</li>
 <li>Priors: <code>Uniform()</code>, <code>LogUniform()</code>, <code>Beta(a, b)</code>, <code>Normal(mean, sd)</code>,
   <code>LogNormal(mu, sigma)</code> and <code>Gamma(shape, rate)</code>, each truncated to the
@@ -4025,6 +4025,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>loss_function</code> or <code>observation_models</code>, exactly one, and raises a
   <code>ValueError</code> with both or neither. Write <code>loss_function="sse"</code> where a
   problem relied on the default.</li>
+<li><strong>Breaking:</strong> public class names write every letter of an acronym in
+  capitals, as PEP 8 asks: <code>OdeSolver</code> is <code>ODESolver</code>. <code>EnbPI</code> keeps the
+  spelling of its authors. See
+  <a href="../../codebase/conventions/#python">Conventions</a>.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>

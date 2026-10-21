@@ -3430,7 +3430,7 @@ times <code>2.38² / d</code> and the log Jacobian in the acceptance; and
 move and <code>c</code> the required <code>stay_probability</code>. Every particle draws from its
 own stream, so a run repeats from its seed whatever the threads. ABC reaches
 the same rule with weights of 0 or 1: the next tolerance is the weighted
-quantile of the distances, so <code>AbcSmc</code> takes <code>target_cess</code> and no quantile.
+quantile of the distances, so <code>ABCSMC</code> takes <code>target_cess</code> and no quantile.
 ABC resamples at every step, since a particle of weight 0 cannot move, and
 when the first move of a step accepts less than <code>min_acceptance</code> it keeps the
 particles of the step before, whose moves completed.</p>
@@ -3484,7 +3484,7 @@ an order statistic whose expected coverage is below it.</p>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_smc.rs</code>,
 <code>crates/commol-inference/tests/test_distributions.rs</code>,
 <code>tests/uncertainty/test_smc.py</code>,
-<code>tests/uncertainty/test_coverage.py</code> (<code>TestGibbsPosterior</code>, <code>TestAbcSmc</code>).</p>
+<code>tests/uncertainty/test_coverage.py</code> (<code>TestGibbsPosterior</code>, <code>TestABCSMC</code>).</p>
 <h2 id="observation-noise-is-an-argument">Observation noise is an argument<a class="headerlink" href="#observation-noise-is-an-argument" title="Permanent link">&para;</a></h2>
 <p>Every reader of observations of a sample (<code>Predictive.at_observations</code>, every
 function of <code>commol.scores</code>) takes the noise with no default: <code>NoNoise()</code> gives

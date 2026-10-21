@@ -10,7 +10,7 @@ These methods give a posterior of the parameters with no noise model. The **Gibb
 import numpy as np
 
 from commol import (
-    AbcSmc,
+    ABCSMC,
     Aggregate,
     CalibrationParameter,
     CalibrationProblem,
@@ -75,7 +75,7 @@ print(lower < float(np.mean(flows)) < upper)  # True
 # ABC on the same data, from the chain binomial: each run draws its own flows.
 stochastic = problem.model_copy(update={"replicates": 1, "replicate_summary": "mean"})
 abc = Calibrator(Simulation(flow_model("StochasticSteps")), stochastic).uncertainty(
-    AbcSmc(
+    ABCSMC(
         priors=Priors.uniform_on_bounds(),
         distance=LossDistance(),
         particles=300,
@@ -155,7 +155,7 @@ With [observation models](https://munqu.github.io/commol/latest/guide/uncertaint
 
 ## ABC
 
-`AbcSmc` keeps a particle when the distance between its run and the data is at most a tolerance `ε`, and lowers `ε` step by step (Del Moral, Doucet and Jasra 2012). With weights of 0 or 1, the share of the particles that a tolerance keeps is its conditional effective sample size, so each next tolerance is the weighted quantile of the current distances at `target_cess`: the smallest distance whose share of the weight at or below it reaches it. The run stops when the first move of a step accepts less than `min_acceptance`, and keeps the sample of the tolerance before; it also stops when no lower tolerance keeps `target_cess` of the particles, as with whole numbers that tie. `diagnostics.stop_reason` says which.
+`ABCSMC` keeps a particle when the distance between its run and the data is at most a tolerance `ε`, and lowers `ε` step by step (Del Moral, Doucet and Jasra 2012). With weights of 0 or 1, the share of the particles that a tolerance keeps is its conditional effective sample size, so each next tolerance is the weighted quantile of the current distances at `target_cess`: the smallest distance whose share of the weight at or below it reaches it. The run stops when the first move of a step accepts less than `min_acceptance`, and keeps the sample of the tolerance before; it also stops when no lower tolerance keeps `target_cess` of the particles, as with whole numbers that tie. `diagnostics.stop_reason` says which.
 
 | `distance`                                 | Value                                                                                                                                                 |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -166,13 +166,13 @@ With [observation models](https://munqu.github.io/commol/latest/guide/uncertaint
 
 With a stochastic engine each distance runs one fresh replicate, seeded from its particle's stream, and the particle keeps that distance until a move replaces it: that is what makes ABC sample its target. The problem's `replicates` and `replicate_summary` do not apply, and `diagnostics.notes` says so. The problem still needs them, since every calibration of a stochastic engine does.
 
-`AbcRejection(priors, distance, draws, quantile)` is one step of the same code with no move: it draws from the priors and keeps the closest share `quantile` of the draws.
+`ABCRejection(priors, distance, draws, quantile)` is one step of the same code with no move: it draws from the priors and keeps the closest share `quantile` of the draws.
 
 ```python
-from commol import AbcRejection
+from commol import ABCRejection
 
 rejection = calibrator.uncertainty(
-    AbcRejection(
+    ABCRejection(
         priors=Priors.uniform_on_bounds(), distance=LossDistance(), draws=400, quantile=0.1
     )
 )
