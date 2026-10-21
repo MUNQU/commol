@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-22
+
+This release adds the first uncertainty methods with a stated model of the data: observation models and their likelihood, the Bayesian posterior and the Gibbs posterior by sequential Monte Carlo, approximate Bayesian computation, priors, local approximations (Laplace, the sandwich and the Laplace mixture), conformal intervals, the profile likelihood and sensitivity analysis with no data. Before you upgrade, read the **Breaking** entries: an `Aggregate` states the initial amount of each bin in the unit of that bin, a `CalibrationProblem` needs a `loss_function`, a `Predictive` takes a `Calibrator`, and public class names write every letter of an acronym in capitals. See [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
+
 ### Added
 
 - Local approximations through `Calibrator.uncertainty`, on the unbounded scale of the parameters, with a fit on a bound refused: `Laplace(draws)`, the normal `N(θ̂, H⁻¹)` of the observation models, and `Calibrator.delta_band(result, positions, level)`, the band of the outputs by the delta method; `Sandwich(block_length, draws)`, the covariance `H⁻¹ B H⁻¹` with the scores summed over blocks (CR1) and a Student t with `G − 1` degrees of freedom, which needs no noise model and refuses `loss_function="mae"` and too few blocks; `LaplaceMixture(starts, draws, target)`, a Laplace approximation at each optimum of a multi-start fit as the proposal of Pareto-smoothed importance sampling of a `LikelihoodTarget(priors)` or `GibbsTarget(priors, eta)`, which reports `k_hat` and marks a sample with `k_hat > 0.7` as unreliable. `curvature` is `"gauss_newton"` (the expected Fisher information of each observation model, by default) or `"hessian"`. See [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/index.md).
@@ -432,6 +436,7 @@ ______________________________________________________________________
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.6.0** - Uncertainty methods with a model of the data: likelihood, posteriors, local approximations, conformal intervals, profiles and sensitivity analysis
 - **0.5.0** - Uncertainty by resampling the data, identifiability of parameters and the removal of the ensemble calibration
 - **0.4.0** - One process under several structures and engines, stochastic engines and model descriptions
 - **0.3.0** - ODE engine, positions on the axis and one interface for every model kind
