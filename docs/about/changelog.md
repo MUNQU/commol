@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The default label of a quantity of interest wrote each position with 6
+  significant digits, so two positions close together gave one label and the
+  analysis raised `ValueError`: `Trajectory(outputs="A", positions=[1000000,
+  1000001])` gave `"A at 1e+06"` twice. The label now writes each position in
+  full (`"A at 1000000"`, `"A at 1000001"`).
 - `ModelBuilder.build` and `Model.update_parameters` accepted a series point
   or an impulse position that the engine cannot run, such as a point or an
   `impulse_at` of 1.5 under `DifferenceEquations` or `StochasticSteps`, or a

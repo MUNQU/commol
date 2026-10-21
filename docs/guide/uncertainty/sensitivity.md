@@ -123,6 +123,8 @@ or a list of outputs summed, as in an observation.
 | `Trajectory(outputs, positions)` | One `ValueAt` per position, for an analysis over the axis |
 
 Each quantity has a `label`, by default what it reads, such as `"B at 10"`.
+The default label writes each position in full, as Python reads it back, so
+two positions give two labels: `"B at 1000000"` and `"B at 1000001"`.
 
 ## Which method for which budget
 
