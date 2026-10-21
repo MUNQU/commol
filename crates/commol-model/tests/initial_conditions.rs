@@ -131,10 +131,6 @@ impl CompartmentalEngine for FrozenEngine {
             .collect()
     }
 
-    fn state(&self) -> Vec<f64> {
-        self.state.clone()
-    }
-
     fn initial_state(&self) -> Vec<f64> {
         self.initial_state.clone()
     }
@@ -176,7 +172,7 @@ fn written_state(
     if excess > 0.0 {
         return Err(plan.infeasibility(excess));
     }
-    Ok(engine.state())
+    Ok(engine.state)
 }
 
 fn assert_close(actual: &[f64], expected: &[f64]) {

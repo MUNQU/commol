@@ -798,7 +798,6 @@ fn benchmark_run_against_run_at() {
 #[test]
 fn the_engine_writes_initial_conditions_and_its_state_excludes_accumulators() {
     use commol_core::{ModelValue, ModelValueType};
-    use commol_model::CompartmentalEngine;
 
     let mut engine = engine(&decay_model(TIGHT));
     assert_eq!(engine.output_names(), ["A", "B", "moved"]);
@@ -816,7 +815,7 @@ fn the_engine_writes_initial_conditions_and_its_state_excludes_accumulators() {
     assert_eq!(engine.apply_values(&plan, &[400.0]).unwrap(), 0.0);
     engine.reset();
 
-    assert_eq!(CompartmentalEngine::state(&engine), vec![400.0, 600.0]);
+    assert_eq!(engine.state(), vec![400.0, 600.0]);
 }
 
 #[test]
