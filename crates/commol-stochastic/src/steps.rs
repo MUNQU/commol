@@ -359,6 +359,10 @@ impl CompartmentalEngine for StochasticSteps {
         StochasticSteps::state(self)
     }
 
+    fn initial_state(&self) -> Vec<f64> {
+        self.units.model.initial_state()[..self.units.model.num_compartments()].to_vec()
+    }
+
     fn total(&self) -> f64 {
         self.units.model.total()
     }
