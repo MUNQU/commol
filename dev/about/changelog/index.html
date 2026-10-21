@@ -3853,6 +3853,11 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>InfeasibleStart { excess: ... }</code>. It now gives the message a calibration
   gives for the same values after the index of the parameter set: what the
   amounts exceed, the remainder and by how much.</li>
+<li>A <code>Gain(start, end)</code> quantity read its start at <code>end - (end - start)</code>,
+  which can round away from <code>start</code>: <code>Gain(start=0.1, end=0.4)</code> read it at
+  <code>0.09999999999999998</code>, so on the <code>DifferentialEquations</code> engine the gain
+  did not start where <code>ValueAt(0.1)</code> reads. A gain now reads its start at
+  exactly <code>start</code>.</li>
 <li><code>SimulationPlotter.plot_series</code> read the model of a windowed series with
   the first window it found, at the window ends of a grid from 0, so with
   observations at 7.5 and 17.5 no model value sat on an observation and the
