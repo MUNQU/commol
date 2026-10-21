@@ -26,6 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `InfeasibleStart { excess: ... }`. It now gives the message a calibration
   gives for the same values after the index of the parameter set: what the
   amounts exceed, the remainder and by how much.
+- `SimulationPlotter.plot_series` read the model of a windowed series with
+  the first window it found, at the window ends of a grid from 0, so with
+  observations at 7.5 and 17.5 no model value sat on an observation and the
+  windows of the other observations were ignored. When the observations of a
+  series have a window, or differ in outputs or factor, the model line, the
+  band of the replicates and the band of a `Predictive` now read each
+  observation through its own operator at its own position, as the loss
+  reads it. Observations with several factors no longer leave the line
+  unscaled or raise `ValueError` with a `Predictive`.
 
 ## [0.6.0] - 2026-10-22
 

@@ -16,9 +16,14 @@ if TYPE_CHECKING:
 
 from commol.api.inference.intervals import member_statistics
 from commol.api.inference.predictive import Predictive, SeriesBand
-from commol.api.results import SimulationReplicates, SimulationResults, same_position
+from commol.api.results import (
+    SimulationReplicates,
+    SimulationResults,
+    index_at,
+    same_position,
+)
 from commol.api.simulation import Simulation
-from commol.api.windows import window_ends, windowed_totals
+from commol.api.windows import windowed_totals
 from commol.context.calibration import CalibrationResult, ObservedDataPoint
 from commol.context.inference.conformal import PredictionIntervals
 from commol.context.inference.global_sensitivity import (
@@ -124,14 +129,20 @@ class SimulationPlotter:
             Optional observed data points to overlay on corresponding bin subplots.
             Model predictions with a factor_id will be scaled for plotting using
             factor values from the calibration_result, so observed values remain in
-            their original units.
+            their original units. When the points of a series share one sum of
+            outputs and one factor and have no window, the model line covers
+            every position of the results. Otherwise the model of each point is
+            read through its own operator (outputs, window, factor) at its own
+            position, as the loss reads it, and the line joins these values.
         calibration_result : CalibrationResult | Predictive | None
             Optional calibration result. A `CalibrationResult` gives the factor
             values (``best_parameters``) that multiply model predictions. A
             `Predictive` plots the band of its draws instead of the simulation
             line; each draw's series is read through the observation operator
             of the problem (sums, windows and factors of the observations of
-            the series), then the draws are reduced with their weights.
+            the series, each at its own position when they do not share one
+            operator with no window), then the draws are reduced with their
+            weights.
         config : PlotConfig | None
             Configuration for plot layout and styling (figsize, dpi, layout,
             style, palette, context). If None, uses defaults.
@@ -170,7 +181,8 @@ class SimulationPlotter:
         ------
         ValueError
             If an entry of ``series`` is neither an output name nor a bin or
-            accumulator id.
+            accumulator id, or the results have no value at the position of
+            an observation read on its own or at the start of its window.
         """
         logger.info("Starting plot_series")
 
@@ -532,10 +544,9 @@ class SimulationPlotter:
         Label the x axis at the plotted positions `tick_every` apart.
 
         The tick grid is phased to the first plotted position rather than to
-        position 0: for a windowed series the plotted positions are window
-        ends, so anchoring at 0 would put ticks on positions that carry no
-        plotted point and hand `position_label` a position outside the
-        series' convention.
+        position 0: a series read at its observations is plotted at their
+        positions, so anchoring at 0 would put ticks on positions that carry
+        no plotted point.
         """
         if tick_every is not None and positions:
             anchor = positions[0]
@@ -572,32 +583,51 @@ class SimulationPlotter:
             return (rows, cols)
 
     @staticmethod
-    def _apply_windows(
-        series: list[float],
-        positions: Sequence[float],
-        observed: list[ObservedDataPoint],
-    ) -> tuple[list[float], list[float]] | None:
+    def _reads_each_observation(observed: list[ObservedDataPoint]) -> bool:
         """
-        Return (ends, values) where each value is the increment of `series`
-        over the window that closes at its end (:func:`commol.windowed_totals`).
+        Whether the model of a series is read at each observation: when one
+        has a window, or the observations differ in outputs or factor.
 
-        The simulation line covers every window end across the full series
-        (:func:`commol.window_ends`), so the plot starts at the first window
-        end rather than at the first observation.
+        Otherwise one operator reads every observation, and the model line
+        covers every position of the results.
+        """
+        operators = {
+            (tuple(point.outputs or ()), point.factor_id) for point in observed
+        }
+        return any(point.window for point in observed) or len(operators) > 1
 
-        Returns None if no observed point has a window set.
+    def _observation_values(
+        self,
+        results: SimulationResults,
+        bin_id: str,
+        observed: list[ObservedDataPoint],
+        factor_values: dict[str, float],
+    ) -> list[float]:
+        """
+        The model value of each observation, read through its own operator as
+        the loss reads it: the sum of its outputs at its position, its
+        increment over its window (:func:`commol.windowed_totals`), times its
+        factor.
 
         Raises
         ------
         ValueError
-            If the series has no value at a window end or start, such as a
-            window of 2.5 on the integer positions of ``Simulation.run``.
+            If the results have no value at the position of an observation or
+            at the start of its window, such as a window of 2.5 on the integer
+            positions of ``Simulation.run``.
         """
-        window = next((p.window for p in observed if p.window), None)
-        if window is None:
-            return None
-        ends = window_ends(window, positions[-1] if positions else 0.0)
-        return ends, windowed_totals(series, positions, window, ends)
+        values = []
+        for point in observed:
+            series = self._sum_series(
+                results, point.outputs or self._series_components(bin_id)
+            )
+            value = (
+                windowed_totals(series, results.positions, point.window, [point.at])[0]
+                if point.window
+                else series[index_at(results.positions, point.at)]
+            )
+            values.append(value * self._factor_value(point.factor_id, factor_values))
+        return values
 
     def _group_observed_data(
         self, observed_data: list[ObservedDataPoint] | None
@@ -653,9 +683,9 @@ class SimulationPlotter:
         bin_id: str,
         observed: list[ObservedDataPoint],
     ) -> list[str]:
-        for point in observed:
-            if point.outputs:
-                return point.outputs
+        """The outputs of the one operator of the observations of a series."""
+        if observed and observed[0].outputs:
+            return observed[0].outputs
         return self._series_components(bin_id)
 
     @staticmethod
@@ -699,21 +729,10 @@ class SimulationPlotter:
         }
 
     @staticmethod
-    def _model_factor_for_observed(
-        observed: list[ObservedDataPoint],
-        factor_values: dict[str, float],
-    ) -> float:
-        factor_ids = {point.factor_id for point in observed if point.factor_id}
-        if not factor_ids:
+    def _factor_value(factor_id: str | None, factor_values: dict[str, float]) -> float:
+        """The value of a factor, or 1 for none or one the result lacks."""
+        if factor_id is None:
             return 1.0
-        if len(factor_ids) > 1:
-            logger.warning(
-                "Multiple factor_id values found for one plotted series; leaving "
-                "model predictions unscaled."
-            )
-            return 1.0
-
-        factor_id = next(iter(factor_ids))
         if factor_id not in factor_values:
             logger.warning(
                 f"Factor parameter '{factor_id}' not found in calibration result; "
@@ -895,21 +914,17 @@ class SimulationPlotter:
         """
         Plot the series of a single bin on given axes.
         """
-        component_ids = self._observed_component_ids(bin_id, observed)
-        series = self._sum_series(self.results, component_ids)
-        windowed = self._apply_windows(series, self.results.positions, observed)
-        if windowed is not None:
-            positions, values = windowed
-        else:
-            positions = self.results.positions
-            values = series
-        factor = self._model_factor_for_observed(observed, factor_values)
-        values = self._apply_factor_to_series(values, factor)
+        positions, values = self._model_line(
+            self.results, bin_id, observed, factor_values
+        )
 
         # Build parameters for lineplot
         params = {
             "x": positions,
             "y": values,
+            # Each point is drawn as it is: observations at one position with
+            # different windows are never averaged.
+            "estimator": None,
             "ax": ax,
             "label": "Simulation"
             if self.replicates is None
@@ -921,7 +936,7 @@ class SimulationPlotter:
         # Plot simulation results as line
         sns.lineplot(**params)
         if self.replicates is not None:
-            self._plot_replicate_band(ax, component_ids, observed, factor)
+            self._plot_replicate_band(ax, bin_id, observed, factor_values)
 
         # Overlay observed data if available
         if observed:
@@ -953,12 +968,39 @@ class SimulationPlotter:
             ax.legend()
         ax.grid(True, alpha=0.3)
 
+    def _model_line(
+        self,
+        results: SimulationResults,
+        bin_id: str,
+        observed: list[ObservedDataPoint],
+        factor_values: dict[str, float],
+    ) -> tuple[list[float], list[float]]:
+        """
+        The positions and values of the model of one series in one run.
+
+        When the observations of the series do not share one operator with no
+        window, the model value of each observation at its position
+        (`_observation_values`). Otherwise the sum of the outputs of their
+        operator at every position of the results, times its factor.
+        """
+        if self._reads_each_observation(observed):
+            return [point.at for point in observed], self._observation_values(
+                results, bin_id, observed, factor_values
+            )
+        series = self._sum_series(
+            results, self._observed_component_ids(bin_id, observed)
+        )
+        factor = self._factor_value(
+            observed[0].factor_id if observed else None, factor_values
+        )
+        return results.positions, self._apply_factor_to_series(series, factor)
+
     def _plot_replicate_band(
         self,
         ax: "Axes",
-        component_ids: list[str],
+        bin_id: str,
         observed: list[ObservedDataPoint],
-        factor: float,
+        factor_values: dict[str, float],
     ) -> None:
         """
         The band of the replicates: each replicate reduced to the plotted
@@ -968,11 +1010,10 @@ class SimulationPlotter:
         per_replicate = []
         positions: list[float] = self.results.positions
         for replicate in self.replicates:
-            series = self._sum_series(replicate, component_ids)
-            windowed = self._apply_windows(series, replicate.positions, observed)
-            if windowed is not None:
-                positions, series = windowed
-            per_replicate.append(self._apply_factor_to_series(series, factor))
+            positions, series = self._model_line(
+                replicate, bin_id, observed, factor_values
+            )
+            per_replicate.append(series)
         statistics = member_statistics(per_replicate, self.confidence_level)
         ax.fill_between(
             positions,
@@ -991,37 +1032,40 @@ class SimulationPlotter:
         """
         The band of one series of a predictive.
 
-        Without a window or factor in the observations of the series, the band
-        of the sum of its outputs. With one, each draw is read through the
-        observation operator at every window end, as the loss reads it.
+        When the observations of the series do not share one operator with no
+        window, each draw is read through the operator of each observation at
+        its position, as the loss reads it. With one operator and a factor,
+        each draw is read through it at every position of the predictive.
+        Otherwise, the band of the sum of the outputs.
         """
-        component_ids = self._observed_component_ids(bin_id, observed)
-        window = next((p.window for p in observed if p.window), None)
-        factor_ids = {p.factor_id for p in observed if p.factor_id}
-        if window is None and not factor_ids:
-            return predictive.series_band(component_ids, self.confidence_level)
-        if len(factor_ids) > 1:
-            raise ValueError(
-                f"Series '{bin_id}' has observations with several factors "
-                f"{sorted(factor_ids)}; a band reads one."
+        if self._reads_each_observation(observed):
+            points = [
+                ObservedDataPoint(
+                    at=point.at,
+                    outputs=point.outputs or self._series_components(bin_id),
+                    label=bin_id,
+                    value=0.0,
+                    window=point.window,
+                    factor_id=point.factor_id,
+                )
+                for point in observed
+            ]
+            return predictive.at_observations(points, NoNoise()).band(
+                self.confidence_level
             )
-        first = predictive.positions[0]
-        last = predictive.positions[-1]
-        ends = (
-            [at for at in window_ends(window, last) if at - window >= first]
-            if window is not None
-            else predictive.positions
-        )
+        component_ids = self._observed_component_ids(bin_id, observed)
+        factor_id = observed[0].factor_id if observed else None
+        if factor_id is None:
+            return predictive.series_band(component_ids, self.confidence_level)
         points = [
             ObservedDataPoint(
                 at=at,
                 outputs=component_ids,
                 label=bin_id,
                 value=0.0,
-                window=window,
-                factor_id=next(iter(factor_ids), None),
+                factor_id=factor_id,
             )
-            for at in ends
+            for at in predictive.positions
         ]
         return predictive.at_observations(points, NoNoise()).band(self.confidence_level)
 
