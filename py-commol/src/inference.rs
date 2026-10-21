@@ -35,9 +35,10 @@ pub struct PyCalibrationProblem {
 }
 
 /// The Python error of a parameter set that has no prediction:
-/// `InfeasibleStateError` when it leaves the values its model allows, with
-/// the message of the run that left them; `ValueError` for a value that is
-/// not finite; `RuntimeError` otherwise.
+/// `InfeasibleStateError` when its starting state or its run leaves the
+/// values its model allows, with the message of the plan of values or of
+/// the run; `ValueError` for a value that is not finite; `RuntimeError`
+/// otherwise.
 fn prediction_error(index: usize, error: EvaluationError) -> PyErr {
     match error {
         EvaluationError::Violation(Violation::NonFinite) => {
@@ -45,14 +46,22 @@ fn prediction_error(index: usize, error: EvaluationError) -> PyErr {
                 "Parameter set {index} gives a value that is not finite"
             ))
         }
-        EvaluationError::Violation(Violation::InfeasibleRun { message }) => {
-            InfeasibleStateError::new_err(format!(
-                "Parameter set {index} is not feasible: {message}"
-            ))
-        }
-        EvaluationError::Violation(violation) => InfeasibleStateError::new_err(format!(
-            "Parameter set {index} is not feasible: {violation:?}"
+        EvaluationError::Violation(
+            Violation::InfeasibleStart { message, .. } | Violation::InfeasibleRun { message },
+        ) => InfeasibleStateError::new_err(format!(
+            "Parameter set {index} is not feasible: {message}"
         )),
+        EvaluationError::Violation(
+            Violation::OutOfBounds { .. }
+            | Violation::Constraint { .. }
+            | Violation::MeanOutsideModel { .. },
+        ) => {
+            // coverage: invariant, a run of the forward model returns only the violations above
+            unreachable!(
+                "a run of the forward model checks no bounds, no constraint and no observation \
+                 model"
+            )
+        }
         EvaluationError::Failed(message) => PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
             format!("Parameter set {index}: {message}"),
         ),

@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `InfeasibleRun`. It now gives the message of the run after the index of the
   parameter set: the compartment, the step and the flows, as
   `Simulation.run` reports them.
+- The `InfeasibleStateError` of a draw of a `Predictive` whose initial
+  amounts leave the remainder below zero said only
+  `InfeasibleStart { excess: ... }`. It now gives the message a calibration
+  gives for the same values after the index of the parameter set: what the
+  amounts exceed, the remainder and by how much.
 
 ## [0.6.0] - 2026-10-22
 

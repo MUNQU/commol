@@ -222,8 +222,8 @@ class Predictive:
             at integer steps).
         InfeasibleStateError
             If a draw leaves the values its model allows. The message names
-            the parameter set, then says what the run says: the compartment,
-            the step and the flows.
+            the parameter set, then says what the run says (the compartment,
+            the step and the flows), or what the initial amounts exceed.
         """
         self.source: PredictiveSource = source
         self.sample: ParameterSample = sample
@@ -375,8 +375,8 @@ class Predictive:
             analysis.
         InfeasibleStateError
             If a draw leaves the values its model allows. The message names
-            the parameter set, then says what the run says: the compartment,
-            the step and the flows.
+            the parameter set, then says what the run says (the compartment,
+            the step and the flows), or what the initial amounts exceed.
         """
         draws = self.source.rust_observation_draws(
             self.sample, list(observed_data), noise

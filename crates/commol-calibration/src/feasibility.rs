@@ -33,6 +33,8 @@ pub enum Violation {
     InfeasibleStart {
         /// The engine's measure of the excess.
         excess: f64,
+        /// What the values exceed, as the plan of values reports it.
+        message: String,
     },
     /// The run left the values the model allows.
     InfeasibleRun {
@@ -59,7 +61,7 @@ impl Violation {
             Self::OutOfBounds { amount }
             | Self::Constraint { amount }
             | Self::MeanOutsideModel { amount } => amount,
-            Self::InfeasibleStart { excess } => 100.0 * excess,
+            Self::InfeasibleStart { excess, .. } => 100.0 * excess,
             Self::InfeasibleRun { .. } | Self::NonFinite => 0.0,
         }
     }
@@ -371,7 +373,11 @@ mod tests {
 
     #[test]
     fn the_amount_of_an_infeasible_start_is_a_hundred_times_its_excess() {
-        assert_eq!(Violation::InfeasibleStart { excess: 0.5 }.amount(), 50.0);
+        let start = Violation::InfeasibleStart {
+            excess: 0.5,
+            message: "A above its limit".to_string(),
+        };
+        assert_eq!(start.amount(), 50.0);
         let run = Violation::InfeasibleRun {
             message: "A below zero".to_string(),
         };
