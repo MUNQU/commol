@@ -1463,6 +1463,174 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1825,6 +1993,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -2408,6 +2604,62 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../codebase/decisions/local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../codebase/decisions/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
   
 
     
@@ -3020,6 +3272,10 @@ describe the observations and the unknowns in a <code>CalibrationProblem</code>,
 <td>This page</td>
 </tr>
 <tr>
+<td>Maximum likelihood with a model of the noise of each series</td>
+<td><a href="../uncertainty/observation-models/">Observation Models</a></td>
+</tr>
+<tr>
 <td>Calibrating initial conditions</td>
 <td><a href="../calibration-initial-conditions/">Calibrating Initial Conditions</a></td>
 </tr>
@@ -3069,43 +3325,42 @@ describe the observations and the unknowns in a <code>CalibrationProblem</code>,
 </span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>        <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_bc&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k2 * B&quot;</span><span class="p">)</span>
 </span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>        <span class="o">.</span><span class="n">build</span><span class="p">(</span>
 </span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>            <span class="n">Aggregate</span><span class="p">(</span>
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>                <span class="n">total</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>                <span class="n">bin_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mf">0.99</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">},</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>            <span class="p">),</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>            <span class="n">engine</span><span class="o">=</span><span class="n">engine</span><span class="p">,</span>
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>        <span class="p">)</span>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>    <span class="p">)</span>
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>
-</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="c1"># Observations generated from k1 = 0.4, k2 = 0.1</span>
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="n">truth</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">basic_model</span><span class="p">(</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
-</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="n">observed_data</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">][</span><span class="n">step</span><span class="p">])</span>
-</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>    <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">51</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
-</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a><span class="p">]</span>
-</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>
-</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="c1"># 1. A model whose unknowns are None</span>
-</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="n">model</span> <span class="o">=</span> <span class="n">basic_model</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>
-</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a><span class="c1"># 2. The problem: observations, unknowns, loss and optimizer</span>
-</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
-</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
-</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
-</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
-</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>    <span class="p">],</span>
-</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>    <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span>
-</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">NelderMeadConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">2000</span><span class="p">),</span>
-</span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span>
-</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="p">)</span>
-</span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a>
-</span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a><span class="c1"># 3. Calibrate</span>
-</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a><span class="n">result</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">),</span> <span class="n">problem</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
-</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a><span class="nb">print</span><span class="p">({</span><span class="n">name</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">best_parameters</span><span class="o">.</span><span class="n">items</span><span class="p">())})</span>
-</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a><span class="c1"># {&#39;k1&#39;: 0.4, &#39;k2&#39;: 0.1}</span>
-</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a>
-</span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a><span class="c1"># 4. Write the values back, and simulate</span>
-</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a><span class="n">model</span><span class="o">.</span><span class="n">apply_calibration_parameters</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">problem</span><span class="p">)</span>
-</span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60" href="#__codelineno-0-60"></a><span class="n">calibrated</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>                <span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">990</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>            <span class="p">),</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>            <span class="n">engine</span><span class="o">=</span><span class="n">engine</span><span class="p">,</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>        <span class="p">)</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>    <span class="p">)</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="c1"># Observations generated from k1 = 0.4, k2 = 0.1</span>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="n">truth</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">basic_model</span><span class="p">(</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="n">observed_data</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">][</span><span class="n">step</span><span class="p">])</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>    <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">51</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a><span class="p">]</span>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a><span class="c1"># 1. A model whose unknowns are None</span>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="n">model</span> <span class="o">=</span> <span class="n">basic_model</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a><span class="c1"># 2. The problem: observations, unknowns, loss and optimizer</span>
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
+</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>    <span class="p">],</span>
+</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>    <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span>
+</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">NelderMeadConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">2000</span><span class="p">),</span>
+</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span>
+</span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a><span class="p">)</span>
+</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a>
+</span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a><span class="c1"># 3. Calibrate</span>
+</span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a><span class="n">result</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">),</span> <span class="n">problem</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a><span class="nb">print</span><span class="p">({</span><span class="n">name</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">best_parameters</span><span class="o">.</span><span class="n">items</span><span class="p">())})</span>
+</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a><span class="c1"># {&#39;k1&#39;: 0.4, &#39;k2&#39;: 0.1}</span>
+</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a>
+</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a><span class="c1"># 4. Write the values back, and simulate</span>
+</span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a><span class="n">model</span><span class="o">.</span><span class="n">apply_calibration_parameters</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">problem</span><span class="p">)</span>
+</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a><span class="n">calibrated</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
 </span></code></pre></div>
 <p>A <code>Simulation</code> follows its model: after <code>apply_calibration_parameters</code> or
 <code>update_parameters</code>, its next <code>run</code> (and its <code>engine</code>) uses the new values,
@@ -3136,9 +3391,15 @@ also when it was created while a parameter was <code>None</code>. See
 </tr>
 <tr>
 <td><code>loss_function</code></td>
-<td><code>str</code></td>
-<td><code>"sse"</code></td>
-<td>How the misfit is measured; see <a href="#losses">Losses</a>.</td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>How the misfit is measured; see <a href="#losses">Losses</a>. A problem has <code>loss_function</code> or <code>observation_models</code>, exactly one.</td>
+</tr>
+<tr>
+<td><code>observation_models</code></td>
+<td><code>dict[str, ObservationModel] \| None</code></td>
+<td><code>None</code></td>
+<td>One observation model per series label: the fit maximizes their likelihood. See <a href="../uncertainty/observation-models/">Observation Models</a>.</td>
 </tr>
 <tr>
 <td><code>optimization_config</code></td>
@@ -3156,7 +3417,7 @@ also when it was created while a parameter was <code>None</code>. See
 <td><code>normalize_observations</code></td>
 <td><code>bool</code></td>
 <td><code>False</code></td>
-<td>Divides each residual by the RMS of its observation series, so series of very different size weigh the same.</td>
+<td>Divides each residual by the RMS of its observation series, so series of very different size weigh the same. Needs a loss.</td>
 </tr>
 <tr>
 <td><code>initial_condition_remainder</code></td>
@@ -3217,7 +3478,7 @@ also when it was created while a parameter was <code>None</code>. See
 <td><code>weight</code></td>
 <td><code>float</code></td>
 <td><code>1.0</code></td>
-<td>How much the observation counts in every loss; see <a href="#losses">Losses</a>.</td>
+<td>How much the observation counts in every loss, and the power of its term of a likelihood; see <a href="#losses">Losses</a>.</td>
 </tr>
 <tr>
 <td><code>factor_id</code></td>
@@ -3230,6 +3491,12 @@ also when it was created while a parameter was <code>None</code>. See
 <td><code>float \| None</code></td>
 <td><code>None</code></td>
 <td>Compares with the gain over <code>(at − window, at]</code> instead of the value.</td>
+</tr>
+<tr>
+<td><code>trials</code></td>
+<td><code>int \| None</code></td>
+<td><code>None</code></td>
+<td>The trials of the observation, for a <code>BinomialObservations()</code> model that reads them from each observation.</td>
 </tr>
 </tbody>
 </table>
@@ -3254,7 +3521,7 @@ also when it was created while a parameter was <code>None</code>. See
 <td><code>parameter_type</code></td>
 <td><code>str</code></td>
 <td>required</td>
-<td><code>"parameter"</code>, <code>"initial_condition"</code> or <code>"factor"</code>.</td>
+<td><code>"parameter"</code>, <code>"initial_condition"</code>, <code>"factor"</code> or <code>"noise"</code>.</td>
 </tr>
 <tr>
 <td><code>min_bound</code>, <code>max_bound</code></td>
@@ -3287,21 +3554,31 @@ also when it was created while a parameter was <code>None</code>. See
 <tr>
 <td><code>"initial_condition"</code></td>
 <td>A bin, a category, or an expanded compartment</td>
-<td>A fraction of the total; see <a href="../calibration-initial-conditions/">Calibrating Initial Conditions</a></td>
+<td>An amount in the unit of its bin, or the split of a category; see <a href="../calibration-initial-conditions/">Calibrating Initial Conditions</a></td>
 </tr>
 <tr>
 <td><code>"factor"</code></td>
 <td>Any new id, used by observations through <code>factor_id</code></td>
 <td>A factor on the predictions; not part of the model</td>
 </tr>
+<tr>
+<td><code>"noise"</code></td>
+<td>Any new id, named by an <a href="../uncertainty/observation-models/#noise-parameters">observation model</a></td>
+<td>An argument of the model, such as its standard deviation; not part of the model</td>
+</tr>
 </tbody>
 </table>
-<p><code>"parameter"</code> and <code>"factor"</code> work with every kind of model. The other types are
+<p><code>"parameter"</code>, <code>"factor"</code> and <code>"noise"</code> work with every kind of model. The other types are
 values of the model kind, and the kind declares which it accepts
 (<code>model.structure.calibration_value_types()</code>): an aggregate model accepts
 <code>"initial_condition"</code>. A type the kind does not accept raises a <code>ValueError</code>
 that names the kind when you create the <code>Calibrator</code>.</p>
 <h2 id="losses">Losses<a class="headerlink" href="#losses" title="Permanent link">&para;</a></h2>
+<p>A problem has a loss or observation models, exactly one, and neither has a
+default: what to fit is a modelling choice. A loss measures the residuals;
+<a href="../uncertainty/observation-models/">observation models</a> say how each series
+scatters, and the fit maximizes their likelihood, so its loss is <code>−log L</code>.
+<code>CalibrationProblem</code> raises a <code>ValueError</code> with both or neither.</p>
 <table>
 <thead>
 <tr>
@@ -3312,7 +3589,7 @@ that names the kind when you create the <code>Calibrator</code>.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>"sse"</code> (default)</td>
+<td><code>"sse"</code></td>
 <td><code>Σ w·r²</code></td>
 <td>The usual choice</td>
 </tr>
@@ -3424,6 +3701,10 @@ because what to fit is a modelling choice:</p>
 <td>The same</td>
 </tr>
 <tr>
+<td>A stochastic engine needs a loss: with <code>observation_models</code>, <code>Calibrator</code> raises a <code>ValueError</code></td>
+<td><code>PyCalibrationProblem::new</code> in <code>py-commol/src/inference.rs</code>; <code>Discrepancy::set_summary</code></td>
+</tr>
+<tr>
 <td>The summaries and the CRPS are computed in <code>LossConfig</code>, and the observation weights apply to every option</td>
 <td><code>LossConfig::replicate_loss</code> in <code>crates/commol-calibration/src/types.rs</code></td>
 </tr>
@@ -3453,7 +3734,7 @@ replicate of each draw.</p>
 </tr>
 <tr>
 <td><code>final_loss</code></td>
-<td>The loss at <code>best_parameters</code></td>
+<td>The loss at <code>best_parameters</code>; with observation models, the negative log-likelihood</td>
 </tr>
 <tr>
 <td><code>iterations</code></td>
@@ -3522,8 +3803,8 @@ value into the model, routed by its <code>parameter_type</code>:</p>
 <td>The initial conditions, so the model rebuilds exactly the state the optimizer scored</td>
 </tr>
 <tr>
-<td><code>"factor"</code></td>
-<td>Nothing: it describes the observations, not the model</td>
+<td><code>"factor"</code>, <code>"noise"</code></td>
+<td>Nothing: they describe the observations, not the model</td>
 </tr>
 </tbody>
 </table>

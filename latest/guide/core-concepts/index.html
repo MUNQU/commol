@@ -808,10 +808,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#updating-fractions-after-building" class="md-nav__link">
+  <a href="#updating-the-initial-state-after-building" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Updating fractions after building
+        Updating the initial state after building
       
     </span>
   </a>
@@ -1522,6 +1522,174 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1884,6 +2052,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -2487,6 +2683,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../codebase/decisions/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/results/" class="md-nav__link">
         
   
@@ -3053,10 +3305,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#updating-fractions-after-building" class="md-nav__link">
+  <a href="#updating-the-initial-state-after-building" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Updating fractions after building
+        Updating the initial state after building
       
     </span>
   </a>
@@ -3188,7 +3440,7 @@ see <a href="../building-models/">Building Models</a>.</p>
 </tbody>
 </table>
 <h2 id="compartments">Compartments<a class="headerlink" href="#compartments" title="Permanent link">&para;</a></h2>
-<p>A compartment (a <em>bin</em>) holds an amount: a part of the total. A model can have
+<p>A compartment (a <em>bin</em>) holds an amount, in the unit of the bin. A model can have
 any number of them, with any ids.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Aggregate</span><span class="p">,</span> <span class="n">ModelBuilder</span><span class="p">,</span> <span class="n">Simulation</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -3265,9 +3517,9 @@ it is not part of the total.</p>
 <h2 id="initial-conditions-the-structure">Initial conditions: the structure<a class="headerlink" href="#initial-conditions-the-structure" title="Permanent link">&para;</a></h2>
 <p>The calls above write the <strong>process</strong>: what changes and how. The
 <strong>structure</strong> lays the process out. <code>Aggregate</code> holds an amount per
-compartment, and gives the total and the fraction of it that starts in each
-bin. The total is a real number, finite and greater than 0:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">structure</span> <span class="o">=</span> <span class="n">Aggregate</span><span class="p">(</span><span class="n">total</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">bin_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">})</span>
+compartment, and gives the amount that each bin starts with, in the unit of
+the bin. An amount is a real number, finite and not negative:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">structure</span> <span class="o">=</span> <span class="n">Aggregate</span><span class="p">(</span><span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">900</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -3278,15 +3530,11 @@ bin. The total is a real number, finite and greater than 0:</p>
 </thead>
 <tbody>
 <tr>
-<td><code>total</code> is finite and greater than 0</td>
+<td>Every amount is finite and not negative</td>
 <td><code>Aggregate(...)</code></td>
 </tr>
 <tr>
-<td>The bin fractions sum to 1.0</td>
-<td><code>Aggregate(...)</code></td>
-</tr>
-<tr>
-<td>Every bin has a fraction</td>
+<td>Every bin has an amount</td>
 <td>The model is built</td>
 </tr>
 <tr>
@@ -3295,7 +3543,7 @@ bin. The total is a real number, finite and greater than 0:</p>
 </tr>
 </tbody>
 </table>
-<p>A fraction may be <code>None</code> when calibration will find it; see
+<p>An amount may be <code>None</code> when calibration will find it; see
 <a href="../calibration/">Model Calibration</a>.</p>
 <h2 id="build-and-run">Build and run<a class="headerlink" href="#build-and-run" title="Permanent link">&para;</a></h2>
 <p><code>build</code> joins the process with the structure and an engine, validates the
@@ -3315,7 +3563,7 @@ every kind its process fits. Here <code>model.structure</code> is an <code>Aggre
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">type</span><span class="p">)</span>                    <span class="c1"># DifferenceEquations</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">kind</span><span class="p">)</span>                 <span class="c1"># aggregate</span>
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nb">print</span><span class="p">([</span><span class="n">b</span><span class="o">.</span><span class="n">id</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">process</span><span class="o">.</span><span class="n">bins</span><span class="p">])</span>   <span class="c1"># [&#39;A&#39;, &#39;B&#39;, &#39;C&#39;]</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">total</span><span class="p">)</span>                <span class="c1"># 1000.0</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">bin_amounts</span><span class="p">)</span>          <span class="c1"># {&#39;A&#39;: 900.0, &#39;B&#39;: 100.0, &#39;C&#39;: 0.0}</span>
 </span></code></pre></div>
 <p>Four engines run an aggregate model, with the same process and structure:</p>
 <table>
@@ -3411,8 +3659,8 @@ categories:</p>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>A -&gt; A_g1_t1, A_g1_t2, A_g2_t1, A_g2_t2      8 compartments for 2 bins
 </span></code></pre></div>
-<p>The initial amount of each compartment is the total times the product of its
-fractions:</p>
+<p>The initial amount of each compartment is the amount of its bin times the
+product of the fractions of its categories:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">stratified</span> <span class="o">=</span> <span class="p">(</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Stratified&quot;</span><span class="p">)</span>
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
@@ -3422,16 +3670,15 @@ fractions:</p>
 </span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">)</span>
 </span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span>
 </span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>        <span class="n">Aggregate</span><span class="p">(</span>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>            <span class="n">total</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>            <span class="n">bin_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">},</span>
-</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>            <span class="n">stratification_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;group&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;g1&quot;</span><span class="p">:</span> <span class="mf">0.6</span><span class="p">,</span> <span class="s2">&quot;g2&quot;</span><span class="p">:</span> <span class="mf">0.4</span><span class="p">}},</span>
-</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>        <span class="p">),</span>
-</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>        <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
-</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>    <span class="p">)</span>
-</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="p">)</span>
-</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>
-</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="k">for</span> <span class="n">compartment</span> <span class="ow">in</span> <span class="n">stratified</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">initial_state</span><span class="p">(</span><span class="n">stratified</span><span class="o">.</span><span class="n">process</span><span class="p">):</span>
-</span><span id="__span-9-19"><a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">compartment</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">compartment</span><span class="o">.</span><span class="n">amount</span><span class="p">)</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>            <span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">9000</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">1000</span><span class="p">},</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>            <span class="n">stratification_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;group&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;g1&quot;</span><span class="p">:</span> <span class="mf">0.6</span><span class="p">,</span> <span class="s2">&quot;g2&quot;</span><span class="p">:</span> <span class="mf">0.4</span><span class="p">}},</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>        <span class="p">),</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>        <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>    <span class="p">)</span>
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="p">)</span>
+</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>
+</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="k">for</span> <span class="n">compartment</span> <span class="ow">in</span> <span class="n">stratified</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">initial_state</span><span class="p">(</span><span class="n">stratified</span><span class="o">.</span><span class="n">process</span><span class="p">):</span>
+</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">compartment</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">compartment</span><span class="o">.</span><span class="n">amount</span><span class="p">)</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -3491,23 +3738,23 @@ declared before it.</p>
 </span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">)</span>
 </span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span>
 </span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>        <span class="n">Aggregate</span><span class="p">(</span>
-</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>            <span class="n">total</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span>
-</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>            <span class="n">bin_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">},</span>
-</span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>            <span class="n">stratification_fractions</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-11-18"><a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>                <span class="s2">&quot;group&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;g1&quot;</span><span class="p">:</span> <span class="mf">0.6</span><span class="p">,</span> <span class="s2">&quot;g2&quot;</span><span class="p">:</span> <span class="mf">0.4</span><span class="p">},</span>
-</span><span id="__span-11-19"><a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a>                <span class="s2">&quot;subtype&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;s1&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s2">&quot;s2&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">},</span>
-</span><span id="__span-11-20"><a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a>            <span class="p">},</span>
-</span><span id="__span-11-21"><a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a>        <span class="p">),</span>
-</span><span id="__span-11-22"><a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a>        <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
-</span><span id="__span-11-23"><a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a>    <span class="p">)</span>
-</span><span id="__span-11-24"><a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a><span class="p">)</span>
-</span><span id="__span-11-25"><a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a>
-</span><span id="__span-11-26"><a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a><span class="nb">print</span><span class="p">([</span><span class="n">c</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">conditional</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">initial_state</span><span class="p">(</span><span class="n">conditional</span><span class="o">.</span><span class="n">process</span><span class="p">)])</span>
-</span><span id="__span-11-27"><a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a><span class="c1"># [&#39;A_g1&#39;, &#39;A_g2_s1&#39;, &#39;A_g2_s2&#39;, &#39;B_g1&#39;, &#39;B_g2_s1&#39;, &#39;B_g2_s2&#39;]</span>
+</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>            <span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">9000</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">1000</span><span class="p">},</span>
+</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>            <span class="n">stratification_fractions</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>                <span class="s2">&quot;group&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;g1&quot;</span><span class="p">:</span> <span class="mf">0.6</span><span class="p">,</span> <span class="s2">&quot;g2&quot;</span><span class="p">:</span> <span class="mf">0.4</span><span class="p">},</span>
+</span><span id="__span-11-18"><a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>                <span class="s2">&quot;subtype&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;s1&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s2">&quot;s2&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">},</span>
+</span><span id="__span-11-19"><a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a>            <span class="p">},</span>
+</span><span id="__span-11-20"><a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a>        <span class="p">),</span>
+</span><span id="__span-11-21"><a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a>        <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
+</span><span id="__span-11-22"><a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a>    <span class="p">)</span>
+</span><span id="__span-11-23"><a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a><span class="p">)</span>
+</span><span id="__span-11-24"><a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a>
+</span><span id="__span-11-25"><a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a><span class="nb">print</span><span class="p">([</span><span class="n">c</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">conditional</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">initial_state</span><span class="p">(</span><span class="n">conditional</span><span class="o">.</span><span class="n">process</span><span class="p">)])</span>
+</span><span id="__span-11-26"><a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a><span class="c1"># [&#39;A_g1&#39;, &#39;A_g2_s1&#39;, &#39;A_g2_s2&#39;, &#39;B_g1&#39;, &#39;B_g2_s1&#39;, &#39;B_g2_s2&#39;]</span>
 </span></code></pre></div>
 <p>The fractions of a conditional stratification are fractions of the subgroup it
-splits, not of the total. <code>subgroup_total</code> multiplies along the chain to give
-the total of a subgroup, and <code>get_conditioning_categories</code> names the subgroup:</p>
+splits, not of the whole bin, so they multiply along the chain.
+<code>subgroup_total</code> sums the initial state over the compartments of a subgroup,
+and <code>get_conditioning_categories</code> names the subgroup:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">aggregate</span><span class="p">,</span> <span class="n">process</span> <span class="o">=</span> <span class="n">conditional</span><span class="o">.</span><span class="n">structure</span><span class="p">,</span> <span class="n">conditional</span><span class="o">.</span><span class="n">process</span>
 </span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">aggregate</span><span class="o">.</span><span class="n">subgroup_total</span><span class="p">(</span><span class="n">process</span><span class="p">))</span>                 <span class="c1"># 10000</span>
 </span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">aggregate</span><span class="o">.</span><span class="n">subgroup_total</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;g2&quot;</span><span class="p">]))</span>         <span class="c1"># 10000 x 0.4 = 4000</span>
@@ -3518,9 +3765,9 @@ the total of a subgroup, and <code>get_conditioning_categories</code> names the 
 for the full API.</p>
 <h3 id="per-compartment-overrides">Per-compartment overrides<a class="headerlink" href="#per-compartment-overrides" title="Permanent link">&para;</a></h3>
 <p>When the product of fractions cannot express the starting state, for example a
-state that is empty in only one category, <code>compartment_fractions</code> overrides
-single expanded compartments. Each fraction is a fraction of the <strong>total</strong> and
-replaces the product for that compartment only:</p>
+state that is empty in only one category, <code>compartment_amounts</code> overrides
+single expanded compartments. Each amount is in the unit of the bin of its
+compartment and replaces the product for that compartment only:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">overridden</span> <span class="o">=</span> <span class="p">(</span>
 </span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Override&quot;</span><span class="p">)</span>
 </span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
@@ -3530,17 +3777,16 @@ replaces the product for that compartment only:</p>
 </span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">)</span>
 </span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span>
 </span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>        <span class="n">Aggregate</span><span class="p">(</span>
-</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>            <span class="n">total</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span>
-</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>            <span class="n">bin_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">},</span>
-</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>            <span class="n">stratification_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;group&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;g1&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s2">&quot;g2&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">}},</span>
-</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>            <span class="n">compartment_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;B_g1&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">},</span>
-</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>        <span class="p">),</span>
-</span><span id="__span-13-15"><a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>        <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
-</span><span id="__span-13-16"><a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>    <span class="p">)</span>
-</span><span id="__span-13-17"><a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="p">)</span>
-</span><span id="__span-13-18"><a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>
-</span><span id="__span-13-19"><a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="nb">print</span><span class="p">({</span><span class="n">c</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">c</span><span class="o">.</span><span class="n">amount</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">overridden</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">initial_state</span><span class="p">(</span><span class="n">overridden</span><span class="o">.</span><span class="n">process</span><span class="p">)})</span>
-</span><span id="__span-13-20"><a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a><span class="c1"># B_g1 starts empty; the other compartments keep their product</span>
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>            <span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">9000</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">1000</span><span class="p">},</span>
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>            <span class="n">stratification_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;group&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;g1&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s2">&quot;g2&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">}},</span>
+</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>            <span class="n">compartment_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;B_g1&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>        <span class="p">),</span>
+</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>        <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
+</span><span id="__span-13-15"><a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>    <span class="p">)</span>
+</span><span id="__span-13-16"><a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a><span class="p">)</span>
+</span><span id="__span-13-17"><a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a>
+</span><span id="__span-13-18"><a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a><span class="nb">print</span><span class="p">({</span><span class="n">c</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">c</span><span class="o">.</span><span class="n">amount</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">overridden</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">initial_state</span><span class="p">(</span><span class="n">overridden</span><span class="o">.</span><span class="n">process</span><span class="p">)})</span>
+</span><span id="__span-13-19"><a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="c1"># B_g1 starts empty; the other compartments keep their product</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -3551,24 +3797,21 @@ replaces the product for that compartment only:</p>
 </thead>
 <tbody>
 <tr>
-<td>Each fraction is between 0.0 and 1.0</td>
+<td>Each amount is finite and not negative</td>
 <td><code>Aggregate(...)</code></td>
 </tr>
 <tr>
 <td>Each name is an expanded compartment</td>
 <td>The model is built</td>
 </tr>
-<tr>
-<td>The initial amounts do not sum to more than <code>total</code></td>
-<td>The model is built</td>
-</tr>
 </tbody>
 </table>
-<p><code>model.structure.update_compartment_fractions(model.process, {"B_g1": 0.05})</code>
+<p>An override may hold more than the product gave its compartment: the bins keep
+no sum. <code>model.structure.update_compartment_amounts(model.process, {"B_g1": 50})</code>
 changes or adds overrides on a built model; the engine checks them against
 the expansion of the process before they are stored.</p>
-<h3 id="updating-fractions-after-building">Updating fractions after building<a class="headerlink" href="#updating-fractions-after-building" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">overridden</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">update_bin_fractions</span><span class="p">({</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mf">0.85</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mf">0.15</span><span class="p">})</span>
+<h3 id="updating-the-initial-state-after-building">Updating the initial state after building<a class="headerlink" href="#updating-the-initial-state-after-building" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">overridden</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">update_bin_amounts</span><span class="p">({</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">8500</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">1500</span><span class="p">})</span>
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">overridden</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">update_stratification_fractions</span><span class="p">({</span><span class="s2">&quot;g1&quot;</span><span class="p">:</span> <span class="mf">0.7</span><span class="p">})</span>  <span class="c1"># g2 becomes 0.3</span>
 </span></code></pre></div>
 <table>
@@ -3580,8 +3823,8 @@ the expansion of the process before they are stored.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>update_bin_fractions</code></td>
-<td>After the update, the bin fractions sum to 1.0. Move an amount between bins in one call.</td>
+<td><code>update_bin_amounts</code></td>
+<td>Each amount is finite and not negative, or <code>None</code> for calibration. The other bins keep their amounts.</td>
 </tr>
 <tr>
 <td><code>update_stratification_fractions</code></td>
@@ -3605,13 +3848,12 @@ absolute, because a proportional rate has no single source to multiply.</p>
 </span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t1&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k * A * B&quot;</span><span class="p">)</span>
 </span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span>
 </span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>        <span class="n">Aggregate</span><span class="p">(</span>
-</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>            <span class="n">total</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
-</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>            <span class="n">bin_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">},</span>
-</span><span id="__span-15-12"><a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a>        <span class="p">),</span>
-</span><span id="__span-15-13"><a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a>        <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
-</span><span id="__span-15-14"><a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a>    <span class="p">)</span>
-</span><span id="__span-15-15"><a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a><span class="p">)</span>
-</span><span id="__span-15-16"><a id="__codelineno-15-16" name="__codelineno-15-16" href="#__codelineno-15-16"></a><span class="c1"># Each step: A loses k*A*B, B loses k*A*B, C gains 2*k*A*B</span>
+</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>            <span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">500</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">500</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>        <span class="p">),</span>
+</span><span id="__span-15-12"><a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a>        <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
+</span><span id="__span-15-13"><a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a>    <span class="p">)</span>
+</span><span id="__span-15-14"><a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a><span class="p">)</span>
+</span><span id="__span-15-15"><a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a><span class="c1"># Each step: A loses k*A*B, B loses k*A*B, C gains 2*k*A*B</span>
 </span></code></pre></div>
 <p>For <strong>independent</strong> flows from several compartments, use the <code>$compartment</code>
 placeholder: the builder creates one transition per source. An empty <code>target</code>
@@ -3624,13 +3866,12 @@ removes the flow from the system.</p>
 </span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;outflow&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;mu * $compartment&quot;</span><span class="p">)</span>
 </span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span>
 </span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>        <span class="n">Aggregate</span><span class="p">(</span>
-</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>            <span class="n">total</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
-</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>            <span class="n">bin_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">},</span>
-</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>        <span class="p">),</span>
-</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>        <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
-</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>    <span class="p">)</span>
-</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a><span class="p">)</span>
-</span><span id="__span-16-15"><a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a><span class="nb">print</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">id</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">outflow</span><span class="o">.</span><span class="n">process</span><span class="o">.</span><span class="n">transitions</span><span class="p">])</span>  <span class="c1"># [&#39;outflow__A&#39;, &#39;outflow__B&#39;]</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>            <span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">500</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">500</span><span class="p">},</span>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>        <span class="p">),</span>
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>        <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
+</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>    <span class="p">)</span>
+</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a><span class="p">)</span>
+</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a><span class="nb">print</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">id</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">outflow</span><span class="o">.</span><span class="n">process</span><span class="o">.</span><span class="n">transitions</span><span class="p">])</span>  <span class="c1"># [&#39;outflow__A&#39;, &#39;outflow__B&#39;]</span>
 </span></code></pre></div>
 <h2 id="units-of-the-axis">Units of the axis<a class="headerlink" href="#units-of-the-axis" title="Permanent link">&para;</a></h2>
 <p>A model knows only steps: a rate is per step, and a position or a period is a

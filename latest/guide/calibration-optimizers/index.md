@@ -40,8 +40,7 @@ def model(k1: float | None, k2: float | None):
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+                bin_amounts={"A": 990, "B": 10, "C": 0},
             ),
             engine="DifferenceEquations",
         )
@@ -60,6 +59,7 @@ def calibrate(optimization_config) -> dict[str, float]:
             CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
             CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
         ],
+        loss_function="sse",
         optimization_config=optimization_config,
         seed=7,
     )
@@ -96,7 +96,7 @@ print(calibrate(nelder_mead))  # {'k1': 0.4, 'k2': 0.1}
 | `verbose`                        | `False`                  | Writes a progress table to `sys.stdout` (a notebook shows it). It shows one start, so it needs `run(starts=1)`.                          |
 | `header_interval`                | `100`                    | With `verbose`, repeats the table header every this many iterations.                                                                     |
 
-The search starts at `initial_guess`, or at the midpoint of the bounds; a start of 0 works. Nelder-Mead searches an unbounded coordinate `u` and scores `x = lo + (hi − lo)·(sin u + 1)/2` (the transform of MINUIT and lmfit), so every value it tries is inside the bounds (`SineTransform` in `crates/commol-calibration/src/optimization.rs`). An optimum exactly at a bound is reached only asymptotically, so it can take more iterations.
+The search starts at `initial_guess`, or at the midpoint of the bounds; a start of 0 works. Nelder-Mead searches an unbounded coordinate `u` and scores `x = lo + (hi − lo)·(sin u + 1)/2` (the transform of MINUIT and lmfit), so every value it tries is inside the bounds (`SineTransform` of the argmin fork). An optimum exactly at a bound is reached only asymptotically, so it can take more iterations. Nelder-Mead needs finite bounds: a run with an infinite bound fails with the message `Nelder-Mead needs finite bounds`.
 
 ## `converged` and `termination_reason`
 
@@ -151,6 +151,7 @@ problem = CalibrationProblem(
         CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
         CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
     ],
+    loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=2000),
     seed=7,
 )

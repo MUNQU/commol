@@ -126,11 +126,12 @@ Practical identifiability from any parameter sample: how much it contracts each 
 
 Attributes:
 
-| Name                    | Type              | Description                                                                                                                                                       |
-| ----------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sample`                | `ParameterSample` | The sample, such as the draws of an uncertainty method.                                                                                                           |
-| `reference`             | `str`             | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds.                                                                 |
-| `correlation_threshold` | `float`           | The absolute correlation above which a pair is listed and its parameters are poorly determined, strictly between 0 and 1. No default: it is a modelling judgment. |
+| Name                    | Type              | Description                                                                                                                                                                                        |
+| ----------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sample`                | `ParameterSample` | The sample, such as the draws of an uncertainty method.                                                                                                                                            |
+| `reference`             | `{bounds, prior}` | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds, or "prior", the prior of each parameter in priors, such as the priors the sample was drawn with. |
+| `correlation_threshold` | `float`           | The absolute correlation above which a pair is listed and its parameters are poorly determined, strictly between 0 and 1. No default: it is a modelling judgment.                                  |
+| `priors`                | \`Priors          | dict[str, Distribution]                                                                                                                                                                            |
 
 Source code in `commol/context/inference/identifiability.py`
 
@@ -145,18 +146,92 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
     ----------
     sample : ParameterSample
         The sample, such as the draws of an uncertainty method.
-    reference : str
+    reference : {"bounds", "prior"}
         The distribution the contraction compares with: ``"bounds"``, the
-        uniform distribution on the bounds.
+        uniform distribution on the bounds, or ``"prior"``, the prior of each
+        parameter in `priors`, such as the priors the sample was drawn with.
     correlation_threshold : float
         The absolute correlation above which a pair is listed and its
         parameters are poorly determined, strictly between 0 and 1. No
         default: it is a modelling judgment.
+    priors : Priors | dict[str, Distribution] | None
+        The prior of each parameter, with ``reference="prior"`` only.
     """
 
     sample: ParameterSample
-    reference: Literal["bounds"]
+    reference: Literal["bounds", "prior"]
     correlation_threshold: float = Field(gt=0.0, lt=1.0)
+    priors: Priors | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def read_priors(cls, data: object) -> object:
+        """Read a mapping of parameter to distribution as `Priors`."""
+        if isinstance(data, Mapping) and data.get("priors") is not None:
+            return {**data, "priors": coerce_priors(data["priors"])}
+        return data
+
+    @model_validator(mode="after")
+    def check_priors(self) -> Self:
+        """The priors go with ``reference="prior"``, and only with it."""
+        if self.reference == "prior" and self.priors is None:
+            raise ValueError(
+                "reference='prior' needs priors: the prior of each parameter."
+            )
+        if self.reference == "bounds" and self.priors is not None:
+            raise ValueError(
+                "priors are read only with reference='prior'; with "
+                "reference='bounds' leave them out."
+            )
+        return self
+```
+
+### Methods:
+
+#### read_priors
+
+```python
+read_priors(data: object) -> object
+```
+
+Read a mapping of parameter to distribution as `Priors`.
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+@model_validator(mode="before")
+@classmethod
+def read_priors(cls, data: object) -> object:
+    """Read a mapping of parameter to distribution as `Priors`."""
+    if isinstance(data, Mapping) and data.get("priors") is not None:
+        return {**data, "priors": coerce_priors(data["priors"])}
+    return data
+```
+
+#### check_priors
+
+```python
+check_priors() -> Self
+```
+
+The priors go with `reference="prior"`, and only with it.
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+@model_validator(mode="after")
+def check_priors(self) -> Self:
+    """The priors go with ``reference="prior"``, and only with it."""
+    if self.reference == "prior" and self.priors is None:
+        raise ValueError(
+            "reference='prior' needs priors: the prior of each parameter."
+        )
+    if self.reference == "bounds" and self.priors is not None:
+        raise ValueError(
+            "priors are read only with reference='prior'; with "
+            "reference='bounds' leave them out."
+        )
+    return self
 ```
 
 ## StartsIdentifiability
@@ -203,15 +278,15 @@ Bases: `_Frozen`
 
 Which parameters the model and the data determine: one structural and one practical verdict per parameter, and the evidence of each method.
 
-The structural verdict comes from `StructuralRank` on the design of the observations; a dense design answers what denser data would determine, so its verdicts stay in its section. The practical verdict comes from `Collinearity`, `SampleIdentifiability` and `StartsIdentifiability`.
+The structural verdict comes from `StructuralRank` on the design of the observations, and from a flat profile; a dense design answers what denser data would determine, so its verdicts stay in its section. The practical verdict comes from `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability` and the other profiles.
 
 Attributes:
 
-| Name                                       | Type                           | Description                                        |
-| ------------------------------------------ | ------------------------------ | -------------------------------------------------- |
-| `parameters`                               | `list[str]`                    | The parameters, in problem order.                  |
-| `verdicts`                                 | `dict[str, ParameterVerdicts]` | The verdicts of each parameter.                    |
-| `structural, collinearity, sample, starts` | `list`                         | The sections of the methods that ran, one per run. |
+| Name                                                | Type                           | Description                                        |
+| --------------------------------------------------- | ------------------------------ | -------------------------------------------------- |
+| `parameters`                                        | `list[str]`                    | The parameters, in problem order.                  |
+| `verdicts`                                          | `dict[str, ParameterVerdicts]` | The verdicts of each parameter.                    |
+| `structural, collinearity, sample, starts, profile` | `list`                         | The sections of the methods that ran, one per run. |
 
 Source code in `commol/context/inference/identifiability.py`
 
@@ -222,9 +297,10 @@ class IdentifiabilityReport(_Frozen):
     practical verdict per parameter, and the evidence of each method.
 
     The structural verdict comes from `StructuralRank` on the design of the
-    observations; a dense design answers what denser data would determine,
-    so its verdicts stay in its section. The practical verdict comes from
-    `Collinearity`, `SampleIdentifiability` and `StartsIdentifiability`.
+    observations, and from a flat profile; a dense design answers what
+    denser data would determine, so its verdicts stay in its section. The
+    practical verdict comes from `Collinearity`, `SampleIdentifiability`,
+    `StartsIdentifiability` and the other profiles.
 
     Attributes
     ----------
@@ -232,7 +308,7 @@ class IdentifiabilityReport(_Frozen):
         The parameters, in problem order.
     verdicts : dict[str, ParameterVerdicts]
         The verdicts of each parameter.
-    structural, collinearity, sample, starts : list
+    structural, collinearity, sample, starts, profile : list
         The sections of the methods that ran, one per run.
     """
 
@@ -242,6 +318,7 @@ class IdentifiabilityReport(_Frozen):
     collinearity: list[CollinearitySection] = Field(default_factory=list)
     sample: list[SampleSection] = Field(default_factory=list)
     starts: list[StartsSection] = Field(default_factory=list)
+    profile: list[ProfileSection] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def check_parameters(self) -> Self:
@@ -309,6 +386,7 @@ class IdentifiabilityReport(_Frozen):
             collinearity=[s for r in reports for s in r.collinearity],
             sample=[s for r in reports for s in r.sample],
             starts=[s for r in reports for s in r.starts],
+            profile=[s for r in reports for s in r.profile],
         )
 ```
 
@@ -423,6 +501,7 @@ def merge(self, *others: "IdentifiabilityReport") -> "IdentifiabilityReport":
         collinearity=[s for r in reports for s in r.collinearity],
         sample=[s for r in reports for s in r.sample],
         starts=[s for r in reports for s in r.starts],
+        profile=[s for r in reports for s in r.profile],
     )
 ```
 
@@ -466,11 +545,11 @@ The structural verdict of one parameter.
 
 Attributes:
 
-| Name           | Type                    | Description                                                                                                                                                                                                          |
-| -------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdict`      | `StructuralVerdictName` | identifiable: the null space of the sensitivities has no component on it. in_combination: only the combinations in combinations are. non_identifiable: it lies in the null space. conflicting: two reports disagree. |
-| `reasons`      | `list[str]`             | Why, one per piece of evidence.                                                                                                                                                                                      |
-| `combinations` | `list[str]`             | The identifiable combinations that hold the parameter, such as "k1 · s".                                                                                                                                             |
+| Name           | Type                    | Description                                                                                                                                                                                                                                                                                                      |
+| -------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verdict`      | `StructuralVerdictName` | identifiable: the null space of the sensitivities has no component on it, or a profile crosses its threshold. in_combination: the data determine it only together with other parameters. non_identifiable: it lies in the null space, or nothing the data read depends on it. conflicting: two reports disagree. |
+| `reasons`      | `list[str]`             | Why, one per piece of evidence.                                                                                                                                                                                                                                                                                  |
+| `combinations` | `list[str]`             | The algebraic combinations that hold the parameter, such as "k1 · s", from the methods that compute them (the structural rank); empty for the verdict of a profile, whose reason names the compensating parameters.                                                                                              |
 
 Source code in `commol/context/inference/identifiability.py`
 
@@ -483,14 +562,17 @@ class StructuralVerdict(_Frozen):
     ----------
     verdict : StructuralVerdictName
         ``identifiable``: the null space of the sensitivities has no
-        component on it. ``in_combination``: only the combinations in
-        `combinations` are. ``non_identifiable``: it lies in the null space.
-        ``conflicting``: two reports disagree.
+        component on it, or a profile crosses its threshold. ``in_combination``:
+        the data determine it only together with other parameters.
+        ``non_identifiable``: it lies in the null space, or nothing the data
+        read depends on it. ``conflicting``: two reports disagree.
     reasons : list[str]
         Why, one per piece of evidence.
     combinations : list[str]
-        The identifiable combinations that hold the parameter, such as
-        ``"k1 · s"``.
+        The algebraic combinations that hold the parameter, such as
+        ``"k1 · s"``, from the methods that compute them (the structural
+        rank); empty for the verdict of a profile, whose reason names the
+        compensating parameters.
     """
 
     verdict: StructuralVerdictName
@@ -758,14 +840,14 @@ The evidence of `SampleIdentifiability`.
 
 Attributes:
 
-| Name                    | Type                          | Description                                                                                                                          |
-| ----------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `reference`             | `str`                         | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds.                                    |
-| `correlation_threshold` | `float`                       | The absolute correlation above which a pair is listed.                                                                               |
-| `contraction`           | `dict[str, float]`            | 1 − Var(sample) / Var(reference) of each parameter: near 0 when the sample spreads as the reference, near 1 when it sits on a value. |
-| `correlation`           | `dict[str, dict[str, float]]` | The weighted correlation matrix.                                                                                                     |
-| `correlated_pairs`      | `list[CorrelatedPair]`        | The pairs above the threshold.                                                                                                       |
-| `modes`                 | `dict[str, list[float]]`      | The modes of the marginal of each parameter.                                                                                         |
+| Name                    | Type                          | Description                                                                                                                                |
+| ----------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `reference`             | `{bounds, prior}`             | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds, or "prior", the prior of each parameter. |
+| `correlation_threshold` | `float`                       | The absolute correlation above which a pair is listed.                                                                                     |
+| `contraction`           | `dict[str, float]`            | 1 − Var(sample) / Var(reference) of each parameter: near 0 when the sample spreads as the reference, near 1 when it sits on a value.       |
+| `correlation`           | `dict[str, dict[str, float]]` | The weighted correlation matrix.                                                                                                           |
+| `correlated_pairs`      | `list[CorrelatedPair]`        | The pairs above the threshold.                                                                                                             |
+| `modes`                 | `dict[str, list[float]]`      | The modes of the marginal of each parameter.                                                                                               |
 
 Source code in `commol/context/inference/identifiability.py`
 
@@ -776,9 +858,10 @@ class SampleSection(_Frozen):
 
     Attributes
     ----------
-    reference : str
+    reference : {"bounds", "prior"}
         The distribution the contraction compares with: ``"bounds"``, the
-        uniform distribution on the bounds.
+        uniform distribution on the bounds, or ``"prior"``, the prior of each
+        parameter.
     correlation_threshold : float
         The absolute correlation above which a pair is listed.
     contraction : dict[str, float]
@@ -792,7 +875,7 @@ class SampleSection(_Frozen):
         The modes of the marginal of each parameter.
     """
 
-    reference: Literal["bounds"]
+    reference: Literal["bounds", "prior"]
     correlation_threshold: float
     contraction: dict[str, float]
     correlation: dict[str, dict[str, float]]
@@ -876,4 +959,50 @@ class StartsSection(_Frozen):
     near_best: list[int]
     spread: dict[str, float]
     flagged: list[str]
+```
+
+## ProfileSection
+
+Bases: `_Frozen`
+
+The evidence of a `ProfileLikelihood`.
+
+Attributes:
+
+| Name        | Type                                        | Description                               |
+| ----------- | ------------------------------------------- | ----------------------------------------- |
+| `threshold` | `{chi_square, beale, bootstrap_calibrated}` | The rule of the threshold.                |
+| `level`     | `float`                                     | The level of each pointwise interval.     |
+| `tolerance` | `float`                                     | The numerical tolerance of the statistic. |
+| `verdicts`  | \`dict\[str, ProfileVerdictName             | None\]\`                                  |
+| `intervals` | \`dict\[str, tuple\[float                   | None, float                               |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+class ProfileSection(_Frozen):
+    """
+    The evidence of a `ProfileLikelihood`.
+
+    Attributes
+    ----------
+    threshold : {"chi_square", "beale", "bootstrap_calibrated"}
+        The rule of the threshold.
+    level : float
+        The level of each pointwise interval.
+    tolerance : float
+        The numerical tolerance of the statistic.
+    verdicts : dict[str, ProfileVerdictName | None]
+        The verdict of each profiled parameter; None when its threshold is
+        below the tolerance.
+    intervals : dict[str, tuple[float | None, float | None]]
+        The interval of each profiled parameter; None on a side that does not
+        cross the threshold.
+    """
+
+    threshold: Literal["chi_square", "beale", "bootstrap_calibrated"]
+    level: float
+    tolerance: float
+    verdicts: dict[str, ProfileVerdictName | None]
+    intervals: dict[str, tuple[float | None, float | None]]
 ```

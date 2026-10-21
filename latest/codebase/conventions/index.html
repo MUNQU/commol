@@ -1286,6 +1286,174 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1648,6 +1816,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -2241,6 +2437,62 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../decisions/local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../decisions/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
   
 
     
@@ -3097,6 +3349,21 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
 <li>Public functions and methods have a NumPy-style docstring: a one-line
   summary, then <code>Parameters</code>, <code>Returns</code> and <code>Raises</code> as needed. Private helpers
   may use a one-line docstring.</li>
+<li>A public class name writes every letter of an acronym in capitals, as PEP 8
+  asks: <code>ABCSMC</code>, <code>SMCResult</code>, <code>ODESolver</code>, <code>PRCC</code>. A method keeps the
+  spelling of the authors who named it, so <code>EnbPI</code> (Xu and Xie 2021) stays
+  as written. Rust names follow the Rust guidelines, in which an acronym is
+  one word (<code>OdeSolver</code>, <code>SmcSampler</code>).
+  <code>tests/docs/test_reference.py::test_public_names_capitalize_acronyms</code>
+  checks the known acronyms of <code>commol.__all__</code>.</li>
+<li>A family of configurations is one class per member, joined in a union:
+  <code>ABCDistance</code> (<code>LossDistance</code>, <code>SeriesDistance</code>), <code>ObservationNoise</code>,
+  <code>Eta</code> (<code>InformationMatchingEta</code>, <code>BootstrapCoverageEta</code>). The user builds
+  a member from its class, so each configuration has one spelling. A
+  classmethod is only an alternative constructor or a preset of its own
+  class (<code>Priors.uniform_on_bounds()</code>, <code>PlotConfig.publication()</code>,
+  <code>ParameterSample.equally_weighted(...)</code>, <code>AxisPattern.pulse(...)</code>); it
+  never returns an instance of another class, such as a subclass.</li>
 <li>Context data structures are Pydantic v2 models.</li>
 <li><code>ModelBuilder</code> methods return <code>Self</code>, so calls chain.</li>
 <li>Log with the standard <code>logging</code> module. Library code never writes to the

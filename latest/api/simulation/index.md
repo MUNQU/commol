@@ -2009,7 +2009,7 @@ def __repr__(self) -> str:
     )
 ```
 
-## OdeSolver
+## ODESolver
 
 Bases: `BaseModel`
 
@@ -2026,7 +2026,7 @@ Attributes:
 Source code in `commol/context/engine.py`
 
 ```python
-class OdeSolver(BaseModel):
+class ODESolver(BaseModel):
     """
     Settings of the ``DifferentialEquations`` engine.
 

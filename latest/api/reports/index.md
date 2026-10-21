@@ -12,13 +12,13 @@ applied_parameters_report(model: Model, result: CalibrationResult | Mapping[str,
 
 Report every parameter of a calibrated model, and the values of its kind.
 
-Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); an aggregate model adds `initial_conditions`.
+Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); an aggregate model adds `initial_amounts` and `category_splits`.
 
-Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` parameters have no place in the model, so they are reported from `problem` when it is given.
+Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` and `noise` parameters have no place in the model, so they are reported from `problem` when it is given.
 
-Initial conditions of an aggregate model carry the effective `value` the engine builds from the uniform expansion plus the declared compartment overrides, its `fraction` as that value over the declared total, and the `group` it belongs to: `total` for bins and unconditional stratifications, and the conditioning categories for a conditional one. The `total` row is the declared total, with fraction 1.0. A bin left uncalibrated keeps a `None` fraction and `None` value as its "needs calibration" marker even when overrides touch some of its compartments.
+`initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin.
 
-With a `sample` each entry gains an `interval` holding the weighted statistics of its draws (`ParameterSample.summary`). A parameter is in the unit it was calibrated in. An initial-condition entry is in the fraction the row reports: a conditional stratification's category is calibrated as a group fraction but reported over the total, so its interval is rescaled by the group's share of the total and brackets the reported fraction.
+With a `sample` each entry gains an `interval` holding the weighted statistics of its draws (`ParameterSample.summary`). Every entry is in the unit it was calibrated in: a parameter in its own, an amount in the unit of its bin, and a category split as a fraction of its group.
 
 Parameters:
 
@@ -26,15 +26,15 @@ Parameters:
 | ------------------ | -------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `model`            | `Model`              | The model carrying the applied values. | *required*                                                                                  |
 | `result`           | \`CalibrationResult  | Mapping\`                              | The calibration result, or a mapping of parameter id to value such as one draw of a sample. |
-| `problem`          | \`CalibrationProblem | None\`                                 | The problem the result came from, used to report factor parameters.                         |
+| `problem`          | \`CalibrationProblem | None\`                                 | The problem the result came from, used to report factor and noise parameters.               |
 | `sample`           | \`ParameterSample    | None\`                                 | Draws of the parameters, such as the sample of an uncertainty method.                       |
 | `confidence_level` | \`float              | None\`                                 | Confidence level of the intervals; required with a sample.                                  |
 
 Returns:
 
-| Type                      | Description                                                                                                                              |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `AppliedParametersReport` | Key parameters and the sections of the kind (initial_conditions for an aggregate model), preceded by confidence_level when there is one. |
+| Type                      | Description                                                                                                                                               |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AppliedParametersReport` | Key parameters and the sections of the kind (initial_amounts and category_splits for an aggregate model), preceded by confidence_level when there is one. |
 
 Raises:
 
@@ -59,30 +59,26 @@ def applied_parameters_report(
     it, so entries the calibration left alone appear alongside the fitted ones.
     The structure of the model adds the sections of its kind
     (`ModelStructure.report_sections`); an aggregate model adds
-    ``initial_conditions``.
+    ``initial_amounts`` and ``category_splits``.
 
     Parameters that are not a single number, such as a formula or a
     series, are omitted: they are inputs rather than fitted values.
-    ``factor`` parameters have no place in the model, so they are reported from
-    `problem` when it is given.
+    ``factor`` and ``noise`` parameters have no place in the model, so they are
+    reported from `problem` when it is given.
 
-    Initial conditions of an aggregate model carry the effective
-    ``value`` the engine builds
-    from the uniform expansion plus the declared compartment overrides, its
-    ``fraction`` as that value over the declared total, and the
-    ``group`` it belongs to: ``total`` for bins and unconditional
-    stratifications, and the conditioning categories for a conditional one.
-    The ``total`` row is the declared total, with fraction 1.0. A bin left
-    uncalibrated keeps a ``None`` fraction and ``None`` value as its "needs
-    calibration" marker even when overrides touch some of its compartments.
+    ``initial_amounts`` gives each bin and each overridden compartment of an
+    aggregate model its ``amount`` the engine builds and the ``unit`` of its
+    bin, so bins of different units are reported side by side; no row is a
+    share of a total. A bin left uncalibrated keeps a ``None`` amount as its
+    "needs calibration" marker even when overrides touch some of its
+    compartments. ``category_splits`` gives each category its ``fraction`` of
+    the group it splits, and that ``group``: the categories a conditional
+    stratification is conditioned on, empty when it splits every bin.
 
     With a `sample` each entry gains an ``interval`` holding the weighted
-    statistics of its draws (`ParameterSample.summary`). A parameter is in
-    the unit it was calibrated in. An
-    initial-condition entry is in the fraction the row reports: a conditional
-    stratification's category is calibrated as a group fraction but reported
-    over the total, so its interval is rescaled by the group's share of the
-    total and brackets the reported fraction.
+    statistics of its draws (`ParameterSample.summary`). Every entry is in
+    the unit it was calibrated in: a parameter in its own, an amount in the
+    unit of its bin, and a category split as a fraction of its group.
 
     Parameters
     ----------
@@ -92,7 +88,8 @@ def applied_parameters_report(
         The calibration result, or a mapping of parameter id to value such as
         one draw of a sample.
     problem : CalibrationProblem | None, optional
-        The problem the result came from, used to report factor parameters.
+        The problem the result came from, used to report factor and noise
+        parameters.
     sample : ParameterSample | None, optional
         Draws of the parameters, such as the sample of an uncertainty method.
     confidence_level : float | None, optional
@@ -101,9 +98,9 @@ def applied_parameters_report(
     Returns
     -------
     AppliedParametersReport
-        Key ``parameters`` and the sections of the kind (``initial_conditions``
-        for an aggregate model), preceded by ``confidence_level`` when there
-        is one.
+        Key ``parameters`` and the sections of the kind (``initial_amounts``
+        and ``category_splits`` for an aggregate model), preceded by
+        ``confidence_level`` when there is one.
 
     Raises
     ------
@@ -121,10 +118,13 @@ def applied_parameters_report(
         for parameter in model.parameters
         if isinstance(parameter.value, (int, float))
     }
-    for factor_id in _factor_ids(problem):
-        if factor_id in calibrated:
-            parameters[factor_id] = _parameter_entry(
-                factor_id, calibrated[factor_id], calibrated_ids, parameter_statistics
+    for observation_id in _observation_parameter_ids(problem):
+        if observation_id in calibrated:
+            parameters[observation_id] = _parameter_entry(
+                observation_id,
+                calibrated[observation_id],
+                calibrated_ids,
+                parameter_statistics,
             )
 
     report: dict[str, object] = {}
@@ -141,7 +141,7 @@ def applied_parameters_report(
 ## simulation_report
 
 ```python
-simulation_report(simulation: Simulation, results: SimulationResults, at: Sequence[float], window: float, num_windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), ensemble_runs: Sequence[SimulationResults] | Predictive | None = None, confidence_level: float | None = None) -> SimulationReport
+simulation_report(simulation: Simulation, results: SimulationResults, at: Sequence[float], window: float, num_windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), ensemble_runs: Sequence[SimulationResults] | Predictive | None = None, confidence_level: float | None = None, prediction_intervals: PredictionIntervals | None = None) -> SimulationReport
 ```
 
 Report the observed data, compartment series and accumulators of a run.
@@ -152,23 +152,24 @@ Callers add whatever envelope they need around these blocks, such as a run label
 
 Parameters:
 
-| Name               | Type                          | Description                                                      | Default                                     |
-| ------------------ | ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------- |
-| `simulation`       | `Simulation`                  | The simulation the results came from.                            | *required*                                  |
-| `results`          | `SimulationResults`           | Results of a run, with their positions.                          | *required*                                  |
-| `at`               | `Sequence[float]`             | Positions the series and cumulative accumulators are sampled at. | *required*                                  |
-| `window`           | `float`                       | Length of one window on the axis.                                | *required*                                  |
-| `num_windows`      | `int`                         | Number of windows on the observed and windowed axes.             | *required*                                  |
-| `observed_data`    | `Iterable[ObservedDataPoint]` | The calibration targets to report alongside the run.             | `()`                                        |
-| `accumulators`     | `Iterable[str]`               | Accumulator ids to report.                                       | `()`                                        |
-| `ensemble_runs`    | \`Sequence[SimulationResults] | Predictive                                                       | None\`                                      |
-| `confidence_level` | \`float                       | None\`                                                           | Confidence level of the reported intervals. |
+| Name                   | Type                          | Description                                                      | Default                                                                                       |
+| ---------------------- | ----------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `simulation`           | `Simulation`                  | The simulation the results came from.                            | *required*                                                                                    |
+| `results`              | `SimulationResults`           | Results of a run, with their positions.                          | *required*                                                                                    |
+| `at`                   | `Sequence[float]`             | Positions the series and cumulative accumulators are sampled at. | *required*                                                                                    |
+| `window`               | `float`                       | Length of one window on the axis.                                | *required*                                                                                    |
+| `num_windows`          | `int`                         | Number of windows on the observed and windowed axes.             | *required*                                                                                    |
+| `observed_data`        | `Iterable[ObservedDataPoint]` | The calibration targets to report alongside the run.             | `()`                                                                                          |
+| `accumulators`         | `Iterable[str]`               | Accumulator ids to report.                                       | `()`                                                                                          |
+| `ensemble_runs`        | \`Sequence[SimulationResults] | Predictive                                                       | None\`                                                                                        |
+| `confidence_level`     | \`float                       | None\`                                                           | Confidence level of the reported intervals.                                                   |
+| `prediction_intervals` | \`PredictionIntervals         | None\`                                                           | Prediction intervals of a conformal method (ConformalResult.intervals), reported as they are. |
 
 Returns:
 
-| Type               | Description                             |
-| ------------------ | --------------------------------------- |
-| `SimulationReport` | Keys observed, series and accumulators. |
+| Type               | Description                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| `SimulationReport` | Keys observed, series and accumulators, then prediction_intervals when they are given. |
 
 Raises:
 
@@ -189,6 +190,7 @@ def simulation_report(
     accumulators: Iterable[str] = (),
     ensemble_runs: "Sequence[SimulationResults] | Predictive | None" = None,
     confidence_level: float | None = None,
+    prediction_intervals: PredictionIntervals | None = None,
 ) -> SimulationReport:
     """
     Report the observed data, compartment series and accumulators of a run.
@@ -223,11 +225,15 @@ def simulation_report(
         engine, or a `Predictive`, whose draws carry their weights.
     confidence_level : float | None, optional
         Confidence level of the reported intervals.
+    prediction_intervals : PredictionIntervals | None, optional
+        Prediction intervals of a conformal method
+        (``ConformalResult.intervals``), reported as they are.
 
     Returns
     -------
     SimulationReport
-        Keys ``observed``, ``series`` and ``accumulators``.
+        Keys ``observed``, ``series`` and ``accumulators``, then
+        ``prediction_intervals`` when they are given.
 
     Raises
     ------
@@ -235,7 +241,7 @@ def simulation_report(
         If the results have no value at a position the report reads.
     """
     accumulator_ids = list(accumulators)
-    return {
+    report: SimulationReport = {
         "observed": observed_report(observed_data, window, num_windows),
         "series": series_report(
             simulation,
@@ -256,6 +262,11 @@ def simulation_report(
             confidence_level,
         ),
     }
+    if prediction_intervals is not None:
+        report["prediction_intervals"] = cast(
+            "PredictionIntervalsReport", prediction_intervals.model_dump()
+        )
+    return report
 ```
 
 ## identifiability_report

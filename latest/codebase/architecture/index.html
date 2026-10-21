@@ -1286,6 +1286,174 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1648,6 +1816,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -2363,6 +2559,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../decisions/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/results/" class="md-nav__link">
         
   
@@ -2938,7 +3190,7 @@ top to bottom. The dashed box is the base that every box uses.</p>
     E3["Stochastic&lt;br/&gt;random events"]
     O[/one series per output/]
     C["Calibration&lt;br/&gt;the problem in layers, optimizers"]
-    I["Inference&lt;br/&gt;parameter sample, predictive, scores,&lt;br/&gt;resampling, sensitivities, identifiability"]
+    I["Inference&lt;br/&gt;parameter sample, predictive, scores,&lt;br/&gt;resampling, conformal, sensitivities, identifiability,&lt;br/&gt;priors, sequential Monte Carlo, global sensitivity"]
     F["Base: commol-core, commol-random&lt;br/&gt;used by every box"]
     J --&gt; M
     M --&gt; E1 &amp; E2 &amp; E3
@@ -2980,12 +3232,12 @@ top to bottom. The dashed box is the base that every box uses.</p>
 <tr>
 <td>Calibration</td>
 <td><code>commol-calibration</code></td>
-<td>The calibration problem in layers (forward model, observation operator, feasibility, discrepancy, optimization objective), and the optimizers that find the values that make an engine match observations, from one or several starts.</td>
+<td>The calibration problem in layers (forward model, observation operator, feasibility, discrepancy: a loss or the likelihood of observation models, optimization objective), and the optimizers that find the values that make an engine match observations, from one or several starts, or with one parameter or prediction held fixed (<code>Subproblem</code>).</td>
 </tr>
 <tr>
 <td>Inference</td>
 <td><code>commol-inference</code></td>
-<td>What every uncertainty method returns or reads: the weighted parameter sample, the one quantile, the predictive of a sample, its observation noise and its scores; the resampling methods, which fit copies of the problem with other data (<code>CalibrationProblem::with_data</code>); the port of sensitivities and the identifiability analyses. It depends on calibration, never the reverse.</td>
+<td>What every uncertainty method returns or reads: the weighted parameter sample, the one quantile, the predictive of a sample, its observation noise and its scores; the resampling methods, which fit copies of the problem with other data (<code>CalibrationProblem::with_data</code>); the conformal prediction intervals; the port of sensitivities and the identifiability analyses; the distributions and priors, and the sequential Monte Carlo sampler with its targets (Gibbs posterior, ABC, the posterior of observation models); the noise, the parametric bootstrap and the log score of observation models; the input spaces, designs, quantities of interest and estimators of global sensitivity, which run on a forward model with no observations; the profile likelihood of parameters and predictions and its thresholds. It depends on calibration, never the reverse.</td>
 </tr>
 </tbody>
 </table>

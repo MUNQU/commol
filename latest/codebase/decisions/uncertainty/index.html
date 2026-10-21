@@ -18,7 +18,7 @@
         <link rel="prev" href="../calibration/">
       
       
-        <link rel="next" href="../results/">
+        <link rel="next" href="../local-approximations/">
       
       
         
@@ -1286,6 +1286,174 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1648,6 +1816,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -2350,6 +2546,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#one-smc-core-many-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One SMC core, many targets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#observation-noise-is-an-argument" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2360,10 +2567,88 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#conformal-variants-share-one-score-and-one-quantile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conformal variants share one score and one quantile
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-analysis-needs-no-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An analysis needs no data
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2869,10 +3154,43 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#one-smc-core-many-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One SMC core, many targets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#observation-noise-is-an-argument" class="md-nav__link">
     <span class="md-ellipsis">
       
         Observation noise is an argument
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conformal-variants-share-one-score-and-one-quantile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conformal variants share one score and one quantile
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-analysis-needs-no-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An analysis needs no data
       
     </span>
   </a>
@@ -2901,8 +3219,8 @@
 
 <h1 id="uncertainty">Uncertainty<a class="headerlink" href="#uncertainty" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>How the uncertainty methods share one sample, one entry point and their ports,
-and what a replicate may change.</p>
+<p>How the uncertainty methods share one sample, one registry, their ports and
+one sampler, what a replicate may change, and why an analysis needs no data.</p>
 <h2 id="a-sample-carries-its-weights">A sample carries its weights<a class="headerlink" href="#a-sample-carries-its-weights" title="Permanent link">&para;</a></h2>
 <p>A method with draws returns its own result type, which holds a
 <code>ParameterSample</code> (<code>crates/commol-inference/src/sample.rs</code>,
@@ -2933,11 +3251,13 @@ weights give the unweighted statistic.</p>
 <code>tests/uncertainty/test_sample.py</code>.</p>
 <h2 id="methods-plug-into-one-entry-point">Methods plug into one entry point<a class="headerlink" href="#methods-plug-into-one-entry-point" title="Permanent link">&para;</a></h2>
 <p><code>Calibrator.uncertainty(method: UncertaintyMethod[R]) -&gt; R</code> runs every
-uncertainty method, and <code>Calibrator.identifiability(method:
-IdentifiabilityMethod[R]) -&gt; R</code> every identifiability method. Both kinds
-subclass <code>InferenceMethod[R]</code> (<code>context/inference/method.py</code>) and share one
-registry; each entry point refuses the other kind with a <code>TypeError</code> that
-names the right one.
+uncertainty method, <code>Calibrator.identifiability(method:
+IdentifiabilityMethod[R]) -&gt; R</code> every identifiability method, and
+<code>SensitivityAnalysis.run(method: SensitivityMethod[R]) -&gt; R</code> every sensitivity
+method. The kinds subclass <code>InferenceMethod[R]</code> (<code>context/inference/method.py</code>)
+and share one registry, which hands each runner the object of its entry
+point; each entry point refuses another kind with a <code>TypeError</code> that names the
+right one.
 A method is three parts: a configuration that subclasses <code>UncertaintyMethod</code>
 with its result type (<code>context/inference/</code>), a runner in Rust bound in
 <code>py-commol/src/inference.rs</code>, and a result (<code>context/inference/</code>). It registers
@@ -2981,7 +3301,7 @@ knows how its derivatives are made. <code>FiniteDifferences</code> is the first:
 differences, one-sided of second order at a bound, with the step
 <code>h = η^{1/3} · max(|θ|, w)</code> (at most <code>w / 8</code>), where <code>η</code> is the output
 accuracy of the engine (<code>SimulationEngine::output_accuracy</code>: machine epsilon,
-or the <code>rtol</code> of the ODE engine) and <code>w</code> the width of the bounds. Each entry
+or the <code>rtol</code> of the ODE engine) and <code>w</code> the width of the bounds (1 when infinite). Each entry
 carries an estimated error, from the steps <code>h</code> and <code>2h</code> and the accuracy of
 the runs; the structural rank counts a singular value only above the norm of
 that error (Weyl's inequality). The scaled sensitivities
@@ -3087,10 +3407,91 @@ window of positions (<code>BlockScheme</code>), and <code>block_length</code> ha
 <p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_with_data.rs</code>,
 <code>crates/commol-inference/tests/test_resampling.rs</code>,
 <code>tests/uncertainty/test_resampling.py</code>.</p>
+<h2 id="one-smc-core-many-targets">One SMC core, many targets<a class="headerlink" href="#one-smc-core-many-targets" title="Permanent link">&para;</a></h2>
+<p>Every sequential Monte Carlo method runs on one sampler, <code>SmcSampler</code>
+(<code>crates/commol-inference/src/smc/sampler.rs</code>), which knows no method. A
+method is a <code>TemperedTarget</code> of two steps: <code>evaluate(θ, stream)</code> runs the
+model once (one fresh replicate, seeded from the particle's stream, with a
+stochastic engine) and gives the value the particle keeps, or <code>None</code> outside
+the support (<code>discrepancy_in_support</code>); <code>log_kernel(value, level)</code> is a pure
+function of that value. Reweighting and the choice of the next level read the
+kept values, so they run no model: only a proposed move calls <code>evaluate</code>. The
+Gibbs posterior keeps the loss (<code>−level · η · loss</code>, temperatures from 0 to
+1); ABC keeps the distance (0 within the tolerance, <code>−∞</code> outside); the
+posterior of observation models (<code>LikelihoodTarget</code>, <code>smc/likelihood.rs</code>)
+keeps the log-likelihood (<code>level · log L</code>), so its log evidence is the log
+marginal likelihood.</p>
+<p>The sampler owns the rest, the same for every target: the next level by
+bisection on the conditional effective sample size, to <code>target_cess</code>;
+systematic resampling under <code>resample_threshold</code>; random-walk Metropolis on
+the unbounded scale of <code>transform.rs</code>, with the covariance of the particles
+times <code>2.38² / d</code> and the log Jacobian in the acceptance; and
+<code>⌈log c / log(1 − a)⌉</code> moves per step, with <code>a</code> the acceptance of the first
+move and <code>c</code> the required <code>stay_probability</code>. Every particle draws from its
+own stream, so a run repeats from its seed whatever the threads. ABC reaches
+the same rule with weights of 0 or 1: the next tolerance is the weighted
+quantile of the distances, so <code>ABCSMC</code> takes <code>target_cess</code> and no quantile.
+ABC resamples at every step, since a particle of weight 0 cannot move, and
+when the first move of a step accepts less than <code>min_acceptance</code> it keeps the
+particles of the step before, whose moves completed.</p>
+<p>Every prior is a <code>Distribution</code> of one family (<code>distribution.rs</code>), truncated
+to its parameter's bounds and drawn by inverting its distribution function
+with special functions on <code>libm</code>, so a seed gives the same draws on every
+platform. Each sampling method takes <code>priors</code> with no default, and <code>η</code> of a
+Gibbs posterior has no default either: a number or a calibration.
+Information matching reads the curvature and the meat of the sandwich;
+bootstrap coverage interpolates the per-replicate thresholds of <code>η</code> at the
+positions <code>i / (M + 1)</code>, because the largest <code>η</code> that covers at the level is
+an order statistic whose expected coverage is below it.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One sampler per method (population Monte Carlo for ABC, a tempering sampler for the Gibbs posterior)</td>
+<td>Two codes for resampling, moves and diagnostics, which drift apart.</td>
+</tr>
+<tr>
+<td><code>log_kernel(θ, level)</code> that runs the model</td>
+<td>Every change of level would run every particle again, and with a stochastic engine a new simulation would replace the distance a particle was accepted with, so ABC would no longer sample its target.</td>
+</tr>
+<tr>
+<td>The problem's replicates and their summary for ABC</td>
+<td>ABC is valid only when each particle keeps the distance of one simulation.</td>
+</tr>
+<tr>
+<td>Moves on the scale of the parameters</td>
+<td>Proposals near a bound fall outside, each at the cost of a model run, and a parameter over orders of magnitude has a skewed posterior.</td>
+</tr>
+<tr>
+<td>A fixed number of moves, or moves until the mean squared jump stabilizes</td>
+<td>A cost hidden in the code, or no rule a test can check.</td>
+</tr>
+<tr>
+<td>Distributions from a dependency</td>
+<td>Their draws change with its version.</td>
+</tr>
+<tr>
+<td>A uniform prior by default, or <code>η = 1</code></td>
+<td>A modelling choice made silently; the loss has no scale.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_smc.rs</code>,
+<code>crates/commol-inference/tests/test_distributions.rs</code>,
+<code>tests/uncertainty/test_smc.py</code>,
+<code>tests/uncertainty/test_coverage.py</code> (<code>TestGibbsPosterior</code>, <code>TestABCSMC</code>).</p>
 <h2 id="observation-noise-is-an-argument">Observation noise is an argument<a class="headerlink" href="#observation-noise-is-an-argument" title="Permanent link">&para;</a></h2>
 <p>Every reader of observations of a sample (<code>Predictive.at_observations</code>, every
 function of <code>commol.scores</code>) takes the noise with no default: <code>NoNoise()</code> gives
-a band of the model, <code>ResidualNoise(...)</code> a prediction interval. The Rust port
+a band of the model, <code>ResidualNoise(...)</code> and <code>DistributionNoise()</code> (the
+observation models of the problem) a prediction interval. The log score needs
+a density, so it takes only <code>DistributionNoise</code>; the parametric bootstrap
+(<code>ParametricResampler</code>) draws its data sets with the same draws. The Rust port
 <code>ObservationNoise</code> (<code>crates/commol-inference/src/predictive.rs</code>) sees one
 draw's whole vector of observations with the draw's parameter values, so a
 noise can draw blocks of residuals across observations, and a noise model can
@@ -3118,8 +3519,93 @@ has residuals of.</p>
 </tr>
 </tbody>
 </table>
+<p>| A kernel density of the draws for the log score | A bandwidth to choose, and bias in the tails the log score weighs most. |</p>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_resampling.rs::residual_noise_rejects_a_series_with_no_residuals</code>,
-<code>tests/uncertainty/test_resampling.py::TestResidualNoise</code>.</p>
+<code>tests/uncertainty/test_resampling.py::TestResidualNoise</code>,
+<code>crates/commol-inference/tests/test_likelihood_target.rs</code>,
+<code>tests/uncertainty/test_scores.py::TestLogScore</code>.</p>
+<h2 id="conformal-variants-share-one-score-and-one-quantile">Conformal variants share one score and one quantile<a class="headerlink" href="#conformal-variants-share-one-score-and-one-quantile" title="Permanent link">&para;</a></h2>
+<p>A conformal variant only chooses which predictions and which held-out values
+feed a <code>NonconformityScore</code>; the score, its scale and the quantile
+<code>⌈(n + 1)(1 − α)⌉</code> live once (<code>crates/commol-inference/src/conformal/score.rs</code>,
+<code>quantile.rs</code>). <code>score</code>, <code>by</code> and <code>level</code> are required in every variant, and
+<code>check_conformal_settings</code> rejects in Rust <code>"normalized"</code> per series. A horizon
+of <code>RollingConformal</code> is a count of observations after the origin. <code>EnbPI</code>
+draws its own block counts through <code>ReplicateRunner::fit_one</code>, and
+<code>AdaptiveConformal</code> keeps its state in Rust (<code>AdaptiveLevel</code>) and returns the
+same <code>ConformalResult</code> as every variant.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A default score or pooling</td>
+<td>The choice sets the pattern of the widths, a modelling choice.</td>
+</tr>
+<tr>
+<td><code>"normalized"</code> per series</td>
+<td>Its factor is one constant per series, so its intervals equal those of <code>"absolute"</code>.</td>
+</tr>
+<tr>
+<td>A horizon as a distance on the axis</td>
+<td>Positions are <code>f64</code> and can be irregular, so each point would have its own horizon and an unbounded interval.</td>
+</tr>
+<tr>
+<td>A <code>CVPlus</code> class</td>
+<td>Blocks of consecutive positions make the folds of CV+, so it is jackknife+ with a longer <code>block_length</code>.</td>
+</tr>
+<tr>
+<td>EnbPI on a <code>BootstrapResult</code></td>
+<td>No bootstrap leaves a block out, so no replicate gives a leave-one-out prediction.</td>
+</tr>
+<tr>
+<td>A mutable Python <code>AdaptiveConformal</code></td>
+<td>Configurations are frozen, and every variant returns one result type.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_conformal.rs</code>,
+<code>tests/uncertainty/test_conformal.py</code>, the studies of
+<code>tests/uncertainty/test_coverage.py</code>.</p>
+<h2 id="an-analysis-needs-no-data">An analysis needs no data<a class="headerlink" href="#an-analysis-needs-no-data" title="Permanent link">&para;</a></h2>
+<p><code>ForwardAnalysis</code> runs every method on <code>ForwardModel::unobserved</code> (values
+written as a calibration writes them). Quantities read the observation
+operator. A design point is the mean of its replicates on common seeds; a
+predictive or a propagation gives each replicate of each draw its own seed
+(<code>run_sets</code>), and each purpose has a stream (<code>stream_seed</code>). Morris, Sobol
+and chaos refuse a sample; PRCC reads its weights.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A problem with fake observations</td>
+<td>Invented data in a type that means a fit.</td>
+</tr>
+<tr>
+<td>Python callables as quantities</td>
+<td>Every run would return to Python, one at a time.</td>
+</tr>
+<tr>
+<td>Resampling a sample to equal weights</td>
+<td>Repeated draws that the test of PRCC counts as independent.</td>
+</tr>
+<tr>
+<td>Hermite polynomials for a normal input</td>
+<td>Every distribution is truncated, so they are not orthogonal.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_global_sensitivity.rs</code>,
+<code>tests/uncertainty/test_sensitivity.py</code>.</p>
 
 
 

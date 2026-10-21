@@ -37,8 +37,7 @@ model = (
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -67,8 +66,7 @@ model = (
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k3")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.999, "M": 0.0, "B": 0.001, "C": 0.0},
+            bin_amounts={"A": 999, "M": 0, "B": 1, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -100,8 +98,7 @@ model = (
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -153,8 +150,7 @@ model = (
     )
     .build(
         Aggregate(
-            total=10000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 9900, "B": 100, "C": 0},
             stratification_fractions={"group": {"g1": 0.25, "g2": 0.55, "g3": 0.2}},
         ),
         engine="DifferenceEquations",
@@ -187,8 +183,7 @@ model = (
     .add_transition(id="return_CA", source=["C"], target=["A"], rate="k3")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -220,8 +215,7 @@ model = (
     )
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.95, "B": 0.05, "C": 0.0},
+            bin_amounts={"A": 950, "B": 50, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -262,8 +256,7 @@ model = (
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
             stratification_fractions={
                 "group": {"g1": 0.6, "g2": 0.4},
                 "type": {"t1": 0.8, "t2": 0.2},
@@ -306,8 +299,7 @@ model = (
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
             stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
         ),
         engine="DifferenceEquations",
@@ -365,8 +357,7 @@ model = (
     )
     .build(
         Aggregate(
-            total=10000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 9900, "B": 100, "C": 0},
             stratification_fractions={
                 "group": {"g1": 0.6, "g2": 0.4},
                 "subtype": {"s1": 0.7, "s2": 0.3},
@@ -425,8 +416,7 @@ model = (
     )
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            bin_amounts={"A": 990, "B": 10, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -506,8 +496,7 @@ model = (
     .add_transition("flow", ["A"], ["B"], rate=rate)
     .build(
         Aggregate(
-            total=10000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 10000, "B": 0},
         ),
         "DifferenceEquations",
     )
@@ -542,8 +531,7 @@ model = (
     .add_transition("flow", ["A"], ["B"], rate=rate)
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 1000, "B": 0},
             stratification_fractions={"group": {"cat1": 0.5, "cat2": 0.5}},
         ),
         "DifferenceEquations",

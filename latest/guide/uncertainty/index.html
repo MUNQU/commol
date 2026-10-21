@@ -1474,6 +1474,174 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1836,6 +2004,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -2419,6 +2615,62 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../codebase/decisions/local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../codebase/decisions/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
   
 
     
@@ -3042,11 +3294,11 @@ Each method has its own page, listed in the table below.</p>
 <tbody>
 <tr>
 <td>Which parameters fit the data?</td>
-<td>The <a href="identifiability/">identifiability</a> methods; a sample of the parameters, or a profile of the loss; several starts that end apart with equal losses show that the data do not identify the parameters</td>
+<td>The <a href="identifiability/">identifiability</a> methods; a sample of the parameters, or a <a href="profiles/">profile</a> of the likelihood or the loss; several starts that end apart with equal losses show that the data do not identify the parameters</td>
 </tr>
 <tr>
 <td>How do the inputs move the outputs?</td>
-<td>The predictive of a sample: the run of every draw, and its band</td>
+<td>The predictive of a sample: the run of every draw, and its band; with no data, a <a href="sensitivity/">sensitivity analysis</a>, which propagates the inputs and ranks them</td>
 </tr>
 <tr>
 <td>Are the intervals calibrated?</td>
@@ -3061,11 +3313,13 @@ observation will fall: an observation also carries measurement noise. A
 <strong>prediction interval</strong> adds that noise to every draw before it reduces them
 (the <code>ObservationNoise</code> port of <code>commol-inference</code>). Every reader of
 observations takes the noise as an argument with no default: <code>NoNoise()</code> gives
-a band of the model, and <code>ResidualNoise(...)</code> adds residuals of a fit, which
+a band of the model, <code>ResidualNoise(...)</code> adds residuals of a fit, which
 gives a prediction interval with no noise model
-(<a href="resampling/#prediction-intervals">Resampling</a>). Comparing a band of the
+(<a href="resampling/#prediction-intervals">Resampling</a>), and <code>DistributionNoise()</code>
+draws from the <a href="observation-models/">observation models</a> of the problem. Comparing a band of the
 model with data underestimates the spread, so its coverage of the data is below
-its level.</p>
+its level. A <a href="conformal/">conformal</a> interval is a prediction interval with a
+coverage guarantee, from the scores of observations the fit did not use.</p>
 <h2 id="which-method-answers-which-question">Which method answers which question<a class="headerlink" href="#which-method-answers-which-question" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3137,6 +3391,138 @@ its level.</p>
 <td>No</td>
 <td><a href="resampling/#prediction-intervals">Resampling</a></td>
 </tr>
+<tr>
+<td><code>GibbsPosterior</code></td>
+<td>A posterior of the parameters from the loss and priors, with a scale <code>η</code> of the loss</td>
+<td>No</td>
+<td><a href="smc/#gibbs-posterior">Sequential Monte Carlo</a></td>
+</tr>
+<tr>
+<td><code>ABCSMC</code></td>
+<td>A posterior of the parameters whose runs come within a tolerance of the data, with priors</td>
+<td>No</td>
+<td><a href="smc/#abc">Sequential Monte Carlo</a></td>
+</tr>
+<tr>
+<td><code>ABCRejection</code></td>
+<td>The same, from the closest draws of the priors</td>
+<td>No</td>
+<td><a href="smc/#abc">Sequential Monte Carlo</a></td>
+</tr>
+<tr>
+<td><code>SplitConformal</code></td>
+<td>Where new observations fall, with a guaranteed coverage, from held-out observations</td>
+<td>No</td>
+<td><a href="conformal/#split-conformal">Conformal</a></td>
+</tr>
+<tr>
+<td><code>RollingConformal</code></td>
+<td>Where the next observations fall at each horizon ahead of the data</td>
+<td>No</td>
+<td><a href="conformal/#rolling-origins">Conformal</a></td>
+</tr>
+<tr>
+<td><code>JackknifePlus</code></td>
+<td>Where new observations fall, with a guaranteed coverage and no held-out data</td>
+<td>No</td>
+<td><a href="conformal/#jackknife">Conformal</a></td>
+</tr>
+<tr>
+<td><code>EnbPI</code></td>
+<td>Where the next observations of a series with dependent errors fall</td>
+<td>No</td>
+<td><a href="conformal/#enbpi">Conformal</a></td>
+</tr>
+<tr>
+<td><code>AdaptiveConformal</code></td>
+<td>Intervals for observations as they arrive, whose share of misses tends to its level</td>
+<td>No</td>
+<td><a href="conformal/#adaptive-conformal-inference">Conformal</a></td>
+</tr>
+<tr>
+<td><code>observation_models</code> with <code>Calibrator.run()</code></td>
+<td>The maximum-likelihood fit of the parameters and the noise</td>
+<td>Yes</td>
+<td><a href="observation-models/#maximum-likelihood-against-the-posterior">Observation Models</a></td>
+</tr>
+<tr>
+<td><code>BayesianPosterior</code></td>
+<td>The posterior of the parameters from the likelihood and priors, with its evidence</td>
+<td>Yes</td>
+<td><a href="observation-models/#maximum-likelihood-against-the-posterior">Observation Models</a></td>
+</tr>
+<tr>
+<td><code>ParametricBootstrap</code></td>
+<td>How far the parameters move in data sets drawn from the models at the fit</td>
+<td>Yes</td>
+<td><a href="observation-models/#maximum-likelihood-against-the-posterior">Observation Models</a></td>
+</tr>
+<tr>
+<td><code>DistributionNoise</code></td>
+<td>Where the next observations fall: a prediction interval of the models</td>
+<td>Yes</td>
+<td><a href="observation-models/#prediction-with-noise">Observation Models</a></td>
+</tr>
+<tr>
+<td><code>Laplace</code></td>
+<td>A normal around the fit from the curvature of <code>−log L</code>, and the band of the outputs by the delta method</td>
+<td>Yes</td>
+<td><a href="local/#laplace-approximation-and-the-delta-method">Local Approximations</a></td>
+</tr>
+<tr>
+<td><code>Sandwich</code></td>
+<td>A covariance around the fit that holds when the noise model is wrong or the noise depends on its neighbours</td>
+<td>No</td>
+<td><a href="local/#sandwich">Local Approximations</a></td>
+</tr>
+<tr>
+<td><code>LaplaceMixture</code></td>
+<td>A posterior from Laplace approximations at the optima of several starts, corrected by importance sampling, with <code>k_hat</code></td>
+<td>With <code>LikelihoodTarget</code></td>
+<td><a href="local/#laplace-mixture-and-importance-sampling">Local Approximations</a></td>
+</tr>
+<tr>
+<td><code>Propagation</code></td>
+<td>How uncertainty in the inputs moves the outputs, with no data</td>
+<td>No</td>
+<td><a href="sensitivity/#propagation">Sensitivity Analysis</a></td>
+</tr>
+<tr>
+<td><code>PRCC</code></td>
+<td>How steadily each output rises or falls with each input, of independent inputs or a sample</td>
+<td>No</td>
+<td><a href="sensitivity/#prcc">Sensitivity Analysis</a></td>
+</tr>
+<tr>
+<td><code>Morris</code></td>
+<td>Which inputs matter, in few runs</td>
+<td>No</td>
+<td><a href="sensitivity/#morris-screening">Sensitivity Analysis</a></td>
+</tr>
+<tr>
+<td><code>Sobol</code></td>
+<td>The share of the variance of an output each input explains, alone and with interactions</td>
+<td>No</td>
+<td><a href="sensitivity/#sobol-indices">Sensitivity Analysis</a></td>
+</tr>
+<tr>
+<td><code>PolynomialChaos</code></td>
+<td>A polynomial surrogate of an output and its Sobol indices, in few runs</td>
+<td>No</td>
+<td><a href="sensitivity/#polynomial-chaos">Sensitivity Analysis</a></td>
+</tr>
+<tr>
+<td><code>ProfileLikelihood</code></td>
+<td>The interval of each parameter and whether the data determine it, from refits with the parameter held</td>
+<td>No: <code>Threshold.chi_square</code> needs one, <code>beale</code> and <code>bootstrap_calibrated</code> do not</td>
+<td><a href="profiles/">Profile Likelihood</a></td>
+</tr>
+<tr>
+<td><code>PredictionProfile</code></td>
+<td>The interval of a prediction: the values the data do not reject</td>
+<td>No, as <code>ProfileLikelihood</code></td>
+<td><a href="profiles/#prediction-profiles">Profile Likelihood</a></td>
+</tr>
 </tbody>
 </table>
 <p>Each uncertainty method adds its row here when it lands.</p>
@@ -3169,7 +3555,7 @@ its level.</p>
 </span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>        <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * A * B / total&quot;</span><span class="p">)</span>
 </span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>        <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_bc&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k2 * B&quot;</span><span class="p">)</span>
 </span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>        <span class="o">.</span><span class="n">build</span><span class="p">(</span>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>            <span class="n">Aggregate</span><span class="p">(</span><span class="n">total</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">bin_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mf">0.99</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">}),</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>            <span class="n">Aggregate</span><span class="p">(</span><span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">990</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">}),</span>
 </span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>            <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
 </span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>        <span class="p">)</span>
 </span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>    <span class="p">)</span>
@@ -3310,9 +3696,14 @@ values, and <code>member_statistics</code> reduces ensemble members with it.</p>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">weighted_quantiles</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">],</span> <span class="n">levels</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">],</span> <span class="n">weights</span><span class="o">=</span><span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">]))</span>  <span class="c1"># [0.75]</span>
 </span></code></pre></div>
 <h2 id="the-predictive">The predictive<a class="headerlink" href="#the-predictive" title="Permanent link">&para;</a></h2>
-<p><code>Predictive(calibrator, sample, positions)</code> runs every draw at <code>positions</code>, in
-parallel in Rust. With a stochastic engine every replicate of a draw is a draw
-of the predictive, with an equal share of its weight.</p>
+<p><code>Predictive(source, sample, positions)</code> runs every draw at <code>positions</code>, in
+parallel in Rust, through the forward model of its source: a <code>Calibrator</code>, or
+a <code>SensitivityAnalysis</code> of the inputs of the sample. With a stochastic engine
+every replicate of a draw is a draw of the predictive, with an equal share of
+its weight and a seed of its own, derived from the seed of the source, so
+every draw shows fresh noise and the predictive repeats from that seed.
+The positions are sorted and unique, and each one is a position the engine
+reports at; otherwise <code>Predictive</code> raises <code>ValueError</code> before any draw runs.</p>
 <table>
 <thead>
 <tr>
@@ -3331,7 +3722,7 @@ of the predictive, with an equal share of its weight.</p>
 </tr>
 <tr>
 <td><code>at_observations(observed_data, noise)</code></td>
-<td>Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with <code>noise</code> drawn from the calibrator's seed: <code>NoNoise()</code> or <code>ResidualNoise(...)</code> (<code>ObservationDraws</code>)</td>
+<td>Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with <code>noise</code> drawn from the calibrator's seed: <code>NoNoise()</code>, <code>ResidualNoise(...)</code> or <code>DistributionNoise()</code> (<code>ObservationDraws</code>)</td>
 </tr>
 <tr>
 <td><code>runs()</code>, <code>weights</code></td>
@@ -3350,7 +3741,8 @@ return a <code>Score</code>: the value of each observation, the mean of each ser
 the overall mean. Which observations to score and the observation noise are
 arguments with no default: score data the method did not see, such as the
 held-out positions above, and say whether you score a band of the model
-(<code>NoNoise()</code>) or a prediction interval (<code>ResidualNoise(...)</code>).</p>
+(<code>NoNoise()</code>) or a prediction interval (<code>ResidualNoise(...)</code>,
+<code>DistributionNoise()</code>).</p>
 <table>
 <thead>
 <tr>
@@ -3385,6 +3777,11 @@ held-out positions above, and say whether you score a band of the model
 <td><code>F(y)</code>, randomized where draws tie with <code>y</code></td>
 <td>Uniform</td>
 </tr>
+<tr>
+<td><code>log_score(predictive, observations, DistributionNoise())</code></td>
+<td><code>log Σ_d w_d · p(y | μ_d)</code>, the log density of <code>y</code> under the mixture of the observation models over the draws; another noise raises a <code>TypeError</code></td>
+<td>Higher</td>
+</tr>
 </tbody>
 </table>
 <h2 id="the-entry-point">The entry point<a class="headerlink" href="#the-entry-point" title="Permanent link">&para;</a></h2>
@@ -3398,7 +3795,10 @@ the configuration's type. A configuration with no registered runner raises a
 <code>IdentifiabilityMethod[R]</code>: they answer another question
 (<a href="identifiability/">Identifiability</a>). Both kinds subclass
 <code>InferenceMethod[R]</code> and share one registry; each entry point refuses the
-other kind with a <code>TypeError</code> that names the right one.</p>
+other kind with a <code>TypeError</code> that names the right one. The sensitivity
+methods, subclasses of <code>SensitivityMethod[R]</code>, run with no data through
+<code>SensitivityAnalysis(simulation, inputs).run(method)</code>, the third entry point
+of the registry (<a href="sensitivity/">Sensitivity Analysis</a>).</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">BayesianBootstrap</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">result</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span><span class="n">BayesianBootstrap</span><span class="p">(</span><span class="n">replicates</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">block_length</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
@@ -3422,6 +3822,22 @@ other kind with a <code>TypeError</code> that names the right one.</p>
 <tr>
 <td>Bootstraps, the jackknife and prediction intervals with no noise model</td>
 <td><a href="resampling/">Resampling</a></td>
+</tr>
+<tr>
+<td>Posteriors with no noise model: the Gibbs posterior and ABC</td>
+<td><a href="smc/">Sequential Monte Carlo</a></td>
+</tr>
+<tr>
+<td>Maximum likelihood, the posterior and prediction intervals of observation models</td>
+<td><a href="observation-models/">Observation Models</a></td>
+</tr>
+<tr>
+<td>Prediction intervals with a coverage guarantee</td>
+<td><a href="conformal/">Conformal Prediction Intervals</a></td>
+</tr>
+<tr>
+<td>How the inputs move the outputs, with no data</td>
+<td><a href="sensitivity/">Sensitivity Analysis</a></td>
 </tr>
 <tr>
 <td>Several starts of an optimizer</td>

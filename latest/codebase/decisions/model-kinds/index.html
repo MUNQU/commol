@@ -1286,6 +1286,174 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1648,6 +1816,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -2343,6 +2539,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../results/" class="md-nav__link">
         
   
@@ -2842,7 +3094,7 @@
 use only <code>Model</code> and the methods of <code>ModelStructure</code>
 (<code>py-commol/commol/context/structure.py</code>), and in Rust only the
 <code>SimulationEngine</code> trait (<code>crates/commol-core/src/simulation_engine.rs</code>). What
-only an aggregate model has (compartments, initial fractions) is behind them:
+only an aggregate model has (compartments, initial amounts) is behind them:
 <code>Aggregate</code> (<code>context/aggregate.py</code>), and in Rust <code>CompartmentalEngine</code> and
 <code>InitialConditionPlan</code> (<code>crates/commol-model/</code>). A new kind, such as an agent
 network, is a new <code>ModelStructure</code> subclass with its engines in the list;
@@ -2905,7 +3157,7 @@ kinds of model: <code>Aggregate</code> lays the process out as amounts per compa
 <code>Network</code> and <code>Agents</code> come with their proposals (<a href="https://github.com/MUNQU/commol/issues/144">#144</a>, <a href="https://github.com/MUNQU/commol/issues/145">#145</a>). It is tagged in JSON by <code>kind</code>. In
 Python <code>Model</code> is generic in its structure class: <code>ModelBuilder.build(structure,
 engine)</code> returns a <code>Model</code> of the class of <code>structure</code> (a <code>TypeVar</code>, never a
-value), so <code>model.structure.total</code> type-checks, and <code>Model.from_json</code> reads the
+value), so <code>model.structure.bin_amounts</code> type-checks, and <code>Model.from_json</code> reads the
 class from the <code>kind</code> and <code>variant</code> of the file. The engine is part of the
 model because it sets what a rate means.</p>
 <p>The interface of a kind stays on the structure and reads the process from the
@@ -2949,9 +3201,9 @@ kind and the variant; the Python registry (<code>ModelStructure._kinds</code>) i
 reads the variant only to run its checks (<code>AggregateVariant::check</code>), so the
 engines do not change. A subclass with no tag would load back as its base class
 and compare unequal; a kind per narrower form would split the structures again.</p>
-<p>The fractions of <code>Aggregate</code> are mappings by id (<code>bin_fractions={"A": 0.99}</code>),
-in Python and in the file, and Rust keeps their order (<code>IndexMap</code>). A list of
-<code>{"bin", "fraction"}</code> records needs a second shape for the constructor, and
+<p>The amounts and fractions of <code>Aggregate</code> are mappings by id
+(<code>bin_amounts={"A": 990}</code>), in Python and in the file, and Rust keeps their
+order (<code>IndexMap</code>). A list of <code>{"bin", "amount"}</code> records needs a second shape for the constructor, and
 Pydantic calls a custom <code>__init__</code> when it validates a file too.</p>
 <p><strong>Guards:</strong> <code>crates/commol-core/src/types/model.rs</code> (tests),
 <code>tests/building/test_save_and_load.py</code>,

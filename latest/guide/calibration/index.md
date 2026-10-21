@@ -7,6 +7,7 @@ Calibration finds the parameter values (and, if you want, initial conditions and
 | Topic                                                              | Page                                                                                                                  |
 | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
 | The workflow, the problem, losses and results                      | This page                                                                                                             |
+| Maximum likelihood with a model of the noise of each series        | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md)             |
 | Calibrating initial conditions                                     | [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
 | Several outputs, aggregates, weights, scale factors, windowed data | [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)                         |
 | Nelder-Mead and particle swarm settings                            | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md)                             |
@@ -40,8 +41,7 @@ def basic_model(k1: float | None, k2: float | None, engine="DifferenceEquations"
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+                bin_amounts={"A": 990, "B": 10, "C": 0},
             ),
             engine=engine,
         )
@@ -87,50 +87,55 @@ A `Simulation` follows its model: after `apply_calibration_parameters` or `updat
 | ----------------------------- | ------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `observed_data`               | `list[ObservedDataPoint]`                   | required | What the model must reproduce. See [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md).                                                                                     |
 | `parameters`                  | `list[CalibrationParameter]`                | required | The unknowns and their bounds.                                                                                                                                                                                        |
-| `loss_function`               | `str`                                       | `"sse"`  | How the misfit is measured; see [Losses](#losses).                                                                                                                                                                    |
+| `loss_function`               | `str \| None`                               | `None`   | How the misfit is measured; see [Losses](#losses). A problem has `loss_function` or `observation_models`, exactly one.                                                                                                |
+| `observation_models`          | `dict[str, ObservationModel] \| None`       | `None`   | One observation model per series label: the fit maximizes their likelihood. See [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md).                            |
 | `optimization_config`         | `NelderMeadConfig` or `ParticleSwarmConfig` | required | The optimizer and its settings. See [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md).                                                                                        |
 | `constraints`                 | `list[CalibrationConstraint]`               | `[]`     | Relations the result must respect. See [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md).                                                                                   |
-| `normalize_observations`      | `bool`                                      | `False`  | Divides each residual by the RMS of its observation series, so series of very different size weigh the same.                                                                                                          |
+| `normalize_observations`      | `bool`                                      | `False`  | Divides each residual by the RMS of its observation series, so series of very different size weigh the same. Needs a loss.                                                                                            |
 | `initial_condition_remainder` | `str \| None`                               | `None`   | The compartment or bin that absorbs the difference when initial conditions are calibrated. See [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md). |
 | `seed`                        | `int \| None`                               | `None`   | Makes every random choice reproducible.                                                                                                                                                                               |
 
 ### Observations
 
-| `ObservedDataPoint` field | Type                | Default  | Meaning                                                                                                       |
-| ------------------------- | ------------------- | -------- | ------------------------------------------------------------------------------------------------------------- |
-| `at`                      | `float`             | required | The position of the observation on the axis. A difference model accepts integer steps only.                   |
-| `output`                  | `str \| None`       | `None`   | The output it observes: a compartment or accumulator name, such as `B` or `B_g1`. Give `output` or `outputs`. |
-| `outputs`                 | `list[str] \| None` | `None`   | Outputs to sum before the comparison; needs a `label`.                                                        |
-| `label`                   | `str`               | `output` | The name of the observed series in reports, plots and the normalization.                                      |
-| `value`                   | `float`             | required | The observed value.                                                                                           |
-| `weight`                  | `float`             | `1.0`    | How much the observation counts in every loss; see [Losses](#losses).                                         |
-| `factor_id`               | `str \| None`       | `None`   | A `factor` parameter that multiplies the prediction.                                                          |
-| `window`                  | `float \| None`     | `None`   | Compares with the gain over `(at − window, at]` instead of the value.                                         |
+| `ObservedDataPoint` field | Type                | Default  | Meaning                                                                                                          |
+| ------------------------- | ------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| `at`                      | `float`             | required | The position of the observation on the axis. A difference model accepts integer steps only.                      |
+| `output`                  | `str \| None`       | `None`   | The output it observes: a compartment or accumulator name, such as `B` or `B_g1`. Give `output` or `outputs`.    |
+| `outputs`                 | `list[str] \| None` | `None`   | Outputs to sum before the comparison; needs a `label`.                                                           |
+| `label`                   | `str`               | `output` | The name of the observed series in reports, plots and the normalization.                                         |
+| `value`                   | `float`             | required | The observed value.                                                                                              |
+| `weight`                  | `float`             | `1.0`    | How much the observation counts in every loss, and the power of its term of a likelihood; see [Losses](#losses). |
+| `factor_id`               | `str \| None`       | `None`   | A `factor` parameter that multiplies the prediction.                                                             |
+| `window`                  | `float \| None`     | `None`   | Compares with the gain over `(at − window, at]` instead of the value.                                            |
+| `trials`                  | `int \| None`       | `None`   | The trials of the observation, for a `BinomialObservations()` model that reads them from each observation.       |
 
 ### Unknowns
 
 | `CalibrationParameter` field | Type            | Default  | Meaning                                                           |
 | ---------------------------- | --------------- | -------- | ----------------------------------------------------------------- |
 | `id`                         | `str`           | required | What to calibrate; depends on `parameter_type`.                   |
-| `parameter_type`             | `str`           | required | `"parameter"`, `"initial_condition"` or `"factor"`.               |
+| `parameter_type`             | `str`           | required | `"parameter"`, `"initial_condition"`, `"factor"` or `"noise"`.    |
 | `min_bound`, `max_bound`     | `float`         | required | The search interval.                                              |
 | `initial_guess`              | `float \| None` | `None`   | Where the optimizer starts; the midpoint of the bounds if `None`. |
 
-| `parameter_type`      | `id` names                                            | The value is                                                                                                                                       |
-| --------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"parameter"`         | A model parameter, usually declared with `value=None` | The parameter value                                                                                                                                |
-| `"initial_condition"` | A bin, a category, or an expanded compartment         | A fraction of the total; see [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
-| `"factor"`            | Any new id, used by observations through `factor_id`  | A factor on the predictions; not part of the model                                                                                                 |
+| `parameter_type`      | `id` names                                                                                                                                | The value is                                                                                                                                                                            |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"parameter"`         | A model parameter, usually declared with `value=None`                                                                                     | The parameter value                                                                                                                                                                     |
+| `"initial_condition"` | A bin, a category, or an expanded compartment                                                                                             | An amount in the unit of its bin, or the split of a category; see [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
+| `"factor"`            | Any new id, used by observations through `factor_id`                                                                                      | A factor on the predictions; not part of the model                                                                                                                                      |
+| `"noise"`             | Any new id, named by an [observation model](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#noise-parameters) | An argument of the model, such as its standard deviation; not part of the model                                                                                                         |
 
-`"parameter"` and `"factor"` work with every kind of model. The other types are values of the model kind, and the kind declares which it accepts (`model.structure.calibration_value_types()`): an aggregate model accepts `"initial_condition"`. A type the kind does not accept raises a `ValueError` that names the kind when you create the `Calibrator`.
+`"parameter"`, `"factor"` and `"noise"` work with every kind of model. The other types are values of the model kind, and the kind declares which it accepts (`model.structure.calibration_value_types()`): an aggregate model accepts `"initial_condition"`. A type the kind does not accept raises a `ValueError` that names the kind when you create the `Calibrator`.
 
 ## Losses
 
-| `loss_function`   | Formula (residual `r = observed − predicted`, weight `w`) | Use when                              |
-| ----------------- | --------------------------------------------------------- | ------------------------------------- |
-| `"sse"` (default) | `Σ w·r²`                                                  | The usual choice                      |
-| `"rmse"`          | `√(Σ w·r² / Σ w)`                                         | You want the error in the data's unit |
-| `"mae"`           | \`Σ w·                                                    | r                                     |
+A problem has a loss or observation models, exactly one, and neither has a default: what to fit is a modelling choice. A loss measures the residuals; [observation models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md) say how each series scatters, and the fit maximizes their likelihood, so its loss is `−log L`. `CalibrationProblem` raises a `ValueError` with both or neither.
+
+| `loss_function` | Formula (residual `r = observed − predicted`, weight `w`) | Use when                              |
+| --------------- | --------------------------------------------------------- | ------------------------------------- |
+| `"sse"`         | `Σ w·r²`                                                  | The usual choice                      |
+| `"rmse"`        | `√(Σ w·r² / Σ w)`                                         | You want the error in the data's unit |
+| `"mae"`         | \`Σ w·                                                    | r                                     |
 
 How weights count
 
@@ -172,12 +177,13 @@ result = Calibrator(Simulation(stochastic), problem).run()
 print(round(result.best_parameters["k1"], 1))  # 0.4
 ```
 
-| Rule                                                                                                                                         | Where                                                                    |
-| -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| A stochastic engine needs `replicates`, `replicate_summary` and `seed`; without one, `Calibrator` raises and the message lists the summaries | `rust_loss_config` in `py-commol/commol/context/_model/engine_state.py`  |
-| A deterministic engine does not use `replicates` and `replicate_summary`                                                                     | The same                                                                 |
-| The summaries and the CRPS are computed in `LossConfig`, and the observation weights apply to every option                                   | `LossConfig::replicate_loss` in `crates/commol-calibration/src/types.rs` |
-| A constraint at positions is checked on every replicate                                                                                      | `CalibrationProblem::evaluate`                                           |
+| Rule                                                                                                                                         | Where                                                                                   |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| A stochastic engine needs `replicates`, `replicate_summary` and `seed`; without one, `Calibrator` raises and the message lists the summaries | `rust_loss_config` in `py-commol/commol/context/_model/engine_state.py`                 |
+| A deterministic engine does not use `replicates` and `replicate_summary`                                                                     | The same                                                                                |
+| A stochastic engine needs a loss: with `observation_models`, `Calibrator` raises a `ValueError`                                              | `PyCalibrationProblem::new` in `py-commol/src/inference.rs`; `Discrepancy::set_summary` |
+| The summaries and the CRPS are computed in `LossConfig`, and the observation weights apply to every option                                   | `LossConfig::replicate_loss` in `crates/commol-calibration/src/types.rs`                |
+| A constraint at positions is checked on every replicate                                                                                      | `CalibrationProblem::evaluate`                                                          |
 
 With one replicate the CRPS is the absolute error. The [predictive](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive) of a sample runs every replicate of each draw.
 
@@ -188,7 +194,7 @@ With one replicate the CRPS is the absolute error. The [predictive](https://munq
 | `CalibrationResult` field | Meaning                                                                                                                                                                                                                                            |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `best_parameters`         | `dict[str, float]`: the best value of every unknown, in the order of `problem.parameters`                                                                                                                                                          |
-| `final_loss`              | The loss at `best_parameters`                                                                                                                                                                                                                      |
+| `final_loss`              | The loss at `best_parameters`; with observation models, the negative log-likelihood                                                                                                                                                                |
 | `iterations`              | The optimizer iterations performed                                                                                                                                                                                                                 |
 | `converged`               | `True` only when the optimizer met its convergence test or `target_cost`; a run that used all `max_iterations` is `False`. See [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#converged-and-termination_reason). |
 | `termination_reason`      | Why it stopped                                                                                                                                                                                                                                     |
@@ -214,7 +220,7 @@ print(f"loss = {result.final_loss:.3g} after {result.iterations} iterations")
 | --------------------- | ------------------------------------------------------------------------------------ |
 | `"parameter"`         | The model parameter with that id                                                     |
 | `"initial_condition"` | The initial conditions, so the model rebuilds exactly the state the optimizer scored |
-| `"factor"`            | Nothing: it describes the observations, not the model                                |
+| `"factor"`, `"noise"` | Nothing: they describe the observations, not the model                               |
 
 It accepts a `CalibrationResult` or a plain `{id: value}` mapping, such as one of `sample.draws()`; a `ParameterSample` has no single set of values and raises `TypeError`. It computes the new definition first, so a rejected value leaves the model unchanged. To set values by hand, use `Model.update_parameters({...})`.
 

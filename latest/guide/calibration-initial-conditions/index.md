@@ -2,7 +2,7 @@
 
 [Back to Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)
 
-An `initial_condition` unknown fits how the state starts: the share of a bin, the split of a category, or the amount of one expanded compartment. The Rust engine applies the values in a fixed order, and a **remainder** compartment keeps the sum of the amounts at `total`.
+An `initial_condition` unknown fits how the state starts: the amount of a bin in its unit, the split of a category, or the amount of one expanded compartment. The Rust engine applies the values in a fixed order, and a **remainder** compartment keeps the sum of the amounts the model states.
 
 ## Quick path
 
@@ -18,8 +18,9 @@ from commol import (
     Simulation,
 )
 
-def model_with_b(b_fraction: float | None):
-    a_fraction = None if b_fraction is None else 1.0 - b_fraction
+def model_with_b(b_amount: float | None):
+    # A holds what B does not, so A and B keep 1000 between them.
+    a_amount = 1000 if b_amount is None else 1000 - b_amount
     return (
         ModelBuilder(name="Initial B")
         .add_bin(id="A", name="State A")
@@ -30,15 +31,12 @@ def model_with_b(b_fraction: float | None):
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
-            Aggregate(
-                total=1000,
-                bin_fractions={"A": a_fraction, "B": b_fraction, "C": 0.0},
-            ),
+            Aggregate(bin_amounts={"A": a_amount, "B": b_amount, "C": 0}),
             engine="DifferenceEquations",
         )
     )
 
-truth = Simulation(model_with_b(0.02)).run(num_steps=40)
+truth = Simulation(model_with_b(20)).run(num_steps=40)
 observed_data = [
     ObservedDataPoint(at=step, output="B", value=truth["B"][step])
     for step in range(5, 41, 5)
@@ -49,31 +47,32 @@ problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=[
         CalibrationParameter(
-            id="B", parameter_type="initial_condition", min_bound=0.0, max_bound=0.1
+            id="B", parameter_type="initial_condition", min_bound=0.0, max_bound=100.0
         )
     ],
     initial_condition_remainder="A",
+    loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=1000),
 )
 
 result = Calibrator(Simulation(model), problem).run()
-print(round(result.best_parameters["B"], 4))  # 0.02
+print(round(result.best_parameters["B"], 2))  # 20.0
 
 model.apply_calibration_parameters(result, problem)
 print({c.name: round(c.amount, 1) for c in model.structure.initial_state(model.process)})
 # {'A': 980.0, 'B': 20.0, 'C': 0.0}
 ```
 
-Here `B` is calibrated, and `A`, the remainder, takes what is left of the total.
+Here `B` is calibrated, and `A`, the remainder, takes what `B` leaves of the 1000 that the model states for `A` and `B`.
 
 ## What an id can name
 
-| `id`                                      | Example                | The value is                                                                                                                         |
-| ----------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| A bin                                     | `"B"`                  | The fraction of the total in the bin. Its compartments share it in their current proportions.                                        |
-| A bin prefix (a bin and some categories)  | `"B_g1"`               | The fraction in those compartments, shared in the same way. Compartments are matched by label, so `B_g1` never covers a bin `B_g1x`. |
-| An expanded compartment                   | `"B_g1_t2"`            | The fraction of the total in that compartment alone.                                                                                 |
-| A category of a **binary** stratification | `"g1"` or `"group:g1"` | The split: every `(g1, g2)` pair of compartments keeps its total and gives `g1` this fraction.                                       |
+| `id`                                      | Example                | The value is                                                                                                                               |
+| ----------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| A bin                                     | `"B"`                  | The amount of the bin, in its unit. Its compartments share it in the proportions of the initial state, also when the `Simulation` has run. |
+| A bin prefix (a bin and some categories)  | `"B_g1"`               | The amount in those compartments, shared in the same way. Compartments are matched by label, so `B_g1` never covers a bin `B_g1x`.         |
+| An expanded compartment                   | `"B_g1_t2"`            | The amount of that compartment alone, in the unit of its bin.                                                                              |
+| A category of a **binary** stratification | `"g1"` or `"group:g1"` | The split: every `(g1, g2)` pair of compartments keeps its total and gives `g1` this fraction.                                             |
 
 A category name that two stratifications declare must be qualified with its stratification, as in `"group:g1"`; a bare name is rejected as ambiguous.
 
@@ -87,16 +86,18 @@ The engine resolves every id when you create the `Calibrator` (`InitialCondition
 
 ## The remainder
 
-Without help, calibrated values change the sum of the amounts. Name a compartment or bin in `initial_condition_remainder`, and it absorbs the difference:
+Without help, calibrated values change the sum of the amounts. Name a compartment or bin in `initial_condition_remainder`, and it takes what the values leave of the amounts the model states:
 
-| Rule                                             | Detail                                                                                      |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| It is not calibrated                             | It takes `total` minus everything else.                                                     |
-| It keeps its own split                           | A bin remainder shares the difference across its compartments in their current proportions. |
-| It must not overlap a calibrated id              | Building the problem rejects it otherwise.                                                  |
-| A value that would make it negative is penalized | The optimizer moves away from it.                                                           |
+| Rule                                             | Detail                                                                                                                                                                                                         |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| It is not calibrated                             | It takes the sum of the amounts the model states, less every other compartment.                                                                                                                                |
+| It keeps the sum of what the values and it cover | A compartment that no value covers keeps its amount, so it does not change the remainder. A bin left `None` for calibration counts as 0, so the remainder states the sum: `A` holds 1000 while `B` is unknown. |
+| It has the unit of every amount it gives         | The `Calibrator` rejects a calibrated bin, prefix or compartment whose unit is not the unit of the remainder, and names both. A category split has no unit.                                                    |
+| It keeps its own split                           | A bin remainder shares what it takes across its compartments in the proportions of the initial state.                                                                                                          |
+| It must not overlap a calibrated id              | Building the problem rejects it otherwise.                                                                                                                                                                     |
+| A value that would make it negative is penalized | The optimizer moves away from it.                                                                                                                                                                              |
 
-Without a remainder, values are applied as given, and only a sum of the initial amounts above `total` is penalized.
+Without a remainder, values are applied as given, and the other compartments keep their amounts. So a model of a count in `A` and `B` and of a concentration in `C` can fit the amount of `C` alone, or fit `B` with `A` as the remainder.
 
 ## Order of application
 
@@ -124,18 +125,17 @@ def stratified(b_g1: float | None):
         .add_transition(id="t_ba", source=["B"], target=["A"], rate="k1")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.9, "B": 0.1},
+                bin_amounts={"A": 900, "B": 100},
                 stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
-                compartment_fractions={}
+                compartment_amounts={}
                 if b_g1 is None
-                else {"B_g1": b_g1, "A_g1": 0.5 - b_g1},
+                else {"B_g1": b_g1, "A_g1": 500 - b_g1},
             ),
             engine="DifferenceEquations",
         )
     )
 
-truth = Simulation(stratified(0.01)).run(num_steps=20)
+truth = Simulation(stratified(10)).run(num_steps=20)
 problem = CalibrationProblem(
     observed_data=[
         ObservedDataPoint(at=step, output="A_g1", value=truth["A_g1"][step])
@@ -146,17 +146,18 @@ problem = CalibrationProblem(
             id="B_g1",
             parameter_type="initial_condition",
             min_bound=0.0,
-            max_bound=0.1,
-            initial_guess=0.03,  # Nelder-Mead is local: start near the answer
+            max_bound=100.0,
+            initial_guess=30.0,  # Nelder-Mead is local: start near the answer
         )
     ],
     initial_condition_remainder="A_g1",
+    loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=1000),
 )
 
 composite = stratified(None)
 result = Calibrator(Simulation(composite), problem).run()
-print(round(result.best_parameters["B_g1"], 4))  # 0.01
+print(round(result.best_parameters["B_g1"], 2))  # 10.0
 
 composite.apply_calibration_parameters(result, problem)
 print({c.name: round(c.amount, 1) for c in composite.structure.initial_state(composite.process)})
@@ -167,15 +168,16 @@ print({c.name: round(c.amount, 1) for c in composite.structure.initial_state(com
 
 `apply_calibration_parameters` writes the values so that the model rebuilds the state the optimizer scored:
 
-1. Each bin and each category gets the fraction the engine applied, so the definition stays readable.
-1. Every compartment whose amount still differs from the scored one is pinned as a `compartment_fractions` override.
+1. Each bin whose every compartment a value or the remainder sets gets the amount the engine gave it, in the unit of the bin, and each category gets the split the engine applied, so the definition stays readable.
+1. Every compartment whose amount still differs from the scored one is pinned as a `compartment_amounts` override.
 
-So an expanded-compartment id always becomes an override, and so does a bin or category value that overlaps an existing override. Reloading the saved model gives the scored state exactly. A calibrated category split is written with `update_stratification_fractions`: the named category gets the value and its complement the rest.
+So an expanded-compartment id always becomes an override, and so does a bin or category value that overlaps an existing override. A bin of which a value sets only some compartments keeps its amount. Reloading the saved model gives the scored state exactly. A calibrated category split is written with `update_stratification_fractions`: the named category gets the value and its complement the rest.
 
 ## Checklist
 
-- [ ] Each unknown fraction is `None` in the model.
-- [ ] A remainder is named when the calibrated values should keep the total.
+- [ ] Each unknown amount is `None` in the model, and the bounds are amounts in the unit of its bin (a category split is in `[0, 1]`).
+- [ ] A remainder is named when the calibrated values should keep a sum, and it holds that sum in the model.
+- [ ] The remainder has the unit of every amount it gives.
 - [ ] The remainder is not also calibrated.
 - [ ] Category ids name a binary stratification, qualified when the name is shared.
 

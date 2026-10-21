@@ -92,6 +92,7 @@ class SimulationPlotter:
         position_label: Callable[[float], str] | None = None,
         tick_every: float | None = None,
         x_label: str = "Step",
+        prediction_intervals: PredictionIntervals | None = None,
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
         """
@@ -138,6 +139,12 @@ class SimulationPlotter:
             plotted position.
         x_label : str
             The x-axis label. Default "Step".
+        prediction_intervals : PredictionIntervals | None
+            Prediction intervals of a conformal method
+            (``ConformalResult.intervals``). The subplot of each of their
+            series, by label, shows the band between their lower and upper
+            ends and their point prediction; an unbounded interval is left
+            out of the band.
         **kwargs : str | int | float | bool | None
             Additional keyword arguments passed to seaborn.lineplot().
             Common parameters: linewidth, alpha, linestyle, marker, etc.
@@ -176,6 +183,11 @@ class SimulationPlotter:
             tick_every,
             x_label,
         )
+        if prediction_intervals is not None:
+            for ax, bin_id in zip(axes, bins_to_plot, strict=False):
+                self._plot_prediction_intervals(
+                    ax, bin_id, prediction_intervals, show_legend
+                )
         self._finalize_plot(axes, bins_to_plot, output_file, config, "Series")
 
         return fig
@@ -252,7 +264,238 @@ class SimulationPlotter:
 
         return fig
 
-    def _apply_seaborn_style(self, config: PlotConfig) -> None:
+    @staticmethod
+    def plot_prcc(
+        result: PRCCResult,
+        output_file: str | None = None,
+        config: PlotConfig | None = None,
+        x_label: str = "Step",
+    ) -> "Figure":
+        """
+        Plot the PRCC of each input: one subplot per series.
+
+        A series of a `Trajectory` draws one line per input over its
+        positions; any other quantity draws one bar per input.
+
+        Parameters
+        ----------
+        result : PRCCResult
+            The result of `PRCC`.
+        output_file : str | None
+            Path to save the figure. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        x_label : str
+            The x-axis label of a series over positions. Default "Step".
+
+        Returns
+        -------
+        Figure
+            The matplotlib Figure object.
+        """
+        config = config or PlotConfig()
+        SimulationPlotter._apply_seaborn_style(config)
+        groups: dict[str, list[int]] = defaultdict(list)
+        for index, series in enumerate(result.series):
+            groups[series].append(index)
+        names = list(groups)
+        fig, axes = SimulationPlotter._create_grid(config, len(names))
+        for ax, name in zip(axes, names, strict=False):
+            indices = groups[name]
+            positions = [
+                position
+                for position in (result.positions[i] for i in indices)
+                if position is not None
+            ]
+            if len(positions) == len(indices):
+                for j, input_name in enumerate(result.inputs):
+                    ax.plot(
+                        positions,
+                        [result.coefficients[i][j] for i in indices],
+                        marker="o",
+                        label=input_name,
+                    )
+                ax.set_xlabel(x_label)
+                ax.legend()
+            else:
+                ax.bar(result.inputs, result.coefficients[indices[0]])
+            ax.axhline(0.0, color="grey", linewidth=0.8)
+            ax.set_ylim(-1.05, 1.05)
+            ax.set_ylabel("PRCC")
+            ax.set_title(name)
+        SimulationPlotter._finalize_plot(axes, names, output_file, config, "PRCC")
+        return fig
+
+    @staticmethod
+    def plot_morris(
+        result: MorrisResult,
+        output_file: str | None = None,
+        config: PlotConfig | None = None,
+    ) -> "Figure":
+        """
+        Plot ``σ`` against ``μ*`` of each input: one subplot per quantity,
+        one labelled point per input.
+
+        An input far to the right matters; one high up acts through
+        interactions or a non-linear effect.
+
+        Parameters
+        ----------
+        result : MorrisResult
+            The result of `Morris`.
+        output_file : str | None
+            Path to save the figure. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+
+        Returns
+        -------
+        Figure
+            The matplotlib Figure object.
+        """
+        config = config or PlotConfig()
+        SimulationPlotter._apply_seaborn_style(config)
+        fig, axes = SimulationPlotter._create_grid(config, len(result.labels))
+        for ax, q in zip(axes, range(len(result.labels)), strict=False):
+            for j, input_name in enumerate(result.inputs):
+                mu_star, sigma = result.mu_star[q][j], result.sigma[q][j]
+                ax.scatter([mu_star], [sigma], label=input_name)
+                ax.annotate(input_name, (mu_star, sigma))
+            ax.set_xlabel("μ*")
+            ax.set_ylabel("σ")
+            ax.set_title(result.labels[q])
+            ax.legend()
+        SimulationPlotter._finalize_plot(
+            axes, result.labels, output_file, config, "Morris"
+        )
+        return fig
+
+    @staticmethod
+    def plot_sobol(
+        result: SobolResult | ChaosResult,
+        output_file: str | None = None,
+        config: PlotConfig | None = None,
+    ) -> "Figure":
+        """
+        Plot the first-order and total Sobol indices: one subplot per
+        quantity, one pair of bars per input, with the intervals of a
+        `SobolResult`.
+
+        Parameters
+        ----------
+        result : SobolResult | ChaosResult
+            The result of `Sobol` or `PolynomialChaos`.
+        output_file : str | None
+            Path to save the figure. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+
+        Returns
+        -------
+        Figure
+            The matplotlib Figure object.
+        """
+        config = config or PlotConfig()
+        SimulationPlotter._apply_seaborn_style(config)
+        inputs = result.inputs
+        fig, axes = SimulationPlotter._create_grid(config, len(result.labels))
+        width = 0.4
+        for ax, q in zip(axes, range(len(result.labels)), strict=False):
+            places = list(range(len(inputs)))
+            for offset, name, values in (
+                (-width / 2, "First order", result.first[q]),
+                (width / 2, "Total", result.total[q]),
+            ):
+                errors = None
+                if isinstance(result, SobolResult):
+                    lower, upper = (
+                        (result.first_lower[q], result.first_upper[q])
+                        if name == "First order"
+                        else (result.total_lower[q], result.total_upper[q])
+                    )
+                    errors = [
+                        [
+                            max(v - low, 0.0)
+                            for v, low in zip(values, lower, strict=True)
+                        ],
+                        [
+                            max(high - v, 0.0)
+                            for v, high in zip(values, upper, strict=True)
+                        ],
+                    ]
+                ax.bar(
+                    [place + offset for place in places],
+                    values,
+                    width,
+                    yerr=errors,
+                    capsize=3,
+                    label=name,
+                )
+            ax.set_xticks(places)
+            ax.set_xticklabels(inputs)
+            ax.set_ylabel("Sobol index")
+            ax.set_title(result.labels[q])
+            ax.legend()
+        SimulationPlotter._finalize_plot(
+            axes, result.labels, output_file, config, "Sobol"
+        )
+        return fig
+
+    @staticmethod
+    def plot_profiles(
+        result: ProfileResult,
+        output_file: str | None = None,
+        config: PlotConfig | None = None,
+    ) -> "Figure":
+        """
+        Plot each profile: one subplot per parameter or prediction, with the
+        statistic of each point, the threshold, and the ends of the interval.
+
+        A profile that stays under the threshold up to a bound is open on that
+        side; a flat one stays near 0 over its whole range.
+
+        Parameters
+        ----------
+        result : ProfileResult
+            The result of `ProfileLikelihood` or `PredictionProfile`.
+        output_file : str | None
+            Path to save the figure. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+
+        Returns
+        -------
+        Figure
+            The matplotlib Figure object.
+        """
+        config = config or PlotConfig()
+        SimulationPlotter._apply_seaborn_style(config)
+        names = list(result.profiles)
+        fig, axes = SimulationPlotter._create_grid(config, len(names))
+        for ax, name in zip(axes, names, strict=False):
+            profile = result.profiles[name]
+            ax.plot(profile.values, profile.statistics, marker="o", markersize=3)
+            ax.axhline(profile.threshold, color="grey", linestyle="--", linewidth=1)
+            interval = result.intervals[name]
+            for end in (interval.lower, interval.upper):
+                if end is not None:
+                    ax.axvline(end, color="grey", linestyle=":", linewidth=1)
+            ax.set_xlabel(name)
+            ax.set_ylabel("Profile statistic")
+            ax.set_title(name)
+        SimulationPlotter._finalize_plot(axes, names, output_file, config, "Profiles")
+        return fig
+
+    @staticmethod
+    def _create_grid(config: PlotConfig, count: int) -> tuple["Figure", list["Axes"]]:
+        """A figure of `count` subplots in the layout of `config`."""
+        rows, cols = config.layout or SimulationPlotter._calculate_layout(count)
+        return SimulationPlotter._create_figure(
+            rows, cols, (cols * 4.5, rows * 3.5 + 1.0), config.dpi
+        )
+
+    @staticmethod
+    def _apply_seaborn_style(config: PlotConfig) -> None:
         """Apply Seaborn styling configuration from PlotConfig."""
         if config.style:
             sns.set_style(config.style)
@@ -299,7 +542,8 @@ class SimulationPlotter:
             [position_label(position) for position in ticks], rotation=45, ha="right"
         )
 
-    def _calculate_layout(self, num_bins: int) -> tuple[int, int]:
+    @staticmethod
+    def _calculate_layout(num_bins: int) -> tuple[int, int]:
         """
         Calculate optimal subplot layout (rows, cols) for given number of bins.
         """
@@ -532,6 +776,38 @@ class SimulationPlotter:
                     tick_every,
                     x_label,
                 )
+
+    @staticmethod
+    def _plot_prediction_intervals(
+        ax: "Axes",
+        series_id: str,
+        intervals: PredictionIntervals,
+        show_legend: bool,
+    ) -> None:
+        """
+        The band of the prediction intervals of one series and its point
+        prediction, when the intervals have the series.
+        """
+        series = intervals.series.get(series_id)
+        if series is None:
+            return
+        bounded = [
+            (at, lower, upper)
+            for at, lower, upper in zip(
+                series.positions, series.lower, series.upper, strict=True
+            )
+            if math.isfinite(lower) and math.isfinite(upper)
+        ]
+        ax.fill_between(
+            [at for at, _, _ in bounded],
+            [lower for _, lower, _ in bounded],
+            [upper for _, _, upper in bounded],
+            alpha=0.3,
+            label=f"{intervals.level:.0%} prediction interval",
+        )
+        ax.plot(series.positions, series.prediction, linestyle="--", label="Prediction")
+        if show_legend:
+            ax.legend()
 
     @staticmethod
     def _finalize_plot(
@@ -1003,7 +1279,7 @@ def __init__(
 #### plot_series
 
 ```python
-plot_series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | Predictive | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', **kwargs: str | int | float | bool | None) -> Figure
+plot_series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | Predictive | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', prediction_intervals: PredictionIntervals | None = None, **kwargs: str | int | float | bool | None) -> Figure
 ```
 
 Plot simulation results with one subplot per series.
@@ -1012,18 +1288,19 @@ Creates a figure with subplots arranged in a grid, where each subplot shows the 
 
 Parameters:
 
-| Name                 | Type                       | Description                                               | Default                                                                                                                                                                                                                                              |
-| -------------------- | -------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `output_file`        | \`str                      | None\`                                                    | Path to save the figure. If None, figure is not saved (only returned).                                                                                                                                                                               |
-| `observed_data`      | \`list[ObservedDataPoint]  | None\`                                                    | Optional observed data points to overlay on corresponding bin subplots. Model predictions with a factor_id will be scaled for plotting using factor values from the calibration_result, so observed values remain in their original units.           |
-| `calibration_result` | \`CalibrationResult        | Predictive                                                | None\`                                                                                                                                                                                                                                               |
-| `config`             | \`PlotConfig               | None\`                                                    | Configuration for plot layout and styling (figsize, dpi, layout, style, palette, context). If None, uses defaults.                                                                                                                                   |
-| `series`             | \`list[str]                | None\`                                                    | What to plot, one subplot each. An entry is an output name (an expanded compartment or accumulator, such as A_g1) or a bin or accumulator id, which plots the sum of its outputs. An exact output name wins over an id. If None, plots every output. |
-| `show_legend`        | `bool`                     | Whether to show the legend on each subplot. Default True. | `True`                                                                                                                                                                                                                                               |
-| `position_label`     | \`Callable\[[float], str\] | None\`                                                    | Turns a position on the axis into an x-axis tick label, such as a date. If None, the ticks show the position.                                                                                                                                        |
-| `tick_every`         | \`float                    | None\`                                                    | Labels the plotted positions tick_every apart on the axis, counted from the first plotted position. If None, labels every plotted position.                                                                                                          |
-| `x_label`            | `str`                      | The x-axis label. Default "Step".                         | `'Step'`                                                                                                                                                                                                                                             |
-| `**kwargs`           | \`str                      | int                                                       | float                                                                                                                                                                                                                                                |
+| Name                   | Type                       | Description                                               | Default                                                                                                                                                                                                                                              |
+| ---------------------- | -------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`          | \`str                      | None\`                                                    | Path to save the figure. If None, figure is not saved (only returned).                                                                                                                                                                               |
+| `observed_data`        | \`list[ObservedDataPoint]  | None\`                                                    | Optional observed data points to overlay on corresponding bin subplots. Model predictions with a factor_id will be scaled for plotting using factor values from the calibration_result, so observed values remain in their original units.           |
+| `calibration_result`   | \`CalibrationResult        | Predictive                                                | None\`                                                                                                                                                                                                                                               |
+| `config`               | \`PlotConfig               | None\`                                                    | Configuration for plot layout and styling (figsize, dpi, layout, style, palette, context). If None, uses defaults.                                                                                                                                   |
+| `series`               | \`list[str]                | None\`                                                    | What to plot, one subplot each. An entry is an output name (an expanded compartment or accumulator, such as A_g1) or a bin or accumulator id, which plots the sum of its outputs. An exact output name wins over an id. If None, plots every output. |
+| `show_legend`          | `bool`                     | Whether to show the legend on each subplot. Default True. | `True`                                                                                                                                                                                                                                               |
+| `position_label`       | \`Callable\[[float], str\] | None\`                                                    | Turns a position on the axis into an x-axis tick label, such as a date. If None, the ticks show the position.                                                                                                                                        |
+| `tick_every`           | \`float                    | None\`                                                    | Labels the plotted positions tick_every apart on the axis, counted from the first plotted position. If None, labels every plotted position.                                                                                                          |
+| `x_label`              | `str`                      | The x-axis label. Default "Step".                         | `'Step'`                                                                                                                                                                                                                                             |
+| `prediction_intervals` | \`PredictionIntervals      | None\`                                                    | Prediction intervals of a conformal method (ConformalResult.intervals). The subplot of each of their series, by label, shows the band between their lower and upper ends and their point prediction; an unbounded interval is left out of the band.  |
+| `**kwargs`             | \`str                      | int                                                       | float                                                                                                                                                                                                                                                |
 
 Returns:
 
@@ -1051,6 +1328,7 @@ def plot_series(
     position_label: Callable[[float], str] | None = None,
     tick_every: float | None = None,
     x_label: str = "Step",
+    prediction_intervals: PredictionIntervals | None = None,
     **kwargs: str | int | float | bool | None,
 ) -> "Figure":
     """
@@ -1097,6 +1375,12 @@ def plot_series(
         plotted position.
     x_label : str
         The x-axis label. Default "Step".
+    prediction_intervals : PredictionIntervals | None
+        Prediction intervals of a conformal method
+        (``ConformalResult.intervals``). The subplot of each of their
+        series, by label, shows the band between their lower and upper
+        ends and their point prediction; an unbounded interval is left
+        out of the band.
     **kwargs : str | int | float | bool | None
         Additional keyword arguments passed to seaborn.lineplot().
         Common parameters: linewidth, alpha, linestyle, marker, etc.
@@ -1135,6 +1419,11 @@ def plot_series(
         tick_every,
         x_label,
     )
+    if prediction_intervals is not None:
+        for ax, bin_id in zip(axes, bins_to_plot, strict=False):
+            self._plot_prediction_intervals(
+                ax, bin_id, prediction_intervals, show_legend
+            )
     self._finalize_plot(axes, bins_to_plot, output_file, config, "Series")
 
     return fig
@@ -1246,6 +1535,339 @@ def plot_cumulative(
     )
     self._finalize_plot(axes, bins_to_plot, output_file, config, "Cumulative")
 
+    return fig
+```
+
+#### plot_prcc
+
+```python
+plot_prcc(result: PRCCResult, output_file: str | None = None, config: PlotConfig | None = None, x_label: str = 'Step') -> Figure
+```
+
+Plot the PRCC of each input: one subplot per series.
+
+A series of a `Trajectory` draws one line per input over its positions; any other quantity draws one bar per input.
+
+Parameters:
+
+| Name          | Type         | Description                                                  | Default                                                        |
+| ------------- | ------------ | ------------------------------------------------------------ | -------------------------------------------------------------- |
+| `result`      | `PRCCResult` | The result of PRCC.                                          | *required*                                                     |
+| `output_file` | \`str        | None\`                                                       | Path to save the figure. If None, the figure is only returned. |
+| `config`      | \`PlotConfig | None\`                                                       | Layout and style. If None, the defaults.                       |
+| `x_label`     | `str`        | The x-axis label of a series over positions. Default "Step". | `'Step'`                                                       |
+
+Returns:
+
+| Type     | Description                   |
+| -------- | ----------------------------- |
+| `Figure` | The matplotlib Figure object. |
+
+Source code in `commol/api/plotter.py`
+
+```python
+@staticmethod
+def plot_prcc(
+    result: PRCCResult,
+    output_file: str | None = None,
+    config: PlotConfig | None = None,
+    x_label: str = "Step",
+) -> "Figure":
+    """
+    Plot the PRCC of each input: one subplot per series.
+
+    A series of a `Trajectory` draws one line per input over its
+    positions; any other quantity draws one bar per input.
+
+    Parameters
+    ----------
+    result : PRCCResult
+        The result of `PRCC`.
+    output_file : str | None
+        Path to save the figure. If None, the figure is only returned.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+    x_label : str
+        The x-axis label of a series over positions. Default "Step".
+
+    Returns
+    -------
+    Figure
+        The matplotlib Figure object.
+    """
+    config = config or PlotConfig()
+    SimulationPlotter._apply_seaborn_style(config)
+    groups: dict[str, list[int]] = defaultdict(list)
+    for index, series in enumerate(result.series):
+        groups[series].append(index)
+    names = list(groups)
+    fig, axes = SimulationPlotter._create_grid(config, len(names))
+    for ax, name in zip(axes, names, strict=False):
+        indices = groups[name]
+        positions = [
+            position
+            for position in (result.positions[i] for i in indices)
+            if position is not None
+        ]
+        if len(positions) == len(indices):
+            for j, input_name in enumerate(result.inputs):
+                ax.plot(
+                    positions,
+                    [result.coefficients[i][j] for i in indices],
+                    marker="o",
+                    label=input_name,
+                )
+            ax.set_xlabel(x_label)
+            ax.legend()
+        else:
+            ax.bar(result.inputs, result.coefficients[indices[0]])
+        ax.axhline(0.0, color="grey", linewidth=0.8)
+        ax.set_ylim(-1.05, 1.05)
+        ax.set_ylabel("PRCC")
+        ax.set_title(name)
+    SimulationPlotter._finalize_plot(axes, names, output_file, config, "PRCC")
+    return fig
+```
+
+#### plot_morris
+
+```python
+plot_morris(result: MorrisResult, output_file: str | None = None, config: PlotConfig | None = None) -> Figure
+```
+
+Plot `σ` against `μ*` of each input: one subplot per quantity, one labelled point per input.
+
+An input far to the right matters; one high up acts through interactions or a non-linear effect.
+
+Parameters:
+
+| Name          | Type           | Description           | Default                                                        |
+| ------------- | -------------- | --------------------- | -------------------------------------------------------------- |
+| `result`      | `MorrisResult` | The result of Morris. | *required*                                                     |
+| `output_file` | \`str          | None\`                | Path to save the figure. If None, the figure is only returned. |
+| `config`      | \`PlotConfig   | None\`                | Layout and style. If None, the defaults.                       |
+
+Returns:
+
+| Type     | Description                   |
+| -------- | ----------------------------- |
+| `Figure` | The matplotlib Figure object. |
+
+Source code in `commol/api/plotter.py`
+
+```python
+@staticmethod
+def plot_morris(
+    result: MorrisResult,
+    output_file: str | None = None,
+    config: PlotConfig | None = None,
+) -> "Figure":
+    """
+    Plot ``σ`` against ``μ*`` of each input: one subplot per quantity,
+    one labelled point per input.
+
+    An input far to the right matters; one high up acts through
+    interactions or a non-linear effect.
+
+    Parameters
+    ----------
+    result : MorrisResult
+        The result of `Morris`.
+    output_file : str | None
+        Path to save the figure. If None, the figure is only returned.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+
+    Returns
+    -------
+    Figure
+        The matplotlib Figure object.
+    """
+    config = config or PlotConfig()
+    SimulationPlotter._apply_seaborn_style(config)
+    fig, axes = SimulationPlotter._create_grid(config, len(result.labels))
+    for ax, q in zip(axes, range(len(result.labels)), strict=False):
+        for j, input_name in enumerate(result.inputs):
+            mu_star, sigma = result.mu_star[q][j], result.sigma[q][j]
+            ax.scatter([mu_star], [sigma], label=input_name)
+            ax.annotate(input_name, (mu_star, sigma))
+        ax.set_xlabel("μ*")
+        ax.set_ylabel("σ")
+        ax.set_title(result.labels[q])
+        ax.legend()
+    SimulationPlotter._finalize_plot(
+        axes, result.labels, output_file, config, "Morris"
+    )
+    return fig
+```
+
+#### plot_sobol
+
+```python
+plot_sobol(result: SobolResult | ChaosResult, output_file: str | None = None, config: PlotConfig | None = None) -> Figure
+```
+
+Plot the first-order and total Sobol indices: one subplot per quantity, one pair of bars per input, with the intervals of a `SobolResult`.
+
+Parameters:
+
+| Name          | Type          | Description   | Default                                                        |
+| ------------- | ------------- | ------------- | -------------------------------------------------------------- |
+| `result`      | \`SobolResult | ChaosResult\` | The result of Sobol or PolynomialChaos.                        |
+| `output_file` | \`str         | None\`        | Path to save the figure. If None, the figure is only returned. |
+| `config`      | \`PlotConfig  | None\`        | Layout and style. If None, the defaults.                       |
+
+Returns:
+
+| Type     | Description                   |
+| -------- | ----------------------------- |
+| `Figure` | The matplotlib Figure object. |
+
+Source code in `commol/api/plotter.py`
+
+```python
+@staticmethod
+def plot_sobol(
+    result: SobolResult | ChaosResult,
+    output_file: str | None = None,
+    config: PlotConfig | None = None,
+) -> "Figure":
+    """
+    Plot the first-order and total Sobol indices: one subplot per
+    quantity, one pair of bars per input, with the intervals of a
+    `SobolResult`.
+
+    Parameters
+    ----------
+    result : SobolResult | ChaosResult
+        The result of `Sobol` or `PolynomialChaos`.
+    output_file : str | None
+        Path to save the figure. If None, the figure is only returned.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+
+    Returns
+    -------
+    Figure
+        The matplotlib Figure object.
+    """
+    config = config or PlotConfig()
+    SimulationPlotter._apply_seaborn_style(config)
+    inputs = result.inputs
+    fig, axes = SimulationPlotter._create_grid(config, len(result.labels))
+    width = 0.4
+    for ax, q in zip(axes, range(len(result.labels)), strict=False):
+        places = list(range(len(inputs)))
+        for offset, name, values in (
+            (-width / 2, "First order", result.first[q]),
+            (width / 2, "Total", result.total[q]),
+        ):
+            errors = None
+            if isinstance(result, SobolResult):
+                lower, upper = (
+                    (result.first_lower[q], result.first_upper[q])
+                    if name == "First order"
+                    else (result.total_lower[q], result.total_upper[q])
+                )
+                errors = [
+                    [
+                        max(v - low, 0.0)
+                        for v, low in zip(values, lower, strict=True)
+                    ],
+                    [
+                        max(high - v, 0.0)
+                        for v, high in zip(values, upper, strict=True)
+                    ],
+                ]
+            ax.bar(
+                [place + offset for place in places],
+                values,
+                width,
+                yerr=errors,
+                capsize=3,
+                label=name,
+            )
+        ax.set_xticks(places)
+        ax.set_xticklabels(inputs)
+        ax.set_ylabel("Sobol index")
+        ax.set_title(result.labels[q])
+        ax.legend()
+    SimulationPlotter._finalize_plot(
+        axes, result.labels, output_file, config, "Sobol"
+    )
+    return fig
+```
+
+#### plot_profiles
+
+```python
+plot_profiles(result: ProfileResult, output_file: str | None = None, config: PlotConfig | None = None) -> Figure
+```
+
+Plot each profile: one subplot per parameter or prediction, with the statistic of each point, the threshold, and the ends of the interval.
+
+A profile that stays under the threshold up to a bound is open on that side; a flat one stays near 0 over its whole range.
+
+Parameters:
+
+| Name          | Type            | Description                                           | Default                                                        |
+| ------------- | --------------- | ----------------------------------------------------- | -------------------------------------------------------------- |
+| `result`      | `ProfileResult` | The result of ProfileLikelihood or PredictionProfile. | *required*                                                     |
+| `output_file` | \`str           | None\`                                                | Path to save the figure. If None, the figure is only returned. |
+| `config`      | \`PlotConfig    | None\`                                                | Layout and style. If None, the defaults.                       |
+
+Returns:
+
+| Type     | Description                   |
+| -------- | ----------------------------- |
+| `Figure` | The matplotlib Figure object. |
+
+Source code in `commol/api/plotter.py`
+
+```python
+@staticmethod
+def plot_profiles(
+    result: ProfileResult,
+    output_file: str | None = None,
+    config: PlotConfig | None = None,
+) -> "Figure":
+    """
+    Plot each profile: one subplot per parameter or prediction, with the
+    statistic of each point, the threshold, and the ends of the interval.
+
+    A profile that stays under the threshold up to a bound is open on that
+    side; a flat one stays near 0 over its whole range.
+
+    Parameters
+    ----------
+    result : ProfileResult
+        The result of `ProfileLikelihood` or `PredictionProfile`.
+    output_file : str | None
+        Path to save the figure. If None, the figure is only returned.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+
+    Returns
+    -------
+    Figure
+        The matplotlib Figure object.
+    """
+    config = config or PlotConfig()
+    SimulationPlotter._apply_seaborn_style(config)
+    names = list(result.profiles)
+    fig, axes = SimulationPlotter._create_grid(config, len(names))
+    for ax, name in zip(axes, names, strict=False):
+        profile = result.profiles[name]
+        ax.plot(profile.values, profile.statistics, marker="o", markersize=3)
+        ax.axhline(profile.threshold, color="grey", linestyle="--", linewidth=1)
+        interval = result.intervals[name]
+        for end in (interval.lower, interval.upper):
+            if end is not None:
+                ax.axvline(end, color="grey", linestyle=":", linewidth=1)
+        ax.set_xlabel(name)
+        ax.set_ylabel("Profile statistic")
+        ax.set_title(name)
+    SimulationPlotter._finalize_plot(axes, names, output_file, config, "Profiles")
     return fig
 ```
 

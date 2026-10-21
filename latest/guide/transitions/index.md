@@ -20,8 +20,7 @@ model = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+            bin_amounts={"A": 900, "B": 100, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -86,8 +85,7 @@ periodic = (
     )
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.99, "B": 0.01},
+            bin_amounts={"A": 990, "B": 10},
         ),
         engine="DifferenceEquations",
     )
@@ -110,8 +108,7 @@ merge = (
     .add_transition(id="t1", source=["A", "B"], target=["C", "C"], rate="k * A * B")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.5, "B": 0.5, "C": 0.0},
+            bin_amounts={"A": 500, "B": 500, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -139,8 +136,7 @@ outflow = (
     )
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.4, "B": 0.3, "C": 0.3},
+            bin_amounts={"A": 400, "B": 300, "C": 300},
         ),
         engine="DifferenceEquations",
     )
@@ -159,7 +155,7 @@ for transition in outflow.process.transitions:
 | At least two sources or two targets                                             | `ValueError`: write the compartment name instead |
 | A `rate` is given                                                               | `ValueError`                                     |
 
-`stratified_rates` may also use `$compartment`; each generated transition gets its own copy.
+`stratified_rates` may also use `$compartment`; each generated transition gets its own copy. Each generated transition keeps `per_compartment`, `accumulators` and the impulse schedule of the call. With `per_compartment=True`, `$compartment` reads the compartment that flows: in a flow from `A_g1`, `"k * $compartment"` is `k * A_g1`.
 
 ## Transitions between categories
 
@@ -175,8 +171,7 @@ moving = (
     .add_transition(id="move", source=["g1"], target=["g2"], rate="k")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.5, "B": 0.5},
+            bin_amounts={"A": 500, "B": 500},
             stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
         ),
         engine="DifferenceEquations",
@@ -207,8 +202,7 @@ own_compartment = (
     .add_transition(id="t", source=["A"], target=["B"], rate="k * A", per_compartment=True)
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.5, "B": 0.5},
+            bin_amounts={"A": 500, "B": 500},
             stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
         ),
         engine="DifferenceEquations",
@@ -218,7 +212,7 @@ print(own_compartment.describe().render("text"))
 # A_g1 -> B_g1: k * A_g1   and   A_g2 -> B_g2: k * A_g2
 ```
 
-It applies to the fallback rate and to every stratified rate, and only to transitions between bins.
+It applies to the fallback rate and to every stratified rate, and only to transitions between bins. Any other bin in the rate keeps its total: in the flow `A_g1 -> B_g1`, `"k * A * C / total"` reads `A_g1` and the total of `C`.
 
 ## Stratified rates
 
@@ -245,8 +239,7 @@ group_rates = (
     )
     .build(
         Aggregate(
-            total=900,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 900, "B": 0},
             stratification_fractions={"group": {"g1": 0.3, "g2": 0.3, "g3": 0.4}},
         ),
         engine="DifferenceEquations",
@@ -300,8 +293,7 @@ redirect = (
     )
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.5, "B": 0.5},
+            bin_amounts={"A": 500, "B": 500},
             stratification_fractions={
                 "group": {"g1": 0.5, "g2": 0.5},
                 "subtype": {"s1": 0.5, "s2": 0.5},
@@ -336,8 +328,7 @@ impulse_model = (
     .add_transition(id="flow", source=["A"], target=["B"], rate="k")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 1000, "B": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -373,8 +364,7 @@ too_fast = (
     .add_transition(id="t", source=["A"], target=["B"], rate="k")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 1000, "B": 0},
         ),
         engine="DifferenceEquations",
     )

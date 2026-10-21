@@ -1413,6 +1413,174 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1775,6 +1943,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -2378,6 +2574,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../codebase/decisions/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/results/" class="md-nav__link">
         
   
@@ -2942,24 +3194,24 @@ the same layout. A third, <code>identifiability_report</code>, gives the verdict
 </span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>        <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_bc&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k2 * B&quot;</span><span class="p">)</span>
 </span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>        <span class="o">.</span><span class="n">build</span><span class="p">(</span>
 </span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>            <span class="n">Aggregate</span><span class="p">(</span>
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>                <span class="n">total</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
-</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>                <span class="n">bin_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mf">0.99</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">},</span>
-</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>            <span class="p">),</span>
-</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>            <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
-</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>        <span class="p">)</span>
-</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>    <span class="p">)</span>
-</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>
-</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="n">ends</span> <span class="o">=</span> <span class="p">[</span><span class="mi">7</span><span class="p">,</span> <span class="mi">14</span><span class="p">,</span> <span class="mi">21</span><span class="p">,</span> <span class="mi">28</span><span class="p">]</span>
-</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a><span class="n">truth</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="mf">0.4</span><span class="p">))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">28</span><span class="p">)</span>
-</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a><span class="n">observed_data</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">end</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">count</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
-</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>    <span class="k">for</span> <span class="n">end</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ends</span><span class="p">,</span> <span class="n">windowed_totals</span><span class="p">(</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span> <span class="n">truth</span><span class="o">.</span><span class="n">positions</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="n">ends</span><span class="p">))</span>
-</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a><span class="p">]</span>
-</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
-</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
-</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
-</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>    <span class="p">],</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>                <span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">990</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>            <span class="p">),</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>            <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>        <span class="p">)</span>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>    <span class="p">)</span>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="n">ends</span> <span class="o">=</span> <span class="p">[</span><span class="mi">7</span><span class="p">,</span> <span class="mi">14</span><span class="p">,</span> <span class="mi">21</span><span class="p">,</span> <span class="mi">28</span><span class="p">]</span>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="n">truth</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="mf">0.4</span><span class="p">))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">28</span><span class="p">)</span>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a><span class="n">observed_data</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">end</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">count</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>    <span class="k">for</span> <span class="n">end</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ends</span><span class="p">,</span> <span class="n">windowed_totals</span><span class="p">(</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span> <span class="n">truth</span><span class="o">.</span><span class="n">positions</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="n">ends</span><span class="p">))</span>
+</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a><span class="p">]</span>
+</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
+</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
+</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>    <span class="p">],</span>
+</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>    <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span>
 </span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">NelderMeadConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">500</span><span class="p">),</span>
 </span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="p">)</span>
 </span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a>
@@ -2989,19 +3241,22 @@ confidence_level=None)</code> lists every number the calibrated model holds, and
 whether calibration set it. The <code>parameters</code> section is the same for every
 kind of model; the structure of the model adds the sections of its kind
 (<code>ModelStructure.report_sections</code>). An aggregate model adds
-<code>initial_conditions</code>:</p>
+<code>initial_amounts</code> and <code>category_splits</code>:</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">&quot;parameters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">&quot;k1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.4</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;calibrated&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">},</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">&quot;k2&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;calibrated&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">}</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="p">},</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">&quot;initial_conditions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">&quot;total&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;group&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;total&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;fraction&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1000.0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;calibrated&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">},</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">&quot;A&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;group&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;total&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;fraction&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.99</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">990.0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;calibrated&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">},</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">&quot;B&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;group&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;total&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;fraction&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.01</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">10.0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;calibrated&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">},</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nt">&quot;C&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;group&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;total&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;fraction&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;calibrated&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">}</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span><span class="p">}</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="p">}</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">&quot;initial_amounts&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">&quot;A&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;amount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">990.0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;unit&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;item&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;calibrated&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">},</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">&quot;B&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;amount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">10.0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;unit&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;item&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;calibrated&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">},</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">&quot;C&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;amount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">100000.0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;unit&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;mg/l&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;calibrated&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">}</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span><span class="nt">&quot;category_splits&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nt">&quot;g1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;group&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w"> </span><span class="nt">&quot;fraction&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;calibrated&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">},</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nt">&quot;g2&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;group&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w"> </span><span class="nt">&quot;fraction&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;calibrated&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">}</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="p">}</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -3042,24 +3297,20 @@ kind of model; the structure of the model adds the sections of its kind
 <td>Only numeric parameters: formulas and series are inputs, not fitted values.</td>
 </tr>
 <tr>
-<td><code>total</code></td>
-<td>The declared <code>total</code>, with fraction 1.0.</td>
+<td><code>initial_amounts</code></td>
+<td>One row per bin and per overridden compartment: the <code>amount</code> the engine builds, overrides included, and the <code>unit</code> of its bin. No row is a share of a total, so bins of different units sit side by side.</td>
 </tr>
 <tr>
-<td>Initial-condition <code>value</code></td>
-<td>The amount the engine builds, overrides included.</td>
-</tr>
-<tr>
-<td>Initial-condition <code>fraction</code></td>
-<td>That amount over <code>total</code>, so every row shares one denominator.</td>
+<td><code>category_splits</code></td>
+<td>One row per category: its <code>fraction</code> of the group it splits. A category has no amount, because it can split bins of different units.</td>
 </tr>
 <tr>
 <td><code>group</code></td>
-<td><code>"total"</code>, or the conditioning categories for a conditional stratification.</td>
+<td>The conditioning categories of a conditional stratification, or <code>[]</code> when it splits every bin.</td>
 </tr>
 <tr>
-<td>An uncalibrated bin (<code>None</code> fraction)</td>
-<td><code>fraction</code> and <code>value</code> are <code>null</code>.</td>
+<td>An uncalibrated bin (<code>None</code> amount)</td>
+<td><code>amount</code> is <code>null</code>.</td>
 </tr>
 <tr>
 <td>A <code>sample</code></td>
@@ -3068,8 +3319,10 @@ kind of model; the structure of the model adds the sections of its kind
 </tbody>
 </table>
 <p>The key order of each entry is fixed (<code>value</code>, <code>calibrated</code>, then <code>interval</code>;
-<code>group</code>, <code>fraction</code>, <code>value</code>, <code>calibrated</code>, then <code>interval</code>), so saved JSON files
-stay comparable.</p>
+<code>amount</code>, <code>unit</code>, <code>calibrated</code>, then <code>interval</code>; <code>group</code>, <code>fraction</code>,
+<code>calibrated</code>, then <code>interval</code>), so saved JSON files stay comparable. An
+interval is in the unit of its entry: an amount in the unit of its bin, a split
+as a fraction of its group.</p>
 <h2 id="simulation_report"><code>simulation_report</code><a class="headerlink" href="#simulation_report" title="Permanent link">&para;</a></h2>
 <p><code>simulation_report(simulation, results, at, window, num_windows,
 observed_data=(), accumulators=(), ensemble_runs=None, confidence_level=None)</code>
@@ -3131,9 +3384,13 @@ model reports at non-integer positions once the results hold them
 <td><code>ensemble_runs</code>, <code>confidence_level</code></td>
 <td>The <code>SimulationReplicates</code> of a stochastic engine, one <code>SimulationResults</code> per member, or a <a href="../uncertainty/#the-predictive"><code>Predictive</code></a>, whose draws carry their weights. Every number becomes a <code>{mean, median, ci_lower, ci_upper, min, max}</code> block, reduced member by member with the weights; the layout does not change.</td>
 </tr>
+<tr>
+<td><code>prediction_intervals</code></td>
+<td>The <code>PredictionIntervals</code> of a <a href="../uncertainty/conformal/">conformal method</a> (<code>ConformalResult.intervals</code>). The report gains a last block, <code>prediction_intervals</code>: its <code>level</code>, <code>series</code> (by label: <code>positions</code>, <code>prediction</code>, <code>lower</code>, <code>upper</code>) and <code>unbounded</code>.</td>
+</tr>
 </tbody>
 </table>
-<p>The report holds only these blocks. Add your own envelope around them, such as
+<p>The report holds only these blocks, and <code>prediction_intervals</code> when it is given. Add your own envelope around them, such as
 a run label or summary figures in your domain's terms:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">document</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;calibration&quot;</span><span class="p">,</span> <span class="s2">&quot;at&quot;</span><span class="p">:</span> <span class="n">ends</span><span class="p">,</span> <span class="o">**</span><span class="n">run_report</span><span class="p">}</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">document</span><span class="p">)[:</span><span class="mi">30</span><span class="p">])</span>

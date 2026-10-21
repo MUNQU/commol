@@ -2,238 +2,274 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://munqu.github.io/commol/latest/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/about/changelog/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/about/license/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/advanced/model-structure/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/api/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/api/axis-patterns/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/api/axis-units/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/api/calibrator/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/api/identifiability/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/api/model-builder/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/api/model/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/api/plotting/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/api/reports/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/latest/api/sensitivity/</loc>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/api/simulation/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/api/uncertainty/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/architecture/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/conventions/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/coverage/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/design-decisions/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/maintainer-playbook/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/mental-model/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/repository-map/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/tests/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/decisions/calibration/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/decisions/engines/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/decisions/initial-conditions/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/latest/codebase/decisions/local-approximations/</loc>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/decisions/model-kinds/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/decisions/model-structure/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/latest/codebase/decisions/profiles/</loc>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/decisions/results/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/decisions/security/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/decisions/time/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/decisions/transitions-and-rates/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/decisions/uncertainty/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/development/contributing/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/development/design-per-compartment-initial-conditions/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/development/release/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/development/workflow/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/getting-started/installation/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/getting-started/quickstart/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/axis-patterns/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/building-models/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/calibration-constraints/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/calibration-observations/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/calibration-optimizers/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/calibration/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/core-concepts/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/describing-models/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/examples/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/mathematical-expressions/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/reports/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/simulations/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/stochastic/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/transitions/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/units-and-equations/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/uncertainty/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/latest/guide/uncertainty/conformal/</loc>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/latest/guide/uncertainty/local/</loc>
+         <lastmod>2026-10-21</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/</loc>
+         <lastmod>2026-10-21</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/latest/guide/uncertainty/profiles/</loc>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/uncertainty/resampling/</loc>
-         <lastmod>2026-10-18</lastmod>
+         <lastmod>2026-10-21</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/</loc>
+         <lastmod>2026-10-21</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/latest/guide/uncertainty/smc/</loc>
+         <lastmod>2026-10-21</lastmod>
     </url>
 </urlset>

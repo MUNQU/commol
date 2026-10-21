@@ -1286,6 +1286,174 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1648,6 +1816,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -2278,6 +2474,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-problem-has-a-loss-or-observation-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A problem has a loss or observation models
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#nelder-mead-searches-inside-the-bounds" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2321,6 +2528,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-subproblem-holds-one-quantity-fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A subproblem holds one quantity fixed
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2345,6 +2563,62 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
   
 
     
@@ -2814,6 +3088,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-problem-has-a-loss-or-observation-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A problem has a loss or observation models
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#nelder-mead-searches-inside-the-bounds" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2857,6 +3142,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-subproblem-holds-one-quantity-fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A subproblem holds one quantity fixed
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2884,16 +3180,63 @@
 <p><code>LossConfig::term</code> and <code>LossConfig::finish</code> in
 <code>crates/commol-calibration/src/types.rs</code> compute every loss: <code>sse</code> is
 <code>Σ w·r²</code>, <code>rmse</code> is <code>√(Σ w·r² / Σ w)</code>, <code>mae</code> is <code>Σ w·|r| / Σ w</code>. The
-discrepancy (<code>discrepancy.rs</code>) calls them for the optimizer and for every
-method that reads the loss.</p>
-<p><strong>Rule:</strong> never write a loss formula elsewhere.</p>
-<p><strong>Guards:</strong> <code>commol-calibration/src/types.rs</code> <code>loss_tests</code>; <code>discrepancy::tests</code>.</p>
+likelihood of observation models (<code>Likelihood::pointwise</code> in
+<code>crates/commol-calibration/src/likelihood/mod.rs</code>) is <code>Σ w·log p</code>: a weight
+is a power of its term, so a weight of 2 counts the observation twice in a
+likelihood as in every loss. The discrepancy (<code>discrepancy.rs</code>) calls them
+for the optimizer and for every method that reads the loss.</p>
+<p><strong>Rule:</strong> never write a loss formula or a log density of an observation
+elsewhere.</p>
+<p><strong>Guards:</strong> <code>commol-calibration/src/types.rs</code> <code>loss_tests</code>; <code>discrepancy::tests</code>;
+<code>crates/commol-calibration/tests/test_likelihood.rs::a_weight_of_two_is_the_observation_twice</code>.</p>
+<h2 id="a-problem-has-a-loss-or-observation-models">A problem has a loss or observation models<a class="headerlink" href="#a-problem-has-a-loss-or-observation-models" title="Permanent link">&para;</a></h2>
+<p>A <code>Discrepancy</code> measures predictions by a loss or by the negative
+log-likelihood of one observation model per series label
+(<code>DiscrepancyConfig</code>), never both: the fit and the posterior would answer
+different questions about one problem. Neither has a default, because what
+to fit is a modelling choice. A model takes the prediction of the
+observation operator as its mean and only adds the scatter; its noise
+arguments are numbers or parameters of type <code>Noise</code>, which the value writer
+skips, as it skips factors. What only makes sense for a loss refuses
+observation models: <code>normalize_observations</code>, the replicate summaries of a
+stochastic engine (the likelihood of a summary ignores the noise of the
+process), <code>LossDistance</code> of ABC and information matching of <code>η</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Both, the loss for the optimizer and the likelihood for samplers</td>
+<td>The fit and the posterior would answer different questions.</td>
+</tr>
+<tr>
+<td>Keep <code>"sse"</code> by default and refuse only a loss written next to models</td>
+<td>The rule would depend on whether a field was written, and the library would choose what to fit.</td>
+</tr>
+<tr>
+<td>A noise parameter of type <code>parameter</code></td>
+<td>The value writer would send it to the engine, and reports would mix it with model parameters.</td>
+</tr>
+<tr>
+<td>Densities from a dependency</td>
+<td>Their values change with its version; SciPy reference values in a test check ours.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_likelihood.rs</code>,
+<code>tests/uncertainty/test_observation_models.py</code>.</p>
 <h2 id="nelder-mead-searches-inside-the-bounds">Nelder-Mead searches inside the bounds<a class="headerlink" href="#nelder-mead-searches-inside-the-bounds" title="Permanent link">&para;</a></h2>
 <p>The objective clamps values to their bounds, so the loss is flat outside them,
 and a simplex that crosses a bound collapses there. Nelder-Mead therefore
 searches an unbounded <code>u</code> and scores <code>x = lo + (hi − lo)·(sin u + 1)/2</code>
-(<code>SineTransform</code> and <code>BoundedProblem</code> in <code>optimization.rs</code>). Its evaluations
-and its result are recorded in <code>x</code>. <code>converged</code> is true only for
+(<code>SineTransform</code> and <code>BoundedProblem</code> of the argmin fork, in
+<code>argmin::core::bounds</code>; <code>SearchSpace::transform</code> in <code>optimization.rs</code> builds
+the transform and refuses an infinite bound). Its evaluations and its result
+are recorded in <code>x</code>. <code>converged</code> is true only for
 <code>SolverConverged</code> and <code>TargetCostReached</code> (<code>optimization::converged</code>). An
 error of the model at a vertex of the initial simplex stops the run with its
 message (<code>NelderMead::init</code> of the argmin fork returns it).</p>
@@ -2934,10 +3277,14 @@ must agree with the operator, which
 <code>tests/uncertainty/test_predictive.py::TestObservations</code>.</p>
 <h2 id="constraints-bound-the-support">Constraints bound the support<a class="headerlink" href="#constraints-bound-the-support" title="Permanent link">&para;</a></h2>
 <p>A point is feasible, or it violates the problem by an amount: a bound, a
-constraint, an infeasible start or run, or a value that is not finite
-(<code>Violation</code> in <code>feasibility.rs</code>). Only <code>OptimizationObjective</code> turns a
-violation into a penalty, <code>base × (1 + amount)</code>, where <code>base</code> scales with the
-largest observed value. An inference method sees the same violation as the
+constraint, an infeasible start or run, a value that is not finite, or a
+predicted mean outside the means its observation model allows (<code>Violation</code>
+in <code>feasibility.rs</code>). Only <code>OptimizationObjective</code> turns a violation into a
+penalty, <code>base × (1 + amount)</code>, where <code>base</code> (<code>Discrepancy::penalty_base</code>) is
+above the discrepancy of a poor fit: <code>1000 · n · max_obs²</code> for a loss, and
+<code>1000 · Σ wᵢ tᵢ</code> for observation models, with <code>tᵢ</code> the cost of observation
+<code>i</code> at the narrowest noise the bounds allow and a mean <code>max_obs</code> from it;
+at least <code>1e10</code>. An inference method sees the same violation as the
 edge of the support: its log density is <code>−∞</code> (<code>discrepancy_in_support</code> in
 <code>crates/commol-inference/src/target.rs</code>).</p>
 <table>
@@ -2956,10 +3303,68 @@ edge of the support: its log density is <code>−∞</code> (<code>discrepancy_i
 <td>Reject and draw again, with no value</td>
 <td>A profile or a Laplace fit needs the value at the edge.</td>
 </tr>
+<tr>
+<td>The base of a loss for a likelihood</td>
+<td>A normal model of a small <code>sd</code> costs more than it, so infeasible points would look better.</td>
+</tr>
+<tr>
+<td>The worst feasible cost seen so far</td>
+<td>State in the objective: the result would depend on the order of evaluations and on threads.</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Guards:</strong> <code>feasibility::tests</code>,
-<code>crates/commol-calibration/tests/test_infeasible_runs.rs</code>.</p>
+<code>crates/commol-calibration/tests/test_infeasible_runs.rs</code>,
+<code>crates/commol-calibration/tests/test_likelihood.rs::the_penalty_is_above_every_feasible_cost</code>.</p>
+<h2 id="a-subproblem-holds-one-quantity-fixed">A subproblem holds one quantity fixed<a class="headerlink" href="#a-subproblem-holds-one-quantity-fixed" title="Permanent link">&para;</a></h2>
+<p><code>Subproblem</code> (<code>crates/commol-calibration/src/subproblem.rs</code>) holds one
+parameter or one prediction while <code>optimize_subproblem</code> (<code>optimization.rs</code>)
+fits the others with the problem's own optimizer. A held parameter leaves the
+search space (<code>SearchSpace</code>): the optimizer searches one dimension less, and
+the cost puts the fixed value back before it scores a point. A held
+prediction <code>g(θ) = c</code> is an equality constraint met by the augmented
+Lagrangian of the argmin fork, whose factory builds the problem's optimizer
+at each outer iteration: Nelder-Mead on the sine transform, from the point of
+the iteration before, or a swarm seeded by <code>replicate_seed(seed, k)</code>. The
+prediction is read through the observation operator of a copy of the problem
+whose runs also report at its positions (<code>CalibrationProblem::observing</code>), so
+one run gives the objective and the constraint, and the cost keeps the
+constraint of the last point it scored. A point that is not feasible keeps
+its penalty and a constraint of 0. Each point starts from Algencan's scaled
+penalty; the multiplier is the warm start.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bounds <code>[v, v]</code> for a held parameter</td>
+<td>Nelder-Mead keeps a vertex for a dimension that moves nothing.</td>
+</tr>
+<tr>
+<td>A growing quadratic penalty on <code>g − c</code></td>
+<td>It meets the constraint only as <code>μ → ∞</code>, and a large <code>μ</code> makes a narrow valley where Nelder-Mead stops early.</td>
+</tr>
+<tr>
+<td>A second run for the prediction</td>
+<td>Twice the model runs of each evaluation.</td>
+</tr>
+<tr>
+<td><code>μ = 100·|Δλ/Δc|</code> from the two points before</td>
+<td>In the experiment of #132 (the ABC model of <code>tests/support/</code> with a normal model, the problem of <code>the_multiplier_of_a_prediction_profile_is_minus_its_slope</code>), B at 30 took 5465 evaluations against 3179 with Algencan's <code>μ₀</code>, C at 24 5405 against 3175, for the same intervals and a mean error of the multipliers of 0.8e-4 against 1.2e-4; <code>10⁴·|Δλ/Δc|</code> gained 4 %. The stop rule reads <code>‖g − c‖</code>, which a small <code>μ</code> leaves large.</td>
+</tr>
+</tbody>
+</table>
+<p>A swarm without stop rules runs each outer iteration to its <code>max_iterations</code>,
+so a held prediction stops at the outer limit and never reports convergence.</p>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_profiles.rs</code>
+(<code>fixing_a_parameter_at_the_fit_keeps_the_loss</code>,
+<code>fixing_a_prediction_at_the_fit_keeps_the_parameters</code>,
+<code>a_problem_observing_more_positions_scores_as_the_problem</code>,
+<code>a_swarm_fits_a_subproblem_and_repeats_from_its_seed</code>).</p>
 
 
 

@@ -1286,6 +1286,174 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1648,6 +1816,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -2387,6 +2583,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../results/" class="md-nav__link">
         
   
@@ -3050,13 +3302,16 @@ differential engine any finite, non-negative position. The engine checks every
 position where it receives it, and its message names the object that holds a
 rejected one: the observation or constraint (<code>check_positions</code> in
 <code>crates/commol-calibration/src/calibration_problem.rs</code>), the impulse transition
-or series parameter (<code>DifferenceEquations::from_compiled</code>).</p>
+or series parameter (<code>DifferenceEquations::from_compiled</code>), or the positions of
+a predictive before any draw runs (<code>Predictive::new</code> in
+<code>crates/commol-inference/src/predictive.rs</code>).</p>
 <p><strong>Rule:</strong> Python passes positions on and shows the engine's message. It never
 checks whether a model type accepts a position.</p>
 <p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_positions.rs</code>,
 <code>crates/commol-difference/src/simulation.rs::integer_positions_are_accepted_and_others_rejected</code>,
 <code>crates/commol-differential/src/tests.rs::a_difference_engine_names_a_series_point_between_steps</code>,
-<code>tests/calibration/test_observations.py::TestPositionsAndEngines</code>.</p>
+<code>tests/calibration/test_observations.py::TestPositionsAndEngines</code>,
+<code>crates/commol-inference/tests/test_predictive.rs::positions_the_engine_cannot_run_are_rejected_before_any_draw</code>.</p>
 <h2 id="results-carry-their-positions">Results carry their positions<a class="headerlink" href="#results-carry-their-positions" title="Permanent link">&para;</a></h2>
 <p><code>Simulation.run</code> and <code>run_at</code> return <code>SimulationResults</code>
 (<code>api/results.py</code>): a <code>dict</code> from output name to values, with the positions in

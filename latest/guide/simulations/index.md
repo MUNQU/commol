@@ -23,8 +23,7 @@ model = (
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+            bin_amounts={"A": 900, "B": 100, "C": 0},
         ),
         engine="DifferenceEquations",
     )
@@ -132,7 +131,7 @@ stochastic = Simulation(
     .add_bin(id="B", name="State B")
     .add_parameter(id="k", value=0.1)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
-    .build(Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}), engine="StochasticEvents")
+    .build(Aggregate(bin_amounts={"A": 1000, "B": 0}), engine="StochasticEvents")
 )
 replicates = stochastic.replicates(200, seed=42).run(num_steps=50)
 mean = replicates.mean()
@@ -175,8 +174,7 @@ stratified = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k", accumulators=["cum_ab"])
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 1000, "B": 0},
             stratification_fractions={
                 "group": {"g1": 0.5, "g2": 0.5},
                 "type": {"t1": 0.5, "t2": 0.5},
@@ -225,7 +223,7 @@ total_g1 = [
     sum(stratified_results[name][step] for name in in_g1)
     for step in range(len(stratified_results[in_g1[0]]))
 ]
-print(round(total_g1[-1]))  # 500: g1 started with half of the total
+print(round(total_g1[-1]))  # 500: g1 started with half of every bin
 ```
 
 ## Windowed totals
@@ -271,7 +269,7 @@ A model built with `engine="DifferentialEquations"` runs in continuous time. The
 ```python
 import math
 
-from commol import OdeSolver
+from commol import ODESolver
 
 ode_model = (
     ModelBuilder(name="Decay")
@@ -282,11 +280,10 @@ ode_model = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1", accumulators=["moved"])
     .build(
         Aggregate(
-            total=1000,
-            bin_fractions={"A": 1.0, "B": 0.0},
+            bin_amounts={"A": 1000, "B": 0},
         ),
         engine="DifferentialEquations",
-        settings=OdeSolver(method="tsit45", rtol=1e-8, atol=1e-8),
+        settings=ODESolver(method="tsit45", rtol=1e-8, atol=1e-8),
     )
 )
 
@@ -298,7 +295,7 @@ print(round(ode.run(num_steps=10)["moved"][10], 1))  # 632.1: the integral of th
 
 ### Solver settings
 
-`OdeSolver` holds the settings of the `DifferentialEquations` engine. They are part of the model (`Model.engine.settings`), so a saved model reproduces its runs. Pass them where you choose the engine, `build(engine="DifferentialEquations", settings=...)`, so one builder can build the model for each engine with its own settings; without them the defaults apply. The `DifferenceEquations` engine takes no settings: the engine rejects settings of another engine with an error that names both (`ValidationError`).
+`ODESolver` holds the settings of the `DifferentialEquations` engine. They are part of the model (`Model.engine.settings`), so a saved model reproduces its runs. Pass them where you choose the engine, `build(engine="DifferentialEquations", settings=...)`, so one builder can build the model for each engine with its own settings; without them the defaults apply. The `DifferenceEquations` engine takes no settings: the engine rejects settings of another engine with an error that names both (`ValidationError`).
 
 | Field    | Default    | Meaning                                                                                                                                                     |
 | -------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -307,6 +304,8 @@ print(round(ode.run(num_steps=10)["moved"][10], 1))  # 632.1: the integral of th
 | `atol`   | `1e-6`     | Absolute tolerance of each state component, in the unit of the bins.                                                                                        |
 
 `bdf` builds its Jacobian from a finite-difference Jacobian-vector product. It uses a dense matrix below `SPARSE_THRESHOLD` state components and a sparse one from there (`crates/commol-differential/src/solve.rs`).
+
+A run stops with `RuntimeError` when the solver cannot take a step, or when a step leaves the state not finite, as when the solution blows up. The message names the last position the solver reached, with either method.
 
 ### Time inside a step
 
@@ -327,7 +326,7 @@ pulse_model = (
     .add_bin(id="B", name="B")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate=AxisPattern.pulse(at=2, value=0.2))
 )
-all_in_a = Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0})
+all_in_a = Aggregate(bin_amounts={"A": 1000, "B": 0})
 ode_pulse = Simulation(
     pulse_model.build(all_in_a, engine="DifferentialEquations")
 ).run(num_steps=3)
@@ -370,16 +369,17 @@ plotter.plot_series(
 )
 ```
 
-| Argument                                  | Default                                        | Meaning                                                                                                                                                                                                                                                                                                              |
-| ----------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `output_file`                             | `None`                                         | Where to save the figure. `None` only returns it.                                                                                                                                                                                                                                                                    |
-| `series`                                  | `None` (every output)                          | What to plot, one subplot each: an output name (`B_g1`) or a bin or accumulator id (`B`), which plots the sum of its outputs (`Simulation.outputs_for`). An exact output name wins. An unknown entry raises `ValueError`.                                                                                            |
-| `observed_data`                           | `None`                                         | `ObservedDataPoint`s to draw on the subplot of their `label`, at their positions (a differential model may observe between integers). An observation with a `window` draws the windowed line, which reads the results at every window end and start (`ValueError` when the results do not hold one).                 |
-| `calibration_result`                      | `None`                                         | A `CalibrationResult` gives the factor values that scale the model. A [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive) draws the weighted median of its draws and their band of `confidence_level`, each draw read through the observation operator (sums, windows, factors). |
-| `config`                                  | `PlotConfig()`                                 | Figure size, dpi, layout and seaborn style.                                                                                                                                                                                                                                                                          |
-| `show_legend`                             | `True`                                         | `plot_series` only.                                                                                                                                                                                                                                                                                                  |
-| `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot_series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`.                                                                                                                                                                                                                    |
-| other keyword arguments                   | —                                              | Passed to `seaborn.lineplot`, such as `linewidth` or `alpha`.                                                                                                                                                                                                                                                        |
+| Argument                                  | Default                                        | Meaning                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`                             | `None`                                         | Where to save the figure. `None` only returns it.                                                                                                                                                                                                                                                                         |
+| `series`                                  | `None` (every output)                          | What to plot, one subplot each: an output name (`B_g1`) or a bin or accumulator id (`B`), which plots the sum of its outputs (`Simulation.outputs_for`). An exact output name wins. An unknown entry raises `ValueError`.                                                                                                 |
+| `observed_data`                           | `None`                                         | `ObservedDataPoint`s to draw on the subplot of their `label`, at their positions (a differential model may observe between integers). An observation with a `window` draws the windowed line, which reads the results at every window end and start (`ValueError` when the results do not hold one).                      |
+| `calibration_result`                      | `None`                                         | A `CalibrationResult` gives the factor values that scale the model. A [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive) draws the weighted median of its draws and their band of `confidence_level`, each draw read through the observation operator (sums, windows, factors).      |
+| `prediction_intervals`                    | `None`                                         | `plot_series` only. The `PredictionIntervals` of a [conformal method](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md): the subplot of each of their series, by label, shows the band from `lower` to `upper` and the point prediction, dashed. An unbounded interval is left out of the band. |
+| `config`                                  | `PlotConfig()`                                 | Figure size, dpi, layout and seaborn style.                                                                                                                                                                                                                                                                               |
+| `show_legend`                             | `True`                                         | `plot_series` only.                                                                                                                                                                                                                                                                                                       |
+| `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot_series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`.                                                                                                                                                                                                                         |
+| other keyword arguments                   | —                                              | Passed to `seaborn.lineplot`, such as `linewidth` or `alpha`.                                                                                                                                                                                                                                                             |
 
 | `PlotConfig` field | Default            | Values                                                      |
 | ------------------ | ------------------ | ----------------------------------------------------------- |

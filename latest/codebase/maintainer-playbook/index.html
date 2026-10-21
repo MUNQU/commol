@@ -1286,6 +1286,174 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1648,6 +1816,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -2241,6 +2437,62 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../decisions/local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../decisions/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
   
 
     
@@ -3246,6 +3498,10 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
       <code>ObservationOperator</code>, sees a <code>Violation</code> as outside the support
       (<code>discrepancy_in_support</code>), and draws every random number from a
       <code>commol_random::Generator</code> seeded from the problem's seed.</li>
+<li>[ ] A method that samples a posterior is a <code>TemperedTarget</code> on
+      <code>SmcSampler</code> (<code>crates/commol-inference/src/smc/</code>), not a sampler of its
+      own, and its configuration takes required <code>priors</code> (<code>WithPriors</code>)
+      (<a href="../decisions/uncertainty/#one-smc-core-many-targets">Design decisions</a>).</li>
 <li>[ ] The runner, bound in <code>py-commol/src/inference.rs</code>, and its stub in
       <code>_commol_rs.pyi</code>.</li>
 <li>[ ] The configuration, a subclass of <code>UncertaintyMethod[YourResult]</code>, and
@@ -3262,6 +3518,14 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
 <code>IdentifiabilityMethod[IdentifiabilityReport]</code> and <code>Calibrator.identifiability</code>;
 it reads derivatives only through <code>SensitivitySource</code>, adds its section to
 <code>IdentifiabilityReport</code>, and needs no coverage study.</p>
+<p>A sensitivity method subclasses <code>SensitivityMethod[YourResult]</code> and runs
+through <code>SensitivityAnalysis.run</code>. Its Rust side is a method of
+<code>ForwardAnalysis</code> (<code>crates/commol-inference/src/global_sensitivity/</code>), which
+builds the design from <code>InputSpace</code> (<code>design.rs</code>), runs it with
+<code>BatchRunner</code> and calls the estimator; the binding and the Python runner only
+convert. A method of independent inputs refuses a sample through
+<code>InputSpace::independent</code>, and a random number comes from a stream of the
+seed of the analysis (<code>stream_seed</code>).</p>
 <h3 id="model-type-engine">Model type (engine)<a class="headerlink" href="#model-type-engine" title="Permanent link">&para;</a></h3>
 <p>To add an engine to the list:</p>
 <ul>
@@ -3315,8 +3579,9 @@ it reads derivatives only through <code>SensitivitySource</code>, adds its secti
 <li>[ ] Write a <code>ModelStructure</code> subclass in <code>py-commol/commol/context/</code>, with
       <code>kind</code> as a <code>Literal</code> default. Implement <code>check_model</code> and
       <code>outputs_by_source</code>; override <code>series_label</code>, <code>uncalibrated_values</code>,
-      <code>with_calibrated_values</code>, <code>report_sections</code>, <code>describe</code> and
-      <code>check_unit_consistency</code> when the kind has them. Reject in
+      <code>check_calibration_values</code>, <code>with_calibrated_values</code>,
+      <code>report_sections</code>, <code>describe</code> and <code>check_unit_consistency</code> when the
+      kind has them. Reject in
       <code>check_model</code> a feature of the process the kind cannot run, and name
       the form that carries over. Import the module in <code>context/__init__.py</code>,
       so <code>Model.from_json</code> reads the kind.</li>
@@ -3361,7 +3626,12 @@ it reads derivatives only through <code>SensitivitySource</code>, adds its secti
 <li>[ ] For a major update that needs code changes, open your own pull request
       and close the Dependabot one with a link to it.</li>
 <li>[ ] The argmin dependency is a fork (<code>MUNQU/argmin</code>, branch <code>development</code>):
-      change the fork first, then update <code>Cargo.lock</code>.</li>
+      change the fork first, then update <code>Cargo.lock</code>. The fork keeps the
+      numerical methods that know no model: the solvers, the sine transform
+      of box bounds (<code>SineTransform</code>, <code>BoundedProblem</code>), the root finder
+      (<code>NewtonRoot</code>) and the finite differences (<code>finitediff</code>). commol keeps
+      what knows the model: the bounds, the start points, the bracket of a
+      quantile.</li>
 </ul>
 <h3 id="releases">Releases<a class="headerlink" href="#releases" title="Permanent link">&para;</a></h3>
 <ul>

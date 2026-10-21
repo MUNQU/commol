@@ -30,6 +30,11 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 - [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md): The three questions, bands and prediction intervals, which method answers which question, the parameter sample, the predictive, scores and the entry point
 - [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md): Structural against practical identifiability, the structural rank, collinearity, a sample, starts, combinations and the report
 - [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md): The Bayesian, residual and wild block bootstraps, the block jackknife, block lengths and prediction intervals from residuals
+- [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md): Priors, the sequential Monte Carlo sampler, the Gibbs posterior and its scale eta, ABC and its distances, and the diagnostics
+- [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md): Observation models of each series, noise parameters, maximum likelihood, the Bayesian posterior and its evidence, prediction intervals with noise, the log score and the parametric bootstrap
+- [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md): Conformal prediction intervals, the guarantee, scores and pooling, split, rolling origins, jackknife+ and CV+, EnbPI, adaptive conformal, plots and reports
+- [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md): Forward questions with no data, input spaces, quantities of interest, propagation, PRCC, Morris screening, Sobol indices, polynomial chaos and their plots
+- [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md): Profile likelihood of parameters and predictions, how to read a profile, the chi-square, Beale and bootstrap thresholds, the adaptive step, verdicts, the report and plots
 - [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md): applied_parameters_report and simulation_report
 - [Examples](https://munqu.github.io/commol/latest/guide/examples/index.md): Complete models
 
@@ -44,6 +49,7 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 - [Model](https://munqu.github.io/commol/latest/api/model/index.md)
 - [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)
 - [Reports](https://munqu.github.io/commol/latest/api/reports/index.md)
+- [Sensitivity](https://munqu.github.io/commol/latest/api/sensitivity/index.md)
 - [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)
 - [Uncertainty](https://munqu.github.io/commol/latest/api/uncertainty/index.md)
 - [Model Structure](https://munqu.github.io/commol/latest/advanced/model-structure/index.md): The data model of a Model

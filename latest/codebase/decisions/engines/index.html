@@ -1286,6 +1286,174 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1648,6 +1816,34 @@
     
   
     Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity
   
 
     
@@ -2356,6 +2552,62 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local-approximations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
   
 
     
@@ -3142,10 +3394,12 @@ sampler in <code>tests/reference_values.txt</code>), <code>py-commol/src/engine.
 <h2 id="whole-units-in-a-stochastic-engine">Whole units in a stochastic engine<a class="headerlink" href="#whole-units-in-a-stochastic-engine" title="Permanent link">&para;</a></h2>
 <p>A stochastic engine moves whole units, so it starts from whole amounts.
 <code>check_model</code> (<code>crates/commol-model/src/builder.rs</code>, called by <code>build</code> and by
-every engine) rejects a total that is not whole, and initial amounts that are
-not whole unless the settings of the engine name a <code>Rounding</code>
-(<code>crates/commol-core/src/types/engine.rs</code>); the message lists both. There is no
-default:</p>
+every engine) rejects a bin whose amount (the sum of its compartments) is not
+whole, and initial amounts that are not whole unless the settings of the
+engine name a <code>Rounding</code> (<code>crates/commol-core/src/types/engine.rs</code>); the
+message lists both. There is no default. A rounding makes the compartments of
+each bin whole and keeps the amount of the bin (<code>round_bins</code>), so a unit never
+moves to another bin, such as from a concentration to a count:</p>
 <table>
 <thead>
 <tr>
@@ -3156,11 +3410,11 @@ default:</p>
 <tbody>
 <tr>
 <td><code>"largest_remainder"</code></td>
-<td>The same whole amounts: each amount rounded down, the units left over to the largest remainders, the first compartment first on a tie</td>
+<td>The same whole amounts: in each bin, each amount rounded down, the units left over to the largest remainders, the first compartment first on a tie</td>
 </tr>
 <tr>
 <td><code>"random"</code></td>
-<td>A multinomial draw of the total with the fractions of the model, from the generator of the run</td>
+<td>A multinomial draw of the amount of each bin with the fractions of the model, from the generator of the run</td>
 </tr>
 </tbody>
 </table>
@@ -3188,6 +3442,18 @@ value that is not whole is an error.</p>
 <td>Reject every amount that is not whole</td>
 <td>Most stratified models would fail, with no way out but to compute whole amounts by hand.</td>
 </tr>
+<tr>
+<td>Round over every compartment at once</td>
+<td>It keeps only the sum of every bin: a unit left over in one bin can start in another bin, of another unit.</td>
+</tr>
+<tr>
+<td>Round each compartment on its own</td>
+<td>No bin keeps its amount, and <code>"random"</code> changes it from one run to the next.</td>
+</tr>
+<tr>
+<td>Round the amount of a bin that is not whole too</td>
+<td>It changes a declared amount without notice.</td>
+</tr>
 </tbody>
 </table>
 <p>A per-step probability of <code>StochasticSteps</code> outside <code>[0, 1]</code>, or proportional
@@ -3197,10 +3463,13 @@ clamp: a binomial draw has no meaning outside <code>[0, 1]</code>, and a clamp w
 the model without notice.</p>
 <p><strong>Guards:</strong> <code>crates/commol-stochastic/tests/oracles.rs</code>
 (<code>amounts_that_are_not_whole_need_a_rounding</code>,
+<code>whole_amounts_need_no_rounding_and_each_bin_must_be_whole</code>,
 <code>the_largest_remainder_starts_every_run_from_the_same_whole_amounts</code>,
 <code>a_random_rounding_starts_on_average_from_the_amounts_of_the_model</code>,
 <code>calibrated_initial_conditions_go_through_the_rounding</code>,
 <code>a_negative_rate_or_probabilities_above_one_fail_at_their_step</code>),
+<code>crates/commol-stochastic/src/units.rs</code> (<code>each_bin_keeps_its_amount_when_rounded</code>),
+<code>builder.rs</code> (<code>a_bin_that_is_not_whole_is_a_build_error_of_a_stochastic_engine</code>),
 <code>tests/stochastic/test_whole_units.py</code>.</p>
 <h2 id="the-solver-is-diffsol">The solver is <code>diffsol</code><a class="headerlink" href="#the-solver-is-diffsol" title="Permanent link">&para;</a></h2>
 <p>The differential engine keeps no numerical method of its own: <code>diffsol</code>
@@ -3212,9 +3481,14 @@ dense (<code>nalgebra</code>) below <code>SPARSE_THRESHOLD</code> state componen
 (<code>faer</code>) from there; <code>diffsol</code> finds the sparse pattern by passing NaN through
 <code>J·v</code>. Solver settings live in the model (<code>Model.engine.settings</code>), so a saved
 model reproduces a run.</p>
+<p>A step that leaves the state not finite stops the run with an error that
+names the last position the solver reached (<code>drive</code>), whatever the method:
+<code>tsit45</code> accepts a step whose error estimate is NaN, where <code>bdf</code> fails on a
+step that is too small.</p>
 <p><strong>Guards:</strong> <code>crates/commol-differential/src/tests.rs</code>
 (<code>bdf_solves_a_stiff_model_within_the_tolerance</code>,
-<code>a_large_stiff_model_uses_the_sparse_path</code>).</p>
+<code>a_large_stiff_model_uses_the_sparse_path</code>,
+<code>a_solution_that_blows_up_stops_the_solver_where_it_fails</code>).</p>
 
 
 

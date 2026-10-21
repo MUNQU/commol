@@ -31,8 +31,7 @@ def model(k1: float | None, k2: float | None):
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .build(
             Aggregate(
-                total=1000,
-                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+                bin_amounts={"A": 990, "B": 10, "C": 0},
             ),
             engine="DifferenceEquations",
         )
@@ -53,6 +52,7 @@ def calibrate(constraints: list[CalibrationConstraint]) -> dict[str, float]:
             CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.01, max_bound=1.0),
         ],
         constraints=constraints,
+        loss_function="sse",
         optimization_config=ParticleSwarmConfig(num_particles=30, max_iterations=300),
         seed=3,
     )

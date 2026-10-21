@@ -37,7 +37,7 @@ def ab_model(k: float | None):
         .add_parameter(id="k", value=k)
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
         .build(
-            Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}),
+            Aggregate(bin_amounts={"A": 1000, "B": 0}),
             engine="DifferenceEquations",
         )
     )
@@ -85,7 +85,7 @@ print(result.diagnostics.block_length)  # 1
 | `WildBootstrap`     | The observed values: each residual times a random sign or Mammen multiplier, one per block | The model is right; the noise has mean zero at each position                      | The same, when the size of the noise changes along the series          |
 | `BlockJackknife`    | One block left out (weight 0) per fit                                                      | The blocks are exchangeable                                                       | A standard error and a bias, and which block moves each parameter most |
 
-None of them needs a noise model. The Bayesian bootstrap never changes the observed values, so it also works when the model is wrong; the residual and wild bootstraps make new data from the model and its residuals.
+None of them needs a noise model. The Bayesian bootstrap never changes the observed values, so it also works when the model is wrong; the residual and wild bootstraps make new data from the model and its residuals. With [observation models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md), `ParametricBootstrap(replicates)` draws new data from the models at the fit; it draws no blocks, so its `diagnostics.block_length` is `None`.
 
 ## Blocks and their length
 
