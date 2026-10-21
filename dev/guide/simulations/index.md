@@ -390,6 +390,8 @@ plotter.plot_series(
 | `palette`          | `None`             | A seaborn palette or matplotlib colormap, such as `"Set2"`  |
 | `context`          | `None`             | `"paper"`, `"notebook"`, `"talk"`, `"poster"`               |
 
+`style`, `palette` and `context` apply to the figure of one plot only. Each method of `SimulationPlotter` draws in a copy of `matplotlib.rcParams` (`_scoped_style` in `py-commol/commol/api/plotter.py`), so the figures that you draw with matplotlib after a plot of commol keep your own style.
+
 To compare with observations:
 
 ```python

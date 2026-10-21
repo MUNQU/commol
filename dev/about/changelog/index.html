@@ -3862,6 +3862,11 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   observation through its own operator at its own position, as the loss
   reads it. Observations with several factors no longer leave the line
   unscaled or raise <code>ValueError</code> with a <code>Predictive</code>.</li>
+<li>A figure of <code>SimulationPlotter</code> with a <code>PlotConfig</code> <code>style</code>, <code>palette</code> or
+  <code>context</code> changed the global style of matplotlib, so every figure drawn with
+  matplotlib after it had the style of commol. The style now applies to the
+  figure of that plot only, and <code>matplotlib.rcParams</code> is as it was before the
+  call.</li>
 </ul>
 <h2 id="060-2026-10-22">[0.6.0] - 2026-10-22<a class="headerlink" href="#060-2026-10-22" title="Permanent link">&para;</a></h2>
 <p>This release adds the first uncertainty methods with a stated model of the

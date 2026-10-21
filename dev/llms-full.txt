@@ -2741,6 +2741,8 @@ plotter.plot_series(
 | `palette`          | `None`             | A seaborn palette or matplotlib colormap, such as `"Set2"`  |
 | `context`          | `None`             | `"paper"`, `"notebook"`, `"talk"`, `"poster"`               |
 
+`style`, `palette` and `context` apply to the figure of one plot only. Each method of `SimulationPlotter` draws in a copy of `matplotlib.rcParams` (`_scoped_style` in `py-commol/commol/api/plotter.py`), so the figures that you draw with matplotlib after a plot of commol keep your own style.
+
 To compare with observations:
 
 ```python
@@ -18799,6 +18801,7 @@ class SimulationPlotter:
             f"and {len(results.positions)} positions"
         )
 
+    @_scoped_style
     def plot_series(
         self,
         output_file: str | None = None,
@@ -18917,6 +18920,7 @@ class SimulationPlotter:
 
         return fig
 
+    @_scoped_style
     def plot_cumulative(
         self,
         output_file: str | None = None,
@@ -18990,6 +18994,7 @@ class SimulationPlotter:
         return fig
 
     @staticmethod
+    @_scoped_style
     def plot_prcc(
         result: PRCCResult,
         output_file: str | None = None,
@@ -19052,6 +19057,7 @@ class SimulationPlotter:
         return fig
 
     @staticmethod
+    @_scoped_style
     def plot_morris(
         result: MorrisResult,
         output_file: str | None = None,
@@ -19096,6 +19102,7 @@ class SimulationPlotter:
         return fig
 
     @staticmethod
+    @_scoped_style
     def plot_sobol(
         result: SobolResult | ChaosResult,
         output_file: str | None = None,
@@ -19167,6 +19174,7 @@ class SimulationPlotter:
         return fig
 
     @staticmethod
+    @_scoped_style
     def plot_profiles(
         result: ProfileResult,
         output_file: str | None = None,
@@ -19221,7 +19229,12 @@ class SimulationPlotter:
 
     @staticmethod
     def _apply_seaborn_style(config: PlotConfig) -> None:
-        """Apply Seaborn styling configuration from PlotConfig."""
+        """
+        Apply the seaborn style, palette and context of `config`.
+
+        It sets `matplotlib.rcParams`, so only a method under `_scoped_style`
+        calls it: the style stays in the figure of that method.
+        """
         if config.style:
             sns.set_style(config.style)
             logger.debug(f"Applied Seaborn style: {config.style}")
@@ -20074,6 +20087,7 @@ Raises:
 Source code in `commol/api/plotter.py`
 
 ```python
+@_scoped_style
 def plot_series(
     self,
     output_file: str | None = None,
@@ -20229,6 +20243,7 @@ Raises:
 Source code in `commol/api/plotter.py`
 
 ```python
+@_scoped_style
 def plot_cumulative(
     self,
     output_file: str | None = None,
@@ -20331,6 +20346,7 @@ Source code in `commol/api/plotter.py`
 
 ```python
 @staticmethod
+@_scoped_style
 def plot_prcc(
     result: PRCCResult,
     output_file: str | None = None,
@@ -20421,6 +20437,7 @@ Source code in `commol/api/plotter.py`
 
 ```python
 @staticmethod
+@_scoped_style
 def plot_morris(
     result: MorrisResult,
     output_file: str | None = None,
@@ -20491,6 +20508,7 @@ Source code in `commol/api/plotter.py`
 
 ```python
 @staticmethod
+@_scoped_style
 def plot_sobol(
     result: SobolResult | ChaosResult,
     output_file: str | None = None,
@@ -20590,6 +20608,7 @@ Source code in `commol/api/plotter.py`
 
 ```python
 @staticmethod
+@_scoped_style
 def plot_profiles(
     result: ProfileResult,
     output_file: str | None = None,
@@ -20652,6 +20671,10 @@ Attributes:
 | `palette` | \`str                 | None\`                                 |
 | `context` | \`str                 | None\`                                 |
 
+Notes
+
+`style`, `palette` and `context` apply to the figure of one call of `SimulationPlotter` only: after the call, `matplotlib.rcParams` is as it was before it, so the figures that you draw with matplotlib keep your style.
+
 Examples:
 
 ```pycon
@@ -20694,6 +20717,12 @@ class PlotConfig(BaseModel):
         Seaborn context for scaling plot elements. Must be a valid seaborn context:
         "paper", "notebook", "talk", or "poster".
         See: https://seaborn.pydata.org/generated/seaborn.set_context.html
+
+    Notes
+    -----
+    ``style``, ``palette`` and ``context`` apply to the figure of one call of
+    `SimulationPlotter` only: after the call, ``matplotlib.rcParams`` is as it
+    was before it, so the figures that you draw with matplotlib keep your style.
 
     Examples
     --------
@@ -34727,6 +34756,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - The `InfeasibleStateError` of a draw of a `Predictive` said only `InfeasibleRun`. It now gives the message of the run after the index of the parameter set: the compartment, the step and the flows, as `Simulation.run` reports them.
 - The `InfeasibleStateError` of a draw of a `Predictive` whose initial amounts leave the remainder below zero said only `InfeasibleStart { excess: ... }`. It now gives the message a calibration gives for the same values after the index of the parameter set: what the amounts exceed, the remainder and by how much.
 - `SimulationPlotter.plot_series` read the model of a windowed series with the first window it found, at the window ends of a grid from 0, so with observations at 7.5 and 17.5 no model value sat on an observation and the windows of the other observations were ignored. When the observations of a series have a window, or differ in outputs or factor, the model line, the band of the replicates and the band of a `Predictive` now read each observation through its own operator at its own position, as the loss reads it. Observations with several factors no longer leave the line unscaled or raise `ValueError` with a `Predictive`.
+- A figure of `SimulationPlotter` with a `PlotConfig` `style`, `palette` or `context` changed the global style of matplotlib, so every figure drawn with matplotlib after it had the style of commol. The style now applies to the figure of that plot only, and `matplotlib.rcParams` is as it was before the call.
 
 ## [0.6.0] - 2026-10-22
 

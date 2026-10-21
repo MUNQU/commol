@@ -4035,6 +4035,10 @@ series first:</p>
 </tr>
 </tbody>
 </table>
+<p><code>style</code>, <code>palette</code> and <code>context</code> apply to the figure of one plot only. Each
+method of <code>SimulationPlotter</code> draws in a copy of <code>matplotlib.rcParams</code>
+(<code>_scoped_style</code> in <code>py-commol/commol/api/plotter.py</code>), so the figures that
+you draw with matplotlib after a plot of commol keep your own style.</p>
 <p>To compare with observations:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ObservedDataPoint</span>
 </span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
