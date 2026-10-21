@@ -54,6 +54,7 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | `group_outputs(ids)` | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id. |
 | `total_series(results, ids)` | `list[float]` | The sum of the given outputs at each position of the results. A bin or accumulator id stands for all its outputs; an output name stands for itself. |
 | `windowed_totals(results, ids, window, at=None)` | `list[float]` | What the given accumulators, or outputs of them, gained in each window. |
+| `sample(results, ids, at)` | `list[float]` | The sum of the given outputs at each position of `at`, such as a bin at the end of each window. |
 | `engine` | engine | The underlying Rust engine, for the model as it is now: the engine `model.engine.type` names (`engine.engine_type`). `engine.step()` advances it one step; `engine.reset()` returns it to the initial state. |
 
 Every `run` starts again from the initial state, so two calls with the same
@@ -296,6 +297,36 @@ print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], range(8), 3))  # [6, 15]
 A window of the grid is a whole number of steps. The `window` of
 `windowed_totals` need not be: see
 [Reporting at any position](#reporting-at-any-position).
+
+## Values at positions
+
+A bin holds an amount at a position, so it is read at the position, not over
+the window before it. `sample` reads the given bins and accumulators at each
+position of `at`; the ids are the ones of `total_series`, and their outputs are
+summed first. Next to `windowed_totals`, it gives the amount in a bin at the
+end of each window and what an accumulator gained over that window:
+
+```python
+ends = stratified.axis_units().window_ends(7, "step", 21)  # [7.0, 14.0, 21.0]
+
+in_a = stratified_simulation.sample(stratified_results, ["A"], ends)
+gained = stratified_simulation.windowed_totals(stratified_results, ["cum_ab"], 7, ends)
+print([round(value) for value in in_a])    # [478, 229, 109]
+print([round(value) for value in gained])  # [522, 250, 119]
+```
+
+`sample(series, positions, at)` of `py-commol/commol/api/results.py` reads
+any series:
+
+```python
+from commol import sample
+
+print(sample([0, 1, 3, 6, 10], range(5), [1, 4]))  # [1, 10]
+```
+
+Each position of `at` must be a position of the results, within a relative
+`1e-9`; otherwise `ValueError` asks you to run the simulation there with
+`run_at`.
 
 ## Differential equations
 

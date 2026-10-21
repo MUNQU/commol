@@ -20,6 +20,8 @@ Runs a model and reads its outputs. Guide: [Running Simulations](../guide/simula
 
 ::: commol.InfeasibleStateError
 
-## Windows
+## Windows and positions
 
 ::: commol.api.windows.windowed_totals
+
+::: commol.api.results.sample

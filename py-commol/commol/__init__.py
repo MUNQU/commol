@@ -15,6 +15,7 @@ from commol.api import (
     AxisPattern,
     ci_percentiles,
     member_statistics,
+    sample,
     weighted_quantiles,
     windowed_totals,
 )
@@ -305,6 +306,7 @@ __all__ = [
     "AxisUnits",
     "ci_percentiles",
     "member_statistics",
+    "sample",
     "weighted_quantiles",
     "windowed_totals",
 ]

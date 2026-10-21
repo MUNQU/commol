@@ -1,7 +1,9 @@
-"""Tests for reducing cumulative series to per-window increments."""
+"""Tests for reducing cumulative series to per-window increments, and for
+reading series at positions."""
 
 import pytest
 
+import commol
 from commol import (
     CalibrationProblem,
     Calibrator,
@@ -10,6 +12,7 @@ from commol import (
     Simulation,
     windowed_totals,
 )
+from commol.api.results import sample
 from commol.context._windows import window_end, window_ends, window_index, window_start
 from tests.support import a_to_b_builder, bounded, build
 
@@ -268,3 +271,43 @@ def test_windowed_totals_take_output_names() -> None:
     assert some == pytest.approx(by_hand)
     assert some == pytest.approx([2 / 3 * value for value in whole])
     assert all(value > 0 for value in some)
+
+
+def test_a_series_is_read_at_positions_through_the_public_api() -> None:
+    """
+    `commol.sample` reads a series at positions, and `Simulation.sample` reads
+    bins and accumulators by id at positions, next to `windowed_totals`.
+
+    A bin id stands for all its strata, so A at the end of each window is the
+    sum of its strata there; an accumulator read at the two ends of a window
+    gives the gain `windowed_totals` reports over it.
+    """
+    builder = a_to_b_builder(
+        parameters={"k1": 0.1},
+        rate="k1",
+        per_compartment=True,
+        accumulator="moved",
+        amounts={"A": 90, "B": 0},
+        stratifications={"g": {"g1": 1 / 3, "g2": 1 / 3, "g3": 1 / 3}},
+    )
+    simulation = Simulation(build(builder))
+    results = simulation.run(6)
+    ends = [2, 4, 6]
+    strata = [f"A_{group}" for group in ("g1", "g2", "g3")]
+
+    a_at_ends = simulation.sample(results, ["A"], ends)
+    by_hand = [sum(results[name][int(end)] for name in strata) for end in ends]
+    moved_at = simulation.sample(results, ["moved"], [0, *ends])
+    gained = simulation.windowed_totals(results, ["moved"], 2, ends)
+
+    assert commol.sample is sample
+    assert commol.sample(results["A_g1"], results.positions, ends) == [
+        results["A_g1"][int(end)] for end in ends
+    ]
+    assert a_at_ends == pytest.approx(by_hand)
+    assert simulation.sample(results, strata, ends) == pytest.approx(by_hand)
+    assert [end - start for start, end in zip(moved_at, moved_at[1:])] == (
+        pytest.approx(gained)
+    )
+    with pytest.raises(ValueError, match="no value at 2.5"):
+        simulation.sample(results, ["A"], [2.5])

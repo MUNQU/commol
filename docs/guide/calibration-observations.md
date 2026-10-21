@@ -186,7 +186,10 @@ print(calibrate_k1(windowed))  # 0.4
 
 `windowed_totals` (module function) and `Simulation.windowed_totals` apply the
 same reduction outside calibration, so a report shows exactly what the loss
-compared. See [Windowed totals](simulations.md#windowed-totals).
+compared. See [Windowed totals](simulations.md#windowed-totals). An
+observation without `window` reads its output at `at`; `sample` and
+`Simulation.sample` read a run there in the same way
+([Values at positions](simulations.md#values-at-positions)).
 
 ## Positions between integers
 

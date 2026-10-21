@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Added #245 -->
 
+- `commol.sample(series, positions, at)` reads a series at given positions,
+  and `Simulation.sample(results, ids, at)` reads bins and accumulators by id
+  at given positions, next to `Simulation.windowed_totals`: for example, the
+  amount in a bin at the end of each window. An id stands for all its outputs,
+  summed; an output name stands for itself.
+
 <!-- Added #254 -->
 
 - An axis of time can start at a calendar date: `ModelBuilder(origin=...)`
