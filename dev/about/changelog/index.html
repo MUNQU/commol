@@ -4053,6 +4053,13 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   state of the run, so its fit, its uncertainty and its <code>Predictive</code> started
   from a wrong split: they now share it in the proportions of the initial
   state.</li>
+<li><code>Model.update_parameters</code> wrote each value with no check, so a list of
+  points for a series parameter left a model that <code>Simulation</code> could not
+  read, with an error that named no parameter. It now takes a list of points
+  for a series parameter and keeps its mode, or a <code>SeriesValue</code> (now in
+  <code>commol</code>) with a new mode, and it runs the checks of a new model: a value
+  it cannot take raises <code>ValueError</code> at the call, with the id of the
+  parameter, and leaves the model unchanged.</li>
 </ul>
 <h2 id="050-2026-10-19">[0.5.0] - 2026-10-19<a class="headerlink" href="#050-2026-10-19" title="Permanent link">&para;</a></h2>
 <p>This release replaces the ensemble calibration with uncertainty methods that

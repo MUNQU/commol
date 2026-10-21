@@ -482,6 +482,45 @@ class Parameter(BaseModel):
             True if the parameter has a value, False if it needs calibration.
         """
         return self.value is not None
+
+    def with_value(self, value: ParameterUpdate) -> "Parameter":
+        """
+        This parameter with another value.
+
+        Parameters
+        ----------
+        value : ParameterUpdate
+            The new value, as `Parameter.value` takes it. A list of
+            (position, value) points replaces the points of a series and keeps
+            its mode; a `SeriesValue` sets both.
+
+        Returns
+        -------
+        Parameter
+            A new parameter with the same id, description and unit.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is a list and this parameter is not a series, or
+            ``value`` is not a valid value; the message names the parameter.
+        """
+        try:
+            if isinstance(value, list):
+                if not isinstance(self.value, SeriesValue):
+                    raise ValueError(
+                        f"Parameter '{self.id}' is not a series, so a list of "
+                        "points has no mode: pass a SeriesValue(data=..., mode=...)"
+                    )
+                value = SeriesValue(data=value, mode=self.value.mode)
+            return Parameter(
+                id=self.id, value=value, description=self.description, unit=self.unit
+            )
+        except ValidationError as error:
+            reasons = "; ".join(detail["msg"] for detail in error.errors())
+            raise ValueError(
+                f"Parameter '{self.id}' cannot take {value!r}: {reasons}"
+            ) from None
 ```
 
 ### Methods:
@@ -541,103 +580,76 @@ def is_calibrated(self) -> bool:
     return self.value is not None
 ```
 
-## SeriesValue
+#### with_value
 
-Bases: `BaseModel`
+```python
+with_value(value: ParameterUpdate) -> Parameter
+```
 
-An empirical series for a parameter value.
+This parameter with another value.
 
-Attributes:
+Parameters:
 
-| Name   | Type                        | Description                                                                                                                                                                                                                                                                                                                                             |
-| ------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data` | `list[tuple[float, float]]` | (position, value) points on the axis. Need not be pre-sorted; the engine sorts them.                                                                                                                                                                                                                                                                    |
-| `mode` | `str`                       | How the series is read between its points: "pulse" (the value on the step of a point, 0 on every other step; integer positions only), "step_function" (the value of the last point at or before t), or "linear" (linear interpolation in t). The engine decides which positions its model type accepts: a DifferenceEquations model only integer steps. |
+| Name    | Type              | Description                                                                                                                                                 | Default    |
+| ------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `value` | `ParameterUpdate` | The new value, as Parameter.value takes it. A list of (position, value) points replaces the points of a series and keeps its mode; a SeriesValue sets both. | *required* |
+
+Returns:
+
+| Type        | Description                                             |
+| ----------- | ------------------------------------------------------- |
+| `Parameter` | A new parameter with the same id, description and unit. |
+
+Raises:
+
+| Type         | Description                                                                                                            |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If value is a list and this parameter is not a series, or value is not a valid value; the message names the parameter. |
 
 Source code in `commol/context/parameter.py`
 
 ```python
-class SeriesValue(BaseModel):
+def with_value(self, value: ParameterUpdate) -> "Parameter":
     """
-    An empirical series for a parameter value.
+    This parameter with another value.
 
-    Attributes
+    Parameters
     ----------
-    data : list[tuple[float, float]]
-        (position, value) points on the axis. Need not be pre-sorted; the
-        engine sorts them.
-    mode : str
-        How the series is read between its points: ``"pulse"`` (the value on
-        the step of a point, 0 on every other step; integer positions only),
-        ``"step_function"`` (the value of the last point at or before ``t``),
-        or ``"linear"`` (linear interpolation in ``t``). The engine decides
-        which positions its model type accepts: a DifferenceEquations model
-        only integer steps.
+    value : ParameterUpdate
+        The new value, as `Parameter.value` takes it. A list of
+        (position, value) points replaces the points of a series and keeps
+        its mode; a `SeriesValue` sets both.
+
+    Returns
+    -------
+    Parameter
+        A new parameter with the same id, description and unit.
+
+    Raises
+    ------
+    ValueError
+        If ``value`` is a list and this parameter is not a series, or
+        ``value`` is not a valid value; the message names the parameter.
     """
-
-    model_config = ConfigDict(extra="forbid")
-
-    data: list[tuple[float, float]]
-    mode: str = Field(default="pulse", pattern="^(pulse|step_function|linear)$")
-
-    @field_validator("data")
-    @classmethod
-    def validate_data(
-        cls, value: list[tuple[float, float]]
-    ) -> list[tuple[float, float]]:
-        """Validate series points before they reach the Rust engine."""
-        if not value:
-            raise ValueError("Series data must contain at least one point")
-
-        positions: list[float] = []
-        for position, point_value in value:
-            if not (math.isfinite(position) and position >= 0):
-                raise ValueError("Series positions must be finite and non-negative")
-            if not math.isfinite(point_value):
-                raise ValueError("Series values must be finite")
-            positions.append(position)
-
-        if len(positions) != len(set(positions)):
-            raise ValueError("Series positions must be unique")
-
-        return value
+    try:
+        if isinstance(value, list):
+            if not isinstance(self.value, SeriesValue):
+                raise ValueError(
+                    f"Parameter '{self.id}' is not a series, so a list of "
+                    "points has no mode: pass a SeriesValue(data=..., mode=...)"
+                )
+            value = SeriesValue(data=value, mode=self.value.mode)
+        return Parameter(
+            id=self.id, value=value, description=self.description, unit=self.unit
+        )
+    except ValidationError as error:
+        reasons = "; ".join(detail["msg"] for detail in error.errors())
+        raise ValueError(
+            f"Parameter '{self.id}' cannot take {value!r}: {reasons}"
+        ) from None
 ```
 
-### Methods:
-
-#### validate_data
-
-```python
-validate_data(value: list[tuple[float, float]]) -> list[tuple[float, float]]
-```
-
-Validate series points before they reach the Rust engine.
-
-Source code in `commol/context/parameter.py`
-
-```python
-@field_validator("data")
-@classmethod
-def validate_data(
-    cls, value: list[tuple[float, float]]
-) -> list[tuple[float, float]]:
-    """Validate series points before they reach the Rust engine."""
-    if not value:
-        raise ValueError("Series data must contain at least one point")
-
-    positions: list[float] = []
-    for position, point_value in value:
-        if not (math.isfinite(position) and position >= 0):
-            raise ValueError("Series positions must be finite and non-negative")
-        if not math.isfinite(point_value):
-            raise ValueError("Series values must be finite")
-        positions.append(position)
-
-    if len(positions) != len(set(positions)):
-        raise ValueError("Series positions must be unique")
-
-    return value
-```
+The value of a series parameter, `SeriesValue`, is documented in [Model API](https://munqu.github.io/commol/latest/api/model/index.md).
 
 ## Transitions
 

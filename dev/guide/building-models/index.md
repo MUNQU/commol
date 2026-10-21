@@ -178,6 +178,29 @@ print(inflow_per_step("step_function"))  # [0.0, 0.0, 1.0, 1.0, 1.0, 4.0, 4.0]
 print(inflow_per_step("linear"))         # [0.0, 0.0, 1.0, 2.0, 3.0, 4.0, 0.0]
 ```
 
+`Model.update_parameters` changes a series of a built model, such as a schedule of a scenario. A list of points keeps the mode of the series; a `SeriesValue` sets the points and the mode. The model takes every value or none: a value it cannot take raises `ValueError` at the call, with the id of the parameter, and the model stays as it was (`tests/building/test_parameters.py::test_update_parameters_rejects_a_value_it_cannot_take`):
+
+```python
+from commol import SeriesValue
+
+schedule = (
+    ModelBuilder(name="Schedule")
+    .add_bin(id="A", name="State A")
+    .add_parameter(id="k_in", value=[(2, 1.0)], mode="pulse")
+    .add_transition(id="inflow", source=[], target=["A"], rate="k_in")
+    .build(Aggregate(bin_amounts={"A": 100}), engine="DifferenceEquations")
+)
+
+schedule.update_parameters({"k_in": [(3, 2.0)]})  # still a pulse
+print(np.diff(Simulation(schedule).run(num_steps=5)["A"]).tolist())
+# [0.0, 0.0, 0.0, 2.0, 0.0]
+schedule.update_parameters(
+    {"k_in": SeriesValue(data=[(3, 2.0)], mode="step_function")}
+)
+print(np.diff(Simulation(schedule).run(num_steps=5)["A"]).tolist())
+# [0.0, 0.0, 0.0, 2.0, 2.0]
+```
+
 `Model.to_json` writes a long series on one line, so model files stay readable.
 
 ## Stratifications

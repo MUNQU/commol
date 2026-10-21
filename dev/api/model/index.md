@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-The validated model that `ModelBuilder.build` returns: a header, the process written once, the structure that lays it out (`Aggregate`, with its neighbors `Complete` and `Groups`), and the entries of `Aggregate.initial_state()`. Guide: [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md), [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate), [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md), [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md). The tree of types is in [Model Structure](https://munqu.github.io/commol/latest/advanced/model-structure/index.md).
+The validated model that `ModelBuilder.build` returns: a header, the process written once, the structure that lays it out (`Aggregate`, with its neighbors `Complete` and `Groups`), the entries of `Aggregate.initial_state()`, and the `SeriesValue` of a series parameter. Guide: [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md), [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate), [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md), [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md). The tree of types is in [Model Structure](https://munqu.github.io/commol/latest/advanced/model-structure/index.md).
 
 ## Model
 
@@ -176,31 +176,45 @@ class Model(BaseModel, Generic[StructureT]):
         self.structure.check_model(self)
         return self
 
-    def update_parameters(self, parameter_values: Mapping[str, float | None]) -> None:
+    def update_parameters(
+        self, parameter_values: Mapping[str, ParameterUpdate]
+    ) -> None:
         """
         Update parameter values in the model.
 
+        The model takes every value or none: the values pass the checks of
+        `Parameter` and of the model, as when the model is made, before any is
+        written.
+
         Parameters
         ----------
-        parameter_values : Mapping[str, float | None]
-            Dictionary mapping parameter IDs to their new values.
+        parameter_values : Mapping[str, ParameterUpdate]
+            Each parameter id mapped to its new value: a number, a formula, a
+            `SeriesValue`, or None to leave it for calibration. A list of
+            (position, value) points replaces the points of a series parameter
+            and keeps its mode; a `SeriesValue` sets the points and the mode.
 
         Raises
         ------
         ValueError
-            If a parameter ID in the dictionary doesn't exist in the model.
+            If an id is not a parameter of the model, a list is given for a
+            parameter that is not a series, a value is not valid (the message
+            names the parameter), or the model rejects the new values.
         """
-        param_dict = {param.id: param for param in self.parameters}
-
+        current = {param.id: param for param in self.parameters}
+        updated = dict(current)
         for param_id, value in parameter_values.items():
-            if param_id not in param_dict:
+            if param_id not in current:
                 raise ValueError(
                     (
                         f"Parameter '{param_id}' not found in model. "
-                        f"Available parameters: {', '.join(param_dict.keys())}"
+                        f"Available parameters: {', '.join(current.keys())}"
                     )
                 )
-            param_dict[param_id].value = value
+            updated[param_id] = current[param_id].with_value(value)
+        parameters = list(updated.values())
+        self.structure.check_model(self.model_copy(update={"parameters": parameters}))
+        self.parameters = parameters
 
     def get_uncalibrated_parameters(self) -> list[str]:
         """
@@ -573,51 +587,67 @@ def validate_structure(self) -> Self:
 #### update_parameters
 
 ```python
-update_parameters(parameter_values: Mapping[str, float | None]) -> None
+update_parameters(parameter_values: Mapping[str, ParameterUpdate]) -> None
 ```
 
 Update parameter values in the model.
 
+The model takes every value or none: the values pass the checks of `Parameter` and of the model, as when the model is made, before any is written.
+
 Parameters:
 
-| Name               | Type                  | Description | Default                                               |
-| ------------------ | --------------------- | ----------- | ----------------------------------------------------- |
-| `parameter_values` | \`Mapping\[str, float | None\]\`    | Dictionary mapping parameter IDs to their new values. |
+| Name               | Type                            | Description                                                                                                                                                                                                                                                      | Default    |
+| ------------------ | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `parameter_values` | `Mapping[str, ParameterUpdate]` | Each parameter id mapped to its new value: a number, a formula, a SeriesValue, or None to leave it for calibration. A list of (position, value) points replaces the points of a series parameter and keeps its mode; a SeriesValue sets the points and the mode. | *required* |
 
 Raises:
 
-| Type         | Description                                                     |
-| ------------ | --------------------------------------------------------------- |
-| `ValueError` | If a parameter ID in the dictionary doesn't exist in the model. |
+| Type         | Description                                                                                                                                                                                  |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If an id is not a parameter of the model, a list is given for a parameter that is not a series, a value is not valid (the message names the parameter), or the model rejects the new values. |
 
 Source code in `commol/context/model.py`
 
 ```python
-def update_parameters(self, parameter_values: Mapping[str, float | None]) -> None:
+def update_parameters(
+    self, parameter_values: Mapping[str, ParameterUpdate]
+) -> None:
     """
     Update parameter values in the model.
 
+    The model takes every value or none: the values pass the checks of
+    `Parameter` and of the model, as when the model is made, before any is
+    written.
+
     Parameters
     ----------
-    parameter_values : Mapping[str, float | None]
-        Dictionary mapping parameter IDs to their new values.
+    parameter_values : Mapping[str, ParameterUpdate]
+        Each parameter id mapped to its new value: a number, a formula, a
+        `SeriesValue`, or None to leave it for calibration. A list of
+        (position, value) points replaces the points of a series parameter
+        and keeps its mode; a `SeriesValue` sets the points and the mode.
 
     Raises
     ------
     ValueError
-        If a parameter ID in the dictionary doesn't exist in the model.
+        If an id is not a parameter of the model, a list is given for a
+        parameter that is not a series, a value is not valid (the message
+        names the parameter), or the model rejects the new values.
     """
-    param_dict = {param.id: param for param in self.parameters}
-
+    current = {param.id: param for param in self.parameters}
+    updated = dict(current)
     for param_id, value in parameter_values.items():
-        if param_id not in param_dict:
+        if param_id not in current:
             raise ValueError(
                 (
                     f"Parameter '{param_id}' not found in model. "
-                    f"Available parameters: {', '.join(param_dict.keys())}"
+                    f"Available parameters: {', '.join(current.keys())}"
                 )
             )
-        param_dict[param_id].value = value
+        updated[param_id] = current[param_id].with_value(value)
+    parameters = list(updated.values())
+    self.structure.check_model(self.model_copy(update={"parameters": parameters}))
+    self.parameters = parameters
 ```
 
 #### get_uncalibrated_parameters
@@ -3736,6 +3766,104 @@ class InitialCompartment(NamedTuple):
     bin: str
     categories: dict[str, str]
     amount: float
+```
+
+## SeriesValue
+
+Bases: `BaseModel`
+
+An empirical series for a parameter value.
+
+Attributes:
+
+| Name   | Type                        | Description                                                                                                                                                                                                                                                                                                                                             |
+| ------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data` | `list[tuple[float, float]]` | (position, value) points on the axis. Need not be pre-sorted; the engine sorts them.                                                                                                                                                                                                                                                                    |
+| `mode` | `str`                       | How the series is read between its points: "pulse" (the value on the step of a point, 0 on every other step; integer positions only), "step_function" (the value of the last point at or before t), or "linear" (linear interpolation in t). The engine decides which positions its model type accepts: a DifferenceEquations model only integer steps. |
+
+Source code in `commol/context/parameter.py`
+
+```python
+class SeriesValue(BaseModel):
+    """
+    An empirical series for a parameter value.
+
+    Attributes
+    ----------
+    data : list[tuple[float, float]]
+        (position, value) points on the axis. Need not be pre-sorted; the
+        engine sorts them.
+    mode : str
+        How the series is read between its points: ``"pulse"`` (the value on
+        the step of a point, 0 on every other step; integer positions only),
+        ``"step_function"`` (the value of the last point at or before ``t``),
+        or ``"linear"`` (linear interpolation in ``t``). The engine decides
+        which positions its model type accepts: a DifferenceEquations model
+        only integer steps.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    data: list[tuple[float, float]]
+    mode: str = Field(default="pulse", pattern="^(pulse|step_function|linear)$")
+
+    @field_validator("data")
+    @classmethod
+    def validate_data(
+        cls, value: list[tuple[float, float]]
+    ) -> list[tuple[float, float]]:
+        """Validate series points before they reach the Rust engine."""
+        if not value:
+            raise ValueError("Series data must contain at least one point")
+
+        positions: list[float] = []
+        for position, point_value in value:
+            if not (math.isfinite(position) and position >= 0):
+                raise ValueError("Series positions must be finite and non-negative")
+            if not math.isfinite(point_value):
+                raise ValueError("Series values must be finite")
+            positions.append(position)
+
+        if len(positions) != len(set(positions)):
+            raise ValueError("Series positions must be unique")
+
+        return value
+```
+
+### Methods:
+
+#### validate_data
+
+```python
+validate_data(value: list[tuple[float, float]]) -> list[tuple[float, float]]
+```
+
+Validate series points before they reach the Rust engine.
+
+Source code in `commol/context/parameter.py`
+
+```python
+@field_validator("data")
+@classmethod
+def validate_data(
+    cls, value: list[tuple[float, float]]
+) -> list[tuple[float, float]]:
+    """Validate series points before they reach the Rust engine."""
+    if not value:
+        raise ValueError("Series data must contain at least one point")
+
+    positions: list[float] = []
+    for position, point_value in value:
+        if not (math.isfinite(position) and position >= 0):
+            raise ValueError("Series positions must be finite and non-negative")
+        if not math.isfinite(point_value):
+            raise ValueError("Series values must be finite")
+        positions.append(position)
+
+    if len(positions) != len(set(positions)):
+        raise ValueError("Series positions must be unique")
+
+    return value
 ```
 
 ## Descriptions
