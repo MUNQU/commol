@@ -103,7 +103,7 @@ class Calibrator:
         sample : ParameterSample
             The draws, in the problem's order.
         positions : list[float]
-            Positions to report at, ascending.
+            Positions to report at, sorted and unique.
 
         Returns
         -------
@@ -799,10 +799,10 @@ The run of every draw of `sample` at `positions`, for a `Predictive`: each repli
 
 Parameters:
 
-| Name        | Type              | Description                        | Default    |
-| ----------- | ----------------- | ---------------------------------- | ---------- |
-| `sample`    | `ParameterSample` | The draws, in the problem's order. | *required* |
-| `positions` | `list[float]`     | Positions to report at, ascending. | *required* |
+| Name        | Type              | Description                                | Default    |
+| ----------- | ----------------- | ------------------------------------------ | ---------- |
+| `sample`    | `ParameterSample` | The draws, in the problem's order.         | *required* |
+| `positions` | `list[float]`     | Positions to report at, sorted and unique. | *required* |
 
 Returns:
 
@@ -826,7 +826,7 @@ def rust_predictive(
     sample : ParameterSample
         The draws, in the problem's order.
     positions : list[float]
-        Positions to report at, ascending.
+        Positions to report at, sorted and unique.
 
     Returns
     -------

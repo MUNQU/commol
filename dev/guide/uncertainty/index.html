@@ -3701,7 +3701,9 @@ parallel in Rust, through the forward model of its source: a <code>Calibrator</c
 a <code>SensitivityAnalysis</code> of the inputs of the sample. With a stochastic engine
 every replicate of a draw is a draw of the predictive, with an equal share of
 its weight and a seed of its own, derived from the seed of the source, so
-every draw shows fresh noise and the predictive repeats from that seed.</p>
+every draw shows fresh noise and the predictive repeats from that seed.
+The positions are sorted and unique, and each one is a position the engine
+reports at; otherwise <code>Predictive</code> raises <code>ValueError</code> before any draw runs.</p>
 <table>
 <thead>
 <tr>

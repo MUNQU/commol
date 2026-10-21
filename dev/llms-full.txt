@@ -4165,7 +4165,7 @@ print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75
 
 ## The predictive
 
-`Predictive(source, sample, positions)` runs every draw at `positions`, in parallel in Rust, through the forward model of its source: a `Calibrator`, or a `SensitivityAnalysis` of the inputs of the sample. With a stochastic engine every replicate of a draw is a draw of the predictive, with an equal share of its weight and a seed of its own, derived from the seed of the source, so every draw shows fresh noise and the predictive repeats from that seed.
+`Predictive(source, sample, positions)` runs every draw at `positions`, in parallel in Rust, through the forward model of its source: a `Calibrator`, or a `SensitivityAnalysis` of the inputs of the sample. With a stochastic engine every replicate of a draw is a draw of the predictive, with an equal share of its weight and a seed of its own, derived from the seed of the source, so every draw shows fresh noise and the predictive repeats from that seed. The positions are sorted and unique, and each one is a position the engine reports at; otherwise `Predictive` raises `ValueError` before any draw runs.
 
 | Member                                                     | Returns                                                                                                                                                                                                                                                 |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -7891,7 +7891,7 @@ class Calibrator:
         sample : ParameterSample
             The draws, in the problem's order.
         positions : list[float]
-            Positions to report at, ascending.
+            Positions to report at, sorted and unique.
 
         Returns
         -------
@@ -8587,10 +8587,10 @@ The run of every draw of `sample` at `positions`, for a `Predictive`: each repli
 
 Parameters:
 
-| Name        | Type              | Description                        | Default    |
-| ----------- | ----------------- | ---------------------------------- | ---------- |
-| `sample`    | `ParameterSample` | The draws, in the problem's order. | *required* |
-| `positions` | `list[float]`     | Positions to report at, ascending. | *required* |
+| Name        | Type              | Description                                | Default    |
+| ----------- | ----------------- | ------------------------------------------ | ---------- |
+| `sample`    | `ParameterSample` | The draws, in the problem's order.         | *required* |
+| `positions` | `list[float]`     | Positions to report at, sorted and unique. | *required* |
 
 Returns:
 
@@ -8614,7 +8614,7 @@ def rust_predictive(
     sample : ParameterSample
         The draws, in the problem's order.
     positions : list[float]
-        Positions to report at, ascending.
+        Positions to report at, sorted and unique.
 
     Returns
     -------
@@ -21323,7 +21323,7 @@ class SensitivityAnalysis:
         sample : ParameterSample
             The draws, in the order of the inputs.
         positions : list[float]
-            Positions to report at, ascending.
+            Positions to report at, sorted and unique.
 
         Returns
         -------
@@ -21587,10 +21587,10 @@ The run of every draw of `sample` at `positions`, for a `Predictive`: each repli
 
 Parameters:
 
-| Name        | Type              | Description                            | Default    |
-| ----------- | ----------------- | -------------------------------------- | ---------- |
-| `sample`    | `ParameterSample` | The draws, in the order of the inputs. | *required* |
-| `positions` | `list[float]`     | Positions to report at, ascending.     | *required* |
+| Name        | Type              | Description                                | Default    |
+| ----------- | ----------------- | ------------------------------------------ | ---------- |
+| `sample`    | `ParameterSample` | The draws, in the order of the inputs.     | *required* |
+| `positions` | `list[float]`     | Positions to report at, sorted and unique. | *required* |
 
 Returns:
 
@@ -21614,7 +21614,7 @@ def rust_predictive(
     sample : ParameterSample
         The draws, in the order of the inputs.
     positions : list[float]
-        Positions to report at, ascending.
+        Positions to report at, sorted and unique.
 
     Returns
     -------
@@ -27096,12 +27096,15 @@ class Predictive:
         sample : ParameterSample
             Its parameters, in the order of the problem or the analysis.
         positions : Sequence[float]
-            Positions to report at, ascending.
+            Positions to report at, sorted and unique.
 
         Raises
         ------
         ValueError
-            If the sample's parameters are not the source's.
+            Before any draw runs: if the sample's parameters are not the
+            source's, or the positions are not sorted and unique or the engine
+            does not report at one of them (a difference engine reports only
+            at integer steps).
         InfeasibleStateError
             If a draw leaves the values its model allows.
         """
@@ -27288,14 +27291,14 @@ Parameters:
 | ----------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- | ---------- |
 | `source`    | `PredictiveSource` | The calibration problem the sample is a sample of (Calibrator), or the sensitivity analysis of its inputs (SensitivityAnalysis). | *required* |
 | `sample`    | `ParameterSample`  | Its parameters, in the order of the problem or the analysis.                                                                     | *required* |
-| `positions` | `Sequence[float]`  | Positions to report at, ascending.                                                                                               | *required* |
+| `positions` | `Sequence[float]`  | Positions to report at, sorted and unique.                                                                                       | *required* |
 
 Raises:
 
-| Type                   | Description                                      |
-| ---------------------- | ------------------------------------------------ |
-| `ValueError`           | If the sample's parameters are not the source's. |
-| `InfeasibleStateError` | If a draw leaves the values its model allows.    |
+| Type                   | Description                                                                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`           | Before any draw runs: if the sample's parameters are not the source's, or the positions are not sorted and unique or the engine does not report at one of them (a difference engine reports only at integer steps). |
+| `InfeasibleStateError` | If a draw leaves the values its model allows.                                                                                                                                                                       |
 
 Source code in `commol/api/inference/predictive.py`
 
@@ -27317,12 +27320,15 @@ def __init__(
     sample : ParameterSample
         Its parameters, in the order of the problem or the analysis.
     positions : Sequence[float]
-        Positions to report at, ascending.
+        Positions to report at, sorted and unique.
 
     Raises
     ------
     ValueError
-        If the sample's parameters are not the source's.
+        Before any draw runs: if the sample's parameters are not the
+        source's, or the positions are not sorted and unique or the engine
+        does not report at one of them (a difference engine reports only
+        at integer steps).
     InfeasibleStateError
         If a draw leaves the values its model allows.
     """
@@ -34717,6 +34723,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - A transition whose rate holds `$compartment` dropped `per_compartment`, `accumulators` and the `absolute` of its stratified rates: each transition it expands to now keeps them, so with `per_compartment=True` `$compartment` reads the compartment that flows, and its accumulators count the flow.
 - A `Calibrator` on a `Simulation` that had run shared a calibrated bin, bin prefix or remainder across its compartments in the proportions of the last state of the run, so its fit, its uncertainty and its `Predictive` started from a wrong split: they now share it in the proportions of the initial state.
 - `Model.update_parameters` wrote each value with no check, so a list of points for a series parameter left a model that `Simulation` could not read, with an error that named no parameter. It now takes a list of points for a series parameter and keeps its mode, or a `SeriesValue` (now in `commol`) with a new mode, and it runs the checks of a new model: a value it cannot take raises `ValueError` at the call, with the id of the parameter, and leaves the model unchanged.
+- A `Predictive` at positions out of order failed inside a draw with a `RuntimeError` that named a parameter set: it now raises `ValueError` before any draw runs, with the first pair out of order, as it does for a position the engine rejects.
 
 ## [0.5.0] - 2026-10-19
 

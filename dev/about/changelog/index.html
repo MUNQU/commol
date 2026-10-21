@@ -4060,6 +4060,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>commol</code>) with a new mode, and it runs the checks of a new model: a value
   it cannot take raises <code>ValueError</code> at the call, with the id of the
   parameter, and leaves the model unchanged.</li>
+<li>A <code>Predictive</code> at positions out of order failed inside a draw with a
+  <code>RuntimeError</code> that named a parameter set: it now raises <code>ValueError</code>
+  before any draw runs, with the first pair out of order, as it does for a
+  position the engine rejects.</li>
 </ul>
 <h2 id="050-2026-10-19">[0.5.0] - 2026-10-19<a class="headerlink" href="#050-2026-10-19" title="Permanent link">&para;</a></h2>
 <p>This release replaces the ensemble calibration with uncertainty methods that
