@@ -36,8 +36,11 @@ Incremented for backwards-compatible bug fixes:
 - Example: Fixing calculation errors, typos in error messages
 
 !!! note "Versions before 1.0.0"
-    While Commol is at `0.x`, a breaking change increments the MINOR version
-    (`0.1.3` → `0.2.0`) and everything else increments the PATCH version.
+    While Commol is at `0.x`, a minor release (`0.X.0`) ships one theme of new
+    features, the one that its milestone names, and it may break the API: the
+    changelog marks each break **Breaking**. A patch release (`0.X.Y`) ships
+    fixes only. So a breaking change waits for the next minor release, and a
+    new feature never goes into a patch release.
 
 ## Where the Version Comes From
 
