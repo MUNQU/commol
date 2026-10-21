@@ -98,6 +98,11 @@ Position = Annotated[float, Field(ge=0.0, allow_inf_nan=False)]
 """A position on the axis of the model."""
 
 
+def _position_text(at: float) -> str:
+    """`at` as the shortest text that reads back as it: `repr`, with no `.0`."""
+    return repr(at).removesuffix(".0")
+
+
 class ValueAt(_OneScalar):
     """
     The value at a position.
@@ -114,7 +119,7 @@ class ValueAt(_OneScalar):
 
     def default_label(self) -> str:
         """`outputs` at `at`."""
-        return f"{self.output_name} at {self.at:g}"
+        return f"{self.output_name} at {_position_text(self.at)}"
 
     def rust_quantity(self) -> RustQuantity:
         """The kind, the outputs and the position."""
@@ -152,7 +157,8 @@ class Gain(_OneScalar):
 
     def default_label(self) -> str:
         """The gain of `outputs` over the window."""
-        return f"{self.output_name} gain over ({self.start:g}, {self.end:g}]"
+        start, end = _position_text(self.start), _position_text(self.end)
+        return f"{self.output_name} gain over ({start}, {end}]"
 
     def rust_quantity(self) -> RustQuantity:
         """The kind, the outputs, the start and the end."""
@@ -245,7 +251,10 @@ class Trajectory(_AtPositions):
         """One `ValueAt` per position."""
         name = self.label or self.output_name
         return [
-            (f"{name} at {at:g}", (self.rust_kind, self.output_list, [at]))
+            (
+                f"{name} at {_position_text(at)}",
+                (self.rust_kind, self.output_list, [at]),
+            )
             for at in self.positions
         ]
 

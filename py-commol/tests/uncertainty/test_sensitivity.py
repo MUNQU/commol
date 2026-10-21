@@ -144,6 +144,23 @@ class TestQuantities:
         assert rust[1] == ("gain", ["B", "C"], [5.0, 10.0])
         assert rust[4] == ("value_at", ["C"], [1.0])
 
+    def test_the_labels_of_close_positions_differ(self) -> None:
+        labels, _ = expand_quantities(
+            [
+                Trajectory(outputs="B", positions=[1000000, 1000001]),
+                ValueAt(outputs="B", at=0.1234567),
+                ValueAt(outputs="B", at=0.1234568),
+                Gain(outputs="C", start=1e-7, end=2.5e16),
+            ]
+        )
+        assert labels == [
+            "B at 1000000",
+            "B at 1000001",
+            "B at 0.1234567",
+            "B at 0.1234568",
+            "C gain over (1e-07, 2.5e+16]",
+        ]
+
     def test_a_quantity_reads_a_valid_window_of_positions(self) -> None:
         with pytest.raises(ValueError, match=r"ends after it starts"):
             Gain(outputs="C", start=10, end=10)
