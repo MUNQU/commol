@@ -16,6 +16,8 @@ import pytest
 from pydantic import ValidationError
 
 from commol import (
+    BootstrapCoverageEta,
+    InformationMatchingEta,
     ABCRejection,
     ABCSMC,
     Beta,
@@ -23,7 +25,6 @@ from commol import (
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
-    EtaCalibration,
     GibbsPosterior,
     LogNormal,
     LogUniform,
@@ -266,7 +267,7 @@ class TestGibbsPosterior:
     def test_information_matching_recovers_eta(self) -> None:
         count = 200
         result = _flow(_flow_data(count, 5)).uncertainty(
-            _gibbs(eta=EtaCalibration.information_matching(block_length=1))
+            _gibbs(eta=InformationMatchingEta(block_length=1))
         )
 
         # η̂ = 1/(2σ̂²): its relative error is about √(2/n).
@@ -282,7 +283,7 @@ class TestGibbsPosterior:
 
     def test_eta_is_required_and_positive(self) -> None:
         settings = _gibbs().model_dump(exclude={"eta"})
-        hint = r"eta.*EtaCalibration\.information_matching\(block_length\).*bootstrap"
+        hint = r"eta.*InformationMatchingEta\(block_length.*BootstrapCoverageEta"
         with pytest.raises(ValueError, match=hint):
             GibbsPosterior.model_validate(settings)
         for eta in (0.0, -1.0):
@@ -290,17 +291,17 @@ class TestGibbsPosterior:
                 _gibbs(eta=eta)
 
     def test_information_matching_needs_a_smooth_sum_loss(self) -> None:
-        method = _gibbs(eta=EtaCalibration.information_matching(block_length=1))
+        method = _gibbs(eta=InformationMatchingEta(block_length=1))
         for loss in ("rmse", "mae"):
             with pytest.raises(
                 ValueError,
-                match=r'loss_function="sse".*EtaCalibration\.bootstrap_coverage',
+                match=r'loss_function="sse".*BootstrapCoverageEta',
             ):
                 _flow(_flow_data(10, 6), loss).uncertainty(method)
 
         with pytest.raises(
             ValueError,
-            match=r"deterministic engine.*EtaCalibration\.bootstrap_coverage",
+            match=r"deterministic engine.*BootstrapCoverageEta",
         ):
             _binomial(300, loss_function="sse").uncertainty(method)
 
@@ -325,7 +326,7 @@ class TestGibbsPosterior:
         )
         with pytest.raises(RuntimeError, match="singular"):
             Calibrator(Simulation(model), problem).uncertainty(
-                _gibbs(eta=EtaCalibration.information_matching(block_length=1))
+                _gibbs(eta=InformationMatchingEta(block_length=1))
             )
 
     def test_bootstrap_coverage_needs_a_loss_above_zero_at_the_fit(self) -> None:
@@ -343,7 +344,7 @@ class TestGibbsPosterior:
             seed=1,
         )
         method = _gibbs(
-            eta=EtaCalibration.bootstrap_coverage(
+            eta=BootstrapCoverageEta(
                 replicates=10, block_length="auto", confidence_level=0.8
             )
         )
@@ -353,7 +354,7 @@ class TestGibbsPosterior:
     def test_bootstrap_coverage_finds_an_eta_whose_intervals_cover(self) -> None:
         result = _flow(_flow_data(20, 7)).uncertainty(
             _gibbs(
-                eta=EtaCalibration.bootstrap_coverage(
+                eta=BootstrapCoverageEta(
                     replicates=8, block_length=1, confidence_level=0.8
                 ),
                 particles=200,
@@ -387,7 +388,7 @@ class TestGibbsPosterior:
         with caplog.at_level(logging.WARNING, logger="commol.api.inference"):
             result = _flow(_flow_data(10, 3)).uncertainty(
                 _gibbs(
-                    eta=EtaCalibration.bootstrap_coverage(
+                    eta=BootstrapCoverageEta(
                         replicates=3, block_length="auto", confidence_level=0.5
                     )
                 )
@@ -560,3 +561,21 @@ class TestResult:
         assert gibbs.levels[-1] == 1.0
         assert gibbs.diagnostics.stop_reason is None
         assert gibbs.log_evidence < 0.0
+
+
+@pytest.mark.parametrize(
+    "eta",
+    [
+        InformationMatchingEta(block_length=1),
+        BootstrapCoverageEta(replicates=3, block_length="auto", confidence_level=0.5),
+    ],
+    ids=["information_matching", "bootstrap_coverage"],
+)
+def test_an_eta_calibration_is_built_from_its_class(
+    eta: InformationMatchingEta | BootstrapCoverageEta,
+) -> None:
+    # A saved method reads back the calibration of its class, by its kind.
+    method = GibbsPosterior.model_validate_json(_gibbs(eta=eta).model_dump_json())
+
+    assert type(method.eta) is type(eta)
+    assert method.eta == eta

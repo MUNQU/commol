@@ -19,10 +19,10 @@ from commol.context.inference.smc import (
     ABCRejection,
     ABCSMC,
     BayesianPosterior,
-    BootstrapCoverage,
+    BootstrapCoverageEta,
     GibbsPosterior,
     GibbsResult,
-    InformationMatching,
+    InformationMatchingEta,
     LossDistance,
     SMCDiagnostics,
     SMCResult,
@@ -104,14 +104,14 @@ def run_gibbs_posterior(
     fit: CalibrationResult | None = None
     coverage: float | None = None
     notes: list[str] = []
-    if isinstance(method.eta, InformationMatching):
+    if isinstance(method.eta, InformationMatchingEta):
         fit = calibrator.run()
         eta = rust.information_matching_eta(
             problem,
             fit_values(calibrator, fit),
             rust_block_length(method.eta.block_length),
         )
-    elif isinstance(method.eta, BootstrapCoverage):
+    elif isinstance(method.eta, BootstrapCoverageEta):
         fit = calibrator.run()
         calibration = method.eta
         found = rust.bootstrap_coverage_eta(

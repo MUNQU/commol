@@ -16,10 +16,10 @@ import pytest
 from pydantic import BaseModel
 
 from commol import (
+    InformationMatchingEta,
     CalibrationConstraint,
     CalibrationProblem,
     Calibrator,
-    EtaCalibration,
     GibbsPosterior,
     GibbsTarget,
     ImportanceResult,
@@ -381,7 +381,7 @@ class TestResults:
 def _matching(block_length: int) -> GibbsPosterior:
     return GibbsPosterior(
         priors=Priors.uniform_on_bounds(),
-        eta=EtaCalibration.information_matching(block_length=block_length),
+        eta=InformationMatchingEta(block_length=block_length),
         particles=50,
         target_cess=0.5,
         resample_threshold=0.5,
