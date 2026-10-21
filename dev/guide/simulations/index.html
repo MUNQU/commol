@@ -3960,12 +3960,12 @@ series first:</p>
 <tr>
 <td><code>observed_data</code></td>
 <td><code>None</code></td>
-<td><code>ObservedDataPoint</code>s to draw on the subplot of their <code>label</code>, at their positions (a differential model may observe between integers). An observation with a <code>window</code> draws the windowed line, which reads the results at every window end and start (<code>ValueError</code> when the results do not hold one).</td>
+<td><code>ObservedDataPoint</code>s to draw on the subplot of their <code>label</code>, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs and one factor and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, <code>window</code> and factor as the loss reads it (<code>ValueError</code> when the results have no value at a position or a window start).</td>
 </tr>
 <tr>
 <td><code>calibration_result</code></td>
 <td><code>None</code></td>
-<td>A <code>CalibrationResult</code> gives the factor values that scale the model. A <a href="../uncertainty/#the-predictive"><code>Predictive</code></a> draws the weighted median of its draws and their band of <code>confidence_level</code>, each draw read through the observation operator (sums, windows, factors).</td>
+<td>A <code>CalibrationResult</code> gives the factor values that scale the model. A <a href="../uncertainty/#the-predictive"><code>Predictive</code></a> draws the weighted median of its draws and their band of <code>confidence_level</code>, each draw read through the observation operator (sums, windows, factors), at the position of each observation when the line of <code>observed_data</code> is.</td>
 </tr>
 <tr>
 <td><code>prediction_intervals</code></td>

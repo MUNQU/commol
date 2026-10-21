@@ -3284,12 +3284,17 @@ impulse step and restarts from the new state, so <code>diffsol</code> needs no e
 predictive reads windows through the observation operator
 (<a href="../calibration/#one-observation-operator">One observation operator</a>). Window <code>w</code>
 covers <code>(w · W, (w + 1) · W]</code>; <code>window_index</code> places a position with
-<code>max(ceil(at / W) − 1, 0)</code>, and <code>observed_report</code> calls it.</p>
+<code>max(ceil(at / W) − 1, 0)</code>, and <code>observed_report</code> calls it.
+<code>SimulationPlotter.plot_series</code> reads the model of a windowed observation the
+same way, through its own window at its own position, never on a grid of
+windows from 0: an observation at 10.5 with a window of 7 falls on no window
+end of that grid.</p>
 <p><strong>Guards:</strong> <code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> (the loss at
 the generating parameters is zero),
 <code>tests/reporting/test_simulation_report.py::test_observed_report_places_each_observation_by_window_index</code>
+<code>tests/plotting/test_plotter.py::TestPredictiveSeries::test_a_windowed_band_of_one_draw_is_its_windowed_run</code>
 and
-<code>tests/plotting/test_plotter.py::TestPredictiveSeries::test_a_windowed_band_of_one_draw_is_its_windowed_run</code>.</p>
+<code>tests/plotting/test_plotter.py::test_each_observed_point_is_read_through_its_own_window_and_position</code>.</p>
 <h2 id="the-engine-owns-positions">The engine owns positions<a class="headerlink" href="#the-engine-owns-positions" title="Permanent link">&para;</a></h2>
 <p>A position on the axis is an <code>f64</code> in every engine call and a <code>float</code> in every
 public Python name (<code>at</code>); a length is <code>window</code> or <code>period</code>; a count of steps
