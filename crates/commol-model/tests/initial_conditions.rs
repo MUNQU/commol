@@ -131,8 +131,8 @@ impl CompartmentalEngine for FrozenEngine {
             .collect()
     }
 
-    fn state(&self) -> Vec<f64> {
-        self.state.clone()
+    fn initial_state(&self) -> Vec<f64> {
+        self.initial_state.clone()
     }
 
     fn total(&self) -> f64 {
@@ -172,7 +172,7 @@ fn written_state(
     if excess > 0.0 {
         return Err(plan.infeasibility(excess));
     }
-    Ok(engine.state())
+    Ok(engine.state)
 }
 
 fn assert_close(actual: &[f64], expected: &[f64]) {
@@ -189,6 +189,21 @@ fn a_bin_value_keeps_the_split_of_its_compartments() {
         written_state(FrozenEngine::two_bins(), &["A", "B"], None, &[650.0, 350.0]).unwrap();
 
     assert_close(&state, &[390.0, 260.0, 280.0, 70.0]);
+}
+
+#[test]
+fn a_bin_and_the_remainder_keep_the_split_of_the_initial_state_after_a_run() {
+    // The run moved A to 50:450 and B to 100:400; A = 100 keeps the 300:200
+    // it starts with, and B takes the remaining 900 at its 400:100.
+    let mut engine = FrozenEngine::two_bins();
+    engine.state = vec![50.0, 450.0, 100.0, 400.0];
+    let plan = engine
+        .plan_values(&initial_conditions(&["A"]), Some("B"))
+        .unwrap();
+
+    assert_eq!(engine.apply_values(&plan, &[100.0]).unwrap(), 0.0);
+
+    assert_close(&engine.initial_state, &[60.0, 40.0, 720.0, 180.0]);
 }
 
 #[test]

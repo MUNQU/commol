@@ -20,8 +20,10 @@ pub trait CompartmentalEngine: SimulationEngine {
     /// [`SimulationEngine::output_names`].
     fn output_labels(&self) -> Vec<OutputLabels>;
 
-    /// Current amount of each compartment, in engine order.
-    fn state(&self) -> Vec<f64>;
+    /// Initial amount of each compartment, in engine order: the state
+    /// [`SimulationEngine::reset`] restores, whatever position the engine has
+    /// reached.
+    fn initial_state(&self) -> Vec<f64>;
 
     /// The sum of the initial amounts the model states, before any calibrated
     /// value is written.

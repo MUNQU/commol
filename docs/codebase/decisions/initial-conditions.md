@@ -40,6 +40,16 @@ whose every compartment a value or the remainder sets and the split of every
 calibrated category, and pins as per-compartment overrides every compartment
 that these cannot reproduce.
 
+**Rule:** the plan reads the initial state of the engine
+(`CompartmentalEngine::initial_state`), never its current state: the split of
+a bin, a prefix or the remainder and the pair totals of a category. A
+`Calibrator` takes the engine of its `Simulation`, which holds the last state
+of a run.
+
+**Guards:**
+`crates/commol-model/tests/initial_conditions.rs::a_bin_and_the_remainder_keep_the_split_of_the_initial_state_after_a_run`,
+`tests/calibration/test_initial_conditions.py::test_a_calibrator_on_a_simulation_that_has_run_splits_a_bin_by_the_initial_state`.
+
 ## The remainder keeps the sum the model declares
 
 The remainder takes the sum of the amounts the model states

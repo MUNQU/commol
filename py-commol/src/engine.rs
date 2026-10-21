@@ -175,7 +175,7 @@ pub fn compartmental_state(
     engine: &Engine,
     plan: &EngineValuePlan,
 ) -> Result<(Vec<f64>, Vec<usize>), String> {
-    let state = compartmental!(engine, engine => engine.state())?;
+    let state = compartmental!(engine, engine => engine.initial_state())?;
     match plan {
         EngineValuePlan::Aggregate(plan) => Ok((state, plan.covered_compartments())),
         // coverage: an arm for the test model kind: compartmental! rejects the engine of a test

@@ -358,8 +358,8 @@ impl CompartmentalEngine for DifferenceEquations {
         self.model.output_labels().to_vec()
     }
 
-    fn state(&self) -> Vec<f64> {
-        DifferenceEquations::state(self)
+    fn initial_state(&self) -> Vec<f64> {
+        self.model.initial_state()[..self.model.num_compartments()].to_vec()
     }
 
     fn total(&self) -> f64 {

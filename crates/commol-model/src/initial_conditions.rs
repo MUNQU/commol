@@ -33,7 +33,7 @@ const EXCESS_TOLERANCE: f64 = 1e-9;
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum InitialConditionTarget {
     /// A bin or a bin prefix. The value is the amount the covered
-    /// compartments hold, shared by weights taken from the base state.
+    /// compartments hold, shared by weights taken from the initial state.
     Aggregate { entries: Vec<(usize, f64)> },
     /// One expanded compartment. The value is its amount.
     Exact { index: usize },
@@ -117,7 +117,7 @@ impl InitialConditionPlan {
     ) -> Result<Self, String> {
         let compartments = engine.compartments();
         let labels = compartment_labels(engine);
-        let state = engine.state();
+        let state = engine.initial_state();
 
         let targets = values
             .iter()
@@ -260,7 +260,7 @@ impl InitialConditionPlan {
         let Some((_, indices)) = &self.remainder else {
             return Ok(0.0);
         };
-        let state = engine.state();
+        let state = engine.initial_state();
         let covered = self.covered_compartments();
         let others: f64 = state
             .iter()
@@ -335,7 +335,7 @@ fn write_target<E: CompartmentalEngine>(
             engine.set_initial_condition(*index, value)?;
         }
         InitialConditionTarget::PairedCategory { pairs } => {
-            let state = engine.state();
+            let state = engine.initial_state();
             for &(category_idx, complement_idx) in pairs {
                 let pair_total = state[category_idx] + state[complement_idx];
                 engine.set_initial_condition(category_idx, value * pair_total)?;

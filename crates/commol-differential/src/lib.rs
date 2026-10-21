@@ -262,8 +262,8 @@ impl CompartmentalEngine for DifferentialEquations {
         self.model.output_labels().to_vec()
     }
 
-    fn state(&self) -> Vec<f64> {
-        DifferentialEquations::state(self)
+    fn initial_state(&self) -> Vec<f64> {
+        self.model.initial_state()[..self.model.num_compartments()].to_vec()
     }
 
     fn total(&self) -> f64 {

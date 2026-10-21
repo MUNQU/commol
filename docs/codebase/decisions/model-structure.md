@@ -24,7 +24,7 @@ The library names what the compartments hold without assuming individuals:
 
 | Term | Meaning | Where |
 |---|---|---|
-| **State** | The vector of the amount of every compartment | `CompartmentalEngine::state`, `Engine.state` |
+| **State** | The vector of the amount of every compartment | `DifferenceEquations::state` and the `state` of the other engines, `Engine.state` |
 | **Amount** | The value of one compartment, in the unit of its bin | `InitialCompartment.amount`, `InitialConditions.bin_amounts` |
 | **Total** | The sum of every compartment, accumulators excluded | the rate variable `total` (`SPECIAL_VAR_TOTAL`) |
 | **Subgroup total** | The sum of the compartments with some categories | `subgroup_total`, the rate variables `total_<cat>…` (`SUBGROUP_TOTAL_PREFIX`) |

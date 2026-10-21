@@ -246,6 +246,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `accumulators` and the `absolute` of its stratified rates: each transition it
   expands to now keeps them, so with `per_compartment=True` `$compartment`
   reads the compartment that flows, and its accumulators count the flow.
+- A `Calibrator` on a `Simulation` that had run shared a calibrated bin, bin
+  prefix or remainder across its compartments in the proportions of the last
+  state of the run, so its fit, its uncertainty and its `Predictive` started
+  from a wrong split: they now share it in the proportions of the initial
+  state.
 
 ## [0.5.0] - 2026-10-19
 

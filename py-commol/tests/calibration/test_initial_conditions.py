@@ -9,7 +9,10 @@ from commol import (
     ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
+    ParameterSample,
     ParticleSwarmConfig,
+    Predictive,
+    SampleMethod,
     Simulation,
 )
 from commol.context.model import Model
@@ -186,3 +189,61 @@ class TestRemainderUnits:
 
     def test_a_remainder_of_the_same_unit_is_accepted(self) -> None:
         assert_accepted(Calibrator, Simulation(_mixed_units()), _remainder_problem("B"))
+
+
+def _moving_split() -> Model:
+    """``k = 0.1`` of ``A_g1`` moves to ``A_g2`` each step; 100 in A, 900 in B."""
+    return (
+        ModelBuilder(name="Moving split")
+        .add_bin(id="A", name="A")
+        .add_bin(id="B", name="B")
+        .add_stratification(id="g", categories=["g1", "g2"])
+        .add_parameter(id="k", value=0.1)
+        .add_transition(
+            id="move",
+            source=["A"],
+            target=["A"],
+            stratified_rates=[
+                {
+                    "conditions": [
+                        {"stratification": "g", "category": "g1", "to": "g2"}
+                    ],
+                    "rate": "k * A_g1",
+                }
+            ],
+        )
+        .build(
+            Aggregate(
+                bin_amounts={"A": 100, "B": 900},
+                stratification_fractions={"g": {"g1": 0.5, "g2": 0.5}},
+            ),
+            engine="DifferenceEquations",
+        )
+    )
+
+
+def test_a_calibrator_on_a_simulation_that_has_run_splits_a_bin_by_the_initial_state():  # noqa: E501
+    # A = 100 splits 50/50, and 0.1 of the 50 in A_g1 moves in one step: 45.
+    problem = CalibrationProblem(
+        observed_data=[ObservedDataPoint(at=1, output="A_g1", value=45.0)],
+        parameters=[bounded("A", 0.0, 200.0, kind="initial_condition")],
+        initial_condition_remainder="B",
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=10),
+    )
+    sample = ParameterSample.equally_weighted(
+        names=["A"],
+        bounds=[(0.0, 200.0)],
+        values=[[100.0]],
+        method=SampleMethod(name="hand"),
+    )
+    simulation = Simulation(_moving_split())
+    simulation.run(num_steps=30)
+    calibrator = Calibrator(simulation, problem)
+
+    start = Predictive(calibrator, sample, positions=[0]).runs()[0]
+    result = calibrator.run()
+
+    assert (start["A_g1"][0], start["A_g2"][0]) == pytest.approx((50.0, 50.0))
+    assert result.best_parameters["A"] == pytest.approx(100.0, abs=1e-6)
+    assert result.final_loss == pytest.approx(0.0, abs=1e-9)
