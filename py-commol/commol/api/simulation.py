@@ -371,20 +371,51 @@ class Simulation:
         """
         return {id: self.outputs_for(id) for id in ids}
 
+    def _series_names(self, ids: Iterable[str]) -> list[str]:
+        """
+        The outputs the ids stand for, in the order given.
+
+        A source id, such as a bin or accumulator id, stands for all its
+        outputs (`outputs_for`); an output name stands for itself.
+
+        Raises
+        ------
+        KeyError
+            If an id is neither a source nor an output of the model.
+        """
+        model = self.model_definition
+        by_source = model.structure.outputs_by_source(model)
+        outputs = [name for names in by_source.values() for name in names]
+        names: list[str] = []
+        for id in ids:
+            if id in by_source:
+                names.extend(by_source[id])
+            elif id in outputs:
+                names.append(id)
+            else:
+                raise KeyError(
+                    f"'{id}' is not a bin, accumulator or output of model "
+                    f"'{model.name}'. Bins and accumulators: {sorted(by_source)}. "
+                    f"Outputs: {outputs}"
+                )
+        return names
+
     def total_series(
         self,
         results: Mapping[str, Sequence[float]],
         ids: Iterable[str],
     ) -> list[float]:
         """
-        Sum the outputs of the given bins or accumulators at each position.
+        Sum the given outputs at each position.
 
         Parameters
         ----------
         results : Mapping[str, Sequence[float]]
             Simulation results, such as those of `run` or `run_at`.
         ids : Iterable[str]
-            Bin and accumulator ids whose outputs are summed together.
+            Bin and accumulator ids, each for all its outputs
+            (`outputs_for`), and output names, each for itself. Their outputs
+            are summed together.
 
         Returns
         -------
@@ -394,10 +425,10 @@ class Simulation:
         Raises
         ------
         KeyError
-            If an id is not a bin or accumulator of the model, or an expected
-            output is missing from `results`.
+            If an id is not a bin, accumulator or output of the model, or an
+            expected output is missing from `results`.
         """
-        names = [name for id in ids for name in self.outputs_for(id)]
+        names = self._series_names(ids)
         missing = [name for name in names if name not in results]
         if missing:
             raise KeyError(f"Missing output series in results: {sorted(missing)}")
@@ -423,7 +454,8 @@ class Simulation:
         results : SimulationResults
             Simulation results, with their positions.
         ids : Iterable[str]
-            Accumulator ids whose outputs are summed before windowing.
+            Accumulator ids, each for all its outputs, and output names, each
+            for itself. Their outputs are summed before windowing.
         window : float
             Length of one window on the axis.
         at : Iterable[float] | None, optional
@@ -440,8 +472,8 @@ class Simulation:
         Raises
         ------
         KeyError
-            If an id is not a bin or accumulator of the model, or an expected
-            output is missing from `results`.
+            If an id is not a bin, accumulator or output of the model, or an
+            expected output is missing from `results`.
         ValueError
             If `window` is not positive, or the results have no value at the
             end or the start of a requested window.
