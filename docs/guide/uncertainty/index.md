@@ -210,6 +210,10 @@ its weight and a seed of its own, derived from the seed of the source, so
 every draw shows fresh noise and the predictive repeats from that seed.
 The positions are sorted and unique, and each one is a position the engine
 reports at; otherwise `Predictive` raises `ValueError` before any draw runs.
+A draw whose run leaves the values its model allows raises
+`InfeasibleStateError` with the index of its parameter set and the message of
+the run: the compartment, the step and the flows, as `Simulation.run` reports
+them ([Amounts below zero](../transitions.md#amounts-below-zero)).
 
 | Member | Returns |
 |---|---|

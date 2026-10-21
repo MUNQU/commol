@@ -114,7 +114,9 @@ records nothing in the history; a failed run still stops the calibration, so a
 rate that cannot be evaluated does not hide behind a poor fit. An optimizer
 that explores the bounds of a rate would otherwise stop on the first infeasible
 point, though the fit lies elsewhere. A prediction of an infeasible draw raises
-`InfeasibleStateError` (`prediction_error` in `py-commol/src/inference.rs`).
+`InfeasibleStateError` (`prediction_error` in `py-commol/src/inference.rs`)
+with the message of the run, which `Violation::InfeasibleRun` carries
+(`tests/uncertainty/test_predictive.py::TestBands::test_an_infeasible_draw_of_a_predictive_names_the_compartment_and_step`).
 Python receives `InfeasibleStateError`, a
 `ValueError` (`simulation_error` in `py-commol/src/engine.rs`); a failed run
 stays a `RuntimeError`.

@@ -13,7 +13,7 @@ use commol_core::{MathExpression, MathExpressionContext};
 use crate::types::{CalibrationConstraint, CalibrationParameter};
 
 /// Why a point is not feasible.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Violation {
     /// A value lies outside its bounds; `amount` is the sum of the distances
     /// to the bounds.
@@ -35,7 +35,11 @@ pub enum Violation {
         excess: f64,
     },
     /// The run left the values the model allows.
-    InfeasibleRun,
+    InfeasibleRun {
+        /// What left them, as the engine reports it: the compartment, the
+        /// position and the flows.
+        message: String,
+    },
     /// The run or the discrepancy is not a finite number.
     NonFinite,
     /// A predicted mean lies outside the means its observation model
@@ -56,7 +60,7 @@ impl Violation {
             | Self::Constraint { amount }
             | Self::MeanOutsideModel { amount } => amount,
             Self::InfeasibleStart { excess } => 100.0 * excess,
-            Self::InfeasibleRun | Self::NonFinite => 0.0,
+            Self::InfeasibleRun { .. } | Self::NonFinite => 0.0,
         }
     }
 }
@@ -368,6 +372,9 @@ mod tests {
     #[test]
     fn the_amount_of_an_infeasible_start_is_a_hundred_times_its_excess() {
         assert_eq!(Violation::InfeasibleStart { excess: 0.5 }.amount(), 50.0);
-        assert_eq!(Violation::InfeasibleRun.amount(), 0.0);
+        let run = Violation::InfeasibleRun {
+            message: "A below zero".to_string(),
+        };
+        assert_eq!(run.amount(), 0.0);
     }
 }

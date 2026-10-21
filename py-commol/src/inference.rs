@@ -35,13 +35,19 @@ pub struct PyCalibrationProblem {
 }
 
 /// The Python error of a parameter set that has no prediction:
-/// `InfeasibleStateError` when it leaves the values its model allows,
-/// `ValueError` for a value that is not finite, `RuntimeError` otherwise.
+/// `InfeasibleStateError` when it leaves the values its model allows, with
+/// the message of the run that left them; `ValueError` for a value that is
+/// not finite; `RuntimeError` otherwise.
 fn prediction_error(index: usize, error: EvaluationError) -> PyErr {
     match error {
         EvaluationError::Violation(Violation::NonFinite) => {
             PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                 "Parameter set {index} gives a value that is not finite"
+            ))
+        }
+        EvaluationError::Violation(Violation::InfeasibleRun { message }) => {
+            InfeasibleStateError::new_err(format!(
+                "Parameter set {index} is not feasible: {message}"
             ))
         }
         EvaluationError::Violation(violation) => InfeasibleStateError::new_err(format!(
