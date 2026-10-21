@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+<!-- Added #245 -->
+
+<!-- Added #254 -->
+
+<!-- Added #255 -->
+
+<!-- Added #256 -->
+
+<!-- Added #257 -->
+
+### Changed
+
+<!-- Changed #245 -->
+
+<!-- Changed #254 -->
+
+<!-- Changed #255 -->
+
+<!-- Changed #256 -->
+
+<!-- Changed #257 -->
+
+### Fixed
+
+<!-- Fixed #245 -->
+
+<!-- Fixed #254 -->
+
+<!-- Fixed #255 -->
+
+<!-- Fixed #256 -->
+
+<!-- Fixed #257 -->
+
 ## [0.6.1] - 2026-10-22
 
 This release fixes bugs of 0.6.0 and changes no API. A series point or an
