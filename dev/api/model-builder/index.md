@@ -401,11 +401,14 @@ class ModelBuilder:
             - "rate": Rate expression string
 
         per_compartment : bool | None, default=None
-            When True, base compartment names in the rate
-            expression are automatically replaced with the specific stratified
-            compartment name for each expanded transition flow. This ensures
-            each subgroup transitions based on its own compartment value
-            rather than the total across all subgroups.
+            When True, each id of a source or target bin in a rate reads the
+            compartment of the flow (``A_g1``) instead of the total of the bin.
+            Any other bin keeps its total: in a transition from ``A`` to ``B``,
+            ``k * A * (C + D) / total`` reads ``A_g1`` and the totals of ``C``
+            and ``D``. It applies to the fallback rate, to every stratified
+            rate, and to every transition that ``$compartment`` expands to,
+            where ``$compartment`` reads the compartment that flows. A
+            transition between categories ignores it.
 
         accumulators : list[str] | None, default=None
             Ids of accumulators that add up the flow of this transition.
@@ -482,26 +485,19 @@ class ModelBuilder:
         if rate and "$compartment" in rate:
             self._validate_compartment_placeholder(id, source, target)
             self._expand_compartment_transition(
-                id, source, target, rate, stratified_rates, impulse_at, impulse_every
+                id,
+                source,
+                target,
+                rate,
+                stratified_rates,
+                per_compartment,
+                accumulators,
+                impulse_at,
+                impulse_every,
             )
             return self
 
-        # Convert stratified rates dicts to Pydantic objects
-        stratified_rates_objects: list[StratifiedRate] | None = None
-        if stratified_rates:
-            stratified_rates_objects = []
-            for rate_dict in stratified_rates:
-                conditions = [
-                    StratificationCondition(**cond) for cond in rate_dict["conditions"]
-                ]
-                stratified_rates_objects.append(
-                    StratifiedRate(
-                        conditions=conditions,
-                        rate=str(rate_dict["rate"]),
-                        absolute=rate_dict.get("absolute"),
-                    )
-                )
-
+        stratified_rates_objects = _stratified_rate_objects(stratified_rates)
         self._transitions.append(
             Transition(
                 id=id,
@@ -586,8 +582,10 @@ class ModelBuilder:
         target: list[str],
         rate: str,
         stratified_rates: list[StratifiedRateDict] | None,
-        impulse_at: list[float] | None = None,
-        impulse_every: tuple[float, float] | None = None,
+        per_compartment: bool | None,
+        accumulators: list[str] | None,
+        impulse_at: list[float] | None,
+        impulse_every: tuple[float, float] | None,
     ) -> None:
         """
         Expand a transition with $compartment placeholder into multiple transitions.
@@ -606,8 +604,9 @@ class ModelBuilder:
             Rate formula containing $compartment
         stratified_rates : list[StratifiedRateDict] | None
             Stratified rates (can contain $compartment which will be expanded)
-        impulse_at, impulse_every : optional
-            Impulse schedule of every expanded transition
+        per_compartment, accumulators, impulse_at, impulse_every : optional
+            The arguments of `add_transition` that every expanded transition
+            keeps
         """
         # Determine if we're expanding over sources or targets
         has_multiple_sources = len(source) > 1
@@ -631,32 +630,9 @@ class ModelBuilder:
             # Replace $compartment with actual compartment name in base rate
             expanded_rate = rate.replace("$compartment", compartment)
 
-            # Expand stratified rates if present
-            expanded_stratified_rates: list[StratifiedRate] | None = None
-            if stratified_rates:
-                expanded_stratified_rates = []
-                for rate_dict in stratified_rates:
-                    # Replace $compartment in stratified rate expression
-                    strat_rate_value = rate_dict["rate"]
-                    # Convert to string if it's a number
-                    if isinstance(strat_rate_value, (int, float)):
-                        strat_rate_str = str(strat_rate_value)
-                    else:
-                        strat_rate_str = strat_rate_value
-
-                    expanded_strat_rate = strat_rate_str.replace(
-                        "$compartment", compartment
-                    )
-
-                    # Convert conditions to Pydantic objects
-                    conditions = [
-                        StratificationCondition(**cond)
-                        for cond in rate_dict["conditions"]
-                    ]
-
-                    expanded_stratified_rates.append(
-                        StratifiedRate(conditions=conditions, rate=expanded_strat_rate)
-                    )
+            expanded_stratified_rates = _stratified_rate_objects(
+                stratified_rates, compartment
+            )
 
             # Generate unique ID for this expanded transition
             expanded_id = f"{id}__{compartment}"
@@ -674,8 +650,10 @@ class ModelBuilder:
                     id=expanded_id,
                     source=expanded_source,
                     target=expanded_target,
+                    accumulators=accumulators or [],
                     rate=expanded_rate,
                     stratified_rates=expanded_stratified_rates,
+                    per_compartment=per_compartment,
                     impulse_at=impulse_at,
                     impulse_every=impulse_every,
                 )
@@ -1210,17 +1188,17 @@ Each transition's rate is evaluated independently, giving per-compartment dynami
 
 Parameters:
 
-| Name               | Type                  | Description                                                                                                                                                                              | Default                                                                                                                                                                                                                                                                                    |
-| ------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `id`               | `str`                 | Unique identifier for the transition. When using $compartment expansion, the system will append "\_\_" to create unique IDs for each expanded transition (e.g., "out\_\_A", "out\_\_B"). | *required*                                                                                                                                                                                                                                                                                 |
-| `source`           | `list[str]`           | List of source state/category identifiers. When using $compartment in the rate, each source will generate a separate transition.                                                         | *required*                                                                                                                                                                                                                                                                                 |
-| `target`           | `list[str]`           | List of target state/category identifiers. When using $compartment, target must be empty [] or have exactly one element.                                                                 | *required*                                                                                                                                                                                                                                                                                 |
-| `rate`             | \`str                 | float                                                                                                                                                                                    | None\`                                                                                                                                                                                                                                                                                     |
-| `stratified_rates` | \`list[dict]          | None\`                                                                                                                                                                                   | List of stratification-specific rates. Each dict must contain: - "conditions": List of dicts with "stratification" and "category" keys - "rate": Rate expression string                                                                                                                    |
-| `per_compartment`  | \`bool                | None\`                                                                                                                                                                                   | When True, base compartment names in the rate expression are automatically replaced with the specific stratified compartment name for each expanded transition flow. This ensures each subgroup transitions based on its own compartment value rather than the total across all subgroups. |
-| `accumulators`     | \`list[str]           | None\`                                                                                                                                                                                   | Ids of accumulators that add up the flow of this transition.                                                                                                                                                                                                                               |
-| `impulse_at`       | \`list[float]         | None\`                                                                                                                                                                                   | Make the transition an impulse at these positions on the axis. At each one, rate is the fraction of the source (proportional) or the amount (absolute) moved at once, before the flows of that step. A DifferenceEquations model needs integer positions.                                  |
-| `impulse_every`    | \`tuple[float, float] | None\`                                                                                                                                                                                   | (period, offset): make the transition an impulse at offset, offset + period, offset + 2 * period, ...                                                                                                                                                                                      |
+| Name               | Type                  | Description                                                                                                                                                                              | Default                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`               | `str`                 | Unique identifier for the transition. When using $compartment expansion, the system will append "\_\_" to create unique IDs for each expanded transition (e.g., "out\_\_A", "out\_\_B"). | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `source`           | `list[str]`           | List of source state/category identifiers. When using $compartment in the rate, each source will generate a separate transition.                                                         | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `target`           | `list[str]`           | List of target state/category identifiers. When using $compartment, target must be empty [] or have exactly one element.                                                                 | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `rate`             | \`str                 | float                                                                                                                                                                                    | None\`                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `stratified_rates` | \`list[dict]          | None\`                                                                                                                                                                                   | List of stratification-specific rates. Each dict must contain: - "conditions": List of dicts with "stratification" and "category" keys - "rate": Rate expression string                                                                                                                                                                                                                                                                                                      |
+| `per_compartment`  | \`bool                | None\`                                                                                                                                                                                   | When True, each id of a source or target bin in a rate reads the compartment of the flow (A_g1) instead of the total of the bin. Any other bin keeps its total: in a transition from A to B, k * A * (C + D) / total reads A_g1 and the totals of C and D. It applies to the fallback rate, to every stratified rate, and to every transition that $compartment expands to, where $compartment reads the compartment that flows. A transition between categories ignores it. |
+| `accumulators`     | \`list[str]           | None\`                                                                                                                                                                                   | Ids of accumulators that add up the flow of this transition.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `impulse_at`       | \`list[float]         | None\`                                                                                                                                                                                   | Make the transition an impulse at these positions on the axis. At each one, rate is the fraction of the source (proportional) or the amount (absolute) moved at once, before the flows of that step. A DifferenceEquations model needs integer positions.                                                                                                                                                                                                                    |
+| `impulse_every`    | \`tuple[float, float] | None\`                                                                                                                                                                                   | (period, offset): make the transition an impulse at offset, offset + period, offset + 2 * period, ...                                                                                                                                                                                                                                                                                                                                                                        |
 
 Returns:
 
@@ -1323,11 +1301,14 @@ def add_transition(
         - "rate": Rate expression string
 
     per_compartment : bool | None, default=None
-        When True, base compartment names in the rate
-        expression are automatically replaced with the specific stratified
-        compartment name for each expanded transition flow. This ensures
-        each subgroup transitions based on its own compartment value
-        rather than the total across all subgroups.
+        When True, each id of a source or target bin in a rate reads the
+        compartment of the flow (``A_g1``) instead of the total of the bin.
+        Any other bin keeps its total: in a transition from ``A`` to ``B``,
+        ``k * A * (C + D) / total`` reads ``A_g1`` and the totals of ``C``
+        and ``D``. It applies to the fallback rate, to every stratified
+        rate, and to every transition that ``$compartment`` expands to,
+        where ``$compartment`` reads the compartment that flows. A
+        transition between categories ignores it.
 
     accumulators : list[str] | None, default=None
         Ids of accumulators that add up the flow of this transition.
@@ -1404,26 +1385,19 @@ def add_transition(
     if rate and "$compartment" in rate:
         self._validate_compartment_placeholder(id, source, target)
         self._expand_compartment_transition(
-            id, source, target, rate, stratified_rates, impulse_at, impulse_every
+            id,
+            source,
+            target,
+            rate,
+            stratified_rates,
+            per_compartment,
+            accumulators,
+            impulse_at,
+            impulse_every,
         )
         return self
 
-    # Convert stratified rates dicts to Pydantic objects
-    stratified_rates_objects: list[StratifiedRate] | None = None
-    if stratified_rates:
-        stratified_rates_objects = []
-        for rate_dict in stratified_rates:
-            conditions = [
-                StratificationCondition(**cond) for cond in rate_dict["conditions"]
-            ]
-            stratified_rates_objects.append(
-                StratifiedRate(
-                    conditions=conditions,
-                    rate=str(rate_dict["rate"]),
-                    absolute=rate_dict.get("absolute"),
-                )
-            )
-
+    stratified_rates_objects = _stratified_rate_objects(stratified_rates)
     self._transitions.append(
         Transition(
             id=id,

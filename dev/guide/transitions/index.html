@@ -3673,7 +3673,10 @@ The builder creates one transition per source (or per target), named
 </tbody>
 </table>
 <p><code>stratified_rates</code> may also use <code>$compartment</code>; each generated transition gets
-its own copy.</p>
+its own copy. Each generated transition keeps <code>per_compartment</code>,
+<code>accumulators</code> and the impulse schedule of the call. With
+<code>per_compartment=True</code>, <code>$compartment</code> reads the compartment that flows: in a
+flow from <code>A_g1</code>, <code>"k * $compartment"</code> is <code>k * A_g1</code>.</p>
 <h2 id="transitions-between-categories">Transitions between categories<a class="headerlink" href="#transitions-between-categories" title="Permanent link">&para;</a></h2>
 <p>When <code>source</code> and <code>target</code> are categories of one stratification, the transition
 moves amounts between them <strong>in every bin</strong>:</p>
@@ -3744,7 +3747,8 @@ each source and target bin id with the flow's own compartment:</p>
 </span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="c1"># A_g1 -&gt; B_g1: k * A_g1   and   A_g2 -&gt; B_g2: k * A_g2</span>
 </span></code></pre></div>
 <p>It applies to the fallback rate and to every stratified rate, and only to
-transitions between bins.</p>
+transitions between bins. Any other bin in the rate keeps its total: in the
+flow <code>A_g1 -&gt; B_g1</code>, <code>"k * A * C / total"</code> reads <code>A_g1</code> and the total of <code>C</code>.</p>
 <h2 id="stratified-rates">Stratified rates<a class="headerlink" href="#stratified-rates" title="Permanent link">&para;</a></h2>
 <p><code>stratified_rates</code> gives some categories their own rate. Each entry has
 <code>conditions</code> and a <code>rate</code>, and may set <code>absolute</code>:</p>
