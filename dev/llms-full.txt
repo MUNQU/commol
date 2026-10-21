@@ -34760,6 +34760,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Fixed
+
 ## [0.6.1] - 2026-10-22
 
 This release fixes bugs of 0.6.0 and changes no API. A series point or an impulse that the engine cannot run now fails at `ModelBuilder.build` and `Model.update_parameters`, not at `Simulation`. Errors of a `Predictive` draw say what was not feasible. A PRCC analysis with a NaN value raises a `ValueError` and no longer runs forever. The quantities of a sensitivity analysis read a gain at its start and give different labels to close positions. A windowed series is plotted at the position of each observation, and a figure no longer changes the global style of matplotlib.
