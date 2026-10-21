@@ -2633,6 +2633,8 @@ print(round(ode.run(num_steps=10)["moved"][10], 1))  # 632.1: the integral of th
 
 `bdf` builds its Jacobian from a finite-difference Jacobian-vector product. It uses a dense matrix below `SPARSE_THRESHOLD` state components and a sparse one from there (`crates/commol-differential/src/solve.rs`).
 
+A run stops with `RuntimeError` when the solver cannot take a step, or when a step leaves the state not finite, as when the solution blows up. The message names the last position the solver reached, with either method.
+
 ### Time inside a step
 
 On `[n, n + 1)` a rate sees `step = n` and the position `t`, which moves continuously. A rate that reads `step`, a `"pulse"` series or a pulse pattern (`AxisPattern.pulse`, `pulses`, `periodic`) is constant on its unit interval, and the engine restarts the integration at each integer where such a rate can jump. A proportional pulse `p` on step `n` acts as the constant rate `p` for one unit: it moves `1 − e^(−p)` of its source, not `p` as in a difference model. To move a fraction at once, use an [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses).
@@ -34743,6 +34745,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- A `DifferentialEquations` run with `method="tsit45"` whose solution blows up returned NaN with no error. A step that leaves the state not finite now raises `RuntimeError` that names the last position the solver reached, with either method.
 - The finite-difference step of a parameter with an infinite bound was infinite, so its sensitivities, identifiability and curvature failed: the width of its bounds now counts as 1 in the step.
 - The quantile of a distribution hundreds of orders of magnitude below 1, such as `Beta(0.01, 1)` at `1e-3`, was far from it, so a prior or a draw of such a shape was wrong: when its Newton and halving steps run out, the quantile now bisects the floating-point numbers between the two ends.
 - A particle swarm whose first particle had a NaN cost kept no best particle and returned its start point: a NaN cost now counts as the worst.

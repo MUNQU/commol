@@ -3481,9 +3481,14 @@ dense (<code>nalgebra</code>) below <code>SPARSE_THRESHOLD</code> state componen
 (<code>faer</code>) from there; <code>diffsol</code> finds the sparse pattern by passing NaN through
 <code>J·v</code>. Solver settings live in the model (<code>Model.engine.settings</code>), so a saved
 model reproduces a run.</p>
+<p>A step that leaves the state not finite stops the run with an error that
+names the last position the solver reached (<code>drive</code>), whatever the method:
+<code>tsit45</code> accepts a step whose error estimate is NaN, where <code>bdf</code> fails on a
+step that is too small.</p>
 <p><strong>Guards:</strong> <code>crates/commol-differential/src/tests.rs</code>
 (<code>bdf_solves_a_stiff_model_within_the_tolerance</code>,
-<code>a_large_stiff_model_uses_the_sparse_path</code>).</p>
+<code>a_large_stiff_model_uses_the_sparse_path</code>,
+<code>a_solution_that_blows_up_stops_the_solver_where_it_fails</code>).</p>
 
 
 

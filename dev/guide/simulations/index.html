@@ -3858,6 +3858,9 @@ engine rejects settings of another engine with an error that names both
 <p><code>bdf</code> builds its Jacobian from a finite-difference Jacobian-vector product. It
 uses a dense matrix below <code>SPARSE_THRESHOLD</code> state components and a sparse one
 from there (<code>crates/commol-differential/src/solve.rs</code>).</p>
+<p>A run stops with <code>RuntimeError</code> when the solver cannot take a step, or when
+a step leaves the state not finite, as when the solution blows up. The
+message names the last position the solver reached, with either method.</p>
 <h3 id="time-inside-a-step">Time inside a step<a class="headerlink" href="#time-inside-a-step" title="Permanent link">&para;</a></h3>
 <p>On <code>[n, n + 1)</code> a rate sees <code>step = n</code> and the position <code>t</code>, which moves
 continuously. A rate that reads <code>step</code>, a <code>"pulse"</code> series or a pulse pattern

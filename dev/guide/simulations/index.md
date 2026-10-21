@@ -305,6 +305,8 @@ print(round(ode.run(num_steps=10)["moved"][10], 1))  # 632.1: the integral of th
 
 `bdf` builds its Jacobian from a finite-difference Jacobian-vector product. It uses a dense matrix below `SPARSE_THRESHOLD` state components and a sparse one from there (`crates/commol-differential/src/solve.rs`).
 
+A run stops with `RuntimeError` when the solver cannot take a step, or when a step leaves the state not finite, as when the solution blows up. The message names the last position the solver reached, with either method.
+
 ### Time inside a step
 
 On `[n, n + 1)` a rate sees `step = n` and the position `t`, which moves continuously. A rate that reads `step`, a `"pulse"` series or a pulse pattern (`AxisPattern.pulse`, `pulses`, `periodic`) is constant on its unit interval, and the engine restarts the integration at each integer where such a rate can jump. A proportional pulse `p` on step `n` acts as the constant rate `p` for one unit: it moves `1 − e^(−p)` of its source, not `p` as in a difference model. To move a fraction at once, use an [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses).

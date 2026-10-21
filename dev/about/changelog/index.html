@@ -4032,6 +4032,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>A <code>DifferentialEquations</code> run with <code>method="tsit45"</code> whose solution blows
+  up returned NaN with no error. A step that leaves the state not finite now
+  raises <code>RuntimeError</code> that names the last position the solver reached,
+  with either method.</li>
 <li>The finite-difference step of a parameter with an infinite bound was
   infinite, so its sensitivities, identifiability and curvature failed: the
   width of its bounds now counts as 1 in the step.</li>

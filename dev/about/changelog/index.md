@@ -65,6 +65,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- A `DifferentialEquations` run with `method="tsit45"` whose solution blows up returned NaN with no error. A step that leaves the state not finite now raises `RuntimeError` that names the last position the solver reached, with either method.
 - The finite-difference step of a parameter with an infinite bound was infinite, so its sensitivities, identifiability and curvature failed: the width of its bounds now counts as 1 in the step.
 - The quantile of a distribution hundreds of orders of magnitude below 1, such as `Beta(0.01, 1)` at `1e-3`, was far from it, so a prior or a draw of such a shape was wrong: when its Newton and halving steps run out, the quantile now bisects the floating-point numbers between the two ends.
 - A particle swarm whose first particle had a NaN cost kept no best particle and returned its start point: a NaN cost now counts as the worst.
