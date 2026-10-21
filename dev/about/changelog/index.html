@@ -3945,6 +3945,12 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Added #256 -->
 
+<ul>
+<li>The window grid on the axis: <code>AxisUnits.window_start(index, span, unit)</code>,
+  <code>window_end(index, span, unit)</code>, <code>window_index(at, span, unit)</code> and
+  <code>window_ends(span, unit, end)</code>, for a window of a span in a unit, such as
+  one week. The width must be a whole number of steps.</li>
+</ul>
 <!-- Added #257 -->
 
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
@@ -3956,6 +3962,14 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Changed #256 -->
 
+<ul>
+<li><strong>Breaking:</strong> the module functions <code>window_start</code>, <code>window_end</code>,
+  <code>window_index</code> and <code>window_ends</code> are removed from <code>commol</code>. Use the methods
+  of <code>AxisUnits</code> (<code>Model.axis_units()</code>), with the width as a span and a unit:
+  <code>window_end(2, 168)</code> on an axis of hours is
+  <code>units.window_end(2, 1, "week")</code>, and a width of 7 steps is <code>(7, "day")</code>,
+  or <code>(7, "step")</code> when the model declares no step unit.</li>
+</ul>
 <!-- Changed #257 -->
 
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>

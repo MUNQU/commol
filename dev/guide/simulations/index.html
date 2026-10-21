@@ -3748,45 +3748,23 @@ the output at its start. Both must be positions of the results.</p>
 </tr>
 <tr>
 <td><code>at</code></td>
-<td>The positions where windows close. By default, every complete window of the results (<code>window_ends</code>). Pass observation positions to get the values a calibration compares against.</td>
+<td>The positions where windows close. By default, every complete window of the results. Pass observation positions to get the values a calibration compares against.</td>
 </tr>
 </tbody>
 </table>
-<p>The window grid and the same reduction work on any series with the
-module-level functions of <code>py-commol/commol/api/windows.py</code>:</p>
-<table>
-<thead>
-<tr>
-<th>Function</th>
-<th>Returns</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>window_start(i, window)</code>, <code>window_end(i, window)</code></td>
-<td>The positions that bound window <code>i</code>: <code>i · window</code> and <code>(i + 1) · window</code></td>
-</tr>
-<tr>
-<td><code>window_index(at, window)</code></td>
-<td>The window that holds a position, <code>max(ceil(at / window) − 1, 0)</code>; the inverse of <code>window_end</code>. Reports place observations with it.</td>
-</tr>
-<tr>
-<td><code>window_ends(window, end)</code></td>
-<td>Every complete window end up to <code>end</code></td>
-</tr>
-<tr>
-<td><code>windowed_totals(series, positions, window, at=None)</code></td>
-<td>The gain of a series over each window</td>
-</tr>
-</tbody>
-</table>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">window_end</span><span class="p">,</span> <span class="n">window_ends</span><span class="p">,</span> <span class="n">window_index</span><span class="p">,</span> <span class="n">windowed_totals</span>
+<p>The axis of a model gives the window grid of a width in a unit
+(<code>Model.axis_units()</code>; <a href="../core-concepts/#units-of-the-axis">Units of the axis</a>),
+and <code>windowed_totals</code> of <code>py-commol/commol/api/windows.py</code> gives the same
+reduction for any series:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">AxisUnits</span><span class="p">,</span> <span class="n">windowed_totals</span>
 </span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">window_ends</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">30</span><span class="p">))</span>                       <span class="c1"># [7, 14, 21, 28]</span>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">window_end</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">7</span><span class="p">),</span> <span class="n">window_index</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">7</span><span class="p">),</span> <span class="n">window_index</span><span class="p">(</span><span class="mf">7.5</span><span class="p">,</span> <span class="mi">7</span><span class="p">))</span>  <span class="c1"># 7 0 1</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">windowed_totals</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mi">21</span><span class="p">,</span> <span class="mi">28</span><span class="p">],</span> <span class="nb">range</span><span class="p">(</span><span class="mi">8</span><span class="p">),</span> <span class="mi">3</span><span class="p">))</span>  <span class="c1"># [6, 15]</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">daily</span> <span class="o">=</span> <span class="n">AxisUnits</span><span class="p">(</span><span class="n">step_unit</span><span class="o">=</span><span class="s2">&quot;day&quot;</span><span class="p">)</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">daily</span><span class="o">.</span><span class="n">window_ends</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">,</span> <span class="mi">30</span><span class="p">))</span>  <span class="c1"># [7.0, 14.0, 21.0, 28.0]</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">daily</span><span class="o">.</span><span class="n">window_end</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">),</span> <span class="n">daily</span><span class="o">.</span><span class="n">window_index</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">))</span>  <span class="c1"># 7.0 0</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">windowed_totals</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mi">21</span><span class="p">,</span> <span class="mi">28</span><span class="p">],</span> <span class="nb">range</span><span class="p">(</span><span class="mi">8</span><span class="p">),</span> <span class="mi">3</span><span class="p">))</span>  <span class="c1"># [6, 15]</span>
 </span></code></pre></div>
-<p>A window need not be a whole number of steps: see
+<p>A window of the grid is a whole number of steps. The <code>window</code> of
+<code>windowed_totals</code> need not be: see
 <a href="#reporting-at-any-position">Reporting at any position</a>.</p>
 <h2 id="differential-equations">Differential equations<a class="headerlink" href="#differential-equations" title="Permanent link">&para;</a></h2>
 <p>A model built with <code>engine="DifferentialEquations"</code> runs in continuous time.
@@ -3910,7 +3888,7 @@ difference model reports only at integer steps; the engine rejects any other
 position and names the object that holds it.</p>
 <p>Windows, reports and plots read a value at a position of the results, so a
 window of <code>2.5</code> works once the results hold its ends:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">ends</span> <span class="o">=</span> <span class="n">window_ends</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>    <span class="c1"># [2.5, 5.0, 7.5, 10.0]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">ends</span> <span class="o">=</span> <span class="p">[</span><span class="mf">2.5</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">,</span> <span class="mf">7.5</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">]</span>
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">ode_windows</span> <span class="o">=</span> <span class="n">ode</span><span class="o">.</span><span class="n">run_at</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="o">*</span><span class="n">ends</span><span class="p">])</span>
 </span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">gained</span> <span class="o">=</span> <span class="n">ode</span><span class="o">.</span><span class="n">windowed_totals</span><span class="p">(</span><span class="n">ode_windows</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;moved&quot;</span><span class="p">],</span> <span class="n">window</span><span class="o">=</span><span class="mf">2.5</span><span class="p">)</span>
 </span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">gained</span><span class="p">])</span>  <span class="c1"># [221.2, 172.3, 134.2, 104.5]</span>

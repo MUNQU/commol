@@ -378,9 +378,8 @@ class Simulation:
             Length of one window on the axis.
         at : Iterable[float] | None, optional
             Positions at which windows close. Defaults to every complete
-            window of the results (:func:`commol.window_ends`). Pass the
-            observation positions to reproduce exactly the values a
-            calibration used.
+            window of the results. Pass the observation positions to
+            reproduce exactly the values a calibration used.
 
         Returns
         -------
@@ -912,12 +911,12 @@ Amount the given accumulators gained over each window.
 
 Parameters:
 
-| Name      | Type                | Description                                                | Default                                                                                                                                                                                           |
-| --------- | ------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `results` | `SimulationResults` | Simulation results, with their positions.                  | *required*                                                                                                                                                                                        |
-| `ids`     | `Iterable[str]`     | Accumulator ids whose outputs are summed before windowing. | *required*                                                                                                                                                                                        |
-| `window`  | `float`             | Length of one window on the axis.                          | *required*                                                                                                                                                                                        |
-| `at`      | \`Iterable[float]   | None\`                                                     | Positions at which windows close. Defaults to every complete window of the results (:func:commol.window_ends). Pass the observation positions to reproduce exactly the values a calibration used. |
+| Name      | Type                | Description                                                | Default                                                                                                                                                                |
+| --------- | ------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `results` | `SimulationResults` | Simulation results, with their positions.                  | *required*                                                                                                                                                             |
+| `ids`     | `Iterable[str]`     | Accumulator ids whose outputs are summed before windowing. | *required*                                                                                                                                                             |
+| `window`  | `float`             | Length of one window on the axis.                          | *required*                                                                                                                                                             |
+| `at`      | \`Iterable[float]   | None\`                                                     | Positions at which windows close. Defaults to every complete window of the results. Pass the observation positions to reproduce exactly the values a calibration used. |
 
 Returns:
 
@@ -955,9 +954,8 @@ def windowed_totals(
         Length of one window on the axis.
     at : Iterable[float] | None, optional
         Positions at which windows close. Defaults to every complete
-        window of the results (:func:`commol.window_ends`). Pass the
-        observation positions to reproduce exactly the values a
-        calibration used.
+        window of the results. Pass the observation positions to
+        reproduce exactly the values a calibration used.
 
     Returns
     -------
@@ -2156,239 +2154,6 @@ A difference-equations step that leaves a compartment below zero raises it. It i
 
 ## Windows
 
-## window_start
-
-```python
-window_start(index: int, window: float) -> float
-```
-
-Position at which a window opens.
-
-Parameters:
-
-| Name     | Type    | Description                       | Default    |
-| -------- | ------- | --------------------------------- | ---------- |
-| `index`  | `int`   | Zero-based window index.          | *required* |
-| `window` | `float` | Length of one window on the axis. | *required* |
-
-Returns:
-
-| Type    | Description     |
-| ------- | --------------- |
-| `float` | index * window. |
-
-Raises:
-
-| Type         | Description                                     |
-| ------------ | ----------------------------------------------- |
-| `ValueError` | If window is not positive or index is negative. |
-
-Source code in `commol/api/windows.py`
-
-```python
-def window_start(index: int, window: float) -> float:
-    """
-    Position at which a window opens.
-
-    Parameters
-    ----------
-    index : int
-        Zero-based window index.
-    window : float
-        Length of one window on the axis.
-
-    Returns
-    -------
-    float
-        ``index * window``.
-
-    Raises
-    ------
-    ValueError
-        If `window` is not positive or `index` is negative.
-    """
-    _check_window(window)
-    if index < 0:
-        raise ValueError(f"index must not be negative, got {index}.")
-    return index * window
-```
-
-## window_end
-
-```python
-window_end(index: int, window: float) -> float
-```
-
-Position at which a window closes, equal to the start of the next.
-
-Parameters:
-
-| Name     | Type    | Description                       | Default    |
-| -------- | ------- | --------------------------------- | ---------- |
-| `index`  | `int`   | Zero-based window index.          | *required* |
-| `window` | `float` | Length of one window on the axis. | *required* |
-
-Returns:
-
-| Type    | Description           |
-| ------- | --------------------- |
-| `float` | (index + 1) * window. |
-
-Raises:
-
-| Type         | Description                                     |
-| ------------ | ----------------------------------------------- |
-| `ValueError` | If window is not positive or index is negative. |
-
-Source code in `commol/api/windows.py`
-
-```python
-def window_end(index: int, window: float) -> float:
-    """
-    Position at which a window closes, equal to the start of the next.
-
-    Parameters
-    ----------
-    index : int
-        Zero-based window index.
-    window : float
-        Length of one window on the axis.
-
-    Returns
-    -------
-    float
-        ``(index + 1) * window``.
-
-    Raises
-    ------
-    ValueError
-        If `window` is not positive or `index` is negative.
-    """
-    return window_start(index + 1, window)
-```
-
-## window_index
-
-```python
-window_index(at: float, window: float) -> int
-```
-
-Window a position belongs to.
-
-The exact inverse of :func:`window_end`, and the containing window for any position in between: `max(ceil(at / window) - 1, 0)`. Position 0 belongs to window 0. :func:`commol.api.reporting.observed_report` places each observation with this rule.
-
-Parameters:
-
-| Name     | Type    | Description                       | Default    |
-| -------- | ------- | --------------------------------- | ---------- |
-| `at`     | `float` | A position on the axis.           | *required* |
-| `window` | `float` | Length of one window on the axis. | *required* |
-
-Returns:
-
-| Type  | Description              |
-| ----- | ------------------------ |
-| `int` | Zero-based window index. |
-
-Raises:
-
-| Type         | Description                                  |
-| ------------ | -------------------------------------------- |
-| `ValueError` | If window is not positive or at is negative. |
-
-Source code in `commol/api/windows.py`
-
-```python
-def window_index(at: float, window: float) -> int:
-    """
-    Window a position belongs to.
-
-    The exact inverse of :func:`window_end`, and the containing window for
-    any position in between: ``max(ceil(at / window) - 1, 0)``. Position 0
-    belongs to window 0. :func:`commol.api.reporting.observed_report` places
-    each observation with this rule.
-
-    Parameters
-    ----------
-    at : float
-        A position on the axis.
-    window : float
-        Length of one window on the axis.
-
-    Returns
-    -------
-    int
-        Zero-based window index.
-
-    Raises
-    ------
-    ValueError
-        If `window` is not positive or `at` is negative.
-    """
-    _check_window(window)
-    if not at >= 0:
-        raise ValueError(f"at must not be negative, got {at}.")
-    return max(math.ceil(_windows_in(at, window)) - 1, 0)
-```
-
-## window_ends
-
-```python
-window_ends(window: float, end: float) -> list[float]
-```
-
-Positions closing each complete window up to a position.
-
-Parameters:
-
-| Name     | Type    | Description                                                | Default    |
-| -------- | ------- | ---------------------------------------------------------- | ---------- |
-| `window` | `float` | Length of one window on the axis.                          | *required* |
-| `end`    | `float` | Last position covered, such as the last position of a run. | *required* |
-
-Returns:
-
-| Type          | Description                                                                   |
-| ------------- | ----------------------------------------------------------------------------- |
-| `list[float]` | window, 2 * window, ... up to end. A trailing partial window is not included. |
-
-Raises:
-
-| Type         | Description                |
-| ------------ | -------------------------- |
-| `ValueError` | If window is not positive. |
-
-Source code in `commol/api/windows.py`
-
-```python
-def window_ends(window: float, end: float) -> list[float]:
-    """
-    Positions closing each complete window up to a position.
-
-    Parameters
-    ----------
-    window : float
-        Length of one window on the axis.
-    end : float
-        Last position covered, such as the last position of a run.
-
-    Returns
-    -------
-    list[float]
-        ``window``, ``2 * window``, ... up to `end`. A trailing partial window
-        is not included.
-
-    Raises
-    ------
-    ValueError
-        If `window` is not positive.
-    """
-    _check_window(window)
-    # A non-positive end has no window: range() of a count below 1 is empty.
-    count = math.floor(_windows_in(end, window))
-    return [window_end(index, window) for index in range(count)]
-```
-
 ## windowed_totals
 
 ```python
@@ -2461,7 +2226,7 @@ def windowed_totals(
         If `window` is not positive, a window starts before position 0, or the
         series has no value at the end or the start of a requested window.
     """
-    _check_window(window)
+    check_window(window)
     ends = (
         window_ends(window, positions[-1] if positions else 0.0)
         if at is None

@@ -3570,7 +3570,7 @@
 </tr>
 <tr>
 <td><code>api/patterns.py</code>, <code>api/windows.py</code></td>
-<td>Rates that change along the axis (<code>AxisPattern</code>), the window grid and windowed totals.</td>
+<td>Rates that change along the axis (<code>AxisPattern</code>), and windowed totals.</td>
 <td>Physical units inside the model.</td>
 </tr>
 <tr>
@@ -3640,8 +3640,13 @@
 </tr>
 <tr>
 <td><code>context/axis_units.py</code></td>
-<td><code>AxisUnits</code>: values in units to steps of the axis, and rates asked from the engine (<code>Model.axis_units</code>).</td>
+<td><code>AxisUnits</code>: values in units to steps of the axis, rates asked from the engine (<code>Model.axis_units</code>), and the window grid of a width in a unit.</td>
 <td>Formulas of a rate per engine (they are in <code>RateMeaning</code>).</td>
+</tr>
+<tr>
+<td><code>context/_windows.py</code></td>
+<td>The window grid in steps, private: what <code>AxisUnits</code>, <code>windowed_totals</code> and the reports read.</td>
+<td>Public API; units.</td>
 </tr>
 <tr>
 <td><code>context/engine.py</code></td>

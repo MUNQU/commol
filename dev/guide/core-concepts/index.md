@@ -373,17 +373,23 @@ print(differential.rate_from_probability(0.3, 1, "week"))
 
 With either rate, one outflow moves `p` of its bin over the period, and the bin keeps `exp(-n / span)` at each step `n`. In the difference model the mean residence is then `1 / rate` steps (`4.52` for a span of 4), not the span: a per-step rate cannot keep both the survival and the mean of the continuous process, and these conversions keep the survival.
 
-The window grid (`window_start`, `window_end`, `window_index`) is in `py-commol/commol/api/windows.py`; see [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals).
+The axis also gives the window grid. A window has a width, a span in a unit, which must be a whole number of steps; any other width raises `ValueError`, naming the span, its unit and the step unit. A width in steps is the span in the step unit, such as `(7, "day")` for 7 steps of a day, or `(7, "step")` when the model declares no step unit.
+
+| Method                                                     | Returns                                                                                                                                   |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `window_start(i, span, unit)`, `window_end(i, span, unit)` | The positions that bound window `i`: `i · width` and `(i + 1) · width`, with the width in steps                                           |
+| `window_index(at, span, unit)`                             | The window that holds a position, `max(ceil(at / width) − 1, 0)`; the inverse of `window_end`. Reports place observations with this rule. |
+| `window_ends(span, unit, end)`                             | Every complete window end up to the position `end`                                                                                        |
 
 ```python
-from commol import window_end, window_index, window_start
-
-week = int(hourly.steps(1, "week"))
-print(window_start(0, week), window_end(0, week))  # 0 168
-print(window_index(168, week))                     # 0
+print(hourly.window_start(0, 1, "week"), hourly.window_end(0, 1, "week"))  # 0.0 168.0
+print(hourly.window_end(2, 1, "week"))       # 504.0
+print(hourly.window_index(168, 1, "week"))   # 0
+print(hourly.window_index(168.5, 1, "week")) # 1
+print(hourly.window_ends(1, "day", 100))     # [24.0, 48.0, 72.0, 96.0]
 ```
 
-A window covers the positions `(start, end]`, the same interval that [windowed observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#counts-per-period-windows) use.
+A window covers the positions `(start, end]`, the same interval that [windowed observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#counts-per-period-windows) use. [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals) reads the gain of a series over each window.
 
 ## Next steps
 

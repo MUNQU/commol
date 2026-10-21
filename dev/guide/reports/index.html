@@ -3340,7 +3340,7 @@ model reports at non-integer positions once the results hold them
 <tbody>
 <tr>
 <td><code>observed</code></td>
-<td>For each observation label: <code>values</code>, padded to <code>num_windows</code>, so it lines up with <code>windowed</code> index for index. An observation goes to the window that holds its position (<code>window_index</code>). <code>weights</code>, <code>outputs</code> and <code>factor_id</code> appear when a series uses them.</td>
+<td>For each observation label: <code>values</code>, padded to <code>num_windows</code>, so it lines up with <code>windowed</code> index for index. An observation goes to the window that holds its position (the rule of <code>AxisUnits.window_index</code>). <code>weights</code>, <code>outputs</code> and <code>factor_id</code> appear when a series uses them.</td>
 </tr>
 <tr>
 <td><code>series</code></td>

@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-Converts values in units to steps of a model axis, and gives the rate that an engine reads from a mean span or a probability over a period. Guide: [Units of the axis](https://munqu.github.io/commol/latest/guide/core-concepts/#units-of-the-axis).
+Converts values in units to steps of a model axis, gives the rate that an engine reads from a mean span or a probability over a period, and gives the window grid of a width in a unit. Guide: [Units of the axis](https://munqu.github.io/commol/latest/guide/core-concepts/#units-of-the-axis).
 
 ## AxisUnits
 
@@ -10,7 +10,7 @@ Bases: `BaseModel`
 
 The unit of one step on a model axis, and the engine that reads its rates.
 
-The axis of a model is its independent variable, of any quantity: time (`"day"`), a length (`"meter"`) or `"step"`, the default increment. `steps` converts a value in a unit of the same dimension to steps. `rate_from_mean_span` and `rate_from_probability` ask the engine what a rate means (`rate_meaning`) and give the rate it reads.
+The axis of a model is its independent variable, of any quantity: time (`"day"`), a length (`"meter"`) or `"step"`, the default increment. `steps` converts a value in a unit of the same dimension to steps. `rate_from_mean_span` and `rate_from_probability` ask the engine what a rate means (`rate_meaning`) and give the rate it reads. `window_start`, `window_end`, `window_index` and `window_ends` give the grid of windows of one width, a span in a unit: window `w` covers the positions `(w * width, (w + 1) * width]`.
 
 `Model.axis_units` builds the one of a model: its `step_unit` and its engine.
 
@@ -30,6 +30,8 @@ Examples:
 >>> daily = AxisUnits(step_unit="day", engine="DifferentialEquations")
 >>> daily.rate_from_mean_span(2, "week")
 0.07142857142857142
+>>> hours.window_end(2, 1, "week")
+504.0
 ```
 
 Source code in `commol/context/axis_units.py`
@@ -43,7 +45,10 @@ class AxisUnits(BaseModel):
     (``"day"``), a length (``"meter"``) or ``"step"``, the default increment.
     `steps` converts a value in a unit of the same dimension to steps.
     `rate_from_mean_span` and `rate_from_probability` ask the engine what a
-    rate means (`rate_meaning`) and give the rate it reads.
+    rate means (`rate_meaning`) and give the rate it reads. `window_start`,
+    `window_end`, `window_index` and `window_ends` give the grid of windows of
+    one width, a span in a unit: window ``w`` covers the positions
+    ``(w * width, (w + 1) * width]``.
 
     `Model.axis_units` builds the one of a model: its ``step_unit`` and its
     engine.
@@ -65,6 +70,8 @@ class AxisUnits(BaseModel):
     >>> daily = AxisUnits(step_unit="day", engine="DifferentialEquations")
     >>> daily.rate_from_mean_span(2, "week")
     0.07142857142857142
+    >>> hours.window_end(2, 1, "week")
+    504.0
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -205,6 +212,117 @@ class AxisUnits(BaseModel):
             probability, self.steps(period, unit)
         )
 
+    def window_start(self, index: int, span: float, unit: str) -> float:
+        """
+        Position at which window `index` opens.
+
+        Parameters
+        ----------
+        index : int
+            Zero-based window index.
+        span : float
+            Width of one window, in `unit`.
+        unit : str
+            Unit of `span`, of the dimension of the step unit.
+
+        Returns
+        -------
+        float
+            ``index`` times the width in steps.
+
+        Raises
+        ------
+        ValueError
+            If the width is not a positive whole number of steps, `unit` has
+            another dimension than the step unit, or `index` is negative.
+        """
+        return windows.window_start(index, self._window_steps(span, unit))
+
+    def window_end(self, index: int, span: float, unit: str) -> float:
+        """
+        Position at which window `index` closes, equal to the start of the next.
+
+        Parameters
+        ----------
+        index : int
+            Zero-based window index.
+        span : float
+            Width of one window, in `unit`.
+        unit : str
+            Unit of `span`, of the dimension of the step unit.
+
+        Returns
+        -------
+        float
+            ``index + 1`` times the width in steps.
+
+        Raises
+        ------
+        ValueError
+            If the width is not a positive whole number of steps, `unit` has
+            another dimension than the step unit, or `index` is negative.
+        """
+        return windows.window_end(index, self._window_steps(span, unit))
+
+    def window_index(self, at: float, span: float, unit: str) -> int:
+        """
+        Window that holds a position.
+
+        The exact inverse of `window_end`, and the window that holds any
+        position in between: ``max(ceil(at / width) - 1, 0)``, with the width
+        in steps. Position 0 belongs to window 0. A report places each
+        observation with this rule.
+
+        Parameters
+        ----------
+        at : float
+            A position on the axis, in steps.
+        span : float
+            Width of one window, in `unit`.
+        unit : str
+            Unit of `span`, of the dimension of the step unit.
+
+        Returns
+        -------
+        int
+            Zero-based window index.
+
+        Raises
+        ------
+        ValueError
+            If the width is not a positive whole number of steps, `unit` has
+            another dimension than the step unit, or `at` is negative.
+        """
+        return windows.window_index(at, self._window_steps(span, unit))
+
+    def window_ends(self, span: float, unit: str, end: float) -> list[float]:
+        """
+        Positions that close each complete window up to a position.
+
+        Parameters
+        ----------
+        span : float
+            Width of one window, in `unit`.
+        unit : str
+            Unit of `span`, of the dimension of the step unit.
+        end : float
+            Last position covered, in steps, such as the last position of a
+            run.
+
+        Returns
+        -------
+        list[float]
+            The width in steps, two widths, ... up to `end`. A trailing
+            partial window is not included.
+
+        Raises
+        ------
+        ValueError
+            If the width is not a positive whole number of steps, or `unit`
+            has another dimension than the step unit.
+        """
+        return windows.window_ends(self._window_steps(span, unit), end)
+
     @property
     def rate_meaning(self) -> str:
         """
@@ -216,6 +334,16 @@ class AxisUnits(BaseModel):
             If there is no engine.
         """
         return self._engine_type().rate_meaning
+
+    def _window_steps(self, span: float, unit: str) -> float:
+        """Width of a window in steps; it must be a positive whole number."""
+        width = self.steps(span, unit)
+        if not (width.is_integer() and width > 0):
+            raise ValueError(
+                f"A window must be a positive whole number of steps: {span} {unit} "
+                f"is {width:g} steps of '{self.step_unit}'."
+            )
+        return width
 
     def _engine_type(self) -> "EngineTypeProtocol":
         if self.engine is None:
@@ -483,4 +611,245 @@ def rate_from_probability(
     return self._engine_type().rate_from_probability(
         probability, self.steps(period, unit)
     )
+```
+
+#### window_start
+
+```python
+window_start(index: int, span: float, unit: str) -> float
+```
+
+Position at which window `index` opens.
+
+Parameters:
+
+| Name    | Type    | Description                                      | Default    |
+| ------- | ------- | ------------------------------------------------ | ---------- |
+| `index` | `int`   | Zero-based window index.                         | *required* |
+| `span`  | `float` | Width of one window, in unit.                    | *required* |
+| `unit`  | `str`   | Unit of span, of the dimension of the step unit. | *required* |
+
+Returns:
+
+| Type    | Description                     |
+| ------- | ------------------------------- |
+| `float` | index times the width in steps. |
+
+Raises:
+
+| Type         | Description                                                                                                                |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If the width is not a positive whole number of steps, unit has another dimension than the step unit, or index is negative. |
+
+Source code in `commol/context/axis_units.py`
+
+```python
+def window_start(self, index: int, span: float, unit: str) -> float:
+    """
+    Position at which window `index` opens.
+
+    Parameters
+    ----------
+    index : int
+        Zero-based window index.
+    span : float
+        Width of one window, in `unit`.
+    unit : str
+        Unit of `span`, of the dimension of the step unit.
+
+    Returns
+    -------
+    float
+        ``index`` times the width in steps.
+
+    Raises
+    ------
+    ValueError
+        If the width is not a positive whole number of steps, `unit` has
+        another dimension than the step unit, or `index` is negative.
+    """
+    return windows.window_start(index, self._window_steps(span, unit))
+```
+
+#### window_end
+
+```python
+window_end(index: int, span: float, unit: str) -> float
+```
+
+Position at which window `index` closes, equal to the start of the next.
+
+Parameters:
+
+| Name    | Type    | Description                                      | Default    |
+| ------- | ------- | ------------------------------------------------ | ---------- |
+| `index` | `int`   | Zero-based window index.                         | *required* |
+| `span`  | `float` | Width of one window, in unit.                    | *required* |
+| `unit`  | `str`   | Unit of span, of the dimension of the step unit. | *required* |
+
+Returns:
+
+| Type    | Description                         |
+| ------- | ----------------------------------- |
+| `float` | index + 1 times the width in steps. |
+
+Raises:
+
+| Type         | Description                                                                                                                |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If the width is not a positive whole number of steps, unit has another dimension than the step unit, or index is negative. |
+
+Source code in `commol/context/axis_units.py`
+
+```python
+def window_end(self, index: int, span: float, unit: str) -> float:
+    """
+    Position at which window `index` closes, equal to the start of the next.
+
+    Parameters
+    ----------
+    index : int
+        Zero-based window index.
+    span : float
+        Width of one window, in `unit`.
+    unit : str
+        Unit of `span`, of the dimension of the step unit.
+
+    Returns
+    -------
+    float
+        ``index + 1`` times the width in steps.
+
+    Raises
+    ------
+    ValueError
+        If the width is not a positive whole number of steps, `unit` has
+        another dimension than the step unit, or `index` is negative.
+    """
+    return windows.window_end(index, self._window_steps(span, unit))
+```
+
+#### window_index
+
+```python
+window_index(at: float, span: float, unit: str) -> int
+```
+
+Window that holds a position.
+
+The exact inverse of `window_end`, and the window that holds any position in between: `max(ceil(at / width) - 1, 0)`, with the width in steps. Position 0 belongs to window 0. A report places each observation with this rule.
+
+Parameters:
+
+| Name   | Type    | Description                                      | Default    |
+| ------ | ------- | ------------------------------------------------ | ---------- |
+| `at`   | `float` | A position on the axis, in steps.                | *required* |
+| `span` | `float` | Width of one window, in unit.                    | *required* |
+| `unit` | `str`   | Unit of span, of the dimension of the step unit. | *required* |
+
+Returns:
+
+| Type  | Description              |
+| ----- | ------------------------ |
+| `int` | Zero-based window index. |
+
+Raises:
+
+| Type         | Description                                                                                                             |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If the width is not a positive whole number of steps, unit has another dimension than the step unit, or at is negative. |
+
+Source code in `commol/context/axis_units.py`
+
+```python
+def window_index(self, at: float, span: float, unit: str) -> int:
+    """
+    Window that holds a position.
+
+    The exact inverse of `window_end`, and the window that holds any
+    position in between: ``max(ceil(at / width) - 1, 0)``, with the width
+    in steps. Position 0 belongs to window 0. A report places each
+    observation with this rule.
+
+    Parameters
+    ----------
+    at : float
+        A position on the axis, in steps.
+    span : float
+        Width of one window, in `unit`.
+    unit : str
+        Unit of `span`, of the dimension of the step unit.
+
+    Returns
+    -------
+    int
+        Zero-based window index.
+
+    Raises
+    ------
+    ValueError
+        If the width is not a positive whole number of steps, `unit` has
+        another dimension than the step unit, or `at` is negative.
+    """
+    return windows.window_index(at, self._window_steps(span, unit))
+```
+
+#### window_ends
+
+```python
+window_ends(span: float, unit: str, end: float) -> list[float]
+```
+
+Positions that close each complete window up to a position.
+
+Parameters:
+
+| Name   | Type    | Description                                                          | Default    |
+| ------ | ------- | -------------------------------------------------------------------- | ---------- |
+| `span` | `float` | Width of one window, in unit.                                        | *required* |
+| `unit` | `str`   | Unit of span, of the dimension of the step unit.                     | *required* |
+| `end`  | `float` | Last position covered, in steps, such as the last position of a run. | *required* |
+
+Returns:
+
+| Type          | Description                                                                               |
+| ------------- | ----------------------------------------------------------------------------------------- |
+| `list[float]` | The width in steps, two widths, ... up to end. A trailing partial window is not included. |
+
+Raises:
+
+| Type         | Description                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If the width is not a positive whole number of steps, or unit has another dimension than the step unit. |
+
+Source code in `commol/context/axis_units.py`
+
+```python
+def window_ends(self, span: float, unit: str, end: float) -> list[float]:
+    """
+    Positions that close each complete window up to a position.
+
+    Parameters
+    ----------
+    span : float
+        Width of one window, in `unit`.
+    unit : str
+        Unit of `span`, of the dimension of the step unit.
+    end : float
+        Last position covered, in steps, such as the last position of a
+        run.
+
+    Returns
+    -------
+    list[float]
+        The width in steps, two widths, ... up to `end`. A trailing
+        partial window is not included.
+
+    Raises
+    ------
+    ValueError
+        If the width is not a positive whole number of steps, or `unit`
+        has another dimension than the step unit.
+    """
+    return windows.window_ends(self._window_steps(span, unit), end)
 ```

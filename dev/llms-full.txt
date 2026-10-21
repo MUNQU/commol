@@ -704,17 +704,23 @@ print(differential.rate_from_probability(0.3, 1, "week"))
 
 With either rate, one outflow moves `p` of its bin over the period, and the bin keeps `exp(-n / span)` at each step `n`. In the difference model the mean residence is then `1 / rate` steps (`4.52` for a span of 4), not the span: a per-step rate cannot keep both the survival and the mean of the continuous process, and these conversions keep the survival.
 
-The window grid (`window_start`, `window_end`, `window_index`) is in `py-commol/commol/api/windows.py`; see [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals).
+The axis also gives the window grid. A window has a width, a span in a unit, which must be a whole number of steps; any other width raises `ValueError`, naming the span, its unit and the step unit. A width in steps is the span in the step unit, such as `(7, "day")` for 7 steps of a day, or `(7, "step")` when the model declares no step unit.
+
+| Method                                                     | Returns                                                                                                                                   |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `window_start(i, span, unit)`, `window_end(i, span, unit)` | The positions that bound window `i`: `i · width` and `(i + 1) · width`, with the width in steps                                           |
+| `window_index(at, span, unit)`                             | The window that holds a position, `max(ceil(at / width) − 1, 0)`; the inverse of `window_end`. Reports place observations with this rule. |
+| `window_ends(span, unit, end)`                             | Every complete window end up to the position `end`                                                                                        |
 
 ```python
-from commol import window_end, window_index, window_start
-
-week = int(hourly.steps(1, "week"))
-print(window_start(0, week), window_end(0, week))  # 0 168
-print(window_index(168, week))                     # 0
+print(hourly.window_start(0, 1, "week"), hourly.window_end(0, 1, "week"))  # 0.0 168.0
+print(hourly.window_end(2, 1, "week"))       # 504.0
+print(hourly.window_index(168, 1, "week"))   # 0
+print(hourly.window_index(168.5, 1, "week")) # 1
+print(hourly.window_ends(1, "day", 100))     # [24.0, 48.0, 72.0, 96.0]
 ```
 
-A window covers the positions `(start, end]`, the same interval that [windowed observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#counts-per-period-windows) use.
+A window covers the positions `(start, end]`, the same interval that [windowed observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#counts-per-period-windows) use. [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals) reads the gain of a series over each window.
 
 ## Next steps
 
@@ -2588,30 +2594,24 @@ per_week = stratified_simulation.windowed_totals(
 print(len(per_week))  # 7: the complete windows of a 50-step run
 ```
 
-| Argument | Meaning                                                                                                                                                                           |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ids`    | Accumulator ids; their outputs are summed first.                                                                                                                                  |
-| `window` | The window length on the axis. Must be positive.                                                                                                                                  |
-| `at`     | The positions where windows close. By default, every complete window of the results (`window_ends`). Pass observation positions to get the values a calibration compares against. |
+| Argument | Meaning                                                                                                                                                           |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ids`    | Accumulator ids; their outputs are summed first.                                                                                                                  |
+| `window` | The window length on the axis. Must be positive.                                                                                                                  |
+| `at`     | The positions where windows close. By default, every complete window of the results. Pass observation positions to get the values a calibration compares against. |
 
-The window grid and the same reduction work on any series with the module-level functions of `py-commol/commol/api/windows.py`:
-
-| Function                                              | Returns                                                                                                                             |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `window_start(i, window)`, `window_end(i, window)`    | The positions that bound window `i`: `i · window` and `(i + 1) · window`                                                            |
-| `window_index(at, window)`                            | The window that holds a position, `max(ceil(at / window) − 1, 0)`; the inverse of `window_end`. Reports place observations with it. |
-| `window_ends(window, end)`                            | Every complete window end up to `end`                                                                                               |
-| `windowed_totals(series, positions, window, at=None)` | The gain of a series over each window                                                                                               |
+The axis of a model gives the window grid of a width in a unit (`Model.axis_units()`; [Units of the axis](https://munqu.github.io/commol/latest/guide/core-concepts/#units-of-the-axis)), and `windowed_totals` of `py-commol/commol/api/windows.py` gives the same reduction for any series:
 
 ```python
-from commol import window_end, window_ends, window_index, windowed_totals
+from commol import AxisUnits, windowed_totals
 
-print(window_ends(window=7, end=30))                       # [7, 14, 21, 28]
-print(window_end(0, 7), window_index(7, 7), window_index(7.5, 7))  # 7 0 1
+daily = AxisUnits(step_unit="day")
+print(daily.window_ends(1, "week", 30))  # [7.0, 14.0, 21.0, 28.0]
+print(daily.window_end(0, 1, "week"), daily.window_index(7, 1, "week"))  # 7.0 0
 print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], range(8), 3))  # [6, 15]
 ```
 
-A window need not be a whole number of steps: see [Reporting at any position](#reporting-at-any-position).
+A window of the grid is a whole number of steps. The `window` of `windowed_totals` need not be: see [Reporting at any position](#reporting-at-any-position).
 
 ## Differential equations
 
@@ -2691,7 +2691,7 @@ print(round(ode_pulse["A"][2] - ode_pulse["A"][3], 1))  # 181.3 = 1000 (1 − e^
 Windows, reports and plots read a value at a position of the results, so a window of `2.5` works once the results hold its ends:
 
 ```python
-ends = window_ends(window=2.5, end=10)    # [2.5, 5.0, 7.5, 10.0]
+ends = [2.5, 5.0, 7.5, 10.0]
 ode_windows = ode.run_at([0.0, *ends])
 gained = ode.windowed_totals(ode_windows, ["moved"], window=2.5)
 print([round(value, 1) for value in gained])  # [221.2, 172.3, 134.2, 104.5]
@@ -3588,9 +3588,9 @@ predicted(at) = output(at) - output(at - window)
 ```
 
 ```python
-from commol import window_ends, windowed_totals
+from commol import windowed_totals
 
-ends = window_ends(window=7, end=70)
+ends = model(0.4).axis_units().window_ends(7, "step", 70)
 counts = windowed_totals(truth["cum_ab"], truth.positions, 7, ends)
 
 windowed = [
@@ -5973,11 +5973,11 @@ The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `a
 
 `simulation_report(simulation, results, at, window, num_windows, observed_data=(), accumulators=(), ensemble_runs=None, confidence_level=None)` reports a run on one axis of windows. It reads each value at a position of the results (`results.positions`), so it works for any model type: a differential model reports at non-integer positions once the results hold them ([Reporting at any position](https://munqu.github.io/commol/latest/guide/simulations/#reporting-at-any-position)).
 
-| Block          | Content                                                                                                                                                                                                                                                         |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `observed`     | For each observation label: `values`, padded to `num_windows`, so it lines up with `windowed` index for index. An observation goes to the window that holds its position (`window_index`). `weights`, `outputs` and `factor_id` appear when a series uses them. |
-| `series`       | Each compartment output sampled at `at`                                                                                                                                                                                                                         |
-| `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window that ends within the results, as the loss compares it) and `cumulative` (sampled at `at`); each reading as a `total` and `by_output`                                       |
+| Block          | Content                                                                                                                                                                                                                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `observed`     | For each observation label: `values`, padded to `num_windows`, so it lines up with `windowed` index for index. An observation goes to the window that holds its position (the rule of `AxisUnits.window_index`). `weights`, `outputs` and `factor_id` appear when a series uses them. |
+| `series`       | Each compartment output sampled at `at`                                                                                                                                                                                                                                               |
+| `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window that ends within the results, as the loss compares it) and `cumulative` (sampled at `at`); each reading as a `total` and `by_output`                                                             |
 
 | Argument                            | Meaning                                                                                                                                                                                                                                                                                                                                                                   |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -6575,7 +6575,7 @@ Every public name of `commol`, generated from the docstrings. The guide pages ex
 | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md)      | `ModelBuilder`                                                                                                                                                                                                                                                                               |
 | [Model](https://munqu.github.io/commol/latest/api/model/index.md)                     | `Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete`, `Groups`, `ModelDescription`, `InitialCompartment`, `SeriesValue`, `UnitConsistencyError`                                                                                                                                     |
-| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)           | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `ODESolver`, `StochasticEventsSettings`, `StochasticStepsSettings`, `InfeasibleStateError`, `window_start`, `window_end`, `window_index`, `window_ends`, `windowed_totals`                                       |
+| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)           | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `ODESolver`, `StochasticEventsSettings`, `StochasticStepsSettings`, `InfeasibleStateError`, `windowed_totals`                                                                                                    |
 | [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)               | `SimulationPlotter`, `PlotConfig`                                                                                                                                                                                                                                                            |
 | [AxisPattern](https://munqu.github.io/commol/latest/api/axis-patterns/index.md)       | `AxisPattern`                                                                                                                                                                                                                                                                                |
 | [AxisUnits](https://munqu.github.io/commol/latest/api/axis-units/index.md)            | `AxisUnits`                                                                                                                                                                                                                                                                                  |
@@ -7307,7 +7307,7 @@ def from_formula(
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-Converts values in units to steps of a model axis, and gives the rate that an engine reads from a mean span or a probability over a period. Guide: [Units of the axis](https://munqu.github.io/commol/latest/guide/core-concepts/#units-of-the-axis).
+Converts values in units to steps of a model axis, gives the rate that an engine reads from a mean span or a probability over a period, and gives the window grid of a width in a unit. Guide: [Units of the axis](https://munqu.github.io/commol/latest/guide/core-concepts/#units-of-the-axis).
 
 ## AxisUnits
 
@@ -7315,7 +7315,7 @@ Bases: `BaseModel`
 
 The unit of one step on a model axis, and the engine that reads its rates.
 
-The axis of a model is its independent variable, of any quantity: time (`"day"`), a length (`"meter"`) or `"step"`, the default increment. `steps` converts a value in a unit of the same dimension to steps. `rate_from_mean_span` and `rate_from_probability` ask the engine what a rate means (`rate_meaning`) and give the rate it reads.
+The axis of a model is its independent variable, of any quantity: time (`"day"`), a length (`"meter"`) or `"step"`, the default increment. `steps` converts a value in a unit of the same dimension to steps. `rate_from_mean_span` and `rate_from_probability` ask the engine what a rate means (`rate_meaning`) and give the rate it reads. `window_start`, `window_end`, `window_index` and `window_ends` give the grid of windows of one width, a span in a unit: window `w` covers the positions `(w * width, (w + 1) * width]`.
 
 `Model.axis_units` builds the one of a model: its `step_unit` and its engine.
 
@@ -7335,6 +7335,8 @@ Examples:
 >>> daily = AxisUnits(step_unit="day", engine="DifferentialEquations")
 >>> daily.rate_from_mean_span(2, "week")
 0.07142857142857142
+>>> hours.window_end(2, 1, "week")
+504.0
 ```
 
 Source code in `commol/context/axis_units.py`
@@ -7348,7 +7350,10 @@ class AxisUnits(BaseModel):
     (``"day"``), a length (``"meter"``) or ``"step"``, the default increment.
     `steps` converts a value in a unit of the same dimension to steps.
     `rate_from_mean_span` and `rate_from_probability` ask the engine what a
-    rate means (`rate_meaning`) and give the rate it reads.
+    rate means (`rate_meaning`) and give the rate it reads. `window_start`,
+    `window_end`, `window_index` and `window_ends` give the grid of windows of
+    one width, a span in a unit: window ``w`` covers the positions
+    ``(w * width, (w + 1) * width]``.
 
     `Model.axis_units` builds the one of a model: its ``step_unit`` and its
     engine.
@@ -7370,6 +7375,8 @@ class AxisUnits(BaseModel):
     >>> daily = AxisUnits(step_unit="day", engine="DifferentialEquations")
     >>> daily.rate_from_mean_span(2, "week")
     0.07142857142857142
+    >>> hours.window_end(2, 1, "week")
+    504.0
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -7510,6 +7517,117 @@ class AxisUnits(BaseModel):
             probability, self.steps(period, unit)
         )
 
+    def window_start(self, index: int, span: float, unit: str) -> float:
+        """
+        Position at which window `index` opens.
+
+        Parameters
+        ----------
+        index : int
+            Zero-based window index.
+        span : float
+            Width of one window, in `unit`.
+        unit : str
+            Unit of `span`, of the dimension of the step unit.
+
+        Returns
+        -------
+        float
+            ``index`` times the width in steps.
+
+        Raises
+        ------
+        ValueError
+            If the width is not a positive whole number of steps, `unit` has
+            another dimension than the step unit, or `index` is negative.
+        """
+        return windows.window_start(index, self._window_steps(span, unit))
+
+    def window_end(self, index: int, span: float, unit: str) -> float:
+        """
+        Position at which window `index` closes, equal to the start of the next.
+
+        Parameters
+        ----------
+        index : int
+            Zero-based window index.
+        span : float
+            Width of one window, in `unit`.
+        unit : str
+            Unit of `span`, of the dimension of the step unit.
+
+        Returns
+        -------
+        float
+            ``index + 1`` times the width in steps.
+
+        Raises
+        ------
+        ValueError
+            If the width is not a positive whole number of steps, `unit` has
+            another dimension than the step unit, or `index` is negative.
+        """
+        return windows.window_end(index, self._window_steps(span, unit))
+
+    def window_index(self, at: float, span: float, unit: str) -> int:
+        """
+        Window that holds a position.
+
+        The exact inverse of `window_end`, and the window that holds any
+        position in between: ``max(ceil(at / width) - 1, 0)``, with the width
+        in steps. Position 0 belongs to window 0. A report places each
+        observation with this rule.
+
+        Parameters
+        ----------
+        at : float
+            A position on the axis, in steps.
+        span : float
+            Width of one window, in `unit`.
+        unit : str
+            Unit of `span`, of the dimension of the step unit.
+
+        Returns
+        -------
+        int
+            Zero-based window index.
+
+        Raises
+        ------
+        ValueError
+            If the width is not a positive whole number of steps, `unit` has
+            another dimension than the step unit, or `at` is negative.
+        """
+        return windows.window_index(at, self._window_steps(span, unit))
+
+    def window_ends(self, span: float, unit: str, end: float) -> list[float]:
+        """
+        Positions that close each complete window up to a position.
+
+        Parameters
+        ----------
+        span : float
+            Width of one window, in `unit`.
+        unit : str
+            Unit of `span`, of the dimension of the step unit.
+        end : float
+            Last position covered, in steps, such as the last position of a
+            run.
+
+        Returns
+        -------
+        list[float]
+            The width in steps, two widths, ... up to `end`. A trailing
+            partial window is not included.
+
+        Raises
+        ------
+        ValueError
+            If the width is not a positive whole number of steps, or `unit`
+            has another dimension than the step unit.
+        """
+        return windows.window_ends(self._window_steps(span, unit), end)
+
     @property
     def rate_meaning(self) -> str:
         """
@@ -7521,6 +7639,16 @@ class AxisUnits(BaseModel):
             If there is no engine.
         """
         return self._engine_type().rate_meaning
+
+    def _window_steps(self, span: float, unit: str) -> float:
+        """Width of a window in steps; it must be a positive whole number."""
+        width = self.steps(span, unit)
+        if not (width.is_integer() and width > 0):
+            raise ValueError(
+                f"A window must be a positive whole number of steps: {span} {unit} "
+                f"is {width:g} steps of '{self.step_unit}'."
+            )
+        return width
 
     def _engine_type(self) -> "EngineTypeProtocol":
         if self.engine is None:
@@ -7788,6 +7916,247 @@ def rate_from_probability(
     return self._engine_type().rate_from_probability(
         probability, self.steps(period, unit)
     )
+```
+
+#### window_start
+
+```python
+window_start(index: int, span: float, unit: str) -> float
+```
+
+Position at which window `index` opens.
+
+Parameters:
+
+| Name    | Type    | Description                                      | Default    |
+| ------- | ------- | ------------------------------------------------ | ---------- |
+| `index` | `int`   | Zero-based window index.                         | *required* |
+| `span`  | `float` | Width of one window, in unit.                    | *required* |
+| `unit`  | `str`   | Unit of span, of the dimension of the step unit. | *required* |
+
+Returns:
+
+| Type    | Description                     |
+| ------- | ------------------------------- |
+| `float` | index times the width in steps. |
+
+Raises:
+
+| Type         | Description                                                                                                                |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If the width is not a positive whole number of steps, unit has another dimension than the step unit, or index is negative. |
+
+Source code in `commol/context/axis_units.py`
+
+```python
+def window_start(self, index: int, span: float, unit: str) -> float:
+    """
+    Position at which window `index` opens.
+
+    Parameters
+    ----------
+    index : int
+        Zero-based window index.
+    span : float
+        Width of one window, in `unit`.
+    unit : str
+        Unit of `span`, of the dimension of the step unit.
+
+    Returns
+    -------
+    float
+        ``index`` times the width in steps.
+
+    Raises
+    ------
+    ValueError
+        If the width is not a positive whole number of steps, `unit` has
+        another dimension than the step unit, or `index` is negative.
+    """
+    return windows.window_start(index, self._window_steps(span, unit))
+```
+
+#### window_end
+
+```python
+window_end(index: int, span: float, unit: str) -> float
+```
+
+Position at which window `index` closes, equal to the start of the next.
+
+Parameters:
+
+| Name    | Type    | Description                                      | Default    |
+| ------- | ------- | ------------------------------------------------ | ---------- |
+| `index` | `int`   | Zero-based window index.                         | *required* |
+| `span`  | `float` | Width of one window, in unit.                    | *required* |
+| `unit`  | `str`   | Unit of span, of the dimension of the step unit. | *required* |
+
+Returns:
+
+| Type    | Description                         |
+| ------- | ----------------------------------- |
+| `float` | index + 1 times the width in steps. |
+
+Raises:
+
+| Type         | Description                                                                                                                |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If the width is not a positive whole number of steps, unit has another dimension than the step unit, or index is negative. |
+
+Source code in `commol/context/axis_units.py`
+
+```python
+def window_end(self, index: int, span: float, unit: str) -> float:
+    """
+    Position at which window `index` closes, equal to the start of the next.
+
+    Parameters
+    ----------
+    index : int
+        Zero-based window index.
+    span : float
+        Width of one window, in `unit`.
+    unit : str
+        Unit of `span`, of the dimension of the step unit.
+
+    Returns
+    -------
+    float
+        ``index + 1`` times the width in steps.
+
+    Raises
+    ------
+    ValueError
+        If the width is not a positive whole number of steps, `unit` has
+        another dimension than the step unit, or `index` is negative.
+    """
+    return windows.window_end(index, self._window_steps(span, unit))
+```
+
+#### window_index
+
+```python
+window_index(at: float, span: float, unit: str) -> int
+```
+
+Window that holds a position.
+
+The exact inverse of `window_end`, and the window that holds any position in between: `max(ceil(at / width) - 1, 0)`, with the width in steps. Position 0 belongs to window 0. A report places each observation with this rule.
+
+Parameters:
+
+| Name   | Type    | Description                                      | Default    |
+| ------ | ------- | ------------------------------------------------ | ---------- |
+| `at`   | `float` | A position on the axis, in steps.                | *required* |
+| `span` | `float` | Width of one window, in unit.                    | *required* |
+| `unit` | `str`   | Unit of span, of the dimension of the step unit. | *required* |
+
+Returns:
+
+| Type  | Description              |
+| ----- | ------------------------ |
+| `int` | Zero-based window index. |
+
+Raises:
+
+| Type         | Description                                                                                                             |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If the width is not a positive whole number of steps, unit has another dimension than the step unit, or at is negative. |
+
+Source code in `commol/context/axis_units.py`
+
+```python
+def window_index(self, at: float, span: float, unit: str) -> int:
+    """
+    Window that holds a position.
+
+    The exact inverse of `window_end`, and the window that holds any
+    position in between: ``max(ceil(at / width) - 1, 0)``, with the width
+    in steps. Position 0 belongs to window 0. A report places each
+    observation with this rule.
+
+    Parameters
+    ----------
+    at : float
+        A position on the axis, in steps.
+    span : float
+        Width of one window, in `unit`.
+    unit : str
+        Unit of `span`, of the dimension of the step unit.
+
+    Returns
+    -------
+    int
+        Zero-based window index.
+
+    Raises
+    ------
+    ValueError
+        If the width is not a positive whole number of steps, `unit` has
+        another dimension than the step unit, or `at` is negative.
+    """
+    return windows.window_index(at, self._window_steps(span, unit))
+```
+
+#### window_ends
+
+```python
+window_ends(span: float, unit: str, end: float) -> list[float]
+```
+
+Positions that close each complete window up to a position.
+
+Parameters:
+
+| Name   | Type    | Description                                                          | Default    |
+| ------ | ------- | -------------------------------------------------------------------- | ---------- |
+| `span` | `float` | Width of one window, in unit.                                        | *required* |
+| `unit` | `str`   | Unit of span, of the dimension of the step unit.                     | *required* |
+| `end`  | `float` | Last position covered, in steps, such as the last position of a run. | *required* |
+
+Returns:
+
+| Type          | Description                                                                               |
+| ------------- | ----------------------------------------------------------------------------------------- |
+| `list[float]` | The width in steps, two widths, ... up to end. A trailing partial window is not included. |
+
+Raises:
+
+| Type         | Description                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If the width is not a positive whole number of steps, or unit has another dimension than the step unit. |
+
+Source code in `commol/context/axis_units.py`
+
+```python
+def window_ends(self, span: float, unit: str, end: float) -> list[float]:
+    """
+    Positions that close each complete window up to a position.
+
+    Parameters
+    ----------
+    span : float
+        Width of one window, in `unit`.
+    unit : str
+        Unit of `span`, of the dimension of the step unit.
+    end : float
+        Last position covered, in steps, such as the last position of a
+        run.
+
+    Returns
+    -------
+    list[float]
+        The width in steps, two widths, ... up to `end`. A trailing
+        partial window is not included.
+
+    Raises
+    ------
+    ValueError
+        If the width is not a positive whole number of steps, or `unit`
+        has another dimension than the step unit.
+    """
+    return windows.window_ends(self._window_steps(span, unit), end)
 ```
 
 # Calibration API
@@ -24006,9 +24375,8 @@ class Simulation:
             Length of one window on the axis.
         at : Iterable[float] | None, optional
             Positions at which windows close. Defaults to every complete
-            window of the results (:func:`commol.window_ends`). Pass the
-            observation positions to reproduce exactly the values a
-            calibration used.
+            window of the results. Pass the observation positions to
+            reproduce exactly the values a calibration used.
 
         Returns
         -------
@@ -24540,12 +24908,12 @@ Amount the given accumulators gained over each window.
 
 Parameters:
 
-| Name      | Type                | Description                                                | Default                                                                                                                                                                                           |
-| --------- | ------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `results` | `SimulationResults` | Simulation results, with their positions.                  | *required*                                                                                                                                                                                        |
-| `ids`     | `Iterable[str]`     | Accumulator ids whose outputs are summed before windowing. | *required*                                                                                                                                                                                        |
-| `window`  | `float`             | Length of one window on the axis.                          | *required*                                                                                                                                                                                        |
-| `at`      | \`Iterable[float]   | None\`                                                     | Positions at which windows close. Defaults to every complete window of the results (:func:commol.window_ends). Pass the observation positions to reproduce exactly the values a calibration used. |
+| Name      | Type                | Description                                                | Default                                                                                                                                                                |
+| --------- | ------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `results` | `SimulationResults` | Simulation results, with their positions.                  | *required*                                                                                                                                                             |
+| `ids`     | `Iterable[str]`     | Accumulator ids whose outputs are summed before windowing. | *required*                                                                                                                                                             |
+| `window`  | `float`             | Length of one window on the axis.                          | *required*                                                                                                                                                             |
+| `at`      | \`Iterable[float]   | None\`                                                     | Positions at which windows close. Defaults to every complete window of the results. Pass the observation positions to reproduce exactly the values a calibration used. |
 
 Returns:
 
@@ -24583,9 +24951,8 @@ def windowed_totals(
         Length of one window on the axis.
     at : Iterable[float] | None, optional
         Positions at which windows close. Defaults to every complete
-        window of the results (:func:`commol.window_ends`). Pass the
-        observation positions to reproduce exactly the values a
-        calibration used.
+        window of the results. Pass the observation positions to
+        reproduce exactly the values a calibration used.
 
     Returns
     -------
@@ -25784,239 +26151,6 @@ A difference-equations step that leaves a compartment below zero raises it. It i
 
 ## Windows
 
-## window_start
-
-```python
-window_start(index: int, window: float) -> float
-```
-
-Position at which a window opens.
-
-Parameters:
-
-| Name     | Type    | Description                       | Default    |
-| -------- | ------- | --------------------------------- | ---------- |
-| `index`  | `int`   | Zero-based window index.          | *required* |
-| `window` | `float` | Length of one window on the axis. | *required* |
-
-Returns:
-
-| Type    | Description     |
-| ------- | --------------- |
-| `float` | index * window. |
-
-Raises:
-
-| Type         | Description                                     |
-| ------------ | ----------------------------------------------- |
-| `ValueError` | If window is not positive or index is negative. |
-
-Source code in `commol/api/windows.py`
-
-```python
-def window_start(index: int, window: float) -> float:
-    """
-    Position at which a window opens.
-
-    Parameters
-    ----------
-    index : int
-        Zero-based window index.
-    window : float
-        Length of one window on the axis.
-
-    Returns
-    -------
-    float
-        ``index * window``.
-
-    Raises
-    ------
-    ValueError
-        If `window` is not positive or `index` is negative.
-    """
-    _check_window(window)
-    if index < 0:
-        raise ValueError(f"index must not be negative, got {index}.")
-    return index * window
-```
-
-## window_end
-
-```python
-window_end(index: int, window: float) -> float
-```
-
-Position at which a window closes, equal to the start of the next.
-
-Parameters:
-
-| Name     | Type    | Description                       | Default    |
-| -------- | ------- | --------------------------------- | ---------- |
-| `index`  | `int`   | Zero-based window index.          | *required* |
-| `window` | `float` | Length of one window on the axis. | *required* |
-
-Returns:
-
-| Type    | Description           |
-| ------- | --------------------- |
-| `float` | (index + 1) * window. |
-
-Raises:
-
-| Type         | Description                                     |
-| ------------ | ----------------------------------------------- |
-| `ValueError` | If window is not positive or index is negative. |
-
-Source code in `commol/api/windows.py`
-
-```python
-def window_end(index: int, window: float) -> float:
-    """
-    Position at which a window closes, equal to the start of the next.
-
-    Parameters
-    ----------
-    index : int
-        Zero-based window index.
-    window : float
-        Length of one window on the axis.
-
-    Returns
-    -------
-    float
-        ``(index + 1) * window``.
-
-    Raises
-    ------
-    ValueError
-        If `window` is not positive or `index` is negative.
-    """
-    return window_start(index + 1, window)
-```
-
-## window_index
-
-```python
-window_index(at: float, window: float) -> int
-```
-
-Window a position belongs to.
-
-The exact inverse of :func:`window_end`, and the containing window for any position in between: `max(ceil(at / window) - 1, 0)`. Position 0 belongs to window 0. :func:`commol.api.reporting.observed_report` places each observation with this rule.
-
-Parameters:
-
-| Name     | Type    | Description                       | Default    |
-| -------- | ------- | --------------------------------- | ---------- |
-| `at`     | `float` | A position on the axis.           | *required* |
-| `window` | `float` | Length of one window on the axis. | *required* |
-
-Returns:
-
-| Type  | Description              |
-| ----- | ------------------------ |
-| `int` | Zero-based window index. |
-
-Raises:
-
-| Type         | Description                                  |
-| ------------ | -------------------------------------------- |
-| `ValueError` | If window is not positive or at is negative. |
-
-Source code in `commol/api/windows.py`
-
-```python
-def window_index(at: float, window: float) -> int:
-    """
-    Window a position belongs to.
-
-    The exact inverse of :func:`window_end`, and the containing window for
-    any position in between: ``max(ceil(at / window) - 1, 0)``. Position 0
-    belongs to window 0. :func:`commol.api.reporting.observed_report` places
-    each observation with this rule.
-
-    Parameters
-    ----------
-    at : float
-        A position on the axis.
-    window : float
-        Length of one window on the axis.
-
-    Returns
-    -------
-    int
-        Zero-based window index.
-
-    Raises
-    ------
-    ValueError
-        If `window` is not positive or `at` is negative.
-    """
-    _check_window(window)
-    if not at >= 0:
-        raise ValueError(f"at must not be negative, got {at}.")
-    return max(math.ceil(_windows_in(at, window)) - 1, 0)
-```
-
-## window_ends
-
-```python
-window_ends(window: float, end: float) -> list[float]
-```
-
-Positions closing each complete window up to a position.
-
-Parameters:
-
-| Name     | Type    | Description                                                | Default    |
-| -------- | ------- | ---------------------------------------------------------- | ---------- |
-| `window` | `float` | Length of one window on the axis.                          | *required* |
-| `end`    | `float` | Last position covered, such as the last position of a run. | *required* |
-
-Returns:
-
-| Type          | Description                                                                   |
-| ------------- | ----------------------------------------------------------------------------- |
-| `list[float]` | window, 2 * window, ... up to end. A trailing partial window is not included. |
-
-Raises:
-
-| Type         | Description                |
-| ------------ | -------------------------- |
-| `ValueError` | If window is not positive. |
-
-Source code in `commol/api/windows.py`
-
-```python
-def window_ends(window: float, end: float) -> list[float]:
-    """
-    Positions closing each complete window up to a position.
-
-    Parameters
-    ----------
-    window : float
-        Length of one window on the axis.
-    end : float
-        Last position covered, such as the last position of a run.
-
-    Returns
-    -------
-    list[float]
-        ``window``, ``2 * window``, ... up to `end`. A trailing partial window
-        is not included.
-
-    Raises
-    ------
-    ValueError
-        If `window` is not positive.
-    """
-    _check_window(window)
-    # A non-positive end has no window: range() of a count below 1 is empty.
-    count = math.floor(_windows_in(end, window))
-    return [window_end(index, window) for index in range(count)]
-```
-
 ## windowed_totals
 
 ```python
@@ -26089,7 +26223,7 @@ def windowed_totals(
         If `window` is not positive, a window starts before position 0, or the
         series has no value at the end or the start of a requested window.
     """
-    _check_window(window)
+    check_window(window)
     ends = (
         window_ends(window, positions[-1] if positions else 0.0)
         if at is None
@@ -34762,7 +34896,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- The window grid on the axis: `AxisUnits.window_start(index, span, unit)`, `window_end(index, span, unit)`, `window_index(at, span, unit)` and `window_ends(span, unit, end)`, for a window of a span in a unit, such as one week. The width must be a whole number of steps.
+
 ### Changed
+
+- **Breaking:** the module functions `window_start`, `window_end`, `window_index` and `window_ends` are removed from `commol`. Use the methods of `AxisUnits` (`Model.axis_units()`), with the width as a span and a unit: `window_end(2, 168)` on an axis of hours is `units.window_end(2, 1, "week")`, and a width of 7 steps is `(7, "day")`, or `(7, "step")` when the model declares no step unit.
 
 ### Fixed
 

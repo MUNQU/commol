@@ -10,7 +10,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- The window grid on the axis: `AxisUnits.window_start(index, span, unit)`, `window_end(index, span, unit)`, `window_index(at, span, unit)` and `window_ends(span, unit, end)`, for a window of a span in a unit, such as one week. The width must be a whole number of steps.
+
 ### Changed
+
+- **Breaking:** the module functions `window_start`, `window_end`, `window_index` and `window_ends` are removed from `commol`. Use the methods of `AxisUnits` (`Model.axis_units()`), with the width as a span and a unit: `window_end(2, 168)` on an axis of hours is `units.window_end(2, 1, "week")`, and a width of 7 steps is `(7, "day")`, or `(7, "step")` when the model declares no step unit.
 
 ### Fixed
 

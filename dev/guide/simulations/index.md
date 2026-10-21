@@ -237,30 +237,24 @@ per_week = stratified_simulation.windowed_totals(
 print(len(per_week))  # 7: the complete windows of a 50-step run
 ```
 
-| Argument | Meaning                                                                                                                                                                           |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ids`    | Accumulator ids; their outputs are summed first.                                                                                                                                  |
-| `window` | The window length on the axis. Must be positive.                                                                                                                                  |
-| `at`     | The positions where windows close. By default, every complete window of the results (`window_ends`). Pass observation positions to get the values a calibration compares against. |
+| Argument | Meaning                                                                                                                                                           |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ids`    | Accumulator ids; their outputs are summed first.                                                                                                                  |
+| `window` | The window length on the axis. Must be positive.                                                                                                                  |
+| `at`     | The positions where windows close. By default, every complete window of the results. Pass observation positions to get the values a calibration compares against. |
 
-The window grid and the same reduction work on any series with the module-level functions of `py-commol/commol/api/windows.py`:
-
-| Function                                              | Returns                                                                                                                             |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `window_start(i, window)`, `window_end(i, window)`    | The positions that bound window `i`: `i · window` and `(i + 1) · window`                                                            |
-| `window_index(at, window)`                            | The window that holds a position, `max(ceil(at / window) − 1, 0)`; the inverse of `window_end`. Reports place observations with it. |
-| `window_ends(window, end)`                            | Every complete window end up to `end`                                                                                               |
-| `windowed_totals(series, positions, window, at=None)` | The gain of a series over each window                                                                                               |
+The axis of a model gives the window grid of a width in a unit (`Model.axis_units()`; [Units of the axis](https://munqu.github.io/commol/latest/guide/core-concepts/#units-of-the-axis)), and `windowed_totals` of `py-commol/commol/api/windows.py` gives the same reduction for any series:
 
 ```python
-from commol import window_end, window_ends, window_index, windowed_totals
+from commol import AxisUnits, windowed_totals
 
-print(window_ends(window=7, end=30))                       # [7, 14, 21, 28]
-print(window_end(0, 7), window_index(7, 7), window_index(7.5, 7))  # 7 0 1
+daily = AxisUnits(step_unit="day")
+print(daily.window_ends(1, "week", 30))  # [7.0, 14.0, 21.0, 28.0]
+print(daily.window_end(0, 1, "week"), daily.window_index(7, 1, "week"))  # 7.0 0
 print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], range(8), 3))  # [6, 15]
 ```
 
-A window need not be a whole number of steps: see [Reporting at any position](#reporting-at-any-position).
+A window of the grid is a whole number of steps. The `window` of `windowed_totals` need not be: see [Reporting at any position](#reporting-at-any-position).
 
 ## Differential equations
 
@@ -340,7 +334,7 @@ print(round(ode_pulse["A"][2] - ode_pulse["A"][3], 1))  # 181.3 = 1000 (1 − e^
 Windows, reports and plots read a value at a position of the results, so a window of `2.5` works once the results hold its ends:
 
 ```python
-ends = window_ends(window=2.5, end=10)    # [2.5, 5.0, 7.5, 10.0]
+ends = [2.5, 5.0, 7.5, 10.0]
 ode_windows = ode.run_at([0.0, *ends])
 gained = ode.windowed_totals(ode_windows, ["moved"], window=2.5)
 print([round(value, 1) for value in gained])  # [221.2, 172.3, 134.2, 104.5]

@@ -3929,18 +3929,43 @@ keeps <code>exp(-n / span)</code> at each step <code>n</code>. In the difference
 residence is then <code>1 / rate</code> steps (<code>4.52</code> for a span of 4), not the span: a
 per-step rate cannot keep both the survival and the mean of the continuous
 process, and these conversions keep the survival.</p>
-<p>The window grid (<code>window_start</code>, <code>window_end</code>, <code>window_index</code>) is in
-<code>py-commol/commol/api/windows.py</code>; see
-<a href="../simulations/#windowed-totals">Windowed totals</a>.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">window_end</span><span class="p">,</span> <span class="n">window_index</span><span class="p">,</span> <span class="n">window_start</span>
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="n">week</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">hourly</span><span class="o">.</span><span class="n">steps</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">))</span>
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">window_start</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">week</span><span class="p">),</span> <span class="n">window_end</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">week</span><span class="p">))</span>  <span class="c1"># 0 168</span>
-</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">window_index</span><span class="p">(</span><span class="mi">168</span><span class="p">,</span> <span class="n">week</span><span class="p">))</span>                     <span class="c1"># 0</span>
+<p>The axis also gives the window grid. A window has a width, a span in a unit,
+which must be a whole number of steps; any other width raises <code>ValueError</code>,
+naming the span, its unit and the step unit. A width in steps is the span in
+the step unit, such as <code>(7, "day")</code> for 7 steps of a day, or <code>(7, "step")</code>
+when the model declares no step unit.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>window_start(i, span, unit)</code>, <code>window_end(i, span, unit)</code></td>
+<td>The positions that bound window <code>i</code>: <code>i · width</code> and <code>(i + 1) · width</code>, with the width in steps</td>
+</tr>
+<tr>
+<td><code>window_index(at, span, unit)</code></td>
+<td>The window that holds a position, <code>max(ceil(at / width) − 1, 0)</code>; the inverse of <code>window_end</code>. Reports place observations with this rule.</td>
+</tr>
+<tr>
+<td><code>window_ends(span, unit, end)</code></td>
+<td>Every complete window end up to the position <code>end</code></td>
+</tr>
+</tbody>
+</table>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">hourly</span><span class="o">.</span><span class="n">window_start</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">),</span> <span class="n">hourly</span><span class="o">.</span><span class="n">window_end</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">))</span>  <span class="c1"># 0.0 168.0</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">hourly</span><span class="o">.</span><span class="n">window_end</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">))</span>       <span class="c1"># 504.0</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">hourly</span><span class="o">.</span><span class="n">window_index</span><span class="p">(</span><span class="mi">168</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">))</span>   <span class="c1"># 0</span>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">hourly</span><span class="o">.</span><span class="n">window_index</span><span class="p">(</span><span class="mf">168.5</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">))</span> <span class="c1"># 1</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">hourly</span><span class="o">.</span><span class="n">window_ends</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;day&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">))</span>     <span class="c1"># [24.0, 48.0, 72.0, 96.0]</span>
 </span></code></pre></div>
 <p>A window covers the positions <code>(start, end]</code>, the same interval that
 <a href="../calibration-observations/#counts-per-period-windows">windowed observations</a>
-use.</p>
+use. <a href="../simulations/#windowed-totals">Windowed totals</a> reads the gain of a
+series over each window.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
