@@ -354,7 +354,7 @@ class TestPropagation:
         assert result.values[:2] != result.values[2:]
 
 
-class TestPrcc:
+class TestPRCC:
     def test_prcc_signs_the_inputs_of_a_model_and_ignores_a_dummy(self) -> None:
         simulation = Simulation(
             build(abc_builder(parameters={"k1": 0.3, "k2": 0.1, "unused": 1.0}))

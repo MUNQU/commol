@@ -31,7 +31,7 @@ EngineName: TypeAlias = Literal[
 of the model says which kinds of model it runs."""
 
 
-class OdeSolver(BaseModel):
+class ODESolver(BaseModel):
     """
     Settings of the ``DifferentialEquations`` engine.
 
@@ -123,12 +123,12 @@ class StochasticStepsSettings(BaseModel):
 
 
 EngineSettings: TypeAlias = (
-    OdeSolver | StochasticEventsSettings | StochasticStepsSettings
+    ODESolver | StochasticEventsSettings | StochasticStepsSettings
 )
 """Settings of an engine: one class per engine that takes settings."""
 
 _SETTINGS: dict[str, type[EngineSettings]] = {
-    "DifferentialEquations": OdeSolver,
+    "DifferentialEquations": ODESolver,
     "StochasticEvents": StochasticEventsSettings,
     "StochasticSteps": StochasticStepsSettings,
 }
@@ -148,7 +148,7 @@ class ModelEngine(BaseModel):
         kind of the structure of the model.
     settings : EngineSettings | None
         Settings of that engine; None uses its defaults.
-        ``DifferentialEquations`` takes `OdeSolver`, ``StochasticEvents``
+        ``DifferentialEquations`` takes `ODESolver`, ``StochasticEvents``
         takes `StochasticEventsSettings` and ``StochasticSteps`` takes
         `StochasticStepsSettings`.
     """

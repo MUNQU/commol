@@ -672,7 +672,7 @@ class DistributionProtocol(Protocol):
     def quantile(self, p: float) -> float: ...
     def sample(self, count: int, seed: int) -> list[float]: ...
 
-class SmcRunProtocol(Protocol):
+class SMCRunProtocol(Protocol):
     @property
     def values(self) -> list[list[float]]: ...
     @property
@@ -851,7 +851,7 @@ class InferenceModule(Protocol):
         bootstrap: BootstrapSettingsProtocol | None = None,
     ) -> ProfileRunProtocol: ...
     Distribution: type[DistributionProtocol]
-    SmcRun: type[SmcRunProtocol]
+    SMCRun: type[SMCRunProtocol]
     EtaCoverage: type[EtaCoverageProtocol]
     ConformalRun: type[ConformalRunProtocol]
     ForwardAnalysis: type[ForwardAnalysisProtocol]
@@ -906,7 +906,7 @@ class InferenceModule(Protocol):
         target_cess: float,
         stay_probability: float,
         seed: int,
-    ) -> SmcRunProtocol: ...
+    ) -> SMCRunProtocol: ...
     def bayesian_posterior(
         self,
         problem: CalibrationProblemProtocol,
@@ -916,7 +916,7 @@ class InferenceModule(Protocol):
         target_cess: float,
         stay_probability: float,
         seed: int,
-    ) -> SmcRunProtocol: ...
+    ) -> SMCRunProtocol: ...
     def laplace(
         self,
         problem: CalibrationProblemProtocol,
@@ -983,7 +983,7 @@ class InferenceModule(Protocol):
         min_acceptance: float,
         stay_probability: float,
         seed: int,
-    ) -> tuple[SmcRunProtocol, bool]: ...
+    ) -> tuple[SMCRunProtocol, bool]: ...
     def abc_rejection(
         self,
         problem: CalibrationProblemProtocol,
@@ -992,7 +992,7 @@ class InferenceModule(Protocol):
         draws: int,
         quantile: float,
         seed: int,
-    ) -> tuple[SmcRunProtocol, bool]: ...
+    ) -> tuple[SMCRunProtocol, bool]: ...
     def starts_identifiability(
         self,
         ends: list[list[float]],

@@ -148,7 +148,7 @@ times `2.38² / d` and the log Jacobian in the acceptance; and
 move and `c` the required `stay_probability`. Every particle draws from its
 own stream, so a run repeats from its seed whatever the threads. ABC reaches
 the same rule with weights of 0 or 1: the next tolerance is the weighted
-quantile of the distances, so `AbcSmc` takes `target_cess` and no quantile.
+quantile of the distances, so `ABCSMC` takes `target_cess` and no quantile.
 ABC resamples at every step, since a particle of weight 0 cannot move, and
 when the first move of a step accepts less than `min_acceptance` it keeps the
 particles of the step before, whose moves completed.
@@ -176,7 +176,7 @@ an order statistic whose expected coverage is below it.
 **Guards:** `crates/commol-inference/tests/test_smc.rs`,
 `crates/commol-inference/tests/test_distributions.rs`,
 `tests/uncertainty/test_smc.py`,
-`tests/uncertainty/test_coverage.py` (`TestGibbsPosterior`, `TestAbcSmc`).
+`tests/uncertainty/test_coverage.py` (`TestGibbsPosterior`, `TestABCSMC`).
 
 ## Observation noise is an argument
 

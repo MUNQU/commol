@@ -1,6 +1,8 @@
 """Check that the documentation names what exists: every public name has an
-API entry, and every site link, crate, named test and cited path exists."""
+API entry, every public class writes its acronyms in capitals, and every site
+link, crate, named test and cited path exists."""
 
+import inspect
 import re
 import subprocess
 from pathlib import Path
@@ -30,6 +32,27 @@ def test_public_name_has_an_api_entry(name: str) -> None:
     path = f"{obj.__module__}.{getattr(obj, '__qualname__', name)}"
     assert path in documented_targets(), (
         f"commol.{name} ({path}) has no '::: {path}' entry under docs/api/"
+    )
+
+
+ACRONYMS = ("ABC", "SMC", "ODE", "PRCC", "PSO")
+"""Acronyms that public class names use, each written in capitals."""
+
+
+@pytest.mark.docs
+def test_public_names_capitalize_acronyms() -> None:
+    """No public class writes a known acronym as a CapWords word (``Abc``)."""
+    mixed = {acronym.capitalize(): acronym for acronym in ACRONYMS}
+    found = {
+        name: [
+            mixed[word] for word in re.findall(r"[A-Z][a-z0-9]+", name) if word in mixed
+        ]
+        for name in commol.__all__
+        if inspect.isclass(getattr(commol, name))
+    }
+    offending = {name: words for name, words in found.items() if words}
+    assert not offending, (
+        f"public classes that do not write an acronym in capitals: {offending}"
     )
 
 

@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from commol import (
     Model,
-    OdeSolver,
+    ODESolver,
     Simulation,
     StochasticEventsSettings,
     StochasticStepsSettings,
@@ -120,7 +120,7 @@ class TestBuild:
             builder.build(
                 builder.structure,
                 engine="DifferentialEquations",
-                settings=OdeSolver(rtol=1e-10),
+                settings=ODESolver(rtol=1e-10),
             )
         ).run(1)
 
@@ -128,7 +128,7 @@ class TestBuild:
         assert_close(differential["A"][1], 1000 * math.exp(-0.1), rel=1e-7)
 
     def test_the_engine_takes_its_settings(self) -> None:
-        settings = OdeSolver(method="bdf", rtol=1e-8)
+        settings = ODESolver(method="bdf", rtol=1e-8)
 
         builder = a_to_b_builder()
         model = builder.build(
@@ -141,7 +141,7 @@ class TestBuild:
         builder = a_to_b_builder()
         with pytest.raises(ValidationError) as error:
             builder.build(
-                builder.structure, engine="DifferenceEquations", settings=OdeSolver()
+                builder.structure, engine="DifferenceEquations", settings=ODESolver()
             )
 
         assert "DifferentialEquations" in str(error.value)
@@ -155,7 +155,7 @@ class TestBuild:
 
 class TestSaveAndLoad:
     def test_settings_are_saved_and_loaded_back(self, tmp_path) -> None:
-        model = build_ode(a_to_b_builder(), OdeSolver(method="bdf", rtol=1e-8))
+        model = build_ode(a_to_b_builder(), ODESolver(method="bdf", rtol=1e-8))
         path = tmp_path / "model.json"
         model.to_json(path)
 

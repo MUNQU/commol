@@ -34,7 +34,7 @@ jobs:
           - name: Gibbs posterior and ABC
             tests: >-
               tests/uncertainty/test_coverage.py::TestGibbsPosterior
-              tests/uncertainty/test_coverage.py::TestAbcSmc
+              tests/uncertainty/test_coverage.py::TestABCSMC
           - name: harness, wild bootstrap and prediction interval
             tests: >-
               tests/uncertainty/test_coverage.py::TestHarness

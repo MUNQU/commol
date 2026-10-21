@@ -102,8 +102,8 @@ from commol.context.inference.sample import (
     SampleMethod,
 )
 from commol.context.inference.smc import (
-    AbcRejection,
-    AbcSmc,
+    ABCRejection,
+    ABCSMC,
     BayesianPosterior,
     BootstrapCoverage,
     EtaCalibration,
@@ -112,13 +112,13 @@ from commol.context.inference.smc import (
     InformationMatching,
     LossDistance,
     SeriesDistance,
-    SmcDiagnostics,
-    SmcResult,
+    SMCDiagnostics,
+    SMCResult,
 )
 
 __all__ = [
-    "AbcRejection",
-    "AbcSmc",
+    "ABCRejection",
+    "ABCSMC",
     "AdaptiveConformal",
     "BayesianBootstrap",
     "BayesianPosterior",
@@ -193,8 +193,8 @@ __all__ = [
     "SensitivityMethod",
     "SeriesDistance",
     "SeriesIntervals",
-    "SmcDiagnostics",
-    "SmcResult",
+    "SMCDiagnostics",
+    "SMCResult",
     "Sobol",
     "SobolResult",
     "SplitConformal",

@@ -37,13 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `EtaCalibration.bootstrap_coverage(replicates, block_length,
   confidence_level)` (any loss). See
   [Sequential Monte Carlo](../guide/uncertainty/smc.md#gibbs-posterior).
-- `AbcSmc` and `AbcRejection`: approximate Bayesian computation on a required
+- `ABCSMC` and `ABCRejection`: approximate Bayesian computation on a required
   distance, `LossDistance()` or `SeriesDistance(metric)`. With a stochastic
   engine each distance reads one fresh replicate of its particle, so the
   problem's `replicates` and `replicate_summary` do not apply, and the result
   says so. See [ABC](../guide/uncertainty/smc.md#abc).
-- `SmcResult`: the sample, the level of each step, the log evidence, the
-  value each particle keeps and the diagnostics of each step (`SmcDiagnostics`:
+- `SMCResult`: the sample, the level of each step, the log evidence, the
+  value each particle keeps and the diagnostics of each step (`SMCDiagnostics`:
   effective size, resampling, acceptance rate and move count).
 - Priors: `Uniform()`, `LogUniform()`, `Beta(a, b)`, `Normal(mean, sd)`,
   `LogNormal(mu, sigma)` and `Gamma(shape, rate)`, each truncated to the
@@ -222,6 +222,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `loss_function` or `observation_models`, exactly one, and raises a
   `ValueError` with both or neither. Write `loss_function="sse"` where a
   problem relied on the default.
+- **Breaking:** public class names write every letter of an acronym in
+  capitals, as PEP 8 asks: `OdeSolver` is `ODESolver`. `EnbPI` keeps the
+  spelling of its authors. See
+  [Conventions](../codebase/conventions.md#python).
 
 ### Fixed
 

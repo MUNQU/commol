@@ -10,12 +10,12 @@ one state, so a test can compare it with the equations of its source.
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 
-from commol import Aggregate, OdeSolver, Simulation
+from commol import Aggregate, ODESolver, Simulation
 from commol.context.model import Model
 
 from .models import TIGHT, FactoryBuilder, build, build_ode
 
-FINE = OdeSolver(rtol=TIGHT.rtol, atol=1e-12)
+FINE = ODESolver(rtol=TIGHT.rtol, atol=1e-12)
 """
 ``TIGHT`` with a smaller absolute tolerance, for models whose values are of
 order one or below: the error of a value near zero stays below its own size.
@@ -45,7 +45,7 @@ def flow_model(
     parameters: Mapping[str, float | str] | None = None,
     *,
     ode: bool = True,
-    settings: OdeSolver = FINE,
+    settings: ODESolver = FINE,
     accumulators: Sequence[str] = (),
 ) -> Model[Aggregate]:
     """
@@ -62,7 +62,7 @@ def flow_model(
     ode : bool
         Build for differential equations with ``settings``; otherwise for
         difference equations.
-    settings : OdeSolver
+    settings : ODESolver
         The settings of the differential engine.
     accumulators : Sequence[str]
         Accumulator ids that the flows may name.

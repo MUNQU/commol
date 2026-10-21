@@ -12,7 +12,7 @@ Runs a model and reads its outputs. Guide: [Running Simulations](../guide/simula
 
 ::: commol.api.results.SimulationReplicates
 
-::: commol.context.engine.OdeSolver
+::: commol.context.engine.ODESolver
 
 ::: commol.context.engine.StochasticEventsSettings
 

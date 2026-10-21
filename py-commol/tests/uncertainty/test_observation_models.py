@@ -16,7 +16,7 @@ import pytest
 from pydantic import ValidationError
 
 from commol import (
-    AbcSmc,
+    ABCSMC,
     BayesianPosterior,
     BinomialObservations,
     CalibrationProblem,
@@ -447,7 +447,7 @@ class TestBayesianPosterior:
             windowed=True,
             observation_models={"B": PoissonObservations()},
         )
-        abc = AbcSmc(
+        abc = ABCSMC(
             priors=Priors.uniform_on_bounds(),
             distance=LossDistance(),
             particles=10,
