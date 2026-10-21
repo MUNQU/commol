@@ -3274,7 +3274,7 @@ compartment. The Rust engine applies the values in a fixed order, and a
 <tr>
 <td>A bin</td>
 <td><code>"B"</code></td>
-<td>The amount of the bin, in its unit. Its compartments share it in their current proportions.</td>
+<td>The amount of the bin, in its unit. Its compartments share it in the proportions of the initial state, also when the <code>Simulation</code> has run.</td>
 </tr>
 <tr>
 <td>A bin prefix (a bin and some categories)</td>
@@ -3347,7 +3347,7 @@ values leave of the amounts the model states:</p>
 </tr>
 <tr>
 <td>It keeps its own split</td>
-<td>A bin remainder shares what it takes across its compartments in their current proportions.</td>
+<td>A bin remainder shares what it takes across its compartments in the proportions of the initial state.</td>
 </tr>
 <tr>
 <td>It must not overlap a calibrated id</td>

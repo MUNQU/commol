@@ -4049,6 +4049,11 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>accumulators</code> and the <code>absolute</code> of its stratified rates: each transition it
   expands to now keeps them, so with <code>per_compartment=True</code> <code>$compartment</code>
   reads the compartment that flows, and its accumulators count the flow.</li>
+<li>A <code>Calibrator</code> on a <code>Simulation</code> that had run shared a calibrated bin, bin
+  prefix or remainder across its compartments in the proportions of the last
+  state of the run, so its fit, its uncertainty and its <code>Predictive</code> started
+  from a wrong split: they now share it in the proportions of the initial
+  state.</li>
 </ul>
 <h2 id="050-2026-10-19">[0.5.0] - 2026-10-19<a class="headerlink" href="#050-2026-10-19" title="Permanent link">&para;</a></h2>
 <p>This release replaces the ensemble calibration with uncertainty methods that
