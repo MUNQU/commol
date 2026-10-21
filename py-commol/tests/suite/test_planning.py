@@ -316,6 +316,76 @@ def test_an_open_issue_outside_the_project_gets_no_level() -> None:
     assert parallel.level_changes({1: 0}, {}) == []
 
 
+def project_answers(items: list, added: dict):
+    """The answers of ``rest`` for the levels: the items, then each new item."""
+
+    def answer(_path: str, **options) -> object:
+        if options.get("method") == "POST":
+            return added
+        if options.get("method") == "PATCH":
+            return None
+        return items
+
+    return answer
+
+
+def test_an_open_issue_outside_the_project_is_added_before_its_level(
+    capsys,
+) -> None:
+    issues = {1: an_issue(1), 2: an_issue(2, blocked_by=frozenset({1}))}
+    items = [
+        {
+            "id": 100,
+            "content_type": "Issue",
+            "content": {
+                "number": 1,
+                "repository_url": "https://api.github.com/repos/o/a",
+            },
+            "fields": [{"name": "Level", "value": 0}],
+        }
+    ]
+
+    with (
+        patch.object(parallel, "repository", return_value="o/a"),
+        patch.object(
+            parallel, "project_field", return_value=("orgs/o/projectsV2/1", 7)
+        ),
+        patch.object(
+            parallel, "rest", side_effect=project_answers(items, {"id": 200})
+        ) as rest,
+    ):
+        parallel.write_levels(issues)
+
+    # 1 is an item with its level already; 2 is not an item, so it is added
+    # (its id is 20) and then gets its level.
+    assert [(call.args, call.kwargs) for call in rest.call_args_list] == [
+        (("orgs/o/projectsV2/1/items?per_page=100&fields=7",), {"every_page": True}),
+        (
+            ("orgs/o/projectsV2/1/items",),
+            {"method": "POST", "data": {"type": "Issue", "id": 20}},
+        ),
+        (
+            ("orgs/o/projectsV2/1/items/200",),
+            {"method": "PATCH", "data": {"fields": [{"id": 7, "value": 1}]}},
+        ),
+    ]
+    out = capsys.readouterr().out
+    assert "Project: #2 added" in out
+    assert "Level: 1 written" in out
+
+
+def test_an_added_item_without_an_id_stops_the_levels() -> None:
+    with (
+        patch.object(parallel, "repository", return_value="o/a"),
+        patch.object(
+            parallel, "project_field", return_value=("orgs/o/projectsV2/1", 7)
+        ),
+        patch.object(parallel, "rest", side_effect=project_answers([], {})),
+        pytest.raises(SystemExit, match="#1 .*no item"),
+    ):
+        parallel.write_levels({1: an_issue(1)})
+
+
 # The release before the milestone
 
 

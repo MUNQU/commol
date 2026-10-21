@@ -95,7 +95,9 @@ open blockers (an open blocker of another repository counts as level 0). The
 view "By precedence" groups the open issues by `Level`, so each group can
 start when the groups above it close. GitHub Projects cannot group by
 "blocked by" links, and its hierarchy view follows sub-issues only, so the
-script writes the field. It writes only the levels that change, through REST,
+script writes the field. First it adds to the project each open proposal,
+change and release that is not an item of it, so that every one gets its
+level. It writes only the levels that change, through REST,
 with your own `gh` login: no workflow and no stored token. If it cannot write
 them (no write access to the project, a rate limit), it says so in one line
 and lists the next issues all the same. `start.sh` writes
@@ -114,7 +116,11 @@ gh issue list --milestone 0.5.0
 
 An issue is ready when every issue that blocks it is closed.
 
-The project adds a new issue as `Todo` and moves it to `Done` when it closes.
+The project adds a new issue of the repository (its workflow "Auto-add to
+project", with the filter `is:issue`), sets it to `Todo` (workflow "Item added
+to project") and moves it to `Done` when it closes. An open issue that the
+workflow misses gets its item from `parallel.py --levels`, which `next.sh` and
+`start.sh` run.
 A pull request that says `Closes #N` links to its issue and closes it when it
 merges. `In Progress` is set when the work starts, by `.github/scripts/start.sh`
 (see below), or by hand from the project or a terminal:
