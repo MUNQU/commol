@@ -19,8 +19,10 @@ class SeriesValue(BaseModel):
         the step of a point, 0 on every other step; integer positions only),
         ``"step_function"`` (the value of the last point at or before ``t``),
         or ``"linear"`` (linear interpolation in ``t``). The engine decides
-        which positions its model type accepts: a DifferenceEquations model
-        only integer steps.
+        which positions its model type accepts: a DifferenceEquations or
+        StochasticSteps model only integer steps. The model rejects a
+        position its engine cannot run when it is built or its parameters
+        change.
     """
 
     model_config = ConfigDict(extra="forbid")

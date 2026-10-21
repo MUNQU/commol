@@ -155,9 +155,10 @@ differential engine any finite, non-negative position. The engine checks every
 position where it receives it, and its message names the object that holds a
 rejected one: the observation or constraint (`check_positions` in
 `crates/commol-calibration/src/calibration_problem.rs`), the impulse transition
-or series parameter (`DifferenceEquations::from_compiled`), or the positions of
-a predictive before any draw runs (`Predictive::new` in
-`crates/commol-inference/src/predictive.rs`).
+or series parameter when the model is built or its parameters change
+(`check_model` in `crates/commol-model/src/builder.rs`, for an engine that
+steps only at integers), or the positions of a predictive before any draw
+runs (`Predictive::new` in `crates/commol-inference/src/predictive.rs`).
 
 **Rule:** Python passes positions on and shows the engine's message. It never
 checks whether a model type accepts a position.
@@ -165,6 +166,8 @@ checks whether a model type accepts a position.
 **Guards:** `crates/commol-calibration/tests/test_positions.rs`,
 `crates/commol-difference/src/simulation.rs::integer_positions_are_accepted_and_others_rejected`,
 `crates/commol-differential/src/tests.rs::a_difference_engine_names_a_series_point_between_steps`,
+`crates/commol-model/tests/schedules.rs::an_engine_that_steps_at_integers_rejects_a_position_between_steps_at_the_check`,
+`tests/building/test_parameters.py::test_a_point_the_engine_cannot_run_is_rejected_at_build_and_update`,
 `tests/calibration/test_observations.py::TestPositionsAndEngines`,
 `crates/commol-inference/tests/test_predictive.rs::positions_the_engine_cannot_run_are_rejected_before_any_draw`.
 

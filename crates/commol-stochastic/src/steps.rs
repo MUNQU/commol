@@ -47,9 +47,9 @@ impl StochasticSteps {
     /// # Errors
     ///
     /// Returns a message when the model is not of this engine, when
-    /// [`CompiledModel::try_from_model`] fails (a bin whose amount is not whole, or
-    /// amounts that are not whole and no rounding), or when an impulse or a
-    /// series point is not at an integer step.
+    /// [`CompiledModel::try_from_model`] fails (a bin whose amount is not whole,
+    /// amounts that are not whole and no rounding, or an impulse or a series
+    /// point that is not at an integer step).
     pub fn try_from_model(model: &commol_core::Model) -> Result<Self, String> {
         let EngineSettings::StochasticSteps(settings) = *model.engine.settings() else {
             return Err(format!(
@@ -58,18 +58,6 @@ impl StochasticSteps {
             ));
         };
         let compiled = CompiledModel::try_from_model(model)?;
-        if let Some((transition, position)) = compiled.first_non_integer_impulse() {
-            return Err(format!(
-                "Impulse transition '{transition}' acts at {position}, which is not an \
-                 integer step; the StochasticSteps engine steps only at integers"
-            ));
-        }
-        if let Some((parameter, position)) = compiled.first_non_integer_series_point() {
-            return Err(format!(
-                "Series parameter '{parameter}' has a point at {position}, which is not \
-                 an integer step; the StochasticSteps engine steps only at integers"
-            ));
-        }
         let mut groups: Vec<(usize, Vec<usize>)> = Vec::new();
         let mut absolute = Vec::new();
         for (index, change) in compiled.flow_changes().iter().enumerate() {

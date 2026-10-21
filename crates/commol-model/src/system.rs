@@ -383,27 +383,6 @@ impl CompiledModel {
         positions
     }
 
-    /// The first series point that is not an integer, with its parameter
-    /// name, if any. A difference engine only steps at integers.
-    pub fn first_non_integer_series_point(&self) -> Option<(String, f64)> {
-        self.series_parameters.iter().find_map(|series| {
-            series
-                .first_non_integer()
-                .map(|position| (series.parameter_name.clone(), position))
-        })
-    }
-
-    /// The first impulse position that is not an integer, with its
-    /// transition id, if any. A difference engine only steps at integers.
-    pub fn first_non_integer_impulse(&self) -> Option<(String, f64)> {
-        self.impulse_flows.iter().find_map(|impulse| {
-            impulse
-                .schedule
-                .first_non_integer()
-                .map(|position| (impulse.flow.transition_id.clone(), position))
-        })
-    }
-
     /// Apply the impulses that act at position `t` to `state`, at once.
     ///
     /// Every jump is computed from the state before any of them, as the flows

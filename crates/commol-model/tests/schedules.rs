@@ -1,10 +1,10 @@
 //! Where an engine in continuous time stops (impulses, the values a rate
 //! compares `t` with, the points of a series, every integer when a rate reads
-//! `step`), the checks of impulse schedules, and the flows that drain a
-//! compartment.
+//! `step`), the checks of impulse schedules and of the series points and
+//! impulse positions an engine runs, and the flows that drain a compartment.
 
-use commol_core::Model;
-use commol_model::{CompiledModel, as_whole};
+use commol_core::{EngineType, Model, ModelEngine, ParameterValue, SeriesMode};
+use commol_model::{CompiledModel, as_whole, check_model};
 
 /// A → B and A → C at the rates `ab` and `ac`, from A = 800 and B = 200,
 /// with the parameters `k = 0.3`, `z = 0` and `s`, a series of the given
@@ -132,6 +132,106 @@ fn an_impulse_period_is_positive_and_its_offset_finite() {
         let error = CompiledModel::try_from_model(&model).err();
         assert!(error.is_some(), "period {period}, offset {offset}");
     }
+}
+
+/// `model` with the engine `engine`.
+fn on(engine: EngineType, mut model: Model) -> Model {
+    model.engine = ModelEngine::new(engine);
+    model
+}
+
+#[test]
+fn an_engine_that_steps_at_integers_rejects_a_position_between_steps_at_the_check() {
+    for (engine, stepper) in [
+        (
+            EngineType::DifferenceEquations,
+            "a difference-equations model",
+        ),
+        (EngineType::StochasticSteps, "the StochasticSteps engine"),
+    ] {
+        for (extra, message) in [
+            (
+                r#","impulse_at":[3,1.5,2.5]"#,
+                "Impulse transition 'ab' acts at 1.5, which is not an integer step",
+            ),
+            (
+                r#","impulse_every":[2,0.5]"#,
+                "Impulse transition 'ab' acts at 0.5, which is not an integer step",
+            ),
+            (
+                r#","impulse_every":[1.5,0]"#,
+                "Impulse transition 'ab' acts at 1.5, which is not an integer step",
+            ),
+        ] {
+            let error =
+                check_model(&on(engine, model("k", "k", "linear", extra))).expect_err(extra);
+            assert_eq!(
+                error,
+                format!("{message}; {stepper} steps only at integers")
+            );
+        }
+        let mut series = on(engine, model("k", "k", "step_function", ""));
+        series.parameters[2].value = Some(ParameterValue::Series {
+            data: vec![(4.0, 1.0), (3.5, 2.0), (2.5, 3.0)],
+            mode: SeriesMode::StepFunction,
+        });
+        let error = check_model(&series).expect_err("2.5 is between steps");
+        assert_eq!(
+            error,
+            format!(
+                "Series parameter 's' has a point at 2.5, which is not an integer step; \
+                 {stepper} steps only at integers"
+            )
+        );
+        assert_eq!(
+            check_model(&on(engine, model("k", "k", "linear", ""))),
+            Ok(())
+        );
+    }
+    let between = model("k", "k", "step_function", r#","impulse_at":[1.5]"#);
+    assert_eq!(check_model(&between), Ok(()), "an ODE model runs at 1.5");
+}
+
+#[test]
+fn a_pulse_between_steps_is_rejected_by_every_engine() {
+    for engine in [
+        EngineType::DifferentialEquations,
+        EngineType::DifferenceEquations,
+    ] {
+        let mut pulse = on(engine, model("k", "k", "pulse", ""));
+        pulse.parameters[2].value = Some(ParameterValue::Series {
+            data: vec![(1.0, 1.0), (1.5, 2.0)],
+            mode: SeriesMode::Pulse,
+        });
+        let error = check_model(&pulse).expect_err("1.5 is between steps");
+        assert_eq!(
+            error,
+            "Series parameter 's' is a pulse at 1.5, which is not an integer step; a \
+             pulse acts on one whole step"
+        );
+    }
+}
+
+#[test]
+fn a_position_that_is_not_valid_keeps_its_own_message_on_an_integer_engine() {
+    let engine = EngineType::DifferenceEquations;
+    let mut negative = on(engine, model("k", "k", "linear", r#","impulse_at":[1]"#));
+    negative.process.transitions[0].impulse_at = Some(vec![-1.5, f64::INFINITY]);
+    let error = CompiledModel::try_from_model(&negative).err().unwrap();
+    assert!(error.contains("finite and not negative"), "{error}");
+
+    let mut both = on(engine, model("k", "k", "linear", r#","impulse_at":[1.5]"#));
+    both.process.transitions[0].impulse_every = Some((1.5, 0.0));
+    let error = CompiledModel::try_from_model(&both).err().unwrap();
+    assert!(error.contains("sets both"), "{error}");
+
+    let mut series = on(engine, model("k", "k", "linear", ""));
+    series.parameters[2].value = Some(ParameterValue::Series {
+        data: vec![(-1.5, 1.0)],
+        mode: SeriesMode::Linear,
+    });
+    let error = CompiledModel::try_from_model(&series).err().unwrap();
+    assert!(error.contains("finite and not negative"), "{error}");
 }
 
 #[test]
