@@ -235,6 +235,12 @@ dense (`nalgebra`) below `SPARSE_THRESHOLD` state components and sparse
 `J·v`. Solver settings live in the model (`Model.engine.settings`), so a saved
 model reproduces a run.
 
+A step that leaves the state not finite stops the run with an error that
+names the last position the solver reached (`drive`), whatever the method:
+`tsit45` accepts a step whose error estimate is NaN, where `bdf` fails on a
+step that is too small.
+
 **Guards:** `crates/commol-differential/src/tests.rs`
 (`bdf_solves_a_stiff_model_within_the_tolerance`,
-`a_large_stiff_model_uses_the_sparse_path`).
+`a_large_stiff_model_uses_the_sparse_path`,
+`a_solution_that_blows_up_stops_the_solver_where_it_fails`).

@@ -884,22 +884,25 @@ fn a_rate_that_cannot_be_evaluated_stops_the_solver() {
 
 #[test]
 fn a_solution_that_blows_up_stops_the_solver_where_it_fails() {
-    // X' = X², from X = 1: X = 1 / (1 − t) has no value at t = 1.
-    let model = model(
-        "DifferentialEquations",
-        &[("X", 1.0)],
-        &[],
-        &[],
-        &[transition("growth", &[], &["X"], "X * X", "")],
-        TIGHT_BDF,
-    );
+    for settings in [TIGHT, TIGHT_BDF] {
+        // X' = X², from X = 1: X = 1 / (1 − t) has no value at t = 1.
+        let model = model(
+            "DifferentialEquations",
+            &[("X", 1.0)],
+            &[],
+            &[],
+            &[transition("growth", &[], &["X"], "X * X", "")],
+            settings,
+        );
 
-    let error = engine(&model).run_at(&[2.0]).unwrap_err().to_string();
+        let error = engine(&model).run_at(&[0.5, 2.0]).unwrap_err().to_string();
 
-    let (position, _) = error
-        .strip_prefix("The ODE solver failed after t = ")
-        .and_then(|rest| rest.split_once(':'))
-        .expect("the message of a step the solver cannot take");
-    let failed_after: f64 = position.parse().unwrap();
-    assert!(failed_after > 0.999 && failed_after < 1.0, "{error}");
+        let (position, _) = error
+            .strip_prefix("The ODE solver failed after t = ")
+            .and_then(|rest| rest.split_once(':'))
+            .unwrap_or_else(|| panic!("{settings}: not the message of a failed step: {error}"));
+        let failed_after: f64 = position.parse().unwrap();
+        // The numerical solution may pass t = 1 by its error before it fails.
+        assert!((failed_after - 1.0).abs() < 1e-3, "{settings}: {error}");
+    }
 }

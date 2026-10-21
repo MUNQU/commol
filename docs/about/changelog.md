@@ -229,6 +229,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `DifferentialEquations` run with `method="tsit45"` whose solution blows
+  up returned NaN with no error. A step that leaves the state not finite now
+  raises `RuntimeError` that names the last position the solver reached,
+  with either method.
 - The finite-difference step of a parameter with an infinite bound was
   infinite, so its sensitivities, identifiability and curvature failed: the
   width of its bounds now counts as 1 in the step.

@@ -355,6 +355,10 @@ engine rejects settings of another engine with an error that names both
 uses a dense matrix below `SPARSE_THRESHOLD` state components and a sparse one
 from there (`crates/commol-differential/src/solve.rs`).
 
+A run stops with `RuntimeError` when the solver cannot take a step, or when
+a step leaves the state not finite, as when the solution blows up. The
+message names the last position the solver reached, with either method.
+
 ### Time inside a step
 
 On `[n, n + 1)` a rate sees `step = n` and the position `t`, which moves
