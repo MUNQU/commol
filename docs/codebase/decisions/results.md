@@ -8,25 +8,43 @@ How intervals, descriptions, reports and model files are made from a model and i
 
 Every interval is a weighted quantile: the inverse of the weighted empirical
 distribution, interpolated between the midpoints of the cumulative weights
-(`statistics::quantiles` in `crates/commol-inference/src/statistics.rs`). With
+(`statistics::quantiles` in `crates/commol-calibration/src/statistics.rs`). With
 equal weights it equals NumPy's `method="hazen"`; a weight of zero removes a
 value. `ci_percentiles` (`api/inference/intervals.py`) turns a confidence level
 into the two percentile points of `statistics::interval_levels`. `member_statistics` reduces each member to the
 quantity of interest **first**, and then takes weighted quantiles across
 members; taking quantiles first gives a band that describes no member. The
-replicates of a stochastic run (`SimulationReplicates.quantiles`), a sample
-and a predictive use the same quantile.
+replicates of a stochastic run (`SimulationReplicates.quantiles`), a sample,
+a predictive and the summary of the replicates of a calibration
+(`"median"` and `Quantile(q)`, `ReplicateSummary::summarize`) use the same
+quantile. So a calibration with `Quantile(0.25)` compares the observations
+with the value that `SimulationReplicates.quantiles([0.25])` gives for the
+same runs.
+
+The module lives in `commol-calibration`, the lowest crate that takes a
+quantile, and `commol-inference` re-exports it (`pub use
+commol_calibration::statistics`), so there is one copy.
 
 | Alternative | Why not |
 |---|---|
 | NumPy's default (`linear`) with equal weights and another rule with weights | Two conventions: a sample would change its interval when it gains weights. |
 | Harrell–Davis | Smoother, but with no simple weighted form, and slower. |
+| The module in `commol-core` | No crate below calibration takes a quantile, and `commol-core` holds the model types and the engine contract. |
+| A copy of Hazen's rule in `commol-calibration` | Two quantiles again, which can drift apart. |
 
 **Rule:** every new interval goes through `weighted_quantiles` or
-`member_statistics`.
+`member_statistics`, and every quantile in Rust through
+`statistics::quantiles`.
 
-**Guards:** `crates/commol-inference/src/statistics.rs` tests,
-`tests/uncertainty/test_intervals.py`.
+**Guards:** `crates/commol-calibration/src/statistics.rs` tests,
+`crates/commol-calibration/tests/test_replicate_summary.rs`,
+`tests/uncertainty/test_intervals.py`,
+`tests/stochastic/test_calibration.py::test_a_quantile_summary_agrees_with_the_quantiles_of_the_replicates`,
+and `tests/suite/test_rules.py::test_commol_has_one_quantile`, which fails
+when a Rust function named for a quantile sorts values outside
+`statistics.rs`. The conformal quantile (`conformal/quantile.rs`) is the one
+exception: it is a rank that gives an interval its coverage, not an estimate
+of a quantile.
 
 ## A setting has one name and one check
 

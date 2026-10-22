@@ -14,6 +14,9 @@
 //! | [`Discrepancy`] | Compares predictions with the observations: a loss, or the likelihood of an observation model per series ([`Likelihood`]) |
 //! | [`OptimizationObjective`] | The argmin cost function: the only place that turns a violation into a penalty |
 //!
+//! The summary of the replicates of a stochastic engine and every method of
+//! `commol-inference` take the one quantile of [`statistics`].
+//!
 //! [`optimize`] minimizes the objective with Nelder-Mead or a particle
 //! swarm; [`optimize_starts`] runs several starts in parallel
 //! ([`start_points`]).
@@ -48,6 +51,7 @@ pub mod objective;
 pub mod observation;
 pub mod optimization;
 pub mod starts;
+pub mod statistics;
 pub mod subproblem;
 pub mod types;
 pub mod values;
