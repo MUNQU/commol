@@ -1492,6 +1492,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Quantities of interest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-quantity-that-is-nan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A quantity that is NaN
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2651,6 +2668,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/local-approximations/" class="md-nav__link">
         
   
@@ -3186,6 +3231,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Quantities of interest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-quantity-that-is-nan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A quantity that is NaN
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3361,14 +3423,14 @@ estimator (<code>global_sensitivity/</code>), joined by <code>ForwardAnalysis</c
 </span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="p">)</span>
 </span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a><span class="n">analysis</span> <span class="o">=</span> <span class="n">SensitivityAnalysis</span><span class="p">(</span><span class="n">simulation</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 </span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>
-</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a><span class="n">peak</span> <span class="o">=</span> <span class="n">Peak</span><span class="p">(</span><span class="n">outputs</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">101</span><span class="p">)))</span>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a><span class="n">peak</span> <span class="o">=</span> <span class="n">Peak</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">101</span><span class="p">)))</span>
 </span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a><span class="n">result</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">PRCC</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">peak</span><span class="p">]))</span>
 </span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">inputs</span><span class="p">,</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">coefficients</span><span class="p">[</span><span class="mi">0</span><span class="p">]])</span>  <span class="c1"># [&#39;k1&#39;, &#39;k2&#39;] [0.97, -0.95]</span>
 </span></code></pre></div>
 <p>The peak of <code>B</code> rises with <code>k1</code> and falls with <code>k2</code>: the PRCC of <code>k1</code> is near
 1 and that of <code>k2</code> near −1. Over the axis (below), <code>C</code> early on rises with
-both, since more recovery fills <code>C</code> faster, and late falls with <code>k2</code>, since
-more recovery stops the outbreak sooner.</p>
+both, since a faster flow out of <code>B</code> fills <code>C</code> faster, and late falls with
+<code>k2</code>, since a faster flow out of <code>B</code> ends the growth of <code>B</code> sooner.</p>
 <h2 id="forward-and-inverse-questions">Forward and inverse questions<a class="headerlink" href="#forward-and-inverse-questions" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3444,10 +3506,29 @@ keep every replicate, each with a seed of its own. A deterministic engine
 does not use <code>replicates</code>, so the same analysis runs on either engine; with no
 seed, one is drawn and logged.</p>
 <h2 id="quantities-of-interest">Quantities of interest<a class="headerlink" href="#quantities-of-interest" title="Permanent link">&para;</a></h2>
-<p>A quantity reduces each run to a scalar, in Rust, through the observation
-operator of the calibration (<code>crates/commol-inference/src/quantity.rs</code>), so a
-design of thousands of runs never returns to Python. <code>outputs</code> is one output
-or a list of outputs summed, as in an observation.</p>
+<p>A quantity reads a series of each run and reduces it to a scalar, in Rust,
+through the observation operator of the calibration
+(<code>crates/commol-inference/src/quantity.rs</code>), so a design of thousands of runs
+never returns to Python. The quantities live in
+<code>commol/context/inference/quantities.py</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Series</th>
+<th>Value at a position</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A name, a list of names, or <code>Level(outputs)</code></td>
+<td>The sum of the outputs, their level</td>
+</tr>
+<tr>
+<td><code>Increments(outputs, window)</code></td>
+<td>The gain of the sum over <code>(end - window, end]</code>: the position is the end of a window, at least <code>window</code></td>
+</tr>
+</tbody>
+</table>
 <table>
 <thead>
 <tr>
@@ -3457,30 +3538,101 @@ or a list of outputs summed, as in an observation.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>ValueAt(outputs, at)</code></td>
+<td><code>ValueAt(series, at)</code></td>
 <td>The value at <code>at</code></td>
+</tr>
+<tr>
+<td><code>Peak(series, positions)</code></td>
+<td>The largest value at the positions</td>
+</tr>
+<tr>
+<td><code>PeakPosition(series, positions)</code></td>
+<td>The first of the positions where the value is largest</td>
+</tr>
+<tr>
+<td><code>Trajectory(series, positions)</code></td>
+<td>The value at each position, one scalar per position, for an analysis over the axis</td>
 </tr>
 <tr>
 <td><code>Gain(outputs, start, end)</code></td>
 <td>The value at <code>end</code> minus the value at <code>start</code>: what entered a cumulative output over <code>(start, end]</code>, as an observation with a window</td>
 </tr>
+</tbody>
+</table>
+<p>The series is a modelling choice. The peak of a level is the largest amount;
+for an output that only grows, such as <code>C</code> here or an accumulator, it is the
+value at the last position. The peak of <code>Increments</code> is the largest gain over
+one window, and <code>PeakPosition</code> gives the end of that window:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Increments</span><span class="p">,</span> <span class="n">PeakPosition</span><span class="p">,</span> <span class="n">Propagation</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">ends</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">101</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">inflow</span> <span class="o">=</span> <span class="n">Increments</span><span class="p">(</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">quantities</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">Peak</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="n">inflow</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="n">ends</span><span class="p">),</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">PeakPosition</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="n">inflow</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="n">ends</span><span class="p">),</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">Peak</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="n">ends</span><span class="p">),</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">]</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="n">gains</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">Propagation</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="n">quantities</span><span class="p">))</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="k">for</span> <span class="n">summary</span> <span class="ow">in</span> <span class="n">gains</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="mf">0.9</span><span class="p">):</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">label</span><span class="p">,</span> <span class="nb">round</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">lower</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">median</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">upper</span><span class="p">))</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># peak of C gain over windows of 10 178 358 496</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="c1"># position of the peak of C gain over windows of 10 20 30 50</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="c1"># peak of C 809 980 999</span>
+</span></code></pre></div>
+<p>Every quantity follows the same rules:</p>
+<table>
+<thead>
 <tr>
-<td><code>Peak(outputs, positions)</code></td>
-<td>The largest value at the positions</td>
+<th>Rule</th>
+<th>So</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A quantity reads only the positions it names, with no interpolation</td>
+<td>A position the engine does not report at is a <code>ValueError</code></td>
 </tr>
 <tr>
-<td><code>PeakPosition(outputs, positions)</code></td>
-<td>The first of the positions where the value is largest</td>
+<td>Outputs are summed at each row before any reduction</td>
+<td>The peak of <code>["A", "B"]</code> is the peak of <code>A + B</code></td>
 </tr>
 <tr>
-<td><code>Trajectory(outputs, positions)</code></td>
-<td>One <code>ValueAt</code> per position, for an analysis over the axis</td>
+<td><code>PeakPosition</code> gives the first of the positions where the value is largest</td>
+<td>A tie gives the earlier position</td>
+</tr>
+<tr>
+<td>A NaN in a value a quantity reads makes it NaN</td>
+<td>Its peak and the position of its peak are NaN too</td>
+</tr>
+<tr>
+<td>With a stochastic engine, a quantity is computed for each replicate</td>
+<td>A design point holds the mean of its replicates; a propagation keeps each</td>
 </tr>
 </tbody>
 </table>
 <p>Each quantity has a <code>label</code>, by default what it reads, such as <code>"B at 10"</code>.
 The default label writes each position in full, as Python reads it back, so
 two positions give two labels: <code>"B at 1000000"</code> and <code>"B at 1000001"</code>.</p>
+<h3 id="a-quantity-that-is-nan">A quantity that is NaN<a class="headerlink" href="#a-quantity-that-is-nan" title="Permanent link">&para;</a></h3>
+<p>A propagation keeps the NaN of each run in <code>values</code>. Every reduction across
+runs raises a <code>ValueError</code> on a NaN: <code>summary()</code>, <code>member_statistics</code>, and
+PRCC, Morris, Sobol and the polynomial chaos at the first batch of their
+design, before they estimate. The message gives the index of the quantity, in
+the order of the labels, the points where it is NaN, and the first run: its
+point, inputs, replicate and seed. A <code>Propagation</code> with the same inputs and
+seed gives the value of each run.</p>
+<p><code>PropagationResult.where(mask)</code> keeps the runs where <code>mask</code> is true and
+renormalises their weights to sum to 1. A filter conditions the result: the
+summary is the distribution given the condition, not over every run, and
+<code>effective_size</code> says how many runs the kept weights are worth. You write the
+condition, such as <code>np.isfinite(values[:, i])</code> or a value above a threshold:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">values</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">gains</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">late</span> <span class="o">=</span> <span class="n">gains</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">values</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">30</span><span class="p">)</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">late</span><span class="o">.</span><span class="n">values</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">late</span><span class="o">.</span><span class="n">effective_size</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">gains</span><span class="o">.</span><span class="n">effective_size</span><span class="p">))</span>  <span class="c1"># 23 23 100</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">late</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="mf">0.9</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">median</span><span class="p">))</span>  <span class="c1"># 216</span>
+</span></code></pre></div>
 <h2 id="which-method-for-which-budget">Which method for which budget<a class="headerlink" href="#which-method-for-which-budget" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3534,18 +3686,18 @@ quantities of each run, and their <code>weights</code>. <code>summary(confidence
 the weighted mean, median and central interval of each quantity. The sample is
 a <code>ParameterSample</code>, so <code>Predictive(analysis, result.sample, positions)</code> gives
 the bands and plots of a calibration.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Predictive</span><span class="p">,</span> <span class="n">Propagation</span><span class="p">,</span> <span class="n">ValueAt</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">result</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">Propagation</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">peak</span><span class="p">,</span> <span class="n">ValueAt</span><span class="p">(</span><span class="n">outputs</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">at</span><span class="o">=</span><span class="mi">100</span><span class="p">)])</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">)</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="k">for</span> <span class="n">summary</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="mf">0.9</span><span class="p">):</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">label</span><span class="p">,</span> <span class="nb">round</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">lower</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">median</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">upper</span><span class="p">))</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c1"># peak of B 172 421 655</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="c1"># C at 100 809 980 999</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="n">band</span> <span class="o">=</span> <span class="n">Predictive</span><span class="p">(</span><span class="n">analysis</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">sample</span><span class="p">,</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">25.0</span><span class="p">,</span> <span class="mf">50.0</span><span class="p">])</span><span class="o">.</span><span class="n">band</span><span class="p">(</span><span class="mf">0.9</span><span class="p">)</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">band</span><span class="o">.</span><span class="n">median</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">]])</span>  <span class="c1"># [10, 293, 53]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Predictive</span><span class="p">,</span> <span class="n">Propagation</span><span class="p">,</span> <span class="n">ValueAt</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">result</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">Propagation</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">peak</span><span class="p">,</span> <span class="n">ValueAt</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">at</span><span class="o">=</span><span class="mi">100</span><span class="p">)])</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="p">)</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">for</span> <span class="n">summary</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="mf">0.9</span><span class="p">):</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">label</span><span class="p">,</span> <span class="nb">round</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">lower</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">median</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">upper</span><span class="p">))</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1"># peak of B 172 421 655</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="c1"># C at 100 809 980 999</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="n">band</span> <span class="o">=</span> <span class="n">Predictive</span><span class="p">(</span><span class="n">analysis</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">sample</span><span class="p">,</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">25.0</span><span class="p">,</span> <span class="mf">50.0</span><span class="p">])</span><span class="o">.</span><span class="n">band</span><span class="p">(</span><span class="mf">0.9</span><span class="p">)</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">band</span><span class="o">.</span><span class="n">median</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">]])</span>  <span class="c1"># [10, 293, 53]</span>
 </span></code></pre></div>
 <p><code>Predictive.at_observations</code> of an analysis takes <code>NoNoise()</code> only: residual
 noise needs the residuals of a fit, and <code>DistributionNoise()</code> the observation
@@ -3563,17 +3715,15 @@ in place of the draws. Equal weights give the usual PRCC. A <code>Trajectory</co
 the coefficients over the axis; a quantity with one value in every run, such
 as a state at position 0, has NaN coefficients.</p>
 <p>A NaN has no rank, so a quantity that is NaN at a draw raises a <code>ValueError</code>
-before PRCC ranks any value. The message gives the index of the quantity, in
-the order of the labels, and the draws where it is NaN; a <code>Propagation</code> with
-the same inputs and seed gives the value of each run.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Trajectory</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">over_axis</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">PRCC</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">Trajectory</span><span class="p">(</span><span class="n">outputs</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">100</span><span class="p">])])</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">)</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">over_axis</span><span class="o">.</span><span class="n">labels</span><span class="p">)</span>  <span class="c1"># [&#39;C at 10&#39;, &#39;C at 50&#39;, &#39;C at 100&#39;]</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="nb">print</span><span class="p">([[</span><span class="nb">round</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">row</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">over_axis</span><span class="o">.</span><span class="n">coefficients</span><span class="p">])</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># [[0.99, 0.9], [0.91, 0.31], [0.96, -0.89]]</span>
+before PRCC ranks any value (<a href="#a-quantity-that-is-nan">A quantity that is NaN</a>).</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Trajectory</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">over_axis</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">PRCC</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">Trajectory</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">100</span><span class="p">])])</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="p">)</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">over_axis</span><span class="o">.</span><span class="n">labels</span><span class="p">)</span>  <span class="c1"># [&#39;C at 10&#39;, &#39;C at 50&#39;, &#39;C at 100&#39;]</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="nb">print</span><span class="p">([[</span><span class="nb">round</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">row</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">over_axis</span><span class="o">.</span><span class="n">coefficients</span><span class="p">])</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c1"># [[0.99, 0.9], [0.91, 0.31], [0.96, -0.89]]</span>
 </span></code></pre></div>
 <h2 id="morris-screening">Morris screening<a class="headerlink" href="#morris-screening" title="Permanent link">&para;</a></h2>
 <p><code>Morris</code> (Morris 1991) runs <code>trajectories</code> trajectories: each starts at a
@@ -3584,10 +3734,10 @@ effect is on the scale of <code>F(x)</code>, so inputs of different units compar
 <code>mu_star</code> (Campolongo, Cariboni and Saltelli 2007) ranks the inputs; a <code>sigma</code>
 near or above <code>mu_star</code> says the effect depends on the other inputs or is not
 linear.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Morris</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">screening</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">Morris</span><span class="p">(</span><span class="n">trajectories</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">levels</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">peak</span><span class="p">]))</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">screening</span><span class="o">.</span><span class="n">mu_star</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="n">screening</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>  <span class="c1"># [385, 279] 60</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Morris</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">screening</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">Morris</span><span class="p">(</span><span class="n">trajectories</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">levels</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">peak</span><span class="p">]))</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">screening</span><span class="o">.</span><span class="n">mu_star</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="n">screening</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>  <span class="c1"># [385, 279] 60</span>
 </span></code></pre></div>
 <h2 id="sobol-indices">Sobol indices<a class="headerlink" href="#sobol-indices" title="Permanent link">&para;</a></h2>
 <p><code>Sobol</code> uses the design of Saltelli (2010) on two matrices of independent
@@ -3602,17 +3752,17 @@ dependent inputs, such as a posterior, moving one input breaks its dependence
 on the others, and the indices lose their meaning and no longer add up; an
 input space from a sample raises a <code>ValueError</code> that names PRCC and
 propagation, which take it.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Sobol</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">indices</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">Sobol</span><span class="p">(</span><span class="n">base_draws</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span> <span class="n">bootstrap</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">peak</span><span class="p">])</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="p">)</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[(</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)]:</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">first</span> <span class="o">=</span> <span class="p">(</span><span class="n">indices</span><span class="o">.</span><span class="n">first_lower</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="n">indices</span><span class="o">.</span><span class="n">first</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="n">indices</span><span class="o">.</span><span class="n">first_upper</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">])</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">total</span> <span class="o">=</span> <span class="p">(</span><span class="n">indices</span><span class="o">.</span><span class="n">total_lower</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="n">indices</span><span class="o">.</span><span class="n">total</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="n">indices</span><span class="o">.</span><span class="n">total_upper</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">])</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">first</span><span class="p">],</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">total</span><span class="p">])</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1"># k1 [0.47, 0.63, 0.78] [0.55, 0.59, 0.63]</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="c1"># k2 [0.21, 0.36, 0.48] [0.38, 0.41, 0.45]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Sobol</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">indices</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">Sobol</span><span class="p">(</span><span class="n">base_draws</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span> <span class="n">bootstrap</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">peak</span><span class="p">])</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="p">)</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[(</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)]:</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="n">first</span> <span class="o">=</span> <span class="p">(</span><span class="n">indices</span><span class="o">.</span><span class="n">first_lower</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="n">indices</span><span class="o">.</span><span class="n">first</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="n">indices</span><span class="o">.</span><span class="n">first_upper</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">])</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="n">total</span> <span class="o">=</span> <span class="p">(</span><span class="n">indices</span><span class="o">.</span><span class="n">total_lower</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="n">indices</span><span class="o">.</span><span class="n">total</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="n">indices</span><span class="o">.</span><span class="n">total_upper</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">])</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">first</span><span class="p">],</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">total</span><span class="p">])</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="c1"># k1 [0.47, 0.63, 0.78] [0.55, 0.59, 0.63]</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="c1"># k2 [0.21, 0.36, 0.48] [0.38, 0.41, 0.45]</span>
 </span></code></pre></div>
 <h2 id="polynomial-chaos">Polynomial chaos<a class="headerlink" href="#polynomial-chaos" title="Permanent link">&para;</a></h2>
 <p><code>PolynomialChaos</code> (Sudret 2008) takes every input to <code>u = F(x)</code>, uniform on
@@ -3623,11 +3773,11 @@ squares of the coefficients. <code>loo_error</code> is the leave-one-out error r
 to the variance: the indices are those of the expansion, and they are those
 of the model only as far as the expansion predicts it. <code>predict</code> gives the
 quantities at any input values, as a surrogate.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">PolynomialChaos</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">chaos</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">PolynomialChaos</span><span class="p">(</span><span class="n">degree</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">draws</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">peak</span><span class="p">]))</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">chaos</span><span class="o">.</span><span class="n">loo_error</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">4</span><span class="p">),</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">chaos</span><span class="o">.</span><span class="n">total</span><span class="p">[</span><span class="mi">0</span><span class="p">]])</span>  <span class="c1"># 0.0036 [0.61, 0.39]</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">chaos</span><span class="o">.</span><span class="n">predict</span><span class="p">([[</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">]])[</span><span class="mi">0</span><span class="p">]])</span>  <span class="c1"># [428]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">PolynomialChaos</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">chaos</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">PolynomialChaos</span><span class="p">(</span><span class="n">degree</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">draws</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">peak</span><span class="p">]))</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">chaos</span><span class="o">.</span><span class="n">loo_error</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">4</span><span class="p">),</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">chaos</span><span class="o">.</span><span class="n">total</span><span class="p">[</span><span class="mi">0</span><span class="p">]])</span>  <span class="c1"># 0.0036 [0.61, 0.39]</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">chaos</span><span class="o">.</span><span class="n">predict</span><span class="p">([[</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">]])[</span><span class="mi">0</span><span class="p">]])</span>  <span class="c1"># [428]</span>
 </span></code></pre></div>
 <h2 id="plots">Plots<a class="headerlink" href="#plots" title="Permanent link">&para;</a></h2>
 <p>Each result draws its own figure with <code>plot()</code>, one panel per quantity, and
@@ -3638,9 +3788,9 @@ and one bar per input for any other quantity. The <code>plot</code> of a <code>M
 draws <code>sigma</code> against <code>mu_star</code>, one point per input. The <code>plot</code> of a
 <code>SobolResult</code> draws the first-order and total indices with their intervals,
 and the <code>plot</code> of a <code>ChaosResult</code> draws those of the expansion.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">over_axis</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_label</span><span class="o">=</span><span class="s2">&quot;Step&quot;</span><span class="p">)</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">screening</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">indices</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">over_axis</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_label</span><span class="o">=</span><span class="s2">&quot;Step&quot;</span><span class="p">)</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">screening</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">indices</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
 </span></code></pre></div>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
@@ -3649,6 +3799,11 @@ and the <code>plot</code> of a <code>ChaosResult</code> draws those of the expan
 <li>[ ] Morris, Sobol and the polynomial chaos run on independent inputs; a
       posterior goes to PRCC or propagation.</li>
 <li>[ ] A stochastic engine has <code>replicates</code> and a <code>seed</code>.</li>
+<li>[ ] Each quantity reads the series you mean: the level of an output that
+      only grows peaks at the last position, its <code>Increments</code> at the largest
+      gain of a window.</li>
+<li>[ ] A quantity that is NaN is filtered with <code>where(mask)</code> only on a
+      condition you can defend, and the summary is read as conditioned on it.</li>
 <li>[ ] The intervals of Sobol are narrow enough to rank the inputs, and none is
       NaN (a bootstrap replicate of no variance); if not, raise <code>base_draws</code>.</li>
 <li>[ ] The leave-one-out error of a polynomial chaos is small before you read

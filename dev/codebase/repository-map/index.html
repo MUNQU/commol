@@ -2581,6 +2581,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/local-approximations/" class="md-nav__link">
         
   
@@ -3385,8 +3413,8 @@
 <td>Ranks, verdicts.</td>
 </tr>
 <tr>
-<td><code>crates/commol-inference/src/design.rs</code>, <code>quantity.rs</code>, <code>batch.rs</code></td>
-<td>What a design-based method shares: <code>InputSpace</code> (independent distributions or a sample) and its designs (Latin hypercube, Morris trajectories, the Saltelli matrices, the scale <code>F(x)</code>); <code>Quantity</code> and <code>Quantities</code>, read through the observation operator; <code>BatchRunner</code>, every point through a forward model in parallel, replicate by replicate or as their mean.</td>
+<td><code>crates/commol-inference/src/design.rs</code>, <code>crates/commol-inference/src/quantity.rs</code>, <code>batch.rs</code></td>
+<td>What a design-based method shares: <code>InputSpace</code> (independent distributions or a sample) and its designs (Latin hypercube, Morris trajectories, the Saltelli matrices, the scale <code>F(x)</code>); <code>Series</code>, <code>Quantity</code> (a series and its reduction, read from JSON) and <code>Quantities</code>, read through the observation operator; <code>BatchRunner</code>, every point through a forward model in parallel, replicate by replicate or as their mean, which rejects a quantity that is NaN.</td>
 <td>Estimators.</td>
 </tr>
 <tr>
@@ -3502,6 +3530,11 @@
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
+<td><code>py-commol/src/quantity.rs</code></td>
+<td><code>commol_rs.inference</code>: the quantities of interest read from the JSON of their classes, and <code>quantities_as_read</code>, which writes them back.</td>
+<td>Logic beyond type conversion.</td>
+</tr>
+<tr>
 <td><code>py-commol/src/inference.rs</code></td>
 <td><code>commol_rs.inference</code>: <code>CalibrationProblem</code> (built once from a <code>Calibrator</code>, with a loss or observation models: starts, history, predictions, the predictive, the log score, the pointwise log-likelihood), <code>ParameterSample</code>, <code>Predictive</code>, <code>ObservationDraws</code>, <code>BootstrapRun</code>, <code>JackknifeRun</code>, <code>weighted_quantiles</code>, <code>weighted_mean</code>, <code>by_series</code>, <code>quantile_error</code>; the runners of methods (the bootstraps, <code>parametric_bootstrap</code>, <code>jackknife</code>).</td>
 <td>Logic beyond type conversion.</td>
@@ -3580,7 +3613,7 @@
 </tr>
 <tr>
 <td><code>context/inference/</code></td>
-<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code>, <code>IdentifiabilityMethod</code> and <code>SensitivityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>, <code>DistributionNoise</code>), the distributions and <code>Priors</code> (<code>distributions.py</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>context/inference/smc.py</code>: <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, <code>InformationMatchingEta</code>, <code>BootstrapCoverageEta</code>, <code>ABCSMC</code>, <code>ABCRejection</code>, the distances, <code>SMCResult</code>, <code>GibbsResult</code>), of the local approximations (<code>context/inference/local.py</code>: <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, its targets, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>DeltaBand</code>, <code>ImportanceResult</code>), of the conformal methods (<code>context/inference/conformal.py</code>), of the sensitivity methods with <code>InputSpace</code> and the quantities of interest (<code>context/inference/global_sensitivity.py</code>), and of the profiles (<code>context/inference/profiles.py</code>: <code>ProfileLikelihood</code>, <code>PredictionProfile</code>, <code>PredictionSpec</code>, <code>Threshold</code>, <code>ProfileResult</code>).</td>
+<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code>, <code>IdentifiabilityMethod</code> and <code>SensitivityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>, <code>DistributionNoise</code>), the distributions and <code>Priors</code> (<code>distributions.py</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>context/inference/smc.py</code>: <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, <code>InformationMatchingEta</code>, <code>BootstrapCoverageEta</code>, <code>ABCSMC</code>, <code>ABCRejection</code>, the distances, <code>SMCResult</code>, <code>GibbsResult</code>), of the local approximations (<code>context/inference/local.py</code>: <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, its targets, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>DeltaBand</code>, <code>ImportanceResult</code>), of the conformal methods (<code>context/inference/conformal.py</code>), of the sensitivity methods with <code>InputSpace</code> (<code>context/inference/global_sensitivity.py</code>), the quantities of interest (<code>quantities.py</code>: a series, <code>Level</code> or <code>Increments</code>, and its reduction), and of the profiles (<code>context/inference/profiles.py</code>: <code>ProfileLikelihood</code>, <code>PredictionProfile</code>, <code>PredictionSpec</code>, <code>Threshold</code>, <code>ProfileResult</code>).</td>
 <td>Runners.</td>
 </tr>
 <tr>
@@ -3867,8 +3900,8 @@
 </tr>
 <tr>
 <td>Change a sensitivity method, a design or a quantity of interest</td>
-<td><code>crates/commol-inference/src/global_sensitivity/</code>; <code>design.rs</code>, <code>quantity.rs</code>, <code>batch.rs</code></td>
-<td><code>crates/commol-calibration/src/forward.rs</code> (<code>unobserved</code>), <code>py-commol/src/sensitivity.rs</code>, <code>py-commol/commol/context/inference/global_sensitivity.py</code>, <code>api/sensitivity.py</code>, <code>api/inference/global_sensitivity.py</code>, <code>docs/guide/uncertainty/sensitivity.md</code></td>
+<td><code>crates/commol-inference/src/global_sensitivity/</code>; <code>design.rs</code>, <code>crates/commol-inference/src/quantity.rs</code>, <code>batch.rs</code></td>
+<td><code>crates/commol-calibration/src/forward.rs</code> (<code>unobserved</code>), <code>py-commol/src/sensitivity.rs</code>, <code>py-commol/src/quantity.rs</code>, <code>py-commol/commol/context/inference/quantities.py</code>, <code>context/inference/global_sensitivity.py</code>, <code>api/sensitivity.py</code>, <code>api/inference/global_sensitivity.py</code>, <code>docs/guide/uncertainty/sensitivity.md</code></td>
 </tr>
 <tr>
 <td>Change a local approximation (the curvature, Laplace, the sandwich, the Laplace mixture) or PSIS</td>

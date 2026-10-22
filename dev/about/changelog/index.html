@@ -2443,6 +2443,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/local-approximations/" class="md-nav__link">
         
   
@@ -4034,6 +4062,24 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <!-- Added #280 -->
 
+<ul>
+<li>
+<p>A quantity of interest reads a series and reduces it. The series is a name
+  or a list of names, their <code>Level</code>, or <code>Increments(outputs, window)</code>: the
+  gain of their sum over each window that ends at a position. So
+  <code>Peak(series=Increments("acc", window=7), positions=ends)</code> is the largest
+  gain of <code>acc</code> over a window of 7, and <code>PeakPosition</code> with the same arguments
+  the end of that window, with no class of their own. <code>commol</code> exports <code>Level</code>
+  and <code>Increments</code>. See
+  <a href="../../guide/uncertainty/sensitivity/#quantities-of-interest">Quantities of interest</a>.</p>
+</li>
+<li>
+<p><code>PropagationResult.where(mask)</code> keeps the runs where <code>mask</code> is true and
+  renormalises their weights to sum to 1, and
+  <code>PropagationResult.effective_size</code> gives Kish's effective size of the
+  weights. A filter conditions the result on the condition of the mask.</p>
+</li>
+</ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <!-- Changed #246 -->
 
@@ -4096,6 +4142,24 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <!-- Changed #280 -->
 
+<ul>
+<li>
+<p><strong>Breaking:</strong> <code>ValueAt</code>, <code>Peak</code>, <code>PeakPosition</code> and <code>Trajectory</code> take
+  <code>series</code> in place of <code>outputs</code>: <code>ValueAt(outputs="B", at=10)</code> is
+  <code>ValueAt(series="B", at=10)</code>. <code>Gain(outputs, start, end)</code> keeps <code>outputs</code>,
+  and the outputs of a quantity read back as a list. The quantities live in
+  <code>commol.context.inference.quantities</code>, and cross to Rust as the JSON of
+  their classes.</p>
+</li>
+<li>
+<p>Every reduction across runs raises <code>ValueError</code> on a quantity that is NaN:
+  <code>PropagationResult.summary()</code>, <code>member_statistics</code>, <code>weighted_quantiles</code>, and
+  Morris, Sobol and the polynomial chaos before they estimate, as PRCC did.
+  The message of a method names the quantity, the points where it is NaN, and
+  the point, inputs, replicate and seed of the first such run.
+  <code>PropagationResult.values</code> keeps the NaN of each run.</p>
+</li>
+</ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <!-- Fixed #246 -->
 
@@ -4109,6 +4173,17 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Fixed #280 -->
 
+<ul>
+<li>
+<p>A NaN in the values a <code>Peak</code> or a <code>PeakPosition</code> reads makes it NaN. The
+  peak skipped the NaN, and the position of the peak was the first position
+  when the value there was NaN.</p>
+</li>
+<li>
+<p>A weighted quantile of values with a NaN raises <code>ValueError</code>, where it
+  sorted the NaN by its sign bit and gave a wrong number.</p>
+</li>
+</ul>
 <h2 id="070-2026-10-22">[0.7.0] - 2026-10-22<a class="headerlink" href="#070-2026-10-22" title="Permanent link">&para;</a></h2>
 <p>This release reads a run through the classes of commol. The axis of a model
 gives the window grid (<code>AxisUnits.window_end</code> and the other methods) and, from

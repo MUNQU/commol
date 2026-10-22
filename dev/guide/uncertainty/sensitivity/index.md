@@ -48,12 +48,12 @@ inputs = InputSpace.independent(
 )
 analysis = SensitivityAnalysis(simulation, inputs, seed=1)
 
-peak = Peak(outputs="B", positions=list(range(101)))
+peak = Peak(series="B", positions=list(range(101)))
 result = analysis.run(PRCC(draws=200, quantities=[peak]))
 print(result.inputs, [round(c, 2) for c in result.coefficients[0]])  # ['k1', 'k2'] [0.97, -0.95]
 ```
 
-The peak of `B` rises with `k1` and falls with `k2`: the PRCC of `k1` is near 1 and that of `k2` near −1. Over the axis (below), `C` early on rises with both, since more recovery fills `C` faster, and late falls with `k2`, since more recovery stops the outbreak sooner.
+The peak of `B` rises with `k1` and falls with `k2`: the PRCC of `k1` is near 1 and that of `k2` near −1. Over the axis (below), `C` early on rises with both, since a faster flow out of `B` fills `C` faster, and late falls with `k2`, since a faster flow out of `B` ends the growth of `B` sooner.
 
 ## Forward and inverse questions
 
@@ -81,17 +81,67 @@ An initial condition is an amount in the unit of its bin, or a category split in
 
 ## Quantities of interest
 
-A quantity reduces each run to a scalar, in Rust, through the observation operator of the calibration (`crates/commol-inference/src/quantity.rs`), so a design of thousands of runs never returns to Python. `outputs` is one output or a list of outputs summed, as in an observation.
+A quantity reads a series of each run and reduces it to a scalar, in Rust, through the observation operator of the calibration (`crates/commol-inference/src/quantity.rs`), so a design of thousands of runs never returns to Python. The quantities live in `commol/context/inference/quantities.py`.
 
-| Quantity                           | Value                                                                                                                                |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `ValueAt(outputs, at)`             | The value at `at`                                                                                                                    |
-| `Gain(outputs, start, end)`        | The value at `end` minus the value at `start`: what entered a cumulative output over `(start, end]`, as an observation with a window |
-| `Peak(outputs, positions)`         | The largest value at the positions                                                                                                   |
-| `PeakPosition(outputs, positions)` | The first of the positions where the value is largest                                                                                |
-| `Trajectory(outputs, positions)`   | One `ValueAt` per position, for an analysis over the axis                                                                            |
+| Series                                       | Value at a position                                                                                    |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| A name, a list of names, or `Level(outputs)` | The sum of the outputs, their level                                                                    |
+| `Increments(outputs, window)`                | The gain of the sum over `(end - window, end]`: the position is the end of a window, at least `window` |
+
+| Quantity                          | Value                                                                                                                                |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `ValueAt(series, at)`             | The value at `at`                                                                                                                    |
+| `Peak(series, positions)`         | The largest value at the positions                                                                                                   |
+| `PeakPosition(series, positions)` | The first of the positions where the value is largest                                                                                |
+| `Trajectory(series, positions)`   | The value at each position, one scalar per position, for an analysis over the axis                                                   |
+| `Gain(outputs, start, end)`       | The value at `end` minus the value at `start`: what entered a cumulative output over `(start, end]`, as an observation with a window |
+
+The series is a modelling choice. The peak of a level is the largest amount; for an output that only grows, such as `C` here or an accumulator, it is the value at the last position. The peak of `Increments` is the largest gain over one window, and `PeakPosition` gives the end of that window:
+
+```python
+from commol import Increments, PeakPosition, Propagation
+
+ends = list(range(10, 101, 10))
+inflow = Increments("C", window=10)
+quantities = [
+    Peak(series=inflow, positions=ends),
+    PeakPosition(series=inflow, positions=ends),
+    Peak(series="C", positions=ends),
+]
+gains = analysis.run(Propagation(draws=100, quantities=quantities))
+for summary in gains.summary(0.9):
+    print(summary.label, round(summary.lower), round(summary.median), round(summary.upper))
+# peak of C gain over windows of 10 178 358 496
+# position of the peak of C gain over windows of 10 20 30 50
+# peak of C 809 980 999
+```
+
+Every quantity follows the same rules:
+
+| Rule                                                                       | So                                                                        |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| A quantity reads only the positions it names, with no interpolation        | A position the engine does not report at is a `ValueError`                |
+| Outputs are summed at each row before any reduction                        | The peak of `["A", "B"]` is the peak of `A + B`                           |
+| `PeakPosition` gives the first of the positions where the value is largest | A tie gives the earlier position                                          |
+| A NaN in a value a quantity reads makes it NaN                             | Its peak and the position of its peak are NaN too                         |
+| With a stochastic engine, a quantity is computed for each replicate        | A design point holds the mean of its replicates; a propagation keeps each |
 
 Each quantity has a `label`, by default what it reads, such as `"B at 10"`. The default label writes each position in full, as Python reads it back, so two positions give two labels: `"B at 1000000"` and `"B at 1000001"`.
+
+### A quantity that is NaN
+
+A propagation keeps the NaN of each run in `values`. Every reduction across runs raises a `ValueError` on a NaN: `summary()`, `member_statistics`, and PRCC, Morris, Sobol and the polynomial chaos at the first batch of their design, before they estimate. The message gives the index of the quantity, in the order of the labels, the points where it is NaN, and the first run: its point, inputs, replicate and seed. A `Propagation` with the same inputs and seed gives the value of each run.
+
+`PropagationResult.where(mask)` keeps the runs where `mask` is true and renormalises their weights to sum to 1. A filter conditions the result: the summary is the distribution given the condition, not over every run, and `effective_size` says how many runs the kept weights are worth. You write the condition, such as `np.isfinite(values[:, i])` or a value above a threshold:
+
+```python
+import numpy as np
+
+values = np.asarray(gains.values)
+late = gains.where(values[:, 1] > 30)
+print(len(late.values), round(late.effective_size), round(gains.effective_size))  # 23 23 100
+print(round(late.summary(0.9)[0].median))  # 216
+```
 
 ## Which method for which budget
 
@@ -113,7 +163,7 @@ Start with Morris to drop the inputs that do not matter, then Sobol or a polynom
 from commol import Predictive, Propagation, ValueAt
 
 result = analysis.run(
-    Propagation(draws=100, quantities=[peak, ValueAt(outputs="C", at=100)])
+    Propagation(draws=100, quantities=[peak, ValueAt(series="C", at=100)])
 )
 for summary in result.summary(0.9):
     print(summary.label, round(summary.lower), round(summary.median), round(summary.upper))
@@ -132,13 +182,13 @@ print([round(value) for value in band.median["B"]])  # [10, 293, 53]
 
 With inputs from a sample, the sample is the design, and the ranks, the correlations and the test read its weights: a rank is the weight below a value plus half the weight at it, and the test counts Kish's effective size in place of the draws. Equal weights give the usual PRCC. A `Trajectory` gives the coefficients over the axis; a quantity with one value in every run, such as a state at position 0, has NaN coefficients.
 
-A NaN has no rank, so a quantity that is NaN at a draw raises a `ValueError` before PRCC ranks any value. The message gives the index of the quantity, in the order of the labels, and the draws where it is NaN; a `Propagation` with the same inputs and seed gives the value of each run.
+A NaN has no rank, so a quantity that is NaN at a draw raises a `ValueError` before PRCC ranks any value ([A quantity that is NaN](#a-quantity-that-is-nan)).
 
 ```python
 from commol import Trajectory
 
 over_axis = analysis.run(
-    PRCC(draws=100, quantities=[Trajectory(outputs="C", positions=[10, 50, 100])])
+    PRCC(draws=100, quantities=[Trajectory(series="C", positions=[10, 50, 100])])
 )
 print(over_axis.labels)  # ['C at 10', 'C at 50', 'C at 100']
 print([[round(c, 2) for c in row] for row in over_axis.coefficients])
@@ -203,6 +253,8 @@ figure = indices.plot()
 - [ ] Each input has bounds and a distribution you can defend; a uniform needs finite bounds.
 - [ ] Morris, Sobol and the polynomial chaos run on independent inputs; a posterior goes to PRCC or propagation.
 - [ ] A stochastic engine has `replicates` and a `seed`.
+- [ ] Each quantity reads the series you mean: the level of an output that only grows peaks at the last position, its `Increments` at the largest gain of a window.
+- [ ] A quantity that is NaN is filtered with `where(mask)` only on a condition you can defend, and the summary is read as conditioned on it.
 - [ ] The intervals of Sobol are narrow enough to rank the inputs, and none is NaN (a bootstrap replicate of no variance); if not, raise `base_draws`.
 - [ ] The leave-one-out error of a polynomial chaos is small before you read its indices, and `predict` reads values inside the bounds of the inputs.
 

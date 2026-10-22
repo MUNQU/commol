@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Every figure takes `axes=`, the `Figure` of an earlier figure of commol, and draws each series on the panel of that series: each panel has the id of its series as the label of its `Axes`. A series with no panel raises `ValueError` that names it. See [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#several-results-on-one-figure).
 
+- A quantity of interest reads a series and reduces it. The series is a name or a list of names, their `Level`, or `Increments(outputs, window)`: the gain of their sum over each window that ends at a position. So `Peak(series=Increments("acc", window=7), positions=ends)` is the largest gain of `acc` over a window of 7, and `PeakPosition` with the same arguments the end of that window, with no class of their own. `commol` exports `Level` and `Increments`. See [Quantities of interest](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#quantities-of-interest).
+
+- `PropagationResult.where(mask)` keeps the runs where `mask` is true and renormalises their weights to sum to 1, and `PropagationResult.effective_size` gives Kish's effective size of the weights. A filter conditions the result on the condition of the mask.
+
 ### Changed
 
 - **Breaking:** each figure is a method of the results it draws, and `SimulationPlotter` is removed. Each figure returns the matplotlib `Figure`. A predictive gives its own figures, so no `Simulation` is built only to draw it. See [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting).
@@ -24,9 +28,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 | `SimulationPlotter.plot_prcc(result)`, `plot_morris`, `plot_sobol`, `plot_profiles`                                           | `result.plot()` of `PRCCResult`, `MorrisResult`, `SobolResult`, `ChaosResult` and `ProfileResult` |
 
 - **Breaking:** matplotlib draws the figures, and is the optional extra `commol[plot]` (`pip install 'commol[plot]'`); seaborn is no longer a dependency, and `import commol` loads no plotting library. Without matplotlib, a figure raises `ImportError` with the install line. The other keyword arguments of a figure go to `Axes.plot`, not to `seaborn.lineplot`.
+
 - **Breaking:** `PlotConfig.style` takes a matplotlib style or a list of styles, and `PlotConfig` has no `palette` and no `context`. The style sheets of matplotlib give the former values: `style="whitegrid", context="talk", palette="colorblind"` is `style=["seaborn-v0_8-whitegrid", "seaborn-v0_8-talk", "seaborn-v0_8-colorblind"]`. The presets (`presentation`, `publication`, `notebook`) use these sheets.
 
+- **Breaking:** `ValueAt`, `Peak`, `PeakPosition` and `Trajectory` take `series` in place of `outputs`: `ValueAt(outputs="B", at=10)` is `ValueAt(series="B", at=10)`. `Gain(outputs, start, end)` keeps `outputs`, and the outputs of a quantity read back as a list. The quantities live in `commol.context.inference.quantities`, and cross to Rust as the JSON of their classes.
+
+- Every reduction across runs raises `ValueError` on a quantity that is NaN: `PropagationResult.summary()`, `member_statistics`, `weighted_quantiles`, and Morris, Sobol and the polynomial chaos before they estimate, as PRCC did. The message of a method names the quantity, the points where it is NaN, and the point, inputs, replicate and seed of the first such run. `PropagationResult.values` keeps the NaN of each run.
+
 ### Fixed
+
+- A NaN in the values a `Peak` or a `PeakPosition` reads makes it NaN. The peak skipped the NaN, and the position of the peak was the first position when the value there was NaN.
+- A weighted quantile of values with a NaN raises `ValueError`, where it sorted the NaN by its sign bit and gave a wrong number.
 
 ## [0.7.0] - 2026-10-22
 

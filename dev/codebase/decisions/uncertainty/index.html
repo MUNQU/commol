@@ -18,7 +18,7 @@
         <link rel="prev" href="../calibration/">
       
       
-        <link rel="next" href="../local-approximations/">
+        <link rel="next" href="../sensitivity/">
       
       
         
@@ -2578,21 +2578,38 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#an-analysis-needs-no-data" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        An analysis needs no data
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3186,17 +3203,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#an-analysis-needs-no-data" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        An analysis needs no data
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -3571,41 +3577,6 @@ same <code>ConformalResult</code> as every variant.</p>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_conformal.rs</code>,
 <code>tests/uncertainty/test_conformal.py</code>, the studies of
 <code>tests/uncertainty/test_coverage.py</code>.</p>
-<h2 id="an-analysis-needs-no-data">An analysis needs no data<a class="headerlink" href="#an-analysis-needs-no-data" title="Permanent link">&para;</a></h2>
-<p><code>ForwardAnalysis</code> runs every method on <code>ForwardModel::unobserved</code> (values
-written as a calibration writes them). Quantities read the observation
-operator. A design point is the mean of its replicates on common seeds; a
-predictive or a propagation gives each replicate of each draw its own seed
-(<code>run_sets</code>), and each purpose has a stream (<code>stream_seed</code>). Morris, Sobol
-and chaos refuse a sample; PRCC reads its weights.</p>
-<table>
-<thead>
-<tr>
-<th>Alternative</th>
-<th>Why not</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>A problem with fake observations</td>
-<td>Invented data in a type that means a fit.</td>
-</tr>
-<tr>
-<td>Python callables as quantities</td>
-<td>Every run would return to Python, one at a time.</td>
-</tr>
-<tr>
-<td>Resampling a sample to equal weights</td>
-<td>Repeated draws that the test of PRCC counts as independent.</td>
-</tr>
-<tr>
-<td>Hermite polynomials for a normal input</td>
-<td>Every distribution is truncated, so they are not orthogonal.</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_global_sensitivity.rs</code>,
-<code>tests/uncertainty/test_sensitivity.py</code>.</p>
 
 
 
