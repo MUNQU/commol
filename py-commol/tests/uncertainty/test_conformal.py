@@ -77,14 +77,27 @@ def _variant_settings() -> dict[type, dict[str, object]]:
     return {
         SplitConformal: {
             "calibration_data": _held_out(range(21, 41), 2),
-            "level": 0.9,
+            "confidence_level": 0.9,
             "positions": [41.0],
         },
-        RollingConformal: {"origins": [10.0, 12.0], "level": 0.9, "positions": [41.0]},
-        JackknifePlus: {"block_length": 1, "level": 0.9, "positions": [41.0]},
-        EnbPI: {"replicates": 20, "block_length": 1, "level": 0.9, "positions": [41.0]},
+        RollingConformal: {
+            "origins": [10.0, 12.0],
+            "confidence_level": 0.9,
+            "positions": [41.0],
+        },
+        JackknifePlus: {
+            "block_length": 1,
+            "confidence_level": 0.9,
+            "positions": [41.0],
+        },
+        EnbPI: {
+            "replicates": 20,
+            "block_length": 1,
+            "confidence_level": 0.9,
+            "positions": [41.0],
+        },
         AdaptiveConformal: {
-            "level": 0.9,
+            "confidence_level": 0.9,
             "step": 0.01,
             "stream": _held_out(range(21, 41), 2),
         },
@@ -108,7 +121,7 @@ class TestScores:
                 calibration_data=held_out,
                 score="spread",
                 by="series",
-                level=0.8,
+                confidence_level=0.8,
                 positions=positions,
                 sample=sample,
             )
@@ -118,7 +131,7 @@ class TestScores:
                 calibration_data=held_out,
                 score="absolute",
                 by="series",
-                level=0.8,
+                confidence_level=0.8,
                 positions=positions,
             )
         )
@@ -190,7 +203,7 @@ class TestScores:
                 calibration_data=held_out,
                 score="absolute",
                 by="series",
-                level=0.9,
+                confidence_level=0.9,
                 positions=[45.0, 50.0],
             )
         )
@@ -214,7 +227,7 @@ class TestRollingConformal:
                 origins=[float(t) for t in range(20, 51)],
                 score="absolute",
                 by="series",
-                level=0.8,
+                confidence_level=0.8,
                 positions=[61.0, 62.0, 63.0, 64.0, 65.0, 66.0],
             )
         )
@@ -238,7 +251,7 @@ class TestRollingConformal:
                 origins=[5.0],
                 score="absolute",
                 by="series",
-                level=0.5,
+                confidence_level=0.5,
                 positions=[21.0, 22.0, 23.0],
             )
         )
@@ -277,7 +290,7 @@ class TestRollingConformal:
                     origins=[10.0],
                     score="absolute",
                     by="series",
-                    level=0.5,
+                    confidence_level=0.5,
                     positions=[21.0],
                 )
             )
@@ -299,7 +312,7 @@ class TestEnbPI:
                     block_length=1,
                     score="absolute",
                     by="series",
-                    level=0.9,
+                    confidence_level=0.9,
                     positions=[41.0],
                 )
             )
@@ -314,7 +327,7 @@ class TestAdaptiveConformal:
         # The noise of the flows grows from 1 to 3 after 100 points.
         noise = np.concatenate([rng.normal(0.0, 1.0, 100), rng.normal(0.0, 3.0, 500)])
         stream = flow_observations((C + noise).tolist(), windowed=True, start=31)
-        settings = {"score": "absolute", "by": "series", "level": 0.9}
+        settings = {"score": "absolute", "by": "series", "confidence_level": 0.9}
 
         adaptive = calibrator.uncertainty(
             AdaptiveConformal(**settings, step=0.02, stream=stream)
@@ -368,11 +381,10 @@ class TestResults:
         }[variant]
 
         result = calibrator.uncertainty(
-            variant(**settings, score="absolute", by="series", level=0.5)
+            variant(**settings, score="absolute", by="series", confidence_level=0.5)
         )
 
         assert assumption in result.guarantee, result.guarantee
-        assert result.intervals.level == 0.5
         assert list(result.scores) == ["B"]
 
 
@@ -410,7 +422,7 @@ class TestFailures:
                     ),
                     score="absolute",
                     by="series",
-                    level=0.5,
+                    confidence_level=0.5,
                     positions=[40.0],
                 )
             )
@@ -433,7 +445,26 @@ class TestFailures:
                     origins=[2.0],
                     score="absolute",
                     by="series",
-                    level=0.5,
+                    confidence_level=0.5,
                     positions=[41.0],
                 )
             )
+
+
+def test_a_conformal_method_takes_a_confidence_level() -> None:
+    values = (C + np.random.default_rng(5).normal(0.0, 1.0, 50)).tolist()
+    calibrator = flow_calibrator(values[:30], windowed=True)
+    later = flow_observations(values[30:], windowed=True, start=31)
+
+    result = calibrator.uncertainty(
+        SplitConformal(
+            calibration_data=later,
+            positions=[51.0],
+            score="absolute",
+            by="series",
+            confidence_level=0.5,
+        )
+    )
+
+    assert result.intervals.confidence_level == 0.5
+    assert "probability at least 0.5 " in result.guarantee

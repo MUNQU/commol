@@ -1023,6 +1023,18 @@ fn weighted_quantiles(values: Vec<f64>, weights: Vec<f64>, levels: Vec<f64>) -> 
         .map_err(|error| value_error(error.to_string()))
 }
 
+/// The two quantiles of the central interval of `confidence_level`
+///
+/// The one check of a confidence level.
+///
+/// Raises:
+///     ValueError: If `confidence_level` is not strictly between 0 and 1
+#[pyfunction]
+fn interval_levels(confidence_level: f64) -> PyResult<(f64, f64)> {
+    let [lower, upper] = statistics::interval_levels(confidence_level).map_err(value_error)?;
+    Ok((lower, upper))
+}
+
 /// The weighted mean of `values`, one weight per value and some positive
 #[pyfunction]
 fn weighted_mean(values: Vec<f64>, weights: Vec<f64>) -> f64 {
@@ -1066,6 +1078,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyJackknifeRun>()?;
     m.add_function(wrap_pyfunction!(quantile_error, m)?)?;
     m.add_function(wrap_pyfunction!(weighted_quantiles, m)?)?;
+    m.add_function(wrap_pyfunction!(interval_levels, m)?)?;
     m.add_function(wrap_pyfunction!(by_series, m)?)?;
     m.add_function(wrap_pyfunction!(weighted_mean, m)?)?;
     crate::identifiability::register(m)?;

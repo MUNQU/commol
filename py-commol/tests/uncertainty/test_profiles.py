@@ -214,14 +214,9 @@ class TestThresholds:
         bootstrap = BayesianBootstrap(replicates=5, block_length=1)
 
         with pytest.raises(ValidationError, match="no other"):
-            Threshold(kind="beale", level=0.9, bootstrap=bootstrap)
+            Threshold(kind="beale", confidence_level=0.9, bootstrap=bootstrap)
         with pytest.raises(ValidationError, match="no other"):
-            Threshold(kind="bootstrap_calibrated", level=0.9)
-
-    @pytest.mark.parametrize("level", [0.0, 1.0])
-    def test_a_level_is_strictly_between_0_and_1(self, level: float) -> None:
-        with pytest.raises(ValueError, match="level"):
-            Threshold.chi_square(level)
+            Threshold(kind="bootstrap_calibrated", confidence_level=0.9)
 
 
 class TestPredictionProfiles:
@@ -350,3 +345,18 @@ class TestUnreachable:
         assert 0.0 <= min(profile.values) and max(profile.values) <= 100.0
         assert result.intervals["B"] == ProfileInterval(lower=None, upper=None)
         assert result.verdicts["B"] == "practically_non_identifiable"
+
+
+def test_a_threshold_takes_a_confidence_level() -> None:
+    calibrator = line_calibrator(
+        VALUES, observation_models={"B": NormalObservations(sd=1.0)}
+    )
+    threshold = Threshold.chi_square(confidence_level=0.9)
+
+    result = calibrator.uncertainty(
+        ProfileLikelihood(parameters=["c"], threshold=threshold, max_steps=100)
+    )
+
+    z = NormalDist().inv_cdf(0.95)
+    assert result.profiles["c"].threshold == pytest.approx(z**2 / 2)
+    assert [section.confidence_level for section in result.report().profile] == [0.9]

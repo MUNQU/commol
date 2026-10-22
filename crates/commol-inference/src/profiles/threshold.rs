@@ -17,26 +17,19 @@ use crate::resampling::{ReplicateRunner, Resampler};
 use crate::special::{f_one_quantile, normal_quantile};
 use crate::statistics;
 
-fn check_level(level: f64) -> Result<(), String> {
-    if level > 0.0 && level < 1.0 {
-        Ok(())
-    } else {
-        Err(format!("A level is strictly between 0 and 1, got {level}"))
-    }
-}
-
-/// `½ χ²₁(level)`: the threshold of `−log L` for a pointwise interval of
-/// level `level` (Wilks).
+/// `½ χ²₁(confidence_level)`: the threshold of `−log L` for a pointwise
+/// interval of `confidence_level` (Wilks).
 ///
 /// # Errors
 ///
 /// Returns a message when the problem has a loss instead of observation
-/// models, or `level` is not strictly between 0 and 1.
+/// models, or `confidence_level` is not strictly between 0 and 1
+/// ([`statistics::interval_levels`]).
 pub fn chi_square<E: SimulationEngine>(
     problem: &CalibrationProblem<E>,
-    level: f64,
+    confidence_level: f64,
 ) -> Result<f64, String> {
-    check_level(level)?;
+    statistics::interval_levels(confidence_level)?;
     if problem.discrepancy().likelihood().is_none() {
         return Err(
             "The chi-square threshold reads −log L and needs observation models; the problem \
@@ -45,26 +38,26 @@ pub fn chi_square<E: SimulationEngine>(
                 .to_string(),
         );
     }
-    let z = normal_quantile((1.0 + level) / 2.0);
+    let z = normal_quantile((1.0 + confidence_level) / 2.0);
     Ok(z * z / 2.0)
 }
 
 /// Beale's threshold of a sum of squares, for one parameter or prediction:
-/// `S(θ̂) · F(1, n − p; level) / (n − p)`, with `n` the observations of
-/// positive weight and `p` the parameters. It is exact for a linear model
-/// with independent Gaussian errors of one variance.
+/// `S(θ̂) · F(1, n − p; confidence_level) / (n − p)`, with `n` the
+/// observations of positive weight and `p` the parameters. It is exact for
+/// a linear model with independent Gaussian errors of one variance.
 ///
 /// # Errors
 ///
 /// Returns a message when the problem has no sum of squares (another loss,
 /// or observation models), it has no more observations than parameters, or
-/// `level` is not strictly between 0 and 1.
+/// `confidence_level` is not strictly between 0 and 1.
 pub fn beale<E: SimulationEngine>(
     problem: &CalibrationProblem<E>,
     fit_loss: f64,
-    level: f64,
+    confidence_level: f64,
 ) -> Result<f64, String> {
-    check_level(level)?;
+    statistics::interval_levels(confidence_level)?;
     if problem.discrepancy().loss() != Some(LossConfig::SumSquaredError) {
         return Err(
             "Beale's threshold reads a sum of squares; the problem needs the loss 'sse'"
@@ -85,13 +78,13 @@ pub fn beale<E: SimulationEngine>(
         ));
     }
     let nu = (n - p) as f64;
-    Ok(fit_loss * f_one_quantile(nu, level) / nu)
+    Ok(fit_loss * f_one_quantile(nu, confidence_level) / nu)
 }
 
 /// The thresholds of a bootstrap, one per quantity.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BootstrapThresholds {
-    /// The quantile `level` of the rises of each quantity.
+    /// The quantile `confidence_level` of the rises of each quantity.
     pub thresholds: Vec<f64>,
     /// The rise of each quantity on each replicate that did not fail, in
     /// the order of `replicates`.
@@ -111,25 +104,25 @@ pub struct BootstrapThresholds {
 /// ([`ReplicateRunner::fit_one`], giving `θ̂_b` and its loss `L_b(θ̂_b)`),
 /// and each quantity is held at its center on the replicate's data from
 /// `θ̂_b`: the rise is `PL_b(center) − L_b(θ̂_b)`, at least 0. The threshold
-/// of a quantity is the quantile `level` of its rises. Replicates run in
-/// parallel.
+/// of a quantity is the quantile `confidence_level` of its rises.
+/// Replicates run in parallel.
 ///
 /// # Errors
 ///
-/// Returns a message when `level` is not strictly between 0 and 1, the
-/// lengths differ, or every replicate fails.
+/// Returns a message when `confidence_level` is not strictly between 0 and
+/// 1, the lengths differ, or every replicate fails.
 pub fn bootstrap_thresholds<E>(
     runner: &ReplicateRunner<'_, E>,
     resampler: &dyn Resampler,
     replicates: usize,
     quantities: &[ProfiledQuantity],
     centers: &[f64],
-    level: f64,
+    confidence_level: f64,
 ) -> Result<BootstrapThresholds, String>
 where
     E: SimulationEngine + Send + Sync,
 {
-    check_level(level)?;
+    statistics::interval_levels(confidence_level)?;
     if quantities.len() != centers.len() {
         return Err(format!(
             "One center per quantity: {} quantities, {} centers",
@@ -189,7 +182,7 @@ where
     let thresholds = rises
         .iter()
         .map(|column| {
-            statistics::quantiles(column, &weights, &[level])
+            statistics::quantiles(column, &weights, &[confidence_level])
                 .expect("a rise of the profile of a fit is a number")[0]
         })
         .collect();

@@ -425,7 +425,7 @@ fn a_swarm_with_mutation_a_target_and_an_observer_runs() {
         ),
     ] {
         let config = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
-            num_particles: 5,
+            particles: 5,
             max_iterations: 20,
             target_cost: Some(1e-8),
             mutation_strategy: strategy,
@@ -446,7 +446,7 @@ fn a_particle_swarm_with_a_stop_rule_converges() {
     let problem = problem(vec![]).unwrap();
     let swarm = |improvement_stop, radius_stop| {
         OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
-            num_particles: 10,
+            particles: 10,
             max_iterations: 1000,
             seed: Some(3),
             improvement_stop,

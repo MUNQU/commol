@@ -34,7 +34,7 @@ use rayon::prelude::*;
 use super::TemperedTarget;
 use super::kernel::Kernel;
 use crate::distribution::open_uniform;
-use crate::statistics::{effective_size, normalized_weights};
+use crate::statistics::{check_open_unit, effective_size, normalized_weights};
 
 /// One step of a run.
 #[derive(Debug, Clone, PartialEq)]
@@ -177,8 +177,8 @@ impl<K: Kernel> SmcSampler<K> {
                 "resample_threshold must be in (0, 1], got {resample_threshold}"
             ));
         }
-        check_share("target_cess", target_cess)?;
-        check_share("stay_probability", stay_probability)?;
+        check_open_unit("target_cess", target_cess)?;
+        check_open_unit("stay_probability", stay_probability)?;
         Ok(Self {
             particles,
             kernel,
@@ -197,7 +197,7 @@ impl<K: Kernel> SmcSampler<K> {
     /// Returns a message when `min_acceptance` is not strictly between 0
     /// and 1.
     pub fn with_min_acceptance(mut self, min_acceptance: f64) -> Result<Self, String> {
-        check_share("min_acceptance", min_acceptance)?;
+        check_open_unit("min_acceptance", min_acceptance)?;
         self.min_acceptance = Some(min_acceptance);
         Ok(self)
     }
@@ -470,16 +470,6 @@ fn move_count(stay_probability: f64, acceptance_rate: f64) -> usize {
     }
 }
 
-fn check_share(name: &str, value: f64) -> Result<(), String> {
-    if value > 0.0 && value < 1.0 {
-        Ok(())
-    } else {
-        Err(format!(
-            "{name} must be strictly between 0 and 1, got {value}"
-        ))
-    }
-}
-
 /// Log weights that sum to 1 on the weight scale.
 fn normalized_log_weights(log_weights: &[f64]) -> Vec<f64> {
     normalized_weights(log_weights)
@@ -563,7 +553,7 @@ pub fn abc_rejection<T: TemperedTarget>(
     quantile: f64,
     seed: u64,
 ) -> Result<SmcRun, String> {
-    check_share("quantile", quantile)?;
+    check_open_unit("quantile", quantile)?;
     let sampler = SmcSampler::new(draws, super::RandomWalk::new(), 1.0, quantile, 0.5)
         .map_err(|error| error.replace("particles", "draws"))?;
     let mut state = sampler.start(target, seed)?;

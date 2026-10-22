@@ -49,7 +49,7 @@ def _log_failed(run: "ConformalRunProtocol") -> None:
 
 
 def _result(
-    run: "ConformalRunProtocol", level: float, guarantee: str
+    run: "ConformalRunProtocol", confidence_level: float, guarantee: str
 ) -> ConformalResult:
     series: dict[str, dict[str, list[float]]] = {}
     unbounded: dict[str, list[float]] = {}
@@ -70,7 +70,7 @@ def _result(
         scores.setdefault(label, []).append(score)
     return ConformalResult(
         intervals=PredictionIntervals(
-            level=level,
+            confidence_level=confidence_level,
             series={
                 label: SeriesIntervals(**values) for label, values in series.items()
             },
@@ -109,13 +109,13 @@ def run_split_conformal(
         method.positions,
         method.score,
         method.by,
-        method.level,
+        method.confidence_level,
     )
     return _result(
         run,
-        method.level,
+        method.confidence_level,
         f"Each interval covers a new observation with probability at least "
-        f"{method.level} when its score and the scores of the held-out "
+        f"{method.confidence_level} when its score and the scores of the held-out "
         f"observations are exchangeable.",
     )
 
@@ -148,16 +148,16 @@ def run_rolling_conformal(
         method.positions,
         method.score,
         method.by,
-        method.level,
+        method.confidence_level,
         method.starts,
         calibrator.seed,
     )
     _log_failed(run)
     return _result(
         run,
-        method.level,
+        method.confidence_level,
         f"Each interval covers a new observation at its horizon with probability "
-        f"at least {method.level} when the scores of that horizon are "
+        f"at least {method.confidence_level} when the scores of that horizon are "
         f"exchangeable across origins.",
     )
 
@@ -190,14 +190,14 @@ def run_jackknife_plus(
         method.positions,
         method.score,
         method.by,
-        method.level,
+        method.confidence_level,
         method.starts,
         calibrator.seed,
     )
     _log_failed(run)
     return _result(
         run,
-        method.level,
+        method.confidence_level,
         f"Each interval covers a new observation with probability at least "
         f"{run.bound:.4g} when the blocks are exchangeable: the CV+ bound of "
         f"Barber et al. (2021) with K = {run.blocks} blocks of "
@@ -233,16 +233,16 @@ def run_enbpi(calibrator: "Calibrator", method: EnbPI) -> ConformalResult:
         method.positions,
         method.score,
         method.by,
-        method.level,
+        method.confidence_level,
         method.starts,
         calibrator.seed,
     )
     _log_failed(run)
     return _result(
         run,
-        method.level,
+        method.confidence_level,
         f"Each interval covers a new observation with probability near "
-        f"{method.level}, approximately, when the errors are stationary and "
+        f"{method.confidence_level}, approximately, when the errors are stationary and "
         f"strongly mixing (Xu and Xie 2021); blocks of {run.block_length} "
         f"positions.",
     )
@@ -276,13 +276,13 @@ def run_adaptive_conformal(
         method.step,
         method.score,
         method.by,
-        method.level,
+        method.confidence_level,
     )
     return _result(
         run,
-        method.level,
+        method.confidence_level,
         f"The long-run share of the stream outside its intervals tends to "
-        f"{1 - method.level:.4g}, with no assumption on the data (Gibbs and "
+        f"{1 - method.confidence_level:.4g}, with no assumption on the data (Gibbs and "
         f"Candès 2021); it says nothing about one interval.",
     )
 

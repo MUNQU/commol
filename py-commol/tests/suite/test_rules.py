@@ -1,19 +1,25 @@
 """Check the rules of the test suite that a program can judge: every test
 checks a result, every expected failure names the issue that fixes it, and no
-test takes over its time budget unless the test conventions give its reason.
-The rules are in ``docs/codebase/tests.md``."""
+test takes over its time budget unless the test conventions give its reason,
+and every public setting of commol has the one name of its meaning. The rules
+are in ``docs/codebase/tests.md`` and ``docs/codebase/conventions.md``."""
 
 import ast
+import inspect
 import re
 import subprocess
 import sys
 import tomllib
+import typing
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import coverage
 import pytest
+from pydantic import BaseModel
+
+import commol
 
 from tests.suite.durations import DURATIONS
 
@@ -507,3 +513,69 @@ def test_no_coverage_profile_is_tracked() -> None:
 
     assert not tracked, f"Remove the coverage profiles from git: {tracked}"
     assert ignored == profiles
+
+
+# Names
+
+OLD_NAMES = {"num_particles", "base_draws"}
+"""Names of a count that every other method writes as a plain plural noun."""
+
+QUANTILE_LEVELS = {"Quantile", "Quantile.__init__"}
+"""The settings whose ``level`` is the level of a quantile, not of an interval."""
+
+
+def model_classes(annotation: object) -> Iterator[type[BaseModel]]:
+    """The pydantic models of commol that ``annotation`` names, nested or not."""
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        if annotation.__module__.startswith("commol."):
+            yield annotation
+        return
+    for argument in typing.get_args(getattr(annotation, "__value__", annotation)):
+        yield from model_classes(argument)
+
+
+def arguments(owner: str, function: object) -> Iterator[tuple[str, str]]:
+    """Each argument of ``function``, a method of a class or a function, as
+    ``(owner, name)``."""
+    if isinstance(function, classmethod | staticmethod):
+        function = function.__func__
+    if inspect.isfunction(function):
+        for argument in inspect.signature(function).parameters:
+            yield owner, argument
+
+
+def public_settings() -> Iterator[tuple[str, str]]:
+    """Each field of a public pydantic model, and of the models its fields
+    hold, and each argument of a public function or method, as ``(owner,
+    name)``."""
+    seen: set[type] = set()
+    pending: list[object] = [getattr(commol, name) for name in commol.__all__]
+    while pending:
+        item = pending.pop()
+        if not isinstance(item, type):
+            yield from arguments(getattr(item, "__qualname__", ""), item)
+            continue
+        if item in seen:
+            continue
+        seen.add(item)
+        if issubclass(item, BaseModel):
+            for name, field in item.model_fields.items():
+                yield item.__name__, name
+                pending.extend(model_classes(field.annotation))
+        for attribute, member in vars(item).items():
+            if not attribute.startswith("_") or attribute == "__init__":
+                yield from arguments(f"{item.__name__}.{attribute}", member)
+
+
+def test_a_setting_has_one_name() -> None:
+    """A count is a plain plural noun and the level of an interval is
+    ``confidence_level``, in every public setting of commol."""
+    wrong = sorted(
+        f"{owner}: {name}"
+        for owner, name in public_settings()
+        if name in OLD_NAMES or (name == "level" and owner not in QUANTILE_LEVELS)
+    )
+    assert not wrong, (
+        "Name a count with a plural noun (particles, draws, replicates) and the "
+        "level of an interval confidence_level:\n" + "\n".join(wrong)
+    )

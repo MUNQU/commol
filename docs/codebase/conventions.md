@@ -43,6 +43,10 @@ check some of these rules. The rest depend on the author and the reviewer.
   class (`Priors.uniform_on_bounds()`, `PlotConfig.publication()`,
   `ParameterSample.equally_weighted(...)`, `AxisPattern.pulse(...)`); it
   never returns an instance of another class, such as a subclass.
+- A setting keeps the name its meaning has elsewhere: `confidence_level` for
+  the level of an interval, a plural noun for a count. See
+  [Design decisions](decisions/results.md#a-setting-has-one-name-and-one-check);
+  `tests/suite/test_rules.py::test_a_setting_has_one_name` checks it.
 - Context data structures are Pydantic v2 models.
 - `ModelBuilder` methods return `Self`, so calls chain.
 - Log with the standard `logging` module. Library code never writes to the

@@ -558,7 +558,7 @@ impl PyParticleSwarmConfig {
     /// Create Particle Swarm Optimization configuration
     ///
     /// Args:
-    ///     num_particles: Number of particles in the swarm (default: 20)
+    ///     particles: Number of particles in the swarm (default: 20)
     ///     max_iterations: Maximum number of iterations (default: 1000)
     ///     verbose: Enable verbose output (default: false)
     ///     inertia: Optional inertia strategy (PSOInertiaConstant or PSOInertiaChaotic)
@@ -570,10 +570,10 @@ impl PyParticleSwarmConfig {
     ///     improvement_stop: Optional improvement stop rule, `(window, tol_abs, tol_rel)`
     ///     radius_stop: Optional tolerance of the radius stop rule
     #[new]
-    #[pyo3(signature = (num_particles=20, max_iterations=1000, verbose=false, inertia=None, acceleration=None, mutation=None, velocity=None, initialization="uniform", seed=None, improvement_stop=None, radius_stop=None))]
+    #[pyo3(signature = (particles=20, max_iterations=1000, verbose=false, inertia=None, acceleration=None, mutation=None, velocity=None, initialization="uniform", seed=None, improvement_stop=None, radius_stop=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
-        num_particles: usize,
+        particles: usize,
         max_iterations: u64,
         verbose: bool,
         inertia: Option<PyInertia>,
@@ -601,7 +601,7 @@ impl PyParticleSwarmConfig {
             ),
         };
         let config = commol_calibration::ParticleSwarmConfig {
-            num_particles,
+            particles,
             max_iterations,
             target_cost: None,
             inertia_strategy: inertia.map(|inertia| match inertia {

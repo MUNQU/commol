@@ -121,12 +121,7 @@ class BootstrapResult(BaseModel):
         ValueError
             If the confidence level is not strictly between 0 and 1.
         """
-        if not 0.0 < confidence_level < 1.0:
-            raise ValueError(
-                f"A confidence level is strictly between 0 and 1, got "
-                f"{confidence_level}."
-            )
-        low, high = (1.0 - confidence_level) / 2.0, (1.0 + confidence_level) / 2.0
+        low, high = commol_rs.inference.interval_levels(confidence_level)
         errors: dict[str, BoundError] = {}
         for index, name in enumerate(self.sample.names):
             column = [row[index] for row in self.sample.values]

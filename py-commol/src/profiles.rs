@@ -245,7 +245,7 @@ pub struct PyProfileRun {
 ///     parameters: The indices of the parameters to profile
 ///     predictions: The predictions to profile
 ///     threshold: "chi_square", "beale" or "bootstrap"
-///     level: The level of the threshold
+///     confidence_level: The level of the threshold
 ///     max_steps: The most points on each side of a profile
 ///     seed: The seed of the bootstrap and of a particle swarm
 ///     bootstrap: The bootstrap of a "bootstrap" threshold
@@ -256,7 +256,7 @@ pub struct PyProfileRun {
 ///     RuntimeError: If a refit fails, or every replicate of the bootstrap
 ///         fails
 #[pyfunction]
-#[pyo3(signature = (problem, config, fit, parameters, predictions, threshold, level, max_steps, seed, bootstrap=None))]
+#[pyo3(signature = (problem, config, fit, parameters, predictions, threshold, confidence_level, max_steps, seed, bootstrap=None))]
 #[allow(clippy::too_many_arguments)]
 fn trace_profiles(
     py: Python<'_>,
@@ -266,7 +266,7 @@ fn trace_profiles(
     parameters: Vec<usize>,
     predictions: Vec<PyObservedDataPoint>,
     threshold: &str,
-    level: f64,
+    confidence_level: f64,
     max_steps: usize,
     seed: u64,
     bootstrap: Option<PyRef<'_, PyBootstrapSettings>>,
@@ -287,10 +287,11 @@ fn trace_profiles(
     let mut failed = Vec::new();
     let thresholds = match (threshold, bootstrap) {
         ("chi_square", None) => {
-            vec![chi_square(problem_ref, level).map_err(value_error)?; quantities.len()]
+            vec![chi_square(problem_ref, confidence_level).map_err(value_error)?; quantities.len()]
         }
         ("beale", None) => vec![
-            beale(problem_ref, tracer.fit_loss(), level).map_err(value_error)?;
+            beale(problem_ref, tracer.fit_loss(), confidence_level)
+                .map_err(value_error)?;
             quantities.len()
         ],
         ("bootstrap", Some(settings)) => {
@@ -311,7 +312,7 @@ fn trace_profiles(
                     count,
                     &quantities,
                     &centers,
-                    level,
+                    confidence_level,
                 )
             })?
             .map_err(PyRuntimeError::new_err)?;

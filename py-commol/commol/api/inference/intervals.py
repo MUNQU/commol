@@ -30,16 +30,8 @@ def ci_percentiles(confidence_level: float) -> tuple[float, float]:
     ValueError
         If ``confidence_level`` is not strictly between 0 and 1.
     """
-    if not 0.0 < confidence_level < 1.0:
-        raise ValueError(
-            f"confidence_level must be strictly between 0 and 1, got "
-            f"{confidence_level}. Note this is a fraction, not a percentage: "
-            f"use 0.95 for a 95% interval."
-        )
-    return (
-        (1.0 - confidence_level) / 2.0 * 100.0,
-        (1.0 + confidence_level) / 2.0 * 100.0,
-    )
+    lower, upper = commol_rs.inference.interval_levels(confidence_level)
+    return lower * 100.0, upper * 100.0
 
 
 def weighted_quantiles(

@@ -244,7 +244,7 @@ class PSOVelocityProtocol(Protocol):
 class ParticleSwarmConfigProtocol(Protocol):
     def __init__(
         self,
-        num_particles: int = 20,
+        particles: int = 20,
         max_iterations: int = 1000,
         verbose: bool = False,
         inertia: PSOInertiaConstantProtocol | PSOInertiaChaoticProtocol | None = None,
@@ -812,8 +812,8 @@ class ForwardAnalysisProtocol(Protocol):
     ) -> tuple[list[list[float]], list[list[float]], list[list[float]], int]: ...
     def sobol(
         self,
-        base: int,
-        bootstrap: int,
+        draws: int,
+        replicates: int,
         confidence_level: float,
         quantities: str,
     ) -> SobolRunProtocol: ...
@@ -853,7 +853,7 @@ class InferenceModule(Protocol):
         parameters: list[int],
         predictions: list[ObservedDataPointProtocol],
         threshold: str,
-        level: float,
+        confidence_level: float,
         max_steps: int,
         seed: int,
         bootstrap: BootstrapSettingsProtocol | None = None,
@@ -881,6 +881,7 @@ class InferenceModule(Protocol):
     def weighted_quantiles(
         self, values: list[float], weights: list[float], levels: list[float]
     ) -> list[float]: ...
+    def interval_levels(self, confidence_level: float) -> tuple[float, float]: ...
     def weighted_mean(self, values: list[float], weights: list[float]) -> float: ...
     def quantities_as_read(self, json: str) -> str: ...
     def quantity_schedule(self, json: str) -> list[float]: ...
@@ -1032,7 +1033,7 @@ class InferenceModule(Protocol):
         positions: list[float],
         score: str,
         by: str,
-        level: float,
+        confidence_level: float,
     ) -> ConformalRunProtocol: ...
     def rolling_conformal(
         self,
@@ -1043,7 +1044,7 @@ class InferenceModule(Protocol):
         positions: list[float],
         score: str,
         by: str,
-        level: float,
+        confidence_level: float,
         starts: int,
         seed: int,
     ) -> ConformalRunProtocol: ...
@@ -1056,7 +1057,7 @@ class InferenceModule(Protocol):
         positions: list[float],
         score: str,
         by: str,
-        level: float,
+        confidence_level: float,
         starts: int,
         seed: int,
     ) -> ConformalRunProtocol: ...
@@ -1070,7 +1071,7 @@ class InferenceModule(Protocol):
         positions: list[float],
         score: str,
         by: str,
-        level: float,
+        confidence_level: float,
         starts: int,
         seed: int,
     ) -> ConformalRunProtocol: ...
@@ -1083,7 +1084,7 @@ class InferenceModule(Protocol):
         step: float,
         score: str,
         by: str,
-        level: float,
+        confidence_level: float,
     ) -> ConformalRunProtocol: ...
 
 class MathExpressionProtocol(Protocol):

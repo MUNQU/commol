@@ -58,8 +58,8 @@ def _sobol(_: Calibrator) -> object:
     analysis = SensitivityAnalysis(simulation, inputs, seed=7)
     return analysis.run(
         Sobol(
-            base_draws=64,
-            bootstrap=10,
+            draws=64,
+            replicates=10,
             confidence_level=0.9,
             quantities=[ValueAt(series=["x", "y"], at=5.0)],
         )

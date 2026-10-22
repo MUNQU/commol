@@ -137,16 +137,17 @@ noise.
 
 | Threshold | Statistic | Assumes |
 |---|---|---|
-| `Threshold.chi_square(level)` | `−log L` of observation models | The models hold, and `2 × statistic` is near `χ²₁` (Wilks); it gives `½ χ²₁(level)`. It needs observation models |
-| `Threshold.beale(level)` | A sum of squares, the loss `"sse"` | Independent Gaussian errors of one variance: `S(θ̂) · F(1, n − p; level) / (n − p)`, exact for a model linear in its parameters |
-| `Threshold.bootstrap_calibrated(bootstrap, level)` | Any loss | That the bootstrap mimics how the data vary |
+| `Threshold.chi_square(confidence_level)` | `−log L` of observation models | The models hold, and `2 × statistic` is near `χ²₁` (Wilks); it gives `½ χ²₁(confidence_level)`. It needs observation models |
+| `Threshold.beale(confidence_level)` | A sum of squares, the loss `"sse"` | Independent Gaussian errors of one variance: `S(θ̂) · F(1, n − p; confidence_level) / (n − p)`, exact for a model linear in its parameters |
+| `Threshold.bootstrap_calibrated(bootstrap, confidence_level)` | Any loss | That the bootstrap mimics how the data vary |
 
 The bootstrap threshold calibrates the statistic itself (prepivoting, Beran
 1988). Each replicate of `bootstrap` is the replicate
 `Calibrator.uncertainty(bootstrap)` makes from the problem's seed. It is fitted
 (`θ̂_b`), then fitted again with the quantity held at its value at the fit of
 the original data; the rise of the replicate is `PL_b(θ̂ⱼ) − L_b(θ̂_b)`. The
-threshold of the quantity is the quantile `level` of the rises, so each
+threshold of the quantity is the quantile `confidence_level` of the rises, so
+each
 parameter gets its own. It costs one fit and one refit per quantity for each
 replicate. Any bootstrap of [Resampling](resampling.md) works, and the
 [parametric bootstrap](observation-models.md#maximum-likelihood-against-the-posterior)

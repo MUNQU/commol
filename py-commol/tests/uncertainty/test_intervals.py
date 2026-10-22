@@ -1,9 +1,33 @@
-"""The one confidence-interval convention: weighted quantiles in Rust."""
+"""The one confidence-interval convention: weighted quantiles in Rust, and
+one check of every confidence level."""
+
+import re
+from collections.abc import Callable
 
 import numpy as np
 import pytest
 
-from commol import ci_percentiles, member_statistics, weighted_quantiles
+from commol import (
+    BayesianBootstrap,
+    BootstrapCoverageEta,
+    BootstrapResult,
+    InputSpace,
+    ObservedDataPoint,
+    ParameterSample,
+    PropagationResult,
+    SampleMethod,
+    Scenarios,
+    SensitivityAnalysis,
+    Simulation,
+    Sobol,
+    SplitConformal,
+    Threshold,
+    ValueAt,
+    ci_percentiles,
+    member_statistics,
+    weighted_quantiles,
+)
+from tests.support import abc_builder, bounded, build
 
 
 class TestCiPercentiles:
@@ -18,17 +42,6 @@ class TestCiPercentiles:
     def test_width_matches_the_confidence_level(self) -> None:
         lower, upper = ci_percentiles(0.8)
         assert upper - lower == pytest.approx(80.0)
-
-    @pytest.mark.parametrize("confidence_level", [0.0, 1.0, -0.1, 1.5, 95.0])
-    def test_out_of_range_confidence_level_is_rejected(
-        self, confidence_level: float
-    ) -> None:
-        with pytest.raises(ValueError, match="strictly between 0 and 1"):
-            ci_percentiles(confidence_level)
-
-    def test_percentage_mistake_is_called_out(self) -> None:
-        with pytest.raises(ValueError, match="fraction, not a percentage"):
-            ci_percentiles(95.0)
 
 
 class TestMemberStatistics:
@@ -100,10 +113,6 @@ class TestMemberStatistics:
         with pytest.raises(ValueError, match="at least one ensemble member"):
             member_statistics([], 0.95)
 
-    def test_out_of_range_confidence_level_is_rejected(self) -> None:
-        with pytest.raises(ValueError, match="strictly between 0 and 1"):
-            member_statistics([1.0, 2.0], 1.0)
-
 
 class TestWeightedQuantiles:
     """The quantile of commol, by its definition."""
@@ -147,3 +156,72 @@ class TestWeightedQuantiles:
     def test_no_positive_weight_is_rejected(self) -> None:
         with pytest.raises(ValueError, match="positive weight"):
             weighted_quantiles([1.0], [0.5], [0.0])
+
+
+LEVEL_MESSAGE = (
+    "confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95% interval"
+)
+
+
+def _sample() -> ParameterSample:
+    return ParameterSample(
+        names=["k1"],
+        bounds=[(0.0, 0.5)],
+        values=[[0.2], [0.3]],
+        log_weights=[0.0, 0.0],
+        method=SampleMethod(name="test"),
+    )
+
+
+def _scenarios() -> Scenarios:
+    analysis = SensitivityAnalysis(
+        Simulation(build(abc_builder())),
+        InputSpace.uniform_on_bounds([bounded("k1", 0.0, 0.5)]),
+    )
+    return Scenarios(analysis, _sample(), {"base": {}, "slow": {"k2": 0.02}}, [0, 1])
+
+
+ONE = [ValueAt(series="C", at=1)]
+
+TAKES_A_LEVEL: dict[str, Callable[[float], object]] = {
+    "ci_percentiles": ci_percentiles,
+    "member_statistics": lambda c: member_statistics([1.0, 2.0], c),
+    "ParameterSample.interval": lambda c: _sample().interval(c),
+    "BootstrapResult.interval_error": (
+        lambda c: BootstrapResult.model_construct().interval_error(c)
+    ),
+    "PropagationResult.summary": lambda c: PropagationResult(
+        sample=_sample(),
+        labels=["x"],
+        values=[[1.0], [2.0]],
+        weights=[0.5, 0.5],
+        draw_seeds=[1, 2],
+    ).summary(c),
+    "Scenarios.summary": lambda c: _scenarios().summary("base", ONE, c),
+    "Scenarios.compare": lambda c: _scenarios().compare("slow", "base", ONE, c),
+    "Threshold": lambda c: Threshold(kind="beale", confidence_level=c),
+    "Threshold.chi_square": Threshold.chi_square,
+    "Threshold.beale": Threshold.beale,
+    "Threshold.bootstrap_calibrated": lambda c: Threshold.bootstrap_calibrated(
+        BayesianBootstrap(replicates=5, block_length=1), c
+    ),
+    "SplitConformal": lambda c: SplitConformal(
+        calibration_data=[ObservedDataPoint(at=1, output="B", value=1.0)],
+        positions=[2.0],
+        score="absolute",
+        by="all",
+        confidence_level=c,
+    ),
+    "Sobol": lambda c: Sobol(draws=8, replicates=2, confidence_level=c, quantities=ONE),
+    "BootstrapCoverageEta": lambda c: BootstrapCoverageEta(
+        replicates=2, block_length=1, confidence_level=c
+    ),
+}
+
+
+@pytest.mark.parametrize("takes_a_level", TAKES_A_LEVEL.values(), ids=TAKES_A_LEVEL)
+def test_every_confidence_level_has_one_check(
+    takes_a_level: Callable[[float], object],
+) -> None:
+    with pytest.raises(ValueError, match=re.escape(LEVEL_MESSAGE)):
+        takes_a_level(1.5)

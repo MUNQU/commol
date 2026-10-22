@@ -22,15 +22,15 @@ use crate::resampling::{BlockScheme, Perturbation, ReplicateRunner};
 use crate::statistics;
 
 /// The coverage jackknife+ guarantees under exchangeable blocks, with `n`
-/// scored observations in `k` blocks and `α = 1 − level`: the bound of
+/// scored observations in `k` blocks and `α = 1 − confidence_level`: the bound of
 /// K-fold CV+ (Barber et al. 2021, Theorem 4),
 /// `1 − 2α − min{2(1 − 1/K)/(n/K + 1), (1 − K/n)/(K + 1)}`, which is
 /// `1 − 2α` when each block holds one observation (`K = n`). The theorem
 /// assumes blocks of `n/K` observations each.
-pub fn cv_plus_bound(observations: usize, blocks: usize, level: f64) -> f64 {
+pub fn cv_plus_bound(observations: usize, blocks: usize, confidence_level: f64) -> f64 {
     let n = observations as f64;
     let k = blocks as f64;
-    let alpha = 1.0 - level;
+    let alpha = 1.0 - confidence_level;
     let correction = (2.0 * (1.0 - 1.0 / k) / (n / k + 1.0)).min((1.0 - k / n) / (k + 1.0));
     1.0 - 2.0 * alpha - correction.max(0.0)
 }
@@ -126,10 +126,10 @@ where
             ))
         })
         .collect();
-    let alpha = 1.0 - settings.level;
+    let alpha = 1.0 - settings.confidence_level;
     let offset = observed.len();
     let mut intervals = PredictionIntervals {
-        level: settings.level,
+        confidence_level: settings.confidence_level,
         targets: targets.clone(),
         prediction: Vec::new(),
         lower: Vec::new(),
@@ -154,7 +154,9 @@ where
                 .expect("the rows of a run are finite, so are its predictions")[0]
         });
         intervals.lower.push(lower_quantile(&below, alpha));
-        intervals.upper.push(upper_quantile(&above, settings.level));
+        intervals
+            .upper
+            .push(upper_quantile(&above, settings.confidence_level));
     }
     let scored = residuals.len();
     Ok(JackknifePlusRun {
@@ -168,7 +170,7 @@ where
         },
         blocks: fits.len(),
         observations: scored,
-        bound: cv_plus_bound(scored, fits.len(), settings.level),
+        bound: cv_plus_bound(scored, fits.len(), settings.confidence_level),
     })
 }
 

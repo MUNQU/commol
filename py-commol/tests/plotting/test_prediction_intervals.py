@@ -8,7 +8,7 @@ from commol import PredictionIntervals, SeriesIntervals, Simulation
 
 def test_a_figure_draws_prediction_intervals(abc_simulation: Simulation) -> None:
     intervals = PredictionIntervals(
-        level=0.9,
+        confidence_level=0.9,
         series={
             "B": SeriesIntervals(
                 positions=[10.0, 20.0, 30.0],

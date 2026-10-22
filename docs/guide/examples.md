@@ -467,7 +467,7 @@ problem = CalibrationProblem(
     parameters=parameters,
     loss_function="sse",
     optimization_config=ParticleSwarmConfig(
-        num_particles=30,
+        particles=30,
         max_iterations=500,
         verbose=True
     ),

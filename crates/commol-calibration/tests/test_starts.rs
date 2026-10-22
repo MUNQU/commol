@@ -139,7 +139,7 @@ fn one_seed_gives_one_set_of_outcomes() {
 #[test]
 fn the_first_start_of_a_particle_swarm_runs_its_seed_and_the_others_their_own() {
     let config = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
-        num_particles: 4,
+        particles: 4,
         max_iterations: 3,
         seed: Some(5),
         ..ParticleSwarmConfig::default()

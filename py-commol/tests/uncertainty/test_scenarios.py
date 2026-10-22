@@ -200,11 +200,6 @@ def test_an_analysis_runs_its_sample_under_scenarios() -> None:
             r"No scenario 'fast'. Scenarios: \['base', 'slow'\]",
         ),
         (
-            lambda s: s.summary("base", [ValueAt(series="C", at=30)], 1.0),
-            ValueError,
-            "strictly between 0 and 1, got 1.0",
-        ),
-        (
             lambda s: s.summary("base", [ValueAt(series="C", at=40)], 0.9),
             ValueError,
             "give those positions to the Predictive or the Scenarios",
@@ -215,7 +210,7 @@ def test_an_analysis_runs_its_sample_under_scenarios() -> None:
             "Quantity 'nan', in the runs counted from 0",
         ),
     ],
-    ids=["unknown scenario", "level", "missing position", "NaN"],
+    ids=["unknown scenario", "missing position", "NaN"],
 )
 def test_a_comparison_that_cannot_be_read_raises(
     call: Callable[[Scenarios], object],

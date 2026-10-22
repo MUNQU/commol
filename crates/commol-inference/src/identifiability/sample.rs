@@ -5,7 +5,7 @@
 use super::IdentifiabilityError;
 use crate::priors::Priors;
 use crate::sample::ParameterSample;
-use crate::statistics::{effective_size, quantiles};
+use crate::statistics::{check_open_unit, effective_size, quantiles};
 
 /// Points of the grid a kernel density is evaluated on.
 const GRID: usize = 512;
@@ -57,11 +57,8 @@ pub fn sample_identifiability(
     reference: Reference<'_>,
     correlation_threshold: f64,
 ) -> Result<SampleIdentifiability, IdentifiabilityError> {
-    if !(correlation_threshold > 0.0 && correlation_threshold < 1.0) {
-        return Err(IdentifiabilityError::Invalid(format!(
-            "correlation_threshold must be strictly between 0 and 1, got {correlation_threshold}"
-        )));
-    }
+    check_open_unit("correlation_threshold", correlation_threshold)
+        .map_err(IdentifiabilityError::Invalid)?;
     let variances: Vec<f64> = match reference {
         Reference::Bounds => sample
             .bounds()

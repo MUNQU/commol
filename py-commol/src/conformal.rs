@@ -26,10 +26,10 @@ fn conformal_error(error: ConformalError) -> PyErr {
     }
 }
 
-fn settings(score: &str, by: &str, level: f64) -> PyResult<ConformalSettings> {
+fn settings(score: &str, by: &str, confidence_level: f64) -> PyResult<ConformalSettings> {
     let score = NonconformityScore::from_name(Some(score)).map_err(PyValueError::new_err)?;
     let by = Pooling::from_name(Some(by)).map_err(PyValueError::new_err)?;
-    ConformalSettings::new(score, by, level).map_err(PyValueError::new_err)
+    ConformalSettings::new(score, by, confidence_level).map_err(PyValueError::new_err)
 }
 
 /// The intervals of a conformal method, as the runner returns them
@@ -111,7 +111,7 @@ fn check_conformal_settings(score: Option<&str>, by: Option<&str>) -> PyResult<(
 ///     positions: Where the intervals are
 ///     score: "absolute", "normalized" or "spread"
 ///     by: "series" or "all"
-///     level: The level of the intervals
+///     confidence_level: The level of the intervals
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid, the score has no scale, or a
@@ -128,9 +128,9 @@ fn split_conformal(
     positions: Vec<f64>,
     score: &str,
     by: &str,
-    level: f64,
+    confidence_level: f64,
 ) -> PyResult<PyConformalRun> {
-    let settings = settings(score, by, level)?;
+    let settings = settings(score, by, confidence_level)?;
     let calibration: Vec<_> = calibration.into_iter().map(|o| o.inner).collect();
     let predictor = predictor(fit.as_deref(), sample);
     parallel(py, || {
@@ -157,7 +157,7 @@ fn split_conformal(
 ///     positions: Where the intervals are
 ///     score: "absolute" or "normalized"
 ///     by: "series" or "all"
-///     level: The level of the intervals
+///     confidence_level: The level of the intervals
 ///     starts: Starts per fit, the fit first
 ///     seed: Seed of the starts
 ///
@@ -176,11 +176,11 @@ fn rolling_conformal(
     positions: Vec<f64>,
     score: &str,
     by: &str,
-    level: f64,
+    confidence_level: f64,
     starts: usize,
     seed: u64,
 ) -> PyResult<PyConformalRun> {
-    let settings = settings(score, by, level)?;
+    let settings = settings(score, by, confidence_level)?;
     let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
         .map_err(PyValueError::new_err)?;
     parallel(py, || {
@@ -216,7 +216,7 @@ fn blocks(
 ///     positions: Where the intervals are
 ///     score: "absolute", "normalized" or "spread"
 ///     by: "series" or "all"
-///     level: The level of the intervals
+///     confidence_level: The level of the intervals
 ///     starts: Starts per refit, the fit first
 ///     seed: Seed of the starts
 ///
@@ -235,11 +235,11 @@ fn jackknife_plus(
     positions: Vec<f64>,
     score: &str,
     by: &str,
-    level: f64,
+    confidence_level: f64,
     starts: usize,
     seed: u64,
 ) -> PyResult<PyConformalRun> {
-    let settings = settings(score, by, level)?;
+    let settings = settings(score, by, confidence_level)?;
     let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
         .map_err(PyValueError::new_err)?;
     let (scheme, chosen) = blocks(&runner, block_length, BlockDrawing::NonOverlapping)?;
@@ -267,7 +267,7 @@ fn jackknife_plus(
 ///     positions: Where the intervals are
 ///     score: "absolute", "normalized" or "spread"
 ///     by: "series" or "all"
-///     level: The level of the intervals
+///     confidence_level: The level of the intervals
 ///     starts: Starts per replicate, the fit first
 ///     seed: Seed of the replicates
 ///
@@ -287,11 +287,11 @@ fn enbpi(
     positions: Vec<f64>,
     score: &str,
     by: &str,
-    level: f64,
+    confidence_level: f64,
     starts: usize,
     seed: u64,
 ) -> PyResult<PyConformalRun> {
-    let settings = settings(score, by, level)?;
+    let settings = settings(score, by, confidence_level)?;
     let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
         .map_err(PyValueError::new_err)?;
     let (scheme, chosen) = blocks(&runner, block_length, BlockDrawing::NonOverlapping)?;
@@ -318,7 +318,7 @@ fn enbpi(
 ///     step: The step of the working level
 ///     score: "absolute", "normalized" or "spread"
 ///     by: "series" or "all"
-///     level: The target level of the intervals
+///     confidence_level: The target level of the intervals
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid, the score has no scale, or a
@@ -335,9 +335,9 @@ fn adaptive_conformal(
     step: f64,
     score: &str,
     by: &str,
-    level: f64,
+    confidence_level: f64,
 ) -> PyResult<PyConformalRun> {
-    let settings = settings(score, by, level)?;
+    let settings = settings(score, by, confidence_level)?;
     let stream: Vec<_> = stream.into_iter().map(|o| o.inner).collect();
     let predictor = predictor(fit.as_deref(), sample);
     parallel(py, || {

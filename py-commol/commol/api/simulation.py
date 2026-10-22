@@ -270,19 +270,19 @@ class Simulation:
             model=self.model_definition,
         )
 
-    def replicates(self, n: int, *, seed: int | None = None) -> "ReplicateRuns":
+    def replicates(self, count: int, *, seed: int | None = None) -> "ReplicateRuns":
         """
         Replicates of the runs of a stochastic engine.
 
         The returned object has ``run`` and ``run_at``, as `Simulation`, and
-        they return `SimulationReplicates`: ``n`` runs, each with its own seed,
+        they return `SimulationReplicates`: ``count`` runs, each with its own seed,
         run in parallel in the engine. Replicate ``i`` takes the seed derived
         from ``seed`` and ``i`` (the SplitMix64 of ``seed + i``), so it gives
         the same run however many replicates run.
 
         Parameters
         ----------
-        n : int
+        count : int
             How many replicates, at least 1.
         seed : int | None, optional
             The seed the replicate seeds derive from, a whole number from 0 to
@@ -297,16 +297,18 @@ class Simulation:
         ------
         ValueError
             If the engine is deterministic (every replicate would be equal),
-            ``n`` is below 1, or the seed is not valid.
+            ``count`` is below 1, or the seed is not valid.
         """
         if not self.is_stochastic:
             raise ValueError(
                 f"The {self.model_definition.engine.type} engine is deterministic: "
                 "every replicate would be equal. Replicates need a stochastic engine."
             )
-        if isinstance(n, bool) or not isinstance(n, int) or n < 1:
-            raise ValueError(f"The number of replicates is at least 1, got {n!r}.")
-        return ReplicateRuns(self, n, draw_seed() if seed is None else check_seed(seed))
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            raise ValueError(f"The number of replicates is at least 1, got {count!r}.")
+        return ReplicateRuns(
+            self, count, draw_seed() if seed is None else check_seed(seed)
+        )
 
     @property
     def engine(self) -> "EngineProtocol":
@@ -537,13 +539,13 @@ class ReplicateRuns:
     ----------
     simulation : Simulation
         The simulation whose model the replicates run.
-    n : int
+    count : int
         How many replicates.
     seed : int
         The seed the replicate seeds derive from.
     """
 
-    def __init__(self, simulation: Simulation, n: int, seed: int):
+    def __init__(self, simulation: Simulation, count: int, seed: int):
         """
         The replicates of a simulation.
 
@@ -551,13 +553,13 @@ class ReplicateRuns:
         ----------
         simulation : Simulation
             The simulation whose model the replicates run.
-        n : int
+        count : int
             How many replicates.
         seed : int
             The seed the replicate seeds derive from.
         """
         self.simulation = simulation
-        self.n = n
+        self.count = count
         self.seed = seed
 
     def _replicates(self, grid: int | list[float]) -> SimulationReplicates:
@@ -565,7 +567,7 @@ class ReplicateRuns:
         simulation = self.simulation
         simulation._validate_all_parameters_calibrated(simulation.model_definition)
         engine = simulation.engine
-        positions, seeds, runs = engine.run_replicates(self.seed, self.n, grid)
+        positions, seeds, runs = engine.run_replicates(self.seed, self.count, grid)
         outputs = simulation.simulation_outputs
         model = simulation.model_definition
         return SimulationReplicates(

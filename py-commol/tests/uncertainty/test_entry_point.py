@@ -1,17 +1,26 @@
 """One entry point: ``Calibrator.uncertainty`` runs the runner of a
 configuration's type, and its result type follows that type."""
 
+from collections.abc import Callable
 from typing import assert_type
 
 import pytest
+from pydantic import ValidationError
 
 from commol import (
     Calibrator,
     InputSpace,
+    ObservedDataPoint,
+    ParticleSwarmConfig,
+    Ratio,
     SensitivityAnalysis,
     SensitivityMethod,
+    Sobol,
+    SplitConformal,
     StructuralRank,
+    Threshold,
     UncertaintyMethod,
+    ValueAt,
 )
 from commol.api.inference.registry import register, registered
 from tests.support.methods import StartsResult, StartsSample, run_starts_sample
@@ -70,3 +79,47 @@ class TestEntryPoint:
             analysis.run(StartsSample(starts=2))  # ty: ignore[invalid-argument-type]
         with pytest.raises(ValueError, match=r"No method is registered"):
             analysis.run(UnregisteredSensitivity())
+
+
+VALUE = ValueAt(series="B", at=5)
+
+
+@pytest.mark.parametrize(
+    ("build", "old"),
+    [
+        (
+            lambda: SplitConformal(
+                calibration_data=[ObservedDataPoint(at=1, output="B", value=1.0)],
+                positions=[2.0],
+                score="absolute",
+                by="all",
+                level=0.9,
+            ),
+            "level",
+        ),
+        (lambda: Threshold(kind="beale", level=0.9), "level"),
+        (lambda: ParticleSwarmConfig(num_particles=5), "num_particles"),
+        (
+            lambda: Sobol(
+                base_draws=8, replicates=2, confidence_level=0.9, quantities=[VALUE]
+            ),
+            "base_draws",
+        ),
+        (
+            lambda: Sobol(
+                draws=8, bootstrap=2, confidence_level=0.9, quantities=[VALUE]
+            ),
+            "bootstrap",
+        ),
+        (
+            lambda: Ratio(numerator=VALUE, denominator=VALUE, replicates="within"),
+            "replicates",
+        ),
+    ],
+    ids=["conformal", "threshold", "swarm", "sobol draws", "sobol replicates", "ratio"],
+)
+def test_an_old_setting_name_is_rejected(build: Callable[[], object], old: str) -> None:
+    with pytest.raises(
+        ValidationError, match=rf"\n{old}\n  Extra inputs are not permitted"
+    ):
+        build()

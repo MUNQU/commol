@@ -338,7 +338,7 @@ fn a_swarm_fits_a_subproblem_and_repeats_from_its_seed() {
     let problem = line_problem(&VALUES);
     let (a, b) = least_squares(&VALUES);
     let swarm = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
-        num_particles: 20,
+        particles: 20,
         max_iterations: 150,
         ..ParticleSwarmConfig::default()
     });
@@ -368,7 +368,7 @@ fn a_swarm_fits_a_subproblem_and_repeats_from_its_seed() {
     // With the improvement rule, each inner run converges, and the outer run
     // stops when the constraint holds, before its limit.
     let stopping = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
-        num_particles: 20,
+        particles: 20,
         max_iterations: 150,
         improvement_stop: Some(ImprovementStop {
             window: 30,
@@ -648,10 +648,6 @@ fn thresholds_refuse_what_they_cannot_read() {
         "The chi-square threshold reads −log L and needs observation models; the problem \
          has a loss. With a loss, use Threshold.beale (a sum of squares of independent \
          Gaussian errors) or Threshold.bootstrap_calibrated"
-    );
-    assert_eq!(
-        beale(&problem, 1.0, 1.0).unwrap_err(),
-        "A level is strictly between 0 and 1, got 1"
     );
     assert_eq!(
         beale(&line_problem(&VALUES[..2]), 1.0, 0.9).unwrap_err(),

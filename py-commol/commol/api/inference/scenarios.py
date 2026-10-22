@@ -255,11 +255,7 @@ def _summaries(
     runs: list[dict[str, float]], weights: list[float], confidence_level: float
 ) -> list[ScenarioSummary]:
     """The weighted mean, median and central interval of each label of `runs`."""
-    if not 0.0 < confidence_level < 1.0:
-        raise ValueError(
-            f"The confidence level is strictly between 0 and 1, got {confidence_level}"
-        )
-    levels = [0.5, (1 - confidence_level) / 2, (1 + confidence_level) / 2]
+    levels = [0.5, *commol_rs.inference.interval_levels(confidence_level)]
     one_run = len(runs) == 1
     summaries = []
     for label in runs[0]:

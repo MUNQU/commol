@@ -116,10 +116,6 @@ class TestStatistics:
 
         assert (summary.min, summary.median, summary.max) == (1.0, 2.0, 4.0)
 
-    def test_a_confidence_level_is_a_fraction(self) -> None:
-        with pytest.raises(ValueError, match="strictly between 0 and 1"):
-            _sample([0.0, 0.0, 0.0]).interval(95)
-
     def test_draws_are_mappings_in_the_order_of_the_names(self) -> None:
         assert list(_sample([0.0, 0.0, 0.0]).draws())[2] == {"k1": 4.0, "k2": 0.0}
 

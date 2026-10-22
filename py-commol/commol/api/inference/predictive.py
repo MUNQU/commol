@@ -251,7 +251,7 @@ class Predictive:
         The seed of each draw of `sample`, in its order.
 
         With a stochastic engine, replicate ``i`` of draw ``j`` runs with the
-        seed replicate ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])``
+        seed replicate ``i`` of ``Simulation.replicates(count, seed=draw_seeds[j])``
         takes, so those replicates of the model at that draw give its runs.
         """
         return self._rust.draw_seeds

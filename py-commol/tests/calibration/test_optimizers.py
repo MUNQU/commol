@@ -63,7 +63,7 @@ class TestRecovery:
         self, truth: Model, truth_run
     ) -> None:
         config = (
-            ParticleSwarmConfig(num_particles=30, max_iterations=200, verbose=False)
+            ParticleSwarmConfig(particles=30, max_iterations=200, verbose=False)
             .acceleration(
                 "time_varying",
                 c1_initial=2.5,
@@ -83,7 +83,7 @@ class TestRecovery:
 
     def test_particle_swarm_with_chaotic_inertia(self, truth: Model, truth_run) -> None:
         config = ParticleSwarmConfig(
-            num_particles=25,
+            particles=25,
             max_iterations=200,
             verbose=False,
             initialization="opposition_based",
@@ -134,7 +134,7 @@ class TestConverged:
     def test_a_particle_swarm_that_hits_max_iterations_did_not_converge(
         self,
     ) -> None:
-        config = ParticleSwarmConfig(num_particles=5, max_iterations=3)
+        config = ParticleSwarmConfig(particles=5, max_iterations=3)
 
         result = _calibrate(_k_problem(config))
 
@@ -142,7 +142,7 @@ class TestConverged:
 
     def test_a_swarm_that_stagnates_stops_and_converges(self) -> None:
         def swarm() -> ParticleSwarmConfig:
-            return ParticleSwarmConfig(num_particles=10, max_iterations=500)
+            return ParticleSwarmConfig(particles=10, max_iterations=500)
 
         without = _calibrate(_k_problem(swarm(), seed=SEED))
         stopping = [
@@ -162,7 +162,7 @@ class TestConverged:
 
 class TestSeed:
     def test_the_seed_of_a_result_repeats_a_particle_swarm(self) -> None:
-        problem = _k_problem(ParticleSwarmConfig(num_particles=5, max_iterations=3))
+        problem = _k_problem(ParticleSwarmConfig(particles=5, max_iterations=3))
 
         result = _calibrate(problem)
         again = _calibrate(problem.model_copy(update={"seed": result.seed}))
@@ -206,7 +206,7 @@ class TestParticleSwarmSettings:
 
     @staticmethod
     def _base() -> ParticleSwarmConfig:
-        return ParticleSwarmConfig(num_particles=5, max_iterations=5)
+        return ParticleSwarmConfig(particles=5, max_iterations=5)
 
     @staticmethod
     def _search(config: ParticleSwarmConfig) -> float:
@@ -245,7 +245,7 @@ class TestParticleSwarmSettings:
                 lambda c: c.velocity(mutation_threshold=1.0), id="velocity-threshold"
             ),
             pytest.param(
-                lambda c: c.model_copy(update={"num_particles": 6}), id="particles"
+                lambda c: c.model_copy(update={"particles": 6}), id="particles"
             ),
             pytest.param(
                 lambda c: c.model_copy(update={"initialization": "latin_hypercube"}),
@@ -439,3 +439,11 @@ class TestParticleSwarmConfig:
             "Invalid mutation application: worst. Must be one of "
             "[<PSOMutationApplication.GLOBAL_BEST: 'global_best'>"
         )
+
+
+def test_a_particle_swarm_takes_particles(capfd) -> None:
+    config = ParticleSwarmConfig(particles=4, max_iterations=1, verbose=True)
+
+    _calibrate(_k_problem(config))
+
+    assert "Particles: 4\n" in capfd.readouterr().out

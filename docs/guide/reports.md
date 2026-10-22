@@ -156,7 +156,7 @@ reports at non-integer positions once the results hold them
 | `window`, `windows` | The window axis of `observed` and `windowed`: the length of one window and how many. |
 | `observed_data` | The observations to report next to the run. |
 | `accumulators` | The accumulator ids to report. The results read the outputs of each one from their model (`results.model`, which `Simulation.run`, `run_at` and `replicates` set); results built by hand have no model, and reporting an accumulator raises `ValueError` that names it. |
-| `prediction_intervals` | The `PredictionIntervals` of a [conformal method](uncertainty/conformal.md) (`ConformalResult.intervals`). The report gains a last block, `prediction_intervals`: its `level`, `series` (by label: `positions`, `prediction`, `lower`, `upper`) and `unbounded`. |
+| `prediction_intervals` | The `PredictionIntervals` of a [conformal method](uncertainty/conformal.md) (`ConformalResult.intervals`). The report gains a last block, `prediction_intervals`: its `confidence_level`, `series` (by label: `positions`, `prediction`, `lower`, `upper`) and `unbounded`. |
 
 The report holds only these blocks, and `prediction_intervals` when it is given. Add your own envelope around them, such as
 a run label or summary figures in your domain's terms:

@@ -2,6 +2,7 @@
 quantity follows, the ratio of two quantities, the form they cross to Rust in,
 and a propagation filtered by a condition."""
 
+import json
 import math
 
 import numpy as np
@@ -157,7 +158,7 @@ class TestRules:
         for method in [
             PRCC(draws=5, quantities=[peak]),
             Morris(trajectories=2, levels=4, quantities=[peak]),
-            Sobol(base_draws=4, bootstrap=2, confidence_level=0.9, quantities=[peak]),
+            Sobol(draws=4, replicates=2, confidence_level=0.9, quantities=[peak]),
             PolynomialChaos(degree=1, draws=4, quantities=[peak]),
         ]:
             with pytest.raises(
@@ -217,7 +218,7 @@ class TestRatio:
         ratio = Ratio(
             numerator=Gain(outputs="n", start=0, end=7),
             denominator=Gain(outputs="d", start=0, end=7),
-            replicates="within",
+            replicate_rule="within",
         )
 
         result = analysis.run(Propagation(quantities=[ratio]))
@@ -232,15 +233,15 @@ class TestRatio:
             Ratio(
                 numerator=PeakPosition(series="B", positions=[1], label="when"),
                 denominator=value,
-                replicates="pooled",
+                replicate_rule="pooled",
             )
         with pytest.raises(ValueError, match=r"got the Trajectory 'B at 1'"):
             Ratio(
                 numerator=value,
                 denominator=Trajectory(series="B", positions=[1]),
-                replicates="within",
+                replicate_rule="within",
             )
-        with pytest.raises(ValueError, match=r"replicates"):
+        with pytest.raises(ValueError, match=r"replicate_rule"):
             Ratio(numerator=value, denominator=value)  # ty: ignore[missing-argument]
 
 
@@ -312,7 +313,7 @@ class TestBoundary:
             Ratio(
                 numerator=Peak(series="A", positions=[1, 2]),
                 denominator=Gain(outputs="B", start=0, end=1),
-                replicates="within_positive",
+                replicate_rule="within_positive",
             ),
         ]
         _, rust = expand_quantities(quantities)
@@ -321,7 +322,7 @@ class TestBoundary:
         labelled = Ratio(
             numerator=ValueAt(series="A", at=1, label="a"),
             denominator=ValueAt(series="B", at=1, label="b"),
-            replicates="pooled",
+            replicate_rule="pooled",
             label="a over b",
         )
 
@@ -384,3 +385,14 @@ class TestFilter:
         zero = result.model_copy(update={"weights": [0.0, 0.5, 0.5, 0.0]})
         with pytest.raises(ValueError, match=r"positive weight"):
             zero.where([True, False, False, True])
+
+
+@pytest.mark.parametrize("rule", ["within", "within_positive", "pooled"])
+def test_a_ratio_takes_a_replicate_rule(rule: str) -> None:
+    value = ValueAt(series="A", at=1)
+    ratio = Ratio(numerator=value, denominator=value, replicate_rule=rule)
+
+    _, rust = expand_quantities([ratio])
+
+    [read] = json.loads(commol_rs.inference.quantities_as_read(rust))
+    assert read["replicate_rule"] == rule

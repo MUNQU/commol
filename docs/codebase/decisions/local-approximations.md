@@ -114,7 +114,7 @@ no noise scale, so its curvature is no inverse variance. The message names
 `NormalObservations(sd="sd")` with a noise parameter, whose fit estimates
 the scale by maximum likelihood (`SSE/n`, narrower than `SSE/(n − p)` by
 `√(n/(n − p))`), and the sandwich, which needs no noise model. A result
-holds only data: `Calibrator.delta_band(result, positions, level)` reads the
+holds only data: `Calibrator.delta_band(result, positions, confidence_level)` reads the
 problem from the calibrator, so a result read back from JSON gives the same
 band.
 

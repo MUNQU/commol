@@ -19,6 +19,7 @@ from commol.context._model import engine_state
 from commol.context.calibration import CalibrationParameter
 from commol.context.constants import CalibrationParameterType
 from commol.context.inference.distributions import Distribution, Uniform
+from commol.context.inference.levels import ConfidenceLevel
 from commol.context.inference.method import SensitivityMethod
 from commol.context.inference.quantities import Quantity
 from commol.context.inference.sample import ParameterSample
@@ -289,7 +290,7 @@ class PropagationResult(BaseModel):
     draw_seeds : list[int]
         The seed of each draw of `sample`, in its order. With a stochastic
         engine, replicate ``i`` of draw ``j`` runs with the seed replicate
-        ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])`` takes, so
+        ``i`` of ``Simulation.replicates(count, seed=draw_seeds[j])`` takes, so
         those replicates of the model at that draw give the runs of the draw.
 
     A quantity that reads a NaN is NaN in `values`, and `summary` raises on
@@ -381,12 +382,7 @@ class PropagationResult(BaseModel):
             quantity is NaN in a run: `where` keeps the runs a condition
             chooses.
         """
-        if not 0.0 < confidence_level < 1.0:
-            raise ValueError(
-                f"The confidence level is strictly between 0 and 1, got "
-                f"{confidence_level}"
-            )
-        levels = [0.5, (1 - confidence_level) / 2, (1 + confidence_level) / 2]
+        levels = [0.5, *commol_rs.inference.interval_levels(confidence_level)]
         summaries = []
         for index, label in enumerate(self.labels):
             column = [row[index] for row in self.values]
@@ -682,11 +678,11 @@ class SobolResult(BaseModel):
     first_lower, first_upper : list[list[float]]
         The ends of the interval of each first-order index; NaN when a
         bootstrap replicate of the rows has no variance, which more
-        `base_draws` avoid.
+        `draws` avoid.
     total_lower, total_upper : list[list[float]]
         The ends of the interval of each total index.
     runs : int
-        The number of points run: ``base_draws · (inputs + 2)``.
+        The number of points run: ``draws · (inputs + 2)``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -752,10 +748,10 @@ class Sobol(SensitivityMethod[SobolResult]):
 
     Attributes
     ----------
-    base_draws : int
+    draws : int
         The rows of each base matrix; the analysis runs
-        ``base_draws · (inputs + 2)`` points.
-    bootstrap : int
+        ``draws · (inputs + 2)`` points.
+    replicates : int
         The bootstrap replicates of the intervals, at least 2.
     confidence_level : float
         The level of the intervals, strictly between 0 and 1.
@@ -763,11 +759,9 @@ class Sobol(SensitivityMethod[SobolResult]):
         What each run is reduced to.
     """
 
-    base_draws: int = Field(ge=2, description="Rows of each base matrix.")
-    bootstrap: int = Field(ge=2, description="Bootstrap replicates.")
-    confidence_level: float = Field(
-        gt=0.0, lt=1.0, description="Level of the intervals."
-    )
+    draws: int = Field(ge=2, description="Rows of each base matrix.")
+    replicates: int = Field(ge=2, description="Bootstrap replicates.")
+    confidence_level: ConfidenceLevel = Field(description="Level of the intervals.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )

@@ -317,7 +317,7 @@ class ProfileSection(_Frozen):
     ----------
     threshold : {"chi_square", "beale", "bootstrap_calibrated"}
         The rule of the threshold.
-    level : float
+    confidence_level : float
         The level of each pointwise interval.
     tolerance : float
         The numerical tolerance of the statistic.
@@ -330,7 +330,7 @@ class ProfileSection(_Frozen):
     """
 
     threshold: Literal["chi_square", "beale", "bootstrap_calibrated"]
-    level: float
+    confidence_level: float
     tolerance: float
     verdicts: dict[str, ProfileVerdictName | None]
     intervals: dict[str, tuple[float | None, float | None]]

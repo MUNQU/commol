@@ -132,11 +132,11 @@ pub fn optimize_with_python_observer<E: SimulationEngine + Sync>(
                 "=== Particle Swarm Optimization (Verbose Mode) ===\n\
                  Parameters: {:?}\n\
                  Bounds: {:?}\n\
-                 Num particles: {}\n\
+                 Particles: {}\n\
                  Max iterations: {}\n",
                 parameter_names,
                 problem.parameter_bounds(),
-                ps_config.num_particles,
+                ps_config.particles,
                 ps_config.max_iterations
             );
             header.push_str("===================================================\n");

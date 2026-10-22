@@ -127,7 +127,7 @@ never returns to Python. The quantities live in
 | `PeakPosition(series, positions)` | The first of the positions where the value is largest |
 | `Trajectory(series, positions)` | The value at each position, one scalar per position, for an analysis over the axis |
 | `Gain(outputs, start, end)` | The value at `end` minus the value at `start`: what entered a cumulative output over `(start, end]`, as an observation with a window |
-| `Ratio(numerator, denominator, replicates)` | One quantity of one value over another, in each run ([A ratio of two quantities](#a-ratio-of-two-quantities)) |
+| `Ratio(numerator, denominator, replicate_rule)` | One quantity of one value over another, in each run ([A ratio of two quantities](#a-ratio-of-two-quantities)) |
 
 The series is a modelling choice. The peak of a level is the largest amount;
 for an output that only grows, such as `C` here or an accumulator, it is the
@@ -160,7 +160,7 @@ Every quantity follows the same rules:
 | Outputs are summed at each row before any reduction | The peak of `["A", "B"]` is the peak of `A + B` |
 | `PeakPosition` gives the first of the positions where the value is largest | A tie gives the earlier position |
 | A NaN in a value a quantity reads makes it NaN | Its peak and the position of its peak are NaN too |
-| With a stochastic engine, a quantity is computed for each replicate | A design point holds the mean of its replicates, or for a `Ratio` what its `replicates` says; a propagation keeps each |
+| With a stochastic engine, a quantity is computed for each replicate | A design point holds the mean of its replicates, or for a `Ratio` what its `replicate_rule` says; a propagation keeps each |
 
 Each quantity has a `label`, by default what it reads, such as `"B at 10"`.
 The default label writes each position in full, as Python reads it back, so
@@ -193,8 +193,8 @@ print(round(late.summary(0.9)[0].median))  # 216
 
 ### A ratio of two quantities
 
-`Ratio(numerator, denominator, replicates)` divides two quantities of one
-value each (`ValueAt`, `Gain`, `Peak`), numerator N over denominator D, in
+`Ratio(numerator, denominator, replicate_rule)` divides two quantities of
+one value each (`ValueAt`, `Gain`, `Peak`), numerator N over denominator D, in
 each run. It is one quantity, so every method reads it, the sensitivity
 methods too. A `PeakPosition` or a `Trajectory` as an operand is a
 `ValueError`. The share of what entered `C` by position 100 that entered by
@@ -206,7 +206,7 @@ from commol import Gain, Ratio
 early = Ratio(
     numerator=Gain(outputs="C", start=0, end=50),
     denominator=Gain(outputs="C", start=0, end=100),
-    replicates="within",
+    replicate_rule="within",
     label="early share",
 )
 spread = analysis.run(Propagation(draws=100, quantities=[early]))
@@ -218,12 +218,13 @@ print(ranked.inputs, [round(c, 2) for c in ranked.coefficients[0]])  # ['k1', 'k
 ```
 
 The default label is `"(N) / (D)"`, from the labels of the two quantities.
-`replicates` is required, with no default: with a stochastic engine, it says
+`replicate_rule` is required, with no default: with a stochastic engine, it
+says
 how the replicates of a point of PRCC, Morris, Sobol or a polynomial chaos
 combine (`Quantities::combine` in `crates/commol-inference/src/quantity.rs`).
 They are three estimands, and the choice is yours:
 
-| `replicates` | Value of a point | No value when |
+| `replicate_rule` | Value of a point | No value when |
 |---|---|---|
 | `"within"` | The mean of the ratio of each replicate, E[N/D] | A replicate has D = 0 |
 | `"within_positive"` | The mean of the ratio of the replicates with D > 0, E[N/D \| D > 0] | No replicate has D > 0 |
@@ -285,7 +286,7 @@ for label, value in one_run.quantities(quantities).items():
 | The run lacks a position a quantity reads | `ValueError` that lists each such position with its quantity, and says to call `Simulation.run_at` |
 | A quantity names an output the results do not have | `ValueError` that names the output |
 | `run(n)` of the ODE engine | It interpolates the positions that are not breakpoints, so a value differs from that of a run that ends there by about the relative tolerance of the solver, and `PeakPosition` can change on a near-tie |
-| The replicates of a stochastic engine | Each replicate is reduced on its own. A `Propagation` gives draw `j` the seed `draw_seeds[j]`, so `Simulation.replicates(n, seed=result.draw_seeds[j])` of the model at the values of draw `j` gives the runs of that draw. The seed of the analysis itself gives other runs |
+| The replicates of a stochastic engine | Each replicate is reduced on its own. A `Propagation` gives draw `j` the seed `draw_seeds[j]`, so `Simulation.replicates(count, seed=result.draw_seeds[j])` of the model at the values of draw `j` gives the runs of that draw. The seed of the analysis itself gives other runs |
 
 ## Which method for which budget
 
@@ -294,7 +295,7 @@ for label, value in one_run.quantities(quantities).items():
 | `Propagation(draws, quantities)` | The distribution of each quantity, and the band of every output | `draws` | Independent or a sample |
 | `PRCC(draws, quantities)` | How steadily each quantity rises or falls with each input | `draws`, more than the inputs + 1 | Independent or a sample |
 | `Morris(trajectories, levels, quantities)` | Which inputs matter, in few runs | `trajectories · (inputs + 1)` | Independent |
-| `Sobol(base_draws, bootstrap, confidence_level, quantities)` | The share of the variance each input explains, alone and with interactions, with intervals | `base_draws · (inputs + 2)` | Independent |
+| `Sobol(draws, replicates, confidence_level, quantities)` | The share of the variance each input explains, alone and with interactions, with intervals | `draws · (inputs + 2)` | Independent |
 | `PolynomialChaos(degree, draws, quantities, q_norm=1.0, max_interaction=None)` | A polynomial surrogate and its Sobol indices, in far fewer runs for a smooth quantity | `draws`, more than the terms | Independent |
 
 Start with Morris to drop the inputs that do not matter, then Sobol or a
@@ -397,7 +398,7 @@ propagation, which take it.
 from commol import Sobol
 
 indices = analysis.run(
-    Sobol(base_draws=1024, bootstrap=200, confidence_level=0.9, quantities=[peak])
+    Sobol(draws=1024, replicates=200, confidence_level=0.9, quantities=[peak])
 )
 for name, i in [("k1", 0), ("k2", 1)]:
     first = (indices.first_lower[0][i], indices.first[0][i], indices.first_upper[0][i])
@@ -489,7 +490,7 @@ figure = indices.plot()
 - [ ] A quantity that is NaN is filtered with `where(mask)` only on a
       condition you can defend, and the summary is read as conditioned on it.
 - [ ] The intervals of Sobol are narrow enough to rank the inputs, and none is
-      NaN (a bootstrap replicate of no variance); if not, raise `base_draws`.
+      NaN (a bootstrap replicate of no variance); if not, raise `draws`.
 - [ ] The leave-one-out error of a polynomial chaos is small before you read
       its indices, and `predict` reads values inside the bounds of the inputs.
 - [ ] A truncated basis of a polynomial chaos (`max_interaction`, `q_norm`)

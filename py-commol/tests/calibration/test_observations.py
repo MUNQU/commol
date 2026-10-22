@@ -68,7 +68,7 @@ class TestScaleFactors:
             truth,
             observations,
             [bounded("k1"), bounded("detection_rate", 0.1, 1.0, kind="factor")],
-            ParticleSwarmConfig(max_iterations=300, num_particles=25, verbose=False),
+            ParticleSwarmConfig(max_iterations=300, particles=25, verbose=False),
         )
 
         assert result.best_parameters == pytest.approx(

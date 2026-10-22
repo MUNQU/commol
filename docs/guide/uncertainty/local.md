@@ -140,12 +140,14 @@ for `NormalObservations(sd="sd")`, `σ̂² = SSE/n`, not `SSE/(n − p)`. The
 Laplace intervals are then narrower than the classical ones by
 `√(n/(n − p))`, which is negligible when `n ≫ p`.
 
-`calibrator.delta_band(result, positions, level)` gives the band of every
+`calibrator.delta_band(result, positions, confidence_level)` gives the band of
+every
 output by the delta method: the prediction at the fit plus and minus the
 quantile of the normal times `√(J Σ Jᵀ)`, with `J` the derivatives of the
 output on the unbounded scale. It runs the model a few times per parameter,
 not once per draw, and for a model linear in its parameters it equals the
-band of the draws (`Predictive(calibrator, result.sample, positions).band(level)`).
+band of the draws
+(`Predictive(calibrator, result.sample, positions).band(confidence_level)`).
 It reads only the fields of the result, so a result read back from JSON
 works.
 

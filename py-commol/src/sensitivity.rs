@@ -172,22 +172,22 @@ impl PyForwardAnalysis {
     /// Sobol indices on the design of Saltelli, with bootstrap intervals
     ///
     /// Raises:
-    ///     ValueError: If the inputs come from a sample, `base` or `bootstrap`
-    ///         is below 2, the level is not strictly between 0 and 1, or a
-    ///         quantity does not fit the model or is NaN at a point
+    ///     ValueError: If the inputs come from a sample, `draws` or
+    ///         `replicates` is below 2, the level is not strictly between 0
+    ///         and 1, or a quantity does not fit the model or is NaN at a point
     ///     InfeasibleStateError: If a point leaves the values its model allows
     fn sobol(
         &self,
         py: Python<'_>,
-        base: usize,
-        bootstrap: usize,
+        draws: usize,
+        replicates: usize,
         confidence_level: f64,
         quantities: &str,
     ) -> PyResult<SobolValues> {
         let quantities = read_quantities(quantities)?;
         let (result, runs) = parallel(py, || {
             self.inner
-                .sobol(base, bootstrap, confidence_level, &quantities)
+                .sobol(draws, replicates, confidence_level, &quantities)
         })?
         .map_err(predictive_error)?;
         let [first_lower, first_upper] = result.first_interval;
