@@ -567,8 +567,10 @@ impl PyParticleSwarmConfig {
     ///     velocity: Optional velocity configuration (PSOVelocity)
     ///     initialization: Initialization strategy (default: "uniform")
     ///     seed: Random seed for reproducibility (default: None, uses system entropy)
+    ///     improvement_stop: Optional improvement stop rule, `(window, tol_abs, tol_rel)`
+    ///     radius_stop: Optional tolerance of the radius stop rule
     #[new]
-    #[pyo3(signature = (num_particles=20, max_iterations=1000, verbose=false, inertia=None, acceleration=None, mutation=None, velocity=None, initialization="uniform", seed=None))]
+    #[pyo3(signature = (num_particles=20, max_iterations=1000, verbose=false, inertia=None, acceleration=None, mutation=None, velocity=None, initialization="uniform", seed=None, improvement_stop=None, radius_stop=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         num_particles: usize,
@@ -580,6 +582,8 @@ impl PyParticleSwarmConfig {
         velocity: Option<PyRef<PyPSOVelocity>>,
         initialization: &str,
         seed: Option<u64>,
+        improvement_stop: Option<(u64, f64, f64)>,
+        radius_stop: Option<f64>,
     ) -> PyResult<Self> {
         let value_error = PyErr::new::<pyo3::exceptions::PyValueError, _>;
         let (mutation_strategy, mutation_probability, mutation_application) = match mutation {
@@ -637,6 +641,14 @@ impl PyParticleSwarmConfig {
             mutation_probability,
             mutation_application,
             seed,
+            improvement_stop: improvement_stop.map(|(window, tol_abs, tol_rel)| {
+                commol_calibration::ImprovementStop {
+                    window,
+                    tol_abs,
+                    tol_rel,
+                }
+            }),
+            radius_stop,
         };
         Ok(Self {
             inner: config,

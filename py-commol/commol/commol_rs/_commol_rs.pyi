@@ -255,6 +255,8 @@ class ParticleSwarmConfigProtocol(Protocol):
         velocity: PSOVelocityProtocol | None = None,
         initialization: str = "uniform",
         seed: int | None = None,
+        improvement_stop: tuple[int, float, float] | None = None,
+        radius_stop: float | None = None,
     ) -> None: ...
 
 class OptimizationConfigProtocol(Protocol):

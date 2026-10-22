@@ -1,6 +1,7 @@
 """Nelder-Mead and particle swarm recover known parameters and report convergence."""
 
 import pytest
+from pydantic import ValidationError
 
 from commol import (
     CalibrationProblem,
@@ -13,7 +14,9 @@ from commol.context.calibration import (
     PSOChaoticInertia,
     PSOConstantAcceleration,
     PSOConstantInertia,
+    PSOImprovementStop,
     PSOMutationConfig,
+    PSORadiusStop,
     PSOTimeVaryingAcceleration,
     PSOVelocityConfig,
 )
@@ -136,6 +139,25 @@ class TestConverged:
         result = _calibrate(_k_problem(config))
 
         assert result.converged is False
+
+    def test_a_swarm_that_stagnates_stops_and_converges(self) -> None:
+        def swarm() -> ParticleSwarmConfig:
+            return ParticleSwarmConfig(num_particles=10, max_iterations=500)
+
+        without = _calibrate(_k_problem(swarm(), seed=SEED))
+        stopping = [
+            swarm().improvement_stop(window=20, tol_abs=1e-12, tol_rel=1e-10),
+            swarm().radius_stop(1e-6),
+        ]
+
+        assert without.converged is False
+        assert without.iterations == 500
+        for config in stopping:
+            result = _calibrate(_k_problem(config, seed=SEED))
+            assert result.converged is True
+            assert result.termination_reason == "Terminated(SolverConverged)"
+            assert result.iterations < 500
+            assert result.best_parameters["k"] == pytest.approx(TRUE_K, abs=1e-4)
 
 
 class TestSeed:
@@ -335,6 +357,44 @@ class TestParticleSwarmConfig:
         assert config.velocity_config == PSOVelocityConfig(
             clamp_factor=0.1, mutation_threshold=0.01
         )
+
+    def test_the_stop_rules_are_off_by_default_and_keep_their_settings(self) -> None:
+        config = ParticleSwarmConfig()
+        assert config.improvement_stop_config is None
+        assert config.radius_stop_config is None
+
+        config.improvement_stop(window=20, tol_abs=1e-9, tol_rel=1e-7).radius_stop(1e-4)
+
+        assert config.improvement_stop_config == PSOImprovementStop(
+            window=20, tol_abs=1e-9, tol_rel=1e-7
+        )
+        assert config.radius_stop_config == PSORadiusStop(tol=1e-4)
+
+    @pytest.mark.parametrize(
+        ("configure", "field"),
+        [
+            (
+                lambda c: c.improvement_stop(window=0, tol_abs=0.0, tol_rel=0.0),
+                "window",
+            ),
+            (
+                lambda c: c.improvement_stop(window=5, tol_abs=-1.0, tol_rel=0.0),
+                "tol_abs",
+            ),
+            (
+                lambda c: c.improvement_stop(window=5, tol_abs=0.0, tol_rel=-1.0),
+                "tol_rel",
+            ),
+            (lambda c: c.radius_stop(-1.0), "tol"),
+        ],
+    )
+    def test_a_stop_rule_out_of_its_range_names_its_setting(
+        self, configure, field: str
+    ) -> None:
+        with pytest.raises(ValidationError) as error:
+            configure(ParticleSwarmConfig())
+
+        assert error.value.errors()[0]["loc"] == (field,)
 
     @pytest.mark.parametrize(
         ("configure", "message"),

@@ -196,6 +196,7 @@ nav:
               - Time: codebase/decisions/time.md
               - Engines: codebase/decisions/engines.md
               - Calibration: codebase/decisions/calibration.md
+              - Optimizers: codebase/decisions/optimizers.md
               - Uncertainty: codebase/decisions/uncertainty.md
               - Sensitivity Analysis: codebase/decisions/sensitivity.md
               - Local approximations: codebase/decisions/local-approximations.md

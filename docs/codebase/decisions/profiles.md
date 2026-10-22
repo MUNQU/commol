@@ -60,8 +60,11 @@ the threshold is the quantile `level` of the rises
 profile, at the tolerance `ε = max(τ, ν)` (`ProfileTracer::tolerance`). `τ`
 is the tolerance of the optimizer: the `sd_tolerance` of Nelder-Mead as an
 absolute amount, since argmin stops when the sample standard deviation of the
-costs of the simplex falls below it; for a swarm, `1e-6 · max(1, |f̂|)`,
-provisional until it has stop rules (#230). `ν` is the noise floor: the error
+costs of the simplex falls below it; for a swarm with the improvement stop
+rule, `tol_abs + tol_rel · |f̂|`, the improvement the rule allows at the fit,
+since the swarm stops when its best cost improves by less; for a swarm
+without it, `1e-6 · max(1, |f̂|)`, since the swarm has no tolerance on the
+cost (the radius rule reads positions). `ν` is the noise floor: the error
 of one evaluation of the objective at the fit, propagated from the accuracy
 of a run, `Σ |∂ℓᵢ/∂mᵢ| · eᵢ` with `eᵢ = rtol · |mᵢ| + k · atol` for an
 observation that sums `k` outputs, the term derivatives of
@@ -95,6 +98,7 @@ why. With a stochastic engine a flat profile reads
 **Guards:** `verdict::tests`, `crates/commol-inference/tests/test_profile_structure.rs`
 (`the_noise_floor_propagates_the_accuracy_of_a_run`,
 `a_threshold_at_or_below_the_tolerance_reads_no_structure`),
+`crates/commol-inference/tests/test_profiles.rs::the_tolerance_follows_the_optimizer`,
 `tests/uncertainty/test_profile_verdicts.py` (`TestShapes`).
 
 ## A flat profile is read by resetting the others

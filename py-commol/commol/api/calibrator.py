@@ -638,6 +638,8 @@ class Calibrator:
                 mutation_threshold=velocity.mutation_threshold,
             )
 
+        improvement = opt_config.improvement_stop_config
+        radius = opt_config.radius_stop_config
         ps_config = rust_calibration.ParticleSwarmConfig(
             num_particles=opt_config.num_particles,
             max_iterations=opt_config.max_iterations,
@@ -648,6 +650,12 @@ class Calibrator:
             velocity=rust_velocity,
             initialization=opt_config.initialization,
             seed=self.seed,
+            improvement_stop=(
+                None
+                if improvement is None
+                else (improvement.window, improvement.tol_abs, improvement.tol_rel)
+            ),
+            radius_stop=None if radius is None else radius.tol,
         )
         return rust_calibration.OptimizationConfig.particle_swarm(ps_config)
 

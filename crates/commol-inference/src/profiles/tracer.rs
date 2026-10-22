@@ -200,13 +200,19 @@ where
 
     /// The tolerance of the optimizer, `τ`: the `sd_tolerance` of
     /// Nelder-Mead, an absolute amount, since argmin stops when the sample
-    /// standard deviation of the costs of the simplex falls below it. A
-    /// particle swarm has no such rule until it gets stop rules (#230); its
-    /// tolerance is `1e-6 · max(1, |objective at the fit|)`, provisional.
+    /// standard deviation of the costs of the simplex falls below it. For a
+    /// particle swarm with the improvement stop rule, the improvement the
+    /// rule allows at the objective at the fit, `tol_abs + tol_rel · |f̂|`,
+    /// since the swarm stops when its best cost improves by less. A swarm
+    /// without that rule has no tolerance on the cost; its tolerance is
+    /// `1e-6 · max(1, |f̂|)`.
     pub fn optimizer_tolerance(&self) -> f64 {
         match self.config {
             OptimizationConfig::NelderMead(config) => config.sd_tolerance,
-            OptimizationConfig::ParticleSwarm(_) => 1e-6 * self.fit_loss.abs().max(1.0),
+            OptimizationConfig::ParticleSwarm(config) => match config.improvement_stop {
+                Some(stop) => stop.tolerance(self.fit_loss),
+                None => 1e-6 * self.fit_loss.abs().max(1.0),
+            },
         }
     }
 
