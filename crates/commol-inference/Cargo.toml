@@ -22,6 +22,7 @@ finitediff = { git = "https://github.com/MUNQU/argmin", branch = "development" }
 libm = "0.2.15"
 nalgebra = { version = "0.35.0", default-features = false, features = ["std"] }
 rayon = "1.11"
+serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
 commol-difference = { path = "../commol-difference" }

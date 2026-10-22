@@ -25,3 +25,27 @@ pub use chaos::ChaosExpansion;
 pub use morris::{Morris, morris};
 pub use prcc::{Prcc, prcc};
 pub use sobol::{Sobol, sobol};
+
+use crate::predictive::PredictiveError;
+
+/// Check that no quantity is NaN at a point of a design, before an
+/// estimator reduces the quantities (`[point][quantity]`) across the points.
+///
+/// # Errors
+///
+/// [`PredictiveError::NotANumber`] with the first quantity that is NaN at a
+/// point, and every point where it is.
+pub(crate) fn check_numbers(outputs: &[Vec<f64>]) -> Result<(), PredictiveError> {
+    let quantities = outputs.iter().map(Vec::len).max().unwrap_or(0);
+    let nan = |row: &Vec<f64>, quantity: usize| row.get(quantity).is_some_and(|v| v.is_nan());
+    match (0..quantities).find(|&q| outputs.iter().any(|row| nan(row, q))) {
+        None => Ok(()),
+        Some(quantity) => Err(PredictiveError::NotANumber {
+            quantity,
+            points: (0..outputs.len())
+                .filter(|&point| nan(&outputs[point], quantity))
+                .collect(),
+            run: None,
+        }),
+    }
+}

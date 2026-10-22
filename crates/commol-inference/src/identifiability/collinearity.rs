@@ -141,7 +141,10 @@ pub fn collinearity<S: SensitivitySource>(
     }
     let total: f64 = used_weights.iter().sum();
     let used_weights: Vec<f64> = used_weights.iter().map(|w| w / total).collect();
-    let median = |values: &[f64]| quantiles(values, &used_weights, &[0.5])[0];
+    let median = |values: &[f64]| {
+        quantiles(values, &used_weights, &[0.5])
+            .expect("the norms of a finite Jacobian are numbers")[0]
+    };
     let subset = |parameters: Vec<usize>| {
         let gammas: Vec<f64> = columns
             .iter()

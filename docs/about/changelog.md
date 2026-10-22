@@ -29,6 +29,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Added #280 -->
 
+- A quantity of interest reads a series and reduces it. The series is a name
+  or a list of names, their `Level`, or `Increments(outputs, window)`: the
+  gain of their sum over each window that ends at a position. So
+  `Peak(series=Increments("acc", window=7), positions=ends)` is the largest
+  gain of `acc` over a window of 7, and `PeakPosition` with the same arguments
+  the end of that window, with no class of their own. `commol` exports `Level`
+  and `Increments`. See
+  [Quantities of interest](../guide/uncertainty/sensitivity.md#quantities-of-interest).
+
+- `PropagationResult.where(mask)` keeps the runs where `mask` is true and
+  renormalises their weights to sum to 1, and
+  `PropagationResult.effective_size` gives Kish's effective size of the
+  weights. A filter conditions the result on the condition of the mask.
+
 ### Changed
 
 <!-- Changed #246 -->
@@ -68,6 +82,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Changed #280 -->
 
+- **Breaking:** `ValueAt`, `Peak`, `PeakPosition` and `Trajectory` take
+  `series` in place of `outputs`: `ValueAt(outputs="B", at=10)` is
+  `ValueAt(series="B", at=10)`. `Gain(outputs, start, end)` keeps `outputs`,
+  and the outputs of a quantity read back as a list. The quantities live in
+  `commol.context.inference.quantities`, and cross to Rust as the JSON of
+  their classes.
+
+- Every reduction across runs raises `ValueError` on a quantity that is NaN:
+  `PropagationResult.summary()`, `member_statistics`, `weighted_quantiles`, and
+  Morris, Sobol and the polynomial chaos before they estimate, as PRCC did.
+  The message of a method names the quantity, the points where it is NaN, and
+  the point, inputs, replicate and seed of the first such run.
+  `PropagationResult.values` keeps the NaN of each run.
+
 ### Fixed
 
 <!-- Fixed #246 -->
@@ -81,6 +109,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!-- Fixed #276 -->
 
 <!-- Fixed #280 -->
+
+- A NaN in the values a `Peak` or a `PeakPosition` reads makes it NaN. The
+  peak skipped the NaN, and the position of the peak was the first position
+  when the value there was NaN.
+
+- A weighted quantile of values with a NaN raises `ValueError`, where it
+  sorted the NaN by its sign bit and gave a wrong number.
 
 ## [0.7.0] - 2026-10-22
 

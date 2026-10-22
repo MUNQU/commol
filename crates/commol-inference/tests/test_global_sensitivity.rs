@@ -11,7 +11,7 @@ use commol_inference::Priors;
 use commol_inference::batch::BatchRunner;
 use commol_inference::design::InputSpace;
 use commol_inference::global_sensitivity::{ChaosExpansion, ForwardAnalysis, morris, prcc, sobol};
-use commol_inference::quantity::{Quantities, Quantity};
+use commol_inference::quantity::{Quantities, Quantity, Series};
 use commol_inference::{ParameterSample, Predictive, PredictiveError};
 use commol_stochastic::StochasticSteps;
 use nalgebra::{DMatrix, DVector};
@@ -37,6 +37,12 @@ fn names(outputs: &[&str]) -> Vec<String> {
     outputs.iter().map(|name| name.to_string()).collect()
 }
 
+fn level(outputs: &[&str]) -> Series {
+    Series::Level {
+        outputs: names(outputs),
+    }
+}
+
 #[test]
 fn quantities_equal_hand_computations() {
     let engine = DifferenceEquations::try_from_model(&decay("DifferenceEquations")).unwrap();
@@ -44,11 +50,11 @@ fn quantities_equal_hand_computations() {
     let quantities = Quantities::new(
         &[
             Quantity::ValueAt {
-                outputs: names(&["A"]),
+                series: level(&["A"]),
                 at: 2.0,
             },
             Quantity::ValueAt {
-                outputs: names(&["A", "B"]),
+                series: level(&["A", "B"]),
                 at: 3.0,
             },
             Quantity::Gain {
@@ -57,11 +63,11 @@ fn quantities_equal_hand_computations() {
                 end: 3.0,
             },
             Quantity::Peak {
-                outputs: names(&["A"]),
+                series: level(&["A"]),
                 positions: vec![1.0, 2.0, 3.0],
             },
             Quantity::PeakPosition {
-                outputs: names(&["B"]),
+                series: level(&["B"]),
                 positions: vec![1.0, 2.0, 3.0],
             },
         ],
@@ -114,7 +120,7 @@ fn a_gain_reads_its_start_exactly() {
     let with_value = Quantities::new(
         &[
             Quantity::ValueAt {
-                outputs: names(&["B"]),
+                series: level(&["B"]),
                 at: 0.1,
             },
             Quantity::Gain {
@@ -143,7 +149,7 @@ fn stochastic_points_average_replicates_with_common_seeds() {
     let forward = ForwardModel::unobserved(engine.clone(), k(), None, Some(4), 9).unwrap();
     let quantities = Quantities::new(
         &[Quantity::ValueAt {
-            outputs: names(&["A"]),
+            series: level(&["A"]),
             at: 5.0,
         }],
         &engine.output_names(),
@@ -173,7 +179,7 @@ fn a_quantity_reads_only_what_the_model_has() {
     let quantity = |quantity: Quantity| Quantities::new(&[quantity], &outputs);
 
     let unknown = quantity(Quantity::ValueAt {
-        outputs: names(&["C"]),
+        series: level(&["C"]),
         at: 1.0,
     })
     .unwrap_err();
@@ -184,23 +190,23 @@ fn a_quantity_reads_only_what_the_model_has() {
     })
     .unwrap_err();
     let no_positions = quantity(Quantity::Peak {
-        outputs: names(&["A"]),
+        series: level(&["A"]),
         positions: vec![],
     })
     .unwrap_err();
     let no_outputs = quantity(Quantity::ValueAt {
-        outputs: vec![],
+        series: Series::Level { outputs: vec![] },
         at: 1.0,
     })
     .unwrap_err();
     let not_finite = quantity(Quantity::ValueAt {
-        outputs: names(&["A"]),
+        series: level(&["A"]),
         at: f64::NAN,
     })
     .unwrap_err();
     let none = Quantities::new(&[], &outputs).unwrap_err();
     let half_step = quantity(Quantity::ValueAt {
-        outputs: names(&["A"]),
+        series: level(&["A"]),
         at: 1.5,
     })
     .unwrap();
@@ -473,7 +479,7 @@ fn analysis<E: SimulationEngine + Send + Sync>(
 
 fn a_at(at: f64) -> Vec<Quantity> {
     vec![Quantity::ValueAt {
-        outputs: names(&["A"]),
+        series: level(&["A"]),
         at,
     }]
 }
@@ -636,7 +642,7 @@ fn an_analysis_runs_each_method_in_one_call() {
             2,
             4,
             &[Quantity::ValueAt {
-                outputs: names(&["C"]),
+                series: level(&["C"]),
                 at: 1.0,
             }],
         )

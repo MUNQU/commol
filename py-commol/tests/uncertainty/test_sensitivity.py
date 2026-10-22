@@ -39,7 +39,7 @@ from commol import (
     ValueAt,
     scores,
 )
-from commol.context.inference.global_sensitivity import Quantity, expand_quantities
+from commol.context.inference.quantities import Quantity
 from tests.support import abc_builder, bounded, build
 from tests.support.kinds import decay, decay_model
 from tests.support.models import a_to_b_builder, build_stochastic
@@ -78,7 +78,7 @@ class TestInputs:
         )
         analysis = SensitivityAnalysis(simulation, inputs, seed=1)
         result = analysis.run(
-            Propagation(draws=4, quantities=[ValueAt(outputs="A", at=0)])
+            Propagation(draws=4, quantities=[ValueAt(series="A", at=0)])
         )
         assert result.sample.names == ["k1", "A"]
         # The initial amount of A is the input, with the remainder in C.
@@ -120,64 +120,6 @@ class TestInputs:
         inputs = InputSpace.uniform_on_bounds([bounded("k1", 0.0, math.inf)])
         with pytest.raises(ValueError, match=r"Uniform\(\) of 'k1' needs finite"):
             SensitivityAnalysis(simulation, inputs)
-
-
-class TestQuantities:
-    def test_each_quantity_has_a_label_and_a_rust_form(self) -> None:
-        labels, rust = expand_quantities(
-            [
-                ValueAt(outputs="B", at=10),
-                Gain(outputs=["B", "C"], start=5, end=10),
-                Peak(outputs="B", positions=[1, 2, 3], label="peak"),
-                PeakPosition(outputs="B", positions=[1, 2]),
-                Trajectory(outputs="C", positions=[1, 2]),
-            ]
-        )
-        assert labels == [
-            "B at 10",
-            "B + C gain over (5, 10]",
-            "peak",
-            "position of the peak of B",
-            "C at 1",
-            "C at 2",
-        ]
-        assert rust[1] == ("gain", ["B", "C"], [5.0, 10.0])
-        assert rust[4] == ("value_at", ["C"], [1.0])
-
-    def test_the_labels_of_close_positions_differ(self) -> None:
-        labels, _ = expand_quantities(
-            [
-                Trajectory(outputs="B", positions=[1000000, 1000001]),
-                ValueAt(outputs="B", at=0.1234567),
-                ValueAt(outputs="B", at=0.1234568),
-                Gain(outputs="C", start=1e-7, end=2.5e16),
-            ]
-        )
-        assert labels == [
-            "B at 1000000",
-            "B at 1000001",
-            "B at 0.1234567",
-            "B at 0.1234568",
-            "C gain over (1e-07, 2.5e+16]",
-        ]
-
-    def test_a_quantity_reads_a_valid_window_of_positions(self) -> None:
-        with pytest.raises(ValueError, match=r"ends after it starts"):
-            Gain(outputs="C", start=10, end=10)
-        with pytest.raises(ValueError, match=r"ascend"):
-            Peak(outputs="B", positions=[2, 1])
-        with pytest.raises(ValueError, match=r"must not be empty"):
-            ValueAt(outputs=[], at=1)
-        with pytest.raises(ValueError):
-            ValueAt(outputs="B", at=-1)
-
-    def test_quantities_have_labels_of_their_own(self) -> None:
-        with pytest.raises(ValueError, match=r"\['B at 1'\]"):
-            expand_quantities(
-                [ValueAt(outputs="B", at=1), Trajectory(outputs="B", positions=[1])]
-            )
-        with pytest.raises(ValueError, match=r"at least one quantity"):
-            expand_quantities([])
 
 
 class TestAnalysis:
@@ -238,7 +180,7 @@ class TestPropagation:
         self, calibrator: Calibrator
     ) -> None:
         analysis = _from_sample(calibrator)
-        result = analysis.run(Propagation(quantities=[ValueAt(outputs="B", at=10)]))
+        result = analysis.run(Propagation(quantities=[ValueAt(series="B", at=10)]))
 
         positions = [0.0, 10.0, 20.0]
         of_calibration = Predictive(calibrator, _weighted_sample(), positions)
@@ -270,7 +212,7 @@ class TestPropagation:
         analysis = SensitivityAnalysis(simulation, _rates(), seed=3)
         positions = [float(t) for t in range(51)]
         result = analysis.run(
-            Propagation(draws=8, quantities=[Peak(outputs="B", positions=positions)])
+            Propagation(draws=8, quantities=[Peak(series="B", positions=positions)])
         )
 
         assert result.sample.method.name == "propagation"
@@ -304,7 +246,7 @@ class TestPropagation:
                 draws=4,
                 quantities=[
                     Gain(outputs=["B", "C"], start=5, end=20),
-                    PeakPosition(outputs="B", positions=positions),
+                    PeakPosition(series="B", positions=positions),
                 ],
             )
         )
@@ -327,8 +269,8 @@ class TestPropagation:
             Propagation(
                 draws=4,
                 quantities=[
-                    ValueAt(outputs="x", at=0.1),
-                    ValueAt(outputs="x", at=0.4),
+                    ValueAt(series="x", at=0.1),
+                    ValueAt(series="x", at=0.4),
                     Gain(outputs="x", start=0.1, end=0.4),
                 ],
             )
@@ -345,11 +287,9 @@ class TestPropagation:
     ) -> None:
         analysis = SensitivityAnalysis(simulation, _rates(), seed=3)
         with pytest.raises(ValueError, match=r"'Z'"):
-            analysis.run(Propagation(draws=2, quantities=[ValueAt(outputs="Z", at=1)]))
+            analysis.run(Propagation(draws=2, quantities=[ValueAt(series="Z", at=1)]))
         with pytest.raises(ValueError, match=r"1\.5"):
-            analysis.run(
-                Propagation(draws=2, quantities=[ValueAt(outputs="B", at=1.5)])
-            )
+            analysis.run(Propagation(draws=2, quantities=[ValueAt(series="B", at=1.5)]))
 
     def test_the_draws_follow_the_inputs(
         self, simulation: Simulation, calibrator: Calibrator
@@ -368,7 +308,7 @@ class TestPropagation:
         analysis = SensitivityAnalysis(simulation, _rates(), replicates=3, seed=2)
 
         result = analysis.run(
-            Propagation(draws=2, quantities=[ValueAt(outputs="C", at=20)])
+            Propagation(draws=2, quantities=[ValueAt(series="C", at=20)])
         )
 
         assert len(result.values) == 6
@@ -392,7 +332,7 @@ class TestPropagation:
         )
         analysis = SensitivityAnalysis(simulation, inputs, replicates=2, seed=2)
 
-        result = analysis.run(Propagation(quantities=[ValueAt(outputs="C", at=20)]))
+        result = analysis.run(Propagation(quantities=[ValueAt(series="C", at=20)]))
 
         assert result.values[:2] != result.values[2:]
 
@@ -409,7 +349,7 @@ class TestPRCC:
         positions = [float(t) for t in range(101)]
 
         result = analysis.run(
-            PRCC(draws=200, quantities=[Peak(outputs="B", positions=positions)])
+            PRCC(draws=200, quantities=[Peak(series="B", positions=positions)])
         )
 
         (k1, k2, unused) = result.coefficients[0]
@@ -428,7 +368,7 @@ class TestPRCC:
         analysis = SensitivityAnalysis(simulation, _rates(), seed=7)
 
         result = analysis.run(
-            PRCC(draws=30, quantities=[Trajectory(outputs="C", positions=[0, 10, 20])])
+            PRCC(draws=30, quantities=[Trajectory(series="C", positions=[0, 10, 20])])
         )
 
         assert result.labels == ["C at 0", "C at 10", "C at 20"]
@@ -455,7 +395,7 @@ class TestPRCC:
             seed=1,
         )
 
-        result = analysis.run(PRCC(quantities=[ValueAt(outputs="B", at=20)]))
+        result = analysis.run(PRCC(quantities=[ValueAt(series="B", at=20)]))
 
         weights = sample.weights
         assert result.sample == sample
@@ -463,14 +403,14 @@ class TestPRCC:
             sum(weights) ** 2 / sum(w * w for w in weights)
         )
         with pytest.raises(ValueError, match=r"leave draws unset"):
-            analysis.run(PRCC(draws=5, quantities=[ValueAt(outputs="B", at=20)]))
+            analysis.run(PRCC(draws=5, quantities=[ValueAt(series="B", at=20)]))
 
     def test_prcc_needs_more_draws_than_inputs(self, simulation: Simulation) -> None:
         analysis = SensitivityAnalysis(simulation, _rates(), seed=7)
         with pytest.raises(ValueError, match=r"effective size above 3"):
-            analysis.run(PRCC(draws=3, quantities=[ValueAt(outputs="B", at=5)]))
+            analysis.run(PRCC(draws=3, quantities=[ValueAt(series="B", at=5)]))
         with pytest.raises(ValueError, match=r"PRCC of independent inputs needs draws"):
-            analysis.run(PRCC(quantities=[ValueAt(outputs="B", at=5)]))
+            analysis.run(PRCC(quantities=[ValueAt(series="B", at=5)]))
 
     def test_a_quantity_that_is_nan_is_an_error(self) -> None:
         # The sum of A, B and acc is above the largest float from position 1,
@@ -489,7 +429,7 @@ class TestPRCC:
         with pytest.raises(
             ValueError, match=r"quantity 1 .* NaN at the points \[0, 1, 2, 3, 4\]"
         ):
-            analysis.run(PRCC(draws=5, quantities=[ValueAt(outputs="B", at=5), gain]))
+            analysis.run(PRCC(draws=5, quantities=[ValueAt(series="B", at=5), gain]))
 
 
 class TestMorris:
@@ -507,7 +447,7 @@ class TestMorris:
             Morris(
                 trajectories=10,
                 levels=4,
-                quantities=[Peak(outputs="B", positions=positions)],
+                quantities=[Peak(series="B", positions=positions)],
             )
         )
 
@@ -525,9 +465,7 @@ class TestMorris:
         analysis = SensitivityAnalysis(simulation, _rates(), seed=7)
         with pytest.raises(ValueError, match=r"even number of levels"):
             analysis.run(
-                Morris(
-                    trajectories=2, levels=3, quantities=[ValueAt(outputs="B", at=5)]
-                )
+                Morris(trajectories=2, levels=3, quantities=[ValueAt(series="B", at=5)])
             )
 
 
@@ -547,7 +485,7 @@ class TestSobol:
                 base_draws=64,
                 bootstrap=50,
                 confidence_level=0.9,
-                quantities=[Peak(outputs="B", positions=positions)],
+                quantities=[Peak(series="B", positions=positions)],
             )
         )
 
@@ -566,7 +504,7 @@ class TestSobol:
                 base_draws=8,
                 bootstrap=10,
                 confidence_level=1.0,
-                quantities=[ValueAt(outputs="B", at=5)],
+                quantities=[ValueAt(series="B", at=5)],
             )
 
 
@@ -581,9 +519,7 @@ class TestPolynomialChaos:
         analysis = SensitivityAnalysis(simulation, inputs, seed=5)
 
         result = analysis.run(
-            PolynomialChaos(
-                degree=4, draws=80, quantities=[ValueAt(outputs="B", at=20)]
-            )
+            PolynomialChaos(degree=4, draws=80, quantities=[ValueAt(series="B", at=20)])
         )
 
         assert result.loo_error[0] < 0.01
@@ -607,7 +543,7 @@ class TestPolynomialChaos:
         with pytest.raises(ValueError, match=r"needs more points than terms"):
             analysis.run(
                 PolynomialChaos(
-                    degree=3, draws=10, quantities=[ValueAt(outputs="B", at=5)]
+                    degree=3, draws=10, quantities=[ValueAt(series="B", at=5)]
                 )
             )
 
@@ -616,14 +552,14 @@ class TestIndependentInputs:
     @pytest.mark.parametrize(
         "method",
         [
-            Morris(trajectories=2, levels=4, quantities=[ValueAt(outputs="B", at=5)]),
+            Morris(trajectories=2, levels=4, quantities=[ValueAt(series="B", at=5)]),
             Sobol(
                 base_draws=8,
                 bootstrap=10,
                 confidence_level=0.9,
-                quantities=[ValueAt(outputs="B", at=5)],
+                quantities=[ValueAt(series="B", at=5)],
             ),
-            PolynomialChaos(degree=1, draws=8, quantities=[ValueAt(outputs="B", at=5)]),
+            PolynomialChaos(degree=1, draws=8, quantities=[ValueAt(series="B", at=5)]),
         ],
         ids=["Morris", "Sobol", "PolynomialChaos"],
     )
@@ -641,7 +577,7 @@ class TestIndependentInputs:
 class TestEntryPoint:
     def test_each_method_returns_its_result(self, simulation: Simulation) -> None:
         analysis = SensitivityAnalysis(simulation, _rates(), seed=3)
-        quantities: list[Quantity] = [ValueAt(outputs="B", at=10)]
+        quantities: list[Quantity] = [ValueAt(series="B", at=10)]
 
         propagation = analysis.run(Propagation(draws=4, quantities=quantities))
         prcc = analysis.run(PRCC(draws=8, quantities=quantities))

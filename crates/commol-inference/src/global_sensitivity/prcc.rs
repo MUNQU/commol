@@ -18,6 +18,7 @@
 
 use nalgebra::DMatrix;
 
+use super::check_numbers;
 use crate::predictive::PredictiveError;
 use crate::special::beta_i;
 use crate::statistics::effective_size;
@@ -62,15 +63,8 @@ pub fn prcc(
             weights.len()
         )));
     }
+    check_numbers(outputs)?;
     let quantities = outputs.first().map_or(0, Vec::len);
-    if let Some(quantity) = (0..quantities).find(|&q| outputs.iter().any(|row| row[q].is_nan())) {
-        return Err(PredictiveError::NotANumber {
-            quantity,
-            points: (0..draws)
-                .filter(|&draw| outputs[draw][quantity].is_nan())
-                .collect(),
-        });
-    }
     let invalid = |message: String| Err(PredictiveError::Mismatch(message));
     let count = inputs.first().map_or(0, Vec::len);
     if count == 0 {
@@ -290,7 +284,8 @@ mod tests {
             error,
             PredictiveError::NotANumber {
                 quantity: 1,
-                points: vec![1, 3]
+                points: vec![1, 3],
+                run: None
             }
         );
         let message = error.to_string();

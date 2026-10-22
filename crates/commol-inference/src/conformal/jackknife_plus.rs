@@ -150,7 +150,8 @@ where
         intervals.prediction.push(if centres.is_empty() {
             f64::NAN
         } else {
-            statistics::quantiles(&centres, &weights, &[0.5])[0]
+            statistics::quantiles(&centres, &weights, &[0.5])
+                .expect("the rows of a run are finite, so are its predictions")[0]
         });
         intervals.lower.push(lower_quantile(&below, alpha));
         intervals.upper.push(upper_quantile(&above, settings.level));

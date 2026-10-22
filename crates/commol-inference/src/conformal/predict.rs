@@ -57,7 +57,10 @@ where
             let mut spread = Vec::with_capacity(points.len());
             for i in 0..points.len() {
                 let values: Vec<f64> = draws.values.iter().map(|row| row[i]).collect();
-                centre.push(statistics::quantiles(&values, &draws.weights, &[0.5])[0]);
+                centre.push(
+                    statistics::quantiles(&values, &draws.weights, &[0.5])
+                        .expect("the rows of a run are finite, so are its observations")[0],
+                );
                 spread.push(statistics::covariance(&values, &values, &draws.weights).sqrt());
             }
             Ok(Predictions {

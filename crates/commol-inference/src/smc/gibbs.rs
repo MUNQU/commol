@@ -252,7 +252,8 @@ impl Snapshot {
         (0..fit.len())
             .map(|j| {
                 let column: Vec<f64> = self.values.iter().map(|v| v[j]).collect();
-                let interval = quantiles(&column, &weights, levels);
+                let interval = quantiles(&column, &weights, levels)
+                    .expect("the values of a sample are finite");
                 interval[0] <= fit[j] && fit[j] <= interval[1]
             })
             .collect()

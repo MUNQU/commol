@@ -229,22 +229,3 @@ same `ConformalResult` as every variant.
 **Guards:** `crates/commol-inference/tests/test_conformal.rs`,
 `tests/uncertainty/test_conformal.py`, the studies of
 `tests/uncertainty/test_coverage.py`.
-
-## An analysis needs no data
-
-`ForwardAnalysis` runs every method on `ForwardModel::unobserved` (values
-written as a calibration writes them). Quantities read the observation
-operator. A design point is the mean of its replicates on common seeds; a
-predictive or a propagation gives each replicate of each draw its own seed
-(`run_sets`), and each purpose has a stream (`stream_seed`). Morris, Sobol
-and chaos refuse a sample; PRCC reads its weights.
-
-| Alternative | Why not |
-|---|---|
-| A problem with fake observations | Invented data in a type that means a fit. |
-| Python callables as quantities | Every run would return to Python, one at a time. |
-| Resampling a sample to equal weights | Repeated draws that the test of PRCC counts as independent. |
-| Hermite polynomials for a normal input | Every distribution is truncated, so they are not orthogonal. |
-
-**Guards:** `crates/commol-inference/tests/test_global_sensitivity.rs`,
-`tests/uncertainty/test_sensitivity.py`.

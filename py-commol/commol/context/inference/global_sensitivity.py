@@ -1,18 +1,18 @@
-"""What a sensitivity analysis varies and what it reads from each run.
+"""What a sensitivity analysis varies, its methods and their results.
 
 An `InputSpace` names the values that vary, as calibration parameters with
 their types and bounds, and how: independent distributions, one per input, or
-a weighted sample whose inputs may depend on each other. A quantity of
-interest reduces each run to a scalar in Rust, through the observation
-operator of the calibration, so a design of thousands of runs never returns
-to Python.
+a weighted sample whose inputs may depend on each other. Each method reduces
+each run to the quantities of interest of `commol.context.inference.quantities`
+in Rust, so a design of thousands of runs never returns to Python.
 """
 
-from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Annotated, ClassVar, Literal, Self
+from typing import TYPE_CHECKING, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+import numpy as np
+from numpy.typing import ArrayLike
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context._model import engine_state
@@ -20,287 +20,13 @@ from commol.context.calibration import CalibrationParameter
 from commol.context.constants import CalibrationParameterType
 from commol.context.inference.distributions import Distribution, Uniform
 from commol.context.inference.method import SensitivityMethod
+from commol.context.inference.quantities import Quantity
 from commol.context.inference.sample import ParameterSample
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
     from commol.context.visualization import PlotConfig
-
-type RustQuantity = tuple[str, list[str], list[float]]
-"""A quantity as Rust reads it: its kind, its outputs and its positions."""
-
-
-class QuantityBase(BaseModel, ABC):
-    """
-    A scalar read from each run: one output, or the sum of several, as an
-    observation reads them.
-
-    Attributes
-    ----------
-    outputs : str | list[str]
-        The output read, or the outputs summed.
-    label : str | None
-        The name of the quantity in results and plots; by default it says
-        what the quantity reads.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    rust_kind: ClassVar[str]
-
-    outputs: str | list[str] = Field(description="The output, or outputs summed.")
-    label: str | None = Field(default=None, description="The name of the quantity.")
-
-    @field_validator("outputs")
-    @classmethod
-    def require_outputs(cls, value: str | list[str]) -> str | list[str]:
-        """An empty list sums nothing."""
-        if isinstance(value, list) and not value:
-            raise ValueError("outputs must not be empty")
-        return value
-
-    @property
-    def output_list(self) -> list[str]:
-        """The outputs summed, as a list."""
-        return [self.outputs] if isinstance(self.outputs, str) else list(self.outputs)
-
-    @property
-    def output_name(self) -> str:
-        """The outputs as a label reads them."""
-        return " + ".join(self.output_list)
-
-    @abstractmethod
-    def expand(self) -> list[tuple[str, RustQuantity]]:
-        """The label and the Rust form of each scalar this quantity gives."""
-
-    def series(self) -> list[tuple[str, float | None]]:
-        """
-        The series and the position of each scalar this quantity gives: its
-        label and no position, or for a `Trajectory` its name and each
-        position.
-        """
-        return [(label, None) for label, _ in self.expand()]
-
-
-class _OneScalar(QuantityBase):
-    """A quantity that gives one scalar per run."""
-
-    @abstractmethod
-    def default_label(self) -> str:
-        """The label when none is given."""
-
-    @abstractmethod
-    def rust_quantity(self) -> RustQuantity:
-        """The quantity as Rust reads it."""
-
-    def expand(self) -> list[tuple[str, RustQuantity]]:
-        """The label and the Rust form of the scalar."""
-        return [(self.label or self.default_label(), self.rust_quantity())]
-
-
-Position = Annotated[float, Field(ge=0.0, allow_inf_nan=False)]
-"""A position on the axis of the model."""
-
-
-def _position_text(at: float) -> str:
-    """`at` as the shortest text that reads back as it: `repr`, with no `.0`."""
-    return repr(at).removesuffix(".0")
-
-
-class ValueAt(_OneScalar):
-    """
-    The value at a position.
-
-    Attributes
-    ----------
-    at : float
-        The position.
-    """
-
-    rust_kind: ClassVar[str] = "value_at"
-    kind: Literal["value_at"] = "value_at"
-    at: Position = Field(description="The position.")
-
-    def default_label(self) -> str:
-        """`outputs` at `at`."""
-        return f"{self.output_name} at {_position_text(self.at)}"
-
-    def rust_quantity(self) -> RustQuantity:
-        """The kind, the outputs and the position."""
-        return (self.rust_kind, self.output_list, [self.at])
-
-
-class Gain(_OneScalar):
-    """
-    The value at `end` minus the value at `start`: what entered a cumulative
-    output over ``(start, end]``, as an observation with the window
-    ``end - start`` reads it.
-
-    Attributes
-    ----------
-    start : float
-        The start of the window.
-    end : float
-        The end of the window, after `start`.
-    """
-
-    rust_kind: ClassVar[str] = "gain"
-    kind: Literal["gain"] = "gain"
-    start: Position = Field(description="The start of the window.")
-    end: Position = Field(description="The end of the window.")
-
-    @model_validator(mode="after")
-    def end_after_start(self) -> Self:
-        """A window ends after it starts."""
-        if self.end <= self.start:
-            raise ValueError(
-                f"A gain ends after it starts, got start {self.start} and end "
-                f"{self.end}"
-            )
-        return self
-
-    def default_label(self) -> str:
-        """The gain of `outputs` over the window."""
-        start, end = _position_text(self.start), _position_text(self.end)
-        return f"{self.output_name} gain over ({start}, {end}]"
-
-    def rust_quantity(self) -> RustQuantity:
-        """The kind, the outputs, the start and the end."""
-        return (self.rust_kind, self.output_list, [self.start, self.end])
-
-
-class _AtPositions(QuantityBase):
-    """A quantity read at several positions."""
-
-    positions: list[Position] = Field(
-        min_length=1, description="The positions, ascending."
-    )
-
-    @field_validator("positions")
-    @classmethod
-    def ascending(cls, value: list[float]) -> list[float]:
-        """The positions ascend, each once."""
-        if any(later <= earlier for earlier, later in zip(value, value[1:])):
-            raise ValueError("positions must ascend, each once")
-        return value
-
-
-class _Peak(_AtPositions, _OneScalar):
-    """A reduction of the values at several positions."""
-
-    def rust_quantity(self) -> RustQuantity:
-        """The kind, the outputs and the positions."""
-        return (self.rust_kind, self.output_list, list(self.positions))
-
-
-class Peak(_Peak):
-    """
-    The largest value at the positions.
-
-    Attributes
-    ----------
-    positions : list[float]
-        The positions compared, ascending.
-    """
-
-    rust_kind: ClassVar[str] = "peak"
-    kind: Literal["peak"] = "peak"
-
-    def default_label(self) -> str:
-        """The peak of `outputs`."""
-        return f"peak of {self.output_name}"
-
-
-class PeakPosition(_Peak):
-    """
-    The first of the positions where the value is largest.
-
-    Attributes
-    ----------
-    positions : list[float]
-        The positions compared, ascending.
-    """
-
-    rust_kind: ClassVar[str] = "peak_position"
-    kind: Literal["peak_position"] = "peak_position"
-
-    def default_label(self) -> str:
-        """The position of the peak of `outputs`."""
-        return f"position of the peak of {self.output_name}"
-
-
-class Trajectory(_AtPositions):
-    """
-    The value at each position: one `ValueAt` per position, for an analysis
-    over the axis.
-
-    Attributes
-    ----------
-    positions : list[float]
-        The positions, ascending.
-    label : str | None
-        The name of the series; each scalar is named after it and its
-        position.
-    """
-
-    rust_kind: ClassVar[str] = "value_at"
-    kind: Literal["trajectory"] = "trajectory"
-
-    def series(self) -> list[tuple[str, float | None]]:
-        """Its name and each position."""
-        name = self.label or self.output_name
-        return [(name, at) for at in self.positions]
-
-    def expand(self) -> list[tuple[str, RustQuantity]]:
-        """One `ValueAt` per position."""
-        name = self.label or self.output_name
-        return [
-            (
-                f"{name} at {_position_text(at)}",
-                (self.rust_kind, self.output_list, [at]),
-            )
-            for at in self.positions
-        ]
-
-
-type Quantity = Annotated[
-    ValueAt | Gain | Peak | PeakPosition | Trajectory, Field(discriminator="kind")
-]
-"""One of the quantities of interest."""
-
-
-def expand_quantities(
-    quantities: Sequence[QuantityBase],
-) -> tuple[list[str], list[RustQuantity]]:
-    """
-    The label and the Rust form of every scalar of `quantities`, in order.
-
-    Parameters
-    ----------
-    quantities : Sequence[Quantity]
-        The quantities; a `Trajectory` gives one scalar per position.
-
-    Returns
-    -------
-    tuple[list[str], list[RustQuantity]]
-        The labels and the quantities as Rust reads them.
-
-    Raises
-    ------
-    ValueError
-        If there is no quantity, or two scalars have one label.
-    """
-    if not quantities:
-        raise ValueError("Give at least one quantity of interest.")
-    expanded = [pair for quantity in quantities for pair in quantity.expand()]
-    labels = [label for label, _ in expanded]
-    repeated = sorted({label for label in labels if labels.count(label) > 1})
-    if repeated:
-        raise ValueError(
-            f"Two quantities have the labels {repeated}: give each a label of its own."
-        )
-    return labels, [rust for _, rust in expanded]
 
 
 class InputSpace(BaseModel):
@@ -560,6 +286,10 @@ class PropagationResult(BaseModel):
     weights : list[float]
         The weight of each run; with a stochastic engine each replicate has
         an equal share of its draw's weight. They sum to 1.
+
+    A quantity that reads a NaN is NaN in `values`, and `summary` raises on
+    it: `where` keeps the runs a condition chooses, which conditions the
+    result on that condition.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -568,6 +298,61 @@ class PropagationResult(BaseModel):
     labels: list[str]
     values: list[list[float]]
     weights: list[float]
+
+    @property
+    def effective_size(self) -> float:
+        """
+        Kish's effective size of the weights of the runs, ``(Σw)²/Σw²``: the
+        number of equally weighted runs that carry as much information.
+        """
+        weights = np.asarray(self.weights, dtype=float)
+        return float(weights.sum() ** 2 / (weights**2).sum())
+
+    def where(self, mask: ArrayLike) -> "PropagationResult":
+        """
+        The runs where `mask` is true, with their weights renormalised to sum
+        to 1.
+
+        A filter conditions the result: a summary of the runs it keeps is the
+        distribution of each quantity given the condition of the mask, such
+        as ``np.isfinite(values[:, i])`` or a compartment above a threshold,
+        not the distribution over every run. `effective_size` says how many
+        runs the kept weights are worth. `sample` stays the draws of the
+        inputs.
+
+        Parameters
+        ----------
+        mask : ArrayLike
+            One boolean per run, in the order of `values`.
+
+        Returns
+        -------
+        PropagationResult
+            The kept runs, their values and their renormalised weights.
+
+        Raises
+        ------
+        ValueError
+            If `mask` has not one boolean per run, keeps no run, or keeps
+            only runs of weight 0.
+        """
+        keep = np.asarray(mask)
+        if keep.dtype != np.bool_ or keep.shape != (len(self.values),):
+            raise ValueError(
+                f"The mask has one boolean per run: {len(self.values)} runs, got "
+                f"an array of {keep.dtype} with the shape {keep.shape}"
+            )
+        weights = np.asarray(self.weights, dtype=float)[keep]
+        if weights.sum() <= 0.0:
+            raise ValueError(
+                "The mask keeps no run of positive weight: a summary needs at least one"
+            )
+        return self.model_copy(
+            update={
+                "values": [row for row, kept in zip(self.values, keep) if kept],
+                "weights": (weights / weights.sum()).tolist(),
+            }
+        )
 
     def summary(self, confidence_level: float) -> list[QuantitySummary]:
         """
@@ -586,7 +371,9 @@ class PropagationResult(BaseModel):
         Raises
         ------
         ValueError
-            If the confidence level is not strictly between 0 and 1.
+            If the confidence level is not strictly between 0 and 1, or a
+            quantity is NaN in a run: `where` keeps the runs a condition
+            chooses.
         """
         if not 0.0 < confidence_level < 1.0:
             raise ValueError(
@@ -597,9 +384,15 @@ class PropagationResult(BaseModel):
         summaries = []
         for index, label in enumerate(self.labels):
             column = [row[index] for row in self.values]
-            median, lower, upper = commol_rs.inference.weighted_quantiles(
-                column, self.weights, levels
-            )
+            try:
+                median, lower, upper = commol_rs.inference.weighted_quantiles(
+                    column, self.weights, levels
+                )
+            except ValueError as error:
+                raise ValueError(
+                    f"Quantity '{label}', in the runs of values counted from 0: "
+                    f"{error}. where(mask) keeps the runs a condition chooses."
+                ) from error
             summaries.append(
                 QuantitySummary(
                     label=label,

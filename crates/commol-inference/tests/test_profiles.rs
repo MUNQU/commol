@@ -685,7 +685,7 @@ fn a_bootstrap_threshold_of_a_prediction_reads_the_rise_of_each_replicate() {
     let weights = vec![1.0; 8];
     assert_eq!(
         run.thresholds[0],
-        commol_inference::statistics::quantiles(&run.rises[0], &weights, &[0.9])[0]
+        commol_inference::statistics::quantiles(&run.rises[0], &weights, &[0.9]).unwrap()[0]
     );
 }
 

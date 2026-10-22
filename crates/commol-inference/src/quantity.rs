@@ -1,25 +1,70 @@
 //! Quantities of interest: the scalars a method reads from each run.
 //!
-//! A quantity reads one output, or a sum of outputs, through the
-//! [`ObservationOperator`], the one code that turns a run into observed
-//! values: [`Quantity::ValueAt`] is an observation at a position,
-//! [`Quantity::Gain`] an observation with a window, and [`Quantity::Peak`]
-//! and [`Quantity::PeakPosition`] reduce the observations at their positions.
-//! The quantities of a design are evaluated in Rust, run after run, so a
-//! design of thousands of runs never returns to Python.
+//! A quantity reads a [`Series`] of a run and reduces it. The series is the
+//! level of some outputs (their sum at each position), or their increments
+//! over windows of one width. The reduction is the value at a position
+//! ([`Quantity::ValueAt`]), the largest value or its first position over
+//! given positions ([`Quantity::Peak`], [`Quantity::PeakPosition`]), or the
+//! value at each position ([`Quantity::Trajectory`]). [`Quantity::Gain`] is
+//! one window given by its start and its end.
+//!
+//! Every value is read through the [`ObservationOperator`], the one code
+//! that turns a run into observed values: a level is an observation, an
+//! increment an observation with a window. The rules:
+//!
+//! - a quantity reads only the positions it names, with no interpolation;
+//! - outputs are summed at each row before any reduction;
+//! - a peak position is the first of the positions where the value is
+//!   largest;
+//! - a NaN in the values a quantity reads makes it NaN, its peak and the
+//!   position of its peak too;
+//! - with a stochastic engine, a quantity is computed for each replicate.
+//!
+//! A quantity crosses from Python as JSON, with `kind` as the tag of each
+//! enum. The quantities of a design are evaluated in Rust, run after run, so
+//! a design of thousands of runs never returns to Python.
 
 use std::ops::Range;
 
 use commol_calibration::{ObservationOperator, ObservedDataPoint};
+use serde::{Deserialize, Serialize};
 
-/// A scalar read from a run. `outputs` are summed, as the outputs of an
-/// observation are.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Quantity {
-    /// The value at `at`.
-    ValueAt {
+/// What a quantity reads at each position of a run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Series {
+    /// The sum of `outputs` at the position.
+    Level {
         /// The outputs summed.
         outputs: Vec<String>,
+    },
+    /// The gain of the sum of `outputs` over `(end − window, end]`, at each
+    /// end: an observation with the window `window`.
+    Increments {
+        /// The outputs summed.
+        outputs: Vec<String>,
+        /// The width of each window, above 0.
+        window: f64,
+    },
+}
+
+impl Series {
+    /// The outputs summed.
+    pub fn outputs(&self) -> &[String] {
+        match self {
+            Self::Level { outputs } | Self::Increments { outputs, .. } => outputs,
+        }
+    }
+}
+
+/// A series of a run and how it is reduced to scalars.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Quantity {
+    /// The value of `series` at `at`.
+    ValueAt {
+        /// The series read.
+        series: Series,
         /// The position.
         at: f64,
     },
@@ -34,20 +79,44 @@ pub enum Quantity {
         /// The end of the window.
         end: f64,
     },
-    /// The largest value at `positions`.
+    /// The largest value of `series` at `positions`.
     Peak {
-        /// The outputs summed.
-        outputs: Vec<String>,
+        /// The series read.
+        series: Series,
         /// The positions compared.
         positions: Vec<f64>,
     },
-    /// The first of `positions` where the value is largest.
+    /// The first of `positions` where the value of `series` is largest.
     PeakPosition {
-        /// The outputs summed.
-        outputs: Vec<String>,
+        /// The series read.
+        series: Series,
         /// The positions compared.
         positions: Vec<f64>,
     },
+    /// The value of `series` at each of `positions`: one scalar per
+    /// position.
+    Trajectory {
+        /// The series read.
+        series: Series,
+        /// The positions.
+        positions: Vec<f64>,
+    },
+}
+
+impl Quantity {
+    /// The number of scalars the quantity gives: one per position of a
+    /// trajectory, one for every other quantity.
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Trajectory { positions, .. } => positions.len(),
+            _ => 1,
+        }
+    }
+
+    /// Whether the quantity gives no scalar: a trajectory of no positions.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 /// How a quantity reduces its observations.
@@ -59,6 +128,8 @@ enum Reduction {
     Max(Range<usize>),
     /// The position of the first largest value of a range of observations.
     ArgMax(Range<usize>, Vec<f64>),
+    /// The value of each observation of a range.
+    Each(Range<usize>),
 }
 
 /// The quantities of a design, compiled for runs at their schedule.
@@ -67,6 +138,58 @@ pub struct Quantities {
     schedule: Vec<f64>,
     operator: ObservationOperator,
     reductions: Vec<Reduction>,
+    count: usize,
+}
+
+/// The observations of a quantity, one per position, and the start of the
+/// window of each.
+struct Points<'a> {
+    index: usize,
+    points: &'a mut Vec<ObservedDataPoint>,
+    starts: &'a mut Vec<Option<f64>>,
+}
+
+impl Points<'_> {
+    /// The observations of `series` at `positions`, as a range of the
+    /// observations of the design.
+    fn read(&mut self, series: &Series, positions: &[f64]) -> Result<Range<usize>, String> {
+        let index = self.index;
+        if series.outputs().is_empty() {
+            return Err(format!("Quantity {index} has no outputs"));
+        }
+        let window = match series {
+            Series::Level { .. } => None,
+            Series::Increments { window, .. } => {
+                if !(window.is_finite() && *window > 0.0) {
+                    return Err(format!(
+                        "Quantity {index}: the window of increments is finite and above 0, got \
+                         {window}"
+                    ));
+                }
+                Some(*window)
+            }
+        };
+        let first = self.points.len();
+        for &at in positions {
+            check_position(index, at)?;
+            if let Some(window) = window
+                && at < window
+            {
+                return Err(format!(
+                    "Quantity {index}: increments over windows of {window} start at 0 at the \
+                     earliest, so each end is at least {window}; got the end {at}"
+                ));
+            }
+            self.points.push(ObservedDataPoint::of_sum(
+                at,
+                format!("quantity {index}"),
+                series.outputs().to_vec(),
+                0.0,
+            ));
+            self.starts.push(window.map(|window| at - window));
+        }
+        Ok(first..self.points.len())
+    }
 }
 
 impl Quantities {
@@ -76,7 +199,9 @@ impl Quantities {
     ///
     /// Returns a message when there is no quantity, a quantity has no
     /// outputs or names an unknown one, a position is not finite, a gain
-    /// does not end after it starts, or a peak has no positions.
+    /// does not end after it starts, the window of increments is not finite
+    /// and above 0 or longer than an end, or a peak or a trajectory has no
+    /// positions.
     pub fn new(quantities: &[Quantity], output_names: &[String]) -> Result<Self, String> {
         if quantities.is_empty() {
             return Err("No quantities of interest given".to_string());
@@ -85,18 +210,14 @@ impl Quantities {
         let mut starts = Vec::new();
         let mut reductions = Vec::with_capacity(quantities.len());
         for (index, quantity) in quantities.iter().enumerate() {
-            if outputs(quantity).is_empty() {
-                return Err(format!("Quantity {index} has no outputs"));
-            }
-            let point = |at: f64, outputs: &[String]| {
-                ObservedDataPoint::of_sum(at, format!("quantity {index}"), outputs.to_vec(), 0.0)
+            let mut read = Points {
+                index,
+                points: &mut points,
+                starts: &mut starts,
             };
-            match quantity {
-                Quantity::ValueAt { outputs, at } => {
-                    check_position(index, *at)?;
-                    reductions.push(Reduction::One(points.len()));
-                    points.push(point(*at, outputs));
-                    starts.push(None);
+            reductions.push(match quantity {
+                Quantity::ValueAt { series, at } => {
+                    Reduction::One(read.read(series, &[*at])?.start)
                 }
                 Quantity::Gain {
                     outputs,
@@ -104,34 +225,37 @@ impl Quantities {
                     end,
                 } => {
                     check_position(index, *start)?;
-                    check_position(index, *end)?;
                     if end <= start {
                         return Err(format!(
                             "Quantity {index}: a gain ends after it starts, got start {start} \
                              and end {end}"
                         ));
                     }
-                    reductions.push(Reduction::One(points.len()));
-                    points.push(point(*end, outputs));
-                    starts.push(Some(*start));
+                    let series = Series::Level {
+                        outputs: outputs.clone(),
+                    };
+                    let row = read.read(&series, &[*end])?.start;
+                    starts[row] = Some(*start);
+                    Reduction::One(row)
                 }
-                Quantity::Peak { outputs, positions }
-                | Quantity::PeakPosition { outputs, positions } => {
+                Quantity::Peak { series, positions }
+                | Quantity::PeakPosition { series, positions }
+                | Quantity::Trajectory { series, positions } => {
                     if positions.is_empty() {
-                        return Err(format!("Quantity {index}: a peak needs positions"));
+                        return Err(format!(
+                            "Quantity {index}: a peak or a trajectory needs positions"
+                        ));
                     }
-                    for &at in positions {
-                        check_position(index, at)?;
-                    }
-                    let range = points.len()..points.len() + positions.len();
-                    points.extend(positions.iter().map(|&at| point(at, outputs)));
-                    starts.resize(points.len(), None);
-                    reductions.push(match quantity {
+                    let range = read.read(series, positions)?;
+                    match quantity {
                         Quantity::Peak { .. } => Reduction::Max(range),
-                        _ => Reduction::ArgMax(range, positions.clone()),
-                    });
+                        Quantity::PeakPosition { .. } => {
+                            Reduction::ArgMax(range, positions.clone())
+                        }
+                        _ => Reduction::Each(range),
+                    }
                 }
-            }
+            });
         }
         let mut schedule: Vec<f64> = points
             .iter()
@@ -145,6 +269,7 @@ impl Quantities {
         Ok(Self {
             schedule,
             operator,
+            count: quantities.iter().map(Quantity::len).sum(),
             reductions,
         })
     }
@@ -154,48 +279,52 @@ impl Quantities {
         &self.schedule
     }
 
-    /// The number of quantities.
+    /// The number of scalars: one per quantity, and one per position of a
+    /// trajectory.
     pub fn len(&self) -> usize {
-        self.reductions.len()
+        self.count
     }
 
-    /// Whether there is no quantity; never, for compiled quantities.
+    /// Whether there is no scalar; never, for compiled quantities.
     pub fn is_empty(&self) -> bool {
-        self.reductions.is_empty()
+        self.count == 0
     }
 
-    /// The value of each quantity in the rows of a run at [`Self::schedule`].
+    /// The value of each scalar in the rows of a run at [`Self::schedule`].
     pub fn evaluate(&self, rows: &[Vec<f64>]) -> Vec<f64> {
         let mut observed = vec![0.0; self.operator.count()];
         self.operator.apply(rows, &[], &mut observed);
-        self.reductions
-            .iter()
-            .map(|reduction| match reduction {
-                Reduction::One(index) => observed[*index],
-                Reduction::Max(range) => observed[range.clone()]
-                    .iter()
-                    .copied()
-                    .fold(f64::NEG_INFINITY, f64::max),
-                Reduction::ArgMax(range, positions) => {
-                    let values = &observed[range.clone()];
-                    let first = values
-                        .iter()
-                        .enumerate()
-                        .fold(0, |best, (i, &v)| if v > values[best] { i } else { best });
-                    positions[first]
+        let mut values = Vec::with_capacity(self.count);
+        for reduction in &self.reductions {
+            match reduction {
+                Reduction::One(index) => values.push(observed[*index]),
+                Reduction::Max(range) => {
+                    values
+                        .push(first_largest(&observed[range.clone()]).map_or(f64::NAN, |(_, v)| v));
                 }
-            })
-            .collect()
+                Reduction::ArgMax(range, positions) => values.push(
+                    first_largest(&observed[range.clone()]).map_or(f64::NAN, |(i, _)| positions[i]),
+                ),
+                Reduction::Each(range) => values.extend_from_slice(&observed[range.clone()]),
+            }
+        }
+        values
     }
 }
 
-fn outputs(quantity: &Quantity) -> &[String] {
-    match quantity {
-        Quantity::ValueAt { outputs, .. }
-        | Quantity::Gain { outputs, .. }
-        | Quantity::Peak { outputs, .. }
-        | Quantity::PeakPosition { outputs, .. } => outputs,
+/// The index and the value of the first largest of `values`, or None when
+/// one is NaN.
+fn first_largest(values: &[f64]) -> Option<(usize, f64)> {
+    let mut best = (0, values[0]);
+    for (i, &value) in values.iter().enumerate() {
+        if value.is_nan() {
+            return None;
+        }
+        if value > best.1 {
+            best = (i, value);
+        }
     }
+    Some(best)
 }
 
 fn check_position(index: usize, at: f64) -> Result<(), String> {

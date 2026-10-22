@@ -39,15 +39,50 @@ pub fn check_levels(levels: &[f64]) -> Result<(), String> {
     }
 }
 
+/// Values that are NaN where a reduction across them needs a number at
+/// each.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NotANumber {
+    /// Index of each value that is NaN.
+    pub points: Vec<usize>,
+}
+
+impl std::fmt::Display for NotANumber {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "The values at {:?} are NaN, and a quantile needs a number at each",
+            self.points
+        )
+    }
+}
+
+impl std::error::Error for NotANumber {}
+
+impl From<NotANumber> for String {
+    fn from(error: NotANumber) -> Self {
+        error.to_string()
+    }
+}
+
 /// The weighted quantiles of `values` at each of `levels`, in `[0, 1]`
 /// ([`check_levels`]).
+///
+/// # Errors
+///
+/// [`NotANumber`] with every value that is NaN, whatever its weight: a
+/// quantile sorted by the sign bit of a NaN is no quantile.
 ///
 /// # Panics
 ///
 /// Panics when `values` and `weights` differ in length, or no weight is
 /// positive.
-pub fn quantiles(values: &[f64], weights: &[f64], levels: &[f64]) -> Vec<f64> {
+pub fn quantiles(values: &[f64], weights: &[f64], levels: &[f64]) -> Result<Vec<f64>, NotANumber> {
     assert_eq!(values.len(), weights.len(), "one weight per value");
+    let points: Vec<usize> = (0..values.len()).filter(|&i| values[i].is_nan()).collect();
+    if !points.is_empty() {
+        return Err(NotANumber { points });
+    }
     let mut members: Vec<(f64, f64)> = values
         .iter()
         .zip(weights)
@@ -66,7 +101,7 @@ pub fn quantiles(values: &[f64], weights: &[f64], levels: &[f64]) -> Vec<f64> {
             midpoint
         })
         .collect();
-    levels
+    Ok(levels
         .iter()
         .map(|&level| {
             let after = midpoints.partition_point(|&p| p < level);
@@ -85,7 +120,7 @@ pub fn quantiles(values: &[f64], weights: &[f64], levels: &[f64]) -> Vec<f64> {
                 }
             }
         })
-        .collect()
+        .collect())
 }
 
 /// The two quantiles of a central interval of `confidence_level`:
@@ -206,7 +241,7 @@ mod tests {
     fn equal_weights_give_the_hazen_quantile() {
         // NumPy: percentile([1, 2, 4, 8], [10, 50, 80], method="hazen").
         let values = [4.0, 1.0, 8.0, 2.0];
-        let q = quantiles(&values, &[0.25; 4], &[0.1, 0.5, 0.8]);
+        let q = quantiles(&values, &[0.25; 4], &[0.1, 0.5, 0.8]).unwrap();
         assert!(close(q[0], 1.0), "{q:?}");
         assert!(close(q[1], 3.0), "{q:?}");
         assert!(close(q[2], 6.8), "{q:?}");
@@ -215,21 +250,21 @@ mod tests {
     #[test]
     fn a_weighted_median_interpolates_between_midpoints() {
         // Midpoints 1/8 and 5/8: the median is 3/4 of the way to 1.
-        let q = quantiles(&[0.0, 1.0], &[0.25, 0.75], &[0.5]);
+        let q = quantiles(&[0.0, 1.0], &[0.25, 0.75], &[0.5]).unwrap();
         assert!(close(q[0], 0.75), "{q:?}");
     }
 
     #[test]
     fn a_weight_of_zero_removes_a_member() {
-        let with_zero = quantiles(&[1.0, 100.0, 3.0], &[0.5, 0.0, 0.5], &[0.2, 0.5, 0.8]);
-        let without = quantiles(&[1.0, 3.0], &[0.5, 0.5], &[0.2, 0.5, 0.8]);
+        let with_zero = quantiles(&[1.0, 100.0, 3.0], &[0.5, 0.0, 0.5], &[0.2, 0.5, 0.8]).unwrap();
+        let without = quantiles(&[1.0, 3.0], &[0.5, 0.5], &[0.2, 0.5, 0.8]).unwrap();
         assert_eq!(with_zero, without);
     }
 
     #[test]
     fn the_scale_of_the_weights_does_not_matter() {
-        let a = quantiles(&[1.0, 2.0, 5.0], &[1.0, 2.0, 1.0], &[0.3, 0.6]);
-        let b = quantiles(&[1.0, 2.0, 5.0], &[0.25, 0.5, 0.25], &[0.3, 0.6]);
+        let a = quantiles(&[1.0, 2.0, 5.0], &[1.0, 2.0, 1.0], &[0.3, 0.6]).unwrap();
+        let b = quantiles(&[1.0, 2.0, 5.0], &[0.25, 0.5, 0.25], &[0.3, 0.6]).unwrap();
         assert!(close(a[0], b[0]) && close(a[1], b[1]));
     }
 

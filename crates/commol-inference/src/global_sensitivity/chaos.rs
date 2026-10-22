@@ -18,6 +18,9 @@
 
 use nalgebra::DMatrix;
 
+use super::check_numbers;
+use crate::predictive::PredictiveError;
+
 /// A polynomial chaos expansion of each quantity, on the scale `u = F(x)`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChaosExpansion {
@@ -74,10 +77,25 @@ impl ChaosExpansion {
     ///
     /// # Errors
     ///
-    /// Returns a message when the points and the outputs differ in number,
-    /// there is no input, there are not more points than terms, or the
-    /// polynomials of the points are collinear.
-    pub fn fit(unit: &[Vec<f64>], outputs: &[Vec<f64>], degree: usize) -> Result<Self, String> {
+    /// [`PredictiveError::NotANumber`] with the first quantity that is NaN at
+    /// a point, before any fit; [`PredictiveError::Mismatch`] when the points
+    /// and the outputs differ in number, there is no input, there are not
+    /// more points than terms, or the polynomials of the points are
+    /// collinear.
+    pub fn fit(
+        unit: &[Vec<f64>],
+        outputs: &[Vec<f64>],
+        degree: usize,
+    ) -> Result<Self, PredictiveError> {
+        check_numbers(outputs)?;
+        Self::least_squares(unit, outputs, degree).map_err(PredictiveError::Mismatch)
+    }
+
+    fn least_squares(
+        unit: &[Vec<f64>],
+        outputs: &[Vec<f64>],
+        degree: usize,
+    ) -> Result<Self, String> {
         let points = unit.len();
         if outputs.len() != points {
             return Err(format!(
@@ -341,11 +359,13 @@ mod tests {
         assert!(
             ChaosExpansion::fit(&unit[..2], &outputs[..2], 2)
                 .unwrap_err()
+                .to_string()
                 .contains("more points")
         );
         assert!(
             ChaosExpansion::fit(&unit, &outputs, 2)
                 .unwrap_err()
+                .to_string()
                 .contains("collinear")
         );
         assert!(ChaosExpansion::fit(&unit, &outputs[..3], 2).is_err());

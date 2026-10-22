@@ -10,7 +10,9 @@
 //! the input depends on where the other inputs are (interactions or a
 //! non-linear effect); `μ` is the signed mean.
 
+use super::check_numbers;
 use crate::design::MorrisDesign;
+use crate::predictive::PredictiveError;
 
 /// The Morris indices of every input for every quantity.
 #[derive(Debug, Clone, PartialEq)]
@@ -29,8 +31,15 @@ pub struct Morris {
 ///
 /// # Errors
 ///
-/// Returns a message when there is not one row of quantities per point.
-pub fn morris(design: &MorrisDesign, outputs: &[Vec<f64>]) -> Result<Morris, String> {
+/// [`PredictiveError::NotANumber`] with the first quantity that is NaN at a
+/// point, before any effect; [`PredictiveError::Mismatch`] when there is not
+/// one row of quantities per point.
+pub fn morris(design: &MorrisDesign, outputs: &[Vec<f64>]) -> Result<Morris, PredictiveError> {
+    check_numbers(outputs)?;
+    effects(design, outputs).map_err(PredictiveError::Mismatch)
+}
+
+fn effects(design: &MorrisDesign, outputs: &[Vec<f64>]) -> Result<Morris, String> {
     if outputs.len() != design.points.len() {
         return Err(format!(
             "Morris needs one row of quantities per point: {} points, {} rows",

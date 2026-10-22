@@ -988,8 +988,8 @@ impl PyObservationDraws {
 /// `method="hazen"`.
 ///
 /// Raises:
-///     ValueError: If the lengths differ, no weight is positive or a level is
-///         not in [0, 1]
+///     ValueError: If the lengths differ, no weight is positive, a level is
+///         not in [0, 1] or a value is NaN
 #[pyfunction]
 fn weighted_quantiles(values: Vec<f64>, weights: Vec<f64>, levels: Vec<f64>) -> PyResult<Vec<f64>> {
     if values.len() != weights.len() {
@@ -1005,7 +1005,8 @@ fn weighted_quantiles(values: Vec<f64>, weights: Vec<f64>, levels: Vec<f64>) -> 
         ));
     }
     statistics::check_levels(&levels).map_err(value_error)?;
-    Ok(statistics::quantiles(&values, &weights, &levels))
+    statistics::quantiles(&values, &weights, &levels)
+        .map_err(|error| value_error(error.to_string()))
 }
 
 /// The weighted mean of `values`, one weight per value and some positive
@@ -1057,6 +1058,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::smc::register(m)?;
     crate::local::register(m)?;
     crate::conformal::register(m)?;
+    crate::quantity::register(m)?;
     crate::sensitivity::register(m)?;
     crate::profiles::register(m)?;
     Ok(())
