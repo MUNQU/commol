@@ -3351,7 +3351,7 @@ structure: <code>ModelStructure.outputs_by_source</code> and <code>series_label<
 </tr>
 <tr>
 <td><code>api/plotting/panels.py</code></td>
-<td>The data of each panel (name, unit, line, band, observed values, prediction intervals; <code>ComparedPanel</code>, a line and a band per result; <code>ObservationPanel</code>, the model, band and window at each observation), computed without matplotlib.</td>
+<td>The data of each panel (name, unit, line, band, observed values, prediction intervals; <code>ComparedPanel</code>, a line and a band per result; <code>ObservationPanel</code>, the model, band and window at each observation; <code>ComparedObservationPanel</code>, a model and a band per result at each observation), computed without matplotlib.</td>
 </tr>
 </tbody>
 </table>
@@ -3396,6 +3396,10 @@ structure: <code>ModelStructure.outputs_by_source</code> and <code>series_label<
 <td>The operator is defined for each observation in Rust (<code>ObservationOperator</code>), and a label can mix windows, outputs and factors, so the model away from the data would need a rule of its own in Python. A value with a window is a total over <code>(at - window, at]</code>, drawn as a step over its window with its band as a rectangle; a line between window ends would suggest values that do not exist. The run along the whole axis is <code>plot.series</code> on the same <code>axes=</code>.</td>
 </tr>
 <tr>
+<td><code>plot_compared(..., panels="observations")</code> draws one panel per observed series, each result read as <code>plot.observations</code> reads it (<code>compared_observation_panels</code> over <code>run_observation_panels</code>, <code>replicate_observation_panels</code> and <code>predictive_observation_panels</code>); the default <code>panels="series"</code> draws one panel per series</td>
+<td><code>plot_compared</code> is the one public function of a comparison, so a second function for the observed series would double its checks of the outputs, its colors and its <code>axes=</code>. The user chose this argument for #305, as #251 named it. <code>series</code> and <code>window</code> raise <code>ValueError</code> with <code>panels="observations"</code>: the labels set the panels, and each observation its own window.</td>
+</tr>
+<tr>
 <td>The band of <code>plot.observations</code> says in its legend that it has no observation noise</td>
 <td>It is the band of the model across replicates or draws, read with <code>NoNoise()</code>: not a prediction interval of the observations.</td>
 </tr>
@@ -3410,6 +3414,7 @@ structure: <code>ModelStructure.outputs_by_source</code> and <code>series_label<
 <code>test_each_accessor_passes_on_the_arguments_of_its_function</code>,
 <code>test_a_figure_draws_on_given_axes</code>, <code>test_compared_runs_share_the_panels</code>,
 <code>test_compared_runs_need_the_same_outputs</code>,
+<code>test_compared_results_draw_a_panel_per_observed_series</code>,
 <code>test_each_observed_point_is_read_through_its_own_window</code>,
 <code>test_a_windowed_value_is_drawn_as_a_step_over_its_window</code>) and
 <code>tests/plotting/test_panels.py::test_the_panels_of_a_run_need_no_matplotlib</code>.</p>

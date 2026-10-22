@@ -22,6 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - `PropagationResult.where(mask)` keeps the runs where `mask` is true and renormalises their weights to sum to 1, and `PropagationResult.effective_size` gives Kish's effective size of the weights. A filter conditions the result on the condition of the mask.
 
+- `plot_compared(…, panels="observations")` draws one panel per observed series (one `label` of `observed_data`), with each result read through the observation operator of each observation, as `plot.observations` reads one result: the steps, markers and band of each result in the color of its key, and the observations once. The default, `panels="series"`, draws one panel per series. See [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#compare-results-on-the-same-panels).
+
 ### Changed
 
 - **Breaking:** each figure is a method of the results it draws, and `SimulationPlotter` is removed. Each figure returns the matplotlib `Figure`. A predictive gives its own figures, so no `Simulation` is built only to draw it. See [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting).

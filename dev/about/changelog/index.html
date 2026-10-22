@@ -4110,6 +4110,17 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   weights. A filter conditions the result on the condition of the mask.</p>
 </li>
 </ul>
+<!-- Added #305 -->
+
+<ul>
+<li><code>plot_compared(…, panels="observations")</code> draws one panel per observed
+  series (one <code>label</code> of <code>observed_data</code>), with each result read through the
+  observation operator of each observation, as <code>plot.observations</code> reads one
+  result: the steps, markers and band of each result in the color of its key,
+  and the observations once. The default, <code>panels="series"</code>, draws one panel
+  per series. See
+  <a href="../../guide/simulations/#compare-results-on-the-same-panels">Plotting</a>.</li>
+</ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <!-- Changed #246 -->
 

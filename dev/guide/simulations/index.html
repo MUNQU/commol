@@ -4110,7 +4110,7 @@ extra <code>commol[plot]</code>:</p>
 </tr>
 <tr>
 <td>Several runs, replicates or predictives</td>
-<td><code>plot_compared({label: result}, …)</code>: each result on the same panels (<a href="#compare-results-on-the-same-panels">compare results</a>).</td>
+<td><code>plot_compared({label: result}, …)</code>: each result on the same panels, one per series or, with <code>panels="observations"</code>, one per observed series (<a href="#compare-results-on-the-same-panels">compare results</a>).</td>
 </tr>
 </tbody>
 </table>
@@ -4394,6 +4394,24 @@ work as in <code>plot.series</code>.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="n">weekly</span> <span class="o">=</span> <span class="n">plot_compared</span><span class="p">({</span><span class="s2">&quot;k1 = 0.3&quot;</span><span class="p">:</span> <span class="n">results</span><span class="p">,</span> <span class="s2">&quot;k1 = 0.5&quot;</span><span class="p">:</span> <span class="n">faster</span><span class="p">},</span> <span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span> <span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
 </span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="nb">print</span><span class="p">([</span><span class="nb">float</span><span class="p">(</span><span class="n">at</span><span class="p">)</span> <span class="k">for</span> <span class="n">at</span> <span class="ow">in</span> <span class="n">weekly</span><span class="o">.</span><span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get_xdata</span><span class="p">()][:</span><span class="mi">3</span><span class="p">])</span>  <span class="c1"># [7.0, 14.0, 21.0]</span>
 </span></code></pre></div>
+<p><code>panels="observations"</code> draws one panel per <code>label</code> of <code>observed_data</code>, as
+<a href="#a-panel-per-observed-series"><code>plot.observations</code></a> draws one result: each
+result is read only at the observations, through the observation operator of
+each one (the sum of its <code>outputs</code>, its <code>window</code> and its factor). Each result
+has the steps, markers and band of <code>plot.observations</code> in the color of its
+key, and the observations are drawn once. The default, <code>panels="series"</code>,
+draws one panel per entry of <code>series</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">checked</span> <span class="o">=</span> <span class="n">plot_compared</span><span class="p">(</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>    <span class="p">{</span><span class="s2">&quot;k1 = 0.3&quot;</span><span class="p">:</span> <span class="n">results</span><span class="p">,</span> <span class="s2">&quot;k1 = 0.5&quot;</span><span class="p">:</span> <span class="n">faster</span><span class="p">},</span> <span class="n">observed_data</span><span class="o">=</span><span class="n">observed</span><span class="p">,</span> <span class="n">panels</span><span class="o">=</span><span class="s2">&quot;observations&quot;</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="p">)</span>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="nb">print</span><span class="p">([</span><span class="n">ax</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">ax</span> <span class="ow">in</span> <span class="n">checked</span><span class="o">.</span><span class="n">axes</span> <span class="k">if</span> <span class="n">ax</span><span class="o">.</span><span class="n">get_visible</span><span class="p">()])</span>  <span class="c1"># [&#39;cum_ab&#39;, &#39;B_and_C&#39;, &#39;B&#39;]</span>
+</span></code></pre></div>
+<p>With <code>panels="observations"</code>, <code>series</code> and <code>window</code> raise <code>ValueError</code>: the
+labels of <code>observed_data</code> set the panels, and each observation sets its own
+window. An empty <code>observed_data</code>, or a result with no value at the position of
+an observation or at the start of its window, also raises <code>ValueError</code>. <code>plot_compared</code> takes no
+<code>calibration_result</code>: a run or replicates read an observation with a factor
+unscaled, and log a warning. A predictive reads the factors of each draw.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

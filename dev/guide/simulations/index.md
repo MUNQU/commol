@@ -382,7 +382,7 @@ pip install 'commol[plot]'
 | `SimulationReplicates`                                                                                                                                                                                      | `replicates.plot.series(…)`: the mean and a band of `confidence_level` (default 0.95), each replicate reduced to the series first. `replicates.plot.cumulative(…)`: the running total of the mean. `replicates.plot.observations(…)`: the mean and the band of each observed series. |
 | [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive)                                                                                                                     | `predictive.plot.series(…)` and `predictive.plot.cumulative(…)`: the weighted median of the draws and their band of `confidence_level`, with no other run. `predictive.plot.observations(…)`: the median and the band of each observed series.                                       |
 | The results of [sensitivity methods](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#plots) and of [profiles](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#plots) | `result.plot(…)`                                                                                                                                                                                                                                                                     |
-| Several runs, replicates or predictives                                                                                                                                                                     | `plot_compared({label: result}, …)`: each result on the same panels ([compare results](#compare-results-on-the-same-panels)).                                                                                                                                                        |
+| Several runs, replicates or predictives                                                                                                                                                                     | `plot_compared({label: result}, …)`: each result on the same panels, one per series or, with `panels="observations"`, one per observed series ([compare results](#compare-results-on-the-same-panels)).                                                                              |
 
 A figure draws one panel per series and returns the matplotlib `Figure`. It reads the name and the unit of each series from the model of the results (`results.model`). Results built by hand have no model: their figures draw only their outputs, and a bin or accumulator id raises `ValueError`.
 
@@ -517,6 +517,17 @@ The first result names the series and gives the title and the unit of each panel
 weekly = plot_compared({"k1 = 0.3": results, "k1 = 0.5": faster}, series=["cum_ab"], window=7)
 print([float(at) for at in weekly.axes[0].lines[0].get_xdata()][:3])  # [7.0, 14.0, 21.0]
 ```
+
+`panels="observations"` draws one panel per `label` of `observed_data`, as [`plot.observations`](#a-panel-per-observed-series) draws one result: each result is read only at the observations, through the observation operator of each one (the sum of its `outputs`, its `window` and its factor). Each result has the steps, markers and band of `plot.observations` in the color of its key, and the observations are drawn once. The default, `panels="series"`, draws one panel per entry of `series`.
+
+```python
+checked = plot_compared(
+    {"k1 = 0.3": results, "k1 = 0.5": faster}, observed_data=observed, panels="observations"
+)
+print([ax.get_label() for ax in checked.axes if ax.get_visible()])  # ['cum_ab', 'B_and_C', 'B']
+```
+
+With `panels="observations"`, `series` and `window` raise `ValueError`: the labels of `observed_data` set the panels, and each observation sets its own window. An empty `observed_data`, or a result with no value at the position of an observation or at the start of its window, also raises `ValueError`. `plot_compared` takes no `calibration_result`: a run or replicates read an observation with a factor unscaled, and log a warning. A predictive reads the factors of each draw.
 
 ## Next steps
 
