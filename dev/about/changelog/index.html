@@ -2983,7 +2983,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#080-2026-10-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.8.0] - 2026-10-22
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.8.0] - 2026-10-22">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3525,7 +3536,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#080-2026-10-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.8.0] - 2026-10-22
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.8.0] - 2026-10-22">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4042,11 +4064,23 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h2 id="080-2026-10-22">[0.8.0] - 2026-10-22<a class="headerlink" href="#080-2026-10-22" title="Permanent link">&para;</a></h2>
+<p>This release compares runs. <code>Scenarios</code> runs every draw of a sample under
+several sets of parameter values and compares them in pairs, a quantity of
+interest reads a series and reduces it (the peak of the gains over windows,
+for example), and <code>results.quantities</code> reads the quantities of one run.
+Figures are methods of the results they draw: <code>plot.series</code>,
+<code>plot.observations</code> and <code>plot_compared</code>, which draws several runs or samples
+on the same panels. Before you upgrade, read the <strong>Breaking</strong> entries:
+<code>SimulationPlotter</code> and seaborn are removed and matplotlib is the optional
+extra <code>commol[plot]</code>, the quantities take a <code>series</code>, and the runs of the
+draws of a stochastic sample follow one tree of seeds, so their numbers change.
+See <a href="../../guide/uncertainty/sensitivity/">Sensitivity Analysis</a> and
+<a href="../../guide/simulations/">Simulations</a>.</p>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
-<!-- Added #246 -->
-
 <ul>
-<li><code>Scenarios(source, sample, scenarios, positions)</code> runs every draw of a
+<li>
+<p><code>Scenarios(source, sample, scenarios, positions)</code> runs every draw of a
   sample under each scenario, a set of parameter values that override those
   of the model, and is a mapping from the name of a scenario to its
   <code>Predictive</code>. Every scenario runs with the seed of the source, so run <code>k</code>
@@ -4059,12 +4093,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   of every draw, <code>Calibrator.point_sample(result)</code> the point estimate of a fit
   as a sample of one draw, and <code>Calibrator.with_model</code> and
   <code>SensitivityAnalysis.with_model</code> the same source on another model with the
-  same seed. See <a href="../../guide/uncertainty/#scenarios">Scenarios</a>.</li>
-</ul>
-<!-- Added #247 -->
-
-<ul>
-<li><code>plot.observations(observed_data, …)</code> of <code>SimulationResults</code>,
+  same seed. See <a href="../../guide/uncertainty/#scenarios">Scenarios</a>.</p>
+</li>
+<li>
+<p><code>plot.observations(observed_data, …)</code> of <code>SimulationResults</code>,
   <code>SimulationReplicates</code> and <code>Predictive</code> draws one panel per observed series
   (one <code>label</code>), with the model read through the observation operator of each
   observation: the sum of its <code>outputs</code>, its <code>window</code> and its factor. A
@@ -4072,43 +4104,34 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   value with a window is a step over its window, and the band of replicates
   or of a predictive (<code>at_observations(…, NoNoise())</code>) a rectangle over it;
   its legend says that it is a band of the model, not a prediction interval.
-  See <a href="../../guide/simulations/#a-panel-per-observed-series">Plotting</a>.</li>
-</ul>
-<!-- Added #250 -->
-
-<ul>
-<li><code>SimulationResults.quantities(quantities)</code> reduces one run to its
+  See <a href="../../guide/simulations/#a-panel-per-observed-series">Plotting</a>.</p>
+</li>
+<li>
+<p><code>SimulationResults.quantities(quantities)</code> reduces one run to its
   quantities of interest, as <code>dict[str, float]</code>, and
   <code>SimulationReplicates.quantities(quantities)</code> gives one such dict per
   replicate, with the Rust code of <code>Propagation</code>. <code>quantity_schedule</code> gives
   the positions to run at; a run that lacks one raises <code>ValueError</code> that lists
   each missing position with its quantity. The guide shows how to take a ratio
   of two quantities row by row. See
-  <a href="../../guide/uncertainty/sensitivity/#the-quantities-of-one-run">The quantities of one run</a>.</li>
-</ul>
-<!-- Added #251 -->
-
-<ul>
-<li><code>plot_compared({label: result}, …)</code> draws several runs, replicates or
+  <a href="../../guide/uncertainty/sensitivity/#the-quantities-of-one-run">The quantities of one run</a>.</p>
+</li>
+<li>
+<p><code>plot_compared({label: result}, …)</code> draws several runs, replicates or
   predictives of the same model on the same panels: one line per result,
   labelled with its key and in the same color in every panel, the band of
   each set of replicates and of each predictive, and the observations once.
   <code>window=</code> draws the gain of each series over each window. A result without
   the outputs of the first raises <code>ValueError</code> that names its key. See
-  <a href="../../guide/simulations/#compare-results-on-the-same-panels">Plotting</a>.</li>
-</ul>
-<!-- Added #276 -->
-
-<ul>
-<li>Every figure takes <code>axes=</code>, the <code>Figure</code> of an earlier figure of commol, and
+  <a href="../../guide/simulations/#compare-results-on-the-same-panels">Plotting</a>.</p>
+</li>
+<li>
+<p>Every figure takes <code>axes=</code>, the <code>Figure</code> of an earlier figure of commol, and
   draws each series on the panel of that series: each panel has the id of its
   series as the label of its <code>Axes</code>. A series with no panel raises
   <code>ValueError</code> that names it. See
-  <a href="../../guide/simulations/#several-results-on-one-figure">Plotting</a>.</li>
-</ul>
-<!-- Added #280 -->
-
-<ul>
+  <a href="../../guide/simulations/#several-results-on-one-figure">Plotting</a>.</p>
+</li>
 <li>
 <p>A quantity of interest reads a series and reduces it. The series is a name
   or a list of names, their <code>Level</code>, or <code>Increments(outputs, window)</code>: the
@@ -4125,29 +4148,17 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>PropagationResult.effective_size</code> gives Kish's effective size of the
   weights. A filter conditions the result on the condition of the mask.</p>
 </li>
-</ul>
-<!-- Added #305 -->
-
-<ul>
-<li><code>plot_compared(…, panels="observations")</code> draws one panel per observed
+<li>
+<p><code>plot_compared(…, panels="observations")</code> draws one panel per observed
   series (one <code>label</code> of <code>observed_data</code>), with each result read through the
   observation operator of each observation, as <code>plot.observations</code> reads one
   result: the steps, markers and band of each result in the color of its key,
   and the observations once. The default, <code>panels="series"</code>, draws one panel
   per series. See
-  <a href="../../guide/simulations/#compare-results-on-the-same-panels">Plotting</a>.</li>
+  <a href="../../guide/simulations/#compare-results-on-the-same-panels">Plotting</a>.</p>
+</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
-<!-- Changed #246 -->
-
-<!-- Changed #247 -->
-
-<!-- Changed #250 -->
-
-<!-- Changed #251 -->
-
-<!-- Changed #276 -->
-
 <ul>
 <li><strong>Breaking:</strong> each figure is a method of the results it draws, and
   <code>SimulationPlotter</code> is removed. Each figure returns the matplotlib <code>Figure</code>.
@@ -4196,10 +4207,6 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   "seaborn-v0_8-talk", "seaborn-v0_8-colorblind"]</code>. The presets
   (<code>presentation</code>, <code>publication</code>, <code>notebook</code>) use these sheets.</p>
 </li>
-</ul>
-<!-- Changed #280 -->
-
-<ul>
 <li>
 <p><strong>Breaking:</strong> <code>ValueAt</code>, <code>Peak</code>, <code>PeakPosition</code> and <code>Trajectory</code> take
   <code>series</code> in place of <code>outputs</code>: <code>ValueAt(outputs="B", at=10)</code> is
@@ -4216,11 +4223,8 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   the point, inputs, replicate and seed of the first such run.
   <code>PropagationResult.values</code> keeps the NaN of each run.</p>
 </li>
-</ul>
-<!-- Changed #309 -->
-
-<ul>
-<li><strong>Breaking:</strong> the runs of the draws of a sample follow one tree of seeds.
+<li>
+<p><strong>Breaking:</strong> the runs of the draws of a sample follow one tree of seeds.
   Draw <code>j</code> of a stochastic <code>Predictive</code>, <code>Propagation</code>, <code>at_observations</code> or
   score takes a seed of its own, and its replicate <code>i</code> takes the seed that
   replicate <code>i</code> of <code>Simulation.replicates(n, seed=…)</code> takes from it. Before,
@@ -4230,21 +4234,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   draws, and <code>Predictive.draw_seeds</code> and <code>PropagationResult.draw_seeds</code> give
   the seed of each draw: <code>Simulation.replicates(n, seed=draw_seeds[j])</code> of
   the model at the values of draw <code>j</code> gives its runs. See
-  <a href="../../guide/uncertainty/#the-predictive">The predictive</a>.</li>
+  <a href="../../guide/uncertainty/#the-predictive">The predictive</a>.</p>
+</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
-<!-- Fixed #246 -->
-
-<!-- Fixed #247 -->
-
-<!-- Fixed #250 -->
-
-<!-- Fixed #251 -->
-
-<!-- Fixed #276 -->
-
-<!-- Fixed #280 -->
-
 <ul>
 <li>
 <p>A NaN in the values a <code>Peak</code> or a <code>PeakPosition</code> reads makes it NaN. The
@@ -5823,6 +5816,7 @@ the details of these versions.</p>
 <h2 id="version-history">Version History<a class="headerlink" href="#version-history" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Unreleased</strong> - Current development version</li>
+<li><strong>0.8.0</strong> - Comparing runs: scenarios, quantities of a series, figures as methods and runs on the same panels</li>
 <li><strong>0.7.0</strong> - Reading a run through objects: the window grid and dates on the axis, series by output name and reports as methods</li>
 <li><strong>0.6.1</strong> - Fixes of 0.6.0: checks at build, messages of infeasible draws, PRCC with NaN, quantity labels and starts, plots</li>
 <li><strong>0.6.0</strong> - Uncertainty methods with a model of the data: likelihood, posteriors, local approximations, conformal intervals, profiles and sensitivity analysis</li>

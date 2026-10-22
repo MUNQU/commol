@@ -8,22 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-22
+
+This release compares runs. `Scenarios` runs every draw of a sample under several sets of parameter values and compares them in pairs, a quantity of interest reads a series and reduces it (the peak of the gains over windows, for example), and `results.quantities` reads the quantities of one run. Figures are methods of the results they draw: `plot.series`, `plot.observations` and `plot_compared`, which draws several runs or samples on the same panels. Before you upgrade, read the **Breaking** entries: `SimulationPlotter` and seaborn are removed and matplotlib is the optional extra `commol[plot]`, the quantities take a `series`, and the runs of the draws of a stochastic sample follow one tree of seeds, so their numbers change. See [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md) and [Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md).
+
 ### Added
 
 - `Scenarios(source, sample, scenarios, positions)` runs every draw of a sample under each scenario, a set of parameter values that override those of the model, and is a mapping from the name of a scenario to its `Predictive`. Every scenario runs with the seed of the source, so run `k` of each scenario is the same draw with the same seed (common random numbers). `compare(name, baseline, quantities, confidence_level)` takes the difference of each quantity of interest within each run and reduces the differences with the weights of the runs; `summary` reduces one scenario. Both give a `ScenarioSummary` per label, with no interval when there is one run. `Predictive.quantities(quantities)` gives the quantities of every draw, `Calibrator.point_sample(result)` the point estimate of a fit as a sample of one draw, and `Calibrator.with_model` and `SensitivityAnalysis.with_model` the same source on another model with the same seed. See [Scenarios](https://munqu.github.io/commol/latest/guide/uncertainty/#scenarios).
-
 - `plot.observations(observed_data, …)` of `SimulationResults`, `SimulationReplicates` and `Predictive` draws one panel per observed series (one `label`), with the model read through the observation operator of each observation: the sum of its `outputs`, its `window` and its factor. A series that sums some outputs, such as `B_g2 + B_g3`, gets its own panel. A value with a window is a step over its window, and the band of replicates or of a predictive (`at_observations(…, NoNoise())`) a rectangle over it; its legend says that it is a band of the model, not a prediction interval. See [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#a-panel-per-observed-series).
-
 - `SimulationResults.quantities(quantities)` reduces one run to its quantities of interest, as `dict[str, float]`, and `SimulationReplicates.quantities(quantities)` gives one such dict per replicate, with the Rust code of `Propagation`. `quantity_schedule` gives the positions to run at; a run that lacks one raises `ValueError` that lists each missing position with its quantity. The guide shows how to take a ratio of two quantities row by row. See [The quantities of one run](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#the-quantities-of-one-run).
-
 - `plot_compared({label: result}, …)` draws several runs, replicates or predictives of the same model on the same panels: one line per result, labelled with its key and in the same color in every panel, the band of each set of replicates and of each predictive, and the observations once. `window=` draws the gain of each series over each window. A result without the outputs of the first raises `ValueError` that names its key. See [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#compare-results-on-the-same-panels).
-
 - Every figure takes `axes=`, the `Figure` of an earlier figure of commol, and draws each series on the panel of that series: each panel has the id of its series as the label of its `Axes`. A series with no panel raises `ValueError` that names it. See [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#several-results-on-one-figure).
-
 - A quantity of interest reads a series and reduces it. The series is a name or a list of names, their `Level`, or `Increments(outputs, window)`: the gain of their sum over each window that ends at a position. So `Peak(series=Increments("acc", window=7), positions=ends)` is the largest gain of `acc` over a window of 7, and `PeakPosition` with the same arguments the end of that window, with no class of their own. `commol` exports `Level` and `Increments`. See [Quantities of interest](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#quantities-of-interest).
-
 - `PropagationResult.where(mask)` keeps the runs where `mask` is true and renormalises their weights to sum to 1, and `PropagationResult.effective_size` gives Kish's effective size of the weights. A filter conditions the result on the condition of the mask.
-
 - `plot_compared(…, panels="observations")` draws one panel per observed series (one `label` of `observed_data`), with each result read through the observation operator of each observation, as `plot.observations` reads one result: the steps, markers and band of each result in the color of its key, and the observations once. The default, `panels="series"`, draws one panel per series. See [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#compare-results-on-the-same-panels).
 
 ### Changed
@@ -38,13 +35,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 | `SimulationPlotter.plot_prcc(result)`, `plot_morris`, `plot_sobol`, `plot_profiles`                                           | `result.plot()` of `PRCCResult`, `MorrisResult`, `SobolResult`, `ChaosResult` and `ProfileResult` |
 
 - **Breaking:** matplotlib draws the figures, and is the optional extra `commol[plot]` (`pip install 'commol[plot]'`); seaborn is no longer a dependency, and `import commol` loads no plotting library. Without matplotlib, a figure raises `ImportError` with the install line. The other keyword arguments of a figure go to `Axes.plot`, not to `seaborn.lineplot`.
-
 - **Breaking:** `PlotConfig.style` takes a matplotlib style or a list of styles, and `PlotConfig` has no `palette` and no `context`. The style sheets of matplotlib give the former values: `style="whitegrid", context="talk", palette="colorblind"` is `style=["seaborn-v0_8-whitegrid", "seaborn-v0_8-talk", "seaborn-v0_8-colorblind"]`. The presets (`presentation`, `publication`, `notebook`) use these sheets.
-
 - **Breaking:** `ValueAt`, `Peak`, `PeakPosition` and `Trajectory` take `series` in place of `outputs`: `ValueAt(outputs="B", at=10)` is `ValueAt(series="B", at=10)`. `Gain(outputs, start, end)` keeps `outputs`, and the outputs of a quantity read back as a list. The quantities live in `commol.context.inference.quantities`, and cross to Rust as the JSON of their classes.
-
 - Every reduction across runs raises `ValueError` on a quantity that is NaN: `PropagationResult.summary()`, `member_statistics`, `weighted_quantiles`, and Morris, Sobol and the polynomial chaos before they estimate, as PRCC did. The message of a method names the quantity, the points where it is NaN, and the point, inputs, replicate and seed of the first such run. `PropagationResult.values` keeps the NaN of each run.
-
 - **Breaking:** the runs of the draws of a sample follow one tree of seeds. Draw `j` of a stochastic `Predictive`, `Propagation`, `at_observations` or score takes a seed of its own, and its replicate `i` takes the seed that replicate `i` of `Simulation.replicates(n, seed=…)` takes from it. Before, the seed of a replicate depended on the number of replicates. So the numbers of these methods with a stochastic engine change from 0.7.0. The runs of a draw no longer change with the number of replicates or of draws, and `Predictive.draw_seeds` and `PropagationResult.draw_seeds` give the seed of each draw: `Simulation.replicates(n, seed=draw_seeds[j])` of the model at the values of draw `j` gives its runs. See [The predictive](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive).
 
 ### Fixed
@@ -521,6 +514,7 @@ ______________________________________________________________________
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.8.0** - Comparing runs: scenarios, quantities of a series, figures as methods and runs on the same panels
 - **0.7.0** - Reading a run through objects: the window grid and dates on the axis, series by output name and reports as methods
 - **0.6.1** - Fixes of 0.6.0: checks at build, messages of infeasible draws, PRCC with NaN, quantity labels and starts, plots
 - **0.6.0** - Uncertainty methods with a model of the data: likelihood, posteriors, local approximations, conformal intervals, profiles and sensitivity analysis
