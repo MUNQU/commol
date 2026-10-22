@@ -205,7 +205,7 @@ What the settings give: with Nelder-Mead at its default `sd_tolerance` (`1e-6`),
 - a parameter with no effect while the others sit at their fit, but an effect elsewhere in the box, is `non_identifiable` for the profile, and may be identifiable for the rank.
 
 ```python
-from commol import SimulationPlotter, StructuralRank
+from commol import StructuralRank
 
 
 def product_model(k1: float | None, s: float | None, k2: float | None):
@@ -256,10 +256,10 @@ print(merged.verdicts["k1"].structural.verdict, merged.verdicts["s"].structural.
 
 ## Plots
 
-`SimulationPlotter.plot_profiles(result)` draws one panel per profile: the statistic of each point, the threshold as a dashed line and the ends of the interval as dotted lines.
+`result.plot()` draws one panel per profile: the statistic of each point, the threshold as a dashed line and the ends of the interval as dotted lines. It returns the matplotlib `Figure` ([Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting): the extra `commol[plot]`, `output_file`, `config` and `axes`).
 
 ```python
-figure = SimulationPlotter.plot_profiles(result)
+figure = result.plot()
 ```
 
 ## Checklist

@@ -77,13 +77,14 @@ model.update_parameters({"k1": 0.3})
 
 `run` and `run_at` return `SimulationResults` (`py-commol/commol/api/results.py`): a `dict` from output name to one value per position, so `results["A"]`, `json.dumps(results)` and `pandas.DataFrame(results)` work as for any mapping. The positions the values were read at are in `results.positions`.
 
-| Member                                          | Shape                                                                                                                      | Use for                                                  |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `results[name]`                                 | `[value at positions[0], …]`                                                                                               | Reading one output, plotting                             |
-| `results.positions`                             | `[0.0, 1.0, …, n]` for `run(n)`; the requested positions for `run_at`                                                      | Reading a value at a position, windows, reports          |
-| `results.rows()`                                | `[[every output at positions[0]], …]`, in `simulation_outputs` order                                                       | Matrix operations, export                                |
-| `results.model`                                 | The `Model` of the run, which `run` and `run_at` set; `None` for results built by hand                                     | The outputs of each bin and accumulator, read by reports |
-| `results.report(positions, window, windows, …)` | The report of the run, as plain data ([Reports](https://munqu.github.io/commol/latest/guide/reports/#the-report-of-a-run)) | JSON export next to the observations                     |
+| Member                                                 | Shape                                                                                                                      | Use for                                                  |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `results[name]`                                        | `[value at positions[0], …]`                                                                                               | Reading one output, plotting                             |
+| `results.positions`                                    | `[0.0, 1.0, …, n]` for `run(n)`; the requested positions for `run_at`                                                      | Reading a value at a position, windows, reports          |
+| `results.rows()`                                       | `[[every output at positions[0]], …]`, in `simulation_outputs` order                                                       | Matrix operations, export                                |
+| `results.model`                                        | The `Model` of the run, which `run` and `run_at` set; `None` for results built by hand                                     | The outputs of each bin and accumulator, read by reports |
+| `results.report(positions, window, windows, …)`        | The report of the run, as plain data ([Reports](https://munqu.github.io/commol/latest/guide/reports/#the-report-of-a-run)) | JSON export next to the observations                     |
+| `results.plot.series(…)`, `results.plot.cumulative(…)` | A matplotlib `Figure` ([Plotting](#plotting))                                                                              | Figures of the run                                       |
 
 `run(num_steps)` holds `num_steps + 1` positions: position 0 is the initial state.
 
@@ -125,10 +126,9 @@ Replicate `i` takes the seed derived from `seed` and `i`, the SplitMix64 of `see
 | `quantiles(levels)`                                       | `{level: SimulationResults}`, at each position, by [the one quantile](https://munqu.github.io/commol/latest/codebase/decisions/results/#one-confidence-interval-convention) (NumPy's `method="hazen"`)                                              |
 | `member_statistics(output, confidence_level)`             | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate with [the one quantile](https://munqu.github.io/commol/latest/codebase/decisions/results/#one-confidence-interval-convention) |
 | `report(confidence_level, positions, window, windows, …)` | The report of a run, with each number reduced replicate by replicate ([Reports](https://munqu.github.io/commol/latest/guide/reports/#the-report-of-an-ensemble))                                                                                    |
+| `plot.series(…)`, `plot.cumulative(…)`                    | The figure of the mean and of a band of the replicates, and the figure of the running total of the mean ([Plotting](#plotting))                                                                                                                     |
 
 ```python
-from commol.api.plotter import SimulationPlotter
-
 stochastic = Simulation(
     ModelBuilder(name="Stochastic Model")
     .add_bin(id="A", name="State A")
@@ -140,7 +140,7 @@ stochastic = Simulation(
 replicates = stochastic.replicates(200, seed=42).run(num_steps=50)
 mean = replicates.mean()
 band = replicates.member_statistics("B", confidence_level=0.9)
-SimulationPlotter(stochastic, replicates).plot_series()  # the mean and a 95 % band
+replicates.plot.series()  # the mean and a 95 % band
 print(replicates.seeds[:2] == [run.seed for run in replicates[:2]])  # True
 ```
 
@@ -366,18 +366,32 @@ print([round(value, 1) for value in gained])  # [221.2, 172.3, 134.2, 104.5]
 
 ## Plotting
 
-`SimulationPlotter(simulation, results)` draws one subplot per output with seaborn, and returns the matplotlib `Figure`. With the `SimulationReplicates` of a stochastic engine, `plot_series` draws their mean and a band of `confidence_level` (default 0.95), each replicate reduced to the plotted series first:
+A figure is read from the results it draws. It needs matplotlib, the optional extra `commol[plot]`:
+
+```bash
+pip install 'commol[plot]'
+```
+
+`import commol` loads no plotting library. Without matplotlib, a figure raises `ImportError` with this install line.
+
+| Results                                                                                                                                                                                                     | Figures                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SimulationResults`                                                                                                                                                                                         | `results.plot.series(…)`: each series along the axis. `results.plot.cumulative(…)`: the running total of each series.                                                                              |
+| `SimulationReplicates`                                                                                                                                                                                      | `replicates.plot.series(…)`: the mean and a band of `confidence_level` (default 0.95), each replicate reduced to the series first. `replicates.plot.cumulative(…)`: the running total of the mean. |
+| [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive)                                                                                                                     | `predictive.plot.series(…)` and `predictive.plot.cumulative(…)`: the weighted median of the draws and their band of `confidence_level`, with no other run.                                         |
+| The results of [sensitivity methods](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#plots) and of [profiles](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#plots) | `result.plot(…)`                                                                                                                                                                                   |
+
+A figure draws one panel per series and returns the matplotlib `Figure`. It reads the name and the unit of each series from the model of the results (`results.model`). Results built by hand have no model: their figures draw only their outputs, and a bin or accumulator id raises `ValueError`.
 
 ```python
-from commol import PlotConfig, SimulationPlotter
+from commol import PlotConfig
 
-plotter = SimulationPlotter(simulation, results)  # the results of the first run
-plotter.plot_series(output_file="series.png")
-plotter.plot_cumulative(output_file="cumulative.png")
+results.plot.series(output_file="series.png")  # the results of the first run
+results.plot.cumulative(output_file="cumulative.png")
 
-plotter.plot_series(
+results.plot.series(
     output_file="custom.png",
-    config=PlotConfig(figsize=(16, 10), dpi=150, style="whitegrid", palette="Set2", context="talk"),
+    config=PlotConfig(figsize=(16, 10), dpi=150, style=["seaborn-v0_8-whitegrid", "seaborn-v0_8-talk"]),
     series=["B", "C"],
     x_label="Week",
     tick_every=10,
@@ -387,28 +401,30 @@ plotter.plot_series(
 )
 ```
 
-| Argument                                  | Default                                        | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ----------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `output_file`                             | `None`                                         | Where to save the figure. `None` only returns it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `series`                                  | `None` (every output)                          | What to plot, one subplot each: an output name (`B_g1`) or a bin or accumulator id (`B`), which plots the sum of its outputs (`Simulation.outputs_for`). An exact output name wins. An unknown entry raises `ValueError`.                                                                                                                                                                                                                                                                                                    |
-| `observed_data`                           | `None`                                         | `ObservedDataPoint`s to draw on the subplot of their `label`, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs and one factor and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, `window` and factor as the loss reads it (`ValueError` when the results have no value at a position or a window start). |
-| `calibration_result`                      | `None`                                         | A `CalibrationResult` gives the factor values that scale the model. A [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive) draws the weighted median of its draws and their band of `confidence_level`, each draw read through the observation operator (sums, windows, factors), at the position of each observation when the line of `observed_data` is.                                                                                                                                |
-| `prediction_intervals`                    | `None`                                         | `plot_series` only. The `PredictionIntervals` of a [conformal method](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md): the subplot of each of their series, by label, shows the band from `lower` to `upper` and the point prediction, dashed. An unbounded interval is left out of the band.                                                                                                                                                                                                    |
-| `config`                                  | `PlotConfig()`                                 | Figure size, dpi, layout and seaborn style.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `show_legend`                             | `True`                                         | `plot_series` only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot_series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`. With no `position_label`, a model with an [origin](https://munqu.github.io/commol/latest/guide/units-and-equations/#dates-on-the-axis) labels each tick with its date (`2020-01-08`, with the time when it is not midnight): at the plotted positions `tick_every` apart, or at the ticks matplotlib places when `tick_every` is `None`.                                                                                   |
-| other keyword arguments                   | —                                              | Passed to `seaborn.lineplot`, such as `linewidth` or `alpha`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Argument                                  | Default                                        | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`                             | `None`                                         | Where to save the figure. `None` only returns it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `series`                                  | `None` (every output)                          | What to draw, one panel each: an output name (`B_g1`) or a bin or accumulator id (`B`), which draws the sum of its outputs (`ModelStructure.outputs_by_source`). An exact output name wins. An unknown entry raises `ValueError`.                                                                                                                                                                                                                                                                                                                                                  |
+| `observed_data`                           | `None`                                         | `ObservedDataPoint`s to draw on the panel of their `label`, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs and one factor and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, `window` and factor as the loss reads it (`ValueError` when the results have no value at a position or a window start). A predictive reads each draw through the same operator. |
+| `calibration_result`                      | `None`                                         | Runs and replicates only. A `CalibrationResult` gives the factor values that scale the model. A predictive reads the factors of each draw.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `confidence_level`                        | `0.95`                                         | Replicates and predictives only. The level of the band.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `prediction_intervals`                    | `None`                                         | `plot.series` only. The `PredictionIntervals` of a [conformal method](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md): the panel of each of their series, by label, shows the band from `lower` to `upper` and the point prediction, dashed. An unbounded interval is left out of the band.                                                                                                                                                                                                                                                            |
+| `axes`                                    | `None`                                         | A `Figure` of commol to draw on ([several results on one figure](#several-results-on-one-figure)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `config`                                  | `PlotConfig()`                                 | Figure size, dpi, layout and matplotlib style.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `show_legend`                             | `True`                                         | `plot.series` only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot.series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`. With no `position_label`, a model with an [origin](https://munqu.github.io/commol/latest/guide/units-and-equations/#dates-on-the-axis) labels each tick with its date (`2020-01-08`, with the time when it is not midnight): at the plotted positions `tick_every` apart, or at the ticks matplotlib places when `tick_every` is `None`.                                                                                                                                         |
+| other keyword arguments                   | —                                              | Passed to `Axes.plot` for the line of the model, such as `linewidth` or `alpha`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
-| `PlotConfig` field | Default            | Values                                                      |
-| ------------------ | ------------------ | ----------------------------------------------------------- |
-| `figsize`          | `(12, 8)`          | Inches (width, height)                                      |
-| `dpi`              | `100`              | Resolution                                                  |
-| `layout`           | `None` (automatic) | `(rows, columns)`                                           |
-| `style`            | `None`             | `"darkgrid"`, `"whitegrid"`, `"dark"`, `"white"`, `"ticks"` |
-| `palette`          | `None`             | A seaborn palette or matplotlib colormap, such as `"Set2"`  |
-| `context`          | `None`             | `"paper"`, `"notebook"`, `"talk"`, `"poster"`               |
+| `PlotConfig` field | Default            | Values                                                                                                                                                                                                                                                            |
+| ------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `figsize`          | `(12, 8)`          | Inches (width, height) of a figure of running totals. The other figures get 4.5 by 3.5 inches per panel.                                                                                                                                                          |
+| `dpi`              | `100`              | Resolution                                                                                                                                                                                                                                                        |
+| `layout`           | `None` (automatic) | `(rows, columns)`                                                                                                                                                                                                                                                 |
+| `style`            | `None`             | A [matplotlib style](https://matplotlib.org/stable/gallery/style_sheets/style_sheets_reference.html) or a list of styles, applied in order: a name of `matplotlib.style.available`, such as `"ggplot"` or `"seaborn-v0_8-whitegrid"`, or the path of a style file |
 
-`style`, `palette` and `context` apply to the figure of one plot only. Each method of `SimulationPlotter` draws in a copy of `matplotlib.rcParams` (`_scoped_style` in `py-commol/commol/api/plotter.py`), so the figures that you draw with matplotlib after a plot of commol keep your own style.
+`PlotConfig.presentation()`, `publication()` and `notebook()` give a size, a dpi and styles for each use.
+
+The style applies to the figure of one call only. Each figure draws in a copy of `matplotlib.rcParams` (`_scoped_style` in `py-commol/commol/api/plotting/figures.py`), so the figures that you draw with matplotlib after a figure of commol keep your own style.
 
 To compare with observations:
 
@@ -419,7 +435,21 @@ observed = [
     ObservedDataPoint(at=10, output="B", value=45.2),
     ObservedDataPoint(at=20, output="B", value=78.5),
 ]
-plotter.plot_series(output_file="with_data.png", observed_data=observed)
+results.plot.series(output_file="with_data.png", observed_data=observed)
+```
+
+### Several results on one figure
+
+Each panel holds the id of its series as the label of its `Axes` (`ax.get_label()`). Give the `Figure` of an earlier figure as `axes=`, and a figure draws each of its series on the panel of that series. A series with no panel raises `ValueError` that names it. `config` then sets only the style: the size, dpi and layout are those of the given figure.
+
+```python
+faster_model = model.model_copy(deep=True)
+faster_model.update_parameters({"k1": 0.5})
+faster = Simulation(faster_model).run(num_steps=100)
+
+figure = results.plot.series(series=["B", "C"])
+faster.plot.series(series=["B", "C"], axes=figure, linestyle="--")
+print([ax.get_label() for ax in figure.axes if ax.get_visible()])  # ['B', 'C']
 ```
 
 ## Next steps

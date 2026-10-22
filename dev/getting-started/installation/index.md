@@ -10,6 +10,12 @@ Install Commol from PyPI, or build it from source to work on it.
 pip install commol
 ```
 
+The figures need matplotlib, the optional extra `commol[plot]`:
+
+```bash
+pip install 'commol[plot]'
+```
+
 | Requirement                      | Version                                              |
 | -------------------------------- | ---------------------------------------------------- |
 | Python                           | 3.12 or later                                        |

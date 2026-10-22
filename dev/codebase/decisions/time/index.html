@@ -3252,14 +3252,14 @@ the first midnight after <code>start</code>; the first end can close a partial p
 <code>first_weekday</code> numbers days as <code>date.weekday</code> does and has no default: which
 day starts a week is the user's choice. The number of a period is not on the
 axis.</p>
-<p><code>SimulationPlotter.plot_series</code> labels the ticks with <code>_date_label</code> (the date,
+<p><code>plot.series</code> of results labels the ticks with <code>_date_label</code> (the date,
 and the time when it is not midnight) when the model has an origin and the
 call has no <code>position_label</code>. With no <code>tick_every</code>, it formats the ticks that
 matplotlib places, so a long run does not get one label per position.</p>
 <p><strong>Rule:</strong> a conversion between dates and positions goes through <code>AxisUnits</code>;
 an application keeps no origin of its own.</p>
 <p><strong>Guards:</strong> <code>tests/units/test_calendar_axis.py</code>,
-<code>tests/plotting/test_plotter.py::test_an_axis_with_origin_labels_ticks_with_dates</code>.</p>
+<code>tests/plotting/test_figures.py::test_an_axis_with_origin_labels_ticks_with_dates</code>.</p>
 <h2 id="one-step-unit-in-the-unit-check">One step unit in the unit check<a class="headerlink" href="#one-step-unit-in-the-unit-check" title="Permanent link">&para;</a></h2>
 <p>The engine converts no value between units. So <code>UnitChecker._step_unit</code>
 (<code>context/_model/units.py</code>) uses one step unit: the declared
@@ -3347,16 +3347,16 @@ predictive reads windows through the observation operator
 (<a href="../calibration/#one-observation-operator">One observation operator</a>). Window <code>w</code>
 covers <code>(w · W, (w + 1) · W]</code>; <code>window_index</code> places a position with
 <code>max(ceil(at / W) − 1, 0)</code>, and the <code>observed</code> block of a report (<code>_observed_report</code> in <code>api/reporting.py</code>) calls it.
-<code>SimulationPlotter.plot_series</code> reads the model of a windowed observation the
+<code>plot.series</code> of results reads the model of a windowed observation the
 same way, through its own window at its own position, never on a grid of
 windows from 0: an observation at 10.5 with a window of 7 falls on no window
 end of that grid.</p>
 <p><strong>Guards:</strong> <code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> (the loss at
 the generating parameters is zero),
 <code>tests/reporting/test_simulation_report.py::test_observed_report_places_each_observation_by_window_index</code>
-<code>tests/plotting/test_plotter.py::TestPredictiveSeries::test_a_windowed_band_of_one_draw_is_its_windowed_run</code>
+<code>tests/plotting/test_figures.py::TestPredictiveSeries::test_a_windowed_band_of_one_draw_is_its_windowed_run</code>
 and
-<code>tests/plotting/test_plotter.py::test_each_observed_point_is_read_through_its_own_window_and_position</code>.</p>
+<code>tests/plotting/test_figures.py::test_each_observed_point_is_read_through_its_own_window_and_position</code>.</p>
 <h2 id="the-engine-owns-positions">The engine owns positions<a class="headerlink" href="#the-engine-owns-positions" title="Permanent link">&para;</a></h2>
 <p>A position on the axis is an <code>f64</code> in every engine call and a <code>float</code> in every
 public Python name (<code>at</code>); a length is <code>window</code> or <code>period</code>; a count of steps
@@ -3393,7 +3393,7 @@ a model type that reports between integers fits them. A predictive holds the
 positions it was asked for (<code>Predictive.positions</code>).</p>
 <p><strong>Guards:</strong> <code>tests/simulation/test_runs.py::TestResults</code>,
 <code>tests/reporting/test_simulation_report.py::TestNonIntegerPositions</code>,
-<code>tests/plotting/test_plotter.py::TestDifferentialModel</code>.</p>
+<code>tests/plotting/test_figures.py::TestDifferentialModel</code>.</p>
 
 
 

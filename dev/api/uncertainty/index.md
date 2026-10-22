@@ -1102,6 +1102,14 @@ class Predictive:
         """The weight of each draw of the predictive; they sum to 1."""
         return self._rust.weights
 
+    @property
+    def plot(self) -> PredictivePlot:
+        """
+        The figures of the draws: ``plot.series()`` and ``plot.cumulative()``,
+        the weighted median and the band of each series.
+        """
+        return PredictivePlot(self)
+
     def runs(self) -> list[SimulationResults]:
         """
         The trajectory of every draw, in the order of `weights`.
@@ -1332,6 +1340,14 @@ weights: list[float]
 ```
 
 The weight of each draw of the predictive; they sum to 1.
+
+#### plot
+
+```python
+plot: PredictivePlot
+```
+
+The figures of the draws: `plot.series()` and `plot.cumulative()`, the weighted median and the band of each series.
 
 ### Methods:
 
@@ -3433,6 +3449,45 @@ class ProfileResult(_Frozen):
     notes: list[str] = Field(default_factory=list)
     failed_replicates: list[str] = Field(default_factory=list)
 
+    def plot(
+        self,
+        output_file: str | None = None,
+        config: "PlotConfig | None" = None,
+        axes: "Figure | None" = None,
+    ) -> "Figure":
+        """
+        Draw each profile: one panel per parameter or prediction, with the
+        statistic of each point, the threshold, and the ends of the interval.
+
+        A profile that stays under the threshold up to a bound is open on that
+        side; a flat one stays near 0 over its whole range.
+
+        Parameters
+        ----------
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        axes : Figure | None
+            A figure of commol to draw on: each panel is the `Axes` whose
+            label is the name of its profile. If None, a new figure.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            If ``axes`` has no panel of a profile.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _profiles
+
+        return _profiles(self, output_file=output_file, config=config, axes=axes)
+
     def report(self) -> IdentifiabilityReport:
         """
         The verdicts of the profiled parameters as an identifiability report,
@@ -3520,6 +3575,80 @@ class ProfileResult(_Frozen):
 ```
 
 ### Methods:
+
+#### plot
+
+```python
+plot(output_file: str | None = None, config: PlotConfig | None = None, axes: Figure | None = None) -> Figure
+```
+
+Draw each profile: one panel per parameter or prediction, with the statistic of each point, the threshold, and the ends of the interval.
+
+A profile that stays under the threshold up to a bound is open on that side; a flat one stays near 0 over its whole range.
+
+Parameters:
+
+| Name          | Type         | Description | Default                                                                                                              |
+| ------------- | ------------ | ----------- | -------------------------------------------------------------------------------------------------------------------- |
+| `output_file` | \`str        | None\`      | Path to save the figure to. If None, the figure is only returned.                                                    |
+| `config`      | \`PlotConfig | None\`      | Layout and style. If None, the defaults.                                                                             |
+| `axes`        | \`Figure     | None\`      | A figure of commol to draw on: each panel is the Axes whose label is the name of its profile. If None, a new figure. |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                  |
+| ------------- | ------------------------------------------------------------ |
+| `ValueError`  | If axes has no panel of a profile.                           |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
+
+Source code in `commol/context/inference/profiles.py`
+
+```python
+def plot(
+    self,
+    output_file: str | None = None,
+    config: "PlotConfig | None" = None,
+    axes: "Figure | None" = None,
+) -> "Figure":
+    """
+    Draw each profile: one panel per parameter or prediction, with the
+    statistic of each point, the threshold, and the ends of the interval.
+
+    A profile that stays under the threshold up to a bound is open on that
+    side; a flat one stays near 0 over its whole range.
+
+    Parameters
+    ----------
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+    axes : Figure | None
+        A figure of commol to draw on: each panel is the `Axes` whose
+        label is the name of its profile. If None, a new figure.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        If ``axes`` has no panel of a profile.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _profiles
+
+    return _profiles(self, output_file=output_file, config=config, axes=axes)
+```
 
 #### report
 

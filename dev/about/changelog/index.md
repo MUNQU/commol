@@ -10,7 +10,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- Every figure takes `axes=`, the `Figure` of an earlier figure of commol, and draws each series on the panel of that series: each panel has the id of its series as the label of its `Axes`. A series with no panel raises `ValueError` that names it. See [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#several-results-on-one-figure).
+
 ### Changed
+
+- **Breaking:** each figure is a method of the results it draws, and `SimulationPlotter` is removed. Each figure returns the matplotlib `Figure`. A predictive gives its own figures, so no `Simulation` is built only to draw it. See [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting).
+
+| Before                                                                                                                        | Now                                                                                               |
+| ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `SimulationPlotter(simulation, results).plot_series(…)`, `.plot_cumulative(…)`                                                | `results.plot.series(…)`, `results.plot.cumulative(…)`                                            |
+| `SimulationPlotter(simulation, replicates, confidence_level=c).plot_series(…)`                                                | `replicates.plot.series(…, confidence_level=c)`                                                   |
+| `SimulationPlotter(simulation, run, confidence_level=c).plot_series(calibration_result=predictive, …)`, and `plot_cumulative` | `predictive.plot.series(…, confidence_level=c)`, `predictive.plot.cumulative(…)`                  |
+| `SimulationPlotter.plot_prcc(result)`, `plot_morris`, `plot_sobol`, `plot_profiles`                                           | `result.plot()` of `PRCCResult`, `MorrisResult`, `SobolResult`, `ChaosResult` and `ProfileResult` |
+
+- **Breaking:** matplotlib draws the figures, and is the optional extra `commol[plot]` (`pip install 'commol[plot]'`); seaborn is no longer a dependency, and `import commol` loads no plotting library. Without matplotlib, a figure raises `ImportError` with the install line. The other keyword arguments of a figure go to `Axes.plot`, not to `seaborn.lineplot`.
+- **Breaking:** `PlotConfig.style` takes a matplotlib style or a list of styles, and `PlotConfig` has no `palette` and no `context`. The style sheets of matplotlib give the former values: `style="whitegrid", context="talk", palette="colorblind"` is `style=["seaborn-v0_8-whitegrid", "seaborn-v0_8-talk", "seaborn-v0_8-colorblind"]`. The presets (`presentation`, `publication`, `notebook`) use these sheets.
 
 ### Fixed
 

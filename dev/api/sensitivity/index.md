@@ -1510,6 +1510,130 @@ class PRCCResult(BaseModel):
     coefficients: list[list[float]]
     p_values: list[list[float]]
     effective_size: float
+
+    def plot(
+        self,
+        output_file: str | None = None,
+        config: "PlotConfig | None" = None,
+        x_label: str = "Step",
+        axes: "Figure | None" = None,
+    ) -> "Figure":
+        """
+        Draw the PRCC of each input: one panel per series.
+
+        A series of a `Trajectory` draws one line per input over its
+        positions; any other quantity draws one bar per input.
+
+        Parameters
+        ----------
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        x_label : str
+            The label of the x axis of a series over positions.
+        axes : Figure | None
+            A figure of commol to draw on: each panel is the `Axes` whose
+            label is the name of its series. If None, a new figure.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            If ``axes`` has no panel of a series.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _prcc
+
+        return _prcc(
+            self, output_file=output_file, config=config, x_label=x_label, axes=axes
+        )
+```
+
+### Methods:
+
+#### plot
+
+```python
+plot(output_file: str | None = None, config: PlotConfig | None = None, x_label: str = 'Step', axes: Figure | None = None) -> Figure
+```
+
+Draw the PRCC of each input: one panel per series.
+
+A series of a `Trajectory` draws one line per input over its positions; any other quantity draws one bar per input.
+
+Parameters:
+
+| Name          | Type         | Description                                         | Default                                                                                                             |
+| ------------- | ------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `output_file` | \`str        | None\`                                              | Path to save the figure to. If None, the figure is only returned.                                                   |
+| `config`      | \`PlotConfig | None\`                                              | Layout and style. If None, the defaults.                                                                            |
+| `x_label`     | `str`        | The label of the x axis of a series over positions. | `'Step'`                                                                                                            |
+| `axes`        | \`Figure     | None\`                                              | A figure of commol to draw on: each panel is the Axes whose label is the name of its series. If None, a new figure. |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                  |
+| ------------- | ------------------------------------------------------------ |
+| `ValueError`  | If axes has no panel of a series.                            |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
+
+Source code in `commol/context/inference/global_sensitivity.py`
+
+```python
+def plot(
+    self,
+    output_file: str | None = None,
+    config: "PlotConfig | None" = None,
+    x_label: str = "Step",
+    axes: "Figure | None" = None,
+) -> "Figure":
+    """
+    Draw the PRCC of each input: one panel per series.
+
+    A series of a `Trajectory` draws one line per input over its
+    positions; any other quantity draws one bar per input.
+
+    Parameters
+    ----------
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+    x_label : str
+        The label of the x axis of a series over positions.
+    axes : Figure | None
+        A figure of commol to draw on: each panel is the `Axes` whose
+        label is the name of its series. If None, a new figure.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        If ``axes`` has no panel of a series.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _prcc
+
+    return _prcc(
+        self, output_file=output_file, config=config, x_label=x_label, axes=axes
+    )
 ```
 
 ## Morris
@@ -1616,6 +1740,121 @@ class MorrisResult(BaseModel):
     mu_star: list[list[float]]
     sigma: list[list[float]]
     runs: int
+
+    def plot(
+        self,
+        output_file: str | None = None,
+        config: "PlotConfig | None" = None,
+        axes: "Figure | None" = None,
+    ) -> "Figure":
+        """
+        Draw ``σ`` against ``μ*`` of each input: one panel per quantity,
+        one labelled point per input.
+
+        An input far to the right matters; one high up acts through
+        interactions or a non-linear effect.
+
+        Parameters
+        ----------
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        axes : Figure | None
+            A figure of commol to draw on: each panel is the `Axes` whose
+            label is the label of its quantity. If None, a new figure.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            If ``axes`` has no panel of a quantity.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _morris
+
+        return _morris(self, output_file=output_file, config=config, axes=axes)
+```
+
+### Methods:
+
+#### plot
+
+```python
+plot(output_file: str | None = None, config: PlotConfig | None = None, axes: Figure | None = None) -> Figure
+```
+
+Draw `σ` against `μ*` of each input: one panel per quantity, one labelled point per input.
+
+An input far to the right matters; one high up acts through interactions or a non-linear effect.
+
+Parameters:
+
+| Name          | Type         | Description | Default                                                                                                                |
+| ------------- | ------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `output_file` | \`str        | None\`      | Path to save the figure to. If None, the figure is only returned.                                                      |
+| `config`      | \`PlotConfig | None\`      | Layout and style. If None, the defaults.                                                                               |
+| `axes`        | \`Figure     | None\`      | A figure of commol to draw on: each panel is the Axes whose label is the label of its quantity. If None, a new figure. |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                  |
+| ------------- | ------------------------------------------------------------ |
+| `ValueError`  | If axes has no panel of a quantity.                          |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
+
+Source code in `commol/context/inference/global_sensitivity.py`
+
+```python
+def plot(
+    self,
+    output_file: str | None = None,
+    config: "PlotConfig | None" = None,
+    axes: "Figure | None" = None,
+) -> "Figure":
+    """
+    Draw ``σ`` against ``μ*`` of each input: one panel per quantity,
+    one labelled point per input.
+
+    An input far to the right matters; one high up acts through
+    interactions or a non-linear effect.
+
+    Parameters
+    ----------
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+    axes : Figure | None
+        A figure of commol to draw on: each panel is the `Axes` whose
+        label is the label of its quantity. If None, a new figure.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        If ``axes`` has no panel of a quantity.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _morris
+
+    return _morris(self, output_file=output_file, config=config, axes=axes)
 ```
 
 ## Sobol
@@ -1739,6 +1978,113 @@ class SobolResult(BaseModel):
     total_lower: list[list[float]]
     total_upper: list[list[float]]
     runs: int
+
+    def plot(
+        self,
+        output_file: str | None = None,
+        config: "PlotConfig | None" = None,
+        axes: "Figure | None" = None,
+    ) -> "Figure":
+        """
+        Draw the first-order and total Sobol indices: one panel per
+        quantity, one pair of bars per input, with their intervals.
+
+        Parameters
+        ----------
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        axes : Figure | None
+            A figure of commol to draw on: each panel is the `Axes` whose
+            label is the label of its quantity. If None, a new figure.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            If ``axes`` has no panel of a quantity.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _sobol
+
+        return _sobol(self, output_file=output_file, config=config, axes=axes)
+```
+
+### Methods:
+
+#### plot
+
+```python
+plot(output_file: str | None = None, config: PlotConfig | None = None, axes: Figure | None = None) -> Figure
+```
+
+Draw the first-order and total Sobol indices: one panel per quantity, one pair of bars per input, with their intervals.
+
+Parameters:
+
+| Name          | Type         | Description | Default                                                                                                                |
+| ------------- | ------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `output_file` | \`str        | None\`      | Path to save the figure to. If None, the figure is only returned.                                                      |
+| `config`      | \`PlotConfig | None\`      | Layout and style. If None, the defaults.                                                                               |
+| `axes`        | \`Figure     | None\`      | A figure of commol to draw on: each panel is the Axes whose label is the label of its quantity. If None, a new figure. |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                  |
+| ------------- | ------------------------------------------------------------ |
+| `ValueError`  | If axes has no panel of a quantity.                          |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
+
+Source code in `commol/context/inference/global_sensitivity.py`
+
+```python
+def plot(
+    self,
+    output_file: str | None = None,
+    config: "PlotConfig | None" = None,
+    axes: "Figure | None" = None,
+) -> "Figure":
+    """
+    Draw the first-order and total Sobol indices: one panel per
+    quantity, one pair of bars per input, with their intervals.
+
+    Parameters
+    ----------
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+    axes : Figure | None
+        A figure of commol to draw on: each panel is the `Axes` whose
+        label is the label of its quantity. If None, a new figure.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        If ``axes`` has no panel of a quantity.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _sobol
+
+    return _sobol(self, output_file=output_file, config=config, axes=axes)
 ```
 
 ## PolynomialChaos
@@ -1872,6 +2218,42 @@ class ChaosResult(BaseModel):
     total: list[list[float]]
     runs: int
 
+    def plot(
+        self,
+        output_file: str | None = None,
+        config: "PlotConfig | None" = None,
+        axes: "Figure | None" = None,
+    ) -> "Figure":
+        """
+        Draw the first-order and total Sobol indices of the expansion: one
+        panel per quantity, one pair of bars per input.
+
+        Parameters
+        ----------
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        axes : Figure | None
+            A figure of commol to draw on: each panel is the `Axes` whose
+            label is the label of its quantity. If None, a new figure.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            If ``axes`` has no panel of a quantity.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _sobol
+
+        return _sobol(self, output_file=output_file, config=config, axes=axes)
+
     def predict(self, values: Sequence[Sequence[float]]) -> list[list[float]]:
         """
         The quantities the expansion gives at each set of input values.
@@ -1903,6 +2285,75 @@ class ChaosResult(BaseModel):
 ```
 
 ### Methods:
+
+#### plot
+
+```python
+plot(output_file: str | None = None, config: PlotConfig | None = None, axes: Figure | None = None) -> Figure
+```
+
+Draw the first-order and total Sobol indices of the expansion: one panel per quantity, one pair of bars per input.
+
+Parameters:
+
+| Name          | Type         | Description | Default                                                                                                                |
+| ------------- | ------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `output_file` | \`str        | None\`      | Path to save the figure to. If None, the figure is only returned.                                                      |
+| `config`      | \`PlotConfig | None\`      | Layout and style. If None, the defaults.                                                                               |
+| `axes`        | \`Figure     | None\`      | A figure of commol to draw on: each panel is the Axes whose label is the label of its quantity. If None, a new figure. |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                  |
+| ------------- | ------------------------------------------------------------ |
+| `ValueError`  | If axes has no panel of a quantity.                          |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
+
+Source code in `commol/context/inference/global_sensitivity.py`
+
+```python
+def plot(
+    self,
+    output_file: str | None = None,
+    config: "PlotConfig | None" = None,
+    axes: "Figure | None" = None,
+) -> "Figure":
+    """
+    Draw the first-order and total Sobol indices of the expansion: one
+    panel per quantity, one pair of bars per input.
+
+    Parameters
+    ----------
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+    axes : Figure | None
+        A figure of commol to draw on: each panel is the `Axes` whose
+        label is the label of its quantity. If None, a new figure.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        If ``axes`` has no panel of a quantity.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _sobol
+
+    return _sobol(self, output_file=output_file, config=config, axes=axes)
+```
 
 #### predict
 

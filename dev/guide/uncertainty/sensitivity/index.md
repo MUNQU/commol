@@ -190,14 +190,12 @@ print([round(value) for value in chaos.predict([[0.4, 0.1]])[0]])  # [428]
 
 ## Plots
 
-The plots of the results are static methods of `SimulationPlotter`: `plot_prcc` draws one line per input over the positions of a `Trajectory` and one bar per input for any other quantity, `plot_morris` draws `sigma` against `mu_star`, one point per input, and `plot_sobol` draws the first-order and total indices of a `SobolResult`, with their intervals, or of a `ChaosResult`.
+Each result draws its own figure with `plot()`, one panel per quantity, and returns the matplotlib `Figure` ([Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting): the extra `commol[plot]`, `output_file`, `config` and `axes`). The `plot` of a `PRCCResult` draws one line per input over the positions of a `Trajectory` and one bar per input for any other quantity. The `plot` of a `MorrisResult` draws `sigma` against `mu_star`, one point per input. The `plot` of a `SobolResult` draws the first-order and total indices with their intervals, and the `plot` of a `ChaosResult` draws those of the expansion.
 
 ```python
-from commol.api.plotter import SimulationPlotter
-
-figure = SimulationPlotter.plot_prcc(over_axis, x_label="Step")
-figure = SimulationPlotter.plot_morris(screening)
-figure = SimulationPlotter.plot_sobol(indices)
+figure = over_axis.plot(x_label="Step")
+figure = screening.plot()
+figure = indices.plot()
 ```
 
 ## Checklist

@@ -4025,6 +4025,13 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Added #276 -->
 
+<ul>
+<li>Every figure takes <code>axes=</code>, the <code>Figure</code> of an earlier figure of commol, and
+  draws each series on the panel of that series: each panel has the id of its
+  series as the label of its <code>Axes</code>. A series with no panel raises
+  <code>ValueError</code> that names it. See
+  <a href="../../guide/simulations/#several-results-on-one-figure">Plotting</a>.</li>
+</ul>
 <!-- Added #280 -->
 
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
@@ -4038,6 +4045,55 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Changed #276 -->
 
+<ul>
+<li><strong>Breaking:</strong> each figure is a method of the results it draws, and
+  <code>SimulationPlotter</code> is removed. Each figure returns the matplotlib <code>Figure</code>.
+  A predictive gives its own figures, so no <code>Simulation</code> is built only to draw
+  it. See <a href="../../guide/simulations/#plotting">Plotting</a>.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Before</th>
+<th>Now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SimulationPlotter(simulation, results).plot_series(…)</code>, <code>.plot_cumulative(…)</code></td>
+<td><code>results.plot.series(…)</code>, <code>results.plot.cumulative(…)</code></td>
+</tr>
+<tr>
+<td><code>SimulationPlotter(simulation, replicates, confidence_level=c).plot_series(…)</code></td>
+<td><code>replicates.plot.series(…, confidence_level=c)</code></td>
+</tr>
+<tr>
+<td><code>SimulationPlotter(simulation, run, confidence_level=c).plot_series(calibration_result=predictive, …)</code>, and <code>plot_cumulative</code></td>
+<td><code>predictive.plot.series(…, confidence_level=c)</code>, <code>predictive.plot.cumulative(…)</code></td>
+</tr>
+<tr>
+<td><code>SimulationPlotter.plot_prcc(result)</code>, <code>plot_morris</code>, <code>plot_sobol</code>, <code>plot_profiles</code></td>
+<td><code>result.plot()</code> of <code>PRCCResult</code>, <code>MorrisResult</code>, <code>SobolResult</code>, <code>ChaosResult</code> and <code>ProfileResult</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>
+<p><strong>Breaking:</strong> matplotlib draws the figures, and is the optional extra
+  <code>commol[plot]</code> (<code>pip install 'commol[plot]'</code>); seaborn is no longer a
+  dependency, and <code>import commol</code> loads no plotting library. Without
+  matplotlib, a figure raises <code>ImportError</code> with the install line. The other
+  keyword arguments of a figure go to <code>Axes.plot</code>, not to <code>seaborn.lineplot</code>.</p>
+</li>
+<li>
+<p><strong>Breaking:</strong> <code>PlotConfig.style</code> takes a matplotlib style or a list of
+  styles, and <code>PlotConfig</code> has no <code>palette</code> and no <code>context</code>. The style sheets
+  of matplotlib give the former values: <code>style="whitegrid", context="talk",
+  palette="colorblind"</code> is <code>style=["seaborn-v0_8-whitegrid",
+  "seaborn-v0_8-talk", "seaborn-v0_8-colorblind"]</code>. The presets
+  (<code>presentation</code>, <code>publication</code>, <code>notebook</code>) use these sheets.</p>
+</li>
+</ul>
 <!-- Changed #280 -->
 
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>

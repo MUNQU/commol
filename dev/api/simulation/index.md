@@ -1274,6 +1274,16 @@ class SimulationResults(dict[str, list[float]]):
         """
         return [list(row) for row in zip(*self.values())] if self else []
 
+    @property
+    def plot(self) -> ResultsPlot:
+        """
+        The figures of the run: ``plot.series()`` and ``plot.cumulative()``.
+
+        They name each series from `model`; results with no model draw only
+        their outputs.
+        """
+        return ResultsPlot(self)
+
     def report(
         self,
         positions: Sequence[float],
@@ -1342,6 +1352,18 @@ class SimulationResults(dict[str, list[float]]):
             f"{dict.__repr__(self)})"
         )
 ```
+
+### Attributes
+
+#### plot
+
+```python
+plot: ResultsPlot
+```
+
+The figures of the run: `plot.series()` and `plot.cumulative()`.
+
+They name each series from `model`; results with no model draw only their outputs.
 
 ### Methods:
 
@@ -1971,6 +1993,14 @@ class SimulationReplicates(list[SimulationResults]):
         """The seed of each replicate, in order."""
         return [run.seed for run in self if run.seed is not None]
 
+    @property
+    def plot(self) -> ReplicatesPlot:
+        """
+        The figures of the replicates: ``plot.series()``, their mean and band,
+        and ``plot.cumulative()``.
+        """
+        return ReplicatesPlot(self)
+
     def _values(self, name: str) -> np.ndarray:
         return np.asarray([run[name] for run in self], dtype=float)
 
@@ -2170,6 +2200,14 @@ seeds: list[int]
 ```
 
 The seed of each replicate, in order.
+
+#### plot
+
+```python
+plot: ReplicatesPlot
+```
+
+The figures of the replicates: `plot.series()`, their mean and band, and `plot.cumulative()`.
 
 ### Methods:
 

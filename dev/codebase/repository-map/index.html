@@ -3545,7 +3545,7 @@
 </tr>
 <tr>
 <td><code>api/results.py</code></td>
-<td><code>SimulationResults</code> (values with their positions, seed and model, and its <code>report</code>), <code>SimulationReplicates</code> (runs with one seed each, their statistics and their <code>report</code>), <code>index_at</code>, <code>sample</code>.</td>
+<td><code>SimulationResults</code> (values with their positions, seed and model, its <code>report</code> and its <code>plot</code>), <code>SimulationReplicates</code> (runs with one seed each, their statistics, their <code>report</code> and their <code>plot</code>), <code>index_at</code>, <code>sample</code>.</td>
 <td>Engine rules.</td>
 </tr>
 <tr>
@@ -3574,9 +3574,9 @@
 <td>Physical units inside the model.</td>
 </tr>
 <tr>
-<td><code>api/plotter.py</code></td>
-<td>Plots of results, of the bands of a <code>Predictive</code>, of sensitivity results (<code>plot_prcc</code>, <code>plot_morris</code>, <code>plot_sobol</code>) and of profiles (<code>plot_profiles</code>).</td>
-<td>Computation of results.</td>
+<td><code>api/plotting/</code></td>
+<td>The figures of results: the <code>plot</code> accessors of <code>SimulationResults</code>, <code>SimulationReplicates</code> and <code>Predictive</code> (<code>accessors.py</code>), the private drawing functions, which also draw the <code>plot()</code> of the results of sensitivity methods and profiles (<code>figures.py</code>, the only module that imports matplotlib), and the data of each panel, computed without matplotlib (<code>panels.py</code>).</td>
+<td>Computation of results; a public drawing function.</td>
 </tr>
 <tr>
 <td><code>context/inference/</code></td>
@@ -3798,7 +3798,12 @@
 <tr>
 <td>Change how results, windows or reports read positions</td>
 <td><code>py-commol/commol/api/results.py</code></td>
-<td><code>api/windows.py</code>, <code>api/reporting.py</code>, <code>api/plotter.py</code>, <code>api/inference/predictive.py</code></td>
+<td><code>api/windows.py</code>, <code>api/reporting.py</code>, <code>api/plotting/</code>, <code>api/inference/predictive.py</code></td>
+</tr>
+<tr>
+<td>Change a figure</td>
+<td><code>py-commol/commol/api/plotting/</code> (<code>panels.py</code>, the data; <code>figures.py</code>, the drawing)</td>
+<td><code>api/plotting/accessors.py</code>, the <code>plot</code> method of the result, <code>docs/guide/simulations.md</code> (Plotting)</td>
 </tr>
 <tr>
 <td>Add a function or variable to rate expressions</td>
@@ -3904,7 +3909,7 @@
 <li><strong>Type conversion between Python and Rust</strong> → <code>py-commol/src/</code>.</li>
 <li><strong>Validation of user input</strong> → the Pydantic model in <code>context/</code>.</li>
 <li><strong>User-facing workflow</strong> → <code>api/</code>.</li>
-<li><strong>Presentation</strong> (reports, plots) → <code>api/reporting.py</code>, <code>api/plotter.py</code>.</li>
+<li><strong>Presentation</strong> (reports, figures) → <code>api/reporting.py</code>, <code>api/plotting/</code>.</li>
 </ol>
 <h2 id="navigation">Navigation<a class="headerlink" href="#navigation" title="Permanent link">&para;</a></h2>
 <p>Previous: <a href="../architecture/">Architecture</a> | Next: <a href="../design-decisions/">Design decisions</a></p>

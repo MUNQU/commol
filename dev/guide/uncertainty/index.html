@@ -3740,11 +3740,15 @@ calibration gives for the same values: the remainder and the excess
 <td><code>report(confidence_level, positions, window, windows, observed_data=(), accumulators=())</code></td>
 <td>The report of a run, with each number reduced across the draws with their weights (<a href="../reports/#the-report-of-an-ensemble">Reports</a>)</td>
 </tr>
+<tr>
+<td><code>plot.series(…)</code>, <code>plot.cumulative(…)</code></td>
+<td>The weighted median of the draws of each series and their band, or those of its running total (<a href="../simulations/#plotting">Plotting</a>)</td>
+</tr>
 </tbody>
 </table>
-<p><code>SimulationPlotter.plot_series</code> and <code>plot_cumulative</code> draw the band of a
-predictive when it is the <code>calibration_result</code>, and <code>Predictive.report</code>
-reduces its draws with their weights. <code>Model.applied_parameters</code> takes the
+<p><code>predictive.plot.series()</code> and <code>predictive.plot.cumulative()</code> draw the band of
+the predictive, each draw read through the observation operator of its
+observations, and <code>Predictive.report</code> reduces its draws with their weights. <code>Model.applied_parameters</code> takes the
 sample itself (<code>sample=</code>, with a <code>confidence_level</code>).</p>
 <h2 id="scores">Scores<a class="headerlink" href="#scores" title="Permanent link">&para;</a></h2>
 <p>The functions of <code>commol.scores</code> compare a predictive with observations, and

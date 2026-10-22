@@ -3611,7 +3611,7 @@ merged verdict is then <code>conflicting</code>:</p>
   effect elsewhere in the box, is <code>non_identifiable</code> for the profile, and may
   be identifiable for the rank.</li>
 </ul>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">SimulationPlotter</span><span class="p">,</span> <span class="n">StructuralRank</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">StructuralRank</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">product_model</span><span class="p">(</span><span class="n">k1</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">k2</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">):</span>
@@ -3660,10 +3660,11 @@ merged verdict is then <code>conflicting</code>:</p>
 </span><span id="__span-3-47"><a id="__codelineno-3-47" name="__codelineno-3-47" href="#__codelineno-3-47"></a><span class="c1"># in_combination in_combination</span>
 </span></code></pre></div>
 <h2 id="plots">Plots<a class="headerlink" href="#plots" title="Permanent link">&para;</a></h2>
-<p><code>SimulationPlotter.plot_profiles(result)</code> draws one panel per profile: the
-statistic of each point, the threshold as a dashed line and the ends of the
-interval as dotted lines.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">SimulationPlotter</span><span class="o">.</span><span class="n">plot_profiles</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+<p><code>result.plot()</code> draws one panel per profile: the statistic of each point, the
+threshold as a dashed line and the ends of the interval as dotted lines. It
+returns the matplotlib <code>Figure</code> (<a href="../../simulations/#plotting">Plotting</a>: the
+extra <code>commol[plot]</code>, <code>output_file</code>, <code>config</code> and <code>axes</code>).</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
 </span></code></pre></div>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
