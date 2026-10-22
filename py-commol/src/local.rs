@@ -5,6 +5,7 @@
 //! Each runner takes the problem built once by a `Calibrator` and the fit,
 //! and returns plain values; Python builds the result.
 
+use crate::parallelism::parallel;
 use commol_inference::importance::TemperedPosterior;
 use commol_inference::local::{self, CurvatureKind, Gaussian, LocalError, MixtureRun};
 use commol_inference::sensitivity::Matrix;
@@ -84,9 +85,10 @@ fn laplace(
     seed: u64,
 ) -> PyResult<PyLocalRun> {
     let kind = curvature_kind(curvature)?;
-    let (curvature, gaussian) = py
-        .detach(|| local::laplace_approximation(&problem.inner, &fit, kind))
-        .map_err(local_error)?;
+    let (curvature, gaussian) = parallel(py, || {
+        local::laplace_approximation(&problem.inner, &fit, kind)
+    })?
+    .map_err(local_error)?;
     Ok(PyLocalRun::of(
         &gaussian,
         draws,
@@ -128,9 +130,10 @@ fn sandwich(
     seed: u64,
 ) -> PyResult<SandwichTables> {
     let kind = curvature_kind(curvature)?;
-    let run = py
-        .detach(|| local::sandwich_approximation(&problem.inner, &fit, kind, block_length))
-        .map_err(local_error)?;
+    let run = parallel(py, || {
+        local::sandwich_approximation(&problem.inner, &fit, kind, block_length)
+    })?
+    .map_err(local_error)?;
     let local = PyLocalRun::of(&run.gaussian, draws, seed, run.curvature.notes().to_vec());
     Ok((local, run.blocks, run.block_length, run.estimates))
 }
@@ -176,18 +179,17 @@ fn delta_band(
         )));
     }
     let matrix = Matrix::from_fn(p, p, |j, k| covariance[j][k]);
-    let band = py
-        .detach(|| {
-            local::delta_band(
-                &problem.inner,
-                &fit,
-                &matrix,
-                degrees_of_freedom,
-                &positions,
-                confidence_level,
-            )
-        })
-        .map_err(local_error)?;
+    let band = parallel(py, || {
+        local::delta_band(
+            &problem.inner,
+            &fit,
+            &matrix,
+            degrees_of_freedom,
+            &positions,
+            confidence_level,
+        )
+    })?
+    .map_err(local_error)?;
     Ok((band.outputs, band.center, band.lower, band.upper))
 }
 
@@ -274,7 +276,7 @@ fn laplace_mixture(
     let run = match eta {
         None => {
             let target = LikelihoodTarget::new(inner, &priors).map_err(PyValueError::new_err)?;
-            py.detach(|| {
+            parallel(py, || {
                 local::laplace_mixture(
                     inner,
                     &TemperedPosterior::new(&target),
@@ -284,11 +286,11 @@ fn laplace_mixture(
                     kind,
                     seed,
                 )
-            })
+            })?
         }
         Some(eta) => {
             let target = GibbsTarget::new(inner, &priors, eta).map_err(PyValueError::new_err)?;
-            py.detach(|| {
+            parallel(py, || {
                 local::laplace_mixture(
                     inner,
                     &TemperedPosterior::new(&target),
@@ -298,7 +300,7 @@ fn laplace_mixture(
                     kind,
                     seed,
                 )
-            })
+            })?
         }
     }
     .map_err(local_error)?;

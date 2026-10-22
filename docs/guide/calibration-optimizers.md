@@ -163,6 +163,11 @@ equal strata of its bounds, so the starts cover the parameter space
 (`start_points` in `crates/commol-calibration/src/starts.rs`). A particle
 swarm draws its own population; its start `i > 0` takes its own seed.
 
+A particle swarm also scores the particles of each iteration in parallel, in
+the order of the particles, so the result does not depend on the number of
+threads. `commol.threads` chooses the threads and whether the particles run
+in parallel: see [Threads and Parallelism](parallelism.md).
+
 ```python
 problem = CalibrationProblem(
     observed_data=observed_data,
@@ -221,7 +226,7 @@ order. A point the objective penalizes is not kept.
 | Different results on each run | Set `seed`; use more particles or iterations |
 | A local minimum | `run(starts=n)` from several points |
 | A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations |
-| Slow | Fewer observation steps or particles; Nelder-Mead from a good start |
+| Slow | Fewer observation steps or particles; Nelder-Mead from a good start; check `commol.get_threads()` ([Threads and Parallelism](parallelism.md)) |
 
 ## Next steps
 

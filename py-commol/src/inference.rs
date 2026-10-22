@@ -6,6 +6,7 @@
 //! transforms a prediction: the observation operator, the replicates and the
 //! starts all run here.
 
+use crate::parallelism::parallel;
 use commol_calibration::{
     CalibrationProblem, DiscrepancyConfig, EvaluationError, StartOutcome, Violation, Workspace,
     optimize_starts, optimize_with_history,
@@ -195,8 +196,7 @@ impl PyCalibrationProblem {
         let runner = ReplicateRunner::new(&self.inner, &config.inner, fit, starts, seed)
             .map_err(value_error)?;
         let (resampler, chosen) = resampler(runner.fit())?;
-        let run = py
-            .detach(|| bootstrap(&runner, resampler.as_ref(), replicates))
+        let run = parallel(py, || bootstrap(&runner, resampler.as_ref(), replicates))?
             .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
         Ok(PyBootstrapRun {
             values: run.sample.values().to_vec(),
@@ -320,17 +320,21 @@ impl PyCalibrationProblem {
                     "A verbose optimizer shows one start; set starts=1 or verbose=False",
                 ));
             }
-            let result = crate::python_observer::optimize_with_python_observer(
-                &self.inner,
-                &config.inner,
-                config.header_interval,
-            );
+            let result = parallel(py, || {
+                crate::python_observer::optimize_with_python_observer(
+                    &self.inner,
+                    &config.inner,
+                    config.header_interval,
+                )
+            })?;
             vec![StartOutcome {
                 start: self.inner.initial_parameters(),
                 result,
             }]
         } else {
-            py.detach(|| optimize_starts(&self.inner, &config.inner, starts, seed))
+            parallel(py, || {
+                optimize_starts(&self.inner, &config.inner, starts, seed)
+            })?
         };
         Ok(outcomes
             .into_iter()
@@ -348,7 +352,7 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         config: &PyOptimizationConfig,
     ) -> PyResult<PyCalibrationResultWithHistory> {
-        py.detach(|| optimize_with_history(&self.inner, &config.inner))
+        parallel(py, || optimize_with_history(&self.inner, &config.inner))?
             .map(|inner| PyCalibrationResultWithHistory { inner })
             .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)
     }
@@ -372,7 +376,7 @@ impl PyCalibrationProblem {
         parameter_sets: Vec<Vec<f64>>,
     ) -> PyResult<Vec<Vec<Vec<f64>>>> {
         let n = self.inner.observation().count();
-        py.detach(|| {
+        parallel(py, || {
             parameter_sets
                 .par_iter()
                 .enumerate()
@@ -386,7 +390,7 @@ impl PyCalibrationProblem {
                         .map_err(|error| (index, error))
                 })
                 .collect::<Result<Vec<_>, _>>()
-        })
+        })?
         .map_err(|(index, error)| prediction_error(index, error))
     }
 
@@ -405,9 +409,11 @@ impl PyCalibrationProblem {
         positions: Vec<f64>,
         seed: u64,
     ) -> PyResult<PyPredictive> {
-        py.detach(|| Predictive::new(self.inner.forward(), &sample.inner, &positions, seed))
-            .map(|inner| PyPredictive { inner })
-            .map_err(predictive_error)
+        parallel(py, || {
+            Predictive::new(self.inner.forward(), &sample.inner, &positions, seed)
+        })?
+        .map(|inner| PyPredictive { inner })
+        .map_err(predictive_error)
     }
 
     /// Every draw's value of `observations`, read through the observation
@@ -458,7 +464,7 @@ impl PyCalibrationProblem {
                 )
             }
         };
-        py.detach(|| {
+        parallel(py, || {
             observation_draws(
                 self.inner.forward(),
                 &sample.inner,
@@ -466,7 +472,7 @@ impl PyCalibrationProblem {
                 noise.as_ref(),
                 seed,
             )
-        })
+        })?
         .map(|inner| PyObservationDraws { inner })
         .map_err(predictive_error)
     }
@@ -489,8 +495,10 @@ impl PyCalibrationProblem {
     ) -> PyResult<Vec<f64>> {
         let observations: Vec<_> = observations.into_iter().map(|o| o.inner).collect();
         let noise = DistributionNoise::new(&self.inner).map_err(value_error)?;
-        py.detach(|| scores::log_score(&self.inner, &sample.inner, &observations, &noise, seed))
-            .map_err(predictive_error)
+        parallel(py, || {
+            scores::log_score(&self.inner, &sample.inner, &observations, &noise, seed)
+        })?
+        .map_err(predictive_error)
     }
 
     /// The weighted log density of each observation at `values`
@@ -676,8 +684,7 @@ impl PyCalibrationProblem {
                 scheme.count()
             )));
         }
-        let jackknife = py
-            .detach(|| block_jackknife(&runner, &scheme))
+        let jackknife = parallel(py, || block_jackknife(&runner, &scheme))?
             .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
         let spans = scheme.spans();
         Ok(PyJackknifeRun {

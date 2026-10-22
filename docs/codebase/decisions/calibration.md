@@ -2,7 +2,7 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-What weights, bounds, the observation operator and constraints mean in a calibration.
+What weights, bounds, the observation operator and constraints mean in a calibration, and how its work runs in parallel.
 
 ## One meaning of an observation weight
 
@@ -152,7 +152,8 @@ the iteration before, or a swarm seeded by `replicate_seed(seed, k)`. The
 prediction is read through the observation operator of a copy of the problem
 whose runs also report at its positions (`CalibrationProblem::observing`), so
 one run gives the objective and the constraint, and the cost keeps the
-constraint of the last point it scored. A point that is not feasible keeps
+constraint of the last point each thread scored (the augmented Lagrangian
+asks for both on one thread; a swarm scores its particles on several). A point that is not feasible keeps
 its penalty and a constraint of 0. Each point starts from Algencan's scaled
 penalty; the multiplier is the warm start.
 
@@ -186,3 +187,62 @@ sample a runner makes (`sample_method` in `api/inference/resampling.py`) or
 (`test_a_result_records_the_seed_of_its_calibration`);
 `tests/calibration/test_optimizers.py`
 (`test_the_seed_of_a_result_repeats_a_particle_swarm`).
+
+## Parallel work runs in the pool of the setting
+
+Every binding that runs parallel work calls `parallel` (`py-commol/src/parallelism.rs`),
+which releases the GIL and runs the job in `Parallelism::install`
+(`crates/commol-core/src/parallelism.rs`): a `rayon` pool of the number of
+threads of `commol.threads`, built at its first use and kept for the next job
+with the same setting. Every `par_iter` inside the job, of commol and of the
+argmin fork, nested levels included, runs in that pool. The setting is a
+`contextvars` variable that the extension owns, so each Python thread and
+each `commol.threads` block has its own. A pool is kept per number of
+threads and levels: each thread of a pool holds the levels of its pool
+(`start_handler`), because a nested job can run on any thread of the pool.
+
+**Rule:** a binding never calls `py.detach` itself, and no code builds a pool
+or reads `RAYON_NUM_THREADS`.
+
+| Alternative | Why not |
+|---|---|
+| The global pool of `rayon` (`build_global`) | It is fixed at its first use, so a block could not change it, and other libraries of the process share it. |
+| An argument of each method | One choice about the machine repeated in every call; a block could not set it for a whole script. |
+| One pool per number of threads, the levels in a thread-local of the caller | A job that another thread steals reads the levels of that thread, which another setting may have left. |
+
+**Guards:** `crates/commol-core/src/parallelism.rs` `tests`;
+`tests/uncertainty/test_parallelism.py::test_one_thread_keeps_every_parallel_method_on_one_core`;
+`tests/calibration/test_parallelism.py::test_a_thread_limit_bounds_every_parallel_method`.
+
+## A swarm scores in parallel and keeps the order of its particles
+
+The argmin fork runs with its feature `rayon`, so a particle swarm asks for
+the costs of an iteration at once (`bulk_cost`). `OptimizationObjective`,
+`Recorded` and `FixedParameter` answer with `OptimizationObjective::score_all`
+(`objective.rs`): the points in parallel when the levels of the pool are
+`"all"` (`inner_levels_in_parallel`), one after the other with `"outer"`,
+and the costs in the order of the points. `Recorded` keeps the feasible
+points after the scores, in the order of the points, under one lock, so the
+history does not depend on the order in which the threads finish. With
+several failing points, the error is that of the first in the order of the
+points. A score takes the buffers of its thread out of the thread-local
+`WORKSPACE` while it runs (`with_workspace`), so a job that the thread steals
+meanwhile takes its own; `score_in` makes no `rayon` call.
+
+The augmented Lagrangian of the argmin fork scores its inner swarm through
+`AugmentedLagrangianCost`, whose `bulk_cost` is the default of the fork: it
+scores in parallel whatever the levels, and it returns the error of any
+failing particle.
+
+| Alternative | Why not |
+|---|---|
+| A `Mutex` around the history, filled by each `cost` | It records in the order the threads finish. |
+| A parallel loop of our own in the swarm | It repeats the bulk map of the fork. |
+| The levels as a field of `ParticleSwarmConfig` | The levels are a choice about the machine, next to the threads; a result does not depend on them. |
+
+**Guards:** `crates/commol-calibration/src/optimization.rs` `tests`
+(`a_swarm_gives_the_same_result_with_parallel_particles`,
+`the_error_of_a_swarm_is_its_first_failing_particle`,
+`a_swarm_on_a_subproblem_gives_one_fit_whatever_the_threads`);
+`objective::tests::a_score_holds_no_borrow_of_the_workspace`;
+`tests/calibration/test_parallelism.py::test_a_seed_gives_one_result_whatever_the_threads_and_the_level`.

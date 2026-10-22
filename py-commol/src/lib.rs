@@ -13,6 +13,7 @@
 //! - `engine`: The list of engines, and the engine a model names
 //! - `calibration`: The types of a calibration problem and its optimizers
 //! - `inference`: A calibration problem built once, and the methods that read it
+//! - `parallelism`: The threads of the parallel methods and the levels that run in parallel
 //!
 //! ## Example
 //!
@@ -44,6 +45,7 @@ mod identifiability;
 mod inference;
 mod local;
 mod model;
+mod parallelism;
 mod profiles;
 pub(crate) mod python_observer;
 mod quantity;
@@ -111,6 +113,16 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?; // coverage: an error that only PyO3 returns, when the module cannot take it
     inference::register(&inference_module)?;
     m.add_submodule(&inference_module)?;
+
+    // Parallelism module: the threads of the parallel methods
+    let parallelism_module = PyModule::new(py, "parallelism")?;
+    parallelism_module.add(
+        "__doc__",
+        "The threads of the parallel methods and the levels that run in\n\
+         parallel, held per context.",
+    )?; // coverage: an error that only PyO3 returns, when the module cannot take it
+    parallelism::register(&parallelism_module)?;
+    m.add_submodule(&parallelism_module)?;
 
     // Module-level metadata: the version and the commit of the build, which
     // the build script reads (`build_info.rs`); no commit is an empty string.

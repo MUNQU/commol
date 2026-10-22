@@ -33,13 +33,16 @@ from .oracles import (
     total_at,
 )
 from .problems import (
+    abc_swarm_calibrator,
     bounded,
     flow_calibrator,
     flow_observations,
     initial_condition_problem,
     line_calibrator,
     observed,
+    swarm,
 )
+from .parallelism import cores
 from .reference import ABC_START, reference_run, abc_flows, total
 from .simulation import initial_state, run
 
@@ -53,6 +56,7 @@ __all__ = [
     "ODE_REL",
     "ABC_START",
     "a_to_b_builder",
+    "abc_swarm_calibrator",
     "assert_accepted",
     "assert_close",
     "assert_total_conserved",
@@ -63,6 +67,7 @@ __all__ = [
     "build",
     "build_ode",
     "conditional_pathway_builder",
+    "cores",
     "final_size",
     "flow_calibrator",
     "flow_observations",
@@ -78,6 +83,7 @@ __all__ = [
     "run",
     "abcd_builder",
     "settled",
+    "swarm",
     "shared_category_builder",
     "abc_builder",
     "abc_flows",

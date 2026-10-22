@@ -6,6 +6,7 @@
 //! built once by a `Calibrator` and returns the run as plain values; Python
 //! builds the result.
 
+use crate::parallelism::parallel;
 use commol_inference::local::LocalError;
 use commol_inference::resampling::{
     BlockDrawing, BlockScheme, ResidualScale, Residuals, automatic_block_length,
@@ -237,9 +238,10 @@ fn gibbs_posterior(
 ) -> PyResult<PySmcRun> {
     let priors = problem_priors(problem, priors)?;
     let mut sampler = sampler(particles, resample_threshold, target_cess, stay_probability)?;
-    let run = py
-        .detach(|| smc::gibbs_posterior(&problem.inner, &priors, eta, &mut sampler, seed))
-        .map_err(PyRuntimeError::new_err)?;
+    let run = parallel(py, || {
+        smc::gibbs_posterior(&problem.inner, &priors, eta, &mut sampler, seed)
+    })?
+    .map_err(PyRuntimeError::new_err)?;
     Ok(PySmcRun::of(run.run))
 }
 
@@ -274,9 +276,10 @@ fn bayesian_posterior(
     let priors = problem_priors(problem, priors)?;
     LikelihoodTarget::new(&problem.inner, &priors).map_err(value_error)?;
     let mut sampler = sampler(particles, resample_threshold, target_cess, stay_probability)?;
-    let run = py
-        .detach(|| smc::bayesian_posterior(&problem.inner, &priors, &mut sampler, seed))
-        .map_err(PyRuntimeError::new_err)?;
+    let run = parallel(py, || {
+        smc::bayesian_posterior(&problem.inner, &priors, &mut sampler, seed)
+    })?
+    .map_err(PyRuntimeError::new_err)?;
     Ok(PySmcRun::of(run))
 }
 
@@ -359,20 +362,19 @@ fn bootstrap_coverage_eta(
         }
     };
     let blocks = BlockScheme::new(observed, length).map_err(value_error)?;
-    let calibration = py
-        .detach(|| {
-            smc::bootstrap_coverage_eta(
-                &problem.inner,
-                &priors,
-                &fit,
-                &mut sampler,
-                &blocks,
-                replicates,
-                confidence_level,
-                seed,
-            )
-        })
-        .map_err(PyRuntimeError::new_err)?;
+    let calibration = parallel(py, || {
+        smc::bootstrap_coverage_eta(
+            &problem.inner,
+            &priors,
+            &fit,
+            &mut sampler,
+            &blocks,
+            replicates,
+            confidence_level,
+            seed,
+        )
+    })?
+    .map_err(PyRuntimeError::new_err)?;
     Ok(PyEtaCoverage {
         eta: calibration.eta,
         coverage: calibration.coverage,
@@ -423,9 +425,7 @@ fn abc_smc(
         .with_min_acceptance(min_acceptance)
         .map_err(value_error)?;
     let target = AbcTarget::new(&problem.inner, &priors, distance).map_err(value_error)?;
-    let run = py
-        .detach(|| sampler.run(&target, seed))
-        .map_err(PyRuntimeError::new_err)?;
+    let run = parallel(py, || sampler.run(&target, seed))?.map_err(PyRuntimeError::new_err)?;
     Ok((PySmcRun::of(run), target.stochastic()))
 }
 
@@ -461,8 +461,7 @@ fn abc_rejection(
     let priors = problem_priors(problem, priors)?;
     let distance = Distance::from_metric(metric).map_err(value_error)?;
     let target = AbcTarget::new(&problem.inner, &priors, distance).map_err(value_error)?;
-    let run = py
-        .detach(|| smc::abc_rejection(&target, draws, quantile, seed))
+    let run = parallel(py, || smc::abc_rejection(&target, draws, quantile, seed))?
         .map_err(PyRuntimeError::new_err)?;
     Ok((PySmcRun::of(run), target.stochastic()))
 }

@@ -6,6 +6,7 @@
 //! list ([`crate::quantity`]); the results cross as plain values, and
 //! Python builds the result classes.
 
+use crate::parallelism::parallel;
 use commol_inference::design::InputSpace;
 use commol_inference::global_sensitivity::{ChaosExpansion, ForwardAnalysis, Truncation};
 use commol_inference::{NoNoise, Predictive, observation_draws};
@@ -121,9 +122,8 @@ impl PyForwardAnalysis {
         quantities: &str,
     ) -> PyResult<PropagationValues> {
         let quantities = read_quantities(quantities)?;
-        let result = py
-            .detach(|| self.inner.propagate(draws, &quantities))
-            .map_err(predictive_error)?;
+        let result =
+            parallel(py, || self.inner.propagate(draws, &quantities))?.map_err(predictive_error)?;
         let draws = (result.sample.values().to_vec(), result.sample.log_weights());
         Ok((draws, result.values, result.weights, result.draw_seeds))
     }
@@ -138,9 +138,8 @@ impl PyForwardAnalysis {
     ///     InfeasibleStateError: If a point leaves the values its model allows
     fn prcc(&self, py: Python<'_>, draws: Option<usize>, quantities: &str) -> PyResult<PrccValues> {
         let quantities = read_quantities(quantities)?;
-        let (sample, result) = py
-            .detach(|| self.inner.prcc(draws, &quantities))
-            .map_err(predictive_error)?;
+        let (sample, result) =
+            parallel(py, || self.inner.prcc(draws, &quantities))?.map_err(predictive_error)?;
         Ok((
             (sample.values().to_vec(), sample.log_weights()),
             result.coefficients,
@@ -165,8 +164,7 @@ impl PyForwardAnalysis {
         quantities: &str,
     ) -> PyResult<MorrisValues> {
         let quantities = read_quantities(quantities)?;
-        let (result, runs) = py
-            .detach(|| self.inner.morris(trajectories, levels, &quantities))
+        let (result, runs) = parallel(py, || self.inner.morris(trajectories, levels, &quantities))?
             .map_err(predictive_error)?;
         Ok((result.mu, result.mu_star, result.sigma, runs))
     }
@@ -187,12 +185,11 @@ impl PyForwardAnalysis {
         quantities: &str,
     ) -> PyResult<SobolValues> {
         let quantities = read_quantities(quantities)?;
-        let (result, runs) = py
-            .detach(|| {
-                self.inner
-                    .sobol(base, bootstrap, confidence_level, &quantities)
-            })
-            .map_err(predictive_error)?;
+        let (result, runs) = parallel(py, || {
+            self.inner
+                .sobol(base, bootstrap, confidence_level, &quantities)
+        })?
+        .map_err(predictive_error)?;
         let [first_lower, first_upper] = result.first_interval;
         let [total_lower, total_upper] = result.total_interval;
         Ok(SobolValues {
@@ -227,9 +224,10 @@ impl PyForwardAnalysis {
     ) -> PyResult<PyChaosRun> {
         let truncation = Truncation::new(q_norm, max_interaction).map_err(value_error)?;
         let quantities = read_quantities(quantities)?;
-        let (expansion, runs) = py
-            .detach(|| self.inner.chaos(degree, truncation, draws, &quantities))
-            .map_err(predictive_error)?;
+        let (expansion, runs) = parallel(py, || {
+            self.inner.chaos(degree, truncation, draws, &quantities)
+        })?
+        .map_err(predictive_error)?;
         Ok(PyChaosRun {
             mean: expansion.mean(),
             variance: expansion.variance(),
@@ -256,14 +254,14 @@ impl PyForwardAnalysis {
         sample: &PyParameterSample,
         positions: Vec<f64>,
     ) -> PyResult<PyPredictive> {
-        py.detach(|| {
+        parallel(py, || {
             Predictive::new(
                 self.inner.forward(),
                 &sample.inner,
                 &positions,
                 self.inner.seed(),
             )
-        })
+        })?
         .map(|inner| PyPredictive { inner })
         .map_err(predictive_error)
     }
@@ -283,7 +281,7 @@ impl PyForwardAnalysis {
         observations: Vec<PyObservedDataPoint>,
     ) -> PyResult<PyObservationDraws> {
         let observations: Vec<_> = observations.into_iter().map(|o| o.inner).collect();
-        py.detach(|| {
+        parallel(py, || {
             observation_draws(
                 self.inner.forward(),
                 &sample.inner,
@@ -291,7 +289,7 @@ impl PyForwardAnalysis {
                 &NoNoise,
                 self.inner.seed(),
             )
-        })
+        })?
         .map(|inner| PyObservationDraws { inner })
         .map_err(predictive_error)
     }

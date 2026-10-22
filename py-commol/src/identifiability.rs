@@ -4,6 +4,7 @@
 //! sample, and returns the analysis as plain values; Python builds the
 //! report.
 
+use crate::parallelism::parallel;
 use commol_inference::identifiability::{
     self, IdentifiabilityError, Reference, StructuralVerdict, Subset,
 };
@@ -86,9 +87,10 @@ fn structural_rank(
     seed: u64,
 ) -> PyResult<PyStructuralAnalysis> {
     let source = source(problem, dense)?;
-    let analysis = py
-        .detach(|| identifiability::structural_rank(&source, points, seed))
-        .map_err(identifiability_error)?;
+    let analysis = parallel(py, || {
+        identifiability::structural_rank(&source, points, seed)
+    })?
+    .map_err(identifiability_error)?;
     Ok(PyStructuralAnalysis {
         points: analysis
             .points
@@ -171,11 +173,10 @@ fn collinearity(
     threshold: f64,
 ) -> PyResult<PyCollinearityAnalysis> {
     let source = source(problem, false)?;
-    let analysis = py
-        .detach(|| {
-            identifiability::collinearity(&source, &points, &weights, max_subset_size, threshold)
-        })
-        .map_err(identifiability_error)?;
+    let analysis = parallel(py, || {
+        identifiability::collinearity(&source, &points, &weights, max_subset_size, threshold)
+    })?
+    .map_err(identifiability_error)?;
     Ok(PyCollinearityAnalysis {
         sensitivity: analysis.sensitivity,
         pair_gamma: analysis.pair_gamma,

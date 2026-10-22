@@ -5,10 +5,13 @@
 //! optimizer needs a number at every point; an inference method sees the
 //! same violation as a point outside the support.
 
+use std::borrow::Borrow;
 use std::cell::RefCell;
+use std::sync::{Mutex, PoisonError};
 
-use argmin::core::{CostFunction, Error};
-use commol_core::SimulationEngine;
+use argmin::core::{CostFunction, Error, SendAlias, SyncAlias};
+use commol_core::{inner_levels_in_parallel, SimulationEngine};
+use rayon::prelude::*;
 
 use crate::calibration_problem::CalibrationProblem;
 use crate::feasibility::{EvaluationError, Violation};
@@ -16,8 +19,20 @@ use crate::forward::Workspace;
 use crate::types::CalibrationEvaluation;
 
 thread_local! {
-    /// The buffers of this thread's evaluations.
+    /// The buffers of this thread's evaluations, while no evaluation of
+    /// this thread holds them.
     static WORKSPACE: RefCell<Workspace> = RefCell::new(Workspace::default());
+}
+
+/// Run `job` with the buffers of this thread, taken out of the thread-local
+/// while `job` runs and put back after it. A job that this thread runs in
+/// the meantime, such as one that `rayon` steals, takes buffers of its own,
+/// so no buffers are borrowed twice.
+pub(crate) fn with_workspace<R>(job: impl FnOnce(&mut Workspace) -> R) -> R {
+    let mut workspace = WORKSPACE.take();
+    let result = job(&mut workspace);
+    WORKSPACE.set(workspace);
+    result
 }
 
 /// One scored point: the values the problem scored (clamped to their
@@ -66,11 +81,12 @@ impl<'a, E: SimulationEngine> OptimizationObjective<'a, E> {
     /// Returns a message when the number of values is wrong, or the engine
     /// or a constraint cannot be evaluated.
     pub fn score(&self, values: &[f64]) -> Result<Score, Error> {
-        WORKSPACE.with(|workspace| self.score_in(values, &mut workspace.borrow_mut()))
+        with_workspace(|workspace| self.score_in(values, workspace))
     }
 
     /// Score `values` with the buffers of `workspace`, which then holds the
-    /// rows of the run of a feasible point.
+    /// rows of the run of a feasible point. It makes no `rayon` call, so the
+    /// thread that runs it steals no other job meanwhile.
     ///
     /// # Errors
     ///
@@ -98,36 +114,180 @@ impl<'a, E: SimulationEngine> OptimizationObjective<'a, E> {
             Err(EvaluationError::Failed(message)) => Err(Error::msg(message)),
         }
     }
+
+    /// Score each of `points`, in the order of the points: in parallel when
+    /// the inner levels run in parallel ([`inner_levels_in_parallel`]), one
+    /// after the other otherwise.
+    ///
+    /// # Errors
+    ///
+    /// The error of the first point, in the order of the points, that
+    /// fails, whatever the order in which the threads score them.
+    pub fn score_all<P>(&self, points: &[P]) -> Result<Vec<Score>, Error>
+    where
+        P: Borrow<Vec<f64>> + Sync,
+        E: Sync,
+    {
+        if inner_levels_in_parallel() {
+            let scores: Vec<Result<Score, Error>> = points
+                .par_iter()
+                .map(|point| self.score(point.borrow()))
+                .collect();
+            scores.into_iter().collect()
+        } else {
+            points
+                .iter()
+                .map(|point| self.score(point.borrow()))
+                .collect()
+        }
+    }
 }
 
-impl<E: SimulationEngine> CostFunction for OptimizationObjective<'_, E> {
+impl<E: SimulationEngine + Sync> CostFunction for OptimizationObjective<'_, E> {
     type Param = Vec<f64>;
     type Output = f64;
 
     fn cost(&self, values: &Self::Param) -> Result<Self::Output, Error> {
         self.score(values).map(|score| score.cost)
     }
+
+    /// The costs of `params` by [`OptimizationObjective::score_all`].
+    fn bulk_cost<P>(&self, params: &[P]) -> Result<Vec<Self::Output>, Error>
+    where
+        P: Borrow<Self::Param> + SyncAlias,
+        Self::Output: SendAlias,
+        Self: SyncAlias,
+    {
+        let scores = self.score_all(params)?;
+        Ok(scores.into_iter().map(|score| score.cost).collect())
+    }
+
+    fn parallelize(&self) -> bool {
+        inner_levels_in_parallel()
+    }
 }
 
 /// An objective that keeps every feasible evaluation, for
 /// [`crate::optimize_with_history`].
+///
+/// The points of a bulk evaluation are scored first, in parallel when the
+/// inner levels run in parallel, and then recorded in the order of the
+/// points, so the history does not depend on the order in which the
+/// threads finish.
 pub(crate) struct Recorded<'a, E: SimulationEngine> {
     pub(crate) objective: OptimizationObjective<'a, E>,
-    pub(crate) evaluations: RefCell<Vec<CalibrationEvaluation>>,
+    pub(crate) evaluations: Mutex<Vec<CalibrationEvaluation>>,
 }
 
-impl<E: SimulationEngine> CostFunction for Recorded<'_, E> {
+impl<'a, E: SimulationEngine> Recorded<'a, E> {
+    /// The objective of `problem`, with no evaluation yet.
+    pub(crate) fn new(problem: &'a CalibrationProblem<E>) -> Self {
+        Self {
+            objective: OptimizationObjective::new(problem),
+            evaluations: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Keep the feasible scores of `scores`, in their order.
+    fn record<'s>(&self, scores: impl IntoIterator<Item = &'s Score>) {
+        let mut evaluations = self
+            .evaluations
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        evaluations.extend(
+            scores
+                .into_iter()
+                .filter(|score| score.feasible)
+                .map(|score| CalibrationEvaluation {
+                    parameters: score.applied.clone(),
+                    loss: score.cost,
+                }),
+        );
+    }
+
+    /// Every evaluation kept, in the order of the evaluations.
+    pub(crate) fn into_evaluations(self) -> Vec<CalibrationEvaluation> {
+        self.evaluations
+            .into_inner()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+impl<E: SimulationEngine + Sync> CostFunction for Recorded<'_, E> {
     type Param = Vec<f64>;
     type Output = f64;
 
     fn cost(&self, values: &Self::Param) -> Result<Self::Output, Error> {
         let score = self.objective.score(values)?;
-        if score.feasible {
-            self.evaluations.borrow_mut().push(CalibrationEvaluation {
-                parameters: score.applied,
-                loss: score.cost,
-            });
-        }
+        self.record([&score]);
         Ok(score.cost)
+    }
+
+    /// The costs of `params` by [`OptimizationObjective::score_all`], with
+    /// their feasible scores recorded in the order of `params`.
+    fn bulk_cost<P>(&self, params: &[P]) -> Result<Vec<Self::Output>, Error>
+    where
+        P: Borrow<Self::Param> + SyncAlias,
+        Self::Output: SendAlias,
+        Self: SyncAlias,
+    {
+        let scores = self.objective.score_all(params)?;
+        self.record(&scores);
+        Ok(scores.into_iter().map(|score| score.cost).collect())
+    }
+
+    fn parallelize(&self) -> bool {
+        inner_levels_in_parallel()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{CalibrationParameter, LossConfig, ObservedDataPoint};
+    use commol_core::Model;
+    use commol_difference::DifferenceEquations;
+
+    /// A → B at the proportional rate `k`, from A = 1000, with B observed at
+    /// 2.
+    fn problem() -> CalibrationProblem<DifferenceEquations> {
+        let json = r#"{"name":"m","parameters":[{"id":"k","value":0.1}],
+            "engine":{"type":"DifferenceEquations"},
+            "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
+            "accumulators":[],"stratifications":[],
+            "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"k",
+            "stratified_rates":null,"per_compartment":null}]},
+            "structure":{"kind":"aggregate","bin_amounts":{"A":1000.0,"B":0.0}}}"#;
+        let model: Model = serde_json::from_str(json).expect("valid model JSON");
+        CalibrationProblem::new(
+            DifferenceEquations::try_from_model(&model).unwrap(),
+            vec![ObservedDataPoint::new(2.0, "B".to_string(), 190.0)],
+            vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+            vec![],
+            LossConfig::SumSquaredError,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_score_holds_no_borrow_of_the_workspace() {
+        let problem = problem();
+        let objective = OptimizationObjective::new(&problem);
+        let alone = objective.score(&[0.2]).unwrap();
+        let (outer, inner) = with_workspace(|outer| {
+            // While a score of this thread holds its buffers, the
+            // thread-local is free, and a job that the thread steals scores
+            // another point with buffers of its own.
+            assert!(WORKSPACE.with(|workspace| workspace.try_borrow_mut().is_ok()));
+            let outer_score = objective.score_in(&[0.1], outer).unwrap();
+            let inner = objective.score(&[0.2]).unwrap();
+            (outer_score, inner)
+        });
+        assert_eq!(inner, alone);
+        // B at 2 is 1000 (1 − 0.9²) = 190 at k = 0.1, the observed value.
+        assert!(outer.cost.abs() < 1e-9, "{outer:?}");
+        assert!(outer.feasible);
+        // The buffers come back to the thread-local after a score.
+        assert!(WORKSPACE.with(|workspace| !workspace.borrow().rows.is_empty()));
     }
 }

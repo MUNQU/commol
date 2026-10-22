@@ -9,10 +9,11 @@ from commol import (
     NelderMeadConfig,
     ObservationModel,
     ObservedDataPoint,
+    ParticleSwarmConfig,
     Simulation,
 )
 
-from .models import a_to_b_builder, build
+from .models import a_to_b_builder, abc_builder, build
 
 
 def initial_condition_problem(
@@ -169,4 +170,38 @@ def line_calibrator(
         optimization_config=NelderMeadConfig(max_iterations=2000, sd_tolerance=1e-14),
         seed=seed,
     )
+    return Calibrator(Simulation(model), problem)
+
+
+def swarm(
+    particles: int = 12, iterations: int = 15, *, mutation: bool = True
+) -> ParticleSwarmConfig:
+    """A quiet swarm, with a Gaussian mutation of the particles below average."""
+    config = ParticleSwarmConfig(
+        num_particles=particles, max_iterations=iterations, verbose=False
+    )
+    if mutation:
+        config = config.mutation(
+            "gaussian", scale=0.1, probability=0.3, application="below_average"
+        )
+    return config
+
+
+def abc_swarm_calibrator(config: ParticleSwarmConfig) -> Calibrator:
+    """
+    Fit ``k1`` and ``k2`` of ``abc_builder`` (in ``[0, 0.5]`` and
+    ``[0, 0.3]``) to B and C of its run at ``k1 = 0.1``, ``k2 = 0.05``,
+    every 10 steps to 100, with the swarm `config` and the seed 7.
+    """
+    truth = build(abc_builder(parameters={"k1": 0.1, "k2": 0.05}))
+    truth_run = Simulation(truth).run(100)
+    steps = range(10, 101, 10)
+    problem = CalibrationProblem(
+        observed_data=observed(truth_run, "B", steps) + observed(truth_run, "C", steps),
+        parameters=[bounded("k1", 0.0, 0.5), bounded("k2", 0.0, 0.3)],
+        loss_function="sse",
+        optimization_config=config,
+        seed=7,
+    )
+    model = build(abc_builder(parameters={"k1": None, "k2": None}))
     return Calibrator(Simulation(model), problem)

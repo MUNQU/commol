@@ -159,6 +159,7 @@ from commol.context.observation_models import (
 )
 from commol.context.visualization import PlotConfig
 from commol.api.plotting.compared import plot_compared
+from commol.api.parallelism import get_levels, get_threads, set_threads, threads
 
 InfeasibleStateError = _engine.InfeasibleStateError
 """A run left the values its model allows, such as an amount below zero.
@@ -327,4 +328,8 @@ __all__ = [
     "sample",
     "weighted_quantiles",
     "windowed_totals",
+    "get_levels",
+    "get_threads",
+    "set_threads",
+    "threads",
 ]

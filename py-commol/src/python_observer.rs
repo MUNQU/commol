@@ -104,7 +104,7 @@ where
 ///
 /// This function runs `commol_calibration::optimize_with_observer` with an
 /// observer that writes to Python's stdout instead of Rust's.
-pub fn optimize_with_python_observer<E: SimulationEngine>(
+pub fn optimize_with_python_observer<E: SimulationEngine + Sync>(
     problem: &CalibrationProblem<E>,
     config: &OptimizationConfig,
     header_interval: u64,

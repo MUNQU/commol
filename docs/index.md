@@ -82,6 +82,7 @@ results = Simulation(model).run(num_steps=100)
 | Calibration of parameters, initial conditions and scale factors | [Model Calibration](guide/calibration.md) |
 | Parameter samples, predictive bands and scores | [Uncertainty](guide/uncertainty/index.md) |
 | JSON-ready reports and matplotlib figures | [Reports](guide/reports.md), [Plotting](guide/simulations.md#plotting) |
+| Parallel starts, replicates, particles and draws, on the threads you choose | [Threads and Parallelism](guide/parallelism.md) |
 
 ## License and authors
 

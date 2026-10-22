@@ -5,8 +5,6 @@
 //! caller that wants progress passes an observer
 //! ([`optimize_with_observer`]).
 
-use std::cell::RefCell;
-
 use argmin::core::observers::{Observe, ObserverMode};
 use argmin::core::{
     BoundedProblem, CostFunction, Error, Executor, IterState, Operator, PopulationState,
@@ -292,7 +290,7 @@ pub enum OptimizationConfig {
 ///
 /// Returns a message when the configuration is not valid, or the engine or
 /// a constraint cannot be evaluated.
-pub fn optimize<E: SimulationEngine>(
+pub fn optimize<E: SimulationEngine + Sync>(
     problem: &CalibrationProblem<E>,
     config: &OptimizationConfig,
 ) -> Result<CalibrationResult, String> {
@@ -308,7 +306,7 @@ pub fn optimize<E: SimulationEngine>(
 /// # Errors
 ///
 /// As [`optimize`].
-pub fn optimize_from<E: SimulationEngine>(
+pub fn optimize_from<E: SimulationEngine + Sync>(
     problem: &CalibrationProblem<E>,
     config: &OptimizationConfig,
     start: &[f64],
@@ -338,7 +336,7 @@ pub fn optimize_with_observer<E, O>(
     observer: O,
 ) -> Result<CalibrationResult, String>
 where
-    E: SimulationEngine,
+    E: SimulationEngine + Sync,
     O: Observe<NelderMeadState> + Observe<ParticleSwarmState> + 'static,
 {
     let objective = OptimizationObjective::new(problem);
@@ -360,14 +358,11 @@ where
 /// # Errors
 ///
 /// As [`optimize`].
-pub fn optimize_with_history<E: SimulationEngine>(
+pub fn optimize_with_history<E: SimulationEngine + Sync>(
     problem: &CalibrationProblem<E>,
     config: &OptimizationConfig,
 ) -> Result<CalibrationResultWithHistory, String> {
-    let recorded = Recorded {
-        objective: OptimizationObjective::new(problem),
-        evaluations: RefCell::new(Vec::new()),
-    };
+    let recorded = Recorded::new(problem);
     let start = problem.initial_parameters();
     let (result, recorded) = run(
         &SearchSpace::of(problem),
@@ -377,9 +372,8 @@ pub fn optimize_with_history<E: SimulationEngine>(
         None,
         None::<NoObserver>,
     )?;
-    let evaluations: Vec<CalibrationEvaluation> = recorded
-        .map(|recorded| recorded.evaluations.into_inner())
-        .unwrap_or_default();
+    let evaluations: Vec<CalibrationEvaluation> =
+        recorded.map(Recorded::into_evaluations).unwrap_or_default();
     Ok(CalibrationResultWithHistory {
         result,
         evaluations,
@@ -451,7 +445,7 @@ impl SearchSpace {
 /// # Errors
 ///
 /// As [`optimize`], and a message when `start` has the wrong length.
-pub fn optimize_subproblem<E: SimulationEngine>(
+pub fn optimize_subproblem<E: SimulationEngine + Sync>(
     subproblem: &Subproblem<'_, E>,
     config: &OptimizationConfig,
     start: &[f64],
@@ -465,7 +459,7 @@ pub fn optimize_subproblem<E: SimulationEngine>(
                 objective: OptimizationObjective::new(problem),
                 index: *index,
                 value: *value,
-                evaluations: std::cell::Cell::new(0),
+                evaluations: std::sync::atomic::AtomicUsize::new(0),
             };
             let mut space = SearchSpace::of(problem);
             space.bounds.remove(*index);
@@ -494,7 +488,7 @@ pub fn optimize_subproblem<E: SimulationEngine>(
                 prediction: None,
                 multiplier: None,
                 penalty: None,
-                evaluations: cost.evaluations.get(),
+                evaluations: cost.evaluations.into_inner(),
             })
         }
         Fixed::Prediction(held) => {
@@ -516,7 +510,7 @@ pub fn optimize_subproblem<E: SimulationEngine>(
                 prediction,
                 multiplier: Some(run.multiplier),
                 penalty: Some(run.penalty),
-                evaluations: run.cost.evaluations.get(),
+                evaluations: run.cost.evaluations.into_inner(),
             })
         }
     }
@@ -544,7 +538,9 @@ fn run_constrained<C>(
     settings: &ConstraintSettings,
 ) -> Result<ConstrainedRun<C>, String>
 where
-    C: CostFunction<Param = Vec<f64>, Output = f64> + Operator<Param = Vec<f64>, Output = Vec<f64>>,
+    C: CostFunction<Param = Vec<f64>, Output = f64>
+        + Operator<Param = Vec<f64>, Output = Vec<f64>>
+        + Sync,
 {
     let outer = |state: LagrangianState, param: Vec<f64>| {
         state
@@ -647,7 +643,7 @@ pub(crate) fn run<C, O>(
     observer: Option<O>,
 ) -> Result<(CalibrationResult, Option<C>), String>
 where
-    C: CostFunction<Param = Vec<f64>, Output = f64>,
+    C: CostFunction<Param = Vec<f64>, Output = f64> + Sync,
     O: Observe<NelderMeadState> + Observe<ParticleSwarmState> + 'static,
 {
     space.check_start(start)?;
@@ -793,7 +789,7 @@ fn optimize_particle_swarm<C, O>(
     observer: Option<O>,
 ) -> Result<(CalibrationResult, Option<C>), String>
 where
-    C: CostFunction<Param = Vec<f64>, Output = f64>,
+    C: CostFunction<Param = Vec<f64>, Output = f64> + Sync,
     O: Observe<ParticleSwarmState> + 'static,
 {
     let solver = build_particle_swarm_solver(&space.bounds, config)?;
@@ -938,6 +934,7 @@ pub(crate) fn build_particle_swarm_solver(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use commol_core::{Levels, Parallelism};
 
     /// `(x − 0.7)²`, NaN below 0.5.
     struct HalfNan;
@@ -952,6 +949,237 @@ mod tests {
             } else {
                 (x[0] - 0.7).powi(2)
             })
+        }
+    }
+
+    /// A → B at rate `k1`, B → C at rate `k2`, from A = 1000, with B and C
+    /// observed at the run of `k1 = 0.3`, `k2 = 0.1`.
+    fn two_rates() -> CalibrationProblem<commol_difference::DifferenceEquations> {
+        let json = r#"{"name":"m","parameters":[{"id":"k1","value":0.3},{"id":"k2","value":0.1}],
+            "engine":{"type":"DifferenceEquations"},
+            "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"},{"id":"C","name":"C"}],
+            "accumulators":[],"stratifications":[],
+            "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"k1",
+            "stratified_rates":null,"per_compartment":null},
+            {"id":"bc","source":["B"],"target":["C"],"rate":"k2",
+            "stratified_rates":null,"per_compartment":null}]},
+            "structure":{"kind":"aggregate","bin_amounts":{"A":1000.0,"B":0.0,"C":0.0}}}"#;
+        let model: commol_core::Model = serde_json::from_str(json).expect("valid model JSON");
+        let engine = commol_difference::DifferenceEquations::try_from_model(&model).unwrap();
+        let mut truth = engine.clone();
+        let rows = truth.run_at(&[2.0, 4.0, 6.0, 8.0]).unwrap();
+        let observed = rows
+            .iter()
+            .zip([2.0, 4.0, 6.0, 8.0])
+            .flat_map(|(row, at)| {
+                [
+                    crate::ObservedDataPoint::new(at, "B".to_string(), row[1]),
+                    crate::ObservedDataPoint::new(at, "C".to_string(), row[2]),
+                ]
+            })
+            .collect();
+        CalibrationProblem::new(
+            engine,
+            observed,
+            vec![
+                crate::CalibrationParameter::new("k1".to_string(), 0.0, 1.0),
+                crate::CalibrationParameter::new("k2".to_string(), 0.0, 1.0),
+            ],
+            vec![],
+            crate::LossConfig::SumSquaredError,
+        )
+        .unwrap()
+    }
+
+    /// A swarm of 12 particles, 15 iterations, with mutation, seeded.
+    fn swarm() -> OptimizationConfig {
+        OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
+            num_particles: 12,
+            max_iterations: 15,
+            mutation_strategy: MutationStrategy::Gaussian(0.1),
+            mutation_probability: 0.5,
+            mutation_application: MutationApplication::BelowAverage,
+            seed: Some(3),
+            ..ParticleSwarmConfig::default()
+        })
+    }
+
+    #[test]
+    fn a_swarm_gives_the_same_result_with_parallel_particles() {
+        let problem = two_rates();
+        let config = swarm();
+        let run = |threads: i64, levels: Levels| {
+            Parallelism::new(threads, levels)
+                .unwrap()
+                .install(|| optimize_with_history(&problem, &config).unwrap())
+                .unwrap()
+        };
+        let sequential = run(4, Levels::Outer);
+        assert!(
+            sequential.result.final_loss < 1e3,
+            "{:?}",
+            sequential.result
+        );
+        assert!(sequential.evaluations.len() > 12 * 15);
+        // `Debug` writes each float so that it reads back to the same bits.
+        let bits = |value: &dyn std::fmt::Debug| format!("{value:?}");
+        for (threads, levels) in [(4, Levels::All), (1, Levels::All), (3, Levels::All)] {
+            let parallel = run(threads, levels);
+            assert_eq!(bits(&parallel.result), bits(&sequential.result));
+            assert_eq!(bits(&parallel.evaluations), bits(&sequential.evaluations));
+        }
+        let plain = optimize(&problem, &config).unwrap();
+        assert_eq!(bits(&plain), bits(&sequential.result));
+    }
+
+    #[test]
+    fn a_swarm_on_a_subproblem_gives_one_fit_whatever_the_threads() {
+        let problem = two_rates();
+        let config = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
+            num_particles: 8,
+            max_iterations: 6,
+            seed: Some(5),
+            ..ParticleSwarmConfig::default()
+        });
+        let held = crate::ObservedDataPoint::new(8.0, "C".to_string(), 0.0);
+        let run = |threads: i64, levels: Levels| {
+            Parallelism::new(threads, levels)
+                .unwrap()
+                .install(|| {
+                    let parameter = Subproblem::fix_parameter(&problem, 0, 0.3).unwrap();
+                    let prediction = Subproblem::fix_prediction(&problem, &held, 200.0)
+                        .unwrap()
+                        .with_settings(ConstraintSettings {
+                            max_outer_iterations: 3,
+                            ..ConstraintSettings::for_value(200.0)
+                        })
+                        .unwrap();
+                    [parameter, prediction].map(|subproblem| {
+                        let fit =
+                            optimize_subproblem(&subproblem, &config, &[0.5, 0.5], None).unwrap();
+                        format!("{fit:?}")
+                    })
+                })
+                .unwrap()
+        };
+        let sequential = run(1, Levels::Outer);
+        assert!(sequential[1].contains("prediction: Some"), "{sequential:?}");
+        for (threads, levels) in [(4, Levels::All), (3, Levels::Outer), (2, Levels::All)] {
+            assert_eq!(run(threads, levels), sequential);
+        }
+    }
+
+    /// `(x − 0.7)²`, which keeps the names of the threads that score it.
+    #[derive(Default)]
+    struct Threads {
+        names: std::sync::Mutex<std::collections::HashSet<String>>,
+    }
+
+    impl CostFunction for Threads {
+        type Param = Vec<f64>;
+        type Output = f64;
+
+        fn cost(&self, x: &Self::Param) -> Result<Self::Output, Error> {
+            std::thread::sleep(std::time::Duration::from_millis(1));
+            let name = std::thread::current().name().unwrap_or("").to_string();
+            self.names.lock().unwrap().insert(name);
+            Ok((x[0] - 0.7).powi(2))
+        }
+
+        fn parallelize(&self) -> bool {
+            commol_core::inner_levels_in_parallel()
+        }
+    }
+
+    #[test]
+    fn the_particles_run_in_parallel_only_when_every_level_does() {
+        let space = SearchSpace {
+            bounds: vec![(0.0, 1.0)],
+            names: vec!["x".to_string()],
+        };
+        let config = ParticleSwarmConfig {
+            num_particles: 16,
+            max_iterations: 5,
+            seed: Some(1),
+            ..ParticleSwarmConfig::default()
+        };
+        let threads = |levels| {
+            Parallelism::new(4, levels)
+                .unwrap()
+                .install(|| {
+                    let (_, cost) = optimize_particle_swarm(
+                        &space,
+                        Threads::default(),
+                        &config,
+                        None::<NoObserver>,
+                    )
+                    .unwrap();
+                    cost.unwrap().names.into_inner().unwrap().len()
+                })
+                .unwrap()
+        };
+        assert!(threads(Levels::All) > 1);
+        assert_eq!(threads(Levels::Outer), 1);
+    }
+
+    #[test]
+    fn the_error_of_a_swarm_is_its_first_failing_particle() {
+        // The objective rejects a point of the wrong length with a message
+        // that names the length, so each failing particle has its own error.
+        let problem = two_rates();
+        let points: Vec<Vec<f64>> = (0..64)
+            .map(|index| match index {
+                40 => vec![0.1; 3],
+                41.. => vec![0.1; 1 + index % 7 + 3],
+                _ => vec![0.3, 0.1],
+            })
+            .collect();
+        let free: Vec<Vec<f64>> = points.iter().map(|point| point[1..].to_vec()).collect();
+        let expected = "Expected 2 parameters, got 3";
+        let parallelism = Parallelism::new(4, Levels::All).unwrap();
+        for _ in 0..10 {
+            let errors = parallelism
+                .install(|| {
+                    let objective = OptimizationObjective::new(&problem);
+                    let recorded = Recorded::new(&problem);
+                    let fixed = FixedParameter {
+                        objective: OptimizationObjective::new(&problem),
+                        index: 0,
+                        value: 0.3,
+                        evaluations: std::sync::atomic::AtomicUsize::new(0),
+                    };
+                    [
+                        objective.bulk_cost(&points).unwrap_err().to_string(),
+                        recorded.bulk_cost(&points).unwrap_err().to_string(),
+                        fixed.bulk_cost(&free).unwrap_err().to_string(),
+                    ]
+                })
+                .unwrap();
+            assert_eq!(errors, [expected; 3]);
+        }
+    }
+
+    #[test]
+    fn the_objectives_of_a_swarm_parallelize_at_the_level_of_their_pool() {
+        let problem = two_rates();
+        for levels in [Levels::All, Levels::Outer] {
+            let parallelize = Parallelism::new(2, levels)
+                .unwrap()
+                .install(|| {
+                    let fixed = FixedParameter {
+                        objective: OptimizationObjective::new(&problem),
+                        index: 0,
+                        value: 0.3,
+                        evaluations: std::sync::atomic::AtomicUsize::new(0),
+                    };
+                    [
+                        OptimizationObjective::new(&problem).parallelize(),
+                        Recorded::new(&problem).parallelize(),
+                        fixed.parallelize(),
+                    ]
+                })
+                .unwrap();
+            assert_eq!(parallelize, [levels == Levels::All; 3]);
         }
     }
 

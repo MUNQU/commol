@@ -4,6 +4,7 @@
 //! every engine. [`PyEngine`] builds it from a model, and [`PyEngineType`]
 //! lets Python ask the list instead of branching on engine names.
 
+use crate::parallelism::parallel;
 use commol_core::{
     EngineType, ModelKind, ModelValue, SimulationEngine, SimulationError, ValuePlan,
 };
@@ -419,9 +420,10 @@ impl PyEngine {
         let seeds: Vec<u64> = (0..count)
             .map(|index| commol_random::replicate_seed(seed, index))
             .collect();
-        let runs = py
-            .detach(|| commol_core::run_replicates(&start, &positions, &seeds))
-            .map_err(simulation_error)?;
+        let runs = parallel(py, || {
+            commol_core::run_replicates(&start, &positions, &seeds)
+        })?
+        .map_err(simulation_error)?;
         Ok((positions, seeds, runs))
     }
 

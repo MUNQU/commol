@@ -102,8 +102,11 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
       `SmcSampler` (`crates/commol-inference/src/smc/`), not a sampler of its
       own, and its configuration takes required `priors` (`WithPriors`)
       ([Design decisions](decisions/uncertainty.md#one-smc-core-many-targets)).
-- [ ] The runner, bound in `py-commol/src/inference.rs`, and its stub in
-      `_commol_rs.pyi`.
+- [ ] The runner, bound in `py-commol/src/inference.rs`, which runs the
+      method through `parallel` (`py-commol/src/parallelism.rs`), and its
+      stub in `_commol_rs.pyi`; a row in the table of
+      `docs/guide/parallelism.md` and a case of
+      `test_one_thread_keeps_every_parallel_method_on_one_core`.
 - [ ] The configuration, a subclass of `UncertaintyMethod[YourResult]`, and
       the result, in `context/inference/`; a result with draws holds a
       `ParameterSample`.

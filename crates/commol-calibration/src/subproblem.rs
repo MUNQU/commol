@@ -8,14 +8,18 @@
 //! whose inner solver is the problem's optimizer
 //! ([`crate::optimize_subproblem`]).
 
-use std::cell::{Cell, RefCell};
+use std::borrow::Borrow;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::thread::ThreadId;
 
-use argmin::core::{CostFunction, Error, Operator};
-use commol_core::SimulationEngine;
+use argmin::core::{CostFunction, Error, Operator, SendAlias, SyncAlias};
+use commol_core::{inner_levels_in_parallel, SimulationEngine};
 
 use crate::calibration_problem::CalibrationProblem;
 use crate::forward::Workspace;
-use crate::objective::OptimizationObjective;
+use crate::objective::{with_workspace, OptimizationObjective};
 use crate::observation::ObservationOperator;
 use crate::types::{CalibrationResult, ObservedDataPoint};
 
@@ -246,7 +250,7 @@ pub(crate) struct FixedParameter<'a, E: SimulationEngine> {
     pub(crate) objective: OptimizationObjective<'a, E>,
     pub(crate) index: usize,
     pub(crate) value: f64,
-    pub(crate) evaluations: Cell<usize>,
+    pub(crate) evaluations: AtomicUsize,
 }
 
 impl<E: SimulationEngine> FixedParameter<'_, E> {
@@ -260,29 +264,48 @@ impl<E: SimulationEngine> FixedParameter<'_, E> {
     }
 }
 
-impl<E: SimulationEngine> CostFunction for FixedParameter<'_, E> {
+impl<E: SimulationEngine + Sync> CostFunction for FixedParameter<'_, E> {
     type Param = Vec<f64>;
     type Output = f64;
 
     fn cost(&self, free: &Self::Param) -> Result<Self::Output, Error> {
-        self.evaluations.set(self.evaluations.get() + 1);
+        self.evaluations.fetch_add(1, Ordering::Relaxed);
         self.objective.cost(&self.full(free))
+    }
+
+    /// The costs of `params` by [`OptimizationObjective::score_all`].
+    fn bulk_cost<P>(&self, params: &[P]) -> Result<Vec<Self::Output>, Error>
+    where
+        P: Borrow<Self::Param> + SyncAlias,
+        Self::Output: SendAlias,
+        Self: SyncAlias,
+    {
+        self.evaluations.fetch_add(params.len(), Ordering::Relaxed);
+        let points: Vec<Vec<f64>> = params.iter().map(|free| self.full(free.borrow())).collect();
+        let scores = self.objective.score_all(&points)?;
+        Ok(scores.into_iter().map(|score| score.cost).collect())
+    }
+
+    fn parallelize(&self) -> bool {
+        inner_levels_in_parallel()
     }
 }
 
+/// The last point that each thread scored and its prediction; `None` when
+/// the point is not feasible.
+type LastPoints = HashMap<ThreadId, (Vec<f64>, Option<f64>)>;
+
 /// The objective and the constraint `g(θ) − c` of a held prediction, both
-/// from one run: the constraint of the point last scored is kept, so the
-/// augmented Lagrangian, which asks for both at each point, runs the model
-/// once.
+/// from one run: the constraint of the point that a thread scored last is
+/// kept, so the augmented Lagrangian, which asks for both at each point on
+/// one thread, runs the model once. A swarm scores its particles on several
+/// threads at once.
 pub(crate) struct PredictionCost<'a, E: SimulationEngine> {
     objective: OptimizationObjective<'a, E>,
     operator: &'a ObservationOperator,
     value: f64,
-    workspace: RefCell<Workspace>,
-    /// The last point scored and its prediction; `None` when it is not
-    /// feasible.
-    last: RefCell<Option<(Vec<f64>, Option<f64>)>>,
-    pub(crate) evaluations: Cell<usize>,
+    last: Mutex<LastPoints>,
+    pub(crate) evaluations: AtomicUsize,
 }
 
 impl<'a, E: SimulationEngine> PredictionCost<'a, E> {
@@ -291,27 +314,34 @@ impl<'a, E: SimulationEngine> PredictionCost<'a, E> {
             objective: OptimizationObjective::new(&held.observing),
             operator: &held.operator,
             value: held.value,
-            workspace: RefCell::new(Workspace::default()),
-            last: RefCell::new(None),
-            evaluations: Cell::new(0),
+            last: Mutex::default(),
+            evaluations: AtomicUsize::new(0),
         }
     }
 
     /// The objective and the prediction at `values`; no prediction at a
     /// point that is not feasible.
     pub(crate) fn evaluate(&self, values: &[f64]) -> Result<(f64, Option<f64>), Error> {
-        self.evaluations.set(self.evaluations.get() + 1);
-        let mut workspace = self.workspace.borrow_mut();
-        let score = self.objective.score_in(values, &mut workspace)?;
-        let prediction = score
-            .feasible
-            .then(|| mean_prediction(self.operator, &workspace, &score.applied));
-        *self.last.borrow_mut() = Some((values.to_vec(), prediction));
-        Ok((score.cost, prediction))
+        self.evaluations.fetch_add(1, Ordering::Relaxed);
+        let (cost, prediction) = with_workspace(|workspace| {
+            let score = self.objective.score_in(values, workspace)?;
+            let prediction = score
+                .feasible
+                .then(|| mean_prediction(self.operator, workspace, &score.applied));
+            Ok::<_, Error>((score.cost, prediction))
+        })?;
+        self.last_points()
+            .insert(std::thread::current().id(), (values.to_vec(), prediction));
+        Ok((cost, prediction))
+    }
+
+    /// The last point of each thread and its prediction.
+    fn last_points(&self) -> MutexGuard<'_, LastPoints> {
+        self.last.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
 
-impl<E: SimulationEngine> CostFunction for PredictionCost<'_, E> {
+impl<E: SimulationEngine + Sync> CostFunction for PredictionCost<'_, E> {
     type Param = Vec<f64>;
     type Output = f64;
 
@@ -320,14 +350,14 @@ impl<E: SimulationEngine> CostFunction for PredictionCost<'_, E> {
     }
 }
 
-impl<E: SimulationEngine> Operator for PredictionCost<'_, E> {
+impl<E: SimulationEngine + Sync> Operator for PredictionCost<'_, E> {
     type Param = Vec<f64>;
     type Output = Vec<f64>;
 
     /// `g(θ) − c`, or 0 at a point that is not feasible, whose cost is
     /// already the penalty of the objective.
     fn apply(&self, values: &Self::Param) -> Result<Self::Output, Error> {
-        let kept = match self.last.borrow().as_ref() {
+        let kept = match self.last_points().get(&std::thread::current().id()) {
             Some((point, prediction)) if point == values => Some(*prediction),
             _ => None,
         };
@@ -384,12 +414,12 @@ mod tests {
         // observed 190.
         let constraint = cost.apply(&vec![0.1]).unwrap();
         assert!((constraint[0] - 9.51).abs() < 1e-9, "{constraint:?}");
-        assert_eq!(cost.evaluations.get(), 1);
+        assert_eq!(cost.evaluations.load(Ordering::Relaxed), 1);
         // The cost of the same point reads the run again; the constraint of
         // the point just scored does not.
         let loss = cost.cost(&vec![0.1]).unwrap();
         assert!(loss.abs() < 1e-9, "{loss}");
         assert_eq!(cost.apply(&vec![0.1]).unwrap(), constraint);
-        assert_eq!(cost.evaluations.get(), 2);
+        assert_eq!(cost.evaluations.load(Ordering::Relaxed), 2);
     }
 }
