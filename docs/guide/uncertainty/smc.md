@@ -172,8 +172,10 @@ None of them has a default: each sets the cost and the accuracy of the run.
 is the problem's loss with its weights and normalization. It returns a
 `GibbsResult`: the sample at temperature 1, the temperatures, the log of
 `∫ prior(θ) exp(−η loss(θ)) dθ`, the diagnostics, the `η` it ran with, the fit
-a calibration of `η` read (`fit`), and the coverage of a bootstrap calibration
-(`coverage`).
+a calibration of `η` read (`fit`), the coverage of a bootstrap calibration
+(`coverage`), and each replicate of a bootstrap calibration whose sampler
+failed, `"Replicate <index> failed: <reason>"`, also logged as a warning
+(`failed`).
 
 ### What `η` means
 

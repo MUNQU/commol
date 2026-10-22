@@ -7,9 +7,7 @@ squares and ``η = 1/(2σ²)`` the Gibbs posterior is the normal posterior of a
 mean, ``N(ȳ, σ²/n)``.
 """
 
-import logging
 import math
-from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -38,7 +36,6 @@ from commol import (
     SMCResult,
     Uniform,
 )
-from commol.api.inference import smc
 from commol.commol_rs import _commol_rs as commol_rs
 from tests.support import (
     a_to_b_builder,
@@ -372,35 +369,6 @@ class TestGibbsPosterior:
         # The bootstrap spread of a mean is that of its posterior: η is near
         # 1/(2σ²).
         assert 0.25 < result.eta * 2 * NOISE**2 < 4.0
-
-    def test_a_failed_bootstrap_replicate_is_noted_and_logged(
-        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        found = SimpleNamespace(
-            eta=0.1, coverage=0.8, failed=[(2, "Simulation failed: x")]
-        )
-        monkeypatch.setattr(
-            smc,
-            "rust",
-            SimpleNamespace(
-                bootstrap_coverage_eta=lambda *_: found,
-                gibbs_posterior=commol_rs.inference.gibbs_posterior,
-            ),
-        )
-
-        with caplog.at_level(logging.WARNING, logger="commol.api.inference"):
-            result = _flow(_flow_data(10, 3)).uncertainty(
-                _gibbs(
-                    eta=BootstrapCoverageEta(
-                        replicates=3, block_length="auto", confidence_level=0.5
-                    )
-                )
-            )
-
-        note = "Bootstrap replicate 2 failed: Simulation failed: x"
-        assert result.diagnostics.notes == [note]
-        assert [r.getMessage() for r in caplog.records] == [note]
-        assert result.eta == 0.1
 
 
 class TestABC:

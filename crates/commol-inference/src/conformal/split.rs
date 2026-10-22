@@ -69,5 +69,6 @@ where
         intervals,
         scores: labels.into_iter().zip(scores).collect(),
         failed: Vec::new(),
+        not_converged: 0,
     })
 }

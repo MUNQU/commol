@@ -6,7 +6,7 @@
 //! | [`blocks`] | [`BlockScheme`]: blocks of consecutive positions across series, and the automatic block length |
 //! | [`residuals`] | [`Residuals`] of a fit on a [`ResidualScale`] |
 //! | [`resamplers`] | The [`Resampler`] port and its methods: the Bayesian, residual and wild block bootstraps, and the parametric bootstrap of observation models |
-//! | [`runner`] | [`ReplicateRunner`]: fits the data of each replicate, in parallel; [`bootstrap`] gathers a sample |
+//! | [`runner`] | [`ReplicateRunner`]: fits the data of each replicate, in parallel, into [`ReplicateFits`]; [`FitUnit`] names a fit in messages; [`bootstrap`] gathers a sample |
 //! | [`jackknife`] | [`block_jackknife`]: one fit per block left out |
 //! | [`noise`] | [`ResidualNoise`]: observation noise made of the residuals of a fit |
 //!
@@ -31,4 +31,4 @@ pub use resamplers::{
     ResidualBootstrap, WildBootstrap,
 };
 pub use residuals::{ResidualBlocks, ResidualScale, Residuals};
-pub use runner::{BootstrapRun, ReplicateOutcome, ReplicateRunner, bootstrap};
+pub use runner::{BootstrapRun, FitUnit, ReplicateFits, ReplicateRunner, bootstrap};

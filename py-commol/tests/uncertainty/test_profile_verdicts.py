@@ -11,8 +11,6 @@ from commol import (
     NelderMeadConfig,
     NormalObservations,
     ObservedDataPoint,
-    PredictionProfile,
-    PredictionSpec,
     Profile,
     ProfileInterval,
     ProfileLikelihood,
@@ -203,7 +201,7 @@ class TestShapes:
         assert result.verdicts["k1"] == "structurally_non_identifiable"
         assert result.structure["k1"].verdict == "in_combination"
         assert result.structure["k1"].compensated_by == ["s"]
-        report = result.report()
+        report = result.identifiability()
         assert report.parameters == ["k1", "s", "k2"]
         structural = report.verdicts["k1"].structural
         assert structural is not None
@@ -239,7 +237,7 @@ class TestShapes:
         assert lower is not None and 9.0 < lower < 10.0
         assert result.verdicts["tau"] == "practically_non_identifiable"
         assert result.structure["tau"].undetermined == "not_flat"
-        practical = result.report().verdicts["tau"].practical
+        practical = result.identifiability().verdicts["tau"].practical
         assert practical is not None
         assert practical.verdict == "poorly_determined"
 
@@ -260,7 +258,7 @@ class TestShapes:
             "'c'" in note and "below the numerical tolerance" in note
             for note in result.notes
         )
-        assert result.report().verdicts["c"].practical is None
+        assert result.identifiability().verdicts["c"].practical is None
 
     def test_a_refit_below_the_fit_is_noted(self) -> None:
         # Three iterations of Nelder-Mead leave the fit far from the optimum;
@@ -280,22 +278,6 @@ class TestShapes:
 
         assert min(result.profiles["c"].statistics) < -result.tolerance
         assert any("below the fit" in note for note in result.notes)
-
-    def test_only_parameter_profiles_report_on_identifiability(self) -> None:
-        calibrator = line_calibrator(
-            VALUES, observation_models={"B": NormalObservations(sd=1.0)}
-        )
-        result = calibrator.uncertainty(
-            PredictionProfile(
-                specs=[PredictionSpec(at=4, output="B")],
-                threshold=Threshold.chi_square(0.9),
-                max_steps=2,
-            )
-        )
-
-        assert result.structure == {}
-        with pytest.raises(ValueError, match="profiles of predictions"):
-            result.report()
 
 
 class TestStructure:
@@ -321,7 +303,7 @@ class TestStructure:
         rank = calibrator.identifiability(
             StructuralRank(points=5, design="observations")
         )
-        merged = rank.merge(result.report())
+        merged = rank.merge(result.identifiability())
         for name in ("k1", "s"):
             structural = merged.verdicts[name].structural
             assert structural is not None
@@ -347,7 +329,7 @@ class TestStructure:
         rank = calibrator.identifiability(
             StructuralRank(points=5, design="observations")
         )
-        merged = rank.merge(result.report())
+        merged = rank.merge(result.identifiability())
         structural = merged.verdicts["k3"].structural
         assert structural is not None
         assert structural.verdict == "non_identifiable"
@@ -399,7 +381,7 @@ class TestStructure:
         assert result.structure["k2"].compensated_by == ["k1"]
         rank_verdict = rank.verdicts["k2"].structural
         assert rank_verdict is not None and rank_verdict.verdict == "non_identifiable"
-        merged = rank.merge(result.report()).verdicts["k2"].structural
+        merged = rank.merge(result.identifiability()).verdicts["k2"].structural
         assert merged is not None and merged.verdict == "conflicting"
 
     def test_a_stochastic_engine_gives_no_structural_verdict(self) -> None:
@@ -435,7 +417,7 @@ class TestStructure:
         assert result.verdicts["u"] == "practically_non_identifiable"
         assert result.structure["u"].verdict is None
         assert any("'u'" in note and "stochastic" in note for note in result.notes)
-        report = result.report()
+        report = result.identifiability()
         assert report.verdicts["u"].structural is None
 
 
@@ -482,7 +464,10 @@ class TestDefaults:
 
         assert result.verdicts["k1"] == "practically_non_identifiable"
         assert result.structure["k1"].verdict is None
-        assert result.report().verdicts["k1"].practical.verdict == "poorly_determined"
+        assert (
+            result.identifiability().verdicts["k1"].practical.verdict
+            == "poorly_determined"
+        )
 
 
 class TestNotes:
@@ -540,7 +525,7 @@ class TestReport:
             )
         )
 
-        verdicts = result.report().verdicts["k1"]
+        verdicts = result.identifiability().verdicts["k1"]
 
         assert verdicts.structural is None
         assert verdicts.practical is not None
@@ -559,7 +544,7 @@ class TestReport:
             )
         )
 
-        structural = result.report().verdicts["k1"].structural
+        structural = result.identifiability().verdicts["k1"].structural
 
         assert structural is not None
         assert structural.verdict == "in_combination"
@@ -576,7 +561,7 @@ class TestReport:
             )
         )
 
-        reason = result.report().verdicts["k1"].structural.reasons[0]
+        reason = result.identifiability().verdicts["k1"].structural.reasons[0]
 
         assert "compensated by" not in reason
         assert RESET in reason

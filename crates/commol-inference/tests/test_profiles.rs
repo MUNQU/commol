@@ -662,7 +662,10 @@ fn thresholds_refuse_what_they_cannot_read() {
         "One center per quantity: 1 quantities, 0 centers"
     );
     let error = bootstrap_thresholds(&runner, &ZeroWeights, 2, &quantity, &[1.0], 0.9).unwrap_err();
-    assert!(error.starts_with("Every replicate failed (2)"), "{error}");
+    assert!(
+        error.starts_with("Every replicate failed: 0 of 2 replicates fitted"),
+        "{error}"
+    );
 }
 
 /// A resampler that gives every observation weight 0, which no problem
@@ -773,6 +776,9 @@ fn thresholds_fail_when_every_refit_fails() {
     let quantity = [ProfiledQuantity::Parameter(2)];
     let error = bootstrap_thresholds(&runner, &Unchanged, 2, &quantity, &[0.95], 0.9).unwrap_err();
 
-    assert!(error.starts_with("Every replicate failed (2)"), "{error}");
+    assert!(
+        error.starts_with("Every replicate failed: 0 of 2 replicates fitted"),
+        "{error}"
+    );
     assert!(error.contains("z above 0.9"), "{error}");
 }

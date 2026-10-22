@@ -10,7 +10,11 @@ import logging
 from typing import TYPE_CHECKING
 
 from commol.api.inference.registry import register
-from commol.api.inference.resampling import fit_values, rust_block_length
+from commol.api.inference.resampling import (
+    fit_values,
+    log_failed,
+    rust_block_length,
+)
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context._model import engine_state
 from commol.context.inference.conformal import (
@@ -43,11 +47,6 @@ def _predictor(
     return fit_values(calibrator, calibrator.run(starts=method.starts)), None
 
 
-def _log_failed(run: "ConformalRunProtocol") -> None:
-    for index, reason in run.failed:
-        logger.warning("Refit %d failed: %s", index, reason)
-
-
 def _result(
     run: "ConformalRunProtocol", confidence_level: float, guarantee: str
 ) -> ConformalResult:
@@ -78,6 +77,8 @@ def _result(
         ),
         scores=scores,
         guarantee=guarantee,
+        failed=log_failed(run.failed, logger),
+        not_converged=run.not_converged,
     )
 
 
@@ -152,7 +153,6 @@ def run_rolling_conformal(
         method.starts,
         calibrator.seed,
     )
-    _log_failed(run)
     return _result(
         run,
         method.confidence_level,
@@ -194,7 +194,6 @@ def run_jackknife_plus(
         method.starts,
         calibrator.seed,
     )
-    _log_failed(run)
     return _result(
         run,
         method.confidence_level,
@@ -237,7 +236,6 @@ def run_enbpi(calibrator: "Calibrator", method: EnbPI) -> ConformalResult:
         method.starts,
         calibrator.seed,
     )
-    _log_failed(run)
     return _result(
         run,
         method.confidence_level,

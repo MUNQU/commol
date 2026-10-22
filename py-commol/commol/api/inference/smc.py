@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from commol.api.inference.registry import register
 from commol.api.inference.resampling import (
     fit_values,
+    log_failed,
     rust_block_length,
     sample_method,
 )
@@ -107,7 +108,7 @@ def run_gibbs_posterior(
     )
     fit: CalibrationResult | None = None
     coverage: float | None = None
-    notes: list[str] = []
+    failed: list[str] = []
     if isinstance(method.eta, InformationMatchingEta):
         fit = calibrator.run(starts=method.eta.starts)
         eta = rust.information_matching_eta(
@@ -129,9 +130,7 @@ def run_gibbs_posterior(
             calibrator.seed,
         )
         eta, coverage = found.eta, found.coverage
-        for index, reason in found.failed:
-            notes.append(f"Bootstrap replicate {index} failed: {reason}")
-            logger.warning(notes[-1])
+        failed = log_failed(found.failed, logger)
     else:
         eta = method.eta
     run = rust.gibbs_posterior(problem, priors, eta, *sampler, calibrator.seed)
@@ -144,10 +143,11 @@ def run_gibbs_posterior(
         levels=run.levels,
         kept=run.kept,
         log_evidence=run.log_evidence,
-        diagnostics=_diagnostics(run, notes),
+        diagnostics=_diagnostics(run, []),
         eta=eta,
         fit=fit,
         coverage=coverage,
+        failed=failed,
     )
 
 

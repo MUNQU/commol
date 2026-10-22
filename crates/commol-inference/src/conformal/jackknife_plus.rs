@@ -10,15 +10,13 @@
 //! with the blocks as folds.
 
 use commol_core::SimulationEngine;
-use rayon::prelude::*;
 
 use crate::conformal::ConformalError;
 use crate::conformal::intervals::{ConformalRun, PredictionIntervals};
 use crate::conformal::predict::{ensemble_spread, set_predictions, targets};
 use crate::conformal::quantile::{lower_quantile, upper_quantile};
 use crate::conformal::score::{ConformalSettings, NonconformityScore, scales};
-use crate::resampling::runner::every_replicate_failed;
-use crate::resampling::{BlockScheme, Perturbation, ReplicateRunner};
+use crate::resampling::{BlockScheme, FitUnit, Perturbation, ReplicateRunner};
 use crate::statistics;
 
 /// The coverage jackknife+ guarantees under exchangeable blocks, with `n`
@@ -38,7 +36,8 @@ pub fn cv_plus_bound(observations: usize, blocks: usize, confidence_level: f64) 
 /// The intervals of jackknife+ and what its guarantee counts.
 #[derive(Debug, Clone)]
 pub struct JackknifePlusRun {
-    /// The intervals, the residuals and the blocks whose refit failed.
+    /// The intervals, the residuals, and the blocks whose refit failed or
+    /// did not converge.
     pub run: ConformalRun,
     /// The blocks whose refit succeeded, `K`.
     pub blocks: usize,
@@ -54,8 +53,8 @@ pub struct JackknifePlusRun {
 /// # Errors
 ///
 /// Returns an error when `scheme` has fewer than two blocks, fewer than two
-/// refits succeed, a point cannot be predicted, or the score has no scale
-/// at a point.
+/// refits succeed ([`FitUnit::require`]), a point cannot be predicted, or
+/// the score has no scale at a point.
 pub fn jackknife_plus<E>(
     runner: &ReplicateRunner<'_, E>,
     scheme: &BlockScheme,
@@ -74,35 +73,26 @@ where
     }
     let problem = runner.problem();
     let observed = problem.observed_data();
-    let outcomes: Vec<_> = scheme
+    let perturbations: Vec<Perturbation> = scheme
         .blocks()
-        .par_iter()
-        .enumerate()
-        .map(|(block, members)| {
+        .iter()
+        .map(|members| {
             let mut weights: Vec<f64> = observed.iter().map(|obs| obs.weight).collect();
             for &i in members {
                 weights[i] = 0.0;
             }
-            runner.fit_one(block, &Perturbation::Weights(weights))
+            Perturbation::Weights(weights)
         })
         .collect();
-    let mut fits = Vec::new();
+    let refits = runner.fit_all(&perturbations);
+    refits
+        .require(FitUnit::Block, 2)
+        .map_err(ConformalError::Failed)?;
     let mut fit_of_block = vec![None; scheme.count()];
-    let mut failed = Vec::new();
-    for (block, outcome) in outcomes.into_iter().enumerate() {
-        match outcome {
-            Ok(result) => {
-                fit_of_block[block] = Some(fits.len());
-                fits.push(problem.applied_parameter_values(&result.best_parameters));
-            }
-            Err(reason) => failed.push((block, reason)),
-        }
-    }
-    if fits.len() < 2 {
-        return Err(ConformalError::Failed(format!(
-            "jackknife+ needs two refits; {}",
-            every_replicate_failed(&failed)
-        )));
+    let mut fits = Vec::new();
+    for (block, result) in &refits.fits {
+        fit_of_block[*block] = Some(fits.len());
+        fits.push(problem.applied_parameter_values(&result.best_parameters));
     }
     let targets = targets(observed, positions);
     let points: Vec<_> = observed.iter().chain(&targets).cloned().collect();
@@ -166,7 +156,8 @@ where
                 .into_iter()
                 .map(|(i, _, residual)| (observed[i].label.clone(), residual))
                 .collect(),
-            failed,
+            failed: refits.failed,
+            not_converged: refits.not_converged,
         },
         blocks: fits.len(),
         observations: scored,

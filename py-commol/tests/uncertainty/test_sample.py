@@ -81,7 +81,7 @@ class TestStatistics:
         assert sample.mean() == pytest.approx(dict(zip(["k1", "k2"], array.mean(0))))
         np.testing.assert_allclose(sample.covariance(), np.cov(array.T))
         np.testing.assert_allclose(sample.correlation(), np.corrcoef(array.T))
-        assert sample.effective_size() == pytest.approx(3.0)
+        assert sample.effective_size == pytest.approx(3.0)
 
     def test_weighted_statistics_are_their_closed_forms(self) -> None:
         weights = [0.5, 0.25, 0.25]
@@ -91,9 +91,14 @@ class TestStatistics:
         assert sample.mean()["k1"] == pytest.approx(2.0)
         # Σw(x − 2)² = 0.5 + 0 + 1 = 1.5, over 1 − Σw² = 0.625.
         assert sample.covariance()[0][0] == pytest.approx(1.5 / 0.625)
-        assert sample.effective_size() == pytest.approx(1 / 0.375)
         # Midpoints 1/4, 5/8 and 7/8 of k1 = 1, 2, 4.
         assert sample.quantiles([0.5])["k1"] == pytest.approx([1 + 0.25 / 0.375])
+
+    def test_the_effective_size_is_a_property(self) -> None:
+        sample = _sample([math.log(w) for w in [0.5, 0.25, 0.25]])
+
+        # Kish: 1 / (0.5² + 0.25² + 0.25²).
+        assert sample.effective_size == pytest.approx(1 / 0.375)
 
     def test_the_interval_is_the_central_pair_of_quantiles(self) -> None:
         sample = _sample([0.0, 0.0, 0.0])

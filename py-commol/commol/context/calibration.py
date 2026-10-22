@@ -1079,8 +1079,9 @@ class CalibrationResult(BaseModel):
         Why the best start stopped.
     starts : list[StartSummary]
         Every start that finished, in order; the first is the initial guess.
-    failed_runs : list[str]
-        Why each start that failed did, with its number.
+    failed : list[str]
+        Each start that failed: ``"Start <index> failed: <reason>"``, also
+        logged as a warning.
     seed : int
         The seed of the calibration's random numbers (`Calibrator.seed`):
         ``problem.seed``, or the seed the calibrator drew. Set as
@@ -1104,8 +1105,8 @@ class CalibrationResult(BaseModel):
     starts: list[StartSummary] = Field(
         default_factory=list, description="Every start that finished"
     )
-    failed_runs: list[str] = Field(
-        default_factory=list, description="Why each failed start failed"
+    failed: list[str] = Field(
+        default_factory=list, description="Each start that failed"
     )
     seed: int = Field(
         default=..., ge=0, description="Seed of the calibration's random numbers"
@@ -1122,7 +1123,7 @@ class CalibrationResult(BaseModel):
             f"  best_parameters={self.best_parameters},\n"
             f"  termination_reason='{self.termination_reason}',\n"
             f"  starts={len(self.starts)},\n"
-            f"  failed_runs={len(self.failed_runs)},\n"
+            f"  failed={len(self.failed)},\n"
             f"  seed={self.seed}\n"
             f")"
         )

@@ -171,13 +171,13 @@ unweighted statistic.
 | `mean()` | The weighted mean of each parameter |
 | `covariance()`, `correlation()` | Weighted matrices, in the order of `names`; with equal weights, NumPy's `cov` and `corrcoef` |
 | `quantiles(levels)`, `interval(confidence_level)` | Weighted quantiles by [the one convention](#the-one-quantile) |
-| `effective_size()` | Kish's effective sample size, `1 / Σ wᵢ²` |
+| `effective_size` | Kish's effective sample size, `1 / Σ wᵢ²` (a property) |
 | `draws()` | One `{name: value}` mapping per draw |
 | `resample(count, seed)` | A sample of equal weights, drawn by weight |
 | `summary(confidence_level)` | A `ParameterSummary` per parameter, for a report |
 
 ```python
-print(round(sample.effective_size(), 6))  # 3.0
+print(round(sample.effective_size, 6))  # 3.0
 print(next(sample.draws()))  # {'k1': 0.38, 'k2': 0.09}
 ```
 

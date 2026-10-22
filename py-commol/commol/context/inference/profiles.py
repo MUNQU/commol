@@ -523,8 +523,13 @@ class ProfileResult(_Frozen):
     notes : list[str]
         What a reader should know, such as a threshold below the tolerance or
         a refit below the fit.
-    failed_replicates : list[str]
-        With a bootstrap threshold, each replicate that failed.
+    failed : list[str]
+        With a bootstrap threshold, each replicate that failed:
+        ``"Replicate <index> failed: <reason>"``, also logged as a warning.
+        Empty with any other threshold.
+    not_converged : int
+        With a bootstrap threshold, the replicates kept although their
+        optimizer did not converge; 0 with any other threshold.
     """
 
     fit: CalibrationResult
@@ -537,7 +542,8 @@ class ProfileResult(_Frozen):
     evaluation_floor: float | None = None
     structure: dict[str, ProfileStructure] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
-    failed_replicates: list[str] = Field(default_factory=list)
+    failed: list[str] = Field(default_factory=list)
+    not_converged: int = 0
 
     def plot(
         self,
@@ -578,10 +584,10 @@ class ProfileResult(_Frozen):
 
         return _profiles(self, output_file=output_file, config=config, axes=axes)
 
-    def report(self) -> IdentifiabilityReport:
+    def identifiability(self) -> IdentifiabilityReport:
         """
         The verdicts of the profiled parameters as an identifiability report,
-        with a ``profile`` section.
+        with a ``profile`` section; its ``report()`` gives them as data.
 
         ``identifiable`` gives the practical verdict ``determined`` and
         ``practically_non_identifiable`` the practical verdict
@@ -608,8 +614,9 @@ class ProfileResult(_Frozen):
         """
         if self.quantity != "parameter":
             raise ValueError(
-                "Only the profiles of parameters report on identifiability; this "
-                "result holds the profiles of predictions."
+                "This result holds the profiles of predictions, and predictions "
+                "have no verdict on a parameter; profile the parameters "
+                "(ProfileLikelihood) for their identifiability."
             )
         parameters = list(self.fit.best_parameters)
         verdicts: dict[str, ParameterVerdicts] = {}

@@ -218,11 +218,16 @@ class GibbsResult(SMCResult):
     coverage : float | None
         With `BootstrapCoverageEta`, the coverage of the fit by the intervals of
         the bootstrap posteriors at `η`; otherwise None.
+    failed : list[str]
+        With `BootstrapCoverageEta`, each replicate whose sampler failed:
+        ``"Replicate <index> failed: <reason>"``, also logged as a warning.
+        Empty otherwise.
     """
 
     eta: float
     fit: CalibrationResult | None
     coverage: float | None
+    failed: list[str] = Field(default_factory=list)
 
 
 def _require(data: object, name: str, hint: str) -> None:

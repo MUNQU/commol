@@ -93,6 +93,15 @@ class ConformalResult(BaseModel):
         them.
     guarantee : str
         The coverage the method guarantees, and what the guarantee assumes.
+    failed : list[str]
+        Each refit that failed, which gives no score: ``"Origin <index>
+        failed: <reason>"`` for `RollingConformal`, ``"Block <index> failed:
+        <reason>"`` for `JackknifePlus`, ``"Replicate <index> failed:
+        <reason>"`` for `EnbPI`; also logged as a warning. Empty for a method
+        that does not refit.
+    not_converged : int
+        Refits kept although their optimizer did not converge; 0 for a
+        method that does not refit.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
@@ -100,6 +109,8 @@ class ConformalResult(BaseModel):
     intervals: PredictionIntervals
     scores: dict[str, list[float]]
     guarantee: str
+    failed: list[str] = Field(description="Each refit that failed.")
+    not_converged: int = Field(description="Refits that did not converge.")
 
 
 class ConformalMethod(UncertaintyMethod[ConformalResult]):

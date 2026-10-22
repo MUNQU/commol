@@ -415,9 +415,7 @@ where
             Err(reason) => failed.push((*b, reason)),
         }
     }
-    if runs.is_empty() {
-        return Err(crate::resampling::runner::every_replicate_failed(&failed));
-    }
+    crate::resampling::FitUnit::Replicate.require(runs.len(), &failed, 1)?;
 
     let coverage = |runs: &[(usize, SmcState, Vec<Snapshot>)], eta: f64| -> f64 {
         let covered: usize = runs

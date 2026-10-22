@@ -75,4 +75,6 @@ pub struct ConformalRun {
     /// The index and reason of each refit that failed; a failed refit gives
     /// no score.
     pub failed: Vec<(usize, String)>,
+    /// The number of refits kept although their optimizer did not converge.
+    pub not_converged: usize,
 }

@@ -237,7 +237,7 @@ replicate of each draw.
 | `iterations` | The optimizer iterations performed |
 | `converged` | `True` only when the optimizer met its convergence test or `target_cost`; a run that used all `max_iterations` is `False`. See [Optimizers](calibration-optimizers.md#converged-and-termination_reason). |
 | `termination_reason` | Why it stopped |
-| `starts`, `failed_runs` | Every start that finished, and why each failed one did. See [Several starts](calibration-optimizers.md#several-starts). |
+| `starts`, `failed` | Every start that finished, and each start that failed with its reason. See [Several starts](calibration-optimizers.md#several-starts). |
 | `seed` | The seed of the calibration's random numbers (`Calibrator.seed`). See [Reproducibility](calibration-optimizers.md#reproducibility). |
 
 ```python

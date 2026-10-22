@@ -26,7 +26,7 @@ Politis and White (2004) with the correction of Patton, Politis and White
 
 class ResamplingDiagnostics(BaseModel):
     """
-    What happened to the replicates of a resampling method.
+    The blocks of a resampling method, and the synthetic values below zero.
 
     Attributes
     ----------
@@ -36,11 +36,6 @@ class ResamplingDiagnostics(BaseModel):
     block_length_estimates : dict[str, float] | None
         With ``block_length="auto"``, the estimate of each series, by label;
         otherwise None.
-    failed : list[str]
-        Each replicate that failed, with its reason. A failed replicate is not
-        in the sample.
-    not_converged : int
-        Replicates kept although their optimizer did not converge.
     negative_values : int
         Synthetic observed values below zero, over every replicate. They are
         kept; many of them point to ``residual_scale="multiplicative"``.
@@ -52,8 +47,6 @@ class ResamplingDiagnostics(BaseModel):
     block_length_estimates: dict[str, float] | None = Field(
         description="The estimate of each series with the automatic length."
     )
-    failed: list[str] = Field(description="Each replicate that failed.")
-    not_converged: int = Field(description="Replicates that did not converge.")
     negative_values: int = Field(description="Synthetic values below zero.")
 
 
@@ -88,15 +81,21 @@ class BootstrapResult(BaseModel):
     sample : ParameterSample
         One draw per replicate that did not fail, with equal weights; the
         group of a draw is its replicate.
+    failed : list[str]
+        Each replicate that failed: ``"Replicate <index> failed: <reason>"``,
+        also logged as a warning. A failed replicate is not in the sample.
+    not_converged : int
+        Replicates kept although their optimizer did not converge.
     diagnostics : ResamplingDiagnostics
-        The block length, and the replicates that failed, did not converge or
-        made values below zero.
+        The block length, and the synthetic values below zero.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     fit: CalibrationResult
     sample: ParameterSample
+    failed: list[str] = Field(description="Each replicate that failed.")
+    not_converged: int = Field(description="Replicates that did not converge.")
     diagnostics: ResamplingDiagnostics
 
     def interval_error(self, confidence_level: float) -> dict[str, BoundError]:
@@ -279,8 +278,14 @@ class JackknifeResult(BaseModel):
         How far leaving each block out moves each parameter, in standard
         errors: ``(θ̂₍₋ᵦ₎ − θ̂) / se``, one per block. NaN or infinite when a
         standard error is 0.
+    failed : list[str]
+        Each block whose fit failed: ``"Block <index> failed: <reason>"``,
+        with blocks numbered from 0 in order of position; also logged as a
+        warning. A block that failed is not in `blocks`.
+    not_converged : int
+        Fits kept although their optimizer did not converge.
     diagnostics : ResamplingDiagnostics
-        The block length and the fits that failed or did not converge.
+        The block length.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
@@ -292,6 +297,8 @@ class JackknifeResult(BaseModel):
     blocks: list[tuple[float, float]]
     pseudo_values: dict[str, list[float]]
     influence: dict[str, list[float]]
+    failed: list[str] = Field(description="Each block whose fit failed.")
+    not_converged: int = Field(description="Fits that did not converge.")
     diagnostics: ResamplingDiagnostics
 
 

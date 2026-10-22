@@ -162,7 +162,7 @@ class TestResult:
             "  best_parameters={'k1': 0.1},\n"
             "  termination_reason='tolerance',\n"
             "  starts=0,\n"
-            "  failed_runs=0,\n"
+            "  failed=0,\n"
             "  seed=7\n"
             ")"
         )

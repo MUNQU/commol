@@ -110,6 +110,11 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
 - [ ] The configuration, a subclass of `UncertaintyMethod[YourResult]`, and
       the result, in `context/inference/`; a result with draws holds a
       `ParameterSample`.
+- [ ] A method that fits several times fits its perturbations with
+      `ReplicateRunner::fit_all` and checks them with `ReplicateFits::require`;
+      its result has `failed` (the entries of `FitUnit::failed`, logged as
+      warnings) and `not_converged` at the top
+      ([Design decisions](decisions/results.md#fits-that-fail-have-one-place)).
 - [ ] `register(YourMethod, runner)` in `api/inference/registry.py` (import it
       from `commol.api.inference`).
 - [ ] A coverage study (`tests/support/coverage.py`, marker `coverage_study`)

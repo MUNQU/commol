@@ -9,7 +9,7 @@ use commol_inference::profiles::{
     Profile, ProfileEnd, ProfileTracer, ProfileVerdict, ProfiledQuantity, StructuralReading,
     Structure, Undetermined, beale, bootstrap_thresholds, chi_square,
 };
-use commol_inference::resampling::ReplicateRunner;
+use commol_inference::resampling::{FitUnit, ReplicateRunner};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
@@ -232,8 +232,12 @@ pub struct PyProfileRun {
     evaluation_floor: Option<f64>,
     /// The replicates kept by a bootstrap threshold
     replicates: Option<Vec<usize>>,
-    /// The index and reason of each replicate that failed
-    failed: Vec<(usize, String)>,
+    /// Each replicate of a bootstrap threshold that failed:
+    /// "Replicate <index> failed: <reason>"
+    failed: Vec<String>,
+    /// Replicates of a bootstrap threshold kept although their optimizer
+    /// did not converge
+    not_converged: usize,
 }
 
 /// Trace the profile of each parameter and prediction from the fit
@@ -285,6 +289,7 @@ fn trace_profiles(
     let mut rises = None;
     let mut replicates = None;
     let mut failed = Vec::new();
+    let mut not_converged = 0;
     let thresholds = match (threshold, bootstrap) {
         ("chi_square", None) => {
             vec![chi_square(problem_ref, confidence_level).map_err(value_error)?; quantities.len()]
@@ -318,7 +323,8 @@ fn trace_profiles(
             .map_err(PyRuntimeError::new_err)?;
             rises = Some(run.rises);
             replicates = Some(run.replicates);
-            failed = run.failed;
+            failed = FitUnit::Replicate.entries(&run.failed);
+            not_converged = run.not_converged;
             run.thresholds
         }
         _ => {
@@ -367,6 +373,7 @@ fn trace_profiles(
         evaluation_floor: tracer.evaluation_floor(),
         replicates,
         failed,
+        not_converged,
     })
 }
 

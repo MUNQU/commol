@@ -8,11 +8,10 @@
 //! draws: their spread needs the `(B − 1)` scaling to give an interval.
 
 use commol_core::SimulationEngine;
-use rayon::prelude::*;
 
 use crate::resampling::blocks::BlockScheme;
 use crate::resampling::resamplers::Perturbation;
-use crate::resampling::runner::{ReplicateRunner, every_replicate_failed};
+use crate::resampling::runner::{FitUnit, ReplicateRunner};
 
 /// The statistics of a jackknife, one value per parameter in each vector.
 #[derive(Debug, Clone, PartialEq)]
@@ -100,7 +99,7 @@ pub struct Jackknife {
 /// # Errors
 ///
 /// Returns a message when `scheme` has fewer than two blocks, or fewer than
-/// two fits succeed.
+/// two fits succeed ([`FitUnit::require`]).
 pub fn block_jackknife<E>(
     runner: &ReplicateRunner<'_, E>,
     scheme: &BlockScheme,
@@ -117,46 +116,34 @@ where
     }
     let problem = runner.problem();
     let weights: Vec<f64> = problem.observed_data().iter().map(|o| o.weight).collect();
-    let outcomes: Vec<_> = scheme
+    let perturbations: Vec<Perturbation> = scheme
         .blocks()
-        .par_iter()
-        .enumerate()
-        .map(|(block, members)| {
+        .iter()
+        .map(|members| {
             let mut left_out = weights.clone();
             for &observation in members {
                 left_out[observation] = 0.0;
             }
-            runner.fit_one(block, &Perturbation::Weights(left_out))
+            Perturbation::Weights(left_out)
         })
         .collect();
-    let mut leave_outs = Vec::new();
-    let mut blocks = Vec::new();
-    let mut failed = Vec::new();
-    let mut not_converged = 0;
-    for (block, outcome) in outcomes.into_iter().enumerate() {
-        match outcome {
-            Ok(result) => {
-                not_converged += usize::from(!result.converged);
-                leave_outs.push(problem.applied_parameter_values(&result.best_parameters));
-                blocks.push(block);
-            }
-            Err(reason) => failed.push((block, reason)),
-        }
-    }
-    if leave_outs.len() < 2 {
-        if leave_outs.is_empty() {
-            return Err(every_replicate_failed(&failed));
-        }
-        return Err(format!(
-            "Only one block left out could be fitted; a jackknife needs two. {}",
-            every_replicate_failed(&failed)
-        ));
-    }
+    let fits = runner.fit_all(&perturbations);
+    fits.require(FitUnit::Block, 2)?;
+    let (blocks, leave_outs): (Vec<usize>, Vec<Vec<f64>>) = fits
+        .fits
+        .iter()
+        .map(|(block, fit)| {
+            (
+                *block,
+                problem.applied_parameter_values(&fit.best_parameters),
+            )
+        })
+        .unzip();
     Ok(Jackknife {
         statistics: jackknife_statistics(runner.fit(), &leave_outs),
         blocks,
-        failed,
-        not_converged,
+        failed: fits.failed,
+        not_converged: fits.not_converged,
     })
 }
 

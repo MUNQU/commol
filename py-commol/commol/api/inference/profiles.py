@@ -10,7 +10,11 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from commol.api.inference.registry import register
-from commol.api.inference.resampling import fit_values, rust_block_length
+from commol.api.inference.resampling import (
+    fit_values,
+    log_failed,
+    rust_block_length,
+)
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context._model import engine_state
 from commol.context.calibration import CalibrationResult
@@ -219,9 +223,6 @@ def _result(
         )
         lower, upper = profile.interval
         intervals[name] = ProfileInterval(lower=lower, upper=upper)
-    failed = [f"Replicate {index} failed: {reason}" for index, reason in run.failed]
-    for reason in failed:
-        logger.warning(reason)
     return ProfileResult.model_validate(
         {
             "fit": fit,
@@ -234,7 +235,8 @@ def _result(
             "evaluation_floor": run.evaluation_floor,
             "structure": structure,
             "notes": notes,
-            "failed_replicates": failed,
+            "failed": log_failed(run.failed, logger),
+            "not_converged": run.not_converged,
         }
     )
 

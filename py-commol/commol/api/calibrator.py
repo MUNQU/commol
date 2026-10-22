@@ -398,9 +398,8 @@ class Calibrator:
         CalibrationResult
             The best start: the optimized parameter values, in the order of
             the problem's parameters, its final loss and convergence, every
-            start (``starts``), the reason of each start that failed
-            (``failed_runs``, also logged as warnings) and the seed
-            (``seed``).
+            start (``starts``), each start that failed (``failed``, also
+            logged as warnings) and the seed (``seed``).
 
         Raises
         ------
@@ -432,12 +431,12 @@ class Calibrator:
         )
         names = self.parameter_names
         summaries: list[tuple[StartSummary, "CalibrationResultProtocol"]] = []
-        failed_runs: list[str] = []
+        failed: list[str] = []
         for index, outcome in enumerate(outcomes):
             if outcome.result is None:
                 reason = f"Start {index} failed: {outcome.error}"
                 logger.warning(reason)
-                failed_runs.append(reason)
+                failed.append(reason)
                 continue
             summaries.append(
                 (
@@ -451,7 +450,7 @@ class Calibrator:
                 )
             )
         if not summaries:
-            raise RuntimeError("Every start failed: " + "; ".join(failed_runs))
+            raise RuntimeError("Every start failed: " + "; ".join(failed))
         best = min(summaries, key=lambda summary: summary[0].loss)[1]
         result = CalibrationResult(
             best_parameters=dict(best.best_parameters),
@@ -460,7 +459,7 @@ class Calibrator:
             converged=best.converged,
             termination_reason=best.termination_reason,
             starts=[summary for summary, _ in summaries],
-            failed_runs=failed_runs,
+            failed=failed,
             seed=self.seed,
         )
         logger.info(

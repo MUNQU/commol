@@ -108,6 +108,7 @@ def flow_calibrator(
     bounds: tuple[float, float] = (0.0, 50.0),
     observation_models: Mapping[str, ObservationModel] | None = None,
     noise: Sequence[CalibrationParameter] = (),
+    weights: Sequence[float] | None = None,
 ) -> Calibrator:
     """
     Fit a constant flow ``c`` from A to B (``a_to_b_builder`` with the rate
@@ -121,20 +122,46 @@ def flow_calibrator(
 
     The fit minimizes the sum of squares, or, with `observation_models` (of
     the series ``"B"``), maximizes their likelihood, with the `noise`
-    parameters calibrated after ``c``.
+    parameters calibrated after ``c``. `weights`, one per value, replace the
+    weight 1 of each observation.
     """
     model = build(
         a_to_b_builder(
             parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": 0}
         )
     )
+    observations = flow_observations(values, windowed=windowed)
+    if weights is not None:
+        observations = [
+            point.model_copy(update={"weight": weight})
+            for point, weight in zip(observations, weights, strict=True)
+        ]
     problem = CalibrationProblem(
-        observed_data=flow_observations(values, windowed=windowed),
+        observed_data=observations,
         parameters=[bounded("c", *bounds, initial_guess=sum(bounds) / 2), *noise],
         loss_function=None if observation_models else "sse",
         observation_models=dict(observation_models) if observation_models else None,
         optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-14),
         seed=seed,
+    )
+    return Calibrator(Simulation(model), problem)
+
+
+def rate_calibrator(rate: str, flows: Sequence[float]) -> Calibrator:
+    """
+    A flow from A to B at `rate` (``a_to_b_builder``, 10⁶ in A), fitted by
+    ``c`` in [0, 50] from 10 to `flows`, each the flow of one step, at
+    positions 1, 2, ….
+    """
+    model = build(
+        a_to_b_builder(parameters={"c": None}, rate=rate, amounts={"A": 1e6, "B": 0})
+    )
+    problem = CalibrationProblem(
+        observed_data=flow_observations(flows, windowed=True),
+        parameters=[bounded("c", 0.0, 50.0, initial_guess=10.0)],
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-14),
+        seed=1,
     )
     return Calibrator(Simulation(model), problem)
 

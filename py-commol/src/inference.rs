@@ -12,7 +12,7 @@ use commol_calibration::{
     optimize_starts, optimize_with_history,
 };
 use commol_inference::resampling::{
-    BayesianBootstrap, BlockDrawing, BlockScheme, Multipliers, ParametricResampler,
+    BayesianBootstrap, BlockDrawing, BlockScheme, FitUnit, Multipliers, ParametricResampler,
     ReplicateRunner, Resampler, ResidualBlocks, ResidualBootstrap, ResidualNoise, ResidualScale,
     Residuals, WildBootstrap, automatic_block_length, block_jackknife, bootstrap,
 };
@@ -205,7 +205,7 @@ impl PyCalibrationProblem {
                 .groups()
                 .map(<[usize]>::to_vec)
                 .unwrap_or_default(),
-            failed: run.failed,
+            failed: FitUnit::Replicate.entries(&run.failed),
             not_converged: run.not_converged,
             negative_values: run.negative_values,
             block_length: chosen.as_ref().map(|chosen| chosen.length),
@@ -694,11 +694,7 @@ impl PyCalibrationProblem {
             standard_error: jackknife.statistics.standard_error,
             pseudo_values: jackknife.statistics.pseudo_values,
             influence: jackknife.statistics.influence,
-            failed: jackknife
-                .failed
-                .into_iter()
-                .map(|(block, reason)| (spans[block], reason))
-                .collect(),
+            failed: FitUnit::Block.entries(&jackknife.failed),
             not_converged: jackknife.not_converged,
             block_length: chosen.length,
             block_length_estimates: chosen.estimates,
@@ -742,8 +738,8 @@ pub struct PyBootstrapRun {
     values: Vec<Vec<f64>>,
     /// The replicate of each row
     groups: Vec<usize>,
-    /// The index and reason of each replicate that failed
-    failed: Vec<(usize, String)>,
+    /// Each replicate that failed: "Replicate <index> failed: <reason>"
+    failed: Vec<String>,
     /// Replicates kept although their optimizer did not converge
     not_converged: usize,
     /// Synthetic observed values below zero, over every replicate
@@ -769,8 +765,8 @@ pub struct PyJackknifeRun {
     pseudo_values: Vec<Vec<f64>>,
     /// One row of influences per block that fitted
     influence: Vec<Vec<f64>>,
-    /// The span and reason of each block whose fit failed
-    failed: Vec<((f64, f64), String)>,
+    /// Each block whose fit failed: "Block <index> failed: <reason>"
+    failed: Vec<String>,
     /// Fits kept although their optimizer did not converge
     not_converged: usize,
     /// The block length used

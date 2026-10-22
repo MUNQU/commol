@@ -5,9 +5,7 @@ The model is linear in its one parameter (``flow_calibrator``): each
 observation of B is ``c·t``, or ``c`` with a window of one step.
 """
 
-import logging
 import math
-from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -26,13 +24,13 @@ from commol import (
     Simulation,
     SplitConformal,
 )
-from commol.api.inference import conformal as conformal_runners
 from tests.support import (
     a_to_b_builder,
     bounded,
     build,
     flow_calibrator,
     flow_observations,
+    rate_calibrator,
 )
 
 C = 10.0
@@ -263,41 +261,6 @@ class TestRollingConformal:
         ]
         assert half_widths == pytest.approx([1.0, 2.0, 3.0])
 
-    def test_a_failed_refit_is_logged(
-        self, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        calibrator = flow_calibrator(_amounts(range(1, 21), 3), windowed=False)
-        run = SimpleNamespace(
-            labels=["B"],
-            positions=[21.0],
-            prediction=[210.0],
-            lower=[209.0],
-            upper=[211.0],
-            scores=[("B", 1.0)],
-            failed=[(0, "Simulation failed: x")],
-        )
-        monkeypatch.setattr(
-            conformal_runners,
-            "commol_rs",
-            SimpleNamespace(
-                inference=SimpleNamespace(rolling_conformal=lambda *_: run)
-            ),
-        )
-
-        with caplog.at_level(logging.WARNING, logger="commol.api.inference"):
-            result = calibrator.uncertainty(
-                RollingConformal(
-                    origins=[10.0],
-                    score="absolute",
-                    by="series",
-                    confidence_level=0.5,
-                    positions=[21.0],
-                )
-            )
-
-        assert "Refit 0 failed: Simulation failed: x" in caplog.text
-        assert result.scores == {"B": [1.0]}
-
 
 class TestEnbPI:
     def test_enbpi_needs_each_block_left_out(self) -> None:
@@ -388,26 +351,40 @@ class TestResults:
         assert list(result.scores) == ["B"]
 
 
-def _rate_calibrator(rate: str, flows: list[float]) -> Calibrator:
-    """A flow from A to B at `rate`, fitted by ``c`` from 10 to `flows` at
-    positions 1, 2, …"""
-    model = build(
-        a_to_b_builder(parameters={"c": None}, rate=rate, amounts={"A": 1e6, "B": 0})
-    )
-    problem = CalibrationProblem(
-        observed_data=flow_observations(flows, windowed=True),
-        parameters=[bounded("c", 0.0, 50.0, initial_guess=10.0)],
-        loss_function="sse",
-        optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-14),
-        seed=1,
-    )
-    return Calibrator(Simulation(model), problem)
-
-
 class TestFailures:
+    def test_a_conformal_result_counts_the_refits_that_did_not_converge(
+        self,
+    ) -> None:
+        model = build(
+            a_to_b_builder(
+                parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": 0}
+            )
+        )
+        problem = CalibrationProblem(
+            observed_data=flow_observations(_amounts(range(1, 21), 3), windowed=False),
+            parameters=[bounded("c", 0.0, 50.0, initial_guess=25.0)],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=1),
+        )
+        calibrator = Calibrator(Simulation(model), problem)
+
+        result = calibrator.uncertainty(
+            RollingConformal(
+                origins=[10.0, 15.0],
+                score="absolute",
+                by="series",
+                confidence_level=0.5,
+                positions=[21.0],
+            )
+        )
+
+        # One iteration stops both refits.
+        assert result.not_converged == 2
+        assert result.failed == []
+
     def test_a_prediction_that_fails_names_its_parameter_set(self) -> None:
         # The rate is not a number after 25.5, inside the calibration data.
-        calibrator = _rate_calibrator(
+        calibrator = rate_calibrator(
             "c * A / A + 0 * sqrt(25.5 - t)", [10.0, 11.0, 9.0, 10.5]
         )
 
@@ -430,15 +407,15 @@ class TestFailures:
     def test_every_refit_failing_gives_the_reasons(self) -> None:
         # The fit of every flow is 11.5; the refit at the origin 2 heads for
         # 40, past 20, where the rate is not a number.
-        calibrator = _rate_calibrator(
+        calibrator = rate_calibrator(
             "c * A / A + 0 * sqrt(20 - c)", [40.0] * 2 + [C] * 38
         )
 
         assert calibrator.run().best_parameters["c"] == pytest.approx(11.5)
         with pytest.raises(
             RuntimeError,
-            match=r"Every replicate failed \(1\); the first reasons: replicate 0: "
-            "Optimization failed: Simulation failed",
+            match=r"Every origin failed: 0 of 1 origins fitted, and the method needs "
+            r"1; the first reasons: origin 0: Optimization failed: Simulation failed",
         ):
             calibrator.uncertainty(
                 RollingConformal(

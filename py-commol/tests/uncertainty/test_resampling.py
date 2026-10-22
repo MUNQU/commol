@@ -8,6 +8,8 @@ or ``c·t``, a regression through the origin.
 
 import logging
 import math
+import re
+from collections.abc import Callable
 from types import SimpleNamespace
 
 import numpy as np
@@ -17,15 +19,30 @@ from pydantic import ValidationError
 from commol import (
     BayesianBootstrap,
     BlockJackknife,
+    BootstrapCoverageEta,
     BootstrapResult,
+    Calibrator,
+    ConformalResult,
+    GibbsPosterior,
+    GibbsResult,
+    JackknifePlus,
+    JackknifeResult,
+    LogNormalObservations,
     NoNoise,
     ObservedDataPoint,
     Predictive,
+    Priors,
+    ProfileLikelihood,
+    ProfileResult,
     ResidualBootstrap,
     ResidualNoise,
+    RollingConformal,
+    Threshold,
     WildBootstrap,
 )
-from tests.support import flow_calibrator, flow_observations
+from commol.api.inference import smc as smc_runners
+from commol.commol_rs import _commol_rs as commol_rs
+from tests.support import flow_calibrator, flow_observations, line_calibrator
 
 
 def _noisy(count: int, seed: int, level: float = 10.0) -> list[float]:
@@ -72,7 +89,7 @@ class TestBayesianBootstrap:
         assert result.fit == calibrator.run()
         assert result.diagnostics.block_length == 2
         assert result.diagnostics.block_length_estimates is None
-        assert result.diagnostics.failed == []
+        assert result.failed == []
 
     def test_bayesian_bootstrap_matches_the_sandwich_variance(self) -> None:
         # y = c·t + e: least squares through the origin, whose sandwich
@@ -164,7 +181,7 @@ class TestResidualBootstraps:
         )
 
         assert result.diagnostics.negative_values > 0
-        assert len(result.sample) + len(result.diagnostics.failed) == 10
+        assert len(result.sample) + len(result.failed) == 10
 
     def test_one_seed_gives_one_result(self) -> None:
         values = _noisy(24, 9)
@@ -250,31 +267,139 @@ class TestResidualNoise:
             )
 
 
-class TestFailedReplicates:
-    def test_a_failed_replicate_is_in_the_diagnostics_and_in_the_log(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        calibrator = flow_calibrator(_noisy(12, 4), windowed=False, bounds=(0.0, 5.0))
-        engine = calibrator._rust_problem
-        run = SimpleNamespace(
-            values=[[1.0]],
-            groups=None,
-            block_length=1,
-            block_length_estimates=None,
-            failed=[(1, "Simulation failed: x")],
-            not_converged=0,
-            negative_values=0,
-        )
-        calibrator._rust_problem = SimpleNamespace(  # type: ignore[assignment]
-            optimize=engine.optimize, bayesian_bootstrap=lambda *_: run
-        )
+# Small values with residuals of their size: the additive bootstrap makes a
+# value below 0, which a log-normal model cannot read.
+_SMALL = [0.3, 3.2, 0.2, 6.1, 4.0, 9.5, 6.2, 12.0, 9.0, 15.5]
+_BELOW_ZERO = ResidualBootstrap(
+    replicates=20, block_length=1, residual_scale="additive", scheme="moving"
+)
+# Nine flows of which only the first three have weight: a fit without them
+# has nothing to fit.
+_FIRST_BLOCK = [1.0] * 3 + [0.0] * 6
+_NO_WEIGHT = "Every weight is zero"
 
-        with caplog.at_level(logging.WARNING, logger="commol.api.inference"):
-            result = calibrator.uncertainty(
-                BayesianBootstrap(replicates=2, block_length=1)
-            )
 
-        assert result.diagnostics.failed == ["Replicate 1 failed: Simulation failed: x"]
-        assert [r.getMessage() for r in caplog.records if r.levelname == "WARNING"] == [
-            "Replicate 1 failed: Simulation failed: x"
-        ]
+type _Result = (
+    BootstrapResult | JackknifeResult | ProfileResult | ConformalResult | GibbsResult
+)
+
+
+def _log_normal() -> Calibrator:
+    return line_calibrator(
+        _SMALL,
+        observation_models={"B": LogNormalObservations(sigma=0.5, center="median")},
+    )
+
+
+def _bootstrap(_: pytest.MonkeyPatch) -> _Result:
+    return _log_normal().uncertainty(_BELOW_ZERO)
+
+
+def _jackknife(_: pytest.MonkeyPatch) -> _Result:
+    calibrator = flow_calibrator(_noisy(9, 2), windowed=True, weights=_FIRST_BLOCK)
+    return calibrator.uncertainty(BlockJackknife(block_length=3))
+
+
+def _profile(_: pytest.MonkeyPatch) -> _Result:
+    return _log_normal().uncertainty(
+        ProfileLikelihood(
+            parameters=["c"],
+            threshold=Threshold.bootstrap_calibrated(_BELOW_ZERO, 0.9),
+            max_steps=3,
+        )
+    )
+
+
+def _jackknife_plus(_: pytest.MonkeyPatch) -> _Result:
+    calibrator = flow_calibrator(_noisy(9, 2), windowed=True, weights=_FIRST_BLOCK)
+    return calibrator.uncertainty(
+        JackknifePlus(
+            block_length=3,
+            score="absolute",
+            by="series",
+            confidence_level=0.5,
+            positions=[10.0],
+        )
+    )
+
+
+def _rolling(_: pytest.MonkeyPatch) -> _Result:
+    # The origin at 2 has only observations of weight 0 to fit.
+    calibrator = flow_calibrator(
+        _noisy(9, 2), windowed=True, weights=[0.0] * 2 + [1.0] * 7
+    )
+    return calibrator.uncertainty(
+        RollingConformal(
+            origins=[2.0, 5.0],
+            score="absolute",
+            by="series",
+            confidence_level=0.5,
+            positions=[10.0],
+        )
+    )
+
+
+def _gibbs(monkeypatch: pytest.MonkeyPatch) -> _Result:
+    # A sampler run of a bootstrap replicate fails only with a model that
+    # fails, which would fail the posterior too: the extension reports it.
+    found = SimpleNamespace(
+        eta=0.1, coverage=0.8, failed=[f"Replicate 2 failed: {_NO_WEIGHT}"]
+    )
+    monkeypatch.setattr(
+        smc_runners,
+        "rust",
+        SimpleNamespace(
+            bootstrap_coverage_eta=lambda *_: found,
+            gibbs_posterior=commol_rs.inference.gibbs_posterior,
+        ),
+    )
+    return flow_calibrator(_noisy(10, 3), windowed=True).uncertainty(
+        GibbsPosterior(
+            priors=Priors.uniform_on_bounds(),
+            eta=BootstrapCoverageEta(
+                replicates=3, block_length="auto", confidence_level=0.5
+            ),
+            particles=50,
+            target_cess=0.5,
+            resample_threshold=0.5,
+            stay_probability=0.05,
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("run", "unit", "reason"),
+    [
+        (_bootstrap, "Replicate", "needs a value above 0"),
+        (_jackknife, "Block", _NO_WEIGHT),
+        (_profile, "Replicate", "needs a value above 0"),
+        (_jackknife_plus, "Block", _NO_WEIGHT),
+        (_rolling, "Origin", _NO_WEIGHT),
+        (_gibbs, "Replicate", _NO_WEIGHT),
+    ],
+    ids=["bootstrap", "jackknife", "profile", "jackknife_plus", "rolling", "gibbs"],
+)
+def test_every_method_lists_its_failed_replicates_in_failed(
+    run: Callable[[pytest.MonkeyPatch], _Result],
+    unit: str,
+    reason: str,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="commol.api.inference"):
+        result = run(monkeypatch)
+
+    failed = result.failed
+    assert failed
+    for entry in failed:
+        assert re.fullmatch(rf"{unit} \d+ failed: .*{reason}.*", entry), entry
+    warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    assert warnings == failed
+    notes = (
+        result.notes
+        if isinstance(result, ProfileResult)
+        else result.diagnostics.notes
+        if isinstance(result, GibbsResult)
+        else []
+    )
+    assert not any(entry in note for entry in failed for note in notes)

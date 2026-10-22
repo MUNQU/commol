@@ -213,7 +213,7 @@ feed a `NonconformityScore`; the score, its scale and the quantile
 `quantile.rs`). `score`, `by` and `confidence_level` are required in every
 variant, and `check_conformal_settings` rejects in Rust `"normalized"` per
 series. A horizon of `RollingConformal` is a count of observations after the
-origin. `EnbPI` draws its own block counts through `ReplicateRunner::fit_one`,
+origin. `EnbPI` draws its own block counts and fits them with `fit_all`,
 and `AdaptiveConformal` keeps its state in Rust (`AdaptiveLevel`) and returns
 the same `ConformalResult` as every variant.
 
