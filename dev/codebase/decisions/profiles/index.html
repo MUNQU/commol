@@ -2515,6 +2515,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../optimizers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimizers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../uncertainty/" class="md-nav__link">
         
   
@@ -3312,8 +3340,11 @@ the threshold is the quantile <code>level</code> of the rises
 profile, at the tolerance <code>ε = max(τ, ν)</code> (<code>ProfileTracer::tolerance</code>). <code>τ</code>
 is the tolerance of the optimizer: the <code>sd_tolerance</code> of Nelder-Mead as an
 absolute amount, since argmin stops when the sample standard deviation of the
-costs of the simplex falls below it; for a swarm, <code>1e-6 · max(1, |f̂|)</code>,
-provisional until it has stop rules (#230). <code>ν</code> is the noise floor: the error
+costs of the simplex falls below it; for a swarm with the improvement stop
+rule, <code>tol_abs + tol_rel · |f̂|</code>, the improvement the rule allows at the fit,
+since the swarm stops when its best cost improves by less; for a swarm
+without it, <code>1e-6 · max(1, |f̂|)</code>, since the swarm has no tolerance on the
+cost (the radius rule reads positions). <code>ν</code> is the noise floor: the error
 of one evaluation of the objective at the fit, propagated from the accuracy
 of a run, <code>Σ |∂ℓᵢ/∂mᵢ| · eᵢ</code> with <code>eᵢ = rtol · |mᵢ| + k · atol</code> for an
 observation that sums <code>k</code> outputs, the term derivatives of
@@ -3368,6 +3399,7 @@ why. With a stochastic engine a flat profile reads
 <p><strong>Guards:</strong> <code>verdict::tests</code>, <code>crates/commol-inference/tests/test_profile_structure.rs</code>
 (<code>the_noise_floor_propagates_the_accuracy_of_a_run</code>,
 <code>a_threshold_at_or_below_the_tolerance_reads_no_structure</code>),
+<code>crates/commol-inference/tests/test_profiles.rs::the_tolerance_follows_the_optimizer</code>,
 <code>tests/uncertainty/test_profile_verdicts.py</code> (<code>TestShapes</code>).</p>
 <h2 id="a-flat-profile-is-read-by-resetting-the-others">A flat profile is read by resetting the others<a class="headerlink" href="#a-flat-profile-is-read-by-resetting-the-others" title="Permanent link">&para;</a></h2>
 <p>A profile is flat because other parameters compensate the parameter along

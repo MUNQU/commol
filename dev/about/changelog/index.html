@@ -2499,6 +2499,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/optimizers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimizers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/uncertainty/" class="md-nav__link">
         
   
@@ -4240,6 +4268,17 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <!-- Added #230 -->
 
+<ul>
+<li><code>ParticleSwarmConfig.improvement_stop(window=..., tol_abs=..., tol_rel=...)</code>
+  and <code>ParticleSwarmConfig.radius_stop(tol)</code>: a particle swarm stops when its
+  best loss improved by at most <code>tol_abs + tol_rel·|best loss|</code> over the last
+  <code>window</code> iterations, or when every particle is within <code>tol</code> of the best
+  position, as a fraction of the size of the search box. Both are off by
+  default and have no default values. A run that stops by a rule reports
+  <code>converged=True</code>, so a profile that holds a prediction with a swarm also
+  converges. See
+  <a href="../../guide/calibration-optimizers/#stop-rules">Stop rules</a>.</li>
+</ul>
 <!-- Added #239 -->
 
 <ul>
@@ -4292,6 +4331,13 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Changed #230 -->
 
+<ul>
+<li>The tolerance of a profile under a particle swarm with the improvement stop
+  rule is the improvement the rule allows at the fit,
+  <code>tol_abs + tol_rel·|objective at the fit|</code>; without that rule it stays
+  <code>1e-6·max(1, |objective at the fit|)</code>. See
+  <a href="../../guide/uncertainty/profiles/#verdicts-and-the-identifiability-report">Verdicts</a>.</li>
+</ul>
 <!-- Changed #239 -->
 
 <ul>

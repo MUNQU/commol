@@ -18,7 +18,7 @@
         <link rel="prev" href="../engines/">
       
       
-        <link rel="next" href="../uncertainty/">
+        <link rel="next" href="../optimizers/">
       
       
         
@@ -2569,17 +2569,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#nelder-mead-searches-inside-the-bounds" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Nelder-Mead searches inside the bounds
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#a-simulation-follows-its-model" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2645,21 +2634,38 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#a-swarm-scores-in-parallel-and-keeps-the-order-of-its-particles" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A swarm scores in parallel and keeps the order of its particles
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../optimizers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimizers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3244,17 +3250,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#nelder-mead-searches-inside-the-bounds" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Nelder-Mead searches inside the bounds
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#a-simulation-follows-its-model" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3320,17 +3315,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#a-swarm-scores-in-parallel-and-keeps-the-order-of-its-particles" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A swarm scores in parallel and keeps the order of its particles
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -3353,7 +3337,7 @@
 
 <h1 id="calibration">Calibration<a class="headerlink" href="#calibration" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>What weights, bounds, the observation operator and constraints mean in a calibration, and how its work runs in parallel.</p>
+<p>What weights, bounds, the observation operator and constraints mean in a calibration, and how its work runs in parallel. How the optimizers search is on <a href="../optimizers/">Optimizers</a>.</p>
 <h2 id="one-meaning-of-an-observation-weight">One meaning of an observation weight<a class="headerlink" href="#one-meaning-of-an-observation-weight" title="Permanent link">&para;</a></h2>
 <p><code>LossConfig::term</code> and <code>LossConfig::finish</code> in
 <code>crates/commol-calibration/src/types.rs</code> compute every loss: <code>sse</code> is
@@ -3407,20 +3391,6 @@ process), <code>LossDistance</code> of ABC and information matching of <code>η<
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_likelihood.rs</code>,
 <code>tests/uncertainty/test_observation_models.py</code>.</p>
-<h2 id="nelder-mead-searches-inside-the-bounds">Nelder-Mead searches inside the bounds<a class="headerlink" href="#nelder-mead-searches-inside-the-bounds" title="Permanent link">&para;</a></h2>
-<p>The objective clamps values to their bounds, so the loss is flat outside them,
-and a simplex that crosses a bound collapses there. Nelder-Mead therefore
-searches an unbounded <code>u</code> and scores <code>x = lo + (hi − lo)·(sin u + 1)/2</code>
-(<code>SineTransform</code> and <code>BoundedProblem</code> of the argmin fork, in
-<code>argmin::core::bounds</code>; <code>SearchSpace::transform</code> in <code>optimization.rs</code> builds
-the transform and refuses an infinite bound). Its evaluations and its result
-are recorded in <code>x</code>. <code>converged</code> is true only for
-<code>SolverConverged</code> and <code>TargetCostReached</code> (<code>optimization::converged</code>). An
-error of the model at a vertex of the initial simplex stops the run with its
-message (<code>NelderMead::init</code> of the argmin fork returns it).</p>
-<p><strong>Rule:</strong> report and record values in <code>x</code>, never in <code>u</code>. Every optimizer run,
-the verbose one included, goes through <code>optimization::run</code>.</p>
-<p><strong>Guards:</strong> <code>optimization::tests</code>; <code>tests/calibration/test_optimizers.py</code>.</p>
 <h2 id="a-simulation-follows-its-model">A <code>Simulation</code> follows its model<a class="headerlink" href="#a-simulation-follows-its-model" title="Permanent link">&para;</a></h2>
 <p><code>Simulation</code> keeps the JSON its engine was built from. <code>run</code>, <code>engine</code> and
 <code>simulation_outputs</code> compare it with <code>model_dump_json()</code> and rebuild the engine
@@ -3547,8 +3517,10 @@ penalty; the multiplier is the warm start.</p>
 </tr>
 </tbody>
 </table>
-<p>A swarm without stop rules runs each outer iteration to its <code>max_iterations</code>,
-so a held prediction stops at the outer limit and never reports convergence.</p>
+<p>The augmented Lagrangian stops only when an inner run converged. A swarm
+without a stop rule runs each outer iteration to its <code>max_iterations</code>, so a
+held prediction stops at the outer limit and never reports convergence; with
+the improvement rule, it stops when the constraint holds.</p>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_profiles.rs</code>
 (<code>fixing_a_parameter_at_the_fit_keeps_the_loss</code>,
 <code>fixing_a_prediction_at_the_fit_keeps_the_parameters</code>,
@@ -3606,51 +3578,6 @@ or reads <code>RAYON_NUM_THREADS</code>.</p>
 <code>tests/calibration/test_parallelism.py::test_a_thread_limit_bounds_every_parallel_method</code>.
 They read the threads that ran the test kind (<code>threads_of_runs</code>), not the
 CPU time, so the load of the machine does not change them.</p>
-<h2 id="a-swarm-scores-in-parallel-and-keeps-the-order-of-its-particles">A swarm scores in parallel and keeps the order of its particles<a class="headerlink" href="#a-swarm-scores-in-parallel-and-keeps-the-order-of-its-particles" title="Permanent link">&para;</a></h2>
-<p>The argmin fork runs with its feature <code>rayon</code>, so a particle swarm asks for
-the costs of an iteration at once (<code>bulk_cost</code>). <code>OptimizationObjective</code>,
-<code>Recorded</code> and <code>FixedParameter</code> answer with <code>OptimizationObjective::score_all</code>
-(<code>objective.rs</code>): the points in parallel when the levels of the pool are
-<code>"all"</code> (<code>inner_levels_in_parallel</code>), one after the other with <code>"outer"</code>,
-and the costs in the order of the points. <code>Recorded</code> keeps the feasible
-points after the scores, in the order of the points, under one lock, so the
-history does not depend on the order in which the threads finish. With
-several failing points, the error is that of the first in the order of the
-points. A score takes the buffers of its thread out of the thread-local
-<code>WORKSPACE</code> while it runs (<code>with_workspace</code>), so a job that the thread steals
-meanwhile takes its own; <code>score_in</code> makes no <code>rayon</code> call.</p>
-<p>The augmented Lagrangian of the argmin fork scores its inner swarm through
-<code>AugmentedLagrangianCost</code>, whose <code>bulk_cost</code> is the default of the fork: it
-scores in parallel whatever the levels, and it returns the error of any
-failing particle (#320).</p>
-<table>
-<thead>
-<tr>
-<th>Alternative</th>
-<th>Why not</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>A <code>Mutex</code> around the history, filled by each <code>cost</code></td>
-<td>It records in the order the threads finish.</td>
-</tr>
-<tr>
-<td>A parallel loop of our own in the swarm</td>
-<td>It repeats the bulk map of the fork.</td>
-</tr>
-<tr>
-<td>The levels as a field of <code>ParticleSwarmConfig</code></td>
-<td>The levels are a choice about the machine, next to the threads; a result does not depend on them.</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Guards:</strong> <code>crates/commol-calibration/src/optimization.rs</code> <code>tests</code>
-(<code>a_swarm_gives_the_same_result_with_parallel_particles</code>,
-<code>the_error_of_a_swarm_is_its_first_failing_particle</code>,
-<code>a_swarm_on_a_subproblem_gives_one_fit_whatever_the_threads</code>);
-<code>objective::tests::a_score_holds_no_borrow_of_the_workspace</code>;
-<code>tests/calibration/test_parallelism.py::test_a_seed_gives_one_result_whatever_the_threads_and_the_level</code>.</p>
 
 
 

@@ -3959,14 +3959,14 @@ The search starts at `initial_guess`, or at the midpoint of the bounds; a start 
 
 ## `converged` and `termination_reason`
 
-| `termination_reason`            | `converged` | Meaning                                                                 |
-| ------------------------------- | ----------- | ----------------------------------------------------------------------- |
-| `Terminated(SolverConverged)`   | `True`      | Nelder-Mead: the spread of the simplex values fell below `sd_tolerance` |
-| `Terminated(TargetCostReached)` | `True`      | Particle swarm: the loss reached `target_cost`                          |
-| `Terminated(MaxItersReached)`   | `False`     | The run used all `max_iterations`                                       |
-| Any other reason                | `False`     | The run stopped for another reason, such as a timeout                   |
+| `termination_reason`            | `converged` | Meaning                                                                                                                  |
+| ------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `Terminated(SolverConverged)`   | `True`      | Nelder-Mead: the spread of the simplex values fell below `sd_tolerance`. Particle swarm: a [stop rule](#stop-rules) held |
+| `Terminated(TargetCostReached)` | `True`      | Particle swarm: the loss reached `target_cost`                                                                           |
+| `Terminated(MaxItersReached)`   | `False`     | The run used all `max_iterations`                                                                                        |
+| Any other reason                | `False`     | The run stopped for another reason, such as a timeout                                                                    |
 
-`converged` comes from `converged` in `optimization.rs`. A particle swarm without `target_cost` always stops at `max_iterations`, so it reports `converged=False`; judge it by `final_loss`.
+`converged` comes from `converged` in `optimization.rs`. A particle swarm without a [stop rule](#stop-rules) always stops at `max_iterations`, so it reports `converged=False`; judge it by `final_loss`.
 
 ## Particle swarm
 
@@ -3990,14 +3990,45 @@ print(calibrate(swarm))  # {'k1': 0.4, 'k2': 0.1}
 
 Each method returns the configuration, so they chain:
 
-| Method                                                                              | Arguments             | Effect                                                                                                                                                                                         |
-| ----------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.inertia("constant", factor=0.721)`                                                | `factor`              | A fixed inertia weight.                                                                                                                                                                        |
-| `.inertia("chaotic", w_min=…, w_max=…)`                                             | `w_min < w_max`       | An inertia weight that varies chaotically between the two.                                                                                                                                     |
-| `.acceleration("constant", cognitive=1.193, social=1.193)`                          | `cognitive`, `social` | Fixed pulls towards each particle's best and the swarm's best.                                                                                                                                 |
-| `.acceleration("time_varying", c1_initial=…, c1_final=…, c2_initial=…, c2_final=…)` | four factors          | Pulls that change from explore (high `c1`) to exploit (high `c2`).                                                                                                                             |
-| `.velocity(clamp_factor=None, mutation_threshold=None)`                             | fractions             | `clamp_factor` limits speed to a share of the search box (0.1–0.2 is typical); `mutation_threshold` restarts particles slower than it (0.001–0.01).                                            |
-| `.mutation(strategy, *, scale, probability, application)`                           | see right             | Random jumps to escape local minima: `strategy` `"gaussian"` or `"cauchy"` (larger jumps), `probability` per iteration, `application` `"global_best"`, `"all_particles"` or `"below_average"`. |
+| Method                                                                              | Arguments                     | Effect                                                                                                                                                                                         |
+| ----------------------------------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.inertia("constant", factor=0.721)`                                                | `factor`                      | A fixed inertia weight.                                                                                                                                                                        |
+| `.inertia("chaotic", w_min=…, w_max=…)`                                             | `w_min < w_max`               | An inertia weight that varies chaotically between the two.                                                                                                                                     |
+| `.acceleration("constant", cognitive=1.193, social=1.193)`                          | `cognitive`, `social`         | Fixed pulls towards each particle's best and the swarm's best.                                                                                                                                 |
+| `.acceleration("time_varying", c1_initial=…, c1_final=…, c2_initial=…, c2_final=…)` | four factors                  | Pulls that change from explore (high `c1`) to exploit (high `c2`).                                                                                                                             |
+| `.velocity(clamp_factor=None, mutation_threshold=None)`                             | fractions                     | `clamp_factor` limits speed to a share of the search box (0.1–0.2 is typical); `mutation_threshold` restarts particles slower than it (0.001–0.01).                                            |
+| `.mutation(strategy, *, scale, probability, application)`                           | see right                     | Random jumps to escape local minima: `strategy` `"gaussian"` or `"cauchy"` (larger jumps), `probability` per iteration, `application` `"global_best"`, `"all_particles"` or `"below_average"`. |
+| `.improvement_stop(*, window, tol_abs, tol_rel)`                                    | see [Stop rules](#stop-rules) | Stops when the best loss stops improving.                                                                                                                                                      |
+| `.radius_stop(tol)`                                                                 | see [Stop rules](#stop-rules) | Stops when the swarm has gathered around its best position.                                                                                                                                    |
+
+### Stop rules
+
+A swarm stops at `max_iterations` unless a stop rule holds first. The two rules come from the argmin fork; both are off until you set them, and neither has a default value. A run that stops by a rule reports `converged=True` and `termination_reason` `Terminated(SolverConverged)`.
+
+| Rule                                                | Stops when                                                                                                                                               | Arguments |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| `.improvement_stop(window=…, tol_abs=…, tol_rel=…)` | The best loss improved by at most \`tol_abs + tol_rel·                                                                                                   | best loss |
+| `.radius_stop(tol)`                                 | Every particle is within `tol` of the best position, as a fraction of the size of the search box (the length of its diagonal) (Zielinski and Laur, 2007) | `tol` ≥ 0 |
+
+```python
+stopping = ParticleSwarmConfig(num_particles=30, max_iterations=2000).improvement_stop(
+    window=30, tol_abs=1e-12, tol_rel=1e-9
+)
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=[
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+        CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+    ],
+    loss_function="sse",
+    optimization_config=stopping,
+    seed=7,
+)
+result = Calibrator(Simulation(model(None, None)), problem).run()
+print(result.converged, result.iterations < 2000)  # True True
+```
+
+A swarm can stall for some iterations and then improve again, so a short `window` can stop it early. Mutation and velocity mutation scatter the particles again, and unknowns that the data cannot tell apart keep them spread, so with them the radius can stay above `tol`. Neither rule draws random numbers: with the same seed, a run with a rule is the run without it up to the iteration where it stops. In a [profile](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md), the improvement rule also sets the tolerance of a swarm.
 
 ## Several starts
 
@@ -4047,7 +4078,7 @@ print(Calibrator(Simulation(model(None, None)), again).run(starts=4) == result) 
 | Symptom                            | Try                                                                                                                                                                                             |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A result sits at a bound           | Check the bounds, give a better `initial_guess`, or use particle swarm                                                                                                                          |
-| `converged=False`                  | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations`                                                                                                                      |
+| `converged=False`                  | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations`; a particle swarm needs a [stop rule](#stop-rules) to converge                                                       |
 | Different results on each run      | Set `seed`; use more particles or iterations                                                                                                                                                    |
 | A local minimum                    | `run(starts=n)` from several points                                                                                                                                                             |
 | A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations                                                                                                                          |
@@ -6164,7 +6195,7 @@ Every side of every quantity runs in parallel. A held parameter leaves the value
 | `practically_non_identifiable`  | Stays below on at least one side, up to a bound or `max_steps`                                                    | Practical `poorly_determined`                                                                                                |
 | `structurally_non_identifiable` | Flat within `tolerance` over its whole range inside the box of the parameters, or proven flat by the resets below | Structural `in_combination` or `non_identifiable` from the resets; with no structural verdict, practical `poorly_determined` |
 
-`tolerance` is `ε = max(τ, ν)`. `τ` is the `sd_tolerance` of Nelder-Mead, an absolute amount: argmin stops when the costs of its simplex spread by less. For a particle swarm, `τ` is `1e-6 · max(1, |objective at the fit|)` until the swarm gets stop rules. `ν`, the noise floor, is the error of one evaluation of the objective at the fit, from the accuracy of a run: `Σ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on an observation that sums `k` outputs, its prediction `mᵢ`, and the accuracy of the engine (machine epsilon for a difference model, the `rtol` and `atol` of the ODE solver). A solver holds its tolerances at each step, so `ν` is an estimate, not a bound. A threshold at or below `ε` gives no verdict: the profile cannot tell a rise from numerical error, and `notes` says so.
+`tolerance` is `ε = max(τ, ν)`. `τ` is the `sd_tolerance` of Nelder-Mead, an absolute amount: argmin stops when the costs of its simplex spread by less. For a particle swarm with the improvement stop rule, `τ` is the improvement the rule allows at the fit, `tol_abs + tol_rel · |objective at the fit|`: the swarm stops when its best value improves by less. A swarm without that rule has no tolerance on the objective, and `τ` is `1e-6 · max(1, |objective at the fit|)`. `ν`, the noise floor, is the error of one evaluation of the objective at the fit, from the accuracy of a run: `Σ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on an observation that sums `k` outputs, its prediction `mᵢ`, and the accuracy of the engine (machine epsilon for a difference model, the `rtol` and `atol` of the ODE solver). A solver holds its tolerances at each step, so `ν` is an estimate, not a bound. A threshold at or below `ε` gives no verdict: the profile cannot tell a rise from numerical error, and `notes` says so.
 
 A refit whose free parameter sits on a bound, within `1e-8` of the width of its bounds, that it is not on at the fit has left the box of the parameters: the bound, not the data, makes its rise. The flatness reads only the points inside the box, and a note names the parameter and the value where the ridge leaves it. A side whose crossing point has a free parameter on a bound it is not on over the whole side from the fit crosses because of the box: it counts as open, and its interval end stays, with a note. A parameter that stays on its bound from the fit to the crossing is not seen this way: the verdict holds within the box.
 
@@ -9625,6 +9656,8 @@ class Calibrator:
                 mutation_threshold=velocity.mutation_threshold,
             )
 
+        improvement = opt_config.improvement_stop_config
+        radius = opt_config.radius_stop_config
         ps_config = rust_calibration.ParticleSwarmConfig(
             num_particles=opt_config.num_particles,
             max_iterations=opt_config.max_iterations,
@@ -9635,6 +9668,12 @@ class Calibrator:
             velocity=rust_velocity,
             initialization=opt_config.initialization,
             seed=self.seed,
+            improvement_stop=(
+                None
+                if improvement is None
+                else (improvement.window, improvement.tol_abs, improvement.tol_rel)
+            ),
+            radius_stop=None if radius is None else radius.tol,
         )
         return rust_calibration.OptimizationConfig.particle_swarm(ps_config)
 
@@ -11813,12 +11852,14 @@ Attributes:
 
 Methods:
 
-| Name           | Description                                                  |
-| -------------- | ------------------------------------------------------------ |
-| `inertia`      | Set inertia weight strategy ("constant" or "chaotic")        |
-| `acceleration` | Set acceleration coefficients ("constant" or "time_varying") |
-| `mutation`     | Enable mutation to escape local optima                       |
-| `velocity`     | Configure velocity control                                   |
+| Name               | Description                                                  |
+| ------------------ | ------------------------------------------------------------ |
+| `inertia`          | Set inertia weight strategy ("constant" or "chaotic")        |
+| `acceleration`     | Set acceleration coefficients ("constant" or "time_varying") |
+| `mutation`         | Enable mutation to escape local optima                       |
+| `velocity`         | Configure velocity control                                   |
+| `improvement_stop` | Stop when the best loss stops improving                      |
+| `radius_stop`      | Stop when the swarm has gathered around its best position    |
 
 Source code in `commol/context/calibration.py`
 
@@ -11848,6 +11889,10 @@ class ParticleSwarmConfig(BaseModel):
         Enable mutation to escape local optima
     velocity(clamp_factor, mutation_threshold)
         Configure velocity control
+    improvement_stop(window, tol_abs, tol_rel)
+        Stop when the best loss stops improving
+    radius_stop(tol)
+        Stop when the swarm has gathered around its best position
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -11878,6 +11923,8 @@ class ParticleSwarmConfig(BaseModel):
     )
     _mutation: PSOMutationConfig | None = PrivateAttr(default=None)
     _velocity: PSOVelocityConfig | None = PrivateAttr(default=None)
+    _improvement_stop: PSOImprovementStop | None = PrivateAttr(default=None)
+    _radius_stop: PSORadiusStop | None = PrivateAttr(default=None)
 
     @field_validator("initialization")
     @classmethod
@@ -12086,6 +12133,60 @@ class ParticleSwarmConfig(BaseModel):
         )
         return self
 
+    def improvement_stop(self, *, window: int, tol_abs: float, tol_rel: float) -> Self:
+        """
+        Stop when the best loss stops improving.
+
+        The run stops when the best loss improved by at most
+        ``tol_abs + tol_rel * |best loss|`` over the last `window` iterations,
+        and reports ``converged=True``. Off by default. A swarm can stall for
+        some iterations and then improve again, so a short window can stop it
+        early.
+
+        Parameters
+        ----------
+        window : int
+            Iterations over which the improvement is measured (> 0).
+        tol_abs : float
+            Absolute tolerance on the improvement (>= 0).
+        tol_rel : float
+            Tolerance on the improvement relative to the best loss (>= 0).
+
+        Returns
+        -------
+        Self
+            The config instance for method chaining
+        """
+        self._improvement_stop = PSOImprovementStop(
+            window=window, tol_abs=tol_abs, tol_rel=tol_rel
+        )
+        return self
+
+    def radius_stop(self, tol: float) -> Self:
+        """
+        Stop when the swarm has gathered around its best position.
+
+        The run stops when the largest distance of a particle from the best
+        position, divided by the size of the search box, is at most `tol`, and
+        reports ``converged=True``. Off by default. Mutation and velocity
+        mutation scatter the swarm again, so with them the radius can stay
+        above `tol`; values that the data do not tell apart keep the swarm
+        spread.
+
+        Parameters
+        ----------
+        tol : float
+            Tolerance on the radius of the swarm, relative to the size of the
+            search box (>= 0).
+
+        Returns
+        -------
+        Self
+            The config instance for method chaining
+        """
+        self._radius_stop = PSORadiusStop(tol=tol)
+        return self
+
     @property
     def inertia_config(self) -> PSOConstantInertia | PSOChaoticInertia | None:
         """Get the inertia configuration (for internal use)."""
@@ -12107,6 +12208,16 @@ class ParticleSwarmConfig(BaseModel):
     def velocity_config(self) -> PSOVelocityConfig | None:
         """Get the velocity configuration (for internal use)."""
         return self._velocity
+
+    @property
+    def improvement_stop_config(self) -> PSOImprovementStop | None:
+        """Get the improvement stop rule (for internal use)."""
+        return self._improvement_stop
+
+    @property
+    def radius_stop_config(self) -> PSORadiusStop | None:
+        """Get the radius stop rule (for internal use)."""
+        return self._radius_stop
 ```
 
 ### Attributes
@@ -12142,6 +12253,22 @@ velocity_config: PSOVelocityConfig | None
 ```
 
 Get the velocity configuration (for internal use).
+
+#### improvement_stop_config
+
+```python
+improvement_stop_config: PSOImprovementStop | None
+```
+
+Get the improvement stop rule (for internal use).
+
+#### radius_stop_config
+
+```python
+radius_stop_config: PSORadiusStop | None
+```
+
+Get the radius stop rule (for internal use).
 
 ### Methods:
 
@@ -12450,6 +12577,114 @@ def velocity(
         clamp_factor=clamp_factor,
         mutation_threshold=mutation_threshold,
     )
+    return self
+```
+
+#### improvement_stop
+
+```python
+improvement_stop(*, window: int, tol_abs: float, tol_rel: float) -> Self
+```
+
+Stop when the best loss stops improving.
+
+The run stops when the best loss improved by at most `tol_abs + tol_rel * |best loss|` over the last `window` iterations, and reports `converged=True`. Off by default. A swarm can stall for some iterations and then improve again, so a short window can stop it early.
+
+Parameters:
+
+| Name      | Type    | Description                                                    | Default    |
+| --------- | ------- | -------------------------------------------------------------- | ---------- |
+| `window`  | `int`   | Iterations over which the improvement is measured (> 0).       | *required* |
+| `tol_abs` | `float` | Absolute tolerance on the improvement (>= 0).                  | *required* |
+| `tol_rel` | `float` | Tolerance on the improvement relative to the best loss (>= 0). | *required* |
+
+Returns:
+
+| Type   | Description                             |
+| ------ | --------------------------------------- |
+| `Self` | The config instance for method chaining |
+
+Source code in `commol/context/calibration.py`
+
+```python
+def improvement_stop(self, *, window: int, tol_abs: float, tol_rel: float) -> Self:
+    """
+    Stop when the best loss stops improving.
+
+    The run stops when the best loss improved by at most
+    ``tol_abs + tol_rel * |best loss|`` over the last `window` iterations,
+    and reports ``converged=True``. Off by default. A swarm can stall for
+    some iterations and then improve again, so a short window can stop it
+    early.
+
+    Parameters
+    ----------
+    window : int
+        Iterations over which the improvement is measured (> 0).
+    tol_abs : float
+        Absolute tolerance on the improvement (>= 0).
+    tol_rel : float
+        Tolerance on the improvement relative to the best loss (>= 0).
+
+    Returns
+    -------
+    Self
+        The config instance for method chaining
+    """
+    self._improvement_stop = PSOImprovementStop(
+        window=window, tol_abs=tol_abs, tol_rel=tol_rel
+    )
+    return self
+```
+
+#### radius_stop
+
+```python
+radius_stop(tol: float) -> Self
+```
+
+Stop when the swarm has gathered around its best position.
+
+The run stops when the largest distance of a particle from the best position, divided by the size of the search box, is at most `tol`, and reports `converged=True`. Off by default. Mutation and velocity mutation scatter the swarm again, so with them the radius can stay above `tol`; values that the data do not tell apart keep the swarm spread.
+
+Parameters:
+
+| Name  | Type    | Description                                                                          | Default    |
+| ----- | ------- | ------------------------------------------------------------------------------------ | ---------- |
+| `tol` | `float` | Tolerance on the radius of the swarm, relative to the size of the search box (>= 0). | *required* |
+
+Returns:
+
+| Type   | Description                             |
+| ------ | --------------------------------------- |
+| `Self` | The config instance for method chaining |
+
+Source code in `commol/context/calibration.py`
+
+```python
+def radius_stop(self, tol: float) -> Self:
+    """
+    Stop when the swarm has gathered around its best position.
+
+    The run stops when the largest distance of a particle from the best
+    position, divided by the size of the search box, is at most `tol`, and
+    reports ``converged=True``. Off by default. Mutation and velocity
+    mutation scatter the swarm again, so with them the radius can stay
+    above `tol`; values that the data do not tell apart keep the swarm
+    spread.
+
+    Parameters
+    ----------
+    tol : float
+        Tolerance on the radius of the swarm, relative to the size of the
+        search box (>= 0).
+
+    Returns
+    -------
+    Self
+        The config instance for method chaining
+    """
+    self._radius_stop = PSORadiusStop(tol=tol)
     return self
 ```
 
@@ -40264,6 +40499,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - `PolynomialChaos(q_norm=..., max_interaction=...)`: a truncated basis for many inputs. `max_interaction` keeps the terms of at most that many inputs, and `q_norm`, in `(0, 1]`, the terms whose degrees have `Σ α_i^q ≤ degree^q`; the defaults keep the total-degree basis. 20 inputs at degree 4 with `max_interaction=2` have 1,221 terms instead of 10,626, and the number is known before any run. `ChaosResult` records both. See [Bases for many inputs](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#bases-for-many-inputs).
 
+- `ParticleSwarmConfig.improvement_stop(window=..., tol_abs=..., tol_rel=...)` and `ParticleSwarmConfig.radius_stop(tol)`: a particle swarm stops when its best loss improved by at most `tol_abs + tol_rel·|best loss|` over the last `window` iterations, or when every particle is within `tol` of the best position, as a fraction of the size of the search box. Both are off by default and have no default values. A run that stops by a rule reports `converged=True`, so a profile that holds a prediction with a swarm also converges. See [Stop rules](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#stop-rules).
+
 - `commol.set_threads(n)`, the context manager `commol.threads(n, levels)`, `commol.get_threads()` and `commol.get_levels()` choose the number of threads of every parallel method and the levels that run in parallel. The setting holds per Python thread (`contextvars`); without it, commol uses one thread per core. A particle swarm scores the particles of each iteration in parallel, in the order of the particles, with `levels="all"`, the default; `levels="outer"` keeps them in order. A seed gives the same result, history included, with any number of threads and either level. See [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
 
 - A calibration result records the seed it used, `CalibrationResult.seed` (`Calibrator.seed`: `problem.seed`, or the seed the calibrator drew), and the sample of every uncertainty method and of `Calibrator.point_sample` names it in `method.settings["seed"]`. Set as `problem.seed`, it repeats the run, also from a result read back from JSON. See [Reproducibility](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#reproducibility).
@@ -40273,6 +40510,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `Ratio(numerator, denominator, replicates)` is a quantity of interest: one `ValueAt`, `Gain` or `Peak` over another, in each run, so PRCC, Morris, Sobol and a polynomial chaos read a ratio whose denominator depends on the inputs. `replicates` is required: with a stochastic engine, a point of a design holds the mean of the ratios (`"within"`), the mean of the ratios of the replicates with a positive denominator (`"within_positive"`) or the ratio of the means (`"pooled"`). A denominator of 0 makes the ratio of a run NaN, and every method follows the NaN rule. See [A ratio of two quantities](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#a-ratio-of-two-quantities).
 
 ### Changed
+
+- The tolerance of a profile under a particle swarm with the improvement stop rule is the improvement the rule allows at the fit, `tol_abs + tol_rel·|objective at the fit|`; without that rule it stays `1e-6·max(1, |objective at the fit|)`. See [Verdicts](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#verdicts-and-the-identifiability-report).
 
 - The parallel methods run in a thread pool of commol, not in the global pool of `rayon`: the environment variable `RAYON_NUM_THREADS` no longer limits them; use `commol.set_threads`. A particle swarm, which scored its particles one after the other, now scores them in parallel by default.
 
