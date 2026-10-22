@@ -10,6 +10,7 @@ from commol import (
     ParameterSample,
     Peak,
     PeakPosition,
+    Predictive,
     Propagation,
     SampleMethod,
     SensitivityAnalysis,
@@ -21,7 +22,7 @@ from commol import (
     quantity_schedule,
 )
 from commol.context.inference.quantities import Quantity
-from tests.support import abc_builder, bounded, build, build_ode, draws_seed
+from tests.support import abc_builder, bounded, build, build_ode
 from tests.support.models import build_stochastic
 
 QUANTITIES: list[Quantity] = [
@@ -108,9 +109,9 @@ def test_the_quantities_of_replicates_are_one_dict_per_replicate() -> None:
     analysis = _one_draw(simulation, replicates=3, seed=5)
     propagation = analysis.run(Propagation(quantities=QUANTITIES))
 
-    # A propagation seeds the replicates of its draws from a stream of its
-    # seed, not from the seed itself.
-    replicates = simulation.replicates(3, seed=draws_seed(5)).run(10)
+    # A propagation runs the replicates of the seed of each draw, not of its
+    # own seed.
+    replicates = simulation.replicates(3, seed=propagation.draw_seeds[0]).run(10)
     quantities = replicates.quantities(QUANTITIES)
 
     assert [list(row.values()) for row in quantities] == propagation.values
@@ -118,3 +119,32 @@ def test_the_quantities_of_replicates_are_one_dict_per_replicate() -> None:
     assert len({row["C gain over (2, 9]"] for row in quantities}) > 1
     with pytest.raises(ValueError, match="There are no replicates"):
         SimulationReplicates([], seed=1, positions=[1.0]).quantities(QUANTITIES)
+
+
+def test_the_replicates_of_a_draw_are_those_of_its_seed() -> None:
+    values = [[0.3, 0.1], [0.45, 0.2]]
+    sample = ParameterSample.equally_weighted(
+        ["k1", "k2"], [(0.1, 0.5), (0.0, 1.0)], values, SampleMethod(name="test")
+    )
+    inputs = InputSpace.from_sample(sample, [bounded("k1", 0.1, 0.5), bounded("k2")])
+    simulation = Simulation(build_stochastic(abc_builder(), "StochasticSteps"))
+    analysis = SensitivityAnalysis(simulation, inputs, replicates=3, seed=7)
+
+    result = analysis.run(Propagation(quantities=QUANTITIES))
+    predictive = Predictive(analysis, result.sample, [4.0, 8.0])
+
+    assert len(result.draw_seeds) == 2
+    assert predictive.draw_seeds == result.draw_seeds
+    runs = predictive.runs()
+    for draw, (k1, k2) in enumerate(values):
+        model = build_stochastic(
+            abc_builder(parameters={"k1": k1, "k2": k2}), "StochasticSteps"
+        )
+        replicates = Simulation(model).replicates(3, seed=result.draw_seeds[draw])
+        quantities = replicates.run(10).quantities(QUANTITIES)
+        assert [list(row.values()) for row in quantities] == result.values[
+            3 * draw : 3 * draw + 3
+        ]
+        at = replicates.run_at([4.0, 8.0])
+        for replicate in range(3):
+            assert runs[3 * draw + replicate]["A"] == at[replicate]["A"]

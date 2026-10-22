@@ -259,6 +259,7 @@ def _propagation() -> PropagationResult:
         labels=["x", "y"],
         values=[[1.0, 10.0], [2.0, math.nan], [3.0, 30.0], [4.0, 40.0]],
         weights=[0.1, 0.2, 0.3, 0.4],
+        draw_seeds=[1, 2, 3, 4],
     )
 
 

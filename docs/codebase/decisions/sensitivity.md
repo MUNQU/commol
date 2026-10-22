@@ -10,8 +10,10 @@ interest reads from a run, and what a NaN does to a quantity and to a method.
 `ForwardAnalysis` runs every method on `ForwardModel::unobserved` (values
 written as a calibration writes them). Quantities read the observation
 operator. A design point is the mean of its replicates on common seeds; a
-predictive or a propagation gives each replicate of each draw its own seed
-(`run_sets`), and each purpose has a stream (`stream_seed`). Morris, Sobol
+predictive or a propagation gives each draw its own seed and each of its
+replicates a seed of that one (`run_sets`, `draw_seeds`; see
+[Stochastic engines and seeds](engines.md#stochastic-engines-and-seeds)), and
+each purpose has a stream (`stream_seed`). Morris, Sobol
 and chaos refuse a sample; PRCC reads its weights.
 
 | Alternative | Why not |
@@ -20,9 +22,13 @@ and chaos refuse a sample; PRCC reads its weights.
 | Python callables as quantities | Every run would return to Python, one at a time. |
 | Resampling a sample to equal weights | Repeated draws that the test of PRCC counts as independent. |
 | Hermite polynomials for a normal input | Every distribution is truncated, so they are not orthogonal. |
+| Replicate `i` of draw `j` of a sample at the flat index `j · n + i` of one stream | The seed of a draw depends on `n`, and no public seed gives the runs of a draw. |
+| The seed of the source for a sample of one draw, the tree for more | Two rules that depend on the size of the sample. |
 
 **Guards:** `crates/commol-inference/tests/test_global_sensitivity.rs`,
-`tests/uncertainty/test_sensitivity.py`.
+`crates/commol-inference/tests/test_predictive.rs::a_draw_keeps_its_runs_when_the_replicates_change`,
+`tests/uncertainty/test_sensitivity.py`,
+`tests/simulation/test_quantities.py::test_the_replicates_of_a_draw_are_those_of_its_seed`.
 
 ## A quantity is a series and a reduction
 

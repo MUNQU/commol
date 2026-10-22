@@ -80,12 +80,15 @@ def run_propagation(
     labels, quantities = (
         expand_quantities(method.quantities) if method.quantities else ([], "[]")
     )
-    draws, values, weights = analysis.rust_analysis.propagate(method.draws, quantities)
+    draws, values, weights, draw_seeds = analysis.rust_analysis.propagate(
+        method.draws, quantities
+    )
     return PropagationResult(
         sample=_sample(analysis, "propagation", draws),
         labels=labels,
         values=values,
         weights=weights,
+        draw_seeds=draw_seeds,
     )
 
 

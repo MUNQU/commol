@@ -240,6 +240,17 @@ class Predictive:
         return self._rust.weights
 
     @property
+    def draw_seeds(self) -> list[int]:
+        """
+        The seed of each draw of `sample`, in its order.
+
+        With a stochastic engine, replicate ``i`` of draw ``j`` runs with the
+        seed replicate ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])``
+        takes, so those replicates of the model at that draw give its runs.
+        """
+        return self._rust.draw_seeds
+
+    @property
     def plot(self) -> PredictivePlot:
         """
         The figures of the draws: ``plot.series()`` and ``plot.cumulative()``,

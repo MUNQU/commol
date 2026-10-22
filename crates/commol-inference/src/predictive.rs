@@ -8,9 +8,10 @@
 //! band of the model. [`DistributionNoise`] draws from the observation
 //! models of the problem. A stochastic engine runs every replicate of each draw;
 //! each replicate is a draw of the predictive with an equal share of the
-//! draw's weight, and has a seed of its own ([`run_sets`]): replicate `r` of
-//! draw `d` is seeded from the seed of the caller, so the predictive draws
-//! fresh noise for every draw instead of the same replicates for all.
+//! draw's weight, and has a seed of its own ([`run_sets`]): draw `d` takes a
+//! seed of its own from the seed of the caller ([`draw_seeds`]), and its
+//! replicates are the replicates of that seed, so the predictive draws fresh
+//! noise for every draw instead of the same replicates for all.
 
 use commol_calibration::likelihood::log_location;
 use commol_calibration::{
@@ -285,6 +286,8 @@ pub struct Predictive {
     /// `[draw][position][output]`; a replicate is a draw.
     trajectories: Vec<Vec<Vec<f64>>>,
     weights: Vec<f64>,
+    /// The seed of each draw of the sample ([`draw_seeds`]).
+    draw_seeds: Vec<u64>,
 }
 
 /// A band of a predictive: four values at every position and output.
@@ -340,6 +343,7 @@ impl Predictive {
             positions: positions.to_vec(),
             trajectories,
             weights,
+            draw_seeds: draw_seeds(seed, sample.values().len()),
         })
     }
 
@@ -351,6 +355,13 @@ impl Predictive {
     /// The weight of every draw; they sum to 1.
     pub fn weights(&self) -> &[f64] {
         &self.weights
+    }
+
+    /// The seed of each draw of the sample, in its order ([`draw_seeds`]):
+    /// with a stochastic engine, replicate `i` of draw `j` runs with
+    /// `replicate_seed(draw_seeds[j], i)`.
+    pub fn draw_seeds(&self) -> &[u64] {
+        &self.draw_seeds
     }
 
     /// The band of `confidence_level`: at every position and output, the
@@ -597,17 +608,30 @@ where
         .collect())
 }
 
-/// The stream of the seeds of the replicates of a set of draws
+/// The stream of the seeds of the draws of a sample
 /// ([`commol_random::stream_seed`]); the streams 1 to 3 belong to the
 /// designs, the replicates and the bootstrap of a sensitivity analysis.
 pub const DRAWS_STREAM: u64 = 4;
 
+/// The seed of each of `count` draws of a sample run from `seed`: draw `j`
+/// takes `replicate_seed(stream_seed(seed, DRAWS_STREAM), j)`, which depends
+/// on neither `count` nor the number of replicates.
+pub fn draw_seeds(seed: u64, count: usize) -> Vec<u64> {
+    let base = stream_seed(seed, DRAWS_STREAM);
+    (0..count as u64)
+        .map(|draw| replicate_seed(base, draw))
+        .collect()
+}
+
 /// The runs of each parameter set of `sets` at `positions`, in parallel,
 /// `[set][replicate][position][output]`.
 ///
-/// With `seed`, replicate `r` of set `d` of a stochastic engine runs with
-/// its own seed, the replicate `d · R + r` of the stream of draws of `seed`,
-/// so every set draws fresh noise and the runs repeat from `seed`. Without,
+/// With `seed`, the runs of a stochastic engine follow one tree of seeds:
+/// set `d` takes the seed `s_d` of [`draw_seeds`], and its replicate `r`
+/// runs with `replicate_seed(s_d, r)`, the seed replicate `r` of
+/// `Simulation.replicates` takes from `s_d`. So every set draws fresh
+/// noise, the runs repeat from `seed`, and the runs of a set depend on
+/// neither the number of sets nor the number of replicates. Without,
 /// every set runs the replicates of the forward model, the same seeds for
 /// all (common random numbers), as a method that compares sets needs. A
 /// deterministic engine runs once either way.
@@ -626,15 +650,15 @@ where
     E: SimulationEngine + Send + Sync,
 {
     let replicates = forward.replicates().map(|r| r.seeds.len());
-    let base = seed.map(|seed| stream_seed(seed, DRAWS_STREAM));
+    let seeds = seed.map(|seed| draw_seeds(seed, sets.len()));
     sets.par_iter()
         .enumerate()
         .map(|(draw, values)| {
-            let runs = match (replicates, base) {
-                (Some(count), Some(base)) => (0..count)
+            let runs = match (replicates, &seeds) {
+                (Some(count), Some(seeds)) => (0..count as u64)
                     .map(|r| {
-                        let index = (draw * count + r) as u64;
-                        forward.run_once_at(values, positions, Some(replicate_seed(base, index)))
+                        let seed = replicate_seed(seeds[draw], r);
+                        forward.run_once_at(values, positions, Some(seed))
                     })
                     .collect::<Result<Vec<_>, _>>(),
                 _ => forward.run_at(values, positions),

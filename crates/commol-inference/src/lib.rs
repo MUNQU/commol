@@ -62,7 +62,7 @@ pub mod transform;
 pub use distribution::{Distribution, Family};
 pub use predictive::{
     Band, DistributionNoise, NanRun, NoNoise, ObservationDraws, ObservationNoise, Predictive,
-    PredictiveError, SeriesBand, observation_draws,
+    PredictiveError, SeriesBand, draw_seeds, observation_draws,
 };
 pub use priors::Priors;
 pub use sample::ParameterSample;
