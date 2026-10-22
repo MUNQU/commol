@@ -44,6 +44,7 @@ mod local;
 mod model;
 mod profiles;
 pub(crate) mod python_observer;
+mod quantity;
 mod sensitivity;
 mod smc;
 #[cfg(feature = "test-kind")]

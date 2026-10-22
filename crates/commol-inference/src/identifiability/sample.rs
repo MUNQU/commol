@@ -121,7 +121,8 @@ pub fn sample_identifiability(
 /// deviation `deviation`: `0.9 · min(σ, IQR / 1.34) · n_eff^{−1/5}`, or `σ`
 /// in place of the minimum when the IQR is 0.
 fn bandwidth(values: &[f64], weights: &[f64], deviation: f64) -> f64 {
-    let quartiles = quantiles(values, weights, &[0.25, 0.75]);
+    let quartiles =
+        quantiles(values, weights, &[0.25, 0.75]).expect("the values of a sample are finite");
     let spread = (quartiles[1] - quartiles[0]) / 1.34;
     let scale = if spread > 0.0 {
         deviation.min(spread)

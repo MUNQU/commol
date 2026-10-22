@@ -749,8 +749,6 @@ class ConformalRunProtocol(Protocol):
     @property
     def block_length_estimates(self) -> list[tuple[str, float]] | None: ...
 
-type _Quantity = tuple[str, list[str], list[float]]
-
 class SobolRunProtocol(Protocol):
     @property
     def first(self) -> list[list[float]]: ...
@@ -799,24 +797,22 @@ class ForwardAnalysisProtocol(Protocol):
         seed: int = 0,
     ) -> None: ...
     def propagate(
-        self, draws: int | None, quantities: list[_Quantity]
+        self, draws: int | None, quantities: str
     ) -> tuple[_Draws, list[list[float]], list[float]]: ...
     def prcc(
-        self, draws: int | None, quantities: list[_Quantity]
+        self, draws: int | None, quantities: str
     ) -> tuple[_Draws, list[list[float]], list[list[float]], float]: ...
     def morris(
-        self, trajectories: int, levels: int, quantities: list[_Quantity]
+        self, trajectories: int, levels: int, quantities: str
     ) -> tuple[list[list[float]], list[list[float]], list[list[float]], int]: ...
     def sobol(
         self,
         base: int,
         bootstrap: int,
         confidence_level: float,
-        quantities: list[_Quantity],
+        quantities: str,
     ) -> SobolRunProtocol: ...
-    def chaos(
-        self, degree: int, draws: int, quantities: list[_Quantity]
-    ) -> ChaosRunProtocol: ...
+    def chaos(self, degree: int, draws: int, quantities: str) -> ChaosRunProtocol: ...
     def predictive(
         self, sample: ParameterSampleProtocol, positions: list[float]
     ) -> PredictiveProtocol: ...
@@ -872,6 +868,7 @@ class InferenceModule(Protocol):
         self, values: list[float], weights: list[float], levels: list[float]
     ) -> list[float]: ...
     def weighted_mean(self, values: list[float], weights: list[float]) -> float: ...
+    def quantities_as_read(self, json: str) -> str: ...
     def by_series(
         self, labels: list[str], values: list[float]
     ) -> list[tuple[str, float]]: ...

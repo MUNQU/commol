@@ -21,8 +21,8 @@ from commol.context.inference.global_sensitivity import (
     PropagationResult,
     Sobol,
     SobolResult,
-    expand_quantities,
 )
+from commol.context.inference.quantities import expand_quantities
 from commol.context.inference.sample import ParameterSample, SampleMethod
 
 if TYPE_CHECKING:
@@ -78,7 +78,7 @@ def run_propagation(
         `draws`, or a quantity does not fit the model.
     """
     labels, quantities = (
-        expand_quantities(method.quantities) if method.quantities else ([], [])
+        expand_quantities(method.quantities) if method.quantities else ([], "[]")
     )
     draws, values, weights = analysis.rust_analysis.propagate(method.draws, quantities)
     return PropagationResult(
@@ -116,7 +116,7 @@ def run_prcc(analysis: "SensitivityAnalysis", method: PRCC) -> PRCCResult:
     draws, coefficients, p_values, effective_size = analysis.rust_analysis.prcc(
         method.draws, quantities
     )
-    axes = [pair for quantity in method.quantities for pair in quantity.series()]
+    axes = [pair for quantity in method.quantities for pair in quantity.axes()]
     return PRCCResult(
         sample=_sample(analysis, "prcc", draws),
         inputs=analysis.inputs.names,
@@ -149,7 +149,7 @@ def run_morris(analysis: "SensitivityAnalysis", method: Morris) -> MorrisResult:
     ------
     ValueError
         If the inputs come from a sample, the levels are not even, or a
-        quantity does not fit the model.
+        quantity does not fit the model or is NaN at a point.
     """
     labels, quantities = expand_quantities(method.quantities)
     mu, mu_star, sigma, runs = analysis.rust_analysis.morris(
@@ -185,7 +185,7 @@ def run_sobol(analysis: "SensitivityAnalysis", method: Sobol) -> SobolResult:
     ------
     ValueError
         If the inputs come from a sample, or a quantity does not fit the
-        model.
+        model or is NaN at a point.
     """
     labels, quantities = expand_quantities(method.quantities)
     run = analysis.rust_analysis.sobol(
@@ -225,7 +225,8 @@ def run_chaos(analysis: "SensitivityAnalysis", method: PolynomialChaos) -> Chaos
     ------
     ValueError
         If the inputs come from a sample, there are not more draws than terms
-        (checked before any run), or a quantity does not fit the model.
+        (checked before any run), or a quantity does not fit the model or is
+        NaN at a point.
     """
     labels, quantities = expand_quantities(method.quantities)
     run = analysis.rust_analysis.chaos(method.degree, method.draws, quantities)

@@ -194,7 +194,10 @@ impl ParameterSample {
     pub fn quantiles(&self, levels: &[f64]) -> Result<Vec<Vec<f64>>, String> {
         statistics::check_levels(levels)?;
         let per_parameter: Vec<Vec<f64>> = (0..self.names.len())
-            .map(|i| statistics::quantiles(&self.column(i), &self.weights, levels))
+            .map(|i| {
+                statistics::quantiles(&self.column(i), &self.weights, levels)
+                    .expect("the values of a sample are finite")
+            })
             .collect();
         Ok((0..levels.len())
             .map(|l| per_parameter.iter().map(|q| q[l]).collect())

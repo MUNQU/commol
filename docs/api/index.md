@@ -15,7 +15,7 @@ explain how to use them; these pages list every argument, attribute and error.
 | [AxisUnits](axis-units.md) | `AxisUnits` |
 | [Calibration](calibrator.md) | `Calibrator`, `CalibrationProblem`, `Quantile`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `NelderMeadConfig`, `ParticleSwarmConfig`, `CalibrationResult`, `StartSummary`, `CalibrationHistory`, `CalibrationEvaluation`, `LossFunction`, `OptimizationAlgorithm` |
 | [Uncertainty](uncertainty.md) | `InferenceMethod`, `UncertaintyMethod`, `ParameterSample`, `SampleMethod`, `ParameterSummary`, `Predictive`, `PredictiveBand`, `SeriesBand`, `ObservationDraws`, `commol.scores`, `weighted_quantiles`, `member_statistics`, `ci_percentiles` |
-| [Sensitivity](sensitivity.md) | `SensitivityAnalysis`, `InputSpace`, `SensitivityMethod`, `Propagation`, `PropagationResult`, `QuantitySummary`, `PRCC`, `PRCCResult`, `Morris`, `MorrisResult`, `Sobol`, `SobolResult`, `PolynomialChaos`, `ChaosResult`, `ValueAt`, `Gain`, `Peak`, `PeakPosition`, `Trajectory` |
+| [Sensitivity](sensitivity.md) | `SensitivityAnalysis`, `InputSpace`, `SensitivityMethod`, `Propagation`, `PropagationResult`, `QuantitySummary`, `PRCC`, `PRCCResult`, `Morris`, `MorrisResult`, `Sobol`, `SobolResult`, `PolynomialChaos`, `ChaosResult`, `Level`, `Increments`, `ValueAt`, `Gain`, `Peak`, `PeakPosition`, `Trajectory` |
 | [Identifiability](identifiability.md) | `IdentifiabilityMethod`, `StructuralRank`, `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, `IdentifiabilityReport` |
 | [Reports](reports.md) | `Model.applied_parameters`, `SimulationResults.report`, `SimulationReplicates.report`, `Predictive.report`, `IdentifiabilityReport.report` |
 

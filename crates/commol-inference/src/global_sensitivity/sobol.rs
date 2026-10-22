@@ -18,7 +18,9 @@
 use commol_random::Generator;
 use rayon::prelude::*;
 
+use super::check_numbers;
 use crate::design::SaltelliDesign;
+use crate::predictive::PredictiveError;
 use crate::statistics::{interval_levels, quantiles};
 
 /// The first-order and the total index of each input.
@@ -50,10 +52,22 @@ pub struct Sobol {
 ///
 /// # Errors
 ///
-/// Returns a message when there is not one row of quantities per point,
-/// `bootstrap` is below 2, or `confidence_level` is not strictly between 0
-/// and 1.
+/// [`PredictiveError::NotANumber`] with the first quantity that is NaN at a
+/// point, before any index; [`PredictiveError::Mismatch`] when there is not
+/// one row of quantities per point, `bootstrap` is below 2, or
+/// `confidence_level` is not strictly between 0 and 1.
 pub fn sobol(
+    design: &SaltelliDesign,
+    outputs: &[Vec<f64>],
+    bootstrap: usize,
+    confidence_level: f64,
+    seed: u64,
+) -> Result<Sobol, PredictiveError> {
+    check_numbers(outputs)?;
+    estimate(design, outputs, bootstrap, confidence_level, seed).map_err(PredictiveError::Mismatch)
+}
+
+fn estimate(
     design: &SaltelliDesign,
     outputs: &[Vec<f64>],
     bootstrap: usize,
@@ -100,7 +114,8 @@ pub fn sobol(
                 if values.iter().any(|v| v.is_nan()) {
                     return [f64::NAN; 2];
                 }
-                let ends = quantiles(&values, &equal, &levels);
+                let ends = quantiles(&values, &equal, &levels)
+                    .expect("a NaN index returned before the quantiles");
                 [ends[0], ends[1]]
             };
             let (mut first_ends, mut total_ends) = ([vec![], vec![]], [vec![], vec![]]);

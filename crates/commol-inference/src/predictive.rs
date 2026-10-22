@@ -208,7 +208,22 @@ pub enum PredictiveError {
         quantity: usize,
         /// Index of each point where it is NaN, in the order of the design.
         points: Vec<usize>,
+        /// The first run where it is NaN, when the method ran the points.
+        run: Option<Box<NanRun>>,
     },
+}
+
+/// The first run where a quantity is NaN: what runs it again.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NanRun {
+    /// Index of the point, in the order of the design.
+    pub draw: usize,
+    /// Index of the replicate at the point; 0 for a deterministic engine.
+    pub replicate: usize,
+    /// The seed of the replicate, for a stochastic engine.
+    pub seed: Option<u64>,
+    /// The values of the inputs at the point.
+    pub inputs: Vec<f64>,
 }
 
 impl std::fmt::Display for PredictiveError {
@@ -216,13 +231,28 @@ impl std::fmt::Display for PredictiveError {
         match self {
             Self::Mismatch(message) => f.write_str(message),
             Self::Draw { draw, error } => write!(f, "Draw {draw}: {error}"),
-            Self::NotANumber { quantity, points } => write!(
-                f,
-                "The quantity {quantity} (counted from 0, in the order of the labels) is NaN at \
-                 the points {points:?} of the design, and a method that reduces it across the \
-                 points needs a number at each; a Propagation of the same inputs and seed gives \
-                 the value of each run"
-            ),
+            Self::NotANumber {
+                quantity,
+                points,
+                run,
+            } => {
+                let first = run.as_ref().map_or(String::new(), |run| {
+                    let seed = run
+                        .seed
+                        .map_or(String::new(), |seed| format!(" of seed {seed}"));
+                    format!(
+                        ", first at the point {} of the inputs {:?}, replicate {}{seed}",
+                        run.draw, run.inputs, run.replicate
+                    )
+                });
+                write!(
+                    f,
+                    "The quantity {quantity} (counted from 0, in the order of the labels) is NaN \
+                     at the points {points:?} of the design{first}, and a method that reduces it \
+                     across the points needs a number at each; a Propagation of the same inputs \
+                     and seed gives the value of each run"
+                )
+            }
         }
     }
 }
@@ -329,7 +359,7 @@ impl Predictive {
     /// # Errors
     ///
     /// Returns a message when `confidence_level` is not strictly between 0
-    /// and 1.
+    /// and 1, or a value is NaN.
     pub fn band(&self, confidence_level: f64) -> Result<Band, String> {
         let [low, high] = statistics::interval_levels(confidence_level)?;
         let outputs = self
@@ -349,7 +379,7 @@ impl Predictive {
                 for (slot, rows) in values.iter_mut().zip(&self.trajectories) {
                     *slot = rows[position][output];
                 }
-                let q = statistics::quantiles(&values, &self.weights, &[low, 0.5, high]);
+                let q = statistics::quantiles(&values, &self.weights, &[low, 0.5, high])?;
                 band.mean[position][output] = statistics::mean(&values, &self.weights);
                 band.lower[position][output] = q[0];
                 band.median[position][output] = q[1];
@@ -381,7 +411,7 @@ impl Predictive {
     /// # Errors
     ///
     /// Returns a message when `confidence_level` is not strictly between 0
-    /// and 1, or an output index is out of range.
+    /// and 1, an output index is out of range, or a value is NaN.
     pub fn series_band(
         &self,
         outputs: &[usize],
@@ -425,7 +455,7 @@ impl Predictive {
         };
         for position in 0..self.positions.len() {
             let values: Vec<f64> = series.iter().map(|s| s[position]).collect();
-            let q = statistics::quantiles(&values, &self.weights, &[low, 0.5, high]);
+            let q = statistics::quantiles(&values, &self.weights, &[low, 0.5, high])?;
             band.mean.push(statistics::mean(&values, &self.weights));
             band.lower.push(q[0]);
             band.median.push(q[1]);
@@ -451,7 +481,7 @@ impl ObservationDraws {
     /// # Errors
     ///
     /// Returns a message when `confidence_level` is not strictly between 0
-    /// and 1.
+    /// and 1, or a value is NaN.
     pub fn band(&self, confidence_level: f64) -> Result<SeriesBand, String> {
         let [low, high] = statistics::interval_levels(confidence_level)?;
         let n = self.values.first().map_or(0, Vec::len);
@@ -463,7 +493,7 @@ impl ObservationDraws {
         };
         for i in 0..n {
             let values: Vec<f64> = self.values.iter().map(|row| row[i]).collect();
-            let q = statistics::quantiles(&values, &self.weights, &[low, 0.5, high]);
+            let q = statistics::quantiles(&values, &self.weights, &[low, 0.5, high])?;
             band.mean.push(statistics::mean(&values, &self.weights));
             band.lower.push(q[0]);
             band.median.push(q[1]);

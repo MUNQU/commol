@@ -188,7 +188,10 @@ where
     let weights = vec![1.0; kept.len()];
     let thresholds = rises
         .iter()
-        .map(|column| statistics::quantiles(column, &weights, &[level])[0])
+        .map(|column| {
+            statistics::quantiles(column, &weights, &[level])
+                .expect("a rise of the profile of a fit is a number")[0]
+        })
         .collect();
     Ok(BootstrapThresholds {
         thresholds,

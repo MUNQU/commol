@@ -2,13 +2,12 @@
 //!
 //! [`PyForwardAnalysis`] wraps a [`ForwardAnalysis`], built once from a
 //! `SensitivityAnalysis`: each method is one call into Rust, which builds
-//! the design, runs it and estimates. A quantity crosses as
-//! `(kind, outputs, positions)`; the results cross as plain values, and
+//! the design, runs it and estimates. The quantities cross as one JSON
+//! list ([`crate::quantity`]); the results cross as plain values, and
 //! Python builds the result classes.
 
 use commol_inference::design::InputSpace;
 use commol_inference::global_sensitivity::{ChaosExpansion, ForwardAnalysis};
-use commol_inference::quantity::Quantity;
 use commol_inference::{NoNoise, Predictive, observation_draws};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -16,10 +15,8 @@ use pyo3::prelude::*;
 use crate::calibration::{PyCalibrationParameter, PyObservedDataPoint};
 use crate::engine::{Engine, PyEngine};
 use crate::inference::{PyObservationDraws, PyParameterSample, PyPredictive, predictive_error};
+use crate::quantity::read_quantities;
 use crate::smc::{PriorArgs, priors};
-
-/// A quantity as Python passes it: the kind, the outputs and the positions.
-type QuantityArgs = (String, Vec<String>, Vec<f64>);
 
 /// The draws of a method and their log weights, `(values, log_weights)`.
 type Draws = (Vec<Vec<f64>>, Vec<f64>);
@@ -33,31 +30,6 @@ type PrccValues = (Draws, Vec<Vec<f64>>, Vec<Vec<f64>>, f64);
 
 fn value_error(message: String) -> PyErr {
     PyValueError::new_err(message)
-}
-
-/// The quantity of `(kind, outputs, positions)`, as the classes of
-/// `commol.context.inference.global_sensitivity` write it: one position for
-/// `"value_at"`, the start and the end for `"gain"`.
-fn quantity((kind, outputs, positions): QuantityArgs) -> Quantity {
-    match kind.as_str() {
-        "value_at" => Quantity::ValueAt {
-            at: positions[0],
-            outputs,
-        },
-        "gain" => Quantity::Gain {
-            start: positions[0],
-            end: positions[1],
-            outputs,
-        },
-        "peak" => Quantity::Peak { outputs, positions },
-        "peak_position" => Quantity::PeakPosition { outputs, positions },
-        // coverage: an invariant, the quantity classes of Python write only the kinds above
-        other => unreachable!("a quantity of Python has no kind '{other}'"),
-    }
-}
-
-fn quantities(args: Vec<QuantityArgs>) -> Vec<Quantity> {
-    args.into_iter().map(quantity).collect()
 }
 
 /// The inputs, from their parameters and their distributions or sample.
@@ -135,16 +107,16 @@ impl PyForwardAnalysis {
     /// each run
     ///
     /// Raises:
-    ///     ValueError: If the draws do not fit the inputs, or a quantity does
-    ///         not fit the model
+    ///     ValueError: If the draws do not fit the inputs, or a quantity is
+    ///         not a quantity or does not fit the model
     ///     InfeasibleStateError: If a draw leaves the values its model allows
     fn propagate(
         &self,
         py: Python<'_>,
         draws: Option<usize>,
-        quantities: Vec<QuantityArgs>,
+        quantities: &str,
     ) -> PyResult<(Draws, Vec<Vec<f64>>, Vec<f64>)> {
-        let quantities = self::quantities(quantities);
+        let quantities = read_quantities(quantities)?;
         let result = py
             .detach(|| self.inner.propagate(draws, &quantities))
             .map_err(predictive_error)?;
@@ -160,13 +132,8 @@ impl PyForwardAnalysis {
     ///         fit the model or is NaN at a draw, or the ranks of the inputs
     ///         are collinear
     ///     InfeasibleStateError: If a point leaves the values its model allows
-    fn prcc(
-        &self,
-        py: Python<'_>,
-        draws: Option<usize>,
-        quantities: Vec<QuantityArgs>,
-    ) -> PyResult<PrccValues> {
-        let quantities = self::quantities(quantities);
+    fn prcc(&self, py: Python<'_>, draws: Option<usize>, quantities: &str) -> PyResult<PrccValues> {
+        let quantities = read_quantities(quantities)?;
         let (sample, result) = py
             .detach(|| self.inner.prcc(draws, &quantities))
             .map_err(predictive_error)?;
@@ -183,16 +150,17 @@ impl PyForwardAnalysis {
     ///
     /// Raises:
     ///     ValueError: If the inputs come from a sample, the levels are not
-    ///         even and at least 2, or a quantity does not fit the model
+    ///         even and at least 2, or a quantity does not fit the model or
+    ///         is NaN at a point
     ///     InfeasibleStateError: If a point leaves the values its model allows
     fn morris(
         &self,
         py: Python<'_>,
         trajectories: usize,
         levels: usize,
-        quantities: Vec<QuantityArgs>,
+        quantities: &str,
     ) -> PyResult<MorrisValues> {
-        let quantities = self::quantities(quantities);
+        let quantities = read_quantities(quantities)?;
         let (result, runs) = py
             .detach(|| self.inner.morris(trajectories, levels, &quantities))
             .map_err(predictive_error)?;
@@ -204,7 +172,7 @@ impl PyForwardAnalysis {
     /// Raises:
     ///     ValueError: If the inputs come from a sample, `base` or `bootstrap`
     ///         is below 2, the level is not strictly between 0 and 1, or a
-    ///         quantity does not fit the model
+    ///         quantity does not fit the model or is NaN at a point
     ///     InfeasibleStateError: If a point leaves the values its model allows
     fn sobol(
         &self,
@@ -212,9 +180,9 @@ impl PyForwardAnalysis {
         base: usize,
         bootstrap: usize,
         confidence_level: f64,
-        quantities: Vec<QuantityArgs>,
+        quantities: &str,
     ) -> PyResult<SobolValues> {
-        let quantities = self::quantities(quantities);
+        let quantities = read_quantities(quantities)?;
         let (result, runs) = py
             .detach(|| {
                 self.inner
@@ -239,16 +207,17 @@ impl PyForwardAnalysis {
     ///
     /// Raises:
     ///     ValueError: If the inputs come from a sample, there are not more
-    ///         points than terms, or a quantity does not fit the model
+    ///         points than terms, or a quantity does not fit the model or is
+    ///         NaN at a point
     ///     InfeasibleStateError: If a point leaves the values its model allows
     fn chaos(
         &self,
         py: Python<'_>,
         degree: usize,
         draws: usize,
-        quantities: Vec<QuantityArgs>,
+        quantities: &str,
     ) -> PyResult<PyChaosRun> {
-        let quantities = self::quantities(quantities);
+        let quantities = read_quantities(quantities)?;
         let (expansion, runs) = py
             .detach(|| self.inner.chaos(degree, draws, &quantities))
             .map_err(predictive_error)?;

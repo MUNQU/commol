@@ -57,7 +57,9 @@ from commol.context.calibration import (
 from commol.context.inference import (
     ChaosResult,
     Gain,
+    Increments,
     InputSpace,
+    Level,
     Morris,
     MorrisResult,
     Peak,
@@ -175,7 +177,9 @@ def add_stderr_logger(level: int = logging.INFO) -> logging.StreamHandler[TextIO
 __all__ = [
     "ChaosResult",
     "Gain",
+    "Increments",
     "InputSpace",
+    "Level",
     "Morris",
     "MorrisResult",
     "Peak",

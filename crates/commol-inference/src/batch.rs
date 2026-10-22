@@ -9,7 +9,7 @@ use commol_calibration::ForwardModel;
 use commol_core::SimulationEngine;
 use rayon::prelude::*;
 
-use crate::predictive::PredictiveError;
+use crate::predictive::{NanRun, PredictiveError};
 use crate::quantity::Quantities;
 
 /// A forward model and the quantities each of its runs is reduced to.
@@ -71,14 +71,39 @@ impl<'a, E: SimulationEngine + Send + Sync> BatchRunner<'a, E> {
     }
 
     /// The quantities of every point, each the mean of its replicates',
-    /// `[point][quantity]`.
+    /// `[point][quantity]`. Every method that reduces quantities across the
+    /// points of a design reads them here.
     ///
     /// # Errors
     ///
-    /// As [`Self::replicates`].
+    /// As [`Self::replicates`]; [`PredictiveError::NotANumber`] with the
+    /// first quantity that is NaN in a replicate of a point, every point
+    /// where it is, and the first such run.
     pub fn means(&self, points: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, PredictiveError> {
-        Ok(self
-            .replicates(points)?
+        let replicates = self.replicates(points)?;
+        let nan = |runs: &Vec<Vec<f64>>, quantity: usize| {
+            runs.iter().position(|values| values[quantity].is_nan())
+        };
+        let first = (0..self.quantities.len())
+            .find(|&q| replicates.iter().any(|runs| nan(runs, q).is_some()));
+        if let Some(quantity) = first {
+            let points_nan: Vec<usize> = (0..replicates.len())
+                .filter(|&point| nan(&replicates[point], quantity).is_some())
+                .collect();
+            let draw = points_nan[0];
+            let replicate = nan(&replicates[draw], quantity).expect("a point where it is NaN");
+            return Err(PredictiveError::NotANumber {
+                quantity,
+                points: points_nan,
+                run: Some(Box::new(NanRun {
+                    draw,
+                    replicate,
+                    seed: self.forward.replicates().map(|r| r.seeds[replicate]),
+                    inputs: points[draw].clone(),
+                })),
+            });
+        }
+        Ok(replicates
             .into_iter()
             .map(|replicates| {
                 let count = replicates.len() as f64;

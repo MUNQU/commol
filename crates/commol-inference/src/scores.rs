@@ -44,12 +44,12 @@ fn intervals(
 ) -> Result<Vec<(f64, f64)>, String> {
     check(draws, observed)?;
     let levels = statistics::interval_levels(confidence_level)?;
-    Ok((0..observed.len())
+    (0..observed.len())
         .map(|i| {
-            let q = statistics::quantiles(&column(draws, i), &draws.weights, &levels);
-            (q[0], q[1])
+            let q = statistics::quantiles(&column(draws, i), &draws.weights, &levels)?;
+            Ok((q[0], q[1]))
         })
-        .collect())
+        .collect()
 }
 
 /// Whether each observation lies inside the central interval of
@@ -57,8 +57,8 @@ fn intervals(
 ///
 /// # Errors
 ///
-/// Returns a message when the shapes differ or the level is not strictly
-/// between 0 and 1.
+/// Returns a message when the shapes differ, the level is not strictly
+/// between 0 and 1, or a draw is NaN.
 pub fn coverage(
     draws: &ObservationDraws,
     observed: &[f64],
@@ -113,20 +113,20 @@ pub fn weighted_interval_score(
         levels.extend(statistics::interval_levels(c)?);
     }
     let k = confidence_levels.len() as f64;
-    Ok(observed
+    observed
         .iter()
         .enumerate()
         .map(|(i, &y)| {
-            let q = statistics::quantiles(&column(draws, i), &draws.weights, &levels);
+            let q = statistics::quantiles(&column(draws, i), &draws.weights, &levels)?;
             let mut total = 0.5 * (y - q[0]).abs();
             for (index, &c) in confidence_levels.iter().enumerate() {
                 let alpha = 1.0 - c;
                 let (lower, upper) = (q[1 + 2 * index], q[2 + 2 * index]);
                 total += alpha / 2.0 * interval_score_of(lower, upper, alpha, y);
             }
-            total / (k + 0.5)
+            Ok(total / (k + 0.5))
         })
-        .collect())
+        .collect()
 }
 
 /// The continuous ranked probability score of each observation under the

@@ -222,7 +222,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
             .morris("Morris", trajectories, levels, self.design_seed())
             .map_err(PredictiveError::Mismatch)?;
         let outputs = self.means(&design.points, quantities)?;
-        let result = morris(&design, &outputs).map_err(PredictiveError::Mismatch)?;
+        let result = morris(&design, &outputs)?;
         Ok((result, design.points.len()))
     }
 
@@ -252,15 +252,14 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
             .saltelli("Sobol", base, self.design_seed())
             .map_err(PredictiveError::Mismatch)?;
         let outputs = self.means(&design.points, quantities)?;
-        let result = sobol(
+        sobol(
             &design,
             &outputs,
             bootstrap,
             confidence_level,
             stream_seed(self.seed, BOOTSTRAP_STREAM),
         )
-        .map_err(PredictiveError::Mismatch)?;
-        Ok((result, design.points.len()))
+        .map(|result| (result, design.points.len()))
     }
 
     /// A polynomial chaos expansion of `degree` fitted on a Latin hypercube
@@ -299,8 +298,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
             .to_unit(method, &points)
             .map_err(PredictiveError::Mismatch)?;
         let outputs = self.means(&points, quantities)?;
-        let expansion =
-            ChaosExpansion::fit(&unit, &outputs, degree).map_err(PredictiveError::Mismatch)?;
+        let expansion = ChaosExpansion::fit(&unit, &outputs, degree)?;
         Ok((expansion, points.len()))
     }
 

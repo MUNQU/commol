@@ -26,12 +26,9 @@ from commol.context.inference.distributions import (
 )
 from commol.context.inference.global_sensitivity import (
     ChaosResult,
-    Gain,
     InputSpace,
     Morris,
     MorrisResult,
-    Peak,
-    PeakPosition,
     PolynomialChaos,
     PRCC,
     PRCCResult,
@@ -40,6 +37,13 @@ from commol.context.inference.global_sensitivity import (
     QuantitySummary,
     Sobol,
     SobolResult,
+)
+from commol.context.inference.quantities import (
+    Gain,
+    Increments,
+    Level,
+    Peak,
+    PeakPosition,
     Trajectory,
     ValueAt,
 )
@@ -135,6 +139,8 @@ __all__ = [
     "DistributionNoise",
     "EnbPI",
     "Gain",
+    "Increments",
+    "Level",
     "Gamma",
     "GibbsPosterior",
     "GibbsResult",

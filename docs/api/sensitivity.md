@@ -34,12 +34,16 @@ reads from each run, and the base of its methods. Guide:
 
 ::: commol.context.inference.global_sensitivity.ChaosResult
 
-::: commol.context.inference.global_sensitivity.ValueAt
+::: commol.context.inference.quantities.Level
 
-::: commol.context.inference.global_sensitivity.Gain
+::: commol.context.inference.quantities.Increments
 
-::: commol.context.inference.global_sensitivity.Peak
+::: commol.context.inference.quantities.ValueAt
 
-::: commol.context.inference.global_sensitivity.PeakPosition
+::: commol.context.inference.quantities.Gain
 
-::: commol.context.inference.global_sensitivity.Trajectory
+::: commol.context.inference.quantities.Peak
+
+::: commol.context.inference.quantities.PeakPosition
+
+::: commol.context.inference.quantities.Trajectory
