@@ -153,6 +153,7 @@ from commol.context.observation_models import (
     StudentTObservations,
 )
 from commol.context.visualization import PlotConfig
+from commol.api.plotting.compared import plot_compared
 
 InfeasibleStateError = _engine.InfeasibleStateError
 """A run left the values its model allows, such as an amount below zero.
@@ -308,6 +309,7 @@ __all__ = [
     "AxisUnits",
     "ci_percentiles",
     "member_statistics",
+    "plot_compared",
     "sample",
     "weighted_quantiles",
     "windowed_totals",

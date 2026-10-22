@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Added #251 -->
 
+- `plot_compared({label: result}, …)` draws several runs, replicates or
+  predictives of the same model on the same panels: one line per result,
+  labelled with its key and in the same color in every panel, the band of
+  each set of replicates and of each predictive, and the observations once.
+  `window=` draws the gain of each series over each window. A result without
+  the outputs of the first raises `ValueError` that names its key. See
+  [Plotting](../guide/simulations.md#compare-results-on-the-same-panels).
+
 <!-- Added #276 -->
 
 - Every figure takes `axes=`, the `Figure` of an earlier figure of commol, and

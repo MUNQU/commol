@@ -188,6 +188,219 @@ def test_a_series_with_no_panel_is_named(run: SimulationResults) -> None:
         run.plot.series(series=["B", "C"], axes=fig)
 
 
+def _abc_run(k1: float, accumulator: str | None = None) -> SimulationResults:
+    """20 steps of ``abc_builder`` at ``k1``."""
+    builder = abc_builder(parameters={"k1": k1, "k2": 0.1}, accumulator=accumulator)
+    return Simulation(build(builder)).run(20)
+
+
+def _colors(ax) -> list[tuple[float, float, float]]:
+    """The color of each line of a panel, with no alpha."""
+    return [to_rgba(line.get_color())[:3] for line in ax.lines]
+
+
+def test_compared_runs_share_the_panels() -> None:
+    """
+    Each panel has one line per run, labelled with its key, and a run has
+    the same color in every panel.
+    """
+    slow, fast = _abc_run(0.3), _abc_run(0.6)
+
+    fig = commol.plot_compared({"slow": slow, "fast": fast}, series=["A", "B"])
+
+    axes = _visible(fig)
+    assert [ax.get_label() for ax in axes] == ["A", "B"]
+    for ax, name in zip(axes, ["A", "B"], strict=True):
+        assert ax.get_title() == TITLES[name]
+        assert [line.get_label() for line in ax.lines] == ["slow", "fast"]
+        np.testing.assert_allclose(
+            [line.get_ydata() for line in ax.lines], [slow[name], fast[name]]
+        )
+        assert [t.get_text() for t in ax.get_legend().get_texts()] == [
+            "slow",
+            "fast",
+        ]
+    first, second = (_colors(ax) for ax in axes)
+    assert first == second
+    assert first[0] != first[1]
+
+
+@pytest.mark.parametrize(
+    ("labels", "message"),
+    [
+        (("abc", "ab"), r"'ab' does not have the outputs of 'abc': it lacks \['C'\]"),
+        (
+            ("ab", "abc"),
+            r"'abc' does not have the outputs of 'ab': it also has \['C'\]",
+        ),
+    ],
+    ids=["missing", "extra"],
+)
+def test_compared_runs_need_the_same_outputs(
+    labels: tuple[str, str], message: str
+) -> None:
+    runs = {
+        "abc": _abc_run(0.3),
+        "ab": Simulation(build(a_to_b_builder())).run(20),
+    }
+
+    with pytest.raises(ValueError, match=message):
+        commol.plot_compared({label: runs[label] for label in labels})
+
+
+def test_a_comparison_needs_a_result() -> None:
+    with pytest.raises(ValueError, match="at least one result"):
+        commol.plot_compared({})
+
+
+def test_a_compared_predictive_shows_its_band() -> None:
+    """
+    The predictive shows the median and the band of its draws in the color
+    of its key; the run shows its line; the observations are drawn once.
+    """
+    predictive = _predictive([0.02, 0.1])
+    model = build(
+        a_to_b_builder(parameters={"k1": 0.05}, rate="k1", accumulator="events")
+    )
+    run = Simulation(model).run(40)
+    observed = [ObservedDataPoint(at=at, output="B", value=50.0) for at in (10, 20)]
+
+    fig = commol.plot_compared(
+        {"draws": predictive, "run": run},
+        series=["B"],
+        observed_data=observed,
+        confidence_level=0.9,
+    )
+
+    (ax,) = fig.axes
+    band = predictive.series_band(["B"], 0.9)
+    median, line = ax.lines
+    np.testing.assert_allclose(np.asarray(median.get_ydata()), band.median)
+    np.testing.assert_allclose(np.asarray(line.get_ydata()), run["B"])
+    filled, points = ax.collections
+    heights = filled.get_paths()[0].vertices[:, 1]
+    assert heights.min() == pytest.approx(min(band.lower))
+    assert heights.max() == pytest.approx(max(band.upper))
+    assert to_rgba(filled.get_facecolor()[0])[:3] == to_rgba(median.get_color())[:3]
+    np.testing.assert_allclose(points.get_offsets(), [[10.0, 50.0], [20.0, 50.0]])
+    assert sorted(t.get_text() for t in ax.get_legend().get_texts()) == sorted(
+        ["draws", "draws: 90% of the draws", "run", "Observed"]
+    )
+
+
+def test_compared_replicates_show_their_band() -> None:
+    """Replicates show their mean and the band of the replicates."""
+    model = build_stochastic(a_to_b_builder(), "StochasticSteps")
+    replicates = Simulation(model).replicates(5, seed=2).run(20)
+    run = Simulation(build(a_to_b_builder())).run(20)
+
+    fig = commol.plot_compared({"replicates": replicates, "run": run}, series=["B"])
+
+    (ax,) = fig.axes
+    mean, line = ax.lines
+    np.testing.assert_allclose(np.asarray(mean.get_ydata()), replicates.mean()["B"])
+    np.testing.assert_allclose(np.asarray(line.get_ydata()), run["B"])
+    (band,) = ax.collections
+    heights = band.get_paths()[0].vertices[:, 1]
+    values = [replicate["B"] for replicate in replicates]
+    assert heights.min() >= np.min(values) - 1e-9
+    assert heights.max() <= np.max(values) + 1e-9
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == [
+        "replicates",
+        "replicates: 95% of the replicates",
+        "run",
+    ]
+
+
+def test_compared_runs_can_be_windowed() -> None:
+    """Each line is the gain of the accumulator over each window of 7."""
+    slow, fast = _abc_run(0.3, "moved"), _abc_run(0.6, "moved")
+    simulation = Simulation(build(abc_builder(accumulator="moved")))
+
+    fig = commol.plot_compared({"slow": slow, "fast": fast}, series=["moved"], window=7)
+
+    (ax,) = fig.axes
+    for line, run in zip(ax.lines, (slow, fast), strict=True):
+        assert np.asarray(line.get_xdata(), dtype=float).tolist() == [7.0, 14.0]
+        np.testing.assert_allclose(
+            np.asarray(line.get_ydata()),
+            simulation.windowed_totals(run, ["moved"], window=7),
+        )
+
+
+def test_compared_replicates_and_draws_can_be_windowed() -> None:
+    """
+    Replicates show the mean gain over each window and the band of the gains
+    of the replicates; a predictive the median and the band of the gains of
+    its draws, read through the observation operator.
+    """
+    model = build_stochastic(
+        a_to_b_builder(parameters={"k1": 0.1}, rate="k1", accumulator="events"),
+        "StochasticSteps",
+    )
+    replicates = Simulation(model).replicates(5, seed=2).run(40)
+    predictive = _predictive([0.02, 0.1])
+
+    fig = commol.plot_compared(
+        {"replicates": replicates, "draws": predictive},
+        series=["events"],
+        window=10,
+        confidence_level=0.9,
+    )
+
+    (ax,) = fig.axes
+    ends = [10.0, 20.0, 30.0, 40.0]
+    gains = [
+        [run["events"][int(end)] - run["events"][int(end) - 10] for end in ends]
+        for run in replicates
+    ]
+    mean, median = ax.lines
+    np.testing.assert_allclose(np.asarray(mean.get_ydata()), np.mean(gains, axis=0))
+    points = [
+        ObservedDataPoint(at=end, output="events", value=0.0, window=10) for end in ends
+    ]
+    draws = predictive.at_observations(points, commol.NoNoise()).band(0.9)
+    assert np.asarray(median.get_xdata(), dtype=float).tolist() == ends
+    np.testing.assert_allclose(np.asarray(median.get_ydata()), draws.median)
+    replicate_band, draws_band = ax.collections
+    heights = replicate_band.get_paths()[0].vertices[:, 1]
+    assert heights.min() >= np.min(gains) - 1e-9
+    assert heights.max() <= np.max(gains) + 1e-9
+    assert draws_band.get_paths()[0].vertices[:, 1].max() == pytest.approx(
+        max(draws.upper)
+    )
+    assert [t.get_text() for t in ax.get_legend().get_texts()][1::2] == [
+        "replicates: 90% of the replicates",
+        "draws: 90% of the draws",
+    ]
+
+
+def test_compared_results_draw_on_given_axes_with_dates() -> None:
+    """
+    With ``axes=``, each series is drawn on its panel; a model with an
+    origin labels the ticks with dates.
+    """
+    first = _dated_run("day", 20)
+    fig = first.plot.series(series=["B"])
+
+    again = commol.plot_compared(
+        {"first": first, "again": first},
+        series=["B"],
+        axes=fig,
+        tick_every=10,
+        show_legend=False,
+    )
+
+    assert again is fig
+    (ax,) = fig.axes
+    assert [line.get_label() for line in ax.lines] == ["Simulation", "first", "again"]
+    assert _tick_labels(fig) == {
+        0.0: "2020-01-01",
+        10.0: "2020-01-11",
+        20.0: "2020-01-21",
+    }
+
+
 def test_results_built_by_hand_plot_only_outputs() -> None:
     results = SimulationResults(
         [0.0, 1.0, 2.0], {"B_g1": [1.0, 2.0, 3.0], "B_g2": [0.0, 1.0, 1.0]}
@@ -244,6 +457,7 @@ ACCESSORS = [
     (SobolResult.plot, figures._sobol),
     (ChaosResult.plot, figures._sobol),
     (ProfileResult.plot, figures._profiles),
+    (commol.plot_compared, figures._compared_series),
 ]
 
 

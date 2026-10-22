@@ -473,6 +473,7 @@ pip install 'commol[plot]'
 | `SimulationReplicates` | `replicates.plot.series(…)`: the mean and a band of `confidence_level` (default 0.95), each replicate reduced to the series first. `replicates.plot.cumulative(…)`: the running total of the mean. |
 | [`Predictive`](uncertainty/index.md#the-predictive) | `predictive.plot.series(…)` and `predictive.plot.cumulative(…)`: the weighted median of the draws and their band of `confidence_level`, with no other run. |
 | The results of [sensitivity methods](uncertainty/sensitivity.md#plots) and of [profiles](uncertainty/profiles.md#plots) | `result.plot(…)` |
+| Several runs, replicates or predictives | `plot_compared({label: result}, …)`: each result on the same panels ([compare results](#compare-results-on-the-same-panels)). |
 
 A figure draws one panel per series and returns the matplotlib `Figure`. It
 reads the name and the unit of each series from the model of the results
@@ -554,6 +555,41 @@ faster = Simulation(faster_model).run(num_steps=100)
 figure = results.plot.series(series=["B", "C"])
 faster.plot.series(series=["B", "C"], axes=figure, linestyle="--")
 print([ax.get_label() for ax in figure.axes if ax.get_visible()])  # ['B', 'C']
+```
+
+### Compare results on the same panels
+
+`plot_compared({label: result}, …)` draws several results of the same model on
+the same panels and returns the `Figure`. A value is a `SimulationResults`, a
+`SimulationReplicates` or a [`Predictive`](uncertainty/index.md#the-predictive).
+It is a function, not a method: a comparison describes no single result.
+
+```python
+from commol import plot_compared
+
+figure = plot_compared({"k1 = 0.3": results, "k1 = 0.5": faster}, series=["B", "C"])
+print([line.get_label() for line in figure.axes[0].lines])  # ['k1 = 0.3', 'k1 = 0.5']
+```
+
+| What | How it is drawn |
+|---|---|
+| Each result | One line per panel, labelled with its key, in the same color in every panel: `C0` of the matplotlib style for the first key, `C1` for the second, and so on. |
+| Replicates | Their mean and the band of `confidence_level` of the replicates, in the color of their key. |
+| A predictive | The weighted median of its draws and their band of `confidence_level`, in the color of their key. The legend of a band starts with the key: `fit: 95% of the draws`. |
+| `observed_data` | Drawn once, as points on the panel of their label. Without `window`, they also set how each line is read, as in `plot.series`. |
+| `window` | Each line is the gain of the series over each complete window, at the end of the window, as `Simulation.windowed_totals` reads it. A band is the band of the gains of the replicates or of the draws. |
+
+The first result names the series and gives the title and the unit of each
+panel. Every result has the outputs of the first; otherwise `plot_compared`
+raises `ValueError` that names the key of the result and the outputs that
+differ. `axes=` draws on the panels of an earlier figure, and `series`,
+`config`, `show_legend`, `x_label`, `tick_every`, `position_label`,
+`output_file` and other keyword arguments (for `Axes.plot`, on every line)
+work as in `plot.series`.
+
+```python
+weekly = plot_compared({"k1 = 0.3": results, "k1 = 0.5": faster}, series=["cum_ab"], window=7)
+print([float(at) for at in weekly.axes[0].lines[0].get_xdata()][:3])  # [7.0, 14.0, 21.0]
 ```
 
 ## Next steps
