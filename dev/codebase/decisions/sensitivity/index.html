@@ -2552,6 +2552,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-modeller-truncates-a-polynomial-chaos-basis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The modeller truncates a polynomial chaos basis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#nan-propagates-in-a-run-and-stops-a-reduction-across-runs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3116,6 +3127,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-modeller-truncates-a-polynomial-chaos-basis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The modeller truncates a polynomial chaos basis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#nan-propagates-in-a-run-and-stops-a-reduction-across-runs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3284,6 +3306,48 @@ with its quantity; <code>quantity_schedule</code> gives the positions to run at.
 <code>a_done_run_lists_every_position_it_lacks_with_its_quantity</code>),
 <code>tests/simulation/test_quantities.py</code>,
 <code>tests/uncertainty/test_sensitivity.py::TestPropagation::test_propagation_values_have_one_row_per_replicate_of_each_draw</code>.</p>
+<h2 id="the-modeller-truncates-a-polynomial-chaos-basis">The modeller truncates a polynomial chaos basis<a class="headerlink" href="#the-modeller-truncates-a-polynomial-chaos-basis" title="Permanent link">&para;</a></h2>
+<p><code>Truncation</code> (<code>global_sensitivity/chaos.rs</code>) keeps the terms of a basis of
+<code>degree</code> whose degrees have <code>Σ α_i^q ≤ degree^q</code> and that hold at most
+<code>max_interaction</code> inputs; <code>PolynomialChaos</code> passes <code>q_norm</code> and
+<code>max_interaction</code>, whose defaults, 1 and no limit, keep the total-degree
+basis. <code>ChaosExpansion::terms</code> counts the terms with no basis built, the sum
+over the interaction orders <code>r</code> of <code>C(inputs, r)</code> times the ordered tuples
+of <code>r</code> positive degrees the truncation keeps, so <code>ForwardAnalysis::chaos</code>
+refuses too few draws before any run. The basis is built by the recursion of
+the total degree, which stops a branch that cannot hold the degrees left, so
+its terms keep the order of the total-degree basis. A <code>ChaosResult</code> holds
+the truncation, and <code>predict</code> rebuilds the terms from it.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A fixed budget of terms</td>
+<td>A hidden default that refuses valid analyses.</td>
+</tr>
+<tr>
+<td>An automatic choice (least-angle regression, adaptive bases)</td>
+<td>It needs a criterion, which is a modelling choice too; a later proposal can choose terms from the data.</td>
+</tr>
+<tr>
+<td>One class per truncation, joined in a union</td>
+<td>The two bounds are independent and combine.</td>
+</tr>
+<tr>
+<td>Filter the total-degree basis</td>
+<td>The basis of many inputs that the truncation exists to avoid is built anyway.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/src/global_sensitivity/chaos.rs</code>
+(tests module),
+<code>crates/commol-inference/tests/test_global_sensitivity.rs::a_truncated_chaos_basis_fits_many_inputs</code>,
+<code>tests/uncertainty/test_sensitivity.py::TestPolynomialChaos</code>.</p>
 <h2 id="nan-propagates-in-a-run-and-stops-a-reduction-across-runs">NaN propagates in a run and stops a reduction across runs<a class="headerlink" href="#nan-propagates-in-a-run-and-stops-a-reduction-across-runs" title="Permanent link">&para;</a></h2>
 <p>Inside a run, a NaN in a value a quantity reads makes the quantity NaN: a peak
 and the position of a peak are NaN, not the largest of the other values.

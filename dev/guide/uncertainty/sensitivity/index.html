@@ -1597,6 +1597,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Polynomial chaos">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bases-for-many-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bases for many inputs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3358,6 +3375,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Polynomial chaos">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bases-for-many-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bases for many inputs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3861,7 +3895,7 @@ at <code>0.3 - 0.1</code> reads the row of <code>0.2</code>.</p>
 <td>Independent</td>
 </tr>
 <tr>
-<td><code>PolynomialChaos(degree, draws, quantities)</code></td>
+<td><code>PolynomialChaos(degree, draws, quantities, q_norm=1.0, max_interaction=None)</code></td>
 <td>A polynomial surrogate and its Sobol indices, in far fewer runs for a smooth quantity</td>
 <td><code>draws</code>, more than the terms</td>
 <td>Independent</td>
@@ -3960,7 +3994,8 @@ propagation, which take it.</p>
 <h2 id="polynomial-chaos">Polynomial chaos<a class="headerlink" href="#polynomial-chaos" title="Permanent link">&para;</a></h2>
 <p><code>PolynomialChaos</code> (Sudret 2008) takes every input to <code>u = F(x)</code>, uniform on
 <code>[0, 1]</code>, and fits orthonormal Legendre polynomials of <code>u</code> of total degree
-<code>degree</code> by least squares on a Latin hypercube of <code>draws</code> points. One basis
+<code>degree</code>, or a truncation of that basis (<a href="#bases-for-many-inputs">below</a>), by
+least squares on a Latin hypercube of <code>draws</code> points. One basis
 fits every distribution, truncated ones too. The Sobol indices come from the
 squares of the coefficients. <code>loo_error</code> is the leave-one-out error relative
 to the variance: the indices are those of the expansion, and they are those
@@ -3972,6 +4007,48 @@ quantities at any input values, as a surrogate.</p>
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">chaos</span><span class="o">.</span><span class="n">loo_error</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">4</span><span class="p">),</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">chaos</span><span class="o">.</span><span class="n">total</span><span class="p">[</span><span class="mi">0</span><span class="p">]])</span>  <span class="c1"># 0.0036 [0.61, 0.39]</span>
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">chaos</span><span class="o">.</span><span class="n">predict</span><span class="p">([[</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">]])[</span><span class="mi">0</span><span class="p">]])</span>  <span class="c1"># [428]</span>
 </span></code></pre></div>
+<h3 id="bases-for-many-inputs">Bases for many inputs<a class="headerlink" href="#bases-for-many-inputs" title="Permanent link">&para;</a></h3>
+<p>The total-degree basis has <code>(k + degree)! / (k! degree!)</code> terms in <code>k</code>
+inputs: 10,626 for 20 inputs at degree 4. A fit needs more draws than terms,
+so a model of many inputs needs a smaller basis. You choose how to truncate
+it, with two keyword arguments:</p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Keeps</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_interaction</code></td>
+<td>The terms of at most this many inputs</td>
+<td><code>None</code>: no limit</td>
+</tr>
+<tr>
+<td><code>q_norm</code></td>
+<td>The terms whose degrees <code>α</code> have <code>Σ α_i^q ≤ degree^q</code>, with <code>q</code> in <code>(0, 1]</code>: below 1, a term of several inputs keeps a lower degree than a term of one</td>
+<td><code>1.0</code>: the total degree</td>
+</tr>
+</tbody>
+</table>
+<p>The defaults keep the total-degree basis. With <code>max_interaction=2</code>, 20 inputs
+at degree 4 have <code>1 + 20 · 4 + C(20, 2) · 6 = 1,221</code> terms. The number of
+terms is known before any run, so too few <code>draws</code> raise before the first run.
+A truncation drops the terms it does not keep: the total indices hold only
+the interactions of the basis, and <code>loo_error</code> says how much of the model
+the smaller basis misses.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">additive</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="n">PolynomialChaos</span><span class="p">(</span><span class="n">degree</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">max_interaction</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">draws</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">peak</span><span class="p">])</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="p">)</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">additive</span><span class="o">.</span><span class="n">indices</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">additive</span><span class="o">.</span><span class="n">loo_error</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">4</span><span class="p">))</span>  <span class="c1"># 9 0.0071</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">additive</span><span class="o">.</span><span class="n">total</span><span class="p">[</span><span class="mi">0</span><span class="p">]])</span>  <span class="c1"># [0.61, 0.39]</span>
+</span></code></pre></div>
+<p>With one input per term, the 9 terms against the 15 of the total degree hold
+no interaction, so each total index equals the first-order one. Here the
+leave-one-out error stays small: the interaction of <code>k1</code> and <code>k2</code> adds little
+to the peak.</p>
 <h2 id="plots">Plots<a class="headerlink" href="#plots" title="Permanent link">&para;</a></h2>
 <p>Each result draws its own figure with <code>plot()</code>, one panel per quantity, and
 returns the matplotlib <code>Figure</code> (<a href="../../simulations/#plotting">Plotting</a>: the
@@ -3981,9 +4058,9 @@ and one bar per input for any other quantity. The <code>plot</code> of a <code>M
 draws <code>sigma</code> against <code>mu_star</code>, one point per input. The <code>plot</code> of a
 <code>SobolResult</code> draws the first-order and total indices with their intervals,
 and the <code>plot</code> of a <code>ChaosResult</code> draws those of the expansion.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">over_axis</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_label</span><span class="o">=</span><span class="s2">&quot;Step&quot;</span><span class="p">)</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">screening</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">indices</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">over_axis</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_label</span><span class="o">=</span><span class="s2">&quot;Step&quot;</span><span class="p">)</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">screening</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">indices</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
 </span></code></pre></div>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
@@ -4001,6 +4078,9 @@ and the <code>plot</code> of a <code>ChaosResult</code> draws those of the expan
       NaN (a bootstrap replicate of no variance); if not, raise <code>base_draws</code>.</li>
 <li>[ ] The leave-one-out error of a polynomial chaos is small before you read
       its indices, and <code>predict</code> reads values inside the bounds of the inputs.</li>
+<li>[ ] A truncated basis of a polynomial chaos (<code>max_interaction</code>, <code>q_norm</code>)
+      keeps the interactions you expect to matter; its total indices hold no
+      other.</li>
 </ul>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>

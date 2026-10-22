@@ -4145,6 +4145,15 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <!-- Added #226 -->
 
+<ul>
+<li><code>PolynomialChaos(q_norm=..., max_interaction=...)</code>: a truncated basis for
+  many inputs. <code>max_interaction</code> keeps the terms of at most that many inputs,
+  and <code>q_norm</code>, in <code>(0, 1]</code>, the terms whose degrees have
+  <code>Σ α_i^q ≤ degree^q</code>; the defaults keep the total-degree basis. 20 inputs
+  at degree 4 with <code>max_interaction=2</code> have 1,221 terms instead of 10,626,
+  and the number is known before any run. <code>ChaosResult</code> records both. See
+  <a href="../../guide/uncertainty/sensitivity/#bases-for-many-inputs">Bases for many inputs</a>.</li>
+</ul>
 <!-- Added #230 -->
 
 <!-- Added #239 -->

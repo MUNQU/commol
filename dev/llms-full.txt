@@ -5825,13 +5825,13 @@ for label, value in one_run.quantities(quantities).items():
 
 ## Which method for which budget
 
-| Method                                                       | Answers                                                                                    | Runs                              | Inputs                  |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | --------------------------------- | ----------------------- |
-| `Propagation(draws, quantities)`                             | The distribution of each quantity, and the band of every output                            | `draws`                           | Independent or a sample |
-| `PRCC(draws, quantities)`                                    | How steadily each quantity rises or falls with each input                                  | `draws`, more than the inputs + 1 | Independent or a sample |
-| `Morris(trajectories, levels, quantities)`                   | Which inputs matter, in few runs                                                           | `trajectories · (inputs + 1)`     | Independent             |
-| `Sobol(base_draws, bootstrap, confidence_level, quantities)` | The share of the variance each input explains, alone and with interactions, with intervals | `base_draws · (inputs + 2)`       | Independent             |
-| `PolynomialChaos(degree, draws, quantities)`                 | A polynomial surrogate and its Sobol indices, in far fewer runs for a smooth quantity      | `draws`, more than the terms      | Independent             |
+| Method                                                                         | Answers                                                                                    | Runs                              | Inputs                  |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | --------------------------------- | ----------------------- |
+| `Propagation(draws, quantities)`                                               | The distribution of each quantity, and the band of every output                            | `draws`                           | Independent or a sample |
+| `PRCC(draws, quantities)`                                                      | How steadily each quantity rises or falls with each input                                  | `draws`, more than the inputs + 1 | Independent or a sample |
+| `Morris(trajectories, levels, quantities)`                                     | Which inputs matter, in few runs                                                           | `trajectories · (inputs + 1)`     | Independent             |
+| `Sobol(base_draws, bootstrap, confidence_level, quantities)`                   | The share of the variance each input explains, alone and with interactions, with intervals | `base_draws · (inputs + 2)`       | Independent             |
+| `PolynomialChaos(degree, draws, quantities, q_norm=1.0, max_interaction=None)` | A polynomial surrogate and its Sobol indices, in far fewer runs for a smooth quantity      | `draws`, more than the terms      | Independent             |
 
 Start with Morris to drop the inputs that do not matter, then Sobol or a polynomial chaos on the rest. For a slow model, a polynomial chaos needs the fewest runs; read its leave-one-out error before its indices.
 
@@ -5908,7 +5908,7 @@ for name, i in [("k1", 0), ("k2", 1)]:
 
 ## Polynomial chaos
 
-`PolynomialChaos` (Sudret 2008) takes every input to `u = F(x)`, uniform on `[0, 1]`, and fits orthonormal Legendre polynomials of `u` of total degree `degree` by least squares on a Latin hypercube of `draws` points. One basis fits every distribution, truncated ones too. The Sobol indices come from the squares of the coefficients. `loo_error` is the leave-one-out error relative to the variance: the indices are those of the expansion, and they are those of the model only as far as the expansion predicts it. `predict` gives the quantities at any input values, as a surrogate.
+`PolynomialChaos` (Sudret 2008) takes every input to `u = F(x)`, uniform on `[0, 1]`, and fits orthonormal Legendre polynomials of `u` of total degree `degree`, or a truncation of that basis ([below](#bases-for-many-inputs)), by least squares on a Latin hypercube of `draws` points. One basis fits every distribution, truncated ones too. The Sobol indices come from the squares of the coefficients. `loo_error` is the leave-one-out error relative to the variance: the indices are those of the expansion, and they are those of the model only as far as the expansion predicts it. `predict` gives the quantities at any input values, as a surrogate.
 
 ```python
 from commol import PolynomialChaos
@@ -5917,6 +5917,27 @@ chaos = analysis.run(PolynomialChaos(degree=4, draws=60, quantities=[peak]))
 print(round(chaos.loo_error[0], 4), [round(s, 2) for s in chaos.total[0]])  # 0.0036 [0.61, 0.39]
 print([round(value) for value in chaos.predict([[0.4, 0.1]])[0]])  # [428]
 ```
+
+### Bases for many inputs
+
+The total-degree basis has `(k + degree)! / (k! degree!)` terms in `k` inputs: 10,626 for 20 inputs at degree 4. A fit needs more draws than terms, so a model of many inputs needs a smaller basis. You choose how to truncate it, with two keyword arguments:
+
+| Argument          | Keeps                                                                                                                                                  | Default                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
+| `max_interaction` | The terms of at most this many inputs                                                                                                                  | `None`: no limit        |
+| `q_norm`          | The terms whose degrees `α` have `Σ α_i^q ≤ degree^q`, with `q` in `(0, 1]`: below 1, a term of several inputs keeps a lower degree than a term of one | `1.0`: the total degree |
+
+The defaults keep the total-degree basis. With `max_interaction=2`, 20 inputs at degree 4 have `1 + 20 · 4 + C(20, 2) · 6 = 1,221` terms. The number of terms is known before any run, so too few `draws` raise before the first run. A truncation drops the terms it does not keep: the total indices hold only the interactions of the basis, and `loo_error` says how much of the model the smaller basis misses.
+
+```python
+additive = analysis.run(
+    PolynomialChaos(degree=4, max_interaction=1, draws=30, quantities=[peak])
+)
+print(len(additive.indices), round(additive.loo_error[0], 4))  # 9 0.0071
+print([round(s, 2) for s in additive.total[0]])  # [0.61, 0.39]
+```
+
+With one input per term, the 9 terms against the 15 of the total degree hold no interaction, so each total index equals the first-order one. Here the leave-one-out error stays small: the interaction of `k1` and `k2` adds little to the peak.
 
 ## Plots
 
@@ -5937,6 +5958,7 @@ figure = indices.plot()
 - [ ] A quantity that is NaN is filtered with `where(mask)` only on a condition you can defend, and the summary is read as conditioned on it.
 - [ ] The intervals of Sobol are narrow enough to rank the inputs, and none is NaN (a bootstrap replicate of no variance); if not, raise `base_draws`.
 - [ ] The leave-one-out error of a polynomial chaos is small before you read its indices, and `predict` reads values inside the bounds of the inputs.
+- [ ] A truncated basis of a polynomial chaos (`max_interaction`, `q_norm`) keeps the interactions you expect to matter; its total indices hold no other.
 
 ## Next steps
 
@@ -26035,13 +26057,17 @@ A polynomial chaos expansion (Sudret 2008): a polynomial surrogate of each quant
 
 Every input goes to `u = F(x)`, uniform on `[0, 1]` through its distribution, so one basis of orthonormal Legendre polynomials fits every distribution, truncated ones included. The coefficients come from least squares on a Latin hypercube; the leave-one-out error says how well the expansion predicts the model. It needs independent inputs.
 
+The basis keeps every term whose degrees `α` have `Σ α_i^q ≤ degree^q` and that holds at most `max_interaction` inputs. The defaults keep the total-degree basis, of `(k + degree)! / (k! degree!)` terms in `k` inputs; a truncation keeps the terms of low interaction order, so a basis of many inputs needs far fewer terms and runs. The number of terms is known before any run.
+
 Attributes:
 
-| Name         | Type             | Description                                                                                                 |
-| ------------ | ---------------- | ----------------------------------------------------------------------------------------------------------- |
-| `degree`     | `int`            | The total degree of the basis: in k inputs it has (k + degree)! / (k! degree!) terms.                       |
-| `draws`      | `int`            | The points of the Latin hypercube; more than the terms, and two or three times as many is the usual choice. |
-| `quantities` | `list[Quantity]` | What each run is reduced to.                                                                                |
+| Name              | Type             | Description                                                                                                                      |
+| ----------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `degree`          | `int`            | The degree of the basis: the largest degree of an input in a term, and the total degree of a term when q_norm is 1.              |
+| `q_norm`          | `float`          | The q of the hyperbolic truncation, in (0, 1\]: below 1, a term of several inputs keeps a lower total degree than a term of one. |
+| `max_interaction` | \`int            | None\`                                                                                                                           |
+| `draws`           | `int`            | The points of the Latin hypercube; more than the terms, and two or three times as many is the usual choice.                      |
+| `quantities`      | `list[Quantity]` | What each run is reduced to.                                                                                                     |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -26058,11 +26084,24 @@ class PolynomialChaos(SensitivityMethod[ChaosResult]):
     squares on a Latin hypercube; the leave-one-out error says how well the
     expansion predicts the model. It needs independent inputs.
 
+    The basis keeps every term whose degrees ``α`` have
+    ``Σ α_i^q ≤ degree^q`` and that holds at most ``max_interaction``
+    inputs. The defaults keep the total-degree basis, of
+    ``(k + degree)! / (k! degree!)`` terms in ``k`` inputs; a truncation
+    keeps the terms of low interaction order, so a basis of many inputs
+    needs far fewer terms and runs. The number of terms is known before any
+    run.
+
     Attributes
     ----------
     degree : int
-        The total degree of the basis: in ``k`` inputs it has
-        ``(k + degree)! / (k! degree!)`` terms.
+        The degree of the basis: the largest degree of an input in a term,
+        and the total degree of a term when ``q_norm`` is 1.
+    q_norm : float
+        The q of the hyperbolic truncation, in ``(0, 1]``: below 1, a term
+        of several inputs keeps a lower total degree than a term of one.
+    max_interaction : int | None
+        The largest number of inputs of a term; None for no limit.
     draws : int
         The points of the Latin hypercube; more than the terms, and two or
         three times as many is the usual choice.
@@ -26070,7 +26109,13 @@ class PolynomialChaos(SensitivityMethod[ChaosResult]):
         What each run is reduced to.
     """
 
-    degree: int = Field(ge=1, description="The total degree of the basis.")
+    degree: int = Field(ge=1, description="The degree of the basis.")
+    q_norm: float = Field(
+        default=1.0, gt=0.0, le=1.0, description="The q of the q-norm of the basis."
+    )
+    max_interaction: int | None = Field(
+        default=None, ge=1, description="The largest number of inputs of a term."
+    )
     draws: int = Field(ge=2, description="Points of the Latin hypercube.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
@@ -26087,18 +26132,20 @@ The expansion is a surrogate of the model: `predict` gives the quantities at any
 
 Attributes:
 
-| Name             | Type                | Description                                                                                                        |
-| ---------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `inputs`         | `list[str]`         | The inputs, in order.                                                                                              |
-| `input_space`    | `InputSpace`        | The inputs and their distributions, which predict maps values through.                                             |
-| `labels`         | `list[str]`         | The label of each quantity.                                                                                        |
-| `degree`         | `int`               | The total degree of the basis.                                                                                     |
-| `indices`        | `list[list[int]]`   | The degree of each input in each term, [term][input]; term 0 is the constant.                                      |
-| `coefficients`   | `list[list[float]]` | The coefficient of each term for each quantity, [quantity][term], on orthonormal Legendre polynomials of u = F(x). |
-| `loo_error`      | `list[float]`       | The leave-one-out error of each quantity, relative to its variance; NaN for a quantity of no variance.             |
-| `mean, variance` | `list[float]`       | The mean and the variance of each quantity under the expansion.                                                    |
-| `first, total`   | `list[list[float]]` | The first-order and total Sobol indices, [quantity][input]; NaN for a quantity of no variance.                     |
-| `runs`           | `int`               | The number of points run.                                                                                          |
+| Name              | Type                | Description                                                                                                        |
+| ----------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `inputs`          | `list[str]`         | The inputs, in order.                                                                                              |
+| `input_space`     | `InputSpace`        | The inputs and their distributions, which predict maps values through.                                             |
+| `labels`          | `list[str]`         | The label of each quantity.                                                                                        |
+| `degree`          | `int`               | The degree of the basis: the bound of the q-norm of every term.                                                    |
+| `q_norm`          | `float`             | The q of the q-norm of the basis; 1 for the total-degree basis.                                                    |
+| `max_interaction` | \`int               | None\`                                                                                                             |
+| `indices`         | `list[list[int]]`   | The degree of each input in each term, [term][input]; term 0 is the constant.                                      |
+| `coefficients`    | `list[list[float]]` | The coefficient of each term for each quantity, [quantity][term], on orthonormal Legendre polynomials of u = F(x). |
+| `loo_error`       | `list[float]`       | The leave-one-out error of each quantity, relative to its variance; NaN for a quantity of no variance.             |
+| `mean, variance`  | `list[float]`       | The mean and the variance of each quantity under the expansion.                                                    |
+| `first, total`    | `list[list[float]]` | The first-order and total Sobol indices, [quantity][input]; NaN for a quantity of no variance.                     |
+| `runs`            | `int`               | The number of points run.                                                                                          |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -26124,7 +26171,11 @@ class ChaosResult(BaseModel):
     labels : list[str]
         The label of each quantity.
     degree : int
-        The total degree of the basis.
+        The degree of the basis: the bound of the q-norm of every term.
+    q_norm : float
+        The q of the q-norm of the basis; 1 for the total-degree basis.
+    max_interaction : int | None
+        The largest number of inputs of a term; None for no limit.
     indices : list[list[int]]
         The degree of each input in each term, ``[term][input]``; term 0 is
         the constant.
@@ -26149,6 +26200,8 @@ class ChaosResult(BaseModel):
     input_space: InputSpace
     labels: list[str]
     degree: int
+    q_norm: float
+    max_interaction: int | None
     indices: list[list[int]]
     coefficients: list[list[float]]
     loo_error: list[float]
@@ -26213,12 +26266,15 @@ class ChaosResult(BaseModel):
         ------
         ValueError
             If a point has not one value per input or a value outside the
-            bounds of its input, or the coefficients do not fit the degree.
+            bounds of its input, the truncation is not valid, or the
+            coefficients do not fit the basis.
         """
         return commol_rs.inference.chaos_evaluate(
             engine_state.rust_parameters(self.input_space.parameters),
             self.input_space.rust_distributions() or [],
             self.degree,
+            self.q_norm,
+            self.max_interaction,
             self.coefficients,
             [list(point) for point in values],
         )
@@ -26317,9 +26373,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                   |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If a point has not one value per input or a value outside the bounds of its input, or the coefficients do not fit the degree. |
+| Type         | Description                                                                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a point has not one value per input or a value outside the bounds of its input, the truncation is not valid, or the coefficients do not fit the basis. |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -26343,12 +26399,15 @@ def predict(self, values: Sequence[Sequence[float]]) -> list[list[float]]:
     ------
     ValueError
         If a point has not one value per input or a value outside the
-        bounds of its input, or the coefficients do not fit the degree.
+        bounds of its input, the truncation is not valid, or the
+        coefficients do not fit the basis.
     """
     return commol_rs.inference.chaos_evaluate(
         engine_state.rust_parameters(self.input_space.parameters),
         self.input_space.rust_distributions() or [],
         self.degree,
+        self.q_norm,
+        self.max_interaction,
         self.coefficients,
         [list(point) for point in values],
     )
@@ -39927,6 +39986,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+
+- `PolynomialChaos(q_norm=..., max_interaction=...)`: a truncated basis for many inputs. `max_interaction` keeps the terms of at most that many inputs, and `q_norm`, in `(0, 1]`, the terms whose degrees have `Σ α_i^q ≤ degree^q`; the defaults keep the total-degree basis. 20 inputs at degree 4 with `max_interaction=2` have 1,221 terms instead of 10,626, and the number is known before any run. `ChaosResult` records both. See [Bases for many inputs](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#bases-for-many-inputs).
 
 - A calibration result records the seed it used, `CalibrationResult.seed` (`Calibrator.seed`: `problem.seed`, or the seed the calibrator drew), and the sample of every uncertainty method and of `Calibrator.point_sample` names it in `method.settings["seed"]`. Set as `problem.seed`, it repeats the run, also from a result read back from JSON. See [Reproducibility](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#reproducibility).
 
