@@ -28,6 +28,7 @@ from commol.api.reporting import ReportLeaf, SimulationReport
 from commol.context.inference.identifiability import (
     ParameterVerdicts,
     PracticalVerdict,
+    ProfileSection,
     StartsSection,
     StructuralVerdict,
 )
@@ -260,10 +261,37 @@ def test_the_identifiability_report_is_a_method_of_its_result() -> None:
             "collinearity": [],
             "sample": [],
             "starts": [report.starts[0].model_dump()],
+            "profile": [],
         },
     }
     assert data == expected
     assert _key_order(data) == _key_order(expected)
+
+
+def test_an_identifiability_report_has_a_section_of_each_method() -> None:
+    report = IdentifiabilityReport(
+        parameters=["k"],
+        verdicts={"k": ParameterVerdicts()},
+        profile=[
+            ProfileSection(
+                threshold="chi_square",
+                confidence_level=0.95,
+                tolerance=1e-6,
+                verdicts={"k": "identifiable"},
+                intervals={"k": (0.1, 0.4)},
+            )
+        ],
+    )
+
+    sections = report.report()["sections"]
+
+    methods = [
+        name
+        for name in IdentifiabilityReport.model_fields
+        if name not in ("parameters", "verdicts")
+    ]
+    assert list(sections) == methods
+    assert sections["profile"] == [report.profile[0].model_dump()]
 
 
 def test_reports_are_only_methods() -> None:

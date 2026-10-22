@@ -464,5 +464,6 @@ def _identifiability_report(report: IdentifiabilityReport) -> IdentifiabilityRep
         "collinearity": [section.model_dump() for section in report.collinearity],
         "sample": [section.model_dump() for section in report.sample],
         "starts": [section.model_dump() for section in report.starts],
+        "profile": [section.model_dump() for section in report.profile],
     }
     return {"parameters": parameters, "sections": sections}

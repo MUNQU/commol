@@ -100,6 +100,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own to `logging.getLogger("commol")`. See
   [Log messages](../getting-started/quickstart.md#log-messages).
 
+### Fixed
+
+- `IdentifiabilityReport.report()` gives the `profile` section, the
+  evidence of each profile likelihood; before, the report data had no such
+  section.
+
 ## [0.9.0] - 2026-10-22
 
 This release gives control over the work of a calibration and over what a
