@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Fixed
+
 ## [0.8.0] - 2026-10-22
 
 This release compares runs. `Scenarios` runs every draw of a sample under several sets of parameter values and compares them in pairs, a quantity of interest reads a series and reduces it (the peak of the gains over windows, for example), and `results.quantities` reads the quantities of one run. Figures are methods of the results they draw: `plot.series`, `plot.observations` and `plot_compared`, which draws several runs or samples on the same panels. Before you upgrade, read the **Breaking** entries: `SimulationPlotter` and seaborn are removed and matplotlib is the optional extra `commol[plot]`, the quantities take a `series`, and the runs of the draws of a stochastic sample follow one tree of seeds, so their numbers change. See [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md) and [Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md).
