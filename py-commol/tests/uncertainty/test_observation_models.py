@@ -477,7 +477,7 @@ class TestPrediction:
         predictive = Predictive(calibrator, sample, [0, 1])
         observations = flow_observations(values, windowed=True)
 
-        pit = scores.pit(predictive, observations, DistributionNoise(), seed=1)
+        pit = scores.pit(predictive, observations, DistributionNoise())
 
         # Ten bins of 40 expected values each: a chi-square of 9 degrees of
         # freedom, whose 0.999 quantile is 27.9.

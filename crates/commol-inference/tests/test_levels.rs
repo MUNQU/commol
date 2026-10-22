@@ -65,6 +65,7 @@ fn every_confidence_level_has_one_check() {
     let draws = ObservationDraws {
         values: vec![vec![1.0], vec![2.0]],
         weights: vec![0.5, 0.5],
+        seed: 0,
     };
 
     let errors = [

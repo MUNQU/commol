@@ -8,7 +8,8 @@ use commol_calibration::{
 use commol_core::Model;
 use commol_difference::DifferenceEquations;
 use commol_inference::{
-    NoNoise, ParameterSample, Predictive, PredictiveError, draw_seeds, observation_draws,
+    NoNoise, ObservationDraws, ParameterSample, Predictive, PredictiveError, draw_seeds,
+    observation_draws, scores,
 };
 use commol_random::replicate_seed;
 
@@ -279,4 +280,50 @@ fn a_draw_keeps_its_runs_when_the_replicates_change() {
             assert_eq!(run, four.trajectories()[4 * draw + replicate]);
         }
     }
+}
+
+#[test]
+fn the_pit_of_ties_follows_the_seed_of_the_draws() {
+    // Whole units: the draws of A at 5 tie with each other and with the
+    // observed value, the first draw's.
+    let problem = stochastic_problem(1);
+    let sample = sample(vec![vec![0.2]; 40]);
+    let draws_of = |seed| {
+        observation_draws(
+            problem.forward(),
+            &sample,
+            problem.observed_data(),
+            &NoNoise,
+            seed,
+        )
+        .unwrap()
+    };
+    let draws = draws_of(11);
+    let observed = [draws.values[0][0]];
+    let below: f64 = draws
+        .values
+        .iter()
+        .zip(&draws.weights)
+        .filter(|(row, _)| row[0] < observed[0])
+        .map(|(_, w)| w)
+        .sum();
+    let at: f64 = draws
+        .values
+        .iter()
+        .zip(&draws.weights)
+        .filter(|(row, _)| row[0] == observed[0])
+        .map(|(_, w)| w)
+        .sum();
+
+    let pit = scores::pit(&draws, &observed).unwrap();
+
+    assert_eq!(draws.seed, 11);
+    assert_eq!(scores::pit(&draws_of(11), &observed).unwrap(), pit);
+    assert!(pit[0] >= below && pit[0] <= below + at, "{pit:?}");
+    // The same values drawn with another seed randomize the tie otherwise.
+    let reseeded = ObservationDraws {
+        seed: 12,
+        ..draws.clone()
+    };
+    assert_ne!(scores::pit(&reseeded, &observed).unwrap(), pit);
 }

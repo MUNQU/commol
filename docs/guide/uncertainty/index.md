@@ -347,7 +347,7 @@ held-out positions above, and say whether you score a band of the model
 | `interval_score(predictive, observations, noise, confidence_level)` | `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`, `α = 1 − c` | Lower |
 | `weighted_interval_score(predictive, observations, noise, confidence_levels)` | The weighted interval score of Bracher et al. (2021) | Lower |
 | `crps(predictive, observations, noise)` | `Σ wᵢ|xᵢ − y| − ½ Σᵢⱼ wᵢwⱼ|xᵢ − xⱼ|`, the CRPS of a stochastic calibration's loss | Lower |
-| `pit(predictive, observations, noise, seed)` | `F(y)`, randomized where draws tie with `y` | Uniform |
+| `pit(predictive, observations, noise)` | `F(y)`, randomized where draws tie with `y`, from the seed of the source (`Calibrator.seed` or `SensitivityAnalysis.seed`): the same draws give the same values | Uniform |
 | `log_score(predictive, observations, DistributionNoise())` | `log Σ_d w_d · p(y | μ_d)`, the log density of `y` under the mixture of the observation models over the draws; another noise raises a `TypeError` | Higher |
 
 ## The entry point

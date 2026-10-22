@@ -30,7 +30,8 @@ const REPLICATES_STREAM: u64 = 2;
 /// The stream of the bootstrap of Sobol.
 const BOOTSTRAP_STREAM: u64 = 3;
 // Stream 4 is the one of the runs of the draws of a predictive and of a
-// propagation (`crate::predictive::DRAWS_STREAM`).
+// propagation (`crate::predictive::DRAWS_STREAM`), and stream 5 the one of
+// the ties of the PIT (`crate::scores::pit`).
 
 /// The draws of a propagation and what each run gives.
 #[derive(Debug, Clone, PartialEq)]

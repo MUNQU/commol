@@ -192,14 +192,15 @@ def pit(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
     noise: ObservationNoise,
-    seed: int,
 ) -> Score:
     """
     The probability integral transform of each observation.
 
     ``F(y)`` of the weighted draws, randomized between ``F(y⁻)`` and ``F(y)``
     where draws tie with ``y``, so a discrete predictive gives uniform values
-    too.
+    too. The ties take their random numbers from the seed of the source of
+    the predictive (``Calibrator.seed`` or ``SensitivityAnalysis.seed``), the
+    seed of the draws, so the same draws give the same values.
 
     Parameters
     ----------
@@ -209,8 +210,6 @@ def pit(
         The observations to score.
     noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
-    seed : int
-        Seed of the randomization of ties.
 
     Returns
     -------
@@ -218,7 +217,7 @@ def pit(
         Values in ``[0, 1]``; calibrated predictions give uniform values.
     """
     draws = predictive.at_observations(observations, noise)
-    return _score(draws, draws.rust_draws.pit(draws.observed, seed))
+    return _score(draws, draws.rust_draws.pit(draws.observed))
 
 
 def log_score(
