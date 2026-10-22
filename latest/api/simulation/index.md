@@ -137,8 +137,8 @@ class Simulation:
         Returns
         -------
         SimulationResults
-            One value per position for each output, the positions, and the
-            seed of a stochastic run.
+            One value per position for each output, the positions, the seed
+            of a stochastic run, and the model.
 
         Raises
         ------
@@ -161,7 +161,11 @@ class Simulation:
         positions, rows = self._engine.run(num_steps)
         logger.info(f"Simulation complete. It took {time.time() - start} seconds.")
         return SimulationResults.from_rows(
-            positions, self._simulation_outputs, rows, seed=used_seed
+            positions,
+            self._simulation_outputs,
+            rows,
+            seed=used_seed,
+            model=self.model_definition,
         )
 
     def run_at(
@@ -186,8 +190,8 @@ class Simulation:
         Returns
         -------
         SimulationResults
-            One value per position for each output, the positions, and the
-            seed of a stochastic run.
+            One value per position for each output, the positions, the seed
+            of a stochastic run, and the model.
 
         Raises
         ------
@@ -209,7 +213,11 @@ class Simulation:
         self._engine.reset()
         rows = self._engine.run_at(positions)
         return SimulationResults.from_rows(
-            positions, self._simulation_outputs, rows, seed=used_seed
+            positions,
+            self._simulation_outputs,
+            rows,
+            seed=used_seed,
+            model=self.model_definition,
         )
 
     def replicates(self, n: int, *, seed: int | None = None) -> "ReplicateRuns":
@@ -321,20 +329,51 @@ class Simulation:
         """
         return {id: self.outputs_for(id) for id in ids}
 
+    def _series_names(self, ids: Iterable[str]) -> list[str]:
+        """
+        The outputs the ids stand for, in the order given.
+
+        A source id, such as a bin or accumulator id, stands for all its
+        outputs (`outputs_for`); an output name stands for itself.
+
+        Raises
+        ------
+        KeyError
+            If an id is neither a source nor an output of the model.
+        """
+        model = self.model_definition
+        by_source = model.structure.outputs_by_source(model)
+        outputs = [name for names in by_source.values() for name in names]
+        names: list[str] = []
+        for id in ids:
+            if id in by_source:
+                names.extend(by_source[id])
+            elif id in outputs:
+                names.append(id)
+            else:
+                raise KeyError(
+                    f"'{id}' is not a bin, accumulator or output of model "
+                    f"'{model.name}'. Bins and accumulators: {sorted(by_source)}. "
+                    f"Outputs: {outputs}"
+                )
+        return names
+
     def total_series(
         self,
         results: Mapping[str, Sequence[float]],
         ids: Iterable[str],
     ) -> list[float]:
         """
-        Sum the outputs of the given bins or accumulators at each position.
+        Sum the given outputs at each position.
 
         Parameters
         ----------
         results : Mapping[str, Sequence[float]]
             Simulation results, such as those of `run` or `run_at`.
         ids : Iterable[str]
-            Bin and accumulator ids whose outputs are summed together.
+            Bin and accumulator ids, each for all its outputs
+            (`outputs_for`), and output names, each for itself. Their outputs
+            are summed together.
 
         Returns
         -------
@@ -344,10 +383,10 @@ class Simulation:
         Raises
         ------
         KeyError
-            If an id is not a bin or accumulator of the model, or an expected
-            output is missing from `results`.
+            If an id is not a bin, accumulator or output of the model, or an
+            expected output is missing from `results`.
         """
-        names = [name for id in ids for name in self.outputs_for(id)]
+        names = self._series_names(ids)
         missing = [name for name in names if name not in results]
         if missing:
             raise KeyError(f"Missing output series in results: {sorted(missing)}")
@@ -373,14 +412,14 @@ class Simulation:
         results : SimulationResults
             Simulation results, with their positions.
         ids : Iterable[str]
-            Accumulator ids whose outputs are summed before windowing.
+            Accumulator ids, each for all its outputs, and output names, each
+            for itself. Their outputs are summed before windowing.
         window : float
             Length of one window on the axis.
         at : Iterable[float] | None, optional
             Positions at which windows close. Defaults to every complete
-            window of the results (:func:`commol.window_ends`). Pass the
-            observation positions to reproduce exactly the values a
-            calibration used.
+            window of the results. Pass the observation positions to
+            reproduce exactly the values a calibration used.
 
         Returns
         -------
@@ -390,8 +429,8 @@ class Simulation:
         Raises
         ------
         KeyError
-            If an id is not a bin or accumulator of the model, or an expected
-            output is missing from `results`.
+            If an id is not a bin, accumulator or output of the model, or an
+            expected output is missing from `results`.
         ValueError
             If `window` is not positive, or the results have no value at the
             end or the start of a requested window.
@@ -399,6 +438,45 @@ class Simulation:
         return windowed_totals(
             self.total_series(results, ids), results.positions, window, at
         )
+
+    def sample(
+        self,
+        results: SimulationResults,
+        ids: Iterable[str],
+        at: Iterable[float],
+    ) -> list[float]:
+        """
+        Value of the given bins and accumulators at each position of `at`.
+
+        A bin holds an amount at a position, so the value is read at that
+        position, not over the window before it; `windowed_totals` reads the
+        gain of an accumulator over a window.
+
+        Parameters
+        ----------
+        results : SimulationResults
+            Simulation results, with their positions.
+        ids : Iterable[str]
+            Bin and accumulator ids, each for all its outputs
+            (`outputs_for`), and output names, each for itself. Their outputs
+            are summed before they are read.
+        at : Iterable[float]
+            Positions to read, each a position of `results`.
+
+        Returns
+        -------
+        list[float]
+            One value per position in `at`.
+
+        Raises
+        ------
+        KeyError
+            If an id is not a bin, accumulator or output of the model, or an
+            expected output is missing from `results`.
+        ValueError
+            If the results have no value at a position in `at`.
+        """
+        return sample(self.total_series(results, ids), results.positions, at)
 ```
 
 ### Attributes
@@ -500,9 +578,9 @@ Parameters:
 
 Returns:
 
-| Type                | Description                                                                              |
-| ------------------- | ---------------------------------------------------------------------------------------- |
-| `SimulationResults` | One value per position for each output, the positions, and the seed of a stochastic run. |
+| Type                | Description                                                                                         |
+| ------------------- | --------------------------------------------------------------------------------------------------- |
+| `SimulationResults` | One value per position for each output, the positions, the seed of a stochastic run, and the model. |
 
 Raises:
 
@@ -537,8 +615,8 @@ def run(self, num_steps: int, *, seed: int | None = None) -> SimulationResults:
     Returns
     -------
     SimulationResults
-        One value per position for each output, the positions, and the
-        seed of a stochastic run.
+        One value per position for each output, the positions, the seed
+        of a stochastic run, and the model.
 
     Raises
     ------
@@ -561,7 +639,11 @@ def run(self, num_steps: int, *, seed: int | None = None) -> SimulationResults:
     positions, rows = self._engine.run(num_steps)
     logger.info(f"Simulation complete. It took {time.time() - start} seconds.")
     return SimulationResults.from_rows(
-        positions, self._simulation_outputs, rows, seed=used_seed
+        positions,
+        self._simulation_outputs,
+        rows,
+        seed=used_seed,
+        model=self.model_definition,
     )
 ```
 
@@ -584,9 +666,9 @@ Parameters:
 
 Returns:
 
-| Type                | Description                                                                              |
-| ------------------- | ---------------------------------------------------------------------------------------- |
-| `SimulationResults` | One value per position for each output, the positions, and the seed of a stochastic run. |
+| Type                | Description                                                                                         |
+| ------------------- | --------------------------------------------------------------------------------------------------- |
+| `SimulationResults` | One value per position for each output, the positions, the seed of a stochastic run, and the model. |
 
 Raises:
 
@@ -621,8 +703,8 @@ def run_at(
     Returns
     -------
     SimulationResults
-        One value per position for each output, the positions, and the
-        seed of a stochastic run.
+        One value per position for each output, the positions, the seed
+        of a stochastic run, and the model.
 
     Raises
     ------
@@ -644,7 +726,11 @@ def run_at(
     self._engine.reset()
     rows = self._engine.run_at(positions)
     return SimulationResults.from_rows(
-        positions, self._simulation_outputs, rows, seed=used_seed
+        positions,
+        self._simulation_outputs,
+        rows,
+        seed=used_seed,
+        model=self.model_definition,
     )
 ```
 
@@ -840,14 +926,14 @@ def group_outputs(self, ids: Iterable[str]) -> dict[str, list[str]]:
 total_series(results: Mapping[str, Sequence[float]], ids: Iterable[str]) -> list[float]
 ```
 
-Sum the outputs of the given bins or accumulators at each position.
+Sum the given outputs at each position.
 
 Parameters:
 
-| Name      | Type                            | Description                                                | Default    |
-| --------- | ------------------------------- | ---------------------------------------------------------- | ---------- |
-| `results` | `Mapping[str, Sequence[float]]` | Simulation results, such as those of run or run_at.        | *required* |
-| `ids`     | `Iterable[str]`                 | Bin and accumulator ids whose outputs are summed together. | *required* |
+| Name      | Type                            | Description                                                                                                                            | Default    |
+| --------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `results` | `Mapping[str, Sequence[float]]` | Simulation results, such as those of run or run_at.                                                                                    | *required* |
+| `ids`     | `Iterable[str]`                 | Bin and accumulator ids, each for all its outputs (outputs_for), and output names, each for itself. Their outputs are summed together. | *required* |
 
 Returns:
 
@@ -857,9 +943,9 @@ Returns:
 
 Raises:
 
-| Type       | Description                                                                                       |
-| ---------- | ------------------------------------------------------------------------------------------------- |
-| `KeyError` | If an id is not a bin or accumulator of the model, or an expected output is missing from results. |
+| Type       | Description                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------------- |
+| `KeyError` | If an id is not a bin, accumulator or output of the model, or an expected output is missing from results. |
 
 Source code in `commol/api/simulation.py`
 
@@ -870,14 +956,16 @@ def total_series(
     ids: Iterable[str],
 ) -> list[float]:
     """
-    Sum the outputs of the given bins or accumulators at each position.
+    Sum the given outputs at each position.
 
     Parameters
     ----------
     results : Mapping[str, Sequence[float]]
         Simulation results, such as those of `run` or `run_at`.
     ids : Iterable[str]
-        Bin and accumulator ids whose outputs are summed together.
+        Bin and accumulator ids, each for all its outputs
+        (`outputs_for`), and output names, each for itself. Their outputs
+        are summed together.
 
     Returns
     -------
@@ -887,10 +975,10 @@ def total_series(
     Raises
     ------
     KeyError
-        If an id is not a bin or accumulator of the model, or an expected
-        output is missing from `results`.
+        If an id is not a bin, accumulator or output of the model, or an
+        expected output is missing from `results`.
     """
-    names = [name for id in ids for name in self.outputs_for(id)]
+    names = self._series_names(ids)
     missing = [name for name in names if name not in results]
     if missing:
         raise KeyError(f"Missing output series in results: {sorted(missing)}")
@@ -912,12 +1000,12 @@ Amount the given accumulators gained over each window.
 
 Parameters:
 
-| Name      | Type                | Description                                                | Default                                                                                                                                                                                           |
-| --------- | ------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `results` | `SimulationResults` | Simulation results, with their positions.                  | *required*                                                                                                                                                                                        |
-| `ids`     | `Iterable[str]`     | Accumulator ids whose outputs are summed before windowing. | *required*                                                                                                                                                                                        |
-| `window`  | `float`             | Length of one window on the axis.                          | *required*                                                                                                                                                                                        |
-| `at`      | \`Iterable[float]   | None\`                                                     | Positions at which windows close. Defaults to every complete window of the results (:func:commol.window_ends). Pass the observation positions to reproduce exactly the values a calibration used. |
+| Name      | Type                | Description                                                                                                              | Default                                                                                                                                                                |
+| --------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `results` | `SimulationResults` | Simulation results, with their positions.                                                                                | *required*                                                                                                                                                             |
+| `ids`     | `Iterable[str]`     | Accumulator ids, each for all its outputs, and output names, each for itself. Their outputs are summed before windowing. | *required*                                                                                                                                                             |
+| `window`  | `float`             | Length of one window on the axis.                                                                                        | *required*                                                                                                                                                             |
+| `at`      | \`Iterable[float]   | None\`                                                                                                                   | Positions at which windows close. Defaults to every complete window of the results. Pass the observation positions to reproduce exactly the values a calibration used. |
 
 Returns:
 
@@ -927,10 +1015,10 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                            |
-| ------------ | ------------------------------------------------------------------------------------------------------ |
-| `KeyError`   | If an id is not a bin or accumulator of the model, or an expected output is missing from results.      |
-| `ValueError` | If window is not positive, or the results have no value at the end or the start of a requested window. |
+| Type         | Description                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------- |
+| `KeyError`   | If an id is not a bin, accumulator or output of the model, or an expected output is missing from results. |
+| `ValueError` | If window is not positive, or the results have no value at the end or the start of a requested window.    |
 
 Source code in `commol/api/simulation.py`
 
@@ -950,14 +1038,14 @@ def windowed_totals(
     results : SimulationResults
         Simulation results, with their positions.
     ids : Iterable[str]
-        Accumulator ids whose outputs are summed before windowing.
+        Accumulator ids, each for all its outputs, and output names, each
+        for itself. Their outputs are summed before windowing.
     window : float
         Length of one window on the axis.
     at : Iterable[float] | None, optional
         Positions at which windows close. Defaults to every complete
-        window of the results (:func:`commol.window_ends`). Pass the
-        observation positions to reproduce exactly the values a
-        calibration used.
+        window of the results. Pass the observation positions to
+        reproduce exactly the values a calibration used.
 
     Returns
     -------
@@ -967,8 +1055,8 @@ def windowed_totals(
     Raises
     ------
     KeyError
-        If an id is not a bin or accumulator of the model, or an expected
-        output is missing from `results`.
+        If an id is not a bin, accumulator or output of the model, or an
+        expected output is missing from `results`.
     ValueError
         If `window` is not positive, or the results have no value at the
         end or the start of a requested window.
@@ -976,6 +1064,80 @@ def windowed_totals(
     return windowed_totals(
         self.total_series(results, ids), results.positions, window, at
     )
+```
+
+#### sample
+
+```python
+sample(results: SimulationResults, ids: Iterable[str], at: Iterable[float]) -> list[float]
+```
+
+Value of the given bins and accumulators at each position of `at`.
+
+A bin holds an amount at a position, so the value is read at that position, not over the window before it; `windowed_totals` reads the gain of an accumulator over a window.
+
+Parameters:
+
+| Name      | Type                | Description                                                                                                                                        | Default    |
+| --------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `results` | `SimulationResults` | Simulation results, with their positions.                                                                                                          | *required* |
+| `ids`     | `Iterable[str]`     | Bin and accumulator ids, each for all its outputs (outputs_for), and output names, each for itself. Their outputs are summed before they are read. | *required* |
+| `at`      | `Iterable[float]`   | Positions to read, each a position of results.                                                                                                     | *required* |
+
+Returns:
+
+| Type          | Description                   |
+| ------------- | ----------------------------- |
+| `list[float]` | One value per position in at. |
+
+Raises:
+
+| Type         | Description                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------- |
+| `KeyError`   | If an id is not a bin, accumulator or output of the model, or an expected output is missing from results. |
+| `ValueError` | If the results have no value at a position in at.                                                         |
+
+Source code in `commol/api/simulation.py`
+
+```python
+def sample(
+    self,
+    results: SimulationResults,
+    ids: Iterable[str],
+    at: Iterable[float],
+) -> list[float]:
+    """
+    Value of the given bins and accumulators at each position of `at`.
+
+    A bin holds an amount at a position, so the value is read at that
+    position, not over the window before it; `windowed_totals` reads the
+    gain of an accumulator over a window.
+
+    Parameters
+    ----------
+    results : SimulationResults
+        Simulation results, with their positions.
+    ids : Iterable[str]
+        Bin and accumulator ids, each for all its outputs
+        (`outputs_for`), and output names, each for itself. Their outputs
+        are summed before they are read.
+    at : Iterable[float]
+        Positions to read, each a position of `results`.
+
+    Returns
+    -------
+    list[float]
+        One value per position in `at`.
+
+    Raises
+    ------
+    KeyError
+        If an id is not a bin, accumulator or output of the model, or an
+        expected output is missing from `results`.
+    ValueError
+        If the results have no value at a position in `at`.
+    """
+    return sample(self.total_series(results, ids), results.positions, at)
 ```
 
 ## SimulationResults
@@ -992,6 +1154,7 @@ Attributes:
 | ----------- | ------------- | ---------------------------------------------------------------------------------------- |
 | `positions` | `list[float]` | Positions on the axis, ascending. results[name][i] is the value of name at positions[i]. |
 | `seed`      | \`int         | None\`                                                                                   |
+| `model`     | \`Model       | None\`                                                                                   |
 
 Source code in `commol/api/results.py`
 
@@ -1013,16 +1176,23 @@ class SimulationResults(dict[str, list[float]]):
     seed : int | None
         The seed of the run of a stochastic engine, which repeats it; None for
         a deterministic engine, whose runs depend on no seed.
+    model : Model | None
+        The model of the run, which `Simulation.run` and `Simulation.run_at`
+        set; None for results built by hand. A report reads the outputs of
+        each bin and accumulator from its structure, never the values of its
+        parameters.
     """
 
     positions: list[float]
     seed: int | None
+    model: "Model | None"
 
     def __init__(
         self,
         positions: Iterable[float],
         values: Mapping[str, Sequence[float]] | None = None,
         seed: int | None = None,
+        model: "Model | None" = None,
     ):
         """
         Results at the given positions.
@@ -1035,6 +1205,8 @@ class SimulationResults(dict[str, list[float]]):
             One value per position for each output.
         seed : int | None, optional
             The seed of the run, or None when it depends on no seed.
+        model : Model | None, optional
+            The model of the run, or None when no model is known.
 
         Raises
         ------
@@ -1046,6 +1218,7 @@ class SimulationResults(dict[str, list[float]]):
         )
         self.positions = [float(position) for position in positions]
         self.seed = seed
+        self.model = model
         for name, series in self.items():
             if len(series) != len(self.positions):
                 raise ValueError(
@@ -1060,6 +1233,7 @@ class SimulationResults(dict[str, list[float]]):
         names: Sequence[str],
         rows: Sequence[Sequence[float]],
         seed: int | None = None,
+        model: "Model | None" = None,
     ) -> "SimulationResults":
         """
         Results from one row of output values per position.
@@ -1074,6 +1248,8 @@ class SimulationResults(dict[str, list[float]]):
             One row per position.
         seed : int | None, optional
             The seed of the run, or None when it depends on no seed.
+        model : Model | None, optional
+            The model of the run, or None when no model is known.
 
         Returns
         -------
@@ -1081,7 +1257,9 @@ class SimulationResults(dict[str, list[float]]):
             One series per output name.
         """
         columns = list(zip(*rows)) if rows else [() for _ in names]
-        return cls(positions, dict(zip(names, columns, strict=True)), seed=seed)
+        return cls(
+            positions, dict(zip(names, columns, strict=True)), seed=seed, model=model
+        )
 
     def rows(self) -> list[list[float]]:
         """
@@ -1095,6 +1273,66 @@ class SimulationResults(dict[str, list[float]]):
             ``positions[i]``.
         """
         return [list(row) for row in zip(*self.values())] if self else []
+
+    def report(
+        self,
+        positions: Sequence[float],
+        window: float,
+        windows: int,
+        observed_data: "Iterable[ObservedDataPoint]" = (),
+        accumulators: Iterable[str] = (),
+        prediction_intervals: "PredictionIntervals | None" = None,
+    ) -> "SimulationReport":
+        """
+        Report the observed data, compartment series and accumulators of the run.
+
+        The blocks share one window axis, so the observed values, the windowed
+        accumulator increments and the sampled series can be read against
+        each other. Add whatever envelope you need around them, such as a run
+        label, axis labels or summary figures in the terms of your domain.
+
+        Parameters
+        ----------
+        positions : Sequence[float]
+            Positions the series and cumulative accumulators are sampled at;
+            each must be a position of the results.
+        window : float
+            Length of one window on the axis.
+        windows : int
+            Number of windows on the observed and windowed axes.
+        observed_data : Iterable[ObservedDataPoint], optional
+            The calibration targets to report alongside the run.
+        accumulators : Iterable[str], optional
+            Accumulator ids to report; their outputs come from `model`.
+        prediction_intervals : PredictionIntervals | None, optional
+            Prediction intervals of a conformal method
+            (``ConformalResult.intervals``), reported as they are.
+
+        Returns
+        -------
+        SimulationReport
+            Keys ``observed``, ``series`` and ``accumulators``, then
+            ``prediction_intervals`` when they are given.
+
+        Raises
+        ------
+        ValueError
+            If the results have no value at a position the report reads, or
+            they have no `model` and an accumulator is reported.
+        KeyError
+            If an accumulator is not a bin or accumulator of the model.
+        """
+        from commol.api.reporting import _ReportRuns, _simulation_report
+
+        return _simulation_report(
+            _ReportRuns(model=self.model, runs=[self]),
+            positions,
+            window,
+            windows,
+            observed_data,
+            accumulators,
+            prediction_intervals,
+        )
 
     def __repr__(self) -> str:
         """The positions, the seed and the values."""
@@ -1110,7 +1348,7 @@ class SimulationResults(dict[str, list[float]]):
 #### __init__
 
 ```python
-__init__(positions: Iterable[float], values: Mapping[str, Sequence[float]] | None = None, seed: int | None = None)
+__init__(positions: Iterable[float], values: Mapping[str, Sequence[float]] | None = None, seed: int | None = None, model: Model | None = None)
 ```
 
 Results at the given positions.
@@ -1122,6 +1360,7 @@ Parameters:
 | `positions` | `Iterable[float]`                 | Positions on the axis, ascending. | *required*                                               |
 | `values`    | \`Mapping\[str, Sequence[float]\] | None\`                            | One value per position for each output.                  |
 | `seed`      | \`int                             | None\`                            | The seed of the run, or None when it depends on no seed. |
+| `model`     | \`Model                           | None\`                            | The model of the run, or None when no model is known.    |
 
 Raises:
 
@@ -1137,6 +1376,7 @@ def __init__(
     positions: Iterable[float],
     values: Mapping[str, Sequence[float]] | None = None,
     seed: int | None = None,
+    model: "Model | None" = None,
 ):
     """
     Results at the given positions.
@@ -1149,6 +1389,8 @@ def __init__(
         One value per position for each output.
     seed : int | None, optional
         The seed of the run, or None when it depends on no seed.
+    model : Model | None, optional
+        The model of the run, or None when no model is known.
 
     Raises
     ------
@@ -1160,6 +1402,7 @@ def __init__(
     )
     self.positions = [float(position) for position in positions]
     self.seed = seed
+    self.model = model
     for name, series in self.items():
         if len(series) != len(self.positions):
             raise ValueError(
@@ -1171,7 +1414,7 @@ def __init__(
 #### from_rows
 
 ```python
-from_rows(positions: Sequence[float], names: Sequence[str], rows: Sequence[Sequence[float]], seed: int | None = None) -> SimulationResults
+from_rows(positions: Sequence[float], names: Sequence[str], rows: Sequence[Sequence[float]], seed: int | None = None, model: Model | None = None) -> SimulationResults
 ```
 
 Results from one row of output values per position.
@@ -1184,6 +1427,7 @@ Parameters:
 | `names`     | `Sequence[str]`             | Output names, in the order of each row. | *required*                                               |
 | `rows`      | `Sequence[Sequence[float]]` | One row per position.                   | *required*                                               |
 | `seed`      | \`int                       | None\`                                  | The seed of the run, or None when it depends on no seed. |
+| `model`     | \`Model                     | None\`                                  | The model of the run, or None when no model is known.    |
 
 Returns:
 
@@ -1201,6 +1445,7 @@ def from_rows(
     names: Sequence[str],
     rows: Sequence[Sequence[float]],
     seed: int | None = None,
+    model: "Model | None" = None,
 ) -> "SimulationResults":
     """
     Results from one row of output values per position.
@@ -1215,6 +1460,8 @@ def from_rows(
         One row per position.
     seed : int | None, optional
         The seed of the run, or None when it depends on no seed.
+    model : Model | None, optional
+        The model of the run, or None when no model is known.
 
     Returns
     -------
@@ -1222,7 +1469,9 @@ def from_rows(
         One series per output name.
     """
     columns = list(zip(*rows)) if rows else [() for _ in names]
-    return cls(positions, dict(zip(names, columns, strict=True)), seed=seed)
+    return cls(
+        positions, dict(zip(names, columns, strict=True)), seed=seed, model=model
+    )
 ```
 
 #### rows
@@ -1254,6 +1503,104 @@ def rows(self) -> list[list[float]]:
         ``positions[i]``.
     """
     return [list(row) for row in zip(*self.values())] if self else []
+```
+
+#### report
+
+```python
+report(positions: Sequence[float], window: float, windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), prediction_intervals: PredictionIntervals | None = None) -> SimulationReport
+```
+
+Report the observed data, compartment series and accumulators of the run.
+
+The blocks share one window axis, so the observed values, the windowed accumulator increments and the sampled series can be read against each other. Add whatever envelope you need around them, such as a run label, axis labels or summary figures in the terms of your domain.
+
+Parameters:
+
+| Name                   | Type                          | Description                                                                                              | Default                                                                                       |
+| ---------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `positions`            | `Sequence[float]`             | Positions the series and cumulative accumulators are sampled at; each must be a position of the results. | *required*                                                                                    |
+| `window`               | `float`                       | Length of one window on the axis.                                                                        | *required*                                                                                    |
+| `windows`              | `int`                         | Number of windows on the observed and windowed axes.                                                     | *required*                                                                                    |
+| `observed_data`        | `Iterable[ObservedDataPoint]` | The calibration targets to report alongside the run.                                                     | `()`                                                                                          |
+| `accumulators`         | `Iterable[str]`               | Accumulator ids to report; their outputs come from model.                                                | `()`                                                                                          |
+| `prediction_intervals` | \`PredictionIntervals         | None\`                                                                                                   | Prediction intervals of a conformal method (ConformalResult.intervals), reported as they are. |
+
+Returns:
+
+| Type               | Description                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| `SimulationReport` | Keys observed, series and accumulators, then prediction_intervals when they are given. |
+
+Raises:
+
+| Type         | Description                                                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `ValueError` | If the results have no value at a position the report reads, or they have no model and an accumulator is reported. |
+| `KeyError`   | If an accumulator is not a bin or accumulator of the model.                                                        |
+
+Source code in `commol/api/results.py`
+
+```python
+def report(
+    self,
+    positions: Sequence[float],
+    window: float,
+    windows: int,
+    observed_data: "Iterable[ObservedDataPoint]" = (),
+    accumulators: Iterable[str] = (),
+    prediction_intervals: "PredictionIntervals | None" = None,
+) -> "SimulationReport":
+    """
+    Report the observed data, compartment series and accumulators of the run.
+
+    The blocks share one window axis, so the observed values, the windowed
+    accumulator increments and the sampled series can be read against
+    each other. Add whatever envelope you need around them, such as a run
+    label, axis labels or summary figures in the terms of your domain.
+
+    Parameters
+    ----------
+    positions : Sequence[float]
+        Positions the series and cumulative accumulators are sampled at;
+        each must be a position of the results.
+    window : float
+        Length of one window on the axis.
+    windows : int
+        Number of windows on the observed and windowed axes.
+    observed_data : Iterable[ObservedDataPoint], optional
+        The calibration targets to report alongside the run.
+    accumulators : Iterable[str], optional
+        Accumulator ids to report; their outputs come from `model`.
+    prediction_intervals : PredictionIntervals | None, optional
+        Prediction intervals of a conformal method
+        (``ConformalResult.intervals``), reported as they are.
+
+    Returns
+    -------
+    SimulationReport
+        Keys ``observed``, ``series`` and ``accumulators``, then
+        ``prediction_intervals`` when they are given.
+
+    Raises
+    ------
+    ValueError
+        If the results have no value at a position the report reads, or
+        they have no `model` and an accumulator is reported.
+    KeyError
+        If an accumulator is not a bin or accumulator of the model.
+    """
+    from commol.api.reporting import _ReportRuns, _simulation_report
+
+    return _simulation_report(
+        _ReportRuns(model=self.model, runs=[self]),
+        positions,
+        window,
+        windows,
+        observed_data,
+        accumulators,
+        prediction_intervals,
+    )
 ```
 
 #### __repr__
@@ -1329,15 +1676,17 @@ class ReplicateRuns:
         engine = simulation.engine
         positions, seeds, runs = engine.run_replicates(self.seed, self.n, grid)
         outputs = simulation.simulation_outputs
+        model = simulation.model_definition
         return SimulationReplicates(
             (
                 SimulationResults.from_rows(
-                    positions, outputs, rows, seed=replicate_seed
+                    positions, outputs, rows, seed=replicate_seed, model=model
                 )
                 for replicate_seed, rows in zip(seeds, runs, strict=True)
             ),
             seed=self.seed,
             positions=positions,
+            model=model,
         )
 
     def run(self, num_steps: int) -> SimulationReplicates:
@@ -1552,6 +1901,7 @@ Attributes:
 | ----------- | ------------- | ------------------------------------------------- |
 | `seed`      | `int`         | The seed the replicate seeds derive from.         |
 | `positions` | `list[float]` | Positions on the axis, shared by every replicate. |
+| `model`     | \`Model       | None\`                                            |
 
 Source code in `commol/api/results.py`
 
@@ -1571,13 +1921,21 @@ class SimulationReplicates(list[SimulationResults]):
         The seed the replicate seeds derive from.
     positions : list[float]
         Positions on the axis, shared by every replicate.
+    model : Model | None
+        The model of the replicates, which `Simulation.replicates` sets; None
+        for replicates built by hand.
     """
 
     seed: int
     positions: list[float]
+    model: "Model | None"
 
     def __init__(
-        self, runs: Iterable[SimulationResults], seed: int, positions: Sequence[float]
+        self,
+        runs: Iterable[SimulationResults],
+        seed: int,
+        positions: Sequence[float],
+        model: "Model | None" = None,
     ):
         """
         Replicates of one run.
@@ -1590,6 +1948,8 @@ class SimulationReplicates(list[SimulationResults]):
             The seed the replicate seeds derive from.
         positions : Sequence[float]
             Positions on the axis, ascending.
+        model : Model | None, optional
+            The model of the replicates, or None when no model is known.
 
         Raises
         ------
@@ -1599,6 +1959,7 @@ class SimulationReplicates(list[SimulationResults]):
         super().__init__(runs)
         self.seed = seed
         self.positions = [float(position) for position in positions]
+        self.model = model
         for index, run in enumerate(self):
             if run.positions != self.positions:
                 raise ValueError(
@@ -1633,6 +1994,7 @@ class SimulationReplicates(list[SimulationResults]):
         return SimulationResults(
             self.positions,
             {name: self._values(name).mean(axis=0).tolist() for name in names},
+            model=self.model,
         )
 
     def quantiles(self, levels: Sequence[float]) -> dict[float, SimulationResults]:
@@ -1680,6 +2042,7 @@ class SimulationReplicates(list[SimulationResults]):
                     name: [at_position[index] for at_position in per_name[name]]
                     for name in names
                 },
+                model=self.model,
             )
             for index, level in enumerate(levels)
         }
@@ -1720,6 +2083,76 @@ class SimulationReplicates(list[SimulationResults]):
             )
         return member_statistics([run[output] for run in self], confidence_level)
 
+    def report(
+        self,
+        confidence_level: float,
+        positions: Sequence[float],
+        window: float,
+        windows: int,
+        observed_data: "Iterable[ObservedDataPoint]" = (),
+        accumulators: Iterable[str] = (),
+        prediction_intervals: "PredictionIntervals | None" = None,
+    ) -> "SimulationReport":
+        """
+        Report the replicates as `SimulationResults.report` reports one run.
+
+        Every number becomes a ``{mean, median, ci_lower, ci_upper, min,
+        max}`` block, reduced replicate by replicate; the layout is the one of
+        the report of a run.
+
+        Parameters
+        ----------
+        confidence_level : float
+            Confidence level of the reported intervals, strictly between 0
+            and 1.
+        positions : Sequence[float]
+            Positions the series and cumulative accumulators are sampled at;
+            each must be a position of the replicates.
+        window : float
+            Length of one window on the axis.
+        windows : int
+            Number of windows on the observed and windowed axes.
+        observed_data : Iterable[ObservedDataPoint], optional
+            The calibration targets to report alongside the replicates.
+        accumulators : Iterable[str], optional
+            Accumulator ids to report; their outputs come from `model`.
+        prediction_intervals : PredictionIntervals | None, optional
+            Prediction intervals of a conformal method
+            (``ConformalResult.intervals``), reported as they are.
+
+        Returns
+        -------
+        SimulationReport
+            Keys ``observed``, ``series`` and ``accumulators``, then
+            ``prediction_intervals`` when they are given.
+
+        Raises
+        ------
+        ValueError
+            If there are no replicates, the confidence level is out of range,
+            the replicates have no value at a position the report reads, or
+            they have no `model` and an accumulator is reported.
+        KeyError
+            If an accumulator is not a bin or accumulator of the model.
+        """
+        from commol.api.reporting import _ReportRuns, _simulation_report
+
+        if not self:
+            raise ValueError("There are no replicates.")
+        return _simulation_report(
+            _ReportRuns(
+                model=self.model,
+                runs=list(self),
+                confidence_level=confidence_level,
+            ),
+            positions,
+            window,
+            windows,
+            observed_data,
+            accumulators,
+            prediction_intervals,
+        )
+
     def __repr__(self) -> str:
         """The number of replicates, their seed and their positions."""
         return (
@@ -1743,18 +2176,19 @@ The seed of each replicate, in order.
 #### __init__
 
 ```python
-__init__(runs: Iterable[SimulationResults], seed: int, positions: Sequence[float])
+__init__(runs: Iterable[SimulationResults], seed: int, positions: Sequence[float], model: Model | None = None)
 ```
 
 Replicates of one run.
 
 Parameters:
 
-| Name        | Type                          | Description                               | Default    |
-| ----------- | ----------------------------- | ----------------------------------------- | ---------- |
-| `runs`      | `Iterable[SimulationResults]` | One run per replicate, at positions.      | *required* |
-| `seed`      | `int`                         | The seed the replicate seeds derive from. | *required* |
-| `positions` | `Sequence[float]`             | Positions on the axis, ascending.         | *required* |
+| Name        | Type                          | Description                               | Default                                                      |
+| ----------- | ----------------------------- | ----------------------------------------- | ------------------------------------------------------------ |
+| `runs`      | `Iterable[SimulationResults]` | One run per replicate, at positions.      | *required*                                                   |
+| `seed`      | `int`                         | The seed the replicate seeds derive from. | *required*                                                   |
+| `positions` | `Sequence[float]`             | Positions on the axis, ascending.         | *required*                                                   |
+| `model`     | \`Model                       | None\`                                    | The model of the replicates, or None when no model is known. |
 
 Raises:
 
@@ -1766,7 +2200,11 @@ Source code in `commol/api/results.py`
 
 ```python
 def __init__(
-    self, runs: Iterable[SimulationResults], seed: int, positions: Sequence[float]
+    self,
+    runs: Iterable[SimulationResults],
+    seed: int,
+    positions: Sequence[float],
+    model: "Model | None" = None,
 ):
     """
     Replicates of one run.
@@ -1779,6 +2217,8 @@ def __init__(
         The seed the replicate seeds derive from.
     positions : Sequence[float]
         Positions on the axis, ascending.
+    model : Model | None, optional
+        The model of the replicates, or None when no model is known.
 
     Raises
     ------
@@ -1788,6 +2228,7 @@ def __init__(
     super().__init__(runs)
     self.seed = seed
     self.positions = [float(position) for position in positions]
+    self.model = model
     for index, run in enumerate(self):
         if run.positions != self.positions:
             raise ValueError(
@@ -1838,6 +2279,7 @@ def mean(self) -> SimulationResults:
     return SimulationResults(
         self.positions,
         {name: self._values(name).mean(axis=0).tolist() for name in names},
+        model=self.model,
     )
 ```
 
@@ -1917,6 +2359,7 @@ def quantiles(self, levels: Sequence[float]) -> dict[float, SimulationResults]:
                 name: [at_position[index] for at_position in per_name[name]]
                 for name in names
             },
+            model=self.model,
         )
         for index, level in enumerate(levels)
     }
@@ -1988,6 +2431,115 @@ def member_statistics(
             f"Outputs: {sorted(self[0])}"
         )
     return member_statistics([run[output] for run in self], confidence_level)
+```
+
+#### report
+
+```python
+report(confidence_level: float, positions: Sequence[float], window: float, windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), prediction_intervals: PredictionIntervals | None = None) -> SimulationReport
+```
+
+Report the replicates as `SimulationResults.report` reports one run.
+
+Every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block, reduced replicate by replicate; the layout is the one of the report of a run.
+
+Parameters:
+
+| Name                   | Type                          | Description                                                                                                 | Default                                                                                       |
+| ---------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `confidence_level`     | `float`                       | Confidence level of the reported intervals, strictly between 0 and 1.                                       | *required*                                                                                    |
+| `positions`            | `Sequence[float]`             | Positions the series and cumulative accumulators are sampled at; each must be a position of the replicates. | *required*                                                                                    |
+| `window`               | `float`                       | Length of one window on the axis.                                                                           | *required*                                                                                    |
+| `windows`              | `int`                         | Number of windows on the observed and windowed axes.                                                        | *required*                                                                                    |
+| `observed_data`        | `Iterable[ObservedDataPoint]` | The calibration targets to report alongside the replicates.                                                 | `()`                                                                                          |
+| `accumulators`         | `Iterable[str]`               | Accumulator ids to report; their outputs come from model.                                                   | `()`                                                                                          |
+| `prediction_intervals` | \`PredictionIntervals         | None\`                                                                                                      | Prediction intervals of a conformal method (ConformalResult.intervals), reported as they are. |
+
+Returns:
+
+| Type               | Description                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| `SimulationReport` | Keys observed, series and accumulators, then prediction_intervals when they are given. |
+
+Raises:
+
+| Type         | Description                                                                                                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ValueError` | If there are no replicates, the confidence level is out of range, the replicates have no value at a position the report reads, or they have no model and an accumulator is reported. |
+| `KeyError`   | If an accumulator is not a bin or accumulator of the model.                                                                                                                          |
+
+Source code in `commol/api/results.py`
+
+```python
+def report(
+    self,
+    confidence_level: float,
+    positions: Sequence[float],
+    window: float,
+    windows: int,
+    observed_data: "Iterable[ObservedDataPoint]" = (),
+    accumulators: Iterable[str] = (),
+    prediction_intervals: "PredictionIntervals | None" = None,
+) -> "SimulationReport":
+    """
+    Report the replicates as `SimulationResults.report` reports one run.
+
+    Every number becomes a ``{mean, median, ci_lower, ci_upper, min,
+    max}`` block, reduced replicate by replicate; the layout is the one of
+    the report of a run.
+
+    Parameters
+    ----------
+    confidence_level : float
+        Confidence level of the reported intervals, strictly between 0
+        and 1.
+    positions : Sequence[float]
+        Positions the series and cumulative accumulators are sampled at;
+        each must be a position of the replicates.
+    window : float
+        Length of one window on the axis.
+    windows : int
+        Number of windows on the observed and windowed axes.
+    observed_data : Iterable[ObservedDataPoint], optional
+        The calibration targets to report alongside the replicates.
+    accumulators : Iterable[str], optional
+        Accumulator ids to report; their outputs come from `model`.
+    prediction_intervals : PredictionIntervals | None, optional
+        Prediction intervals of a conformal method
+        (``ConformalResult.intervals``), reported as they are.
+
+    Returns
+    -------
+    SimulationReport
+        Keys ``observed``, ``series`` and ``accumulators``, then
+        ``prediction_intervals`` when they are given.
+
+    Raises
+    ------
+    ValueError
+        If there are no replicates, the confidence level is out of range,
+        the replicates have no value at a position the report reads, or
+        they have no `model` and an accumulator is reported.
+    KeyError
+        If an accumulator is not a bin or accumulator of the model.
+    """
+    from commol.api.reporting import _ReportRuns, _simulation_report
+
+    if not self:
+        raise ValueError("There are no replicates.")
+    return _simulation_report(
+        _ReportRuns(
+            model=self.model,
+            runs=list(self),
+            confidence_level=confidence_level,
+        ),
+        positions,
+        window,
+        windows,
+        observed_data,
+        accumulators,
+        prediction_intervals,
+    )
 ```
 
 #### __repr__
@@ -2154,240 +2706,7 @@ A run left the values its model allows, such as an amount below zero.
 
 A difference-equations step that leaves a compartment below zero raises it. It is a `ValueError`; a calibration treats such a run as infeasible.
 
-## Windows
-
-## window_start
-
-```python
-window_start(index: int, window: float) -> float
-```
-
-Position at which a window opens.
-
-Parameters:
-
-| Name     | Type    | Description                       | Default    |
-| -------- | ------- | --------------------------------- | ---------- |
-| `index`  | `int`   | Zero-based window index.          | *required* |
-| `window` | `float` | Length of one window on the axis. | *required* |
-
-Returns:
-
-| Type    | Description     |
-| ------- | --------------- |
-| `float` | index * window. |
-
-Raises:
-
-| Type         | Description                                     |
-| ------------ | ----------------------------------------------- |
-| `ValueError` | If window is not positive or index is negative. |
-
-Source code in `commol/api/windows.py`
-
-```python
-def window_start(index: int, window: float) -> float:
-    """
-    Position at which a window opens.
-
-    Parameters
-    ----------
-    index : int
-        Zero-based window index.
-    window : float
-        Length of one window on the axis.
-
-    Returns
-    -------
-    float
-        ``index * window``.
-
-    Raises
-    ------
-    ValueError
-        If `window` is not positive or `index` is negative.
-    """
-    _check_window(window)
-    if index < 0:
-        raise ValueError(f"index must not be negative, got {index}.")
-    return index * window
-```
-
-## window_end
-
-```python
-window_end(index: int, window: float) -> float
-```
-
-Position at which a window closes, equal to the start of the next.
-
-Parameters:
-
-| Name     | Type    | Description                       | Default    |
-| -------- | ------- | --------------------------------- | ---------- |
-| `index`  | `int`   | Zero-based window index.          | *required* |
-| `window` | `float` | Length of one window on the axis. | *required* |
-
-Returns:
-
-| Type    | Description           |
-| ------- | --------------------- |
-| `float` | (index + 1) * window. |
-
-Raises:
-
-| Type         | Description                                     |
-| ------------ | ----------------------------------------------- |
-| `ValueError` | If window is not positive or index is negative. |
-
-Source code in `commol/api/windows.py`
-
-```python
-def window_end(index: int, window: float) -> float:
-    """
-    Position at which a window closes, equal to the start of the next.
-
-    Parameters
-    ----------
-    index : int
-        Zero-based window index.
-    window : float
-        Length of one window on the axis.
-
-    Returns
-    -------
-    float
-        ``(index + 1) * window``.
-
-    Raises
-    ------
-    ValueError
-        If `window` is not positive or `index` is negative.
-    """
-    return window_start(index + 1, window)
-```
-
-## window_index
-
-```python
-window_index(at: float, window: float) -> int
-```
-
-Window a position belongs to.
-
-The exact inverse of :func:`window_end`, and the containing window for any position in between: `max(ceil(at / window) - 1, 0)`. Position 0 belongs to window 0. :func:`commol.api.reporting.observed_report` places each observation with this rule.
-
-Parameters:
-
-| Name     | Type    | Description                       | Default    |
-| -------- | ------- | --------------------------------- | ---------- |
-| `at`     | `float` | A position on the axis.           | *required* |
-| `window` | `float` | Length of one window on the axis. | *required* |
-
-Returns:
-
-| Type  | Description              |
-| ----- | ------------------------ |
-| `int` | Zero-based window index. |
-
-Raises:
-
-| Type         | Description                                  |
-| ------------ | -------------------------------------------- |
-| `ValueError` | If window is not positive or at is negative. |
-
-Source code in `commol/api/windows.py`
-
-```python
-def window_index(at: float, window: float) -> int:
-    """
-    Window a position belongs to.
-
-    The exact inverse of :func:`window_end`, and the containing window for
-    any position in between: ``max(ceil(at / window) - 1, 0)``. Position 0
-    belongs to window 0. :func:`commol.api.reporting.observed_report` places
-    each observation with this rule.
-
-    Parameters
-    ----------
-    at : float
-        A position on the axis.
-    window : float
-        Length of one window on the axis.
-
-    Returns
-    -------
-    int
-        Zero-based window index.
-
-    Raises
-    ------
-    ValueError
-        If `window` is not positive or `at` is negative.
-    """
-    _check_window(window)
-    if not at >= 0:
-        raise ValueError(f"at must not be negative, got {at}.")
-    return max(math.ceil(_windows_in(at, window)) - 1, 0)
-```
-
-## window_ends
-
-```python
-window_ends(window: float, end: float) -> list[float]
-```
-
-Positions closing each complete window up to a position.
-
-Parameters:
-
-| Name     | Type    | Description                                                | Default    |
-| -------- | ------- | ---------------------------------------------------------- | ---------- |
-| `window` | `float` | Length of one window on the axis.                          | *required* |
-| `end`    | `float` | Last position covered, such as the last position of a run. | *required* |
-
-Returns:
-
-| Type          | Description                                                                   |
-| ------------- | ----------------------------------------------------------------------------- |
-| `list[float]` | window, 2 * window, ... up to end. A trailing partial window is not included. |
-
-Raises:
-
-| Type         | Description                |
-| ------------ | -------------------------- |
-| `ValueError` | If window is not positive. |
-
-Source code in `commol/api/windows.py`
-
-```python
-def window_ends(window: float, end: float) -> list[float]:
-    """
-    Positions closing each complete window up to a position.
-
-    Parameters
-    ----------
-    window : float
-        Length of one window on the axis.
-    end : float
-        Last position covered, such as the last position of a run.
-
-    Returns
-    -------
-    list[float]
-        ``window``, ``2 * window``, ... up to `end`. A trailing partial window
-        is not included.
-
-    Raises
-    ------
-    ValueError
-        If `window` is not positive.
-    """
-    _check_window(window)
-    # A non-positive end has no window: range() of a count below 1 is empty.
-    count = math.floor(_windows_in(end, window))
-    return [window_end(index, window) for index in range(count)]
-```
+## Windows and positions
 
 ## windowed_totals
 
@@ -2461,7 +2780,7 @@ def windowed_totals(
         If `window` is not positive, a window starts before position 0, or the
         series has no value at the end or the start of a requested window.
     """
-    _check_window(window)
+    check_window(window)
     ends = (
         window_ends(window, positions[-1] if positions else 0.0)
         if at is None
@@ -2480,4 +2799,68 @@ def windowed_totals(
             - series[index_at(positions, max(start, 0.0))]
         )
     return totals
+```
+
+## sample
+
+```python
+sample(series: Sequence[float], positions: Sequence[float], at: Iterable[float]) -> list[float]
+```
+
+Read a series at the given positions.
+
+Compartment counts are instantaneous, so they are read at the position rather than averaged over the interval leading to it.
+
+Parameters:
+
+| Name        | Type              | Description                         | Default    |
+| ----------- | ----------------- | ----------------------------------- | ---------- |
+| `series`    | `Sequence[float]` | One value per position.             | *required* |
+| `positions` | `Sequence[float]` | Positions of the series, ascending. | *required* |
+| `at`        | `Iterable[float]` | Positions to read.                  | *required* |
+
+Returns:
+
+| Type          | Description                   |
+| ------------- | ----------------------------- |
+| `list[float]` | One value per position in at. |
+
+Raises:
+
+| Type         | Description                                  |
+| ------------ | -------------------------------------------- |
+| `ValueError` | If a position in at is not one of positions. |
+
+Source code in `commol/api/results.py`
+
+```python
+def sample(
+    series: Sequence[float], positions: Sequence[float], at: Iterable[float]
+) -> list[float]:
+    """
+    Read a series at the given positions.
+
+    Compartment counts are instantaneous, so they are read at the position
+    rather than averaged over the interval leading to it.
+
+    Parameters
+    ----------
+    series : Sequence[float]
+        One value per position.
+    positions : Sequence[float]
+        Positions of the series, ascending.
+    at : Iterable[float]
+        Positions to read.
+
+    Returns
+    -------
+    list[float]
+        One value per position in `at`.
+
+    Raises
+    ------
+    ValueError
+        If a position in `at` is not one of `positions`.
+    """
+    return [series[index_at(positions, position)] for position in at]
 ```

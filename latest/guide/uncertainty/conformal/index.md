@@ -235,7 +235,7 @@ print(round(sum(misses) / len(misses), 3))  # 0.125
 
 ## Results, plots and reports
 
-Every variant returns a `ConformalResult(intervals, scores, guarantee)`. `intervals` is a `PredictionIntervals`: its `level`, a `SeriesIntervals` per series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`. `SimulationPlotter.plot_series(prediction_intervals=...)` draws the band of each series on its subplot, and `simulation_report(..., prediction_intervals=...)` adds it under the key `prediction_intervals`.
+Every variant returns a `ConformalResult(intervals, scores, guarantee)`. `intervals` is a `PredictionIntervals`: its `level`, a `SeriesIntervals` per series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`. `SimulationPlotter.plot_series(prediction_intervals=...)` draws the band of each series on its subplot, and `SimulationResults.report(..., prediction_intervals=...)` adds it under the key `prediction_intervals`.
 
 ```python
 from commol.api.plotter import SimulationPlotter

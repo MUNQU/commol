@@ -53,12 +53,13 @@ builder = ModelBuilder(
 )
 ```
 
-| Argument      | Type          | Default  | Meaning                                                                                                                                    |
-| ------------- | ------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `name`        | `str`         | required | The model name.                                                                                                                            |
-| `description` | `str \| None` | `None`   | A free-text description.                                                                                                                   |
-| `version`     | `str \| None` | `None`   | A version label for your own tracking.                                                                                                     |
-| `bin_unit`    | `str \| None` | `None`   | The default unit of every bin. It enables [unit checking](https://munqu.github.io/commol/latest/guide/units-and-equations/#unit-checking). |
+| Argument      | Type                       | Default  | Meaning                                                                                                                                                                                 |
+| ------------- | -------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`        | `str`                      | required | The model name.                                                                                                                                                                         |
+| `description` | `str \| None`              | `None`   | A free-text description.                                                                                                                                                                |
+| `version`     | `str \| None`              | `None`   | A version label for your own tracking.                                                                                                                                                  |
+| `bin_unit`    | `str \| None`              | `None`   | The default unit of every bin. It enables [unit checking](https://munqu.github.io/commol/latest/guide/units-and-equations/#unit-checking).                                              |
+| `origin`      | `date \| datetime \| None` | `None`   | The calendar moment of position 0, with no time zone, for an axis of time. See [Dates on the axis](https://munqu.github.io/commol/latest/guide/units-and-equations/#dates-on-the-axis). |
 
 Every `add_*` method returns the builder, so calls chain. The other methods:
 

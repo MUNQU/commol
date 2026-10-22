@@ -3545,7 +3545,7 @@
 </tr>
 <tr>
 <td><code>api/results.py</code></td>
-<td><code>SimulationResults</code> (values with their positions and seed), <code>SimulationReplicates</code> (runs with one seed each, and their statistics), <code>index_at</code>, <code>sample</code>.</td>
+<td><code>SimulationResults</code> (values with their positions, seed and model, and its <code>report</code>), <code>SimulationReplicates</code> (runs with one seed each, their statistics and their <code>report</code>), <code>index_at</code>, <code>sample</code>.</td>
 <td>Engine rules.</td>
 </tr>
 <tr>
@@ -3565,12 +3565,12 @@
 </tr>
 <tr>
 <td><code>api/reporting.py</code></td>
-<td><code>simulation_report</code> and <code>applied_parameters_report</code>, with the sections the structure adds (<code>ModelStructure.report_sections</code>).</td>
-<td>Domain vocabulary; sections of one model kind.</td>
+<td>The private functions that build the blocks of the reports: of a run and of an ensemble (<code>_simulation_report</code>, for <code>SimulationResults.report</code>, <code>SimulationReplicates.report</code> and <code>Predictive.report</code>), of the applied parameters (<code>_applied_parameters_report</code>, for <code>Model.applied_parameters</code>, with the sections the structure adds, <code>ModelStructure.report_sections</code>) and of an identifiability analysis (<code>_identifiability_report</code>, for <code>IdentifiabilityReport.report</code>).</td>
+<td>Domain vocabulary; sections of one model kind; a public report function.</td>
 </tr>
 <tr>
 <td><code>api/patterns.py</code>, <code>api/windows.py</code></td>
-<td>Rates that change along the axis (<code>AxisPattern</code>), the window grid and windowed totals.</td>
+<td>Rates that change along the axis (<code>AxisPattern</code>), and windowed totals.</td>
 <td>Physical units inside the model.</td>
 </tr>
 <tr>
@@ -3640,8 +3640,13 @@
 </tr>
 <tr>
 <td><code>context/axis_units.py</code></td>
-<td><code>AxisUnits</code>: values in units to steps of the axis, and rates asked from the engine (<code>Model.axis_units</code>).</td>
+<td><code>AxisUnits</code>: values in units to steps of the axis, rates asked from the engine (<code>Model.axis_units</code>), the window grid of a width in a unit, and the calendar of an axis with an origin (dates to positions, ends of days and weeks).</td>
 <td>Formulas of a rate per engine (they are in <code>RateMeaning</code>).</td>
+</tr>
+<tr>
+<td><code>context/_windows.py</code></td>
+<td>The window grid in steps, private: what <code>AxisUnits</code>, <code>windowed_totals</code> and the reports read.</td>
+<td>Public API; units.</td>
 </tr>
 <tr>
 <td><code>context/engine.py</code></td>
@@ -3887,8 +3892,8 @@
 </tr>
 <tr>
 <td>Change reports</td>
-<td><code>py-commol/commol/api/reporting.py</code></td>
-<td><code>ModelStructure.report_sections</code>, <code>context/_model/report.py</code>, <code>docs/codebase/decisions/results.md</code> (Reports)</td>
+<td><code>py-commol/commol/api/reporting.py</code> (the blocks)</td>
+<td>the methods that call it (<code>api/results.py</code>: <code>SimulationResults.report</code>, <code>SimulationReplicates.report</code>; <code>api/inference/predictive.py</code>: <code>Predictive.report</code>; <code>context/model.py</code>: <code>Model.applied_parameters</code>; <code>context/inference/identifiability.py</code>: <code>IdentifiabilityReport.report</code>), <code>ModelStructure.report_sections</code>, <code>context/_model/report.py</code>, <code>docs/codebase/decisions/results.md</code> (Reports)</td>
 </tr>
 </tbody>
 </table>

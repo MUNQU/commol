@@ -33,7 +33,6 @@ from commol import (
     Simulation,
     StartsIdentifiability,
     StructuralRank,
-    identifiability_report,
 )
 
 
@@ -204,10 +203,10 @@ A parameter is `poorly_determined` when it is in a correlated pair or its margin
 
 ## The report
 
-An `IdentifiabilityReport` holds, for each parameter, a **structural** and a **practical** verdict, and the sections of the methods that ran (`structural`, `collinearity`, `sample`, `starts`, `profile`). The profiles of a `ProfileLikelihood` give their report with `ProfileResult.report()`; a flat profile gives the structural verdict `in_combination` when resetting the other parameters to their fitted values breaks it, and `non_identifiable` when nothing the data read depends on the parameter ([Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#verdicts-and-the-identifiability-report)). `merge` joins reports: a verdict the reports agree on stays, with every reason; one they disagree on is `conflicting`, with both reasons. `identifiability_report` gives it as plain data.
+An `IdentifiabilityReport` holds, for each parameter, a **structural** and a **practical** verdict, and the sections of the methods that ran (`structural`, `collinearity`, `sample`, `starts`, `profile`). The profiles of a `ProfileLikelihood` give their report with `ProfileResult.report()`; a flat profile gives the structural verdict `in_combination` when resetting the other parameters to their fitted values breaks it, and `non_identifiable` when nothing the data read depends on the parameter ([Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#verdicts-and-the-identifiability-report)). `merge` joins reports: a verdict the reports agree on stays, with every reason; one they disagree on is `conflicting`, with both reasons. `report.report()` gives it as plain data ([Reports](https://munqu.github.io/commol/latest/guide/reports/#the-report-of-an-identifiability-analysis)).
 
 ```python
-data = identifiability_report(report)
+data = report.report()
 print(data["parameters"]["k2"]["practical"]["verdict"])  # determined
 ```
 

@@ -152,9 +152,9 @@ predicted(at) = output(at) - output(at - window)
 ```
 
 ```python
-from commol import window_ends, windowed_totals
+from commol import windowed_totals
 
-ends = window_ends(window=7, end=70)
+ends = model(0.4).axis_units().window_ends(7, "step", 70)
 counts = windowed_totals(truth["cum_ab"], truth.positions, 7, ends)
 
 windowed = [
@@ -171,7 +171,7 @@ print(calibrate_k1(windowed))  # 0.4
 | Mixed windows  | Observations may use different windows, and positions need not be multiples of the window. |
 | Combinations   | Works with `factor_id` and `outputs`.                                                      |
 
-`windowed_totals` (module function) and `Simulation.windowed_totals` apply the same reduction outside calibration, so a report shows exactly what the loss compared. See [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals).
+`windowed_totals` (module function) and `Simulation.windowed_totals` apply the same reduction outside calibration, so a report shows exactly what the loss compared. See [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals). An observation without `window` reads its output at `at`; `sample` and `Simulation.sample` read a run there in the same way ([Values at positions](https://munqu.github.io/commol/latest/guide/simulations/#values-at-positions)).
 
 ## Positions between integers
 

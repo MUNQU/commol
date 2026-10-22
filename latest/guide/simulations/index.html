@@ -1044,6 +1044,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#values-at-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Values at positions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#differential-equations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3282,6 +3293,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#values-at-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Values at positions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#differential-equations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3462,12 +3484,17 @@ plotting them.</p>
 <tr>
 <td><code>total_series(results, ids)</code></td>
 <td><code>list[float]</code></td>
-<td>The sum of all outputs of the given ids, at each position of the results.</td>
+<td>The sum of the given outputs at each position of the results. A bin or accumulator id stands for all its outputs; an output name stands for itself.</td>
 </tr>
 <tr>
 <td><code>windowed_totals(results, ids, window, at=None)</code></td>
 <td><code>list[float]</code></td>
-<td>What the given accumulators gained in each window.</td>
+<td>What the given accumulators, or outputs of them, gained in each window.</td>
+</tr>
+<tr>
+<td><code>sample(results, ids, at)</code></td>
+<td><code>list[float]</code></td>
+<td>The sum of the given outputs at each position of <code>at</code>, such as a bin at the end of each window.</td>
 </tr>
 <tr>
 <td><code>engine</code></td>
@@ -3524,6 +3551,16 @@ The positions the values were read at are in <code>results.positions</code>.</p>
 <td><code>results.rows()</code></td>
 <td><code>[[every output at positions[0]], …]</code>, in <code>simulation_outputs</code> order</td>
 <td>Matrix operations, export</td>
+</tr>
+<tr>
+<td><code>results.model</code></td>
+<td>The <code>Model</code> of the run, which <code>run</code> and <code>run_at</code> set; <code>None</code> for results built by hand</td>
+<td>The outputs of each bin and accumulator, read by reports</td>
+</tr>
+<tr>
+<td><code>results.report(positions, window, windows, …)</code></td>
+<td>The report of the run, as plain data (<a href="../reports/#the-report-of-a-run">Reports</a>)</td>
+<td>JSON export next to the observations</td>
 </tr>
 </tbody>
 </table>
@@ -3592,8 +3629,8 @@ replicate gives the same run however many replicates run, and
 <td>One run, with its <code>seed</code>; the number of runs</td>
 </tr>
 <tr>
-<td><code>seed</code>, <code>seeds</code>, <code>positions</code></td>
-<td>The seed the replicate seeds derive from, the seed of each replicate, the positions</td>
+<td><code>seed</code>, <code>seeds</code>, <code>positions</code>, <code>model</code></td>
+<td>The seed the replicate seeds derive from, the seed of each replicate, the positions, the <code>Model</code> of the replicates</td>
 </tr>
 <tr>
 <td><code>mean()</code></td>
@@ -3606,6 +3643,10 @@ replicate gives the same run however many replicates run, and
 <tr>
 <td><code>member_statistics(output, confidence_level)</code></td>
 <td><code>mean</code>, <code>median</code>, <code>ci_lower</code>, <code>ci_upper</code>, <code>min</code>, <code>max</code> of one output at each position, reduced replicate by replicate with <a href="../../codebase/decisions/results/#one-confidence-interval-convention">the one quantile</a></td>
+</tr>
+<tr>
+<td><code>report(confidence_level, positions, window, windows, …)</code></td>
+<td>The report of a run, with each number reduced replicate by replicate (<a href="../reports/#the-report-of-an-ensemble">Reports</a>)</td>
 </tr>
 </tbody>
 </table>
@@ -3691,7 +3732,8 @@ stratifications were declared.</p>
 </span><span id="__span-7-28"><a id="__codelineno-7-28" name="__codelineno-7-28" href="#__codelineno-7-28"></a><span class="c1"># [&#39;cum_ab_g1_t1&#39;, &#39;cum_ab_g1_t2&#39;, &#39;cum_ab_g2_t1&#39;, &#39;cum_ab_g2_t2&#39;]</span>
 </span></code></pre></div>
 <h3 id="totals-by-bin">Totals by bin<a class="headerlink" href="#totals-by-bin" title="Permanent link">&para;</a></h3>
-<p><code>total_series</code> sums every output of the ids you give, at each position:</p>
+<p><code>total_series</code> sums every output of the bin and accumulator ids you give, at
+each position:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">total_b</span> <span class="o">=</span> <span class="n">stratified_simulation</span><span class="o">.</span><span class="n">total_series</span><span class="p">(</span><span class="n">stratified_results</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">])</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">total_ab</span> <span class="o">=</span> <span class="n">stratified_simulation</span><span class="o">.</span><span class="n">total_series</span><span class="p">(</span><span class="n">stratified_results</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">])</span>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">total_ab</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>  <span class="c1"># 1000: A and B hold the whole total</span>
@@ -3704,7 +3746,8 @@ fewer suffixes than their siblings. <code>outputs_for</code>, <code>group_output
 <code>total_series</code> use the model structure, so neither case can go wrong.</p>
 </div>
 <h3 id="totals-by-category">Totals by category<a class="headerlink" href="#totals-by-category" title="Permanent link">&para;</a></h3>
-<p>To select compartments by category, use their labels from
+<p><code>total_series</code> also takes output names, and each one stands for itself. To
+select compartments by category, use their labels from
 <code>model.structure.initial_state(model.process)</code>: each entry has <code>name</code>, <code>bin</code>
 and <code>categories</code>.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">in_g1</span> <span class="o">=</span> <span class="p">[</span>
@@ -3714,11 +3757,8 @@ and <code>categories</code>.</p>
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="p">]</span>
 </span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">in_g1</span><span class="p">)</span>  <span class="c1"># [&#39;A_g1_t1&#39;, &#39;A_g1_t2&#39;, &#39;B_g1_t1&#39;, &#39;B_g1_t2&#39;]</span>
 </span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="n">total_g1</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="nb">sum</span><span class="p">(</span><span class="n">stratified_results</span><span class="p">[</span><span class="n">name</span><span class="p">][</span><span class="n">step</span><span class="p">]</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">in_g1</span><span class="p">)</span>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>    <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">stratified_results</span><span class="p">[</span><span class="n">in_g1</span><span class="p">[</span><span class="mi">0</span><span class="p">]]))</span>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="p">]</span>
-</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">total_g1</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>  <span class="c1"># 500: g1 started with half of every bin</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="n">total_g1</span> <span class="o">=</span> <span class="n">stratified_simulation</span><span class="o">.</span><span class="n">total_series</span><span class="p">(</span><span class="n">stratified_results</span><span class="p">,</span> <span class="n">in_g1</span><span class="p">)</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">total_g1</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>  <span class="c1"># 500: g1 started with half of every bin</span>
 </span></code></pre></div>
 <h2 id="windowed-totals">Windowed totals<a class="headerlink" href="#windowed-totals" title="Permanent link">&para;</a></h2>
 <p><code>windowed_totals</code> turns a cumulative output into the amount it gained in each
@@ -3740,7 +3780,7 @@ the output at its start. Both must be positions of the results.</p>
 <tbody>
 <tr>
 <td><code>ids</code></td>
-<td>Accumulator ids; their outputs are summed first.</td>
+<td>Accumulator ids, each for all its outputs, and output names, each for itself, such as some strata of an accumulator. Their outputs are summed first. An id that is neither raises <code>KeyError</code>, with the bins, accumulators and outputs of the model.</td>
 </tr>
 <tr>
 <td><code>window</code></td>
@@ -3748,46 +3788,46 @@ the output at its start. Both must be positions of the results.</p>
 </tr>
 <tr>
 <td><code>at</code></td>
-<td>The positions where windows close. By default, every complete window of the results (<code>window_ends</code>). Pass observation positions to get the values a calibration compares against.</td>
+<td>The positions where windows close. By default, every complete window of the results. Pass observation positions to get the values a calibration compares against.</td>
 </tr>
 </tbody>
 </table>
-<p>The window grid and the same reduction work on any series with the
-module-level functions of <code>py-commol/commol/api/windows.py</code>:</p>
-<table>
-<thead>
-<tr>
-<th>Function</th>
-<th>Returns</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>window_start(i, window)</code>, <code>window_end(i, window)</code></td>
-<td>The positions that bound window <code>i</code>: <code>i · window</code> and <code>(i + 1) · window</code></td>
-</tr>
-<tr>
-<td><code>window_index(at, window)</code></td>
-<td>The window that holds a position, <code>max(ceil(at / window) − 1, 0)</code>; the inverse of <code>window_end</code>. Reports place observations with it.</td>
-</tr>
-<tr>
-<td><code>window_ends(window, end)</code></td>
-<td>Every complete window end up to <code>end</code></td>
-</tr>
-<tr>
-<td><code>windowed_totals(series, positions, window, at=None)</code></td>
-<td>The gain of a series over each window</td>
-</tr>
-</tbody>
-</table>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">window_end</span><span class="p">,</span> <span class="n">window_ends</span><span class="p">,</span> <span class="n">window_index</span><span class="p">,</span> <span class="n">windowed_totals</span>
+<p>The axis of a model gives the window grid of a width in a unit
+(<code>Model.axis_units()</code>; <a href="../core-concepts/#units-of-the-axis">Units of the axis</a>),
+and <code>windowed_totals</code> of <code>py-commol/commol/api/windows.py</code> gives the same
+reduction for any series:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">AxisUnits</span><span class="p">,</span> <span class="n">windowed_totals</span>
 </span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">window_ends</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">30</span><span class="p">))</span>                       <span class="c1"># [7, 14, 21, 28]</span>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">window_end</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">7</span><span class="p">),</span> <span class="n">window_index</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">7</span><span class="p">),</span> <span class="n">window_index</span><span class="p">(</span><span class="mf">7.5</span><span class="p">,</span> <span class="mi">7</span><span class="p">))</span>  <span class="c1"># 7 0 1</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">windowed_totals</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mi">21</span><span class="p">,</span> <span class="mi">28</span><span class="p">],</span> <span class="nb">range</span><span class="p">(</span><span class="mi">8</span><span class="p">),</span> <span class="mi">3</span><span class="p">))</span>  <span class="c1"># [6, 15]</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">daily</span> <span class="o">=</span> <span class="n">AxisUnits</span><span class="p">(</span><span class="n">step_unit</span><span class="o">=</span><span class="s2">&quot;day&quot;</span><span class="p">)</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">daily</span><span class="o">.</span><span class="n">window_ends</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">,</span> <span class="mi">30</span><span class="p">))</span>  <span class="c1"># [7.0, 14.0, 21.0, 28.0]</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">daily</span><span class="o">.</span><span class="n">window_end</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">),</span> <span class="n">daily</span><span class="o">.</span><span class="n">window_index</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">))</span>  <span class="c1"># 7.0 0</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">windowed_totals</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mi">21</span><span class="p">,</span> <span class="mi">28</span><span class="p">],</span> <span class="nb">range</span><span class="p">(</span><span class="mi">8</span><span class="p">),</span> <span class="mi">3</span><span class="p">))</span>  <span class="c1"># [6, 15]</span>
 </span></code></pre></div>
-<p>A window need not be a whole number of steps: see
+<p>A window of the grid is a whole number of steps. The <code>window</code> of
+<code>windowed_totals</code> need not be: see
 <a href="#reporting-at-any-position">Reporting at any position</a>.</p>
+<h2 id="values-at-positions">Values at positions<a class="headerlink" href="#values-at-positions" title="Permanent link">&para;</a></h2>
+<p>A bin holds an amount at a position, so it is read at the position, not over
+the window before it. <code>sample</code> reads the given bins and accumulators at each
+position of <code>at</code>; the ids are the ones of <code>total_series</code>, and their outputs are
+summed first. Next to <code>windowed_totals</code>, it gives the amount in a bin at the
+end of each window and what an accumulator gained over that window:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">ends</span> <span class="o">=</span> <span class="n">stratified</span><span class="o">.</span><span class="n">axis_units</span><span class="p">()</span><span class="o">.</span><span class="n">window_ends</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="s2">&quot;step&quot;</span><span class="p">,</span> <span class="mi">21</span><span class="p">)</span>  <span class="c1"># [7.0, 14.0, 21.0]</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">in_a</span> <span class="o">=</span> <span class="n">stratified_simulation</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">stratified_results</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">ends</span><span class="p">)</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">gained</span> <span class="o">=</span> <span class="n">stratified_simulation</span><span class="o">.</span><span class="n">windowed_totals</span><span class="p">(</span><span class="n">stratified_results</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span> <span class="mi">7</span><span class="p">,</span> <span class="n">ends</span><span class="p">)</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">in_a</span><span class="p">])</span>    <span class="c1"># [478, 229, 109]</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">gained</span><span class="p">])</span>  <span class="c1"># [522, 250, 119]</span>
+</span></code></pre></div>
+<p><code>sample(series, positions, at)</code> of <code>py-commol/commol/api/results.py</code> reads
+any series:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">sample</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">sample</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">10</span><span class="p">],</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">),</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">]))</span>  <span class="c1"># [1, 10]</span>
+</span></code></pre></div>
+<p>Each position of <code>at</code> must be a position of the results, within a relative
+<code>1e-9</code>; otherwise <code>ValueError</code> asks you to run the simulation there with
+<code>run_at</code>.</p>
 <h2 id="differential-equations">Differential equations<a class="headerlink" href="#differential-equations" title="Permanent link">&para;</a></h2>
 <p>A model built with <code>engine="DifferentialEquations"</code> runs in continuous time.
 The engine (<code>crates/commol-differential/</code>) integrates
@@ -3795,30 +3835,30 @@ The engine (<code>crates/commol-differential/</code>) integrates
 <a href="https://github.com/martinjrobins/diffsol">diffsol</a>. The flows are the same as
 in a difference model: the same transitions, rates, accumulators, outputs,
 calibration, reports and plots. Only the way the engine advances changes.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ODESolver</span>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="n">ode_model</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Decay&quot;</span><span class="p">)</span>
-</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">)</span>
-</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">)</span>
-</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
-</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>    <span class="o">.</span><span class="n">add_accumulator</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;moved&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Moved from A to B&quot;</span><span class="p">)</span>
-</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">accumulators</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;moved&quot;</span><span class="p">])</span>
-</span><span id="__span-12-12"><a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span>
-</span><span id="__span-12-13"><a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>        <span class="n">Aggregate</span><span class="p">(</span>
-</span><span id="__span-12-14"><a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>            <span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">1000</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
-</span><span id="__span-12-15"><a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>        <span class="p">),</span>
-</span><span id="__span-12-16"><a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>        <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferentialEquations&quot;</span><span class="p">,</span>
-</span><span id="__span-12-17"><a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a>        <span class="n">settings</span><span class="o">=</span><span class="n">ODESolver</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s2">&quot;tsit45&quot;</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-8</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-8</span><span class="p">),</span>
-</span><span id="__span-12-18"><a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a>    <span class="p">)</span>
-</span><span id="__span-12-19"><a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a><span class="p">)</span>
-</span><span id="__span-12-20"><a id="__codelineno-12-20" name="__codelineno-12-20" href="#__codelineno-12-20"></a>
-</span><span id="__span-12-21"><a id="__codelineno-12-21" name="__codelineno-12-21" href="#__codelineno-12-21"></a><span class="n">ode</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">ode_model</span><span class="p">)</span>
-</span><span id="__span-12-22"><a id="__codelineno-12-22" name="__codelineno-12-22" href="#__codelineno-12-22"></a><span class="n">at</span> <span class="o">=</span> <span class="n">ode</span><span class="o">.</span><span class="n">run_at</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">2.25</span><span class="p">])</span>
-</span><span id="__span-12-23"><a id="__codelineno-12-23" name="__codelineno-12-23" href="#__codelineno-12-23"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">at</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">][</span><span class="mi">2</span><span class="p">],</span> <span class="mi">3</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="mi">1000</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mf">0.1</span> <span class="o">*</span> <span class="mf">2.25</span><span class="p">),</span> <span class="mi">3</span><span class="p">))</span>  <span class="c1"># 798.516 798.516</span>
-</span><span id="__span-12-24"><a id="__codelineno-12-24" name="__codelineno-12-24" href="#__codelineno-12-24"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">ode</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">10</span><span class="p">)[</span><span class="s2">&quot;moved&quot;</span><span class="p">][</span><span class="mi">10</span><span class="p">],</span> <span class="mi">1</span><span class="p">))</span>  <span class="c1"># 632.1: the integral of the flow</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ODESolver</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="n">ode_model</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Decay&quot;</span><span class="p">)</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">)</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">)</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>    <span class="o">.</span><span class="n">add_accumulator</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;moved&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Moved from A to B&quot;</span><span class="p">)</span>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">accumulators</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;moved&quot;</span><span class="p">])</span>
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span>
+</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a>        <span class="n">Aggregate</span><span class="p">(</span>
+</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a>            <span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">1000</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+</span><span id="__span-14-15"><a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a>        <span class="p">),</span>
+</span><span id="__span-14-16"><a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a>        <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferentialEquations&quot;</span><span class="p">,</span>
+</span><span id="__span-14-17"><a id="__codelineno-14-17" name="__codelineno-14-17" href="#__codelineno-14-17"></a>        <span class="n">settings</span><span class="o">=</span><span class="n">ODESolver</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s2">&quot;tsit45&quot;</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-8</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-8</span><span class="p">),</span>
+</span><span id="__span-14-18"><a id="__codelineno-14-18" name="__codelineno-14-18" href="#__codelineno-14-18"></a>    <span class="p">)</span>
+</span><span id="__span-14-19"><a id="__codelineno-14-19" name="__codelineno-14-19" href="#__codelineno-14-19"></a><span class="p">)</span>
+</span><span id="__span-14-20"><a id="__codelineno-14-20" name="__codelineno-14-20" href="#__codelineno-14-20"></a>
+</span><span id="__span-14-21"><a id="__codelineno-14-21" name="__codelineno-14-21" href="#__codelineno-14-21"></a><span class="n">ode</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">ode_model</span><span class="p">)</span>
+</span><span id="__span-14-22"><a id="__codelineno-14-22" name="__codelineno-14-22" href="#__codelineno-14-22"></a><span class="n">at</span> <span class="o">=</span> <span class="n">ode</span><span class="o">.</span><span class="n">run_at</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">2.25</span><span class="p">])</span>
+</span><span id="__span-14-23"><a id="__codelineno-14-23" name="__codelineno-14-23" href="#__codelineno-14-23"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">at</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">][</span><span class="mi">2</span><span class="p">],</span> <span class="mi">3</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="mi">1000</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mf">0.1</span> <span class="o">*</span> <span class="mf">2.25</span><span class="p">),</span> <span class="mi">3</span><span class="p">))</span>  <span class="c1"># 798.516 798.516</span>
+</span><span id="__span-14-24"><a id="__codelineno-14-24" name="__codelineno-14-24" href="#__codelineno-14-24"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">ode</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">10</span><span class="p">)[</span><span class="s2">&quot;moved&quot;</span><span class="p">][</span><span class="mi">10</span><span class="p">],</span> <span class="mi">1</span><span class="p">))</span>  <span class="c1"># 632.1: the integral of the flow</span>
 </span></code></pre></div>
 <h3 id="solver-settings">Solver settings<a class="headerlink" href="#solver-settings" title="Permanent link">&para;</a></h3>
 <p><code>ODESolver</code> holds the settings of the <code>DifferentialEquations</code> engine. They
@@ -3885,19 +3925,19 @@ that depends on the state, such as <code>if(t &gt;= A, ...)</code>, is not found
 <code>Model.axis_units()</code> gives the rate that the engine of a model reads from a mean
 span or a probability over a period; see
 <a href="../core-concepts/#units-of-the-axis">Units of the axis</a>.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">AxisPattern</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">pulse_model</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Pulse&quot;</span><span class="p">)</span>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">)</span>
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">)</span>
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.2</span><span class="p">))</span>
-</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="p">)</span>
-</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="n">all_in_a</span> <span class="o">=</span> <span class="n">Aggregate</span><span class="p">(</span><span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">1000</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
-</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="n">ode_pulse</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span>
-</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>    <span class="n">pulse_model</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">all_in_a</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferentialEquations&quot;</span><span class="p">)</span>
-</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
-</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">ode_pulse</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">ode_pulse</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">][</span><span class="mi">3</span><span class="p">],</span> <span class="mi">1</span><span class="p">))</span>  <span class="c1"># 181.3 = 1000 (1 − e^−0.2)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">AxisPattern</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="n">pulse_model</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Pulse&quot;</span><span class="p">)</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">)</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">)</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.2</span><span class="p">))</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="p">)</span>
+</span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="n">all_in_a</span> <span class="o">=</span> <span class="n">Aggregate</span><span class="p">(</span><span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">1000</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
+</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="n">ode_pulse</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span>
+</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>    <span class="n">pulse_model</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">all_in_a</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferentialEquations&quot;</span><span class="p">)</span>
+</span><span id="__span-15-12"><a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</span><span id="__span-15-13"><a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">ode_pulse</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">ode_pulse</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">][</span><span class="mi">3</span><span class="p">],</span> <span class="mi">1</span><span class="p">))</span>  <span class="c1"># 181.3 = 1000 (1 − e^−0.2)</span>
 </span></code></pre></div>
 <h3 id="reporting-at-any-position">Reporting at any position<a class="headerlink" href="#reporting-at-any-position" title="Permanent link">&para;</a></h3>
 <p><code>run_at(at)</code> reports at sorted positions on the axis, from the dense output of
@@ -3910,10 +3950,10 @@ difference model reports only at integer steps; the engine rejects any other
 position and names the object that holds it.</p>
 <p>Windows, reports and plots read a value at a position of the results, so a
 window of <code>2.5</code> works once the results hold its ends:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">ends</span> <span class="o">=</span> <span class="n">window_ends</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>    <span class="c1"># [2.5, 5.0, 7.5, 10.0]</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">ode_windows</span> <span class="o">=</span> <span class="n">ode</span><span class="o">.</span><span class="n">run_at</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="o">*</span><span class="n">ends</span><span class="p">])</span>
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">gained</span> <span class="o">=</span> <span class="n">ode</span><span class="o">.</span><span class="n">windowed_totals</span><span class="p">(</span><span class="n">ode_windows</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;moved&quot;</span><span class="p">],</span> <span class="n">window</span><span class="o">=</span><span class="mf">2.5</span><span class="p">)</span>
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">gained</span><span class="p">])</span>  <span class="c1"># [221.2, 172.3, 134.2, 104.5]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">ends</span> <span class="o">=</span> <span class="p">[</span><span class="mf">2.5</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">,</span> <span class="mf">7.5</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">]</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">ode_windows</span> <span class="o">=</span> <span class="n">ode</span><span class="o">.</span><span class="n">run_at</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="o">*</span><span class="n">ends</span><span class="p">])</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="n">gained</span> <span class="o">=</span> <span class="n">ode</span><span class="o">.</span><span class="n">windowed_totals</span><span class="p">(</span><span class="n">ode_windows</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;moved&quot;</span><span class="p">],</span> <span class="n">window</span><span class="o">=</span><span class="mf">2.5</span><span class="p">)</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">gained</span><span class="p">])</span>  <span class="c1"># [221.2, 172.3, 134.2, 104.5]</span>
 </span></code></pre></div>
 <h2 id="plotting">Plotting<a class="headerlink" href="#plotting" title="Permanent link">&para;</a></h2>
 <p><code>SimulationPlotter(simulation, results)</code> draws one subplot per output with
@@ -3921,22 +3961,22 @@ seaborn, and returns the matplotlib <code>Figure</code>. With the <code>Simulati
 of a stochastic engine, <code>plot_series</code> draws their mean and a band of
 <code>confidence_level</code> (default 0.95), each replicate reduced to the plotted
 series first:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">PlotConfig</span><span class="p">,</span> <span class="n">SimulationPlotter</span>
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="n">plotter</span> <span class="o">=</span> <span class="n">SimulationPlotter</span><span class="p">(</span><span class="n">simulation</span><span class="p">,</span> <span class="n">results</span><span class="p">)</span>  <span class="c1"># the results of the first run</span>
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="n">plotter</span><span class="o">.</span><span class="n">plot_series</span><span class="p">(</span><span class="n">output_file</span><span class="o">=</span><span class="s2">&quot;series.png&quot;</span><span class="p">)</span>
-</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="n">plotter</span><span class="o">.</span><span class="n">plot_cumulative</span><span class="p">(</span><span class="n">output_file</span><span class="o">=</span><span class="s2">&quot;cumulative.png&quot;</span><span class="p">)</span>
-</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>
-</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="n">plotter</span><span class="o">.</span><span class="n">plot_series</span><span class="p">(</span>
-</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>    <span class="n">output_file</span><span class="o">=</span><span class="s2">&quot;custom.png&quot;</span><span class="p">,</span>
-</span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>    <span class="n">config</span><span class="o">=</span><span class="n">PlotConfig</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;whitegrid&quot;</span><span class="p">,</span> <span class="n">palette</span><span class="o">=</span><span class="s2">&quot;Set2&quot;</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="s2">&quot;talk&quot;</span><span class="p">),</span>
-</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>    <span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">],</span>
-</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>    <span class="n">x_label</span><span class="o">=</span><span class="s2">&quot;Week&quot;</span><span class="p">,</span>
-</span><span id="__span-15-12"><a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a>    <span class="n">tick_every</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
-</span><span id="__span-15-13"><a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a>    <span class="n">position_label</span><span class="o">=</span><span class="k">lambda</span> <span class="n">at</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;w</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">at</span><span class="p">)</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="mi">7</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
-</span><span id="__span-15-14"><a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a>    <span class="n">linewidth</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span>
-</span><span id="__span-15-15"><a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a>    <span class="n">alpha</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
-</span><span id="__span-15-16"><a id="__codelineno-15-16" name="__codelineno-15-16" href="#__codelineno-15-16"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">PlotConfig</span><span class="p">,</span> <span class="n">SimulationPlotter</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">plotter</span> <span class="o">=</span> <span class="n">SimulationPlotter</span><span class="p">(</span><span class="n">simulation</span><span class="p">,</span> <span class="n">results</span><span class="p">)</span>  <span class="c1"># the results of the first run</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="n">plotter</span><span class="o">.</span><span class="n">plot_series</span><span class="p">(</span><span class="n">output_file</span><span class="o">=</span><span class="s2">&quot;series.png&quot;</span><span class="p">)</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="n">plotter</span><span class="o">.</span><span class="n">plot_cumulative</span><span class="p">(</span><span class="n">output_file</span><span class="o">=</span><span class="s2">&quot;cumulative.png&quot;</span><span class="p">)</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="n">plotter</span><span class="o">.</span><span class="n">plot_series</span><span class="p">(</span>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>    <span class="n">output_file</span><span class="o">=</span><span class="s2">&quot;custom.png&quot;</span><span class="p">,</span>
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>    <span class="n">config</span><span class="o">=</span><span class="n">PlotConfig</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;whitegrid&quot;</span><span class="p">,</span> <span class="n">palette</span><span class="o">=</span><span class="s2">&quot;Set2&quot;</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="s2">&quot;talk&quot;</span><span class="p">),</span>
+</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>    <span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">],</span>
+</span><span id="__span-17-11"><a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>    <span class="n">x_label</span><span class="o">=</span><span class="s2">&quot;Week&quot;</span><span class="p">,</span>
+</span><span id="__span-17-12"><a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>    <span class="n">tick_every</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+</span><span id="__span-17-13"><a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a>    <span class="n">position_label</span><span class="o">=</span><span class="k">lambda</span> <span class="n">at</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;w</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">at</span><span class="p">)</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="mi">7</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+</span><span id="__span-17-14"><a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a>    <span class="n">linewidth</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span>
+</span><span id="__span-17-15"><a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a>    <span class="n">alpha</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
+</span><span id="__span-17-16"><a id="__codelineno-17-16" name="__codelineno-17-16" href="#__codelineno-17-16"></a><span class="p">)</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -3985,7 +4025,7 @@ series first:</p>
 <tr>
 <td><code>x_label</code>, <code>tick_every</code>, <code>position_label</code></td>
 <td><code>"Step"</code>, every plotted position, the position</td>
-<td><code>plot_series</code> only. Label the x axis, for example in weeks. The x axis shows <code>results.positions</code>.</td>
+<td><code>plot_series</code> only. Label the x axis, for example in weeks. The x axis shows <code>results.positions</code>. With no <code>position_label</code>, a model with an <a href="../units-and-equations/#dates-on-the-axis">origin</a> labels each tick with its date (<code>2020-01-08</code>, with the time when it is not midnight): at the plotted positions <code>tick_every</code> apart, or at the ticks matplotlib places when <code>tick_every</code> is <code>None</code>.</td>
 </tr>
 <tr>
 <td>other keyword arguments</td>
@@ -4040,13 +4080,13 @@ method of <code>SimulationPlotter</code> draws in a copy of <code>matplotlib.rcP
 (<code>_scoped_style</code> in <code>py-commol/commol/api/plotter.py</code>), so the figures that
 you draw with matplotlib after a plot of commol keep your own style.</p>
 <p>To compare with observations:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ObservedDataPoint</span>
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="n">observed</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">45.2</span><span class="p">),</span>
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">78.5</span><span class="p">),</span>
-</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="p">]</span>
-</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="n">plotter</span><span class="o">.</span><span class="n">plot_series</span><span class="p">(</span><span class="n">output_file</span><span class="o">=</span><span class="s2">&quot;with_data.png&quot;</span><span class="p">,</span> <span class="n">observed_data</span><span class="o">=</span><span class="n">observed</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ObservedDataPoint</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="n">observed</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">45.2</span><span class="p">),</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">78.5</span><span class="p">),</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="p">]</span>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="n">plotter</span><span class="o">.</span><span class="n">plot_series</span><span class="p">(</span><span class="n">output_file</span><span class="o">=</span><span class="s2">&quot;with_data.png&quot;</span><span class="p">,</span> <span class="n">observed_data</span><span class="o">=</span><span class="n">observed</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>

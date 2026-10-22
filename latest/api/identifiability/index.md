@@ -330,6 +330,21 @@ class IdentifiabilityReport(_Frozen):
             )
         return self
 
+    def report(self) -> "IdentifiabilityReportData":
+        """
+        Report the identifiability of each parameter as plain data.
+
+        Returns
+        -------
+        IdentifiabilityReportData
+            ``parameters``: each parameter, in problem order, with its
+            structural and practical verdicts; ``sections``: the evidence of
+            each method that ran.
+        """
+        from commol.api.reporting import _identifiability_report
+
+        return _identifiability_report(self)
+
     def merge(self, *others: "IdentifiabilityReport") -> "IdentifiabilityReport":
         """
         Join this report with others of the same parameters.
@@ -412,6 +427,39 @@ def check_parameters(self) -> Self:
             f"order, got {list(self.verdicts)}."
         )
     return self
+```
+
+#### report
+
+```python
+report() -> IdentifiabilityReportData
+```
+
+Report the identifiability of each parameter as plain data.
+
+Returns:
+
+| Type                        | Description                                                                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `IdentifiabilityReportData` | parameters: each parameter, in problem order, with its structural and practical verdicts; sections: the evidence of each method that ran. |
+
+Source code in `commol/context/inference/identifiability.py`
+
+```python
+def report(self) -> "IdentifiabilityReportData":
+    """
+    Report the identifiability of each parameter as plain data.
+
+    Returns
+    -------
+    IdentifiabilityReportData
+        ``parameters``: each parameter, in problem order, with its
+        structural and practical verdicts; ``sections``: the evidence of
+        each method that ran.
+    """
+    from commol.api.reporting import _identifiability_report
+
+    return _identifiability_report(self)
 ```
 
 #### merge

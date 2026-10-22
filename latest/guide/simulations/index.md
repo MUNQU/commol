@@ -48,8 +48,9 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | `simulation_outputs`                             | `list[str]`            | The output names, in engine order: compartments first, then accumulators.                                                                                                                                                                                                                                                                                                                                                        |
 | `outputs_for(id)`                                | `list[str]`            | The outputs of one bin or accumulator.                                                                                                                                                                                                                                                                                                                                                                                           |
 | `group_outputs(ids)`                             | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id.                                                                                                                                                                                                                                                                                                                                                                        |
-| `total_series(results, ids)`                     | `list[float]`          | The sum of all outputs of the given ids, at each position of the results.                                                                                                                                                                                                                                                                                                                                                        |
-| `windowed_totals(results, ids, window, at=None)` | `list[float]`          | What the given accumulators gained in each window.                                                                                                                                                                                                                                                                                                                                                                               |
+| `total_series(results, ids)`                     | `list[float]`          | The sum of the given outputs at each position of the results. A bin or accumulator id stands for all its outputs; an output name stands for itself.                                                                                                                                                                                                                                                                              |
+| `windowed_totals(results, ids, window, at=None)` | `list[float]`          | What the given accumulators, or outputs of them, gained in each window.                                                                                                                                                                                                                                                                                                                                                          |
+| `sample(results, ids, at)`                       | `list[float]`          | The sum of the given outputs at each position of `at`, such as a bin at the end of each window.                                                                                                                                                                                                                                                                                                                                  |
 | `engine`                                         | engine                 | The underlying Rust engine, for the model as it is now: the engine `model.engine.type` names (`engine.engine_type`). `engine.step()` advances it one step; `engine.reset()` returns it to the initial state.                                                                                                                                                                                                                     |
 
 Every `run` starts again from the initial state, so two calls with the same model give the same result (`Simulation.run` resets the engine first). To continue a run step by step, use the engine:
@@ -76,11 +77,13 @@ model.update_parameters({"k1": 0.3})
 
 `run` and `run_at` return `SimulationResults` (`py-commol/commol/api/results.py`): a `dict` from output name to one value per position, so `results["A"]`, `json.dumps(results)` and `pandas.DataFrame(results)` work as for any mapping. The positions the values were read at are in `results.positions`.
 
-| Member              | Shape                                                                 | Use for                                         |
-| ------------------- | --------------------------------------------------------------------- | ----------------------------------------------- |
-| `results[name]`     | `[value at positions[0], …]`                                          | Reading one output, plotting                    |
-| `results.positions` | `[0.0, 1.0, …, n]` for `run(n)`; the requested positions for `run_at` | Reading a value at a position, windows, reports |
-| `results.rows()`    | `[[every output at positions[0]], …]`, in `simulation_outputs` order  | Matrix operations, export                       |
+| Member                                          | Shape                                                                                                                      | Use for                                                  |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `results[name]`                                 | `[value at positions[0], …]`                                                                                               | Reading one output, plotting                             |
+| `results.positions`                             | `[0.0, 1.0, …, n]` for `run(n)`; the requested positions for `run_at`                                                      | Reading a value at a position, windows, reports          |
+| `results.rows()`                                | `[[every output at positions[0]], …]`, in `simulation_outputs` order                                                       | Matrix operations, export                                |
+| `results.model`                                 | The `Model` of the run, which `run` and `run_at` set; `None` for results built by hand                                     | The outputs of each bin and accumulator, read by reports |
+| `results.report(positions, window, windows, …)` | The report of the run, as plain data ([Reports](https://munqu.github.io/commol/latest/guide/reports/#the-report-of-a-run)) | JSON export next to the observations                     |
 
 `run(num_steps)` holds `num_steps + 1` positions: position 0 is the initial state.
 
@@ -114,13 +117,14 @@ except ValueError as error:
 
 Replicate `i` takes the seed derived from `seed` and `i`, the SplitMix64 of `seed + i` (`replicate_seed` in `crates/commol-random/src/generator.rs`), so a replicate gives the same run however many replicates run, and `simulation.run(…, seed=replicates[i].seed)` repeats it. `SimulationReplicates` (`py-commol/commol/api/results.py`) is a list of `SimulationResults`:
 
-| Member                                        | Returns                                                                                                                                                                                                                                             |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `replicates[i]`, `len(replicates)`            | One run, with its `seed`; the number of runs                                                                                                                                                                                                        |
-| `seed`, `seeds`, `positions`                  | The seed the replicate seeds derive from, the seed of each replicate, the positions                                                                                                                                                                 |
-| `mean()`                                      | `SimulationResults` of the mean of every output at each position                                                                                                                                                                                    |
-| `quantiles(levels)`                           | `{level: SimulationResults}`, at each position, by [the one quantile](https://munqu.github.io/commol/latest/codebase/decisions/results/#one-confidence-interval-convention) (NumPy's `method="hazen"`)                                              |
-| `member_statistics(output, confidence_level)` | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate with [the one quantile](https://munqu.github.io/commol/latest/codebase/decisions/results/#one-confidence-interval-convention) |
+| Member                                                    | Returns                                                                                                                                                                                                                                             |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `replicates[i]`, `len(replicates)`                        | One run, with its `seed`; the number of runs                                                                                                                                                                                                        |
+| `seed`, `seeds`, `positions`, `model`                     | The seed the replicate seeds derive from, the seed of each replicate, the positions, the `Model` of the replicates                                                                                                                                  |
+| `mean()`                                                  | `SimulationResults` of the mean of every output at each position                                                                                                                                                                                    |
+| `quantiles(levels)`                                       | `{level: SimulationResults}`, at each position, by [the one quantile](https://munqu.github.io/commol/latest/codebase/decisions/results/#one-confidence-interval-convention) (NumPy's `method="hazen"`)                                              |
+| `member_statistics(output, confidence_level)`             | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate with [the one quantile](https://munqu.github.io/commol/latest/codebase/decisions/results/#one-confidence-interval-convention) |
+| `report(confidence_level, positions, window, windows, …)` | The report of a run, with each number reduced replicate by replicate ([Reports](https://munqu.github.io/commol/latest/guide/reports/#the-report-of-an-ensemble))                                                                                    |
 
 ```python
 from commol.api.plotter import SimulationPlotter
@@ -195,7 +199,7 @@ print(stratified_simulation.group_outputs(["A", "cum_ab"])["cum_ab"])
 
 ### Totals by bin
 
-`total_series` sums every output of the ids you give, at each position:
+`total_series` sums every output of the bin and accumulator ids you give, at each position:
 
 ```python
 total_b = stratified_simulation.total_series(stratified_results, ["B"])
@@ -209,7 +213,7 @@ Do not select outputs by name prefix
 
 ### Totals by category
 
-To select compartments by category, use their labels from `model.structure.initial_state(model.process)`: each entry has `name`, `bin` and `categories`.
+`total_series` also takes output names, and each one stands for itself. To select compartments by category, use their labels from `model.structure.initial_state(model.process)`: each entry has `name`, `bin` and `categories`.
 
 ```python
 in_g1 = [
@@ -219,10 +223,7 @@ in_g1 = [
 ]
 print(in_g1)  # ['A_g1_t1', 'A_g1_t2', 'B_g1_t1', 'B_g1_t2']
 
-total_g1 = [
-    sum(stratified_results[name][step] for name in in_g1)
-    for step in range(len(stratified_results[in_g1[0]]))
-]
+total_g1 = stratified_simulation.total_series(stratified_results, in_g1)
 print(round(total_g1[-1]))  # 500: g1 started with half of every bin
 ```
 
@@ -237,30 +238,47 @@ per_week = stratified_simulation.windowed_totals(
 print(len(per_week))  # 7: the complete windows of a 50-step run
 ```
 
-| Argument | Meaning                                                                                                                                                                           |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ids`    | Accumulator ids; their outputs are summed first.                                                                                                                                  |
-| `window` | The window length on the axis. Must be positive.                                                                                                                                  |
-| `at`     | The positions where windows close. By default, every complete window of the results (`window_ends`). Pass observation positions to get the values a calibration compares against. |
+| Argument | Meaning                                                                                                                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ids`    | Accumulator ids, each for all its outputs, and output names, each for itself, such as some strata of an accumulator. Their outputs are summed first. An id that is neither raises `KeyError`, with the bins, accumulators and outputs of the model. |
+| `window` | The window length on the axis. Must be positive.                                                                                                                                                                                                    |
+| `at`     | The positions where windows close. By default, every complete window of the results. Pass observation positions to get the values a calibration compares against.                                                                                   |
 
-The window grid and the same reduction work on any series with the module-level functions of `py-commol/commol/api/windows.py`:
-
-| Function                                              | Returns                                                                                                                             |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `window_start(i, window)`, `window_end(i, window)`    | The positions that bound window `i`: `i · window` and `(i + 1) · window`                                                            |
-| `window_index(at, window)`                            | The window that holds a position, `max(ceil(at / window) − 1, 0)`; the inverse of `window_end`. Reports place observations with it. |
-| `window_ends(window, end)`                            | Every complete window end up to `end`                                                                                               |
-| `windowed_totals(series, positions, window, at=None)` | The gain of a series over each window                                                                                               |
+The axis of a model gives the window grid of a width in a unit (`Model.axis_units()`; [Units of the axis](https://munqu.github.io/commol/latest/guide/core-concepts/#units-of-the-axis)), and `windowed_totals` of `py-commol/commol/api/windows.py` gives the same reduction for any series:
 
 ```python
-from commol import window_end, window_ends, window_index, windowed_totals
+from commol import AxisUnits, windowed_totals
 
-print(window_ends(window=7, end=30))                       # [7, 14, 21, 28]
-print(window_end(0, 7), window_index(7, 7), window_index(7.5, 7))  # 7 0 1
+daily = AxisUnits(step_unit="day")
+print(daily.window_ends(1, "week", 30))  # [7.0, 14.0, 21.0, 28.0]
+print(daily.window_end(0, 1, "week"), daily.window_index(7, 1, "week"))  # 7.0 0
 print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], range(8), 3))  # [6, 15]
 ```
 
-A window need not be a whole number of steps: see [Reporting at any position](#reporting-at-any-position).
+A window of the grid is a whole number of steps. The `window` of `windowed_totals` need not be: see [Reporting at any position](#reporting-at-any-position).
+
+## Values at positions
+
+A bin holds an amount at a position, so it is read at the position, not over the window before it. `sample` reads the given bins and accumulators at each position of `at`; the ids are the ones of `total_series`, and their outputs are summed first. Next to `windowed_totals`, it gives the amount in a bin at the end of each window and what an accumulator gained over that window:
+
+```python
+ends = stratified.axis_units().window_ends(7, "step", 21)  # [7.0, 14.0, 21.0]
+
+in_a = stratified_simulation.sample(stratified_results, ["A"], ends)
+gained = stratified_simulation.windowed_totals(stratified_results, ["cum_ab"], 7, ends)
+print([round(value) for value in in_a])    # [478, 229, 109]
+print([round(value) for value in gained])  # [522, 250, 119]
+```
+
+`sample(series, positions, at)` of `py-commol/commol/api/results.py` reads any series:
+
+```python
+from commol import sample
+
+print(sample([0, 1, 3, 6, 10], range(5), [1, 4]))  # [1, 10]
+```
+
+Each position of `at` must be a position of the results, within a relative `1e-9`; otherwise `ValueError` asks you to run the simulation there with `run_at`.
 
 ## Differential equations
 
@@ -340,7 +358,7 @@ print(round(ode_pulse["A"][2] - ode_pulse["A"][3], 1))  # 181.3 = 1000 (1 − e^
 Windows, reports and plots read a value at a position of the results, so a window of `2.5` works once the results hold its ends:
 
 ```python
-ends = window_ends(window=2.5, end=10)    # [2.5, 5.0, 7.5, 10.0]
+ends = [2.5, 5.0, 7.5, 10.0]
 ode_windows = ode.run_at([0.0, *ends])
 gained = ode.windowed_totals(ode_windows, ["moved"], window=2.5)
 print([round(value, 1) for value in gained])  # [221.2, 172.3, 134.2, 104.5]
@@ -378,7 +396,7 @@ plotter.plot_series(
 | `prediction_intervals`                    | `None`                                         | `plot_series` only. The `PredictionIntervals` of a [conformal method](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md): the subplot of each of their series, by label, shows the band from `lower` to `upper` and the point prediction, dashed. An unbounded interval is left out of the band.                                                                                                                                                                                                    |
 | `config`                                  | `PlotConfig()`                                 | Figure size, dpi, layout and seaborn style.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `show_legend`                             | `True`                                         | `plot_series` only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot_series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`.                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot_series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`. With no `position_label`, a model with an [origin](https://munqu.github.io/commol/latest/guide/units-and-equations/#dates-on-the-axis) labels each tick with its date (`2020-01-08`, with the time when it is not midnight): at the plotted positions `tick_every` apart, or at the ticks matplotlib places when `tick_every` is `None`.                                                                                   |
 | other keyword arguments                   | —                                              | Passed to `seaborn.lineplot`, such as `linewidth` or `alpha`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 | `PlotConfig` field | Default            | Values                                                      |

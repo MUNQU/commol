@@ -3252,10 +3252,40 @@ equations through <code>equation_forms</code>; <code>test_rendering.py</code> ch
 with <code>latexmk</code> when they are installed), <code>tests/building/test_engine.py</code>
 (every engine gives a form).</p>
 <h2 id="reports">Reports<a class="headerlink" href="#reports" title="Permanent link">&para;</a></h2>
-<p><code>api/reporting.py</code> returns blocks of data, not documents:
-<code>simulation_report</code> (observed values, series, accumulators) and
-<code>applied_parameters_report</code> (calibrated parameters, and the sections of the
-model kind: <code>initial_conditions</code> for an aggregate model).</p>
+<p>A report is a method of the object of results whose data it describes:
+<code>SimulationResults.report</code> (one run), <code>SimulationReplicates.report</code> (the
+replicates of a stochastic engine), <code>Predictive.report</code> (the draws of a
+sample), <code>Model.applied_parameters</code> (calibrated parameters, and the sections
+of the model kind: <code>initial_amounts</code> and <code>category_splits</code> for an aggregate
+model) and <code>IdentifiabilityReport.report</code>. The private functions of
+<code>api/reporting.py</code> build the blocks, which are data, not documents. No module
+function reports anything.</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Why, against the alternative</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The report of a run is on the results, not on <code>Simulation</code></td>
+<td><code>Simulation.report(results, ...)</code> puts the report on the object that produces the data and takes the data as an argument; <code>results.report(simulation, ...)</code> takes two objects that must agree.</td>
+</tr>
+<tr>
+<td><code>SimulationResults</code> and <code>SimulationReplicates</code> hold a reference to their <code>Model</code>, which <code>Simulation.run</code>, <code>run_at</code> and <code>replicates</code> set; <code>Predictive</code> reads it through <code>source.simulation</code></td>
+<td>A report reads the outputs of each bin and accumulator (<code>ModelStructure.outputs_by_source</code>); a copy of that map would be a second source of truth, and the figures also need <code>series_label</code>. A report reads only the structure, never the values of the parameters, so a later <code>update_parameters</code> does not change it. <code>Model</code> holds no Rust object, so results still pickle. Results built by hand have no model, and a report that needs one raises <code>ValueError</code> that names the bin or accumulator.</td>
+</tr>
+<tr>
+<td><code>Predictive.report</code> takes no point estimate</td>
+<td>Each leaf of an ensemble comes from its members only; the mean of the draws is not a run of the model.</td>
+</tr>
+<tr>
+<td><code>Model.applied_parameters</code> is on the model</td>
+<td>Most of the block is data of the model (one row per parameter, the sections of its structure); the values and the problem only add what calibration set.</td>
+</tr>
+</tbody>
+</table>
 <ul>
 <li>A single run and an ensemble (replicates or a <code>Predictive</code>) differ only at
   the leaves (<code>ReportLeaf</code>); a predictive's members carry their weights.</li>
@@ -3264,7 +3294,8 @@ model kind: <code>initial_conditions</code> for an aggregate model).</p>
 <li>Labels and summary figures belong to the caller, because they carry domain
   vocabulary.</li>
 </ul>
-<p><strong>Guard:</strong> <code>tests/reporting/</code>.</p>
+<p><strong>Guard:</strong> <code>tests/reporting/</code> (<code>test_reports.py</code> checks that each method
+gives the block of its definition, with its key order).</p>
 <h2 id="a-plot-keeps-the-global-style">A plot keeps the global style<a class="headerlink" href="#a-plot-keeps-the-global-style" title="Permanent link">&para;</a></h2>
 <p>A <code>PlotConfig</code> sets its seaborn style, palette and context through
 <code>matplotlib.rcParams</code>, which is global to the process. Each public method of

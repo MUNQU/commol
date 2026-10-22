@@ -960,6 +960,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#dates-on-the-axis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dates on the axis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3179,6 +3190,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#dates-on-the-axis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dates on the axis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3457,6 +3479,89 @@ with <code>k</code> in <code>"1/day"</code> is a flow and fails with <code>expec
 <code>sin(2 * pi * step / 365)</code> or <code>exp(-decay * step)</code> with <code>decay</code> in
 <code>"dimensionless"</code>, or <code>sin(2 * pi * t / period)</code> with <code>period</code> in the step
 unit.</p>
+<h2 id="dates-on-the-axis">Dates on the axis<a class="headerlink" href="#dates-on-the-axis" title="Permanent link">&para;</a></h2>
+<p>An axis of time can start at a calendar moment: <code>ModelBuilder(origin=...)</code>
+takes a <code>datetime.date</code> (read as its midnight) or a <code>datetime.datetime</code> with
+no time zone. <code>Model.axis_units()</code> then converts between dates and positions,
+and gives the positions where calendar days and weeks end.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">calendar</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">date</span><span class="p">,</span> <span class="n">datetime</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">dated</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Dated&quot;</span><span class="p">,</span> <span class="n">step_unit</span><span class="o">=</span><span class="s2">&quot;hour&quot;</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="n">date</span><span class="p">(</span><span class="mi">2020</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.01</span><span class="p">)</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * A&quot;</span><span class="p">)</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">Aggregate</span><span class="p">(</span><span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">1000</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">}),</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">)</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="p">)</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="n">axis</span> <span class="o">=</span> <span class="n">dated</span><span class="o">.</span><span class="n">axis_units</span><span class="p">()</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="nb">print</span><span class="p">(</span><span class="n">axis</span><span class="o">.</span><span class="n">position_of</span><span class="p">(</span><span class="n">date</span><span class="p">(</span><span class="mi">2020</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)))</span>         <span class="c1"># 24.0</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="nb">print</span><span class="p">(</span><span class="n">axis</span><span class="o">.</span><span class="n">position_of</span><span class="p">(</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2020</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">6</span><span class="p">)))</span>  <span class="c1"># 6.0</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="nb">print</span><span class="p">(</span><span class="n">axis</span><span class="o">.</span><span class="n">moment_of</span><span class="p">(</span><span class="mi">36</span><span class="p">))</span>                         <span class="c1"># 2020-01-02 12:00:00</span>
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="nb">print</span><span class="p">(</span><span class="n">axis</span><span class="o">.</span><span class="n">day_ends</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">72</span><span class="p">))</span>                       <span class="c1"># [24.0, 48.0, 72.0]</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="c1"># 2020-01-01 is a Wednesday: the first week that starts on Sunday ends on 5 January.</span>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="nb">print</span><span class="p">(</span><span class="n">axis</span><span class="o">.</span><span class="n">week_ends</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">400</span><span class="p">,</span> <span class="n">first_weekday</span><span class="o">=</span><span class="n">calendar</span><span class="o">.</span><span class="n">SUNDAY</span><span class="p">))</span>  <span class="c1"># [96.0, 264.0]</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Gives</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>position_of(moment)</code></td>
+<td><code>(moment - origin)</code> in steps; negative before the origin.</td>
+</tr>
+<tr>
+<td><code>moment_of(position)</code></td>
+<td><code>origin + position</code> steps, a <code>datetime</code> with no time zone. The inverse of <code>position_of</code>.</td>
+</tr>
+<tr>
+<td><code>day_ends(start, end)</code></td>
+<td>The positions of the midnights in <code>(start, end]</code>.</td>
+</tr>
+<tr>
+<td><code>week_ends(start, end, first_weekday)</code></td>
+<td>The positions in <code>(start, end]</code> where a week starts, at midnight of <code>first_weekday</code>: 0 (Monday) to 6 (Sunday), as <code>date.weekday()</code> and <code>calendar.SUNDAY</code> number them.</td>
+</tr>
+</tbody>
+</table>
+<p>A period ends where the next one starts, so its end is the midnight that
+starts the next day or week. The range <code>(start, end]</code> is the range of a
+<a href="../calibration-observations/#counts-per-period-windows">window</a>: a period that
+ends at <code>start</code> is not in it, and the first end can close a partial period
+that starts before <code>start</code>. The number of a period (a week number of a
+national rule) is not part of the axis: label a period from its end with your
+own function.</p>
+<p>Rules of the origin, each a <code>ValueError</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A conversion needs an origin.</td>
+<td>An axis without one has no dates.</td>
+</tr>
+<tr>
+<td>The moment has no time zone.</td>
+<td>A step has no time zone, so <code>(moment - origin) / step</code> stays exact through a change of summer time. Convert an aware moment with <code>moment.astimezone(zone).replace(tzinfo=None)</code>.</td>
+</tr>
+<tr>
+<td>The step unit is a unit of time whose length is a whole number of days or a whole fraction of a day, such as <code>hour</code>, <code>day</code> or <code>week</code>.</td>
+<td><code>month</code> and <code>year</code> are units of a fixed length (a month is 1/12 of a year, about 30.44 days), not the length of a calendar month or year, so their positions would not fall on calendar dates.</td>
+</tr>
+</tbody>
+</table>
+<p>With an origin, <a href="../simulations/#plotting"><code>SimulationPlotter.plot_series</code></a>
+labels its ticks with dates when it has no <code>position_label</code>.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

@@ -1203,10 +1203,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#applied_parameters_report" class="md-nav__link">
+  <a href="#the-applied-parameters-of-a-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        applied_parameters_report
+        The applied parameters of a model
       
     </span>
   </a>
@@ -1214,10 +1214,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#simulation_report" class="md-nav__link">
+  <a href="#the-report-of-a-run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        simulation_report
+        The report of a run
       
     </span>
   </a>
@@ -1225,10 +1225,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#identifiability_report" class="md-nav__link">
+  <a href="#the-report-of-an-ensemble" class="md-nav__link">
     <span class="md-ellipsis">
       
-        identifiability_report
+        The report of an ensemble
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-report-of-an-identifiability-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The report of an identifiability analysis
       
     </span>
   </a>
@@ -3079,10 +3090,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#applied_parameters_report" class="md-nav__link">
+  <a href="#the-applied-parameters-of-a-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        applied_parameters_report
+        The applied parameters of a model
       
     </span>
   </a>
@@ -3090,10 +3101,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#simulation_report" class="md-nav__link">
+  <a href="#the-report-of-a-run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        simulation_report
+        The report of a run
       
     </span>
   </a>
@@ -3101,10 +3112,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#identifiability_report" class="md-nav__link">
+  <a href="#the-report-of-an-ensemble" class="md-nav__link">
     <span class="md-ellipsis">
       
-        identifiability_report
+        The report of an ensemble
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-report-of-an-identifiability-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The report of an identifiability analysis
       
     </span>
   </a>
@@ -3155,13 +3177,39 @@
 
 <h1 id="reports">Reports<a class="headerlink" href="#reports" title="Permanent link">&para;</a></h1>
 <p><a href="../calibration/">Back to Model Calibration</a></p>
-<p>Two functions turn a calibrated model and a run into plain dictionaries, ready
-for JSON: <code>applied_parameters_report</code> (what the model holds and what calibration
-set) and <code>simulation_report</code> (what a run produced, next to the observations).
-Both work for a single calibration and for a sample of the parameters, with
-the same layout. A third, <code>identifiability_report</code>, gives the verdicts of an
-<code>IdentifiabilityReport</code> as plain data
-(<a href="../uncertainty/identifiability/#the-report">Identifiability</a>).</p>
+<p>A report turns the data of an object into plain dictionaries, ready for JSON.
+Each report is a method of the object whose data it describes:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Reports</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Model.applied_parameters(values, problem=None, …)</code></td>
+<td>What the model holds and what calibration set</td>
+</tr>
+<tr>
+<td><code>SimulationResults.report(positions, window, windows, …)</code></td>
+<td>What a run produced, next to the observations</td>
+</tr>
+<tr>
+<td><code>SimulationReplicates.report(confidence_level, …)</code></td>
+<td>The same, with each number reduced across the replicates of a stochastic engine</td>
+</tr>
+<tr>
+<td><code>Predictive.report(confidence_level, …)</code></td>
+<td>The same, with each number reduced across the draws of a sample, with their weights</td>
+</tr>
+<tr>
+<td><code>IdentifiabilityReport.report()</code></td>
+<td>The verdicts of an identifiability analysis (<a href="../uncertainty/identifiability/#the-report">Identifiability</a>)</td>
+</tr>
+</tbody>
+</table>
+<p>A single run and an ensemble give the same layout.</p>
 <h2 id="quick-path">Quick path<a class="headerlink" href="#quick-path" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -3174,69 +3222,64 @@ the same layout. A third, <code>identifiability_report</code>, gives the verdict
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">NelderMeadConfig</span><span class="p">,</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">ObservedDataPoint</span><span class="p">,</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">Simulation</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">applied_parameters_report</span><span class="p">,</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">simulation_report</span><span class="p">,</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">windowed_totals</span><span class="p">,</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="p">)</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="k">def</span><span class="w"> </span><span class="nf">model</span><span class="p">(</span><span class="n">k1</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">):</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="k">return</span> <span class="p">(</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>        <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Reported&quot;</span><span class="p">)</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>        <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>        <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>        <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State C&quot;</span><span class="p">)</span>
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>        <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">k1</span><span class="p">)</span>
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>        <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>        <span class="o">.</span><span class="n">add_accumulator</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Total moved from A to B&quot;</span><span class="p">)</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>        <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>            <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * A * B / total&quot;</span><span class="p">,</span> <span class="n">accumulators</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">]</span>
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>        <span class="p">)</span>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>        <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_bc&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k2 * B&quot;</span><span class="p">)</span>
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>        <span class="o">.</span><span class="n">build</span><span class="p">(</span>
-</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>            <span class="n">Aggregate</span><span class="p">(</span>
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>                <span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">990</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
-</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>            <span class="p">),</span>
-</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>            <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
-</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>        <span class="p">)</span>
-</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>    <span class="p">)</span>
-</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>
-</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="n">ends</span> <span class="o">=</span> <span class="p">[</span><span class="mi">7</span><span class="p">,</span> <span class="mi">14</span><span class="p">,</span> <span class="mi">21</span><span class="p">,</span> <span class="mi">28</span><span class="p">]</span>
-</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="n">truth</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="mf">0.4</span><span class="p">))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">28</span><span class="p">)</span>
-</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a><span class="n">observed_data</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">end</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">count</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
-</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>    <span class="k">for</span> <span class="n">end</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ends</span><span class="p">,</span> <span class="n">windowed_totals</span><span class="p">(</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span> <span class="n">truth</span><span class="o">.</span><span class="n">positions</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="n">ends</span><span class="p">))</span>
-</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a><span class="p">]</span>
-</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
-</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
-</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
-</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>    <span class="p">],</span>
-</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>    <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span>
-</span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">NelderMeadConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">500</span><span class="p">),</span>
-</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="p">)</span>
-</span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a>
-</span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a><span class="n">calibrated</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
-</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a><span class="n">result</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">calibrated</span><span class="p">),</span> <span class="n">problem</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
-</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a><span class="n">calibrated</span><span class="o">.</span><span class="n">apply_calibration_parameters</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">problem</span><span class="p">)</span>
-</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a>
-</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a><span class="n">applied</span> <span class="o">=</span> <span class="n">applied_parameters_report</span><span class="p">(</span><span class="n">calibrated</span><span class="p">,</span> <span class="n">result</span><span class="p">,</span> <span class="n">problem</span><span class="p">)</span>
-</span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">applied</span><span class="p">[</span><span class="s2">&quot;parameters&quot;</span><span class="p">][</span><span class="s2">&quot;k2&quot;</span><span class="p">]))</span>  <span class="c1"># {&quot;value&quot;: 0.1, &quot;calibrated&quot;: false}</span>
-</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a>
-</span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60" href="#__codelineno-0-60"></a><span class="n">simulation</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">calibrated</span><span class="p">)</span>
-</span><span id="__span-0-61"><a id="__codelineno-0-61" name="__codelineno-0-61" href="#__codelineno-0-61"></a><span class="n">results</span> <span class="o">=</span> <span class="n">simulation</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">28</span><span class="p">)</span>
-</span><span id="__span-0-62"><a id="__codelineno-0-62" name="__codelineno-0-62" href="#__codelineno-0-62"></a><span class="n">run_report</span> <span class="o">=</span> <span class="n">simulation_report</span><span class="p">(</span>
-</span><span id="__span-0-63"><a id="__codelineno-0-63" name="__codelineno-0-63" href="#__codelineno-0-63"></a>    <span class="n">simulation</span><span class="p">,</span>
-</span><span id="__span-0-64"><a id="__codelineno-0-64" name="__codelineno-0-64" href="#__codelineno-0-64"></a>    <span class="n">results</span><span class="p">,</span>
-</span><span id="__span-0-65"><a id="__codelineno-0-65" name="__codelineno-0-65" href="#__codelineno-0-65"></a>    <span class="n">at</span><span class="o">=</span><span class="n">ends</span><span class="p">,</span>
-</span><span id="__span-0-66"><a id="__codelineno-0-66" name="__codelineno-0-66" href="#__codelineno-0-66"></a>    <span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>
-</span><span id="__span-0-67"><a id="__codelineno-0-67" name="__codelineno-0-67" href="#__codelineno-0-67"></a>    <span class="n">num_windows</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
-</span><span id="__span-0-68"><a id="__codelineno-0-68" name="__codelineno-0-68" href="#__codelineno-0-68"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
-</span><span id="__span-0-69"><a id="__codelineno-0-69" name="__codelineno-0-69" href="#__codelineno-0-69"></a>    <span class="n">accumulators</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span>
-</span><span id="__span-0-70"><a id="__codelineno-0-70" name="__codelineno-0-70" href="#__codelineno-0-70"></a><span class="p">)</span>
-</span><span id="__span-0-71"><a id="__codelineno-0-71" name="__codelineno-0-71" href="#__codelineno-0-71"></a><span class="nb">print</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">run_report</span><span class="p">))</span>  <span class="c1"># [&#39;accumulators&#39;, &#39;observed&#39;, &#39;series&#39;]</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">windowed_totals</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="k">def</span><span class="w"> </span><span class="nf">model</span><span class="p">(</span><span class="n">k1</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">):</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="k">return</span> <span class="p">(</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>        <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Reported&quot;</span><span class="p">)</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>        <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>        <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>        <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State C&quot;</span><span class="p">)</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>        <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">k1</span><span class="p">)</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>        <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>        <span class="o">.</span><span class="n">add_accumulator</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Total moved from A to B&quot;</span><span class="p">)</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>        <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>            <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * A * B / total&quot;</span><span class="p">,</span> <span class="n">accumulators</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">]</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>        <span class="p">)</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>        <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_bc&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k2 * B&quot;</span><span class="p">)</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>        <span class="o">.</span><span class="n">build</span><span class="p">(</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>            <span class="n">Aggregate</span><span class="p">(</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>                <span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">990</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>            <span class="p">),</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>            <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>        <span class="p">)</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>    <span class="p">)</span>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a><span class="n">ends</span> <span class="o">=</span> <span class="p">[</span><span class="mi">7</span><span class="p">,</span> <span class="mi">14</span><span class="p">,</span> <span class="mi">21</span><span class="p">,</span> <span class="mi">28</span><span class="p">]</span>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a><span class="n">truth</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="mf">0.4</span><span class="p">))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">28</span><span class="p">)</span>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="n">observed_data</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">end</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">count</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>    <span class="k">for</span> <span class="n">end</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ends</span><span class="p">,</span> <span class="n">windowed_totals</span><span class="p">(</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span> <span class="n">truth</span><span class="o">.</span><span class="n">positions</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="n">ends</span><span class="p">))</span>
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a><span class="p">]</span>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
+</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
+</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>    <span class="p">],</span>
+</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>    <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span>
+</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">NelderMeadConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">500</span><span class="p">),</span>
+</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a><span class="p">)</span>
+</span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a>
+</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="n">calibrated</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+</span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a><span class="n">result</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">calibrated</span><span class="p">),</span> <span class="n">problem</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a><span class="n">calibrated</span><span class="o">.</span><span class="n">apply_calibration_parameters</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">problem</span><span class="p">)</span>
+</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a>
+</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a><span class="n">applied</span> <span class="o">=</span> <span class="n">calibrated</span><span class="o">.</span><span class="n">applied_parameters</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">problem</span><span class="p">)</span>
+</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">applied</span><span class="p">[</span><span class="s2">&quot;parameters&quot;</span><span class="p">][</span><span class="s2">&quot;k2&quot;</span><span class="p">]))</span>  <span class="c1"># {&quot;value&quot;: 0.1, &quot;calibrated&quot;: false}</span>
+</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a>
+</span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a><span class="n">results</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">calibrated</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">28</span><span class="p">)</span>
+</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a><span class="n">run_report</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">report</span><span class="p">(</span>
+</span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60" href="#__codelineno-0-60"></a>    <span class="n">positions</span><span class="o">=</span><span class="n">ends</span><span class="p">,</span>
+</span><span id="__span-0-61"><a id="__codelineno-0-61" name="__codelineno-0-61" href="#__codelineno-0-61"></a>    <span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>
+</span><span id="__span-0-62"><a id="__codelineno-0-62" name="__codelineno-0-62" href="#__codelineno-0-62"></a>    <span class="n">windows</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+</span><span id="__span-0-63"><a id="__codelineno-0-63" name="__codelineno-0-63" href="#__codelineno-0-63"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
+</span><span id="__span-0-64"><a id="__codelineno-0-64" name="__codelineno-0-64" href="#__codelineno-0-64"></a>    <span class="n">accumulators</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span>
+</span><span id="__span-0-65"><a id="__codelineno-0-65" name="__codelineno-0-65" href="#__codelineno-0-65"></a><span class="p">)</span>
+</span><span id="__span-0-66"><a id="__codelineno-0-66" name="__codelineno-0-66" href="#__codelineno-0-66"></a><span class="nb">print</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">run_report</span><span class="p">))</span>  <span class="c1"># [&#39;accumulators&#39;, &#39;observed&#39;, &#39;series&#39;]</span>
 </span></code></pre></div>
-<h2 id="applied_parameters_report"><code>applied_parameters_report</code><a class="headerlink" href="#applied_parameters_report" title="Permanent link">&para;</a></h2>
-<p><code>applied_parameters_report(model, result, problem=None, parameter_statistics=None,
+<h2 id="the-applied-parameters-of-a-model">The applied parameters of a model<a class="headerlink" href="#the-applied-parameters-of-a-model" title="Permanent link">&para;</a></h2>
+<p><code>Model.applied_parameters(values, problem=None, sample=None,
 confidence_level=None)</code> lists every number the calibrated model holds, and
 whether calibration set it. The <code>parameters</code> section is the same for every
 kind of model; the structure of the model adds the sections of its kind
@@ -3267,11 +3310,11 @@ kind of model; the structure of the model adds the sections of its kind
 </thead>
 <tbody>
 <tr>
-<td><code>model</code></td>
-<td>The model <strong>after</strong> <code>apply_calibration_parameters</code>.</td>
+<td>The model</td>
+<td>Call the method on the model <strong>after</strong> <code>apply_calibration_parameters</code>.</td>
 </tr>
 <tr>
-<td><code>result</code></td>
+<td><code>values</code></td>
 <td>A <code>CalibrationResult</code>, or an <code>{id: value}</code> mapping such as one of <code>sample.draws()</code>.</td>
 </tr>
 <tr>
@@ -3323,12 +3366,12 @@ kind of model; the structure of the model adds the sections of its kind
 <code>calibrated</code>, then <code>interval</code>), so saved JSON files stay comparable. An
 interval is in the unit of its entry: an amount in the unit of its bin, a split
 as a fraction of its group.</p>
-<h2 id="simulation_report"><code>simulation_report</code><a class="headerlink" href="#simulation_report" title="Permanent link">&para;</a></h2>
-<p><code>simulation_report(simulation, results, at, window, num_windows,
-observed_data=(), accumulators=(), ensemble_runs=None, confidence_level=None)</code>
-reports a run on one axis of windows. It reads each value at a position of the
-results (<code>results.positions</code>), so it works for any model type: a differential
-model reports at non-integer positions once the results hold them
+<h2 id="the-report-of-a-run">The report of a run<a class="headerlink" href="#the-report-of-a-run" title="Permanent link">&para;</a></h2>
+<p><code>SimulationResults.report(positions, window, windows, observed_data=(),
+accumulators=(), prediction_intervals=None)</code> reports a run on one axis of
+windows. It reads each value at a position of the results
+(<code>results.positions</code>), so it works for any model type: a differential model
+reports at non-integer positions once the results hold them
 (<a href="../simulations/#reporting-at-any-position">Reporting at any position</a>).</p>
 <table>
 <thead>
@@ -3340,15 +3383,15 @@ model reports at non-integer positions once the results hold them
 <tbody>
 <tr>
 <td><code>observed</code></td>
-<td>For each observation label: <code>values</code>, padded to <code>num_windows</code>, so it lines up with <code>windowed</code> index for index. An observation goes to the window that holds its position (<code>window_index</code>). <code>weights</code>, <code>outputs</code> and <code>factor_id</code> appear when a series uses them.</td>
+<td>For each observation label: <code>values</code>, padded to <code>windows</code>, so it lines up with <code>windowed</code> index for index. An observation goes to the window that holds its position (the rule of <code>AxisUnits.window_index</code>). <code>weights</code>, <code>outputs</code> and <code>factor_id</code> appear when a series uses them.</td>
 </tr>
 <tr>
 <td><code>series</code></td>
-<td>Each compartment output sampled at <code>at</code></td>
+<td>Each compartment output sampled at <code>positions</code></td>
 </tr>
 <tr>
 <td><code>accumulators</code></td>
-<td>For each accumulator: <code>total</code> (its final value), <code>windowed</code> (the gain in each window that ends within the results, as the loss compares it) and <code>cumulative</code> (sampled at <code>at</code>); each reading as a <code>total</code> and <code>by_output</code></td>
+<td>For each accumulator: <code>total</code> (its final value), <code>windowed</code> (the gain in each window that ends within the results, as the loss compares it) and <code>cumulative</code> (sampled at <code>positions</code>); each reading as a <code>total</code> and <code>by_output</code></td>
 </tr>
 </tbody>
 </table>
@@ -3361,16 +3404,12 @@ model reports at non-integer positions once the results hold them
 </thead>
 <tbody>
 <tr>
-<td><code>results</code></td>
-<td><code>SimulationResults</code> of <code>run</code> or <code>run_at</code>.</td>
-</tr>
-<tr>
-<td><code>at</code></td>
+<td><code>positions</code></td>
 <td>The positions where series and cumulative readings are sampled; each must be a position of the results (<code>ValueError</code> otherwise).</td>
 </tr>
 <tr>
-<td><code>window</code>, <code>num_windows</code></td>
-<td>The window axis of <code>observed</code> and <code>windowed</code>.</td>
+<td><code>window</code>, <code>windows</code></td>
+<td>The window axis of <code>observed</code> and <code>windowed</code>: the length of one window and how many.</td>
 </tr>
 <tr>
 <td><code>observed_data</code></td>
@@ -3378,11 +3417,7 @@ model reports at non-integer positions once the results hold them
 </tr>
 <tr>
 <td><code>accumulators</code></td>
-<td>The accumulator ids to report.</td>
-</tr>
-<tr>
-<td><code>ensemble_runs</code>, <code>confidence_level</code></td>
-<td>The <code>SimulationReplicates</code> of a stochastic engine, one <code>SimulationResults</code> per member, or a <a href="../uncertainty/#the-predictive"><code>Predictive</code></a>, whose draws carry their weights. Every number becomes a <code>{mean, median, ci_lower, ci_upper, min, max}</code> block, reduced member by member with the weights; the layout does not change.</td>
+<td>The accumulator ids to report. The results read the outputs of each one from their model (<code>results.model</code>, which <code>Simulation.run</code>, <code>run_at</code> and <code>replicates</code> set); results built by hand have no model, and reporting an accumulator raises <code>ValueError</code> that names it.</td>
 </tr>
 <tr>
 <td><code>prediction_intervals</code></td>
@@ -3395,17 +3430,42 @@ a run label or summary figures in your domain's terms:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">document</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;calibration&quot;</span><span class="p">,</span> <span class="s2">&quot;at&quot;</span><span class="p">:</span> <span class="n">ends</span><span class="p">,</span> <span class="o">**</span><span class="n">run_report</span><span class="p">}</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">document</span><span class="p">)[:</span><span class="mi">30</span><span class="p">])</span>
 </span></code></pre></div>
-<h2 id="identifiability_report"><code>identifiability_report</code><a class="headerlink" href="#identifiability_report" title="Permanent link">&para;</a></h2>
-<p><code>identifiability_report(report)</code> takes the result of
-<code>Calibrator.identifiability</code>, or of <code>IdentifiabilityReport.merge</code>, and returns
+<p>The results hold a reference to their model, not a copy, and a report reads
+only its structure (the outputs of each bin and accumulator), never the values
+of its parameters, so a later <code>update_parameters</code> does not change the report
+of a run. Results with their model still pickle.</p>
+<h2 id="the-report-of-an-ensemble">The report of an ensemble<a class="headerlink" href="#the-report-of-an-ensemble" title="Permanent link">&para;</a></h2>
+<p><code>SimulationReplicates.report(confidence_level, positions, window, windows,
+observed_data=(), accumulators=(), prediction_intervals=None)</code> reports the
+replicates of a stochastic engine, and <code>Predictive.report</code> with the same
+arguments reports the draws of a
+<a href="../uncertainty/#the-predictive"><code>Predictive</code></a>. The layout is the one of
+the report of a run; every number becomes a <code>{mean, median, ci_lower,
+ci_upper, min, max}</code> block, computed per member and then reduced across the
+members with their weights (equal for replicates).
+A predictive takes no point estimate: each number comes from the draws only.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ParameterSample</span><span class="p">,</span> <span class="n">Predictive</span><span class="p">,</span> <span class="n">SampleMethod</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">sample</span> <span class="o">=</span> <span class="n">ParameterSample</span><span class="o">.</span><span class="n">equally_weighted</span><span class="p">(</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="p">[</span><span class="s2">&quot;k1&quot;</span><span class="p">],</span> <span class="p">[(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)],</span> <span class="p">[[</span><span class="mf">0.35</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.4</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.45</span><span class="p">]],</span> <span class="n">SampleMethod</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;draws&quot;</span><span class="p">)</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="p">)</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">predictive</span> <span class="o">=</span> <span class="n">Predictive</span><span class="p">(</span><span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="kc">None</span><span class="p">)),</span> <span class="n">problem</span><span class="p">),</span> <span class="n">sample</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="mi">29</span><span class="p">))</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">band_report</span> <span class="o">=</span> <span class="n">predictive</span><span class="o">.</span><span class="n">report</span><span class="p">(</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="mf">0.9</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="n">ends</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">windows</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">accumulators</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">]</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="p">)</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="nb">print</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">band_report</span><span class="p">[</span><span class="s2">&quot;series&quot;</span><span class="p">][</span><span class="s2">&quot;A&quot;</span><span class="p">]))</span>  <span class="c1"># [&#39;mean&#39;, &#39;median&#39;, &#39;ci_lower&#39;, &#39;ci_upper&#39;, &#39;min&#39;, &#39;max&#39;]</span>
+</span></code></pre></div>
+<h2 id="the-report-of-an-identifiability-analysis">The report of an identifiability analysis<a class="headerlink" href="#the-report-of-an-identifiability-analysis" title="Permanent link">&para;</a></h2>
+<p><code>IdentifiabilityReport.report()</code> gives the result of
+<code>Calibrator.identifiability</code>, or of <code>IdentifiabilityReport.merge</code>, as
 <code>parameters</code> (each parameter, in problem order, with its <code>structural</code> and
 <code>practical</code> verdicts, their reasons and combinations, or <code>None</code>) and
 <code>sections</code> (the evidence of each method that ran, by section name).</p>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
-<li>[ ] The model passed to <code>applied_parameters_report</code> already has the calibrated values.</li>
+<li>[ ] The model reports <code>applied_parameters</code> after <code>apply_calibration_parameters</code>.</li>
 <li>[ ] <code>problem</code> is passed when there are <code>factor</code> parameters.</li>
-<li>[ ] <code>at</code>, <code>window</code> and <code>num_windows</code> match the observations, and the results hold every position the report reads.</li>
+<li>[ ] <code>positions</code>, <code>window</code> and <code>windows</code> match the observations, and the results hold every position the report reads.</li>
 </ul>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>

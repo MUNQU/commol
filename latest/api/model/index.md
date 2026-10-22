@@ -24,6 +24,7 @@ Attributes:
 | `process`     | `Process`         | What changes and how: the bins, accumulators, stratifications and transitions, written once for every structure.        |
 | `structure`   | `StructureT`      | How the process is laid out, which changes between kinds of model, such as the amounts per compartment of an Aggregate. |
 | `step_unit`   | \`str             | None\`                                                                                                                  |
+| `origin`      | \`datetime        | None\`                                                                                                                  |
 
 Source code in `commol/context/model.py`
 
@@ -61,6 +62,11 @@ class Model(BaseModel, Generic[StructureT]):
         Unit of one step on the axis, of any single dimension (``"day"``,
         ``"meter"``). The unit check and `axis_units` use it; None means
         ``step``, the default increment of any axis.
+    origin : datetime | None
+        Calendar moment of position 0, with no time zone, for the dates of
+        `axis_units`. It needs a ``step_unit`` of time whose length is a
+        whole number of days or a whole fraction of a day. None means the
+        axis has no dates.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -84,6 +90,20 @@ class Model(BaseModel, Generic[StructureT]):
             "None means 'step', the default increment of any axis."
         ),
     )
+    origin: Origin | None = Field(
+        None,
+        description=(
+            "Calendar moment of position 0, with no time zone, for the dates "
+            "of axis_units. None means the axis has no dates."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def check_origin_unit(self) -> Self:
+        """Check that an origin has a step unit of fixed calendar length."""
+        if self.origin is not None:
+            seconds_per_step(self.step_unit or DEFAULT_STEP_UNIT)
+        return self
 
     @field_validator("structure", mode="before")
     @classmethod
@@ -282,6 +302,75 @@ class Model(BaseModel, Generic[StructureT]):
             self.update_parameters(parameters)
         self.structure = structure
 
+    def applied_parameters(
+        self,
+        values: CalibrationResult | Mapping[str, float],
+        problem: CalibrationProblem | None = None,
+        sample: "ParameterSample | None" = None,
+        confidence_level: float | None = None,
+    ) -> "AppliedParametersReport":
+        """
+        Report every parameter of the model, and the values of its kind.
+
+        Call it on the model **after** `apply_calibration_parameters`. Each
+        entry carries the value the model holds and whether calibration set
+        it, so entries the calibration left alone appear alongside the fitted
+        ones. The structure of the model adds the sections of its kind
+        (`ModelStructure.report_sections`); an aggregate model adds
+        ``initial_amounts`` and ``category_splits``.
+
+        Parameters that are not a single number, such as a formula or a
+        series, are omitted: they are inputs rather than fitted values.
+        ``factor`` and ``noise`` parameters have no place in the model, so
+        they are reported from `problem` when it is given.
+
+        ``initial_amounts`` gives each bin and each overridden compartment of
+        an aggregate model its ``amount`` the engine builds and the ``unit``
+        of its bin, so bins of different units are reported side by side; no
+        row is a share of a total. A bin left uncalibrated keeps a ``None``
+        amount as its "needs calibration" marker even when overrides touch
+        some of its compartments. ``category_splits`` gives each category its
+        ``fraction`` of the group it splits, and that ``group``: the
+        categories a conditional stratification is conditioned on, empty when
+        it splits every bin.
+
+        With a `sample` each entry gains an ``interval`` holding the weighted
+        statistics of its draws (`ParameterSample.summary`). Every entry is in
+        the unit it was calibrated in: a parameter in its own, an amount in
+        the unit of its bin, and a category split as a fraction of its group.
+
+        Parameters
+        ----------
+        values : CalibrationResult | Mapping
+            The calibration result, or a mapping of parameter id to value such
+            as one draw of a sample.
+        problem : CalibrationProblem | None, optional
+            The problem the values came from, used to report factor and noise
+            parameters.
+        sample : ParameterSample | None, optional
+            Draws of the parameters, such as the sample of an uncertainty
+            method.
+        confidence_level : float | None, optional
+            Confidence level of the intervals; required with a sample.
+
+        Returns
+        -------
+        AppliedParametersReport
+            Key ``parameters`` and the sections of the kind
+            (``initial_amounts`` and ``category_splits`` for an aggregate
+            model), preceded by ``confidence_level`` when there is one.
+
+        Raises
+        ------
+        ValueError
+            If a sample is given without a confidence level.
+        """
+        from commol.api.reporting import _applied_parameters_report
+
+        return _applied_parameters_report(
+            self, values, problem, sample, confidence_level
+        )
+
     def describe(self, layout: Layout = "default") -> ModelDescription:
         """
         A description of the model, as data.
@@ -329,8 +418,9 @@ class Model(BaseModel, Generic[StructureT]):
         The unit of one step of the model, and its engine, to convert values.
 
         The step unit is ``step_unit`` or, when the model declares none,
-        ``step``, the default increment of any axis. The engine is the one of
-        the model, so the rates of `AxisUnits` mean what this engine reads.
+        ``step``, the default increment of any axis. The origin is
+        ``origin``, for the dates of the axis. The engine is the one of the
+        model, so the rates of `AxisUnits` mean what this engine reads.
 
         Returns
         -------
@@ -345,7 +435,9 @@ class Model(BaseModel, Generic[StructureT]):
         >>> gamma = units.rate_from_mean_span(5, "day")
         """
         return AxisUnits(
-            step_unit=self.step_unit or DEFAULT_STEP_UNIT, engine=self.engine.type
+            step_unit=self.step_unit or DEFAULT_STEP_UNIT,
+            engine=self.engine.type,
+            origin=self.origin,
         )
 
     def check_unit_consistency(self, verbose: bool = False) -> None:
@@ -388,6 +480,25 @@ class Model(BaseModel, Generic[StructureT]):
 ```
 
 ### Methods:
+
+#### check_origin_unit
+
+```python
+check_origin_unit() -> Self
+```
+
+Check that an origin has a step unit of fixed calendar length.
+
+Source code in `commol/context/model.py`
+
+```python
+@model_validator(mode="after")
+def check_origin_unit(self) -> Self:
+    """Check that an origin has a step unit of fixed calendar length."""
+    if self.origin is not None:
+        seconds_per_step(self.step_unit or DEFAULT_STEP_UNIT)
+    return self
+```
 
 #### read_structure_kind
 
@@ -762,6 +873,116 @@ def apply_calibration_parameters(
     self.structure = structure
 ```
 
+#### applied_parameters
+
+```python
+applied_parameters(values: CalibrationResult | Mapping[str, float], problem: CalibrationProblem | None = None, sample: ParameterSample | None = None, confidence_level: float | None = None) -> AppliedParametersReport
+```
+
+Report every parameter of the model, and the values of its kind.
+
+Call it on the model **after** `apply_calibration_parameters`. Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); an aggregate model adds `initial_amounts` and `category_splits`.
+
+Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` and `noise` parameters have no place in the model, so they are reported from `problem` when it is given.
+
+`initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin.
+
+With a `sample` each entry gains an `interval` holding the weighted statistics of its draws (`ParameterSample.summary`). Every entry is in the unit it was calibrated in: a parameter in its own, an amount in the unit of its bin, and a category split as a fraction of its group.
+
+Parameters:
+
+| Name               | Type                 | Description | Default                                                                                     |
+| ------------------ | -------------------- | ----------- | ------------------------------------------------------------------------------------------- |
+| `values`           | \`CalibrationResult  | Mapping\`   | The calibration result, or a mapping of parameter id to value such as one draw of a sample. |
+| `problem`          | \`CalibrationProblem | None\`      | The problem the values came from, used to report factor and noise parameters.               |
+| `sample`           | \`ParameterSample    | None\`      | Draws of the parameters, such as the sample of an uncertainty method.                       |
+| `confidence_level` | \`float              | None\`      | Confidence level of the intervals; required with a sample.                                  |
+
+Returns:
+
+| Type                      | Description                                                                                                                                               |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AppliedParametersReport` | Key parameters and the sections of the kind (initial_amounts and category_splits for an aggregate model), preceded by confidence_level when there is one. |
+
+Raises:
+
+| Type         | Description                                      |
+| ------------ | ------------------------------------------------ |
+| `ValueError` | If a sample is given without a confidence level. |
+
+Source code in `commol/context/model.py`
+
+```python
+def applied_parameters(
+    self,
+    values: CalibrationResult | Mapping[str, float],
+    problem: CalibrationProblem | None = None,
+    sample: "ParameterSample | None" = None,
+    confidence_level: float | None = None,
+) -> "AppliedParametersReport":
+    """
+    Report every parameter of the model, and the values of its kind.
+
+    Call it on the model **after** `apply_calibration_parameters`. Each
+    entry carries the value the model holds and whether calibration set
+    it, so entries the calibration left alone appear alongside the fitted
+    ones. The structure of the model adds the sections of its kind
+    (`ModelStructure.report_sections`); an aggregate model adds
+    ``initial_amounts`` and ``category_splits``.
+
+    Parameters that are not a single number, such as a formula or a
+    series, are omitted: they are inputs rather than fitted values.
+    ``factor`` and ``noise`` parameters have no place in the model, so
+    they are reported from `problem` when it is given.
+
+    ``initial_amounts`` gives each bin and each overridden compartment of
+    an aggregate model its ``amount`` the engine builds and the ``unit``
+    of its bin, so bins of different units are reported side by side; no
+    row is a share of a total. A bin left uncalibrated keeps a ``None``
+    amount as its "needs calibration" marker even when overrides touch
+    some of its compartments. ``category_splits`` gives each category its
+    ``fraction`` of the group it splits, and that ``group``: the
+    categories a conditional stratification is conditioned on, empty when
+    it splits every bin.
+
+    With a `sample` each entry gains an ``interval`` holding the weighted
+    statistics of its draws (`ParameterSample.summary`). Every entry is in
+    the unit it was calibrated in: a parameter in its own, an amount in
+    the unit of its bin, and a category split as a fraction of its group.
+
+    Parameters
+    ----------
+    values : CalibrationResult | Mapping
+        The calibration result, or a mapping of parameter id to value such
+        as one draw of a sample.
+    problem : CalibrationProblem | None, optional
+        The problem the values came from, used to report factor and noise
+        parameters.
+    sample : ParameterSample | None, optional
+        Draws of the parameters, such as the sample of an uncertainty
+        method.
+    confidence_level : float | None, optional
+        Confidence level of the intervals; required with a sample.
+
+    Returns
+    -------
+    AppliedParametersReport
+        Key ``parameters`` and the sections of the kind
+        (``initial_amounts`` and ``category_splits`` for an aggregate
+        model), preceded by ``confidence_level`` when there is one.
+
+    Raises
+    ------
+    ValueError
+        If a sample is given without a confidence level.
+    """
+    from commol.api.reporting import _applied_parameters_report
+
+    return _applied_parameters_report(
+        self, values, problem, sample, confidence_level
+    )
+```
+
 #### describe
 
 ```python
@@ -853,7 +1074,7 @@ axis_units() -> AxisUnits
 
 The unit of one step of the model, and its engine, to convert values.
 
-The step unit is `step_unit` or, when the model declares none, `step`, the default increment of any axis. The engine is the one of the model, so the rates of `AxisUnits` mean what this engine reads.
+The step unit is `step_unit` or, when the model declares none, `step`, the default increment of any axis. The origin is `origin`, for the dates of the axis. The engine is the one of the model, so the rates of `AxisUnits` mean what this engine reads.
 
 Returns:
 
@@ -878,8 +1099,9 @@ def axis_units(self) -> AxisUnits:
     The unit of one step of the model, and its engine, to convert values.
 
     The step unit is ``step_unit`` or, when the model declares none,
-    ``step``, the default increment of any axis. The engine is the one of
-    the model, so the rates of `AxisUnits` mean what this engine reads.
+    ``step``, the default increment of any axis. The origin is
+    ``origin``, for the dates of the axis. The engine is the one of the
+    model, so the rates of `AxisUnits` mean what this engine reads.
 
     Returns
     -------
@@ -894,7 +1116,9 @@ def axis_units(self) -> AxisUnits:
     >>> gamma = units.rate_from_mean_span(5, "day")
     """
     return AxisUnits(
-        step_unit=self.step_unit or DEFAULT_STEP_UNIT, engine=self.engine.type
+        step_unit=self.step_unit or DEFAULT_STEP_UNIT,
+        engine=self.engine.type,
+        origin=self.origin,
     )
 ```
 
@@ -2464,7 +2688,7 @@ class Aggregate(ModelStructure, InitialConditions):
         """
         The ``initial_amounts`` and ``category_splits`` sections of a report.
 
-        See :func:`commol.applied_parameters_report`.
+        See `Model.applied_parameters`.
 
         Parameters
         ----------
@@ -3180,7 +3404,7 @@ report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statisti
 
 The `initial_amounts` and `category_splits` sections of a report.
 
-See :func:`commol.applied_parameters_report`.
+See `Model.applied_parameters`.
 
 Parameters:
 
@@ -3208,7 +3432,7 @@ def report_sections(
     """
     The ``initial_amounts`` and ``category_splits`` sections of a report.
 
-    See :func:`commol.applied_parameters_report`.
+    See `Model.applied_parameters`.
 
     Parameters
     ----------

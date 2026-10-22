@@ -3291,10 +3291,14 @@ compartments exist and what they are named.</p>
 <p><code>Aggregate.outputs_by_source(model)</code> maps each bin or accumulator id to its
 output names in engine order. It uses the engine expansion (<code>expanded_outputs</code>), so
 <code>Simulation.outputs_for</code>, <code>group_outputs</code> and <code>total_series</code> group outputs by
-label, not by name.</p>
+label, not by name. <code>total_series</code> and <code>windowed_totals</code> also take output
+names: an id that is a source stands for all its outputs, and any other id
+must be an output name, which stands for itself.</p>
 <p><strong>Guards:</strong> <code>tests/simulation/test_outputs.py::TestOutputsBySource::test_expansion_matches_the_engine_output_names</code>
-(order) and <code>TestSourceIdSharingAPrefix</code> (a bin and an accumulator that share
-a prefix).</p>
+(order), <code>TestSourceIdSharingAPrefix</code> (a bin and an accumulator that share
+a prefix), <code>TestTotalSeries::test_an_output_name_stands_for_itself</code> and
+<code>tests/simulation/test_windows.py::test_windowed_totals_take_output_names</code>
+(output names).</p>
 <h2 id="the-engine-owns-the-variable-names">The engine owns the variable names<a class="headerlink" href="#the-engine-owns-the-variable-names" title="Permanent link">&para;</a></h2>
 <p>The engine sets one variable per expanded compartment and per subgroup total
 (<code>total_&lt;categories&gt;</code>, bin totals and partial bin totals).
