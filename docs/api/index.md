@@ -18,6 +18,7 @@ explain how to use them; these pages list every argument, attribute and error.
 | [Sensitivity](sensitivity.md) | `SensitivityAnalysis`, `InputSpace`, `SensitivityMethod`, `Propagation`, `PropagationResult`, `QuantitySummary`, `PRCC`, `PRCCResult`, `Morris`, `MorrisResult`, `Sobol`, `SobolResult`, `PolynomialChaos`, `ChaosResult`, `Level`, `Increments`, `ValueAt`, `Gain`, `Peak`, `PeakPosition`, `Trajectory`, `Ratio`, `quantity_schedule` |
 | [Identifiability](identifiability.md) | `IdentifiabilityMethod`, `StructuralRank`, `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, `IdentifiabilityReport` |
 | [Reports](reports.md) | `Model.applied_parameters`, `SimulationResults.report`, `SimulationReplicates.report`, `Predictive.report`, `IdentifiabilityReport.report` |
+| [Package](package.md) | `__version__`, `build_info`, `BuildInfo` |
 
 Import every name from the package root, as in `from commol import Simulation`.
 `UnitConsistencyError` is in `commol.utils.equations`; the scores are the
