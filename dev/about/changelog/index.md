@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 See [A setting has one name and one check](https://munqu.github.io/commol/latest/codebase/decisions/results/#a-setting-has-one-name-and-one-check).
 
 - One check, in Rust, rejects a confidence level that is not strictly between 0 and 1, with one message in every method: `confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95% interval`. Every other setting strictly between 0 and 1 (`target_cess`, `stay_probability`, `min_acceptance`, the `quantile` of `ABCRejection`, `correlation_threshold`) says `<name> is strictly between 0 and 1, got <value>`.
+- **Breaking:** a calibration with `replicate_summary=Quantile(q)` compares the observations with the one quantile of commol, the one of `weighted_quantiles`, `SimulationReplicates.quantiles` and every interval (NumPy's `method="hazen"` with equal weights), instead of NumPy's default `linear` quantile. `Quantile(0.25)` of the replicates 1, 2, 3, 4, 5 is now 1.75, not 2.0. So for `q` other than 0.5 the loss and the fitted values change slightly; `"median"` and `Quantile(0.5)` do not change. Your code does not change; run again a calibration with `Quantile(q)` whose result you stored. See [One confidence-interval convention](https://munqu.github.io/commol/latest/codebase/decisions/results/#one-confidence-interval-convention).
 
 ### Removed
 

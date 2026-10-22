@@ -1827,6 +1827,8 @@ Bases: `BaseModel`
 
 A quantile of the replicates of a stochastic engine, for `CalibrationProblem.replicate_summary`.
 
+It is the one quantile of commol, the one of `weighted_quantiles` and `SimulationReplicates.quantiles`: with equal weights, NumPy's `method="hazen"`. `Quantile(0.25)` of the replicates 1, 2, 3, 4, 5 is 1.75.
+
 Attributes:
 
 | Name    | Type    | Description                                             |
@@ -1840,6 +1842,11 @@ class Quantile(BaseModel):
     """
     A quantile of the replicates of a stochastic engine, for
     ``CalibrationProblem.replicate_summary``.
+
+    It is the one quantile of commol, the one of `weighted_quantiles` and
+    `SimulationReplicates.quantiles`: with equal weights, NumPy's
+    ``method="hazen"``. ``Quantile(0.25)`` of the replicates 1, 2, 3, 4, 5 is
+    1.75.
 
     Attributes
     ----------

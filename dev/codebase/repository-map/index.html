@@ -3476,7 +3476,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/types.rs</code></td>
-<td><code>LossConfig</code> (every loss, and <code>replicate_loss</code>), <code>ReplicateSummary</code>, <code>crps</code> and <code>weighted_crps</code>, <code>Replicates</code>, the observation, parameter, constraint and result types.</td>
+<td><code>LossConfig</code> (every loss, and <code>replicate_loss</code>), <code>ReplicateSummary</code> (its median and quantile by <code>statistics::quantiles</code>), <code>crps</code> and <code>weighted_crps</code>, <code>Replicates</code>, the observation, parameter, constraint and result types.</td>
 <td>Optimizer setup.</td>
 </tr>
 <tr>
@@ -3495,8 +3495,8 @@
 <td>Stepping along a profile; thresholds.</td>
 </tr>
 <tr>
-<td><code>crates/commol-inference/src/statistics.rs</code></td>
-<td>The one quantile (weighted, midpoints of the cumulative weights; Hazen with equal weights), weighted mean and covariance, Kish's effective size; the one check of a confidence level (<code>interval_levels</code>) and of any other setting strictly between 0 and 1 (<code>check_open_unit</code>).</td>
+<td><code>crates/commol-calibration/src/statistics.rs</code></td>
+<td>The one quantile (weighted, midpoints of the cumulative weights; Hazen with equal weights), used by the summary of the replicates of a calibration and by every interval, sample and band of <code>commol-inference</code>, which re-exports the module as <code>commol_inference::statistics</code>; weighted mean and covariance, Kish's effective size; the one check of a confidence level (<code>interval_levels</code>) and of any other setting strictly between 0 and 1 (<code>check_open_unit</code>).</td>
 <td>Quantiles or checks of such a setting anywhere else.</td>
 </tr>
 <tr>
@@ -4047,7 +4047,7 @@
 </tr>
 <tr>
 <td>Change the parameter sample, the predictive, the scenarios, the scores or the quantile</td>
-<td><code>crates/commol-inference/src/sample.rs</code>, <code>predictive.rs</code>, <code>scores.rs</code>, <code>statistics.rs</code></td>
+<td><code>crates/commol-inference/src/sample.rs</code>, <code>predictive.rs</code>, <code>scores.rs</code>; <code>crates/commol-calibration/src/statistics.rs</code> (the one quantile, also of the replicates of a calibration)</td>
 <td><code>py-commol/commol/context/inference/sample.py</code>, <code>api/inference/</code> (<code>scenarios.py</code>), <code>docs/guide/uncertainty/index.md</code></td>
 </tr>
 <tr>

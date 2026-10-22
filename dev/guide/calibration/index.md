@@ -155,7 +155,7 @@ You choose what each observation is compared with; there is no default, because 
 | ------------------- | -------------------------------------------- | -------------------------------------------- |
 | `"mean"`            | The mean of the replicates                   | `loss_function`                              |
 | `"median"`          | The median                                   | `loss_function`                              |
-| `Quantile(q)`       | The quantile `q`                             | `loss_function`                              |
+| `Quantile(q)`       | The quantile `q`, a level between 0 and 1    | `loss_function`                              |
 | `"crps"`            | The empirical distribution of the replicates | The continuous ranked probability score, \`E |
 
 ```python
@@ -177,13 +177,14 @@ result = Calibrator(Simulation(stochastic), problem).run()
 print(round(result.best_parameters["k1"], 1))  # 0.4
 ```
 
-| Rule                                                                                                                                         | Where                                                                                   |
-| -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| A stochastic engine needs `replicates`, `replicate_summary` and `seed`; without one, `Calibrator` raises and the message lists the summaries | `rust_loss_config` in `py-commol/commol/context/_model/engine_state.py`                 |
-| A deterministic engine does not use `replicates` and `replicate_summary`                                                                     | The same                                                                                |
-| A stochastic engine needs a loss: with `observation_models`, `Calibrator` raises a `ValueError`                                              | `PyCalibrationProblem::new` in `py-commol/src/inference.rs`; `Discrepancy::set_summary` |
-| The summaries and the CRPS are computed in `LossConfig`, and the observation weights apply to every option                                   | `LossConfig::replicate_loss` in `crates/commol-calibration/src/types.rs`                |
-| A constraint at positions is checked on every replicate                                                                                      | `CalibrationProblem::evaluate`                                                          |
+| Rule                                                                                                                                                                                                                   | Where                                                                                                   |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| A stochastic engine needs `replicates`, `replicate_summary` and `seed`; without one, `Calibrator` raises and the message lists the summaries                                                                           | `rust_loss_config` in `py-commol/commol/context/_model/engine_state.py`                                 |
+| A deterministic engine does not use `replicates` and `replicate_summary`                                                                                                                                               | The same                                                                                                |
+| A stochastic engine needs a loss: with `observation_models`, `Calibrator` raises a `ValueError`                                                                                                                        | `PyCalibrationProblem::new` in `py-commol/src/inference.rs`; `Discrepancy::set_summary`                 |
+| The summaries and the CRPS are computed in `LossConfig`, and the observation weights apply to every option                                                                                                             | `LossConfig::replicate_loss` in `crates/commol-calibration/src/types.rs`                                |
+| The median and `Quantile(q)` are the one quantile of commol, the one of `weighted_quantiles` and `SimulationReplicates.quantiles` (NumPy's `method="hazen"`): `Quantile(0.25)` of the replicates 1, 2, 3, 4, 5 is 1.75 | `ReplicateSummary::summarize`; `statistics::quantiles` in `crates/commol-calibration/src/statistics.rs` |
+| A constraint at positions is checked on every replicate                                                                                                                                                                | `CalibrationProblem::evaluate`                                                                          |
 
 With one replicate the CRPS is the absolute error. The [predictive](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive) of a sample runs every replicate of each draw.
 

@@ -3319,14 +3319,21 @@
 <h2 id="one-confidence-interval-convention">One confidence-interval convention<a class="headerlink" href="#one-confidence-interval-convention" title="Permanent link">&para;</a></h2>
 <p>Every interval is a weighted quantile: the inverse of the weighted empirical
 distribution, interpolated between the midpoints of the cumulative weights
-(<code>statistics::quantiles</code> in <code>crates/commol-inference/src/statistics.rs</code>). With
+(<code>statistics::quantiles</code> in <code>crates/commol-calibration/src/statistics.rs</code>). With
 equal weights it equals NumPy's <code>method="hazen"</code>; a weight of zero removes a
 value. <code>ci_percentiles</code> (<code>api/inference/intervals.py</code>) turns a confidence level
 into the two percentile points of <code>statistics::interval_levels</code>. <code>member_statistics</code> reduces each member to the
 quantity of interest <strong>first</strong>, and then takes weighted quantiles across
 members; taking quantiles first gives a band that describes no member. The
-replicates of a stochastic run (<code>SimulationReplicates.quantiles</code>), a sample
-and a predictive use the same quantile.</p>
+replicates of a stochastic run (<code>SimulationReplicates.quantiles</code>), a sample,
+a predictive and the summary of the replicates of a calibration
+(<code>"median"</code> and <code>Quantile(q)</code>, <code>ReplicateSummary::summarize</code>) use the same
+quantile. So a calibration with <code>Quantile(0.25)</code> compares the observations
+with the value that <code>SimulationReplicates.quantiles([0.25])</code> gives for the
+same runs.</p>
+<p>The module lives in <code>commol-calibration</code>, the lowest crate that takes a
+quantile, and <code>commol-inference</code> re-exports it (<code>pub use
+commol_calibration::statistics</code>), so there is one copy.</p>
 <table>
 <thead>
 <tr>
@@ -3343,12 +3350,28 @@ and a predictive use the same quantile.</p>
 <td>Harrell–Davis</td>
 <td>Smoother, but with no simple weighted form, and slower.</td>
 </tr>
+<tr>
+<td>The module in <code>commol-core</code></td>
+<td>No crate below calibration takes a quantile, and <code>commol-core</code> holds the model types and the engine contract.</td>
+</tr>
+<tr>
+<td>A copy of Hazen's rule in <code>commol-calibration</code></td>
+<td>Two quantiles again, which can drift apart.</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Rule:</strong> every new interval goes through <code>weighted_quantiles</code> or
-<code>member_statistics</code>.</p>
-<p><strong>Guards:</strong> <code>crates/commol-inference/src/statistics.rs</code> tests,
-<code>tests/uncertainty/test_intervals.py</code>.</p>
+<code>member_statistics</code>, and every quantile in Rust through
+<code>statistics::quantiles</code>.</p>
+<p><strong>Guards:</strong> <code>crates/commol-calibration/src/statistics.rs</code> tests,
+<code>crates/commol-calibration/tests/test_replicate_summary.rs</code>,
+<code>tests/uncertainty/test_intervals.py</code>,
+<code>tests/stochastic/test_calibration.py::test_a_quantile_summary_agrees_with_the_quantiles_of_the_replicates</code>,
+and <code>tests/suite/test_rules.py::test_commol_has_one_quantile</code>, which fails
+when a Rust function named for a quantile sorts values outside
+<code>statistics.rs</code>. The conformal quantile (<code>conformal/quantile.rs</code>) is the one
+exception: it is a rank that gives an interval its coverage, not an estimate
+of a quantile.</p>
 <h2 id="a-setting-has-one-name-and-one-check">A setting has one name and one check<a class="headerlink" href="#a-setting-has-one-name-and-one-check" title="Permanent link">&para;</a></h2>
 <p>A setting that means the same thing has the same name in every method, in
 Python and in Rust. The level of an interval is <code>confidence_level</code>: in the

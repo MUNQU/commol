@@ -4393,13 +4393,27 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </table>
 <p>See <a href="../../codebase/decisions/results/#a-setting-has-one-name-and-one-check">A setting has one name and one check</a>.</p>
 <ul>
-<li>One check, in Rust, rejects a confidence level that is not strictly between
+<li>
+<p>One check, in Rust, rejects a confidence level that is not strictly between
   0 and 1, with one message in every method:
   <code>confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95%
   interval</code>. Every other setting strictly between 0 and 1 (<code>target_cess</code>,
   <code>stay_probability</code>, <code>min_acceptance</code>, the <code>quantile</code> of <code>ABCRejection</code>,
   <code>correlation_threshold</code>) says <code>&lt;name&gt; is strictly between 0 and 1, got
-  &lt;value&gt;</code>.</li>
+  &lt;value&gt;</code>.</p>
+</li>
+<li>
+<p><strong>Breaking:</strong> a calibration with <code>replicate_summary=Quantile(q)</code> compares
+  the observations with the one quantile of commol, the one of
+  <code>weighted_quantiles</code>, <code>SimulationReplicates.quantiles</code> and every interval
+  (NumPy's <code>method="hazen"</code> with equal weights), instead of NumPy's default
+  <code>linear</code> quantile. <code>Quantile(0.25)</code> of the replicates 1, 2, 3, 4, 5 is now
+  1.75, not 2.0. So for <code>q</code> other than 0.5 the loss and the fitted values
+  change slightly; <code>"median"</code> and <code>Quantile(0.5)</code> do not change. Your code
+  does not change; run again a calibration with <code>Quantile(q)</code> whose result
+  you stored. See
+  <a href="../../codebase/decisions/results/#one-confidence-interval-convention">One confidence-interval convention</a>.</p>
+</li>
 </ul>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
 <ul>
