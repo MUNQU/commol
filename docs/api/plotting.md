@@ -6,7 +6,8 @@ The figures are read from the results they draw, and return a matplotlib
 `Figure`: `results.plot`, `replicates.plot` and `predictive.plot` give the
 figures of a run, of replicates and of a predictive, and the result of a
 sensitivity method or of a profile likelihood draws its figure with `plot()`.
-They need the optional extra `commol[plot]`. Guide:
+`plot_compared` draws several runs, replicates or predictives on the same
+panels. They need the optional extra `commol[plot]`. Guide:
 [Plotting](../guide/simulations.md#plotting).
 
 ::: commol.api.plotting.accessors.ResultsPlot
@@ -14,6 +15,8 @@ They need the optional extra `commol[plot]`. Guide:
 ::: commol.api.plotting.accessors.ReplicatesPlot
 
 ::: commol.api.plotting.accessors.PredictivePlot
+
+::: commol.api.plotting.compared.plot_compared
 
 ::: commol.context.inference.global_sensitivity.PRCCResult.plot
 

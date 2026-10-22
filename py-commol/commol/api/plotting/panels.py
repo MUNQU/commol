@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from commol.api.inference.intervals import member_statistics
 from commol.api.results import SimulationReplicates, SimulationResults, index_at
 from commol.api.windows import windowed_totals
+from commol.context._windows import check_window, window_ends
 from commol.context.calibration import CalibrationResult, ObservedDataPoint
 from commol.context.inference.noise import NoNoise
 
@@ -104,6 +105,40 @@ class Panel:
     observed: Trace | None = None
     intervals: Band | None = None
     prediction: Trace | None = None
+
+
+@dataclass(frozen=True)
+class ComparedPanel:
+    """
+    One series of a figure that compares results.
+
+    Attributes
+    ----------
+    series : str
+        The id of the series. The `Axes` of the panel has it as its label.
+    name : str
+        The title of the panel.
+    unit : str
+        The unit of the values, or ``""`` when they have none.
+    lines : list[Trace]
+        The line of each result, labelled with its key, in the order of the
+        results.
+    bands : list[Band | None]
+        The band of each result, in the same order: of its replicates or of
+        its draws, or None for a run.
+    observed : Trace | None
+        The observed values, drawn once.
+    """
+
+    series: str
+    name: str
+    unit: str
+    lines: list[Trace]
+    bands: list[Band | None]
+    observed: Trace | None = None
+
+
+type Compared = SimulationResults | SimulationReplicates | Predictive
 
 
 class _Outputs:
@@ -378,6 +413,179 @@ def with_intervals(
             )
         )
     return with_series
+
+
+def compared_panels(
+    results: Mapping[str, Compared],
+    confidence_level: float,
+    observed_data: Iterable[ObservedDataPoint] | None = None,
+    series: Sequence[str] | None = None,
+    window: float | None = None,
+) -> list[ComparedPanel]:
+    """
+    The panels of results drawn together: the line and the band of each
+    result in each series, and the observations once.
+
+    Without `window`, the line and the band of a result are those of its own
+    figure (`run_panels`, `replicate_panels` or `predictive_panels`) with
+    `observed_data`. With `window`, they are the gain of the series over each
+    complete window (`_windowed`). The first result names the series and
+    gives the title and the unit of each panel.
+
+    Parameters
+    ----------
+    results : Mapping[str, SimulationResults | SimulationReplicates | Predictive]
+        The results, by the label of their lines.
+    confidence_level : float
+        The level of the band of replicates and of draws.
+    observed_data : Iterable[ObservedDataPoint] | None
+        Observations, each on the panel of its label.
+    series : Sequence[str] | None
+        The series, or every output of the first result when None.
+    window : float | None
+        The length of a window, or None to read each position.
+
+    Returns
+    -------
+    list[ComparedPanel]
+        One panel per series, in order.
+
+    Raises
+    ------
+    ValueError
+        If there are no results, a result does not have the outputs of the
+        first, or `window` is not positive.
+    """
+    if not results:
+        raise ValueError("Give at least one result to compare.")
+    if window is not None:
+        check_window(window)
+    outputs = {label: _outputs_of(result) for label, result in results.items()}
+    (first, reference), *others = outputs.items()
+    for label, other in others:
+        missing = [name for name in reference.outputs if name not in other.outputs]
+        extra = [name for name in other.outputs if name not in reference.outputs]
+        if missing or extra:
+            differences = [f"it lacks {missing}"] if missing else []
+            differences += [f"it also has {extra}"] if extra else []
+            raise ValueError(
+                f"'{label}' does not have the outputs of '{first}': "
+                f"{' and '.join(differences)}."
+            )
+    selected = reference.select(series)
+    observed = list(observed_data or ())
+    by_label = {
+        label: _result_panels(
+            result, outputs[label], confidence_level, observed, selected, window
+        )
+        for label, result in results.items()
+    }
+    return [
+        ComparedPanel(
+            series=panel.series,
+            name=panel.name,
+            unit=panel.unit,
+            lines=[
+                replace(by_label[label][index].line, label=label) for label in results
+            ],
+            bands=[_labelled(by_label[label][index].band, label) for label in results],
+            observed=panel.observed,
+        )
+        for index, panel in enumerate(by_label[first])
+    ]
+
+
+def model_of(result: Compared) -> "Model | None":
+    """The model of a run, of replicates or of the source of a predictive."""
+    if isinstance(result, SimulationResults | SimulationReplicates):
+        return result.model
+    return result.source.simulation.model_definition
+
+
+def _outputs_of(result: Compared) -> _Outputs:
+    """The outputs of a run, of replicates or of a predictive."""
+    if isinstance(result, SimulationReplicates):
+        return _Outputs(result.mean(), result.model)
+    if isinstance(result, SimulationResults):
+        return _Outputs(result, result.model)
+    return _Outputs(result.output_names, model_of(result))
+
+
+def _result_panels(
+    result: Compared,
+    outputs: _Outputs,
+    confidence_level: float,
+    observed_data: list[ObservedDataPoint],
+    series: list[str],
+    window: float | None,
+) -> list[Panel]:
+    """The panels of one result of a comparison, with or without windows."""
+    if window is None:
+        if isinstance(result, SimulationReplicates):
+            return replicate_panels(
+                result, confidence_level, observed_data, series=series
+            )
+        if isinstance(result, SimulationResults):
+            return run_panels(result, observed_data, series=series)
+        return predictive_panels(result, confidence_level, observed_data, series)
+    by_series = _group_observed(observed_data)
+    return [
+        outputs.panel(
+            series_id,
+            *_windowed(result, outputs, series_id, confidence_level, window),
+            observed=_observed(by_series.get(series_id, [])),
+        )
+        for series_id in series
+    ]
+
+
+def _windowed(
+    result: Compared,
+    outputs: _Outputs,
+    series_id: str,
+    confidence_level: float,
+    window: float,
+) -> tuple[Trace, Band | None]:
+    """
+    The gain of a series over each complete window, as `windowed_totals`
+    reads it: of a run; of the mean of replicates, with the band of the gains
+    of the replicates; or the weighted median and the band of the gains of
+    the draws of a predictive, read through the observation operator.
+    """
+    components = outputs.components(series_id)
+    ends = window_ends(window, result.positions[-1])
+    if isinstance(result, SimulationReplicates):
+        gains = [
+            windowed_totals(_sum(run, components), run.positions, window, ends)
+            for run in result
+        ]
+        statistics = member_statistics(gains, confidence_level)
+        return Trace(ends, statistics["mean"], "Mean of the replicates"), Band(
+            ends,
+            statistics["ci_lower"],
+            statistics["ci_upper"],
+            f"{confidence_level:.0%} of the replicates",
+        )
+    if isinstance(result, SimulationResults):
+        gains = windowed_totals(
+            _sum(result, components), result.positions, window, ends
+        )
+        return Trace(ends, gains, "Simulation"), None
+    points = [
+        ObservedDataPoint(
+            at=end, outputs=components, label=series_id, value=0.0, window=window
+        )
+        for end in ends
+    ]
+    band = result.at_observations(points, NoNoise()).band(confidence_level)
+    return Trace(band.positions, band.median, "Median of the draws"), _draws_band(band)
+
+
+def _labelled(band: Band | None, label: str) -> Band | None:
+    """A band whose legend starts with the label of its result."""
+    if band is None:
+        return None
+    return replace(band, label=f"{label}: {band.label}")
 
 
 def _group_observed(

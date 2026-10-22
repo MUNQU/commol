@@ -102,14 +102,16 @@ are accessors with `series(...)` and `cumulative(...)`, and `PRCCResult`,
 
 | Module | What it holds |
 |---|---|
-| `api/plotting/accessors.py` | The accessors, the public layer. Each method takes the arguments of its drawing function and passes them on. |
+| `api/plotting/accessors.py`, `api/plotting/compared.py` | The public layer: the accessors, and `plot_compared`, the figure of several results. Each method or function takes the arguments of its drawing function and passes them on. |
 | `api/plotting/figures.py` | The drawing functions, private (`_run_series`, `_prcc`, …). Only this module imports matplotlib. |
-| `api/plotting/panels.py` | The data of each panel (name, unit, line, band, observed values, prediction intervals), computed without matplotlib. |
+| `api/plotting/panels.py` | The data of each panel (name, unit, line, band, observed values, prediction intervals; `ComparedPanel`, a line and a band per result), computed without matplotlib. |
 
 | Rule | Why, against the alternative |
 |---|---|
 | Figures are methods of the results, over drawing functions that take `axes=` | `SimulationPlotter(simulation, results)` took two objects that must agree, and a third for a predictive; a facade built from one result has no place for several results on one figure. |
-| The accessors and `plot()` are the only public way to draw a figure | One public way per figure, as for reports. Public drawing functions too would double the documentation and the tests, and drift. |
+| The accessors and `plot()` are the only public way to draw a figure of one result | One public way per figure, as for reports. Public drawing functions too would double the documentation and the tests, and drift. |
+| Several results on the same panels are one public function, `plot_compared({label: result}, …)`, exported from `commol` | A comparison describes no single result: a method of one result, or a mapping in `plot.series`, would give one of them a special role. Each result reads its own model, so the function checks that each has the outputs of the first and names the key of the one that does not. `axes=` alone draws on the same panels, but checks no outputs and gives no label or color per result. |
+| A result of a comparison has the same color in every panel: `C0`, `C1`, … of the style, in the order of the keys, for its line and its band | The next color of the cycle of each `Axes` depends on what the panel already holds, so a result would change color between panels. |
 | A figure returns a matplotlib `Figure`; `axes=` takes a `Figure` of commol, and finds the panel of each series by the label of its `Axes` (`ax.set_label` with the id of the series) | One return type. A `dict` of `Axes` loses the `Figure`, a tuple comes from every call, and a commol object locks the API in. A series with no panel raises `ValueError` that names it. |
 | matplotlib is the optional extra `commol[plot]`, imported when a figure is drawn | The core needs no plotting library, and `import commol` loads none. Without it, a figure raises `ImportError` with the install line. seaborn drew only `lineplot` and `scatterplot`, which `Axes.plot` and `Axes.scatter` draw the same. |
 | The style of a figure stays in that figure | `PlotConfig.style` takes matplotlib styles, applied in a copy of `matplotlib.rcParams`: every drawing function is under `_scoped_style` (`api/plotting/figures.py`, `matplotlib.rc_context`), so `rcParams` is as it was when the function returns or raises. seaborn set the style, palette and context of the whole process. A new drawing function takes the same decorator; `_apply_style` outside it changes the style of every later figure of the user. |
@@ -117,7 +119,8 @@ are accessors with `series(...)` and `cumulative(...)`, and `PRCCResult`,
 **Guards:** `tests/plotting/test_figures.py` (`test_a_figure_leaves_the_global_style`,
 `test_import_commol_loads_no_plotting_library`,
 `test_each_accessor_passes_on_the_arguments_of_its_function`,
-`test_a_figure_draws_on_given_axes`) and
+`test_a_figure_draws_on_given_axes`, `test_compared_runs_share_the_panels`,
+`test_compared_runs_need_the_same_outputs`) and
 `tests/plotting/test_panels.py::test_the_panels_of_a_run_need_no_matplotlib`.
 
 ## Model files are written in full

@@ -14,7 +14,7 @@ import functools
 import logging
 import math
 from collections import defaultdict
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import time
 from typing import TYPE_CHECKING
 
@@ -31,7 +31,7 @@ except ModuleNotFoundError as error:
     ) from error
 
 from commol.api.plotting import panels as _panels
-from commol.api.plotting.panels import Panel
+from commol.api.plotting.panels import Compared, Panel
 from commol.api.results import same_position
 from commol.context.inference.global_sensitivity import SobolResult
 from commol.context.visualization import PlotConfig
@@ -240,6 +240,40 @@ def _predictive_cumulative(
 
 
 @_scoped_style
+def _compared_series(
+    results: Mapping[str, Compared],
+    series: list[str] | None = None,
+    window: float | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    axes: Figure | None = None,
+    output_file: str | None = None,
+    config: PlotConfig | None = None,
+    show_legend: bool = True,
+    position_label: PositionLabel | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    confidence_level: float = 0.95,
+    **kwargs: LineKeywords,
+) -> Figure:
+    """The figure of `plot_compared`."""
+    config = config or PlotConfig()
+    _apply_style(config)
+    panels = _panels.compared_panels(
+        results, confidence_level, observed_data, series, window
+    )
+    model = _panels.model_of(next(iter(results.values())))
+    figure, grid = _axes_of([panel.series for panel in panels], config, axes)
+    for ax, panel in zip(grid, panels, strict=True):
+        _draw_compared_panel(ax, panel, kwargs, x_label)
+        positions = sorted({at for line in panel.lines for at in line.positions})
+        _label_positions(ax, positions, position_label, tick_every, model)
+        if show_legend:
+            ax.legend()
+    _finish(figure, output_file, config, "Compared")
+    return figure
+
+
+@_scoped_style
 def _prcc(
     result: "PRCCResult",
     output_file: str | None = None,
@@ -440,15 +474,7 @@ def _draw_panel(
     if panel.band is not None:
         _fill(ax, panel.band)
     if panel.observed is not None:
-        ax.scatter(
-            panel.observed.positions,
-            panel.observed.values,
-            label=panel.observed.label,
-            color="red",
-            s=30,
-            alpha=0.7,
-            zorder=5,
-        )
+        _draw_observed(ax, panel.observed)
     if panel.intervals is not None and panel.prediction is not None:
         _fill(ax, panel.intervals)
         ax.plot(
@@ -457,6 +483,49 @@ def _draw_panel(
             linestyle="--",
             label=panel.prediction.label,
         )
+    _label_panel(ax, panel, x_label)
+
+
+def _draw_compared_panel(
+    ax: Axes,
+    panel: _panels.ComparedPanel,
+    keywords: dict[str, LineKeywords],
+    x_label: str,
+) -> None:
+    """
+    Draw one panel of a comparison: the line and the band of each result in
+    its own color of the cycle (``C0``, ``C1``, …), which takes `keywords`,
+    the observed points and the labels.
+    """
+    for index, (line, band) in enumerate(zip(panel.lines, panel.bands, strict=True)):
+        color = f"C{index}"
+        (drawn,) = ax.plot(line.positions, line.values, label=line.label, color=color)
+        drawn.set(**keywords)
+        if band is not None:
+            _fill(ax, band, color)
+    if panel.observed is not None:
+        _draw_observed(ax, panel.observed)
+    _label_panel(ax, panel, x_label)
+
+
+def _draw_observed(ax: Axes, observed: _panels.Trace) -> None:
+    """Draw the observed values as points."""
+    ax.scatter(
+        observed.positions,
+        observed.values,
+        label=observed.label,
+        color="red",
+        s=30,
+        alpha=0.7,
+        zorder=5,
+    )
+
+
+def _label_panel(ax: Axes, panel: Panel | _panels.ComparedPanel, x_label: str) -> None:
+    """
+    Label a panel: the id of its series as the label of its `Axes`, the
+    axes, the title and the grid.
+    """
     ax.set_label(panel.series)
     ax.set_xlabel(x_label)
     ax.set_ylabel(panel.unit)
@@ -464,9 +533,16 @@ def _draw_panel(
     ax.grid(True, alpha=0.3)
 
 
-def _fill(ax: Axes, band: _panels.Band) -> None:
-    """Fill a band."""
-    ax.fill_between(band.positions, band.lower, band.upper, alpha=0.3, label=band.label)
+def _fill(ax: Axes, band: _panels.Band, color: str | None = None) -> None:
+    """Fill a band, in `color` or in the next color of the cycle."""
+    ax.fill_between(
+        band.positions,
+        band.lower,
+        band.upper,
+        alpha=0.3,
+        color=color,
+        label=band.label,
+    )
 
 
 def _apply_style(config: PlotConfig) -> None:
