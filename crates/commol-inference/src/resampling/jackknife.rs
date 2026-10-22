@@ -9,6 +9,7 @@
 
 use commol_core::SimulationEngine;
 
+use crate::error::MethodError;
 use crate::resampling::blocks::BlockScheme;
 use crate::resampling::resamplers::Perturbation;
 use crate::resampling::runner::{FitUnit, ReplicateRunner};
@@ -98,21 +99,22 @@ pub struct Jackknife {
 ///
 /// # Errors
 ///
-/// Returns a message when `scheme` has fewer than two blocks, or fewer than
-/// two fits succeed ([`FitUnit::require`]).
+/// [`MethodError::Invalid`] when `scheme` has fewer than two blocks;
+/// [`MethodError::Failed`] when fewer than two fits succeed
+/// ([`FitUnit::require`]).
 pub fn block_jackknife<E>(
     runner: &ReplicateRunner<'_, E>,
     scheme: &BlockScheme,
-) -> Result<Jackknife, String>
+) -> Result<Jackknife, MethodError>
 where
     E: SimulationEngine + Send + Sync,
 {
     if scheme.count() < 2 {
-        return Err(format!(
+        return Err(MethodError::Invalid(format!(
             "block_length {} makes {} block; a jackknife needs at least two",
             scheme.length(),
             scheme.count()
-        ));
+        )));
     }
     let problem = runner.problem();
     let weights: Vec<f64> = problem.observed_data().iter().map(|o| o.weight).collect();

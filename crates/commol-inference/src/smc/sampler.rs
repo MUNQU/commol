@@ -34,6 +34,7 @@ use rayon::prelude::*;
 use super::TemperedTarget;
 use super::kernel::Kernel;
 use crate::distribution::open_uniform;
+use crate::error::MethodError;
 use crate::statistics::{check_open_unit, effective_size, normalized_weights};
 
 /// One step of a run.
@@ -159,26 +160,28 @@ impl<K: Kernel> SmcSampler<K> {
     ///
     /// # Errors
     ///
-    /// Returns a message that names the setting when `particles` is below
-    /// 2, `resample_threshold` is not in `(0, 1]`, or `target_cess` or
-    /// `stay_probability` is not strictly between 0 and 1.
+    /// [`MethodError::Invalid`], which names the setting, when `particles`
+    /// is below 2, `resample_threshold` is not in `(0, 1]`, or `target_cess`
+    /// or `stay_probability` is not strictly between 0 and 1.
     pub fn new(
         particles: usize,
         kernel: K,
         resample_threshold: f64,
         target_cess: f64,
         stay_probability: f64,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, MethodError> {
         if particles < 2 {
-            return Err(format!("particles must be at least 2, got {particles}"));
+            return Err(MethodError::Invalid(format!(
+                "particles must be at least 2, got {particles}"
+            )));
         }
         if !(resample_threshold > 0.0 && resample_threshold <= 1.0) {
-            return Err(format!(
+            return Err(MethodError::Invalid(format!(
                 "resample_threshold must be in (0, 1], got {resample_threshold}"
-            ));
+            )));
         }
-        check_open_unit("target_cess", target_cess)?;
-        check_open_unit("stay_probability", stay_probability)?;
+        check_open_unit("target_cess", target_cess).map_err(MethodError::Invalid)?;
+        check_open_unit("stay_probability", stay_probability).map_err(MethodError::Invalid)?;
         Ok(Self {
             particles,
             kernel,
@@ -194,10 +197,10 @@ impl<K: Kernel> SmcSampler<K> {
     ///
     /// # Errors
     ///
-    /// Returns a message when `min_acceptance` is not strictly between 0
-    /// and 1.
-    pub fn with_min_acceptance(mut self, min_acceptance: f64) -> Result<Self, String> {
-        check_open_unit("min_acceptance", min_acceptance)?;
+    /// [`MethodError::Invalid`] when `min_acceptance` is not strictly between
+    /// 0 and 1.
+    pub fn with_min_acceptance(mut self, min_acceptance: f64) -> Result<Self, MethodError> {
+        check_open_unit("min_acceptance", min_acceptance).map_err(MethodError::Invalid)?;
         self.min_acceptance = Some(min_acceptance);
         Ok(self)
     }
@@ -207,10 +210,11 @@ impl<K: Kernel> SmcSampler<K> {
     ///
     /// # Errors
     ///
-    /// Returns a message when the model fails, every draw of the prior is
-    /// outside the support, or a step accepts no proposal and no
+    /// [`MethodError::Invalid`] when every draw of the prior is outside the
+    /// support; [`MethodError::Failed`] when the model fails, the kernel
+    /// cannot fit the particles, or a step accepts no proposal and no
     /// `min_acceptance` stops it.
-    pub fn run<T: TemperedTarget>(&mut self, target: &T, seed: u64) -> Result<SmcRun, String> {
+    pub fn run<T: TemperedTarget>(&mut self, target: &T, seed: u64) -> Result<SmcRun, MethodError> {
         let mut state = self.start(target, seed)?;
         self.advance(&mut state, target, |_| {})?;
         Ok(state.run())
@@ -221,7 +225,7 @@ impl<K: Kernel> SmcSampler<K> {
     /// # Errors
     ///
     /// As [`Self::run`].
-    pub fn start<T: TemperedTarget>(&self, target: &T, seed: u64) -> Result<SmcState, String> {
+    pub fn start<T: TemperedTarget>(&self, target: &T, seed: u64) -> Result<SmcState, MethodError> {
         let mut streams: Vec<Generator> = (0..self.particles)
             .map(|i| Generator::from_seed(replicate_seed(seed, 1 + i as u64)))
             .collect();
@@ -232,15 +236,16 @@ impl<K: Kernel> SmcSampler<K> {
                 let kept = target.evaluate(&values, stream, workspace)?;
                 Ok((values, kept))
             })
-            .collect::<Result<_, String>>()?;
+            .collect::<Result<_, String>>()
+            .map_err(MethodError::Failed)?;
         let (values, kept): (Vec<_>, Vec<_>) = draws.into_iter().unzip();
         let alive = kept.iter().filter(|k| k.is_some()).count();
         if alive == 0 {
-            return Err(
+            return Err(MethodError::Invalid(
                 "Every draw of the prior is outside the support of the problem: each run is \
                  infeasible or violates a constraint"
                     .to_string(),
-            );
+            ));
         }
         let log_weights: Vec<f64> = kept
             .iter()
@@ -272,7 +277,7 @@ impl<K: Kernel> SmcSampler<K> {
         state: &mut SmcState,
         target: &T,
         mut after_step: impl FnMut(&SmcState),
-    ) -> Result<(), String> {
+    ) -> Result<(), MethodError> {
         let last = target.last_level();
         while state.level != last {
             let before = state.clone();
@@ -295,8 +300,11 @@ impl<K: Kernel> SmcSampler<K> {
             }
             let weights = normalized_weights(&state.log_weights);
             self.kernel
-                .adapt(target.bounds(), &state.values, &weights)?;
-            let acceptance_rate = self.move_particles(state, target, level, 1)?;
+                .adapt(target.bounds(), &state.values, &weights)
+                .map_err(MethodError::Failed)?;
+            let acceptance_rate = self
+                .move_particles(state, target, level, 1)
+                .map_err(MethodError::Failed)?;
             if let Some(minimum) = self.min_acceptance
                 && acceptance_rate < minimum
             {
@@ -310,14 +318,15 @@ impl<K: Kernel> SmcSampler<K> {
                 return Ok(());
             }
             if acceptance_rate == 0.0 {
-                return Err(format!(
+                return Err(MethodError::Failed(format!(
                     "The moves at level {level} accept no proposal, so the particles cannot \
                      move; use more particles or a larger target_cess"
-                ));
+                )));
             }
             let moves = move_count(self.stay_probability, acceptance_rate);
             if moves > 1 {
-                self.move_particles(state, target, level, moves - 1)?;
+                self.move_particles(state, target, level, moves - 1)
+                    .map_err(MethodError::Failed)?;
             }
             state.level = level;
             state.steps.push(SmcStep {
@@ -545,17 +554,17 @@ pub fn next_level<T: TemperedTarget>(
 ///
 /// # Errors
 ///
-/// Returns a message when `draws` is below 2, `quantile` is not strictly
-/// between 0 and 1, the model fails, or every draw is outside the support.
+/// [`MethodError::Invalid`] when `draws` is below 2 or `quantile` is not
+/// strictly between 0 and 1; otherwise as [`SmcSampler::run`].
 pub fn abc_rejection<T: TemperedTarget>(
     target: &T,
     draws: usize,
     quantile: f64,
     seed: u64,
-) -> Result<SmcRun, String> {
-    check_open_unit("quantile", quantile)?;
+) -> Result<SmcRun, MethodError> {
+    check_open_unit("quantile", quantile).map_err(MethodError::Invalid)?;
     let sampler = SmcSampler::new(draws, super::RandomWalk::new(), 1.0, quantile, 0.5)
-        .map_err(|error| error.replace("particles", "draws"))?;
+        .map_err(|error| MethodError::Invalid(error.to_string().replace("particles", "draws")))?;
     let mut state = sampler.start(target, seed)?;
     let level = next_level(
         target,

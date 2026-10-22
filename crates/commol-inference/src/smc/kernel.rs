@@ -32,7 +32,8 @@ pub trait Kernel: Sync {
     /// # Errors
     ///
     /// Returns a message when the particles cannot set a proposal, such as
-    /// a parameter with no spread.
+    /// a parameter with no spread; the sampler reports it as
+    /// [`MethodError::Failed`](crate::MethodError::Failed).
     fn adapt(
         &mut self,
         bounds: &[(f64, f64)],

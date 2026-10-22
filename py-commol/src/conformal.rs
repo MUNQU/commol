@@ -6,9 +6,8 @@
 
 use crate::parallelism::parallel;
 use commol_inference::conformal::{
-    self, ConformalError, ConformalRun, ConformalSettings, NonconformityScore, Pooling, Predictor,
+    self, ConformalRun, ConformalSettings, NonconformityScore, Pooling, Predictor,
 };
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
 use commol_inference::resampling::{
@@ -16,20 +15,12 @@ use commol_inference::resampling::{
 };
 
 use crate::calibration::{PyObservedDataPoint, PyOptimizationConfig};
-use crate::inference::{BlockLength, PyCalibrationProblem, PyParameterSample, predictive_error};
-
-fn conformal_error(error: ConformalError) -> PyErr {
-    match error {
-        ConformalError::Invalid(message) => PyValueError::new_err(message),
-        ConformalError::Prediction(error) => predictive_error(error),
-        ConformalError::Failed(message) => PyRuntimeError::new_err(message),
-    }
-}
+use crate::inference::{BlockLength, PyCalibrationProblem, PyParameterSample, method_error};
 
 fn settings(score: &str, by: &str, confidence_level: f64) -> PyResult<ConformalSettings> {
-    let score = NonconformityScore::from_name(Some(score)).map_err(PyValueError::new_err)?;
-    let by = Pooling::from_name(Some(by)).map_err(PyValueError::new_err)?;
-    ConformalSettings::new(score, by, confidence_level).map_err(PyValueError::new_err)
+    let score = NonconformityScore::from_name(Some(score)).map_err(method_error)?;
+    let by = Pooling::from_name(Some(by)).map_err(method_error)?;
+    ConformalSettings::new(score, by, confidence_level).map_err(method_error)
 }
 
 /// The intervals of a conformal method, as the runner returns them
@@ -100,9 +91,9 @@ fn predictor<'a>(fit: Option<&'a [f64]>, sample: Option<&'a PyParameterSample>) 
 #[pyfunction]
 #[pyo3(signature = (score, by))]
 fn check_conformal_settings(score: Option<&str>, by: Option<&str>) -> PyResult<()> {
-    let score = NonconformityScore::from_name(score).map_err(PyValueError::new_err)?;
-    let by = Pooling::from_name(by).map_err(PyValueError::new_err)?;
-    ConformalSettings::check_pair(score, by).map_err(PyValueError::new_err)
+    let score = NonconformityScore::from_name(score).map_err(method_error)?;
+    let by = Pooling::from_name(by).map_err(method_error)?;
+    ConformalSettings::check_pair(score, by).map_err(method_error)
 }
 
 /// Split conformal intervals at `positions`, for each series of
@@ -148,7 +139,7 @@ fn split_conformal(
         )
     })?
     .map(|run| PyConformalRun::of(run, FitUnit::Replicate))
-    .map_err(conformal_error)
+    .map_err(method_error)
 }
 
 /// Rolling-origin conformal intervals at `positions`, after the data, for
@@ -187,12 +178,12 @@ fn rolling_conformal(
 ) -> PyResult<PyConformalRun> {
     let settings = settings(score, by, confidence_level)?;
     let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
-        .map_err(PyValueError::new_err)?;
+        .map_err(method_error)?;
     parallel(py, || {
         conformal::rolling_conformal(&runner, &origins, &positions, settings)
     })?
     .map(|run| PyConformalRun::of(run, FitUnit::Origin))
-    .map_err(conformal_error)
+    .map_err(method_error)
 }
 
 /// The blocks of `runner`'s problem with `block_length` positions, or the
@@ -203,11 +194,10 @@ fn blocks(
     drawing: BlockDrawing,
 ) -> PyResult<(BlockScheme, BlockLength)> {
     let problem = runner.problem();
-    let residuals = Residuals::new(problem, runner.fit(), ResidualScale::Additive)
-        .map_err(PyValueError::new_err)?;
+    let residuals =
+        Residuals::new(problem, runner.fit(), ResidualScale::Additive).map_err(method_error)?;
     let chosen = BlockLength::resolve(problem.observed_data(), &residuals, block_length, drawing);
-    let scheme =
-        BlockScheme::new(problem.observed_data(), chosen.length).map_err(PyValueError::new_err)?;
+    let scheme = BlockScheme::new(problem.observed_data(), chosen.length).map_err(method_error)?;
     Ok((scheme, chosen))
 }
 
@@ -246,12 +236,12 @@ fn jackknife_plus(
 ) -> PyResult<PyConformalRun> {
     let settings = settings(score, by, confidence_level)?;
     let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
-        .map_err(PyValueError::new_err)?;
+        .map_err(method_error)?;
     let (scheme, chosen) = blocks(&runner, block_length, BlockDrawing::NonOverlapping)?;
     let run = parallel(py, || {
         conformal::jackknife_plus(&runner, &scheme, &positions, settings)
     })?
-    .map_err(conformal_error)?;
+    .map_err(method_error)?;
     Ok(PyConformalRun {
         bound: Some(run.bound),
         blocks: Some(run.blocks),
@@ -298,12 +288,12 @@ fn enbpi(
 ) -> PyResult<PyConformalRun> {
     let settings = settings(score, by, confidence_level)?;
     let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
-        .map_err(PyValueError::new_err)?;
+        .map_err(method_error)?;
     let (scheme, chosen) = blocks(&runner, block_length, BlockDrawing::NonOverlapping)?;
     let run = parallel(py, || {
         conformal::enbpi(&runner, &scheme, replicates, &positions, settings)
     })?
-    .map_err(conformal_error)?;
+    .map_err(method_error)?;
     Ok(PyConformalRun {
         blocks: Some(scheme.count()),
         block_length: Some(chosen.length),
@@ -349,7 +339,7 @@ fn adaptive_conformal(
         conformal::adaptive_conformal(&problem.inner, predictor, &stream, step, settings)
     })?
     .map(|run| PyConformalRun::of(run, FitUnit::Replicate))
-    .map_err(conformal_error)
+    .map_err(method_error)
 }
 
 /// Register the conformal functions with the inference module

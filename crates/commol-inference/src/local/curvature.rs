@@ -19,8 +19,8 @@ use commol_calibration::{CalibrationProblem, TermDerivatives, Workspace};
 use commol_core::SimulationEngine;
 use finitediff::vec::hessian::central_hessian_nograd_error_vec;
 
-use super::LocalError;
-use crate::sensitivity::{Matrix, SensitivityError, SensitivitySource};
+use crate::error::MethodError;
+use crate::sensitivity::{Matrix, SensitivitySource};
 use crate::transform::{Scale, Transform};
 
 /// A value this close to a bound, relative to the width of the bounds, is on
@@ -52,25 +52,25 @@ impl Curvature {
     ///
     /// # Errors
     ///
-    /// [`LocalError::Refused`] when a value of `fit` sits on a bound of its
+    /// [`MethodError::Invalid`] when a value of `fit` sits on a bound of its
     /// parameter, the engine is stochastic, or the discrepancy has no
-    /// curvature (the mean absolute error); [`LocalError::Failed`] when the
+    /// curvature (the mean absolute error); [`MethodError::Failed`] when the
     /// derivatives fail or the curvature is not finite.
     pub fn gauss_newton<E, S>(
         problem: &CalibrationProblem<E>,
         source: &S,
         fit: &[f64],
-    ) -> Result<Self, LocalError>
+    ) -> Result<Self, MethodError>
     where
         E: SimulationEngine,
         S: SensitivitySource + ?Sized,
     {
         let transform = Transform::new(&problem.parameter_bounds());
         check_inside(problem, &transform, fit)?;
-        let sensitivities = source.jacobian(fit).map_err(sensitivity_error)?;
+        let sensitivities = source.jacobian(fit).map_err(MethodError::Sensitivity)?;
         let terms = problem
             .term_derivatives(fit, &sensitivities.predictions)
-            .map_err(LocalError::Refused)?;
+            .map_err(MethodError::Invalid)?;
         let p = fit.len();
         let mut matrix = Matrix::zeros(p, p);
         let mut errors = Matrix::zeros(p, p);
@@ -84,7 +84,7 @@ impl Curvature {
             }
         }
         if matrix.iter().any(|entry| !entry.is_finite()) {
-            return Err(LocalError::Failed(
+            return Err(MethodError::Failed(
                 "The curvature at the fit is not finite: a mean sits on the edge of the means \
                  its observation model allows"
                     .to_string(),
@@ -118,13 +118,13 @@ impl Curvature {
     ///
     /// # Errors
     ///
-    /// As [`Self::gauss_newton`], and [`LocalError::Failed`] when a point of
+    /// As [`Self::gauss_newton`], and [`MethodError::Failed`] when a point of
     /// the differences is infeasible or the engine fails.
     pub fn hessian<E, S>(
         problem: &CalibrationProblem<E>,
         source: &S,
         fit: &[f64],
-    ) -> Result<Self, LocalError>
+    ) -> Result<Self, MethodError>
     where
         E: SimulationEngine,
         S: SensitivitySource + ?Sized,
@@ -151,7 +151,7 @@ impl Curvature {
         };
         let estimate = central_hessian_nograd_error_vec(fit, &objective, &steps, accuracy)
             .map_err(|error| {
-                LocalError::Failed(format!(
+                MethodError::Failed(format!(
                     "The Hessian of the objective at the fit failed: {error}"
                 ))
             })?;
@@ -160,7 +160,7 @@ impl Curvature {
         let matrix = Matrix::from_fn(p, p, |j, k| estimate.hessian[j][k]);
         let errors = Matrix::from_fn(p, p, |j, k| error[j][k]);
         if matrix.iter().any(|entry| !entry.is_finite()) {
-            return Err(LocalError::Failed(
+            return Err(MethodError::Failed(
                 "The Hessian of the objective at the fit is not finite".to_string(),
             ));
         }
@@ -272,9 +272,9 @@ fn check_inside<E: SimulationEngine>(
     problem: &CalibrationProblem<E>,
     transform: &Transform,
     fit: &[f64],
-) -> Result<(), LocalError> {
+) -> Result<(), MethodError> {
     match on_bound(transform, fit) {
-        Some((index, bound)) => Err(LocalError::Refused(format!(
+        Some((index, bound)) => Err(MethodError::Invalid(format!(
             "The fit of '{}' is on its bound {bound}: on the unbounded scale its variance is \
              infinite there. A profile likelihood describes the uncertainty of a parameter on \
              its bound (MUNQU/commol#132)",
@@ -361,13 +361,4 @@ fn term_gradient(term: &TermDerivatives, jacobian: &[f64]) -> Vec<f64> {
         }
     }
     gradient
-}
-
-/// A failure of the derivatives as a local error: a stochastic engine is a
-/// refusal, anything else a failure.
-pub(crate) fn sensitivity_error(error: SensitivityError) -> LocalError {
-    match error {
-        SensitivityError::Stochastic => LocalError::Refused(error.to_string()),
-        error => LocalError::Failed(error.to_string()),
-    }
 }

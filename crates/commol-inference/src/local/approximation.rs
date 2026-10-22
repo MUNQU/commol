@@ -4,9 +4,9 @@
 use commol_calibration::CalibrationProblem;
 use commol_core::SimulationEngine;
 
-use super::LocalError;
-use super::curvature::{Curvature, sensitivity_error};
+use super::curvature::Curvature;
 use super::gaussian::{Gaussian, laplace};
+use crate::error::MethodError;
 use crate::sensitivity::{Design, FiniteDifferences};
 
 /// The curvature a local approximation reads.
@@ -24,14 +24,15 @@ impl CurvatureKind {
     ///
     /// # Errors
     ///
-    /// Returns a message that lists the names when `name` is neither.
-    pub fn from_name(name: &str) -> Result<Self, String> {
+    /// [`MethodError::Invalid`], which lists the names, when `name` is
+    /// neither.
+    pub fn from_name(name: &str) -> Result<Self, MethodError> {
         match name {
             "gauss_newton" => Ok(Self::GaussNewton),
             "hessian" => Ok(Self::Hessian),
-            _ => Err(format!(
+            _ => Err(MethodError::Invalid(format!(
                 "Unknown curvature '{name}'; the curvatures are 'gauss_newton' and 'hessian'"
-            )),
+            ))),
         }
     }
 }
@@ -46,12 +47,12 @@ pub fn curvature_at<E>(
     problem: &CalibrationProblem<E>,
     fit: &[f64],
     kind: CurvatureKind,
-) -> Result<Curvature, LocalError>
+) -> Result<Curvature, MethodError>
 where
     E: SimulationEngine + Send + Sync,
 {
     let source =
-        FiniteDifferences::new(problem, Design::Observations).map_err(sensitivity_error)?;
+        FiniteDifferences::new(problem, Design::Observations).map_err(MethodError::Sensitivity)?;
     match kind {
         CurvatureKind::GaussNewton => Curvature::gauss_newton(problem, &source, fit),
         CurvatureKind::Hessian => Curvature::hessian(problem, &source, fit),
@@ -64,18 +65,18 @@ where
 ///
 /// # Errors
 ///
-/// [`LocalError::Refused`] when the problem has a loss, which has no noise
+/// [`MethodError::Invalid`] when the problem has a loss, which has no noise
 /// scale; otherwise as [`curvature_at`] and [`laplace`].
 pub fn laplace_approximation<E>(
     problem: &CalibrationProblem<E>,
     fit: &[f64],
     kind: CurvatureKind,
-) -> Result<(Curvature, Gaussian), LocalError>
+) -> Result<(Curvature, Gaussian), MethodError>
 where
     E: SimulationEngine + Send + Sync,
 {
     if problem.discrepancy().likelihood().is_none() {
-        return Err(LocalError::Refused(
+        return Err(MethodError::Invalid(
             "Laplace(...) needs observation models: a loss has no noise scale, so its \
              curvature is no inverse variance. For a Laplace approximation give \
              observation_models, such as NormalObservations(sd=\"sd\") with a noise \

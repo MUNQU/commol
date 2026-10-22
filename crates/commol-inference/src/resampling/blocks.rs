@@ -9,6 +9,8 @@ use std::collections::BTreeMap;
 
 use commol_calibration::ObservedDataPoint;
 
+use crate::error::MethodError;
+
 /// The observations of a problem grouped into blocks of `length`
 /// consecutive distinct positions.
 ///
@@ -27,11 +29,11 @@ impl BlockScheme {
     ///
     /// # Errors
     ///
-    /// Returns a message when `length` is 0 or larger than the number of
-    /// distinct positions.
-    pub fn new(observations: &[ObservedDataPoint], length: usize) -> Result<Self, String> {
+    /// [`MethodError::Invalid`] when `length` is 0 or larger than the number
+    /// of distinct positions.
+    pub fn new(observations: &[ObservedDataPoint], length: usize) -> Result<Self, MethodError> {
         let positions = distinct_positions(observations);
-        check_length(length, positions.len())?;
+        check_length(length, positions.len()).map_err(MethodError::Invalid)?;
         let position_of = position_indices(observations, &positions);
         let count = positions.len().div_ceil(length);
         let mut blocks = vec![Vec::new(); count];
@@ -295,7 +297,9 @@ mod tests {
     fn a_length_outside_the_positions_is_rejected() {
         let observations = observed(&[0.0, 1.0, 2.0], "x");
         for length in [0, 4] {
-            let error = BlockScheme::new(&observations, length).unwrap_err();
+            let error = BlockScheme::new(&observations, length)
+                .unwrap_err()
+                .to_string();
             assert!(error.contains("block_length"), "{error}");
             assert!(error.contains("3"), "{error}");
         }

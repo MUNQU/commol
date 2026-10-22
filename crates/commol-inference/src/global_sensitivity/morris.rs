@@ -12,7 +12,7 @@
 
 use super::check_numbers;
 use crate::design::MorrisDesign;
-use crate::predictive::PredictiveError;
+use crate::error::MethodError;
 
 /// The Morris indices of every input for every quantity.
 #[derive(Debug, Clone, PartialEq)]
@@ -31,12 +31,12 @@ pub struct Morris {
 ///
 /// # Errors
 ///
-/// [`PredictiveError::NotANumber`] with the first quantity that is NaN at a
-/// point, before any effect; [`PredictiveError::Mismatch`] when there is not
+/// [`MethodError::Prediction`] of [`PredictiveError::NotANumber`](crate::predictive::PredictiveError::NotANumber) with the first quantity that is NaN at a
+/// point, before any effect; [`MethodError::Invalid`] when there is not
 /// one row of quantities per point.
-pub fn morris(design: &MorrisDesign, outputs: &[Vec<f64>]) -> Result<Morris, PredictiveError> {
+pub fn morris(design: &MorrisDesign, outputs: &[Vec<f64>]) -> Result<Morris, MethodError> {
     check_numbers(outputs)?;
-    effects(design, outputs).map_err(PredictiveError::Mismatch)
+    effects(design, outputs).map_err(MethodError::Invalid)
 }
 
 fn effects(design: &MorrisDesign, outputs: &[Vec<f64>]) -> Result<Morris, String> {

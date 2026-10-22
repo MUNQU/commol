@@ -12,11 +12,10 @@ use commol_calibration::{
     Replicates,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
-use commol_inference::Priors;
 use commol_inference::distribution::Family;
 use commol_inference::importance::TemperedPosterior;
 use commol_inference::local::{
-    Curvature, CurvatureKind, Gaussian, LocalError, delta_band, laplace, laplace_mixture,
+    Curvature, CurvatureKind, Gaussian, delta_band, laplace, laplace_mixture,
     sandwich_approximation,
 };
 use commol_inference::psis::smooth;
@@ -24,6 +23,7 @@ use commol_inference::sensitivity::{Design, FiniteDifferences, SensitivityError}
 use commol_inference::smc::LikelihoodTarget;
 use commol_inference::target::Target;
 use commol_inference::transform::Transform;
+use commol_inference::{MethodError, Priors};
 
 /// The closed form of the outputs of a [`Curve`].
 #[derive(Clone, Copy, Debug)]
@@ -638,7 +638,7 @@ fn a_parameter_the_data_do_not_read_has_no_laplace_approximation() {
     let curvature = Curvature::gauss_newton(&problem, &source, &[1.0, 0.0]).unwrap();
 
     let error = laplace(&curvature).unwrap_err();
-    assert!(matches!(error, LocalError::Refused(_)));
+    assert!(matches!(error, MethodError::Invalid(_)));
     assert!(
         error.to_string().contains("not positive definite"),
         "{error}"
@@ -673,7 +673,7 @@ fn a_mean_on_the_edge_of_its_model_has_no_finite_curvature() {
 
     let error = Curvature::gauss_newton(&problem, &source, &[0.0]).unwrap_err();
 
-    assert!(matches!(error, LocalError::Failed(_)));
+    assert!(matches!(error, MethodError::Failed(_)));
     assert!(error.to_string().contains("not finite"), "{error}");
 }
 
@@ -791,6 +791,7 @@ fn a_curvature_has_two_names() {
     assert!(
         CurvatureKind::from_name("newton")
             .unwrap_err()
+            .to_string()
             .contains("'gauss_newton' and 'hessian'")
     );
 }
@@ -816,7 +817,7 @@ fn a_band_of_replicates_is_refused() {
 
     assert_eq!(
         error,
-        LocalError::Refused(SensitivityError::Stochastic.to_string())
+        MethodError::Sensitivity(SensitivityError::Stochastic)
     );
 }
 
@@ -831,7 +832,7 @@ fn a_hessian_that_steps_outside_the_model_fails() {
 
     let error = Curvature::hessian(&problem, &source, &[5e-5]).unwrap_err();
 
-    assert!(matches!(error, LocalError::Failed(_)));
+    assert!(matches!(error, MethodError::Failed(_)));
     assert!(
         error
             .to_string()
@@ -859,7 +860,7 @@ fn a_hessian_of_an_objective_near_the_largest_number_is_not_finite() {
 
     assert_eq!(
         error,
-        LocalError::Failed("The Hessian of the objective at the fit is not finite".to_string())
+        MethodError::Failed("The Hessian of the objective at the fit is not finite".to_string())
     );
 }
 
@@ -881,7 +882,7 @@ fn a_fit_on_a_bound_above_alone_is_refused() {
 
     let error = Curvature::gauss_newton(&problem, &source, &[1.0, 0.4]).unwrap_err();
 
-    assert!(matches!(error, LocalError::Refused(_)));
+    assert!(matches!(error, MethodError::Invalid(_)));
     assert!(
         error.to_string().contains("'b' is on its bound 0.4"),
         "{error}"
@@ -928,6 +929,6 @@ fn a_mixture_whose_optima_the_prior_rules_out_is_refused() {
 
     assert_eq!(
         error,
-        LocalError::Refused("Every optimum of the starts has a target density of 0".to_string())
+        MethodError::Invalid("Every optimum of the starts has a target density of 0".to_string())
     );
 }

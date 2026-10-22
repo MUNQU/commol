@@ -3,14 +3,14 @@
 use commol_calibration::{CalibrationParameter, CalibrationProblem, LossConfig, ObservedDataPoint};
 use commol_core::Model;
 use commol_difference::DifferenceEquations;
-use commol_inference::ParameterSample;
 use commol_inference::identifiability::{
-    IdentifiabilityError, Reference, StructuralVerdict, collinearity, collinearity_index,
-    sample_identifiability, structural_rank,
+    Reference, StructuralVerdict, collinearity, collinearity_index, sample_identifiability,
+    structural_rank,
 };
 use commol_inference::sensitivity::{
     Design, FiniteDifferences, Matrix, Sensitivities, SensitivityError, SensitivitySource,
 };
+use commol_inference::{MethodError, ParameterSample};
 use commol_random::Generator;
 
 /// A → B at the rate `rate`, from A = 1000, with the parameters `ids`.
@@ -102,10 +102,7 @@ fn every_point_infeasible_raises_with_the_count() {
     let error = structural_rank(&source, 4, 7).unwrap_err();
 
     assert!(
-        matches!(
-            &error,
-            IdentifiabilityError::NoFeasiblePoint { points: 4, .. }
-        ),
+        matches!(&error, MethodError::NoFeasiblePoint { points: 4, .. }),
         "{error:?}"
     );
     let message = error.to_string();
@@ -288,7 +285,7 @@ fn a_failure_of_the_sensitivities_stops_the_structural_rank() {
     let error = structural_rank(&source, 3, 7).unwrap_err();
 
     assert!(
-        matches!(&error, IdentifiabilityError::Sensitivity(SensitivityError::Failed(m)) if m == "broken"),
+        matches!(&error, MethodError::Sensitivity(SensitivityError::Failed(m)) if m == "broken"),
         "{error:?}"
     );
 }
@@ -372,7 +369,7 @@ fn collinearity_checks_its_weights_and_subset_size() {
     for (weights, size) in [(&[1.0, 1.0][..], 2), (&[1.0], 1), (&[1.0], 4)] {
         let error = collinearity(&source, &point, weights, size, 1.2).unwrap_err();
         assert!(
-            matches!(error, IdentifiabilityError::Invalid(_)),
+            matches!(error, MethodError::Invalid(_)),
             "{weights:?} {size}: {error}"
         );
     }
@@ -386,7 +383,7 @@ fn a_correlation_threshold_is_strictly_between_zero_and_one() {
     assert!(sample_identifiability(&draws, Reference::Bounds, 0.5).is_ok());
     for threshold in [0.0, 1.0] {
         let error = sample_identifiability(&draws, Reference::Bounds, threshold).unwrap_err();
-        assert!(matches!(error, IdentifiabilityError::Invalid(_)), "{error}");
+        assert!(matches!(error, MethodError::Invalid(_)), "{error}");
     }
 }
 
@@ -430,10 +427,10 @@ fn a_structural_rank_needs_a_point_and_collinearity_a_feasible_one() {
 
     assert_eq!(
         no_points,
-        IdentifiabilityError::Invalid("A structural rank needs at least one point".to_string())
+        MethodError::Invalid("A structural rank needs at least one point".to_string())
     );
     assert!(
-        matches!(&infeasible, IdentifiabilityError::NoFeasiblePoint { points: 2, reasons }
+        matches!(&infeasible, MethodError::NoFeasiblePoint { points: 2, reasons }
             if reasons.len() == 2),
         "{infeasible:?}"
     );

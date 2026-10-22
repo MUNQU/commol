@@ -166,11 +166,16 @@ fn methods_of_observation_models_refuse_a_loss() {
         &[("a".to_string(), Family::Uniform)],
     )
     .unwrap();
-    let error = LikelihoodTarget::new(&problem, &priors).err().unwrap();
+    let error = LikelihoodTarget::new(&problem, &priors)
+        .err()
+        .unwrap()
+        .to_string();
     assert!(error.contains("needs observation models"), "{error}");
     let error = DistributionNoise::new(&problem).unwrap_err();
     assert!(error.contains("needs observation models"), "{error}");
-    let error = ParametricResampler::new(&problem, &[0.0]).unwrap_err();
+    let error = ParametricResampler::new(&problem, &[0.0])
+        .unwrap_err()
+        .to_string();
     assert!(error.contains("needs observation models"), "{error}");
 }
 
@@ -376,7 +381,9 @@ fn parametric_replicates_draw_the_data_at_the_fit() {
     }
     let mean = total / (3.0 * replicates as f64);
     assert!((mean - 3.0).abs() < 0.05, "{mean}");
-    let error = ParametricResampler::new(&problem, &[-1.0]).unwrap_err();
+    let error = ParametricResampler::new(&problem, &[-1.0])
+        .unwrap_err()
+        .to_string();
     assert!(error.contains("The fit has no likelihood"), "{error}");
 }
 

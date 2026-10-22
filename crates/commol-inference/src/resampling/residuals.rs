@@ -7,6 +7,7 @@ use commol_calibration::{CalibrationProblem, ObservedDataPoint, Workspace};
 use commol_core::SimulationEngine;
 use commol_random::Generator;
 
+use crate::error::MethodError;
 use crate::resampling::blocks::{distinct_positions, position_indices};
 
 /// The scale of the residuals of a fit.
@@ -24,14 +25,15 @@ impl ResidualScale {
     ///
     /// # Errors
     ///
-    /// Returns a message that lists the names when `name` is none of them.
-    pub fn from_name(name: &str) -> Result<Self, String> {
+    /// [`MethodError::Invalid`], which lists the names, when `name` is none
+    /// of them.
+    pub fn from_name(name: &str) -> Result<Self, MethodError> {
         match name {
             "additive" => Ok(Self::Additive),
             "multiplicative" => Ok(Self::Multiplicative),
-            _ => Err(format!(
+            _ => Err(MethodError::Invalid(format!(
                 "residual_scale is '{name}'; it must be \"additive\" or \"multiplicative\""
-            )),
+            ))),
         }
     }
 
@@ -62,20 +64,20 @@ impl Residuals {
     ///
     /// # Errors
     ///
-    /// Returns a message when the fit has no run, or, on the multiplicative
-    /// scale, when an observed or fitted value is not positive; the message
-    /// names the observation.
+    /// As [`MethodError::of_point`] when the fit has no run;
+    /// [`MethodError::Invalid`], which names the observation, when on the
+    /// multiplicative scale an observed or fitted value is not positive.
     pub fn new<E: SimulationEngine>(
         problem: &CalibrationProblem<E>,
         fit: &[f64],
         scale: ResidualScale,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, MethodError> {
         let mut workspace = Workspace::default();
         let applied = problem.applied_parameter_values(fit);
         let predictions = problem
             .forward()
             .run_observed(&applied, &mut workspace)
-            .map_err(|error| format!("The fit has no run: {error}"))?;
+            .map_err(|error| MethodError::of_point("The fit has no run", error))?;
         let observed = problem.observed_data();
         let n = observed.len();
         let replicates = predictions.len() / n.max(1);
@@ -93,12 +95,12 @@ impl Residuals {
                     if obs.value > 0.0 && fit > 0.0 {
                         Ok((obs.value / fit).ln())
                     } else {
-                        Err(format!(
+                        Err(MethodError::Invalid(format!(
                             "Observation '{}' at {} has the observed value {} and the \
                              fitted value {fit}; residual_scale=\"multiplicative\" needs both \
                              positive. Use residual_scale=\"additive\" for this data",
                             obs.label, obs.at, obs.value
-                        ))
+                        )))
                     }
                 }
             })
@@ -221,14 +223,15 @@ impl ResidualBlocks {
     ///
     /// # Errors
     ///
-    /// Returns a message that lists the names when `name` is none of them.
-    pub fn from_name(name: &str) -> Result<Self, String> {
+    /// [`MethodError::Invalid`], which lists the names, when `name` is none
+    /// of them.
+    pub fn from_name(name: &str) -> Result<Self, MethodError> {
         match name {
             "moving" => Ok(Self::Moving),
             "stationary" => Ok(Self::Stationary),
-            _ => Err(format!(
+            _ => Err(MethodError::Invalid(format!(
                 "scheme is '{name}'; it must be \"moving\" or \"stationary\""
-            )),
+            ))),
         }
     }
 }

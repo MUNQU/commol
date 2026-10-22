@@ -17,8 +17,8 @@ use commol_inference::resampling::{
     Residuals, WildBootstrap, automatic_block_length, block_jackknife, bootstrap,
 };
 use commol_inference::{
-    DistributionNoise, NoNoise, ObservationDraws, ObservationNoise, ParameterSample, Predictive,
-    PredictiveError, observation_draws, scores, statistics,
+    DistributionNoise, ErrorKind, MethodError, NoNoise, ObservationDraws, ObservationNoise,
+    ParameterSample, Predictive, PredictiveError, observation_draws, scores, statistics,
 };
 use pyo3::prelude::*;
 use rayon::prelude::*;
@@ -98,8 +98,8 @@ impl ResamplerSpec {
     ) -> PyResult<Self> {
         Ok(Self::Residual {
             block_length,
-            scale: ResidualScale::from_name(residual_scale).map_err(value_error)?,
-            blocks: ResidualBlocks::from_name(scheme).map_err(value_error)?,
+            scale: ResidualScale::from_name(residual_scale).map_err(method_error)?,
+            blocks: ResidualBlocks::from_name(scheme).map_err(method_error)?,
         })
     }
 
@@ -107,7 +107,7 @@ impl ResamplerSpec {
     pub(crate) fn wild(block_length: Option<usize>, multipliers: &str) -> PyResult<Self> {
         Ok(Self::Wild {
             block_length,
-            multipliers: Multipliers::from_name(multipliers).map_err(value_error)?,
+            multipliers: Multipliers::from_name(multipliers).map_err(method_error)?,
         })
     }
 }
@@ -122,14 +122,14 @@ impl PyCalibrationProblem {
     ) -> PyResult<(Box<dyn Resampler>, Option<BlockLength>)> {
         let observed = self.inner.observed_data();
         let blocks = |scale: ResidualScale, requested: Option<usize>, drawing: BlockDrawing| {
-            let residuals = Residuals::new(&self.inner, fit, scale).map_err(value_error)?;
+            let residuals = Residuals::new(&self.inner, fit, scale).map_err(method_error)?;
             let chosen = BlockLength::resolve(observed, &residuals, requested, drawing);
-            let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
+            let scheme = BlockScheme::new(observed, chosen.length).map_err(method_error)?;
             Ok::<_, PyErr>((residuals, chosen, scheme))
         };
         match spec {
             ResamplerSpec::Parametric => {
-                let resampler = ParametricResampler::new(&self.inner, fit).map_err(value_error)?;
+                let resampler = ParametricResampler::new(&self.inner, fit).map_err(method_error)?;
                 Ok((Box::new(resampler), None))
             }
             ResamplerSpec::Bayesian { block_length } => {
@@ -194,10 +194,10 @@ impl PyCalibrationProblem {
         resampler: impl FnOnce(&[f64]) -> PyResult<(Box<dyn Resampler>, Option<BlockLength>)>,
     ) -> PyResult<PyBootstrapRun> {
         let runner = ReplicateRunner::new(&self.inner, &config.inner, fit, starts, seed)
-            .map_err(value_error)?;
+            .map_err(method_error)?;
         let (resampler, chosen) = resampler(runner.fit())?;
         let run = parallel(py, || bootstrap(&runner, resampler.as_ref(), replicates))?
-            .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
+            .map_err(method_error)?;
         Ok(PyBootstrapRun {
             values: run.sample.values().to_vec(),
             groups: run
@@ -413,7 +413,7 @@ impl PyCalibrationProblem {
             Predictive::new(self.inner.forward(), &sample.inner, &positions, seed)
         })?
         .map(|inner| PyPredictive { inner })
-        .map_err(predictive_error)
+        .map_err(method_error)
     }
 
     /// Every draw's value of `observations`, read through the observation
@@ -456,11 +456,11 @@ impl PyCalibrationProblem {
                 ));
             }
             Some((fit, length, scale)) => {
-                let scale = ResidualScale::from_name(&scale).map_err(value_error)?;
-                let residuals = Residuals::new(&self.inner, &fit, scale).map_err(value_error)?;
+                let scale = ResidualScale::from_name(&scale).map_err(method_error)?;
+                let residuals = Residuals::new(&self.inner, &fit, scale).map_err(method_error)?;
                 Box::new(
                     ResidualNoise::new(self.inner.observed_data(), &residuals, length)
-                        .map_err(value_error)?,
+                        .map_err(method_error)?,
                 )
             }
         };
@@ -474,7 +474,7 @@ impl PyCalibrationProblem {
             )
         })?
         .map(|inner| PyObservationDraws { inner })
-        .map_err(predictive_error)
+        .map_err(method_error)
     }
 
     /// The log score of each of `observations` under the predictive of
@@ -498,7 +498,7 @@ impl PyCalibrationProblem {
         parallel(py, || {
             scores::log_score(&self.inner, &sample.inner, &observations, &noise, seed)
         })?
-        .map_err(predictive_error)
+        .map_err(method_error)
     }
 
     /// The weighted log density of each observation at `values`
@@ -524,7 +524,7 @@ impl PyCalibrationProblem {
     ///
     /// Raises:
     ///     ValueError: If the problem has a loss or the fit is not feasible
-    ///     RuntimeError: If every replicate fails
+    ///     RuntimeError: If the run at the fit fails or every replicate fails
     fn parametric_bootstrap(
         &self,
         py: Python<'_>,
@@ -667,25 +667,18 @@ impl PyCalibrationProblem {
     ) -> PyResult<PyJackknifeRun> {
         let observed = self.inner.observed_data();
         let runner = ReplicateRunner::new(&self.inner, &config.inner, &fit, starts, seed)
-            .map_err(value_error)?;
+            .map_err(method_error)?;
         let residuals = Residuals::new(&self.inner, runner.fit(), ResidualScale::Additive)
-            .map_err(value_error)?;
+            .map_err(method_error)?;
         let chosen = BlockLength::resolve(
             observed,
             &residuals,
             block_length,
             BlockDrawing::NonOverlapping,
         );
-        let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
-        if scheme.count() < 2 {
-            return Err(value_error(format!(
-                "block_length {} makes {} block; a jackknife needs at least two",
-                scheme.length(),
-                scheme.count()
-            )));
-        }
-        let jackknife = parallel(py, || block_jackknife(&runner, &scheme))?
-            .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
+        let scheme = BlockScheme::new(observed, chosen.length).map_err(method_error)?;
+        let jackknife =
+            parallel(py, || block_jackknife(&runner, &scheme))?.map_err(method_error)?;
         let spans = scheme.spans();
         Ok(PyJackknifeRun {
             spans: jackknife.blocks.iter().map(|&b| spans[b]).collect(),
@@ -779,10 +772,22 @@ pub(crate) fn value_error(message: String) -> PyErr {
     PyErr::new::<pyo3::exceptions::PyValueError, _>(message)
 }
 
-pub(crate) fn predictive_error(error: PredictiveError) -> PyErr {
-    match error {
-        PredictiveError::Draw { draw, error } => prediction_error(draw, error),
-        error => value_error(error.to_string()),
+/// The Python error of the error of a method, with the message of Rust: a
+/// draw that has no run as [`prediction_error`] says, `ValueError` for an
+/// error of the kind [`ErrorKind::Invalid`], `RuntimeError` for one of the
+/// kind [`ErrorKind::Failed`]. Every binding of a method maps its errors
+/// here.
+pub(crate) fn method_error(error: impl Into<MethodError>) -> PyErr {
+    match error.into() {
+        MethodError::Prediction(PredictiveError::Draw { draw, error }) => {
+            prediction_error(draw, error)
+        }
+        error => match error.kind() {
+            ErrorKind::Invalid => value_error(error.to_string()),
+            ErrorKind::Failed => {
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(error.to_string())
+            }
+        },
     }
 }
 

@@ -5,6 +5,7 @@
 //!
 //! | Module | Holds |
 //! |---|---|
+//! | [`error`] | [`MethodError`]: the one error of every method, [`ErrorKind::Invalid`] or [`ErrorKind::Failed`] |
 //! | [`sample`] | [`ParameterSample`]: weighted draws of the parameters |
 //! | [`statistics`] | The one quantile convention, weighted moments and effective size, from `commol-calibration` |
 //! | [`target`] | [`Target`]: a log density, `−∞` outside the support |
@@ -32,7 +33,8 @@
 //! [`commol_calibration::ForwardModel`] (a problem's, or one with no
 //! observations), reads observations and quantities only through a
 //! [`commol_calibration::ObservationOperator`], and draws every random number
-//! from a [`commol_random::Generator`].
+//! from a [`commol_random::Generator`]; every public function of a method
+//! returns a [`MethodError`].
 
 #![warn(missing_docs)]
 
@@ -40,6 +42,7 @@ pub mod batch;
 pub mod conformal;
 pub mod design;
 pub mod distribution;
+pub mod error;
 pub mod global_sensitivity;
 pub mod identifiability;
 pub mod importance;
@@ -60,6 +63,7 @@ pub mod transform;
 
 pub use commol_calibration::statistics;
 pub use distribution::{Distribution, Family};
+pub use error::{ErrorKind, MethodError};
 pub use predictive::{
     Band, DistributionNoise, NanRun, NoNoise, ObservationDraws, ObservationNoise, Predictive,
     PredictiveError, SeriesBand, draw_seeds, observation_draws,

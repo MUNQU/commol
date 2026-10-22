@@ -22,30 +22,9 @@ pub mod gaussian;
 pub mod mixture;
 pub mod sandwich;
 
-use std::fmt;
-
 pub use approximation::{CurvatureKind, curvature_at, laplace_approximation};
 pub use band::{DeltaBand, delta_band};
 pub use curvature::Curvature;
 pub use gaussian::{Gaussian, laplace};
 pub use mixture::{Component, MixtureRun, laplace_mixture};
 pub use sandwich::{SandwichRun, block_meat, blocks_at, sandwich, sandwich_approximation};
-
-/// Why a local approximation could not be made.
-#[derive(Debug, Clone, PartialEq)]
-pub enum LocalError {
-    /// The method does not apply to this problem or fit, in words.
-    Refused(String),
-    /// A run or a derivative failed.
-    Failed(String),
-}
-
-impl fmt::Display for LocalError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Refused(message) | Self::Failed(message) => f.write_str(message),
-        }
-    }
-}
-
-impl std::error::Error for LocalError {}

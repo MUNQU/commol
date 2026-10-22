@@ -7,25 +7,17 @@
 
 use crate::parallelism::parallel;
 use commol_inference::importance::TemperedPosterior;
-use commol_inference::local::{self, CurvatureKind, Gaussian, LocalError, MixtureRun};
+use commol_inference::local::{self, CurvatureKind, Gaussian, MixtureRun};
 use commol_inference::sensitivity::Matrix;
 use commol_inference::smc::{GibbsTarget, LikelihoodTarget};
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
-use crate::inference::PyCalibrationProblem;
+use crate::inference::{PyCalibrationProblem, method_error};
 use crate::smc::{PriorArgs, problem_priors};
 
-/// A refusal is a `ValueError`, a failure a `RuntimeError`.
-fn local_error(error: LocalError) -> PyErr {
-    match error {
-        LocalError::Refused(message) => PyValueError::new_err(message),
-        LocalError::Failed(message) => PyRuntimeError::new_err(message),
-    }
-}
-
 fn curvature_kind(name: &str) -> PyResult<CurvatureKind> {
-    CurvatureKind::from_name(name).map_err(PyValueError::new_err)
+    CurvatureKind::from_name(name).map_err(method_error)
 }
 
 fn rows(matrix: &Matrix) -> Vec<Vec<f64>> {
@@ -88,7 +80,7 @@ fn laplace(
     let (curvature, gaussian) = parallel(py, || {
         local::laplace_approximation(&problem.inner, &fit, kind)
     })?
-    .map_err(local_error)?;
+    .map_err(method_error)?;
     Ok(PyLocalRun::of(
         &gaussian,
         draws,
@@ -133,7 +125,7 @@ fn sandwich(
     let run = parallel(py, || {
         local::sandwich_approximation(&problem.inner, &fit, kind, block_length)
     })?
-    .map_err(local_error)?;
+    .map_err(method_error)?;
     let local = PyLocalRun::of(&run.gaussian, draws, seed, run.curvature.notes().to_vec());
     Ok((local, run.blocks, run.block_length, run.estimates))
 }
@@ -159,8 +151,8 @@ type BandTables = (Vec<String>, Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>);
 ///
 /// Raises:
 ///     ValueError: If the covariance is not one row and column per
-///         parameter, the level is not strictly between 0 and 1, or a
-///         position is one the engine rejects
+///         parameter, the level is not strictly between 0 and 1, the engine is
+///         stochastic, or a position is one the engine rejects
 ///     RuntimeError: If the derivatives fail at the fit
 #[pyfunction]
 fn delta_band(
@@ -189,7 +181,7 @@ fn delta_band(
             confidence_level,
         )
     })?
-    .map_err(local_error)?;
+    .map_err(method_error)?;
     Ok((band.outputs, band.center, band.lower, band.upper))
 }
 
@@ -275,7 +267,7 @@ fn laplace_mixture(
     let inner = &problem.inner;
     let run = match eta {
         None => {
-            let target = LikelihoodTarget::new(inner, &priors).map_err(PyValueError::new_err)?;
+            let target = LikelihoodTarget::new(inner, &priors).map_err(method_error)?;
             parallel(py, || {
                 local::laplace_mixture(
                     inner,
@@ -289,7 +281,7 @@ fn laplace_mixture(
             })?
         }
         Some(eta) => {
-            let target = GibbsTarget::new(inner, &priors, eta).map_err(PyValueError::new_err)?;
+            let target = GibbsTarget::new(inner, &priors, eta).map_err(method_error)?;
             parallel(py, || {
                 local::laplace_mixture(
                     inner,
@@ -303,7 +295,7 @@ fn laplace_mixture(
             })?
         }
     }
-    .map_err(local_error)?;
+    .map_err(method_error)?;
     Ok(PyMixtureRun::of(run))
 }
 

@@ -20,7 +20,7 @@ use rayon::prelude::*;
 
 use super::check_numbers;
 use crate::design::SaltelliDesign;
-use crate::predictive::PredictiveError;
+use crate::error::MethodError;
 use crate::statistics::{interval_levels, quantiles};
 
 /// The first-order and the total index of each input.
@@ -52,8 +52,8 @@ pub struct Sobol {
 ///
 /// # Errors
 ///
-/// [`PredictiveError::NotANumber`] with the first quantity that is NaN at a
-/// point, before any index; [`PredictiveError::Mismatch`] when there is not
+/// [`MethodError::Prediction`] of [`PredictiveError::NotANumber`](crate::predictive::PredictiveError::NotANumber) with the first quantity that is NaN at a
+/// point, before any index; [`MethodError::Invalid`] when there is not
 /// one row of quantities per point, `replicates` is below 2, or
 /// `confidence_level` is not strictly between 0 and 1.
 pub fn sobol(
@@ -62,9 +62,9 @@ pub fn sobol(
     replicates: usize,
     confidence_level: f64,
     seed: u64,
-) -> Result<Sobol, PredictiveError> {
+) -> Result<Sobol, MethodError> {
     check_numbers(outputs)?;
-    estimate(design, outputs, replicates, confidence_level, seed).map_err(PredictiveError::Mismatch)
+    estimate(design, outputs, replicates, confidence_level, seed).map_err(MethodError::Invalid)
 }
 
 fn estimate(

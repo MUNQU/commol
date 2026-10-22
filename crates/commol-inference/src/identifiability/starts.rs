@@ -2,7 +2,7 @@
 //! starts that converge to different points with the same loss show
 //! parameters the data do not determine.
 
-use super::IdentifiabilityError;
+use crate::error::MethodError;
 
 /// The result of [`starts_identifiability`].
 #[derive(Debug, Clone, PartialEq)]
@@ -24,7 +24,7 @@ pub struct StartsIdentifiability {
 ///
 /// # Errors
 ///
-/// [`IdentifiabilityError::Invalid`] when the inputs differ in length, a
+/// [`MethodError::Invalid`] when the inputs differ in length, a
 /// tolerance is negative, or fewer than two starts converged.
 pub fn starts_identifiability(
     ends: &[Vec<f64>],
@@ -33,20 +33,20 @@ pub fn starts_identifiability(
     bounds: &[(f64, f64)],
     parameter_tolerance: f64,
     loss_tolerance: f64,
-) -> Result<StartsIdentifiability, IdentifiabilityError> {
+) -> Result<StartsIdentifiability, MethodError> {
     if ends.len() != losses.len() || ends.len() != converged.len() {
-        return Err(IdentifiabilityError::Invalid(
+        return Err(MethodError::Invalid(
             "One end, loss and convergence flag per start".to_string(),
         ));
     }
     if !(parameter_tolerance >= 0.0 && loss_tolerance >= 0.0) {
-        return Err(IdentifiabilityError::Invalid(format!(
+        return Err(MethodError::Invalid(format!(
             "The tolerances must not be negative, got {parameter_tolerance} and {loss_tolerance}"
         )));
     }
     let finished: Vec<usize> = (0..ends.len()).filter(|&i| converged[i]).collect();
     if finished.len() < 2 {
-        return Err(IdentifiabilityError::Invalid(format!(
+        return Err(MethodError::Invalid(format!(
             "Comparing starts needs at least two that converged, got {}; run the calibration \
              with more starts (Calibrator.run(starts=n))",
             finished.len()

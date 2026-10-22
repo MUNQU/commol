@@ -14,7 +14,8 @@ use nalgebra::DMatrix;
 use super::TemperedTarget;
 use super::kernel::Kernel;
 use super::sampler::{SmcRun, SmcSampler, SmcState, Stop};
-use crate::local::{CurvatureKind, LocalError, block_meat, blocks_at, curvature_at};
+use crate::error::MethodError;
+use crate::local::{CurvatureKind, block_meat, blocks_at, curvature_at};
 use crate::priors::Priors;
 use crate::resampling::{BayesianBootstrap, BlockScheme};
 use crate::statistics::{interval_levels, normalized_weights, quantiles};
@@ -41,14 +42,16 @@ impl<'a, E: SimulationEngine> GibbsTarget<'a, E> {
     ///
     /// # Errors
     ///
-    /// Returns a message when `eta` is not finite and above 0.
+    /// [`MethodError::Invalid`] when `eta` is not finite and above 0.
     pub fn new(
         problem: &'a CalibrationProblem<E>,
         priors: &'a Priors,
         eta: f64,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, MethodError> {
         if !(eta.is_finite() && eta > 0.0) {
-            return Err(format!("eta must be a finite number above 0, got {eta}"));
+            return Err(MethodError::Invalid(format!(
+                "eta must be a finite number above 0, got {eta}"
+            )));
         }
         Ok(Self {
             problem,
@@ -107,15 +110,16 @@ pub struct GibbsRun {
 ///
 /// # Errors
 ///
-/// Returns a message when `eta` is not valid, the sampler fails, or no
-/// level after one below 1 keeps the effective sample size.
+/// [`MethodError::Invalid`] when `eta` is not valid; as
+/// [`SmcSampler::run`]; [`MethodError::Failed`] when the sampler stops
+/// before the temperature 1.
 pub fn gibbs_posterior<E, K>(
     problem: &CalibrationProblem<E>,
     priors: &Priors,
     eta: f64,
     sampler: &mut SmcSampler<K>,
     seed: u64,
-) -> Result<GibbsRun, String>
+) -> Result<GibbsRun, MethodError>
 where
     E: SimulationEngine + Sync,
     K: Kernel,
@@ -126,14 +130,14 @@ where
 }
 
 /// `run`, when it reached the temperature 1; `posterior` names it in the
-/// message.
-pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcRun, String> {
+/// message of [`MethodError::Failed`] otherwise.
+pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcRun, MethodError> {
     match run.stopped_at {
         Some(Stop::NoNextLevel { level }) | Some(Stop::LowAcceptance { level, .. }) => {
-            Err(format!(
+            Err(MethodError::Failed(format!(
                 "{posterior} stopped at the temperature {level}: no higher one keeps the \
                  effective sample size; use more particles"
-            ))
+            )))
         }
         None => Ok(run),
     }
@@ -150,15 +154,15 @@ pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcR
 ///
 /// # Errors
 ///
-/// [`LocalError::Refused`] when the loss is not the sum of squares, the
+/// [`MethodError::Invalid`] when the loss is not the sum of squares, the
 /// engine is stochastic, the fit is on a bound, or the blocks are not more
-/// than the parameters; [`LocalError::Failed`] when the derivatives fail at
+/// than the parameters; [`MethodError::Failed`] when the derivatives fail at
 /// the fit or `I` is singular.
 pub fn information_matching_eta<E>(
     problem: &CalibrationProblem<E>,
     fit: &[f64],
     block_length: Option<usize>,
-) -> Result<f64, LocalError>
+) -> Result<f64, MethodError>
 where
     E: SimulationEngine + Send + Sync,
 {
@@ -168,14 +172,14 @@ where
         Some(LossConfig::MeanAbsoluteError) => Some("the loss is \"mae\""),
     };
     if let Some(name) = name {
-        return Err(LocalError::Refused(format!(
+        return Err(MethodError::Invalid(format!(
             "InformationMatchingEta(...) needs loss_function=\"sse\" or \
              observation models, sums of smooth terms; {name}. Use \
              BootstrapCoverageEta(...) or a number"
         )));
     }
     if problem.forward().replicates().is_some() {
-        return Err(LocalError::Refused(
+        return Err(MethodError::Invalid(
             "InformationMatchingEta(...) needs a deterministic engine: the runs \
              of a stochastic engine have no derivatives. Use \
              BootstrapCoverageEta(...) or a number"
@@ -194,7 +198,7 @@ where
     let information = natural(curvature.matrix());
     let variance = natural(&meat);
     let inverse = variance.try_inverse().ok_or_else(|| {
-        LocalError::Failed(
+        MethodError::Failed(
             "The variance of the scores of the terms at the fit is singular: information \
              matching needs every parameter read by the data and scores that are not all 0"
                 .to_string(),
@@ -302,30 +306,38 @@ fn threshold(
     low
 }
 
+/// Check that `count` thresholds have an `η` at `confidence_level`: the
+/// lowest position of [`interpolated_eta`], `(1 − confidence_level)(count + 1)`,
+/// is at least 1.
+fn check_threshold_count(count: usize, confidence_level: f64) -> Result<(), MethodError> {
+    if (1.0 - confidence_level) * (count + 1) as f64 >= 1.0 {
+        return Ok(());
+    }
+    let needed = (count..)
+        .find(|&more| (1.0 - confidence_level) * (more + 1) as f64 >= 1.0)
+        .unwrap_or(count);
+    Err(MethodError::Invalid(format!(
+        "Bootstrap coverage at confidence_level = {confidence_level} needs at least \
+         {needed} replicates times parameters, got {count}; use more replicates"
+    )))
+}
+
 /// The `η` whose share of thresholds above it is `confidence_level`: the
 /// order statistics of the thresholds `t₁ ≤ … ≤ t_M` sit at the positions
 /// `i / (M + 1)`, which their distribution function has in expectation, and
 /// `log η` interpolates between the two around `1 − confidence_level`.
-fn interpolated_eta(thresholds: &mut [f64], confidence_level: f64) -> Result<f64, String> {
+fn interpolated_eta(thresholds: &mut [f64], confidence_level: f64) -> Result<f64, MethodError> {
     thresholds.sort_by(f64::total_cmp);
     let m = thresholds.len();
+    check_threshold_count(m, confidence_level)?;
     let position = (1.0 - confidence_level) * (m + 1) as f64;
-    if position < 1.0 {
-        let needed = (m..)
-            .find(|&count| (1.0 - confidence_level) * (count + 1) as f64 >= 1.0)
-            .unwrap_or(m);
-        return Err(format!(
-            "Bootstrap coverage at confidence_level = {confidence_level} needs at least \
-             {needed} replicates times parameters, got {m}; use more replicates"
-        ));
-    }
     let below = position.floor() as usize;
     let lower = thresholds[below - 1];
     if lower <= 0.0 {
-        return Err(format!(
+        return Err(MethodError::Invalid(format!(
             "Even the prior intervals cover the fit less often than confidence_level = \
              {confidence_level}; widen the priors"
-        ));
+        )));
     }
     let Some(&upper) = thresholds.get(below).filter(|upper| upper.is_finite()) else {
         return Ok(lower);
@@ -353,9 +365,12 @@ fn interpolated_eta(thresholds: &mut [f64], confidence_level: f64) -> Result<f64
 ///
 /// # Errors
 ///
-/// Returns a message when `confidence_level` is not strictly between 0 and
-/// 1, the loss at the fit is 0, every replicate fails, or the coverage does
-/// not cross the level.
+/// [`MethodError::Invalid`] when `confidence_level` is not strictly between
+/// 0 and 1, the replicates times the parameters are too few for it, the fit
+/// is outside the support or its loss is 0, or even the intervals of the
+/// priors cover the fit too rarely; [`MethodError::Failed`] when the model
+/// fails at the fit, every replicate fails, or the coverage does not cross
+/// the level.
 #[allow(clippy::too_many_arguments)]
 pub fn bootstrap_coverage_eta<E, K>(
     problem: &CalibrationProblem<E>,
@@ -366,21 +381,25 @@ pub fn bootstrap_coverage_eta<E, K>(
     replicates: usize,
     confidence_level: f64,
     seed: u64,
-) -> Result<CoverageCalibration, String>
+) -> Result<CoverageCalibration, MethodError>
 where
     E: SimulationEngine + Send + Sync,
     K: Kernel,
 {
-    let levels = interval_levels(confidence_level)?;
+    let levels = interval_levels(confidence_level).map_err(MethodError::Invalid)?;
+    check_threshold_count(replicates * fit.len(), confidence_level)?;
     let mut workspace = Workspace::default();
-    let loss = discrepancy_in_support(problem, fit, &mut workspace)?
-        .ok_or_else(|| "The fit is outside the support of the problem".to_string())?;
+    let loss = discrepancy_in_support(problem, fit, &mut workspace)
+        .map_err(MethodError::Failed)?
+        .ok_or_else(|| {
+            MethodError::Invalid("The fit is outside the support of the problem".to_string())
+        })?;
     if loss <= 0.0 {
-        return Err(
+        return Err(MethodError::Invalid(
             "The loss at the fit is 0, so bootstrap coverage has no scale for eta; give eta \
              as a number"
                 .to_string(),
-        );
+        ));
     }
     let observed = problem.observed_data();
     let values: Vec<f64> = observed.iter().map(|obs| obs.value).collect();
@@ -395,7 +414,8 @@ where
                 .with_data(&values, &weights)
                 .map(|replicate| (b, replicate))
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(MethodError::Invalid)?;
     let mut failed = Vec::new();
 
     // One run per replicate, with a snapshot of the particles at each step.
@@ -412,7 +432,7 @@ where
         });
         match outcome {
             Ok((state, snapshots)) => runs.push((*b, state, snapshots)),
-            Err(reason) => failed.push((*b, reason)),
+            Err(reason) => failed.push((*b, reason.to_string())),
         }
     }
     crate::resampling::FitUnit::Replicate.require(runs.len(), &failed, 1)?;
@@ -434,10 +454,10 @@ where
     while coverage(&runs, eta_max) >= confidence_level {
         growths += 1;
         if growths > MAX_GROWTHS {
-            return Err(format!(
+            return Err(MethodError::Failed(format!(
                 "The intervals still cover the fit at eta = {eta_max}; bootstrap coverage \
                  cannot reach confidence_level = {confidence_level}"
-            ));
+            )));
         }
         let grown = eta_max * ETA_GROWTH;
         for (b, state, snapshots) in &mut runs {
@@ -489,7 +509,7 @@ mod tests {
     #[test]
     fn too_few_thresholds_or_none_above_zero_have_no_eta() {
         let mut few = vec![1.0, 2.0];
-        let error = interpolated_eta(&mut few, 0.9).unwrap_err();
+        let error = interpolated_eta(&mut few, 0.9).unwrap_err().to_string();
         assert!(
             error.contains("needs at least") && error.contains("got 2"),
             "{error}"
@@ -498,6 +518,7 @@ mod tests {
         assert!(
             interpolated_eta(&mut zeros, 0.8)
                 .unwrap_err()
+                .to_string()
                 .contains("widen the priors")
         );
     }
@@ -520,7 +541,8 @@ mod tests {
             run(Some(Stop::NoNextLevel { level: 0.3 })),
             "The Gibbs posterior",
         )
-        .unwrap_err();
+        .unwrap_err()
+        .to_string();
         assert!(error.contains("temperature 0.3"), "{error}");
         assert!(reached_the_posterior(run(None), "The Gibbs posterior").is_ok());
     }

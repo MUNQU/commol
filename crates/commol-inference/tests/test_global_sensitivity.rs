@@ -14,7 +14,7 @@ use commol_inference::global_sensitivity::{
     ChaosExpansion, ForwardAnalysis, Truncation, morris, prcc, sobol,
 };
 use commol_inference::quantity::{Quantities, Quantity, Series};
-use commol_inference::{ParameterSample, Predictive, PredictiveError};
+use commol_inference::{MethodError, ParameterSample, Predictive, PredictiveError};
 use commol_stochastic::StochasticSteps;
 use nalgebra::{DMatrix, DVector};
 
@@ -616,7 +616,8 @@ fn an_analysis_takes_draws_by_its_inputs() {
         5,
     )
     .err()
-    .unwrap();
+    .unwrap()
+    .to_string();
     assert!(other.contains("the parameters are"), "{other}");
 }
 
@@ -626,7 +627,8 @@ fn an_analysis_of_no_replicates_is_refused() {
 
     let error = ForwardAnalysis::new(engine, k(), None, Some(0), decay_inputs(), 5)
         .err()
-        .unwrap();
+        .unwrap()
+        .to_string();
 
     assert_eq!(error, "A stochastic engine needs at least one replicate");
 }
@@ -656,10 +658,10 @@ fn a_propagation_names_the_draw_that_has_no_run() {
 
     let error = analysis.propagate(None, &a_at(3.0)).unwrap_err();
 
-    let PredictiveError::Draw {
+    let MethodError::Prediction(PredictiveError::Draw {
         draw: 1,
         error: EvaluationError::Violation(Violation::InfeasibleRun { message }),
-    } = error
+    }) = error
     else {
         panic!("{error:?}");
     };

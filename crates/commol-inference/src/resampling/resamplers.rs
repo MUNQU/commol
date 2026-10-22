@@ -6,6 +6,7 @@ use commol_core::SimulationEngine;
 use commol_random::Generator;
 use commol_random::sample::exponential;
 
+use crate::error::MethodError;
 use crate::predictive::{DistributionNoise, ObservationNoise};
 use crate::resampling::blocks::BlockScheme;
 use crate::resampling::residuals::{ResidualBlocks, Residuals, SeriesResiduals, source_positions};
@@ -85,21 +86,24 @@ impl ParametricResampler {
     ///
     /// # Errors
     ///
-    /// Returns a message when the problem has a loss instead of observation
-    /// models, or the fit is not feasible or has no run.
+    /// [`MethodError::Invalid`] when the problem has a loss instead of
+    /// observation models; as [`MethodError::of_point`] when the fit is not
+    /// feasible or has no run.
     pub fn new<E: SimulationEngine>(
         problem: &CalibrationProblem<E>,
         fit: &[f64],
-    ) -> Result<Self, String> {
+    ) -> Result<Self, MethodError> {
         let noise = DistributionNoise::new(problem).map_err(|_| {
-            "ParametricBootstrap(...) needs observation models; the problem has a loss. Use \
-             ResidualBootstrap(...) or WildBootstrap(...)"
-                .to_string()
+            MethodError::Invalid(
+                "ParametricBootstrap(...) needs observation models; the problem has a loss. \
+                 Use ResidualBootstrap(...) or WildBootstrap(...)"
+                    .to_string(),
+            )
         })?;
         let mut workspace = Workspace::default();
         problem
             .evaluate(fit, &mut workspace)
-            .map_err(|error| format!("The fit has no likelihood: {error}"))?;
+            .map_err(|error| MethodError::of_point("The fit has no likelihood", error))?;
         Ok(Self {
             noise,
             observations: problem.observed_data().to_vec(),
@@ -191,14 +195,15 @@ impl Multipliers {
     ///
     /// # Errors
     ///
-    /// Returns a message that lists the names when `name` is none of them.
-    pub fn from_name(name: &str) -> Result<Self, String> {
+    /// [`MethodError::Invalid`], which lists the names, when `name` is none
+    /// of them.
+    pub fn from_name(name: &str) -> Result<Self, MethodError> {
         match name {
             "rademacher" => Ok(Self::Rademacher),
             "mammen" => Ok(Self::Mammen),
-            _ => Err(format!(
+            _ => Err(MethodError::Invalid(format!(
                 "multipliers is '{name}'; it must be \"rademacher\" or \"mammen\""
-            )),
+            ))),
         }
     }
 

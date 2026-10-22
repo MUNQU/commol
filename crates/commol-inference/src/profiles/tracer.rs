@@ -21,6 +21,7 @@ use commol_core::SimulationEngine;
 use commol_random::replicate_seed;
 use rayon::prelude::*;
 
+use crate::error::MethodError;
 use crate::profiles::verdict::ProfileVerdict;
 
 /// The share of the threshold a step aims to rise by.
@@ -154,26 +155,30 @@ where
     ///
     /// # Errors
     ///
-    /// Returns a message when `fit` has the wrong length or is not feasible.
+    /// [`MethodError::Invalid`] when `fit` has the wrong length or is not
+    /// feasible; [`MethodError::Failed`] when the objective at the fit
+    /// fails.
     pub fn new(
         problem: &'a CalibrationProblem<E>,
         config: &'a OptimizationConfig,
         fit: &[f64],
         seed: u64,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, MethodError> {
         if fit.len() != problem.num_parameters() {
-            return Err(format!(
+            return Err(MethodError::Invalid(format!(
                 "The fit has {} values for {} parameters",
                 fit.len(),
                 problem.num_parameters()
-            ));
+            )));
         }
         let fit = problem.applied_parameter_values(fit);
         let score = OptimizationObjective::new(problem)
             .score(&fit)
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| MethodError::Failed(error.to_string()))?;
         if !score.feasible {
-            return Err("The fit a profile starts from is not feasible".to_string());
+            return Err(MethodError::Invalid(
+                "The fit a profile starts from is not feasible".to_string(),
+            ));
         }
         let stochastic = problem.forward().replicates().is_some();
         let floors = if stochastic {
@@ -309,17 +314,19 @@ where
     ///
     /// # Errors
     ///
-    /// Returns a message when the index is not a parameter of the problem,
-    /// or the prediction is not valid for it.
-    pub fn center(&self, quantity: &ProfiledQuantity) -> Result<f64, String> {
+    /// [`MethodError::Invalid`] when the index is not a parameter of the
+    /// problem, or the prediction is not valid for it.
+    pub fn center(&self, quantity: &ProfiledQuantity) -> Result<f64, MethodError> {
         match quantity {
             ProfiledQuantity::Parameter(index) => self.fit.get(*index).copied().ok_or_else(|| {
-                format!(
+                MethodError::Invalid(format!(
                     "Parameter {index} does not exist; the problem has {}",
                     self.problem.num_parameters()
-                )
+                ))
             }),
-            ProfiledQuantity::Prediction(spec) => predict(self.problem, spec, &self.fit),
+            ProfiledQuantity::Prediction(spec) => {
+                predict(self.problem, spec, &self.fit).map_err(MethodError::Invalid)
+            }
         }
     }
 
@@ -328,21 +335,21 @@ where
     ///
     /// # Errors
     ///
-    /// As [`Self::center`], and the message of a subproblem that fails for a
-    /// reason no point avoids.
+    /// As [`Self::center`], and [`MethodError::Failed`] when a subproblem
+    /// fails for a reason no point avoids.
     pub fn trace(
         &self,
         quantity: &ProfiledQuantity,
         threshold: f64,
         max_steps: usize,
-    ) -> Result<Profile, String> {
+    ) -> Result<Profile, MethodError> {
         self.trace_all(std::slice::from_ref(quantity), &[threshold], max_steps)
             .pop()
             .expect("one profile per quantity")
     }
 
     /// The profile of each of `quantities` up to its threshold, every side
-    /// of every quantity in parallel.
+    /// of every quantity in parallel; each is a result as of [`Self::trace`].
     ///
     /// # Panics
     ///
@@ -352,14 +359,15 @@ where
         quantities: &[ProfiledQuantity],
         thresholds: &[f64],
         max_steps: usize,
-    ) -> Vec<Result<Profile, String>> {
+    ) -> Vec<Result<Profile, MethodError>> {
         assert_eq!(
             quantities.len(),
             thresholds.len(),
             "one threshold per quantity"
         );
-        let centers: Vec<Result<f64, String>> = quantities.iter().map(|q| self.center(q)).collect();
-        let sides: Vec<Result<Side, String>> = (0..2 * quantities.len())
+        let centers: Vec<Result<f64, MethodError>> =
+            quantities.iter().map(|q| self.center(q)).collect();
+        let sides: Vec<Result<Side, MethodError>> = (0..2 * quantities.len())
             .into_par_iter()
             .map(|task| {
                 let index = task / 2;
@@ -443,7 +451,7 @@ where
         center: f64,
         threshold: f64,
         max_steps: usize,
-    ) -> Result<Side, String> {
+    ) -> Result<Side, MethodError> {
         let direction = if side == 0 { -1.0 } else { 1.0 };
         let (scale, limit, largest) = match quantity {
             ProfiledQuantity::Parameter(index) => {
@@ -490,8 +498,10 @@ where
             attempt += 1;
             let result = match quantity {
                 ProfiledQuantity::Parameter(index) => {
-                    let subproblem = Subproblem::fix_parameter(self.problem, *index, value)?;
-                    optimize_subproblem(&subproblem, self.config, &start.parameters, Some(seed))?
+                    let subproblem = Subproblem::fix_parameter(self.problem, *index, value)
+                        .map_err(MethodError::Invalid)?;
+                    optimize_subproblem(&subproblem, self.config, &start.parameters, Some(seed))
+                        .map_err(MethodError::Failed)?
                 }
                 ProfiledQuantity::Prediction(spec) => {
                     let settings = ConstraintSettings {
@@ -500,9 +510,11 @@ where
                         multiplier: start.multiplier,
                         penalty: None,
                     };
-                    let subproblem = Subproblem::fix_prediction(self.problem, spec, value)?
-                        .with_settings(settings)?;
-                    optimize_subproblem(&subproblem, self.config, &start.parameters, Some(seed))?
+                    let subproblem = Subproblem::fix_prediction(self.problem, spec, value)
+                        .and_then(|subproblem| subproblem.with_settings(settings))
+                        .map_err(MethodError::Invalid)?;
+                    optimize_subproblem(&subproblem, self.config, &start.parameters, Some(seed))
+                        .map_err(MethodError::Failed)?
                 }
             };
             evaluations += result.evaluations;

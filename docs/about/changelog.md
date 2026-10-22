@@ -29,6 +29,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the same seed. See [Scores](../guide/uncertainty/index.md#scores).
 - `LaplaceMixture.starts` defaults to 1.
 
+- **Breaking:** every uncertainty, identifiability and sensitivity method
+  raises one exception for one kind of error: `ValueError` when a setting, an
+  input, the data or the model does not fit the method, and `RuntimeError`
+  when a computation that could start fails (an engine run, an optimizer,
+  every replicate, a sampler that stops before its target). An input error of
+  an SMC method, a bootstrap, the jackknife or a profile that raised
+  `RuntimeError`, such as a loss of 0 at the fit or a fit outside the
+  support for `BootstrapCoverageEta`, now raises `ValueError`. Catch `ValueError` for these errors where your code caught
+  `RuntimeError`. See [Design decisions](../codebase/decisions/uncertainty.md#methods-raise-one-error-type).
+
 - **Breaking:** a setting that means the same thing has one name in every
   method. The level of an interval is `confidence_level`, a count is a plain
   plural noun, and the rule that combines the replicates of a ratio is

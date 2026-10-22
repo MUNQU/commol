@@ -10,11 +10,11 @@ use commol_inference::profiles::{
     Structure, Undetermined, beale, bootstrap_thresholds, chi_square,
 };
 use commol_inference::resampling::{FitUnit, ReplicateRunner};
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 use crate::calibration::{PyObservedDataPoint, PyOptimizationConfig};
-use crate::inference::{PyCalibrationProblem, ResamplerSpec, value_error};
+use crate::inference::{PyCalibrationProblem, ResamplerSpec, method_error, value_error};
 
 /// The bootstrap that calibrates a profile threshold
 ///
@@ -276,7 +276,8 @@ fn trace_profiles(
     bootstrap: Option<PyRef<'_, PyBootstrapSettings>>,
 ) -> PyResult<PyProfileRun> {
     let problem_ref = &problem.inner;
-    let tracer = ProfileTracer::new(problem_ref, &config.inner, &fit, seed).map_err(value_error)?;
+    let tracer =
+        ProfileTracer::new(problem_ref, &config.inner, &fit, seed).map_err(method_error)?;
     let quantities: Vec<ProfiledQuantity> = parameters
         .into_iter()
         .map(ProfiledQuantity::Parameter)
@@ -292,22 +293,22 @@ fn trace_profiles(
     let mut not_converged = 0;
     let thresholds = match (threshold, bootstrap) {
         ("chi_square", None) => {
-            vec![chi_square(problem_ref, confidence_level).map_err(value_error)?; quantities.len()]
+            vec![chi_square(problem_ref, confidence_level).map_err(method_error)?; quantities.len()]
         }
         ("beale", None) => vec![
             beale(problem_ref, tracer.fit_loss(), confidence_level)
-                .map_err(value_error)?;
+                .map_err(method_error)?;
             quantities.len()
         ],
         ("bootstrap", Some(settings)) => {
             let centers = quantities
                 .iter()
                 .map(|quantity| tracer.center(quantity))
-                .collect::<Result<Vec<f64>, String>>()
-                .map_err(value_error)?;
+                .collect::<Result<Vec<f64>, _>>()
+                .map_err(method_error)?;
             let runner =
                 ReplicateRunner::new(problem_ref, &config.inner, &fit, settings.starts, seed)
-                    .map_err(value_error)?;
+                    .map_err(method_error)?;
             let (resampler, _) = problem.resampler(&settings.spec, runner.fit())?;
             let count = settings.replicates;
             let run = parallel(py, || {
@@ -320,7 +321,7 @@ fn trace_profiles(
                     confidence_level,
                 )
             })?
-            .map_err(PyRuntimeError::new_err)?;
+            .map_err(method_error)?;
             rises = Some(run.rises);
             replicates = Some(run.replicates);
             failed = FitUnit::Replicate.entries(&run.failed);
@@ -336,7 +337,7 @@ fn trace_profiles(
     let traced = parallel(py, || tracer.trace_all(&quantities, &thresholds, max_steps))?;
     let mut profiles = Vec::with_capacity(traced.len());
     for (index, (profile, quantity)) in traced.into_iter().zip(&quantities).enumerate() {
-        let profile = profile.map_err(PyRuntimeError::new_err)?;
+        let profile = profile.map_err(method_error)?;
         let rises = rises
             .as_ref()
             .map(|rises: &Vec<Vec<f64>>| rises[index].clone());

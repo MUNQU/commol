@@ -3,6 +3,7 @@
 use commol_calibration::ObservedDataPoint;
 use commol_random::Generator;
 
+use crate::error::MethodError;
 use crate::predictive::ObservationNoise;
 use crate::resampling::blocks::{check_length, distinct_positions, position_indices};
 use crate::resampling::residuals::{
@@ -30,14 +31,15 @@ impl ResidualNoise {
     ///
     /// # Errors
     ///
-    /// Returns a message when `length` is 0 or larger than the number of
-    /// distinct positions of `observations`.
+    /// [`MethodError::Invalid`] when `length` is 0 or larger than the number
+    /// of distinct positions of `observations`.
     pub fn new(
         observations: &[ObservedDataPoint],
         residuals: &Residuals,
         length: usize,
-    ) -> Result<Self, String> {
-        check_length(length, distinct_positions(observations).len())?;
+    ) -> Result<Self, MethodError> {
+        check_length(length, distinct_positions(observations).len())
+            .map_err(MethodError::Invalid)?;
         Ok(Self {
             scale: residuals.scale(),
             length,

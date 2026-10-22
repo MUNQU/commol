@@ -6,6 +6,8 @@ use std::collections::HashMap;
 use commol_calibration::ObservedDataPoint;
 use commol_calibration::discrepancy::series_rms;
 
+use crate::error::MethodError;
+
 /// How a predicted and an observed value become a score: `|y − ŷ| / s`,
 /// where the scale `s` depends on the score.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,16 +27,20 @@ impl NonconformityScore {
     ///
     /// # Errors
     ///
-    /// Returns a message that lists the names when `name` is missing or
-    /// none of them.
-    pub fn from_name(name: Option<&str>) -> Result<Self, String> {
+    /// [`MethodError::Invalid`], which lists the names, when `name` is
+    /// missing or none of them.
+    pub fn from_name(name: Option<&str>) -> Result<Self, MethodError> {
         const NAMES: &str = "\"absolute\", \"normalized\" or \"spread\"";
         match name {
             Some("absolute") => Ok(Self::Absolute),
             Some("normalized") => Ok(Self::Normalized),
             Some("spread") => Ok(Self::Spread),
-            Some(other) => Err(format!("score is '{other}'; it must be {NAMES}")),
-            None => Err(format!("score is required; it must be {NAMES}")),
+            Some(other) => Err(MethodError::Invalid(format!(
+                "score is '{other}'; it must be {NAMES}"
+            ))),
+            None => Err(MethodError::Invalid(format!(
+                "score is required; it must be {NAMES}"
+            ))),
         }
     }
 
@@ -58,15 +64,19 @@ impl Pooling {
     ///
     /// # Errors
     ///
-    /// Returns a message that lists the names when `name` is missing or
-    /// none of them.
-    pub fn from_name(name: Option<&str>) -> Result<Self, String> {
+    /// [`MethodError::Invalid`], which lists the names, when `name` is
+    /// missing or none of them.
+    pub fn from_name(name: Option<&str>) -> Result<Self, MethodError> {
         const NAMES: &str = "\"series\" or \"all\"";
         match name {
             Some("series") => Ok(Self::Series),
             Some("all") => Ok(Self::All),
-            Some(other) => Err(format!("by is '{other}'; it must be {NAMES}")),
-            None => Err(format!("by is required; it must be {NAMES}")),
+            Some(other) => Err(MethodError::Invalid(format!(
+                "by is '{other}'; it must be {NAMES}"
+            ))),
+            None => Err(MethodError::Invalid(format!(
+                "by is required; it must be {NAMES}"
+            ))),
         }
     }
 
@@ -95,17 +105,17 @@ impl ConformalSettings {
     ///
     /// # Errors
     ///
-    /// Returns a message when `"normalized"` is taken per series: its
-    /// factor is one constant per series, so its intervals would equal
+    /// [`MethodError::Invalid`] when `"normalized"` is taken per series:
+    /// its factor is one constant per series, so its intervals would equal
     /// those of `"absolute"`.
-    pub fn check_pair(score: NonconformityScore, by: Pooling) -> Result<(), String> {
+    pub fn check_pair(score: NonconformityScore, by: Pooling) -> Result<(), MethodError> {
         if score == NonconformityScore::Normalized && by == Pooling::Series {
-            return Err(
+            return Err(MethodError::Invalid(
                 "score=\"normalized\" with by=\"series\" divides every score of a series by one \
                  constant, so its intervals equal those of \"absolute\"; use by=\"all\" to pool \
                  the series on one scale, or score=\"absolute\""
                     .to_string(),
-            );
+            ));
         }
         Ok(())
     }
@@ -114,16 +124,16 @@ impl ConformalSettings {
     ///
     /// # Errors
     ///
-    /// Returns a message when the pair is rejected ([`Self::check_pair`])
-    /// or `confidence_level` is not strictly between 0 and 1
-    /// ([`crate::statistics::interval_levels`]).
+    /// [`MethodError::Invalid`] when the pair is rejected
+    /// ([`Self::check_pair`]) or `confidence_level` is not strictly between 0
+    /// and 1 ([`crate::statistics::interval_levels`]).
     pub fn new(
         score: NonconformityScore,
         by: Pooling,
         confidence_level: f64,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, MethodError> {
         Self::check_pair(score, by)?;
-        crate::statistics::interval_levels(confidence_level)?;
+        crate::statistics::interval_levels(confidence_level).map_err(MethodError::Invalid)?;
         Ok(Self {
             score,
             by,
@@ -139,9 +149,18 @@ impl ConformalSettings {
 ///
 /// # Errors
 ///
-/// Returns a message when `"normalized"` meets a series the problem does
-/// not observe, `"spread"` has no spread, or a spread is not positive.
+/// [`MethodError::Invalid`] when `"normalized"` meets a series the problem
+/// does not observe, `"spread"` has no spread, or a spread is not positive.
 pub fn scales(
+    score: NonconformityScore,
+    observed: &[ObservedDataPoint],
+    points: &[ObservedDataPoint],
+    spread: Option<&[f64]>,
+) -> Result<Vec<f64>, MethodError> {
+    scale_values(score, observed, points, spread).map_err(MethodError::Invalid)
+}
+
+fn scale_values(
     score: NonconformityScore,
     observed: &[ObservedDataPoint],
     points: &[ObservedDataPoint],

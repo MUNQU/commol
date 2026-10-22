@@ -11,11 +11,11 @@
 
 use commol_core::SimulationEngine;
 
-use crate::conformal::ConformalError;
 use crate::conformal::intervals::{ConformalRun, PredictionIntervals};
 use crate::conformal::predict::{ensemble_spread, set_predictions, targets};
 use crate::conformal::quantile::{lower_quantile, upper_quantile};
 use crate::conformal::score::{ConformalSettings, NonconformityScore, scales};
+use crate::error::MethodError;
 use crate::resampling::{BlockScheme, FitUnit, Perturbation, ReplicateRunner};
 use crate::statistics;
 
@@ -60,12 +60,12 @@ pub fn jackknife_plus<E>(
     scheme: &BlockScheme,
     positions: &[f64],
     settings: ConformalSettings,
-) -> Result<JackknifePlusRun, ConformalError>
+) -> Result<JackknifePlusRun, MethodError>
 where
     E: SimulationEngine + Send + Sync,
 {
     if scheme.count() < 2 {
-        return Err(ConformalError::Invalid(format!(
+        return Err(MethodError::Invalid(format!(
             "block_length {} makes {} block; jackknife+ needs at least two",
             scheme.length(),
             scheme.count()
@@ -85,9 +85,7 @@ where
         })
         .collect();
     let refits = runner.fit_all(&perturbations);
-    refits
-        .require(FitUnit::Block, 2)
-        .map_err(ConformalError::Failed)?;
+    refits.require(FitUnit::Block, 2)?;
     let mut fit_of_block = vec![None; scheme.count()];
     let mut fits = Vec::new();
     for (block, result) in &refits.fits {
@@ -99,8 +97,7 @@ where
     let predictions = set_predictions(problem, &fits, &points)?;
     let spread =
         (settings.score == NonconformityScore::Spread).then(|| ensemble_spread(&predictions));
-    let scales = scales(settings.score, observed, &points, spread.as_deref())
-        .map_err(ConformalError::Invalid)?;
+    let scales = scales(settings.score, observed, &points, spread.as_deref())?;
     // The scored observations: each with its residual and the refit that
     // left it out.
     let block_of = scheme.block_of();

@@ -14,6 +14,7 @@ use commol_core::SimulationEngine;
 use commol_random::Generator;
 
 use super::TemperedTarget;
+use crate::error::MethodError;
 use crate::priors::Priors;
 
 /// The metric of a [`Distance::Series`] within each series.
@@ -30,14 +31,15 @@ impl SeriesMetric {
     ///
     /// # Errors
     ///
-    /// Returns a message that lists the names when `name` is none of them.
-    pub fn from_name(name: &str) -> Result<Self, String> {
+    /// [`MethodError::Invalid`], which lists the names, when `name` is none
+    /// of them.
+    pub fn from_name(name: &str) -> Result<Self, MethodError> {
         match name {
             "rmse" => Ok(Self::Rmse),
             "mae" => Ok(Self::Mae),
-            _ => Err(format!(
+            _ => Err(MethodError::Invalid(format!(
                 "metric is '{name}'; it must be \"rmse\" or \"mae\""
-            )),
+            ))),
         }
     }
 
@@ -79,9 +81,8 @@ impl Distance {
     ///
     /// # Errors
     ///
-    /// Returns a message that lists the metrics when `metric` is none of
-    /// them.
-    pub fn from_metric(metric: Option<&str>) -> Result<Self, String> {
+    /// As [`SeriesMetric::from_name`].
+    pub fn from_metric(metric: Option<&str>) -> Result<Self, MethodError> {
         metric.map_or(Ok(Self::Loss), |name| {
             SeriesMetric::from_name(name).map(Self::Series)
         })
@@ -93,19 +94,19 @@ impl<'a, E: SimulationEngine> AbcTarget<'a, E> {
     ///
     /// # Errors
     ///
-    /// Returns a message when the distance is the loss and the problem has
-    /// observation models instead.
+    /// [`MethodError::Invalid`] when the distance is the loss and the
+    /// problem has observation models instead.
     pub fn new(
         problem: &'a CalibrationProblem<E>,
         priors: &'a Priors,
         distance: Distance,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, MethodError> {
         if distance == Distance::Loss && problem.discrepancy().loss().is_none() {
-            return Err(
+            return Err(MethodError::Invalid(
                 "LossDistance() needs a loss; the problem has observation models. Use \
                  SeriesDistance(...), or BayesianPosterior(...) for their likelihood"
                     .to_string(),
-            );
+            ));
         }
         let labels: Vec<String> = problem
             .observed_data()
@@ -231,7 +232,9 @@ mod tests {
         );
         assert_eq!(
             Distance::from_metric(Some("max")),
-            Err("metric is 'max'; it must be \"rmse\" or \"mae\"".to_string())
+            Err(MethodError::Invalid(
+                "metric is 'max'; it must be \"rmse\" or \"mae\"".to_string()
+            ))
         );
     }
 }

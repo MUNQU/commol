@@ -2,7 +2,7 @@
 //! contracts each parameter against a reference, which parameters move
 //! together, and which marginals have several modes.
 
-use super::IdentifiabilityError;
+use crate::error::MethodError;
 use crate::priors::Priors;
 use crate::sample::ParameterSample;
 use crate::statistics::{check_open_unit, effective_size, quantiles};
@@ -49,16 +49,16 @@ pub enum Reference<'a> {
 ///
 /// # Errors
 ///
-/// [`IdentifiabilityError::Invalid`] when `correlation_threshold` is not
+/// [`MethodError::Invalid`] when `correlation_threshold` is not
 /// strictly between 0 and 1, or the priors are not those of the sample's
 /// parameters and bounds.
 pub fn sample_identifiability(
     sample: &ParameterSample,
     reference: Reference<'_>,
     correlation_threshold: f64,
-) -> Result<SampleIdentifiability, IdentifiabilityError> {
+) -> Result<SampleIdentifiability, MethodError> {
     check_open_unit("correlation_threshold", correlation_threshold)
-        .map_err(IdentifiabilityError::Invalid)?;
+        .map_err(MethodError::Invalid)?;
     let variances: Vec<f64> = match reference {
         Reference::Bounds => sample
             .bounds()
@@ -67,7 +67,7 @@ pub fn sample_identifiability(
             .collect(),
         Reference::Prior(priors) => {
             if priors.names() != sample.names() || priors.bounds() != sample.bounds() {
-                return Err(IdentifiabilityError::Invalid(format!(
+                return Err(MethodError::Invalid(format!(
                     "The priors of {:?} on {:?} are not those of the sample's parameters {:?} \
                      on {:?}",
                     priors.names(),
