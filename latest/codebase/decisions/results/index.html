@@ -2459,6 +2459,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../local-approximations/" class="md-nav__link">
         
   
@@ -2608,10 +2636,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#a-plot-keeps-the-global-style" class="md-nav__link">
+  <a href="#figures" class="md-nav__link">
     <span class="md-ellipsis">
       
-        A plot keeps the global style
+        Figures
       
     </span>
   </a>
@@ -3099,10 +3127,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#a-plot-keeps-the-global-style" class="md-nav__link">
+  <a href="#figures" class="md-nav__link">
     <span class="md-ellipsis">
       
-        A plot keeps the global style
+        Figures
       
     </span>
   </a>
@@ -3296,17 +3324,100 @@ function reports anything.</p>
 </ul>
 <p><strong>Guard:</strong> <code>tests/reporting/</code> (<code>test_reports.py</code> checks that each method
 gives the block of its definition, with its key order).</p>
-<h2 id="a-plot-keeps-the-global-style">A plot keeps the global style<a class="headerlink" href="#a-plot-keeps-the-global-style" title="Permanent link">&para;</a></h2>
-<p>A <code>PlotConfig</code> sets its seaborn style, palette and context through
-<code>matplotlib.rcParams</code>, which is global to the process. Each public method of
-<code>SimulationPlotter</code> is under <code>_scoped_style</code> (<code>api/plotter.py</code>): it draws in a
-copy of <code>rcParams</code> (<code>matplotlib.rc_context</code>), so the style is in its figure and
-<code>rcParams</code> is as it was when the method returns or raises. A new plot method
-takes the same decorator; <code>_apply_seaborn_style</code> outside it changes the style
-of every later figure of the user.</p>
-<p><strong>Guard:</strong> <code>tests/plotting/test_plotter.py::test_a_figure_leaves_the_global_style</code>,
-<code>tests/plotting/test_sensitivity.py::test_a_sensitivity_figure_leaves_the_global_style</code>
-and <code>tests/plotting/test_profiles.py::test_a_profile_figure_leaves_the_global_style</code>.</p>
+<h2 id="figures">Figures<a class="headerlink" href="#figures" title="Permanent link">&para;</a></h2>
+<p>A figure is read from the object of results whose data it draws, as a report
+is: <code>SimulationResults.plot</code>, <code>SimulationReplicates.plot</code> and <code>Predictive.plot</code>
+are accessors with <code>series(...)</code>, <code>cumulative(...)</code> and <code>observations(...)</code>,
+and <code>PRCCResult</code>, <code>MorrisResult</code>, <code>SobolResult</code>, <code>ChaosResult</code> and
+<code>ProfileResult</code> have <code>plot(...)</code>. The figures read the model of the results
+(<code>results.model</code>, or <code>source.simulation</code> of a predictive), and only its
+structure: <code>ModelStructure.outputs_by_source</code> and <code>series_label</code>.</p>
+<p><code>api/plotting/</code> has three layers:</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>What it holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>api/plotting/accessors.py</code>, <code>api/plotting/compared.py</code></td>
+<td>The public layer: the accessors, and <code>plot_compared</code>, the figure of several results. Each method or function takes the arguments of its drawing function and passes them on.</td>
+</tr>
+<tr>
+<td><code>api/plotting/figures.py</code></td>
+<td>The drawing functions, private (<code>_run_series</code>, <code>_prcc</code>, …). Only this module imports matplotlib.</td>
+</tr>
+<tr>
+<td><code>api/plotting/panels.py</code></td>
+<td>The data of each panel (name, unit, line, band, observed values, prediction intervals; <code>ComparedPanel</code>, a line and a band per result; <code>ObservationPanel</code>, the model, band and window at each observation; <code>ComparedObservationPanel</code>, a model and a band per result at each observation), computed without matplotlib.</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Why, against the alternative</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Figures are methods of the results, over drawing functions that take <code>axes=</code></td>
+<td><code>SimulationPlotter(simulation, results)</code> took two objects that must agree, and a third for a predictive; a facade built from one result has no place for several results on one figure.</td>
+</tr>
+<tr>
+<td>The accessors and <code>plot()</code> are the only public way to draw a figure of one result</td>
+<td>One public way per figure, as for reports. Public drawing functions too would double the documentation and the tests, and drift.</td>
+</tr>
+<tr>
+<td>Several results on the same panels are one public function, <code>plot_compared({label: result}, …)</code>, exported from <code>commol</code></td>
+<td>A comparison describes no single result: a method of one result, or a mapping in <code>plot.series</code>, would give one of them a special role. Each result reads its own model, so the function checks that each has the outputs of the first and names the key of the one that does not. <code>axes=</code> alone draws on the same panels, but checks no outputs and gives no label or color per result.</td>
+</tr>
+<tr>
+<td>A result of a comparison has the same color in every panel: <code>C0</code>, <code>C1</code>, … of the style, in the order of the keys, for its line and its band</td>
+<td>The next color of the cycle of each <code>Axes</code> depends on what the panel already holds, so a result would change color between panels.</td>
+</tr>
+<tr>
+<td>A figure returns a matplotlib <code>Figure</code>; <code>axes=</code> takes a <code>Figure</code> of commol, and finds the panel of each series by the label of its <code>Axes</code> (<code>ax.set_label</code> with the id of the series)</td>
+<td>One return type. A <code>dict</code> of <code>Axes</code> loses the <code>Figure</code>, a tuple comes from every call, and a commol object locks the API in. A series with no panel raises <code>ValueError</code> that names it.</td>
+</tr>
+<tr>
+<td>matplotlib is the optional extra <code>commol[plot]</code>, imported when a figure is drawn</td>
+<td>The core needs no plotting library, and <code>import commol</code> loads none. Without it, a figure raises <code>ImportError</code> with the install line. seaborn drew only <code>lineplot</code> and <code>scatterplot</code>, which <code>Axes.plot</code> and <code>Axes.scatter</code> draw the same.</td>
+</tr>
+<tr>
+<td>A panel per observed series is its own method, <code>plot.observations(observed_data)</code>, not a mode of <code>plot.series</code></td>
+<td><code>plot.series</code> draws the model along the whole axis; <code>plot.observations</code> reads it only at the observations. A mode would change which panels and which axis a figure has with the value of one argument.</td>
+</tr>
+<tr>
+<td><code>plot.observations</code> reads the model only at the observations, each through its own operator (<code>run_observation_panels</code>, <code>replicate_observation_panels</code>, and <code>Predictive.at_observations(..., NoNoise())</code> in <code>predictive_observation_panels</code>)</td>
+<td>The operator is defined for each observation in Rust (<code>ObservationOperator</code>), and a label can mix windows, outputs and factors, so the model away from the data would need a rule of its own in Python. A value with a window is a total over <code>(at - window, at]</code>, drawn as a step over its window with its band as a rectangle; a line between window ends would suggest values that do not exist. The run along the whole axis is <code>plot.series</code> on the same <code>axes=</code>.</td>
+</tr>
+<tr>
+<td><code>plot_compared(..., panels="observations")</code> draws one panel per observed series, each result read as <code>plot.observations</code> reads it (<code>compared_observation_panels</code> over <code>run_observation_panels</code>, <code>replicate_observation_panels</code> and <code>predictive_observation_panels</code>); the default <code>panels="series"</code> draws one panel per series</td>
+<td><code>plot_compared</code> is the one public function of a comparison, so a second function for the observed series would double its checks of the outputs, its colors and its <code>axes=</code>. The user chose this argument for #305, as #251 named it. <code>series</code> and <code>window</code> raise <code>ValueError</code> with <code>panels="observations"</code>: the labels set the panels, and each observation its own window.</td>
+</tr>
+<tr>
+<td>The band of <code>plot.observations</code> says in its legend that it has no observation noise</td>
+<td>It is the band of the model across replicates or draws, read with <code>NoNoise()</code>: not a prediction interval of the observations.</td>
+</tr>
+<tr>
+<td>The style of a figure stays in that figure</td>
+<td><code>PlotConfig.style</code> takes matplotlib styles, applied in a copy of <code>matplotlib.rcParams</code>: every drawing function is under <code>_scoped_style</code> (<code>api/plotting/figures.py</code>, <code>matplotlib.rc_context</code>), so <code>rcParams</code> is as it was when the function returns or raises. seaborn set the style, palette and context of the whole process. A new drawing function takes the same decorator; <code>_apply_style</code> outside it changes the style of every later figure of the user.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>tests/plotting/test_figures.py</code> (<code>test_a_figure_leaves_the_global_style</code>,
+<code>test_import_commol_loads_no_plotting_library</code>,
+<code>test_each_accessor_passes_on_the_arguments_of_its_function</code>,
+<code>test_a_figure_draws_on_given_axes</code>, <code>test_compared_runs_share_the_panels</code>,
+<code>test_compared_runs_need_the_same_outputs</code>,
+<code>test_compared_results_draw_a_panel_per_observed_series</code>,
+<code>test_each_observed_point_is_read_through_its_own_window</code>,
+<code>test_a_windowed_value_is_drawn_as_a_step_over_its_window</code>) and
+<code>tests/plotting/test_panels.py::test_the_panels_of_a_run_need_no_matplotlib</code>.</p>
 <h2 id="model-files-are-written-in-full">Model files are written in full<a class="headerlink" href="#model-files-are-written-in-full" title="Permanent link">&para;</a></h2>
 <p><code>Model.to_json</code> writes every field, nulls included. Dropping nulls is not
 round-trip safe: an uncalibrated <code>Parameter.value</code> or <code>BinFraction.fraction</code>

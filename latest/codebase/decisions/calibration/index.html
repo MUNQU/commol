@@ -2583,6 +2583,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../local-approximations/" class="md-nav__link">
         
   
@@ -3255,7 +3283,7 @@ the property, not only in <code>run</code>.</p>
 only code that turns a run into observed quantities: the row of each
 observation, the sum of its outputs, its increment over its window and its
 factor. The loss, the predictions of <code>PyCalibrationProblem</code>, the predictive's
-<code>at_observations</code> and every score read it, and the plotter reads a windowed or
+<code>at_observations</code> and every score read it, and the figures read a windowed or
 scaled series of a predictive through it. The calibration problem is split
 into one layer per job, each in its own module: <code>ForwardModel</code> (<code>forward.rs</code>)
 is the only code that clones, resets, writes values to or runs the engine;
@@ -3275,7 +3303,11 @@ must agree with the operator, which
 <p>An observation is given by <code>at</code> and <code>window</code>, so its window starts at
 <code>at − window</code>. A quantity given by its start, <code>Gain(start, end)</code>, passes the
 start itself (<code>ObservationOperator::with_starts</code>): <code>end − (end − start)</code> can
-round away from <code>start</code>, as <code>0.4 − (0.4 − 0.1)</code> is <code>0.09999999999999998</code>.</p>
+round away from <code>start</code>, as <code>0.4 − (0.4 − 0.1)</code> is <code>0.09999999999999998</code>.
+The operator finds the row of each position and of each start with the
+tolerance of the axis (<code>observation::index_at</code>: equal within <code>1e-9</code> of the
+larger of their magnitudes and 1, as <code>index_at</code> of <code>api/results.py</code>), so a start
+computed as <code>at − window</code> reads the row of the position it rounds away from.</p>
 <p><strong>Guards:</strong> <code>observation::tests</code>,
 <code>crates/commol-inference/tests/test_predictive.rs::observation_draws_are_the_predictions_the_loss_compares</code>,
 <code>tests/uncertainty/test_predictive.py::TestObservations</code>,

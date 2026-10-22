@@ -18,7 +18,7 @@
         <link rel="prev" href="../calibration/">
       
       
-        <link rel="next" href="../local-approximations/">
+        <link rel="next" href="../sensitivity/">
       
       
         
@@ -2579,10 +2579,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#an-analysis-needs-no-data" class="md-nav__link">
+  <a href="#scenarios-pair-the-draws-of-one-sample" class="md-nav__link">
     <span class="md-ellipsis">
       
-        An analysis needs no data
+        Scenarios pair the draws of one sample
       
     </span>
   </a>
@@ -2593,6 +2593,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3187,10 +3215,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#an-analysis-needs-no-data" class="md-nav__link">
+  <a href="#scenarios-pair-the-draws-of-one-sample" class="md-nav__link">
     <span class="md-ellipsis">
       
-        An analysis needs no data
+        Scenarios pair the draws of one sample
       
     </span>
   </a>
@@ -3571,13 +3599,14 @@ same <code>ConformalResult</code> as every variant.</p>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_conformal.rs</code>,
 <code>tests/uncertainty/test_conformal.py</code>, the studies of
 <code>tests/uncertainty/test_coverage.py</code>.</p>
-<h2 id="an-analysis-needs-no-data">An analysis needs no data<a class="headerlink" href="#an-analysis-needs-no-data" title="Permanent link">&para;</a></h2>
-<p><code>ForwardAnalysis</code> runs every method on <code>ForwardModel::unobserved</code> (values
-written as a calibration writes them). Quantities read the observation
-operator. A design point is the mean of its replicates on common seeds; a
-predictive or a propagation gives each replicate of each draw its own seed
-(<code>run_sets</code>), and each purpose has a stream (<code>stream_seed</code>). Morris, Sobol
-and chaos refuse a sample; PRCC reads its weights.</p>
+<h2 id="scenarios-pair-the-draws-of-one-sample">Scenarios pair the draws of one sample<a class="headerlink" href="#scenarios-pair-the-draws-of-one-sample" title="Permanent link">&para;</a></h2>
+<p><code>Scenarios</code> (<code>py-commol/commol/api/inference/scenarios.py</code>) holds one
+<code>Predictive</code> per scenario, each on a copy of the model with its overrides,
+from <code>source.with_model(model)</code> with the seed of the source. Run <code>k</code> of every
+scenario is then the same draw with the same seed, so <code>compare</code> takes each
+difference within a run before it reduces across runs. A quantity is one of
+<code>Quantity</code>, read in Rust (<code>Predictive.quantities</code>); a fit is a sample of one
+draw (<code>Calibrator.point_sample</code>), and one run gives no interval.</p>
 <table>
 <thead>
 <tr>
@@ -3587,25 +3616,21 @@ and chaos refuse a sample; PRCC reads its weights.</p>
 </thead>
 <tbody>
 <tr>
-<td>A problem with fake observations</td>
-<td>Invented data in a type that means a fit.</td>
+<td><code>predictive.under(overrides)</code> and <code>p1.compare(p2)</code></td>
+<td>Two predictives that must share the sample and the seeds: arguments that must agree.</td>
 </tr>
 <tr>
-<td>Python callables as quantities</td>
-<td>Every run would return to Python, one at a time.</td>
+<td>A callable quantity</td>
+<td>A second path in Python, per draw; <code>scenarios[name].runs()</code> gives the runs.</td>
 </tr>
 <tr>
-<td>Resampling a sample to equal weights</td>
-<td>Repeated draws that the test of PRCC counts as independent.</td>
-</tr>
-<tr>
-<td>Hermite polynomials for a normal input</td>
-<td>Every distribution is truncated, so they are not orthogonal.</td>
+<td>The difference of two intervals</td>
+<td>It ignores the pairs, so it is too wide.</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_global_sensitivity.rs</code>,
-<code>tests/uncertainty/test_sensitivity.py</code>.</p>
+<p><strong>Guards:</strong> <code>tests/uncertainty/test_scenarios.py::test_the_draws_of_every_scenario_share_their_seeds</code>,
+<code>tests/uncertainty/test_scenarios.py::test_the_interval_of_a_difference_is_taken_draw_by_draw</code>.</p>
 
 
 

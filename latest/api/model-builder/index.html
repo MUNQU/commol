@@ -2652,6 +2652,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/local-approximations/" class="md-nav__link">
         
   
@@ -4310,7 +4338,7 @@ parameters: the process, which is the same for every kind of model.
 </span><span id="__span-0-90"><a id="__codelineno-0-90" name="__codelineno-0-90"></a><span class="sd">            Calendar moment of position 0: a `datetime.datetime` with no time</span>
 </span><span id="__span-0-91"><a id="__codelineno-0-91" name="__codelineno-0-91"></a><span class="sd">            zone, or a `datetime.date`, read as its midnight. With it,</span>
 </span><span id="__span-0-92"><a id="__codelineno-0-92" name="__codelineno-0-92"></a><span class="sd">            ``Model.axis_units()`` converts between dates and positions, and</span>
-</span><span id="__span-0-93"><a id="__codelineno-0-93" name="__codelineno-0-93"></a><span class="sd">            ``SimulationPlotter.plot_series`` labels its ticks with dates. It</span>
+</span><span id="__span-0-93"><a id="__codelineno-0-93" name="__codelineno-0-93"></a><span class="sd">            ``results.plot.series()`` labels its ticks with dates. It</span>
 </span><span id="__span-0-94"><a id="__codelineno-0-94" name="__codelineno-0-94"></a><span class="sd">            needs a ``step_unit`` of time whose length is a whole number of</span>
 </span><span id="__span-0-95"><a id="__codelineno-0-95" name="__codelineno-0-95"></a><span class="sd">            days or a whole fraction of a day, such as ``&quot;hour&quot;`` or</span>
 </span><span id="__span-0-96"><a id="__codelineno-0-96" name="__codelineno-0-96"></a><span class="sd">            ``&quot;day&quot;``; `build` raises ``ValueError`` otherwise, or for a</span>
@@ -5194,7 +5222,7 @@ of any axis.</p>
                 <p>Calendar moment of position 0: a <code>datetime.datetime</code> with no time
 zone, or a <code>datetime.date</code>, read as its midnight. With it,
 <code>Model.axis_units()</code> converts between dates and positions, and
-<code>SimulationPlotter.plot_series</code> labels its ticks with dates. It
+<code>results.plot.series()</code> labels its ticks with dates. It
 needs a <code>step_unit</code> of time whose length is a whole number of
 days or a whole fraction of a day, such as <code>"hour"</code> or
 <code>"day"</code>; <code>build</code> raises <code>ValueError</code> otherwise, or for a
@@ -5304,7 +5332,7 @@ moment with a time zone.</p>
 </span><span id="__span-0-90"><a id="__codelineno-0-90" name="__codelineno-0-90"></a><span class="sd">        Calendar moment of position 0: a `datetime.datetime` with no time</span>
 </span><span id="__span-0-91"><a id="__codelineno-0-91" name="__codelineno-0-91"></a><span class="sd">        zone, or a `datetime.date`, read as its midnight. With it,</span>
 </span><span id="__span-0-92"><a id="__codelineno-0-92" name="__codelineno-0-92"></a><span class="sd">        ``Model.axis_units()`` converts between dates and positions, and</span>
-</span><span id="__span-0-93"><a id="__codelineno-0-93" name="__codelineno-0-93"></a><span class="sd">        ``SimulationPlotter.plot_series`` labels its ticks with dates. It</span>
+</span><span id="__span-0-93"><a id="__codelineno-0-93" name="__codelineno-0-93"></a><span class="sd">        ``results.plot.series()`` labels its ticks with dates. It</span>
 </span><span id="__span-0-94"><a id="__codelineno-0-94" name="__codelineno-0-94"></a><span class="sd">        needs a ``step_unit`` of time whose length is a whole number of</span>
 </span><span id="__span-0-95"><a id="__codelineno-0-95" name="__codelineno-0-95"></a><span class="sd">        days or a whole fraction of a day, such as ``&quot;hour&quot;`` or</span>
 </span><span id="__span-0-96"><a id="__codelineno-0-96" name="__codelineno-0-96"></a><span class="sd">        ``&quot;day&quot;``; `build` raises ``ValueError`` otherwise, or for a</span>

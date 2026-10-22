@@ -73,7 +73,7 @@ results = Simulation(model).run(num_steps=100)
 | A description of a model: equations, state graphs, the ODD protocol (text, Markdown, LaTeX)            | [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md)                                                           |
 | Calibration of parameters, initial conditions and scale factors                                        | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                                                                  |
 | Parameter samples, predictive bands and scores                                                         | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                                                                        |
-| JSON-ready reports and seaborn plots                                                                   | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md), [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting) |
+| JSON-ready reports and matplotlib figures                                                              | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md), [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting) |
 
 ## License and authors
 

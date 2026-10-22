@@ -2457,6 +2457,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/local-approximations/" class="md-nav__link">
         
   
@@ -3299,7 +3327,7 @@ kind that is not aggregate through every generic layer.</p>
 </tr>
 <tr>
 <td><code>plotting/</code></td>
-<td><code>SimulationPlotter</code></td>
+<td>The figures of results (<code>plot</code> of <code>SimulationResults</code>, <code>SimulationReplicates</code>, <code>Predictive</code> and of the results of sensitivity methods and profiles), their panels (<code>panels.py</code>) and their style</td>
 <td><a href="../../guide/simulations/#plotting">Running Simulations</a></td>
 </tr>
 <tr>
@@ -3432,7 +3460,7 @@ the exact formula).</p>
   <code>abs=1e-5</code> for Nelder-Mead on noise-free data.</li>
 <li><code>np.testing.assert_allclose</code> skips masked values. Read the points of a
   matplotlib collection as floats (<code>np.asarray(offsets, dtype=float)</code>, as
-  <code>_scatter</code> in <code>tests/plotting/test_plotter.py</code> does), so a point at <code>None</code>
+  <code>_scatter</code> in <code>tests/plotting/test_figures.py</code> does), so a point at <code>None</code>
   is NaN and fails.</li>
 </ul>
 <h2 id="reference-models">Reference models<a class="headerlink" href="#reference-models" title="Permanent link">&para;</a></h2>

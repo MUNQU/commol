@@ -2457,6 +2457,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/local-approximations/" class="md-nav__link">
         
   
@@ -3587,7 +3615,7 @@ seed of the analysis (<code>stream_seed</code>).</p>
       so <code>Model.from_json</code> reads the kind.</li>
 <li>[ ] Do not write a builder: <code>ModelBuilder.build(structure, engine)</code> builds
       every kind. Do not change <code>Simulation</code>, <code>Calibrator</code>, the reports or the
-      plotter: if one of them needs something of the kind, add a method to
+      figures: if one of them needs something of the kind, add a method to
       <code>ModelStructure</code> with a default.</li>
 <li>[ ] For a variant of a structure, subclass it with <code>variant</code> as a <code>Literal</code>
       default, and add the variant and its checks to Rust

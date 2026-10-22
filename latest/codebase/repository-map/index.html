@@ -2581,6 +2581,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/local-approximations/" class="md-nav__link">
         
   
@@ -3301,7 +3329,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/observation.rs</code></td>
-<td><code>ObservationOperator</code>: one prediction per observation from the rows of a run (rows, sums of outputs, windows, factors).</td>
+<td><code>ObservationOperator</code>: one prediction per observation from the rows of a run (rows, sums of outputs, windows, factors); <code>index_at</code>, the row of a position within the tolerance of the axis.</td>
 <td>Comparison with data.</td>
 </tr>
 <tr>
@@ -3385,8 +3413,8 @@
 <td>Ranks, verdicts.</td>
 </tr>
 <tr>
-<td><code>crates/commol-inference/src/design.rs</code>, <code>quantity.rs</code>, <code>batch.rs</code></td>
-<td>What a design-based method shares: <code>InputSpace</code> (independent distributions or a sample) and its designs (Latin hypercube, Morris trajectories, the Saltelli matrices, the scale <code>F(x)</code>); <code>Quantity</code> and <code>Quantities</code>, read through the observation operator; <code>BatchRunner</code>, every point through a forward model in parallel, replicate by replicate or as their mean.</td>
+<td><code>crates/commol-inference/src/design.rs</code>, <code>crates/commol-inference/src/quantity.rs</code>, <code>batch.rs</code></td>
+<td>What a design-based method shares: <code>InputSpace</code> (independent distributions or a sample) and its designs (Latin hypercube, Morris trajectories, the Saltelli matrices, the scale <code>F(x)</code>); <code>Series</code>, <code>Quantity</code> (a series and its reduction, read from JSON) and <code>Quantities</code>, read through the observation operator, with the schedule of a list of quantities and the quantities of a run that is done (<code>evaluate_run</code>); <code>BatchRunner</code>, every point through a forward model in parallel, replicate by replicate or as their mean, which rejects a quantity that is NaN.</td>
 <td>Estimators.</td>
 </tr>
 <tr>
@@ -3502,6 +3530,11 @@
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
+<td><code>py-commol/src/quantity.rs</code></td>
+<td><code>commol_rs.inference</code>: the quantities of interest read from the JSON of their classes, <code>quantities_as_read</code>, which writes them back, <code>quantity_schedule</code>, and <code>quantities_of_runs</code>, the quantities of runs that are done.</td>
+<td>Logic beyond type conversion.</td>
+</tr>
+<tr>
 <td><code>py-commol/src/inference.rs</code></td>
 <td><code>commol_rs.inference</code>: <code>CalibrationProblem</code> (built once from a <code>Calibrator</code>, with a loss or observation models: starts, history, predictions, the predictive, the log score, the pointwise log-likelihood), <code>ParameterSample</code>, <code>Predictive</code>, <code>ObservationDraws</code>, <code>BootstrapRun</code>, <code>JackknifeRun</code>, <code>weighted_quantiles</code>, <code>weighted_mean</code>, <code>by_series</code>, <code>quantile_error</code>; the runners of methods (the bootstraps, <code>parametric_bootstrap</code>, <code>jackknife</code>).</td>
 <td>Logic beyond type conversion.</td>
@@ -3545,7 +3578,7 @@
 </tr>
 <tr>
 <td><code>api/results.py</code></td>
-<td><code>SimulationResults</code> (values with their positions, seed and model, and its <code>report</code>), <code>SimulationReplicates</code> (runs with one seed each, their statistics and their <code>report</code>), <code>index_at</code>, <code>sample</code>.</td>
+<td><code>SimulationResults</code> (values with their positions, seed and model, its <code>report</code>, its <code>plot</code> and its <code>quantities</code>), <code>SimulationReplicates</code> (runs with one seed each, their statistics, their <code>report</code>, their <code>plot</code> and their <code>quantities</code>), <code>index_at</code>, <code>sample</code>.</td>
 <td>Engine rules.</td>
 </tr>
 <tr>
@@ -3560,7 +3593,7 @@
 </tr>
 <tr>
 <td><code>api/inference/</code></td>
-<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), the scores (<code>api/inference/scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), the runners of the identifiability methods (<code>api/inference/identifiability.py</code>), which build the report, the runners of the resampling methods (<code>api/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>api/inference/smc.py</code>), of the local approximations (<code>api/inference/local.py</code>), of the conformal methods (<code>api/inference/conformal.py</code>), which build <code>ConformalResult</code>, of the sensitivity methods (<code>api/inference/global_sensitivity.py</code>), and of the profiles (<code>api/inference/profiles.py</code>), which build <code>ProfileResult</code>.</td>
+<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), <code>Scenarios</code>, the predictive of each scenario and their paired comparison (<code>scenarios.py</code>), the scores (<code>api/inference/scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), the runners of the identifiability methods (<code>api/inference/identifiability.py</code>), which build the report, the runners of the resampling methods (<code>api/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>api/inference/smc.py</code>), of the local approximations (<code>api/inference/local.py</code>), of the conformal methods (<code>api/inference/conformal.py</code>), which build <code>ConformalResult</code>, of the sensitivity methods (<code>api/inference/global_sensitivity.py</code>), and of the profiles (<code>api/inference/profiles.py</code>), which build <code>ProfileResult</code>.</td>
 <td>Transforms of predictions; quantile formulas.</td>
 </tr>
 <tr>
@@ -3574,13 +3607,13 @@
 <td>Physical units inside the model.</td>
 </tr>
 <tr>
-<td><code>api/plotter.py</code></td>
-<td>Plots of results, of the bands of a <code>Predictive</code>, of sensitivity results (<code>plot_prcc</code>, <code>plot_morris</code>, <code>plot_sobol</code>) and of profiles (<code>plot_profiles</code>).</td>
-<td>Computation of results.</td>
+<td><code>api/plotting/</code></td>
+<td>The figures of results: the <code>plot</code> accessors of <code>SimulationResults</code>, <code>SimulationReplicates</code> and <code>Predictive</code> (<code>accessors.py</code>), <code>plot_compared</code>, the figure of several of them on the same panels (<code>compared.py</code>), the private drawing functions, which also draw the <code>plot()</code> of the results of sensitivity methods and profiles (<code>figures.py</code>, the only module that imports matplotlib), and the data of each panel, computed without matplotlib (<code>panels.py</code>).</td>
+<td>Computation of results; a public drawing function.</td>
 </tr>
 <tr>
 <td><code>context/inference/</code></td>
-<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code>, <code>IdentifiabilityMethod</code> and <code>SensitivityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>, <code>DistributionNoise</code>), the distributions and <code>Priors</code> (<code>distributions.py</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>context/inference/smc.py</code>: <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, <code>InformationMatchingEta</code>, <code>BootstrapCoverageEta</code>, <code>ABCSMC</code>, <code>ABCRejection</code>, the distances, <code>SMCResult</code>, <code>GibbsResult</code>), of the local approximations (<code>context/inference/local.py</code>: <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, its targets, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>DeltaBand</code>, <code>ImportanceResult</code>), of the conformal methods (<code>context/inference/conformal.py</code>), of the sensitivity methods with <code>InputSpace</code> and the quantities of interest (<code>context/inference/global_sensitivity.py</code>), and of the profiles (<code>context/inference/profiles.py</code>: <code>ProfileLikelihood</code>, <code>PredictionProfile</code>, <code>PredictionSpec</code>, <code>Threshold</code>, <code>ProfileResult</code>).</td>
+<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code>, <code>IdentifiabilityMethod</code> and <code>SensitivityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>, <code>DistributionNoise</code>), the distributions and <code>Priors</code> (<code>distributions.py</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>context/inference/smc.py</code>: <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, <code>InformationMatchingEta</code>, <code>BootstrapCoverageEta</code>, <code>ABCSMC</code>, <code>ABCRejection</code>, the distances, <code>SMCResult</code>, <code>GibbsResult</code>), of the local approximations (<code>context/inference/local.py</code>: <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, its targets, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>DeltaBand</code>, <code>ImportanceResult</code>), of the conformal methods (<code>context/inference/conformal.py</code>), of the sensitivity methods with <code>InputSpace</code> (<code>context/inference/global_sensitivity.py</code>), the quantities of interest (<code>quantities.py</code>: a series, <code>Level</code> or <code>Increments</code>, and its reduction), and of the profiles (<code>context/inference/profiles.py</code>: <code>ProfileLikelihood</code>, <code>PredictionProfile</code>, <code>PredictionSpec</code>, <code>Threshold</code>, <code>ProfileResult</code>).</td>
 <td>Runners.</td>
 </tr>
 <tr>
@@ -3798,7 +3831,12 @@
 <tr>
 <td>Change how results, windows or reports read positions</td>
 <td><code>py-commol/commol/api/results.py</code></td>
-<td><code>api/windows.py</code>, <code>api/reporting.py</code>, <code>api/plotter.py</code>, <code>api/inference/predictive.py</code></td>
+<td><code>api/windows.py</code>, <code>api/reporting.py</code>, <code>api/plotting/</code>, <code>api/inference/predictive.py</code></td>
+</tr>
+<tr>
+<td>Change a figure</td>
+<td><code>py-commol/commol/api/plotting/</code> (<code>panels.py</code>, the data; <code>figures.py</code>, the drawing)</td>
+<td><code>api/plotting/accessors.py</code>, <code>api/plotting/compared.py</code> (<code>plot_compared</code>), the <code>plot</code> method of the result, <code>docs/guide/simulations.md</code> (Plotting)</td>
 </tr>
 <tr>
 <td>Add a function or variable to rate expressions</td>
@@ -3862,8 +3900,8 @@
 </tr>
 <tr>
 <td>Change a sensitivity method, a design or a quantity of interest</td>
-<td><code>crates/commol-inference/src/global_sensitivity/</code>; <code>design.rs</code>, <code>quantity.rs</code>, <code>batch.rs</code></td>
-<td><code>crates/commol-calibration/src/forward.rs</code> (<code>unobserved</code>), <code>py-commol/src/sensitivity.rs</code>, <code>py-commol/commol/context/inference/global_sensitivity.py</code>, <code>api/sensitivity.py</code>, <code>api/inference/global_sensitivity.py</code>, <code>docs/guide/uncertainty/sensitivity.md</code></td>
+<td><code>crates/commol-inference/src/global_sensitivity/</code>; <code>design.rs</code>, <code>crates/commol-inference/src/quantity.rs</code>, <code>batch.rs</code></td>
+<td><code>crates/commol-calibration/src/forward.rs</code> (<code>unobserved</code>), <code>py-commol/src/sensitivity.rs</code>, <code>py-commol/src/quantity.rs</code>, <code>py-commol/commol/context/inference/quantities.py</code>, <code>context/inference/global_sensitivity.py</code>, <code>api/sensitivity.py</code>, <code>api/inference/global_sensitivity.py</code>, <code>api/results.py</code> (<code>quantities</code>), <code>docs/guide/uncertainty/sensitivity.md</code></td>
 </tr>
 <tr>
 <td>Change a local approximation (the curvature, Laplace, the sandwich, the Laplace mixture) or PSIS</td>
@@ -3871,9 +3909,9 @@
 <td><code>crates/commol-calibration/src/likelihood/density.rs</code> (<code>information</code>, <code>scores</code>), <code>discrepancy.rs</code> (<code>term_derivatives</code>), <code>py-commol/src/local.rs</code>, <code>py-commol/commol/context/inference/local.py</code>, <code>api/inference/local.py</code>, <code>docs/guide/uncertainty/local.md</code></td>
 </tr>
 <tr>
-<td>Change the parameter sample, the predictive, the scores or the quantile</td>
+<td>Change the parameter sample, the predictive, the scenarios, the scores or the quantile</td>
 <td><code>crates/commol-inference/src/sample.rs</code>, <code>predictive.rs</code>, <code>scores.rs</code>, <code>statistics.rs</code></td>
-<td><code>py-commol/commol/context/inference/sample.py</code>, <code>api/inference/</code>, <code>docs/guide/uncertainty/index.md</code></td>
+<td><code>py-commol/commol/context/inference/sample.py</code>, <code>api/inference/</code> (<code>scenarios.py</code>), <code>docs/guide/uncertainty/index.md</code></td>
 </tr>
 <tr>
 <td>Change the Python API</td>
@@ -3904,7 +3942,7 @@
 <li><strong>Type conversion between Python and Rust</strong> → <code>py-commol/src/</code>.</li>
 <li><strong>Validation of user input</strong> → the Pydantic model in <code>context/</code>.</li>
 <li><strong>User-facing workflow</strong> → <code>api/</code>.</li>
-<li><strong>Presentation</strong> (reports, plots) → <code>api/reporting.py</code>, <code>api/plotter.py</code>.</li>
+<li><strong>Presentation</strong> (reports, figures) → <code>api/reporting.py</code>, <code>api/plotting/</code>.</li>
 </ol>
 <h2 id="navigation">Navigation<a class="headerlink" href="#navigation" title="Permanent link">&para;</a></h2>
 <p>Previous: <a href="../architecture/">Architecture</a> | Next: <a href="../design-decisions/">Design decisions</a></p>
