@@ -18,6 +18,7 @@ from commol.api import (
     weighted_quantiles,
     windowed_totals,
 )
+from commol.api.build_info import BuildInfo, build_info
 from commol.commol_rs._commol_rs import engine as _engine
 from commol.context import (
     Aggregate,
@@ -166,6 +167,9 @@ A difference-equations step that leaves a compartment below zero raises it.
 It is a `ValueError`; a calibration treats such a run as infeasible.
 """
 
+__version__: str = build_info().version
+"""The PEP 440 version of the installed commol; `build_info` adds its commit."""
+
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
@@ -180,6 +184,8 @@ def add_stderr_logger(level: int = logging.INFO) -> logging.StreamHandler[TextIO
 
 
 __all__ = [
+    "BuildInfo",
+    "build_info",
     "ChaosResult",
     "Gain",
     "Increments",

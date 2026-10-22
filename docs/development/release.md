@@ -52,6 +52,18 @@ Python package version.
 
 Do not commit version bumps. The tag is the version.
 
+A build that is not a release, such as an install from a git commit or
+`maturin develop`, keeps the placeholder. The build script of the extension
+(`py-commol/build.rs`, with its logic in `py-commol/src/build_info.rs`) reads
+the commit from the git metadata of the source, without the `git` program, and
+`commol.__version__` adds it to the placeholder as a PEP 440 local version:
+`0.1.0+g<first 7 characters of the commit>`. A build of any other version is a
+release, and `__version__` gives that version alone, in PEP 440 (`X.Y.Z-beta.N`
+gives `X.Y.ZbN`). `commol.build_info()` gives the version and the full commit,
+or `None` when the source has no git metadata (a source distribution).
+`tests/suite/test_version.py` checks the version and the commit of the build
+that the tests run on, and the Rust tests of `build_info.rs` check the rule.
+
 ## Release Workflow
 
 A release is always made from `main`. Publishing a GitHub release starts the

@@ -177,6 +177,7 @@ nav:
       - Identifiability: api/identifiability.md
       - Sensitivity: api/sensitivity.md
       - Reports: api/reports.md
+      - Package: api/package.md
       - Model Structure: advanced/model-structure.md
   - Development:
       - Codebase Guide:

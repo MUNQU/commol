@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Added #253 -->
 
+- `commol.__version__` gives the installed version, and `commol.build_info()`
+  gives a `BuildInfo` with the version and the full commit the extension was
+  built from (`None` when the source has no git metadata, such as a source
+  distribution). A build that is not a release, such as an install from a
+  git commit, names its commit as a PEP 440 local version:
+  `0.1.0+g<first 7 characters of the commit>`. See
+  [Check the installation](../getting-started/installation.md#check-the-installation).
+
 <!-- Added #282 -->
 
 - `Ratio(numerator, denominator, replicates)` is a quantity of interest: one

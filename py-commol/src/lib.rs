@@ -34,6 +34,8 @@
 use pyo3::prelude::*;
 
 // Module declarations
+#[cfg(test)]
+mod build_info;
 mod calibration;
 mod conformal;
 mod core;
@@ -110,8 +112,11 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     inference::register(&inference_module)?;
     m.add_submodule(&inference_module)?;
 
-    // Module-level metadata
-    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+    // Module-level metadata: the version and the commit of the build, which
+    // the build script reads (`build_info.rs`); no commit is an empty string.
+    let commit = Some(env!("COMMOL_COMMIT")).filter(|commit| !commit.is_empty());
+    m.add("__version__", env!("COMMOL_VERSION"))?;
+    m.add("__commit__", commit)?;
     m.add(
         "__doc__",
         "Commol: High-performance compartment modelling in Rust with Python bindings.",

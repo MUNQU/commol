@@ -1106,3 +1106,5 @@ engine: EngineModule
 calibration: CalibrationModule
 inference: InferenceModule
 rust_commol: RustCommolModule
+__version__: str
+__commit__: str | None
