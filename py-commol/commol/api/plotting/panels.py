@@ -1,0 +1,561 @@
+"""The data of the panels of a figure, computed without matplotlib.
+
+A panel is one series: its name and unit, the line of the model, the band of
+replicates or of draws, the observed values and the prediction intervals.
+`commol.api.plotting.figures` draws the panels; nothing here imports
+matplotlib.
+"""
+
+import itertools
+import logging
+import math
+from collections import defaultdict
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING
+
+from commol.api.inference.intervals import member_statistics
+from commol.api.results import SimulationReplicates, SimulationResults, index_at
+from commol.api.windows import windowed_totals
+from commol.context.calibration import CalibrationResult, ObservedDataPoint
+from commol.context.inference.noise import NoNoise
+
+if TYPE_CHECKING:
+    from commol.api.inference.predictive import Predictive, SeriesBand
+    from commol.context.inference.conformal import PredictionIntervals
+    from commol.context.model import Model
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class Trace:
+    """
+    Values at positions, drawn as a line or as points.
+
+    Attributes
+    ----------
+    positions : list[float]
+        Positions on the axis.
+    values : list[float]
+        One value per position.
+    label : str
+        The label of the legend.
+    """
+
+    positions: list[float]
+    values: list[float]
+    label: str
+
+
+@dataclass(frozen=True)
+class Band:
+    """
+    A band between two values at each position.
+
+    Attributes
+    ----------
+    positions : list[float]
+        Positions on the axis.
+    lower, upper : list[float]
+        The ends of the band at each position.
+    label : str
+        The label of the legend.
+    """
+
+    positions: list[float]
+    lower: list[float]
+    upper: list[float]
+    label: str
+
+
+@dataclass(frozen=True)
+class Panel:
+    """
+    One series of a figure.
+
+    Attributes
+    ----------
+    series : str
+        The id of the series: an output name, or a bin or accumulator id. The
+        `Axes` of the panel has it as its label.
+    name : str
+        The title of the panel.
+    unit : str
+        The unit of the values, or ``""`` when they have none.
+    line : Trace
+        The model: one run, the mean of the replicates or the median of the
+        draws.
+    band : Band | None
+        The band of the replicates or of the draws.
+    observed : Trace | None
+        The observed values, drawn as points.
+    intervals : Band | None
+        The bounded prediction intervals of a conformal method.
+    prediction : Trace | None
+        The point prediction of those intervals.
+    """
+
+    series: str
+    name: str
+    unit: str
+    line: Trace
+    band: Band | None = None
+    observed: Trace | None = None
+    intervals: Band | None = None
+    prediction: Trace | None = None
+
+
+class _Outputs:
+    """The outputs of results, and the bins and accumulators of their model."""
+
+    def __init__(self, outputs: Iterable[str], model: "Model | None"):
+        self.outputs = list(outputs)
+        self.model = model
+
+    def select(self, series: Sequence[str] | None) -> list[str]:
+        """The series to draw, each checked to resolve to outputs."""
+        if series is None:
+            return list(self.outputs)
+        for series_id in series:
+            self.components(series_id)
+        return list(series)
+
+    def components(self, series_id: str) -> list[str]:
+        """The outputs whose sum is the series: itself, or those of an id."""
+        if series_id in self.outputs:
+            return [series_id]
+        if self.model is None:
+            raise ValueError(
+                f"'{series_id}' is not an output of the results, and the results "
+                "have no model to read the outputs of a bin or accumulator from. "
+                f"Outputs: {self.outputs}"
+            )
+        by_source = self.model.structure.outputs_by_source(self.model)
+        if series_id not in by_source:
+            raise ValueError(
+                f"'{series_id}' is neither an output nor a bin or accumulator id. "
+                f"Outputs: {self.outputs}. Bins and accumulators: {sorted(by_source)}"
+            )
+        return by_source[series_id]
+
+    def panel(
+        self,
+        series_id: str,
+        line: Trace,
+        band: Band | None = None,
+        observed: Trace | None = None,
+    ) -> Panel:
+        """The panel of a series, named as the kind of the model names it."""
+        if self.model is None:
+            name, unit = series_id, None
+        else:
+            name, unit = self.model.structure.series_label(self.model, series_id)
+        return Panel(
+            series=series_id,
+            name=name,
+            unit=unit or "",
+            line=line,
+            band=band,
+            observed=observed,
+        )
+
+
+def run_panels(
+    results: SimulationResults,
+    observed_data: Iterable[ObservedDataPoint] | None = None,
+    calibration_result: CalibrationResult | None = None,
+    series: Sequence[str] | None = None,
+) -> list[Panel]:
+    """
+    The panels of one run: the model of each series and its observations.
+
+    Parameters
+    ----------
+    results : SimulationResults
+        The run.
+    observed_data : Iterable[ObservedDataPoint] | None
+        Observations, each on the panel of its label.
+    calibration_result : CalibrationResult | None
+        The values of the factors of the observations.
+    series : Sequence[str] | None
+        The series, or every output when None.
+
+    Returns
+    -------
+    list[Panel]
+        One panel per series, in order.
+    """
+    outputs = _Outputs(results, results.model)
+    factors = calibration_result.best_parameters if calibration_result else {}
+    by_series = _group_observed(observed_data)
+    panels = []
+    for series_id in outputs.select(series):
+        observed = by_series.get(series_id, [])
+        positions, values = _model_line(results, outputs, series_id, observed, factors)
+        panels.append(
+            outputs.panel(
+                series_id,
+                Trace(positions, values, "Simulation"),
+                observed=_observed(observed),
+            )
+        )
+    return panels
+
+
+def replicate_panels(
+    replicates: SimulationReplicates,
+    confidence_level: float,
+    observed_data: Iterable[ObservedDataPoint] | None = None,
+    calibration_result: CalibrationResult | None = None,
+    series: Sequence[str] | None = None,
+) -> list[Panel]:
+    """
+    The panels of replicates: the mean of each series and the band of
+    `confidence_level` of the replicates, each reduced to the series first
+    (`member_statistics`).
+    """
+    mean = replicates.mean()
+    outputs = _Outputs(mean, replicates.model)
+    factors = calibration_result.best_parameters if calibration_result else {}
+    by_series = _group_observed(observed_data)
+    panels = []
+    for series_id in outputs.select(series):
+        observed = by_series.get(series_id, [])
+        positions, values = _model_line(mean, outputs, series_id, observed, factors)
+        statistics = member_statistics(
+            [
+                _model_line(run, outputs, series_id, observed, factors)[1]
+                for run in replicates
+            ],
+            confidence_level,
+        )
+        panels.append(
+            outputs.panel(
+                series_id,
+                Trace(positions, values, f"Mean of {len(replicates)} replicates"),
+                band=Band(
+                    positions,
+                    statistics["ci_lower"],
+                    statistics["ci_upper"],
+                    f"{confidence_level:.0%} of the replicates",
+                ),
+                observed=_observed(observed),
+            )
+        )
+    return panels
+
+
+def predictive_panels(
+    predictive: "Predictive",
+    confidence_level: float,
+    observed_data: Iterable[ObservedDataPoint] | None = None,
+    series: Sequence[str] | None = None,
+) -> list[Panel]:
+    """
+    The panels of a predictive: the weighted median of the draws of each
+    series and their band of `confidence_level`.
+
+    Each draw is read through the operator of the observations of the series,
+    as the loss reads it (`_predictive_band`).
+    """
+    outputs = _Outputs(
+        predictive.output_names, predictive.source.simulation.model_definition
+    )
+    by_series = _group_observed(observed_data)
+    panels = []
+    for series_id in outputs.select(series):
+        observed = by_series.get(series_id, [])
+        band = _predictive_band(
+            predictive, outputs, series_id, observed, confidence_level
+        )
+        panels.append(
+            outputs.panel(
+                series_id,
+                Trace(band.positions, band.median, "Median of the draws"),
+                band=_draws_band(band),
+                observed=_observed(observed),
+            )
+        )
+    return panels
+
+
+def cumulative_panels(
+    results: SimulationResults,
+    observed_data: Iterable[ObservedDataPoint] | None = None,
+    calibration_result: CalibrationResult | None = None,
+    series: Sequence[str] | None = None,
+) -> list[Panel]:
+    """
+    The panels of the running total of each series of a run, and of its
+    observations, each divided by the fitted value of its factor.
+    """
+    outputs = _Outputs(results, results.model)
+    factors = calibration_result.best_parameters if calibration_result else {}
+    by_series = _group_observed(observed_data)
+    return [
+        outputs.panel(
+            series_id,
+            Trace(
+                results.positions,
+                list(
+                    itertools.accumulate(_sum(results, outputs.components(series_id)))
+                ),
+                "Simulation (Cumulative)",
+            ),
+            observed=_cumulative_observed(by_series.get(series_id, []), factors),
+        )
+        for series_id in outputs.select(series)
+    ]
+
+
+def predictive_cumulative_panels(
+    predictive: "Predictive",
+    confidence_level: float,
+    observed_data: Iterable[ObservedDataPoint] | None = None,
+    series: Sequence[str] | None = None,
+) -> list[Panel]:
+    """
+    The panels of the band of the running total of each series of a
+    predictive, and of its observations, each divided by the weighted median
+    of its factor.
+    """
+    outputs = _Outputs(
+        predictive.output_names, predictive.source.simulation.model_definition
+    )
+    factors = {
+        name: values[0] for name, values in predictive.sample.quantiles([0.5]).items()
+    }
+    by_series = _group_observed(observed_data)
+    panels = []
+    for series_id in outputs.select(series):
+        band = predictive.series_band(
+            outputs.components(series_id), confidence_level, cumulative=True
+        )
+        panels.append(
+            outputs.panel(
+                series_id,
+                Trace(band.positions, band.median, "Median of the draws (cumulative)"),
+                band=_draws_band(band),
+                observed=_cumulative_observed(by_series.get(series_id, []), factors),
+            )
+        )
+    return panels
+
+
+def with_intervals(
+    panels: list[Panel], intervals: "PredictionIntervals | None"
+) -> list[Panel]:
+    """
+    The panels with the prediction intervals of their series, by label: the
+    band of the bounded intervals and the point prediction.
+    """
+    if intervals is None:
+        return panels
+    with_series = []
+    for panel in panels:
+        series = intervals.series.get(panel.series)
+        if series is None:
+            with_series.append(panel)
+            continue
+        bounded = [
+            (at, lower, upper)
+            for at, lower, upper in zip(
+                series.positions, series.lower, series.upper, strict=True
+            )
+            if math.isfinite(lower) and math.isfinite(upper)
+        ]
+        with_series.append(
+            replace(
+                panel,
+                intervals=Band(
+                    [at for at, _, _ in bounded],
+                    [lower for _, lower, _ in bounded],
+                    [upper for _, _, upper in bounded],
+                    f"{intervals.level:.0%} prediction interval",
+                ),
+                prediction=Trace(series.positions, series.prediction, "Prediction"),
+            )
+        )
+    return with_series
+
+
+def _group_observed(
+    observed_data: Iterable[ObservedDataPoint] | None,
+) -> dict[str, list[ObservedDataPoint]]:
+    """The observations of each series, by label, in order of position."""
+    grouped: dict[str, list[ObservedDataPoint]] = defaultdict(list)
+    for point in observed_data or ():
+        grouped[point.label].append(point)
+    return {
+        label: sorted(points, key=lambda point: point.at)
+        for label, points in grouped.items()
+    }
+
+
+def _observed(observed: list[ObservedDataPoint]) -> Trace | None:
+    """The observed values of a series, or None when it has none."""
+    if not observed:
+        return None
+    return Trace(
+        [point.at for point in observed],
+        [point.value for point in observed],
+        "Observed",
+    )
+
+
+def _cumulative_observed(
+    observed: list[ObservedDataPoint], factors: Mapping[str, float]
+) -> Trace | None:
+    """
+    The running total of the observations of a series, each divided by the
+    value of its factor when `factors` has it.
+    """
+    if not observed:
+        return None
+    return Trace(
+        [point.at for point in observed],
+        list(
+            itertools.accumulate(
+                point.value / factors[point.factor_id]
+                if point.factor_id is not None and point.factor_id in factors
+                else point.value
+                for point in observed
+            )
+        ),
+        "Observed (Cumulative)",
+    )
+
+
+def _draws_band(band: "SeriesBand") -> Band:
+    """The central interval of the draws of a series band."""
+    return Band(
+        band.positions,
+        band.lower,
+        band.upper,
+        f"{band.confidence_level:.0%} of the draws",
+    )
+
+
+def _factor(factor_id: str | None, factors: Mapping[str, float]) -> float:
+    """The value of a factor, or 1 for none or one the factors lack."""
+    if factor_id is None:
+        return 1.0
+    if factor_id not in factors:
+        logger.warning(
+            f"Factor parameter '{factor_id}' not found in calibration result; "
+            "leaving model predictions unscaled."
+        )
+        return 1.0
+    return factors[factor_id]
+
+
+def _reads_each_observation(observed: list[ObservedDataPoint]) -> bool:
+    """
+    Whether the model of a series is read at each observation: when one has
+    a window, or the observations differ in outputs or factor.
+
+    Otherwise one operator reads every observation, and the model line covers
+    every position of the results.
+    """
+    operators = {(tuple(point.outputs or ()), point.factor_id) for point in observed}
+    return any(point.window for point in observed) or len(operators) > 1
+
+
+def _sum(results: Mapping[str, list[float]], outputs: list[str]) -> list[float]:
+    """The sum of some outputs at each position."""
+    missing = [name for name in outputs if name not in results]
+    if missing:
+        raise KeyError(f"Missing result series for aggregate components: {missing}")
+    return [sum(values) for values in zip(*(results[name] for name in outputs))]
+
+
+def _model_line(
+    results: SimulationResults,
+    outputs: _Outputs,
+    series_id: str,
+    observed: list[ObservedDataPoint],
+    factors: Mapping[str, float],
+) -> tuple[list[float], list[float]]:
+    """
+    The positions and values of the model of one series in one run.
+
+    When the observations of the series do not share one operator with no
+    window, each observation is read through its own operator, as the loss
+    reads it: the sum of its outputs at its position, or its increment over
+    its window (`windowed_totals`), times its factor. Otherwise the sum of the
+    outputs of their operator at every position of the results, times its
+    factor.
+
+    Raises
+    ------
+    ValueError
+        If the results have no value at the position of an observation read
+        on its own or at the start of its window.
+    """
+    if _reads_each_observation(observed):
+        values = []
+        for point in observed:
+            series = _sum(results, point.outputs or outputs.components(series_id))
+            value = (
+                windowed_totals(series, results.positions, point.window, [point.at])[0]
+                if point.window
+                else series[index_at(results.positions, point.at)]
+            )
+            values.append(value * _factor(point.factor_id, factors))
+        return [point.at for point in observed], values
+    components = (
+        observed[0].outputs
+        if observed and observed[0].outputs
+        else outputs.components(series_id)
+    )
+    factor = _factor(observed[0].factor_id if observed else None, factors)
+    return list(results.positions), [
+        value * factor for value in _sum(results, components)
+    ]
+
+
+def _predictive_band(
+    predictive: "Predictive",
+    outputs: _Outputs,
+    series_id: str,
+    observed: list[ObservedDataPoint],
+    confidence_level: float,
+) -> "SeriesBand":
+    """
+    The band of one series of a predictive.
+
+    When the observations of the series do not share one operator with no
+    window, each draw is read through the operator of each observation at its
+    position, as the loss reads it. With one operator and a factor, each draw
+    is read through it at every position of the predictive. Otherwise, the
+    band of the sum of the outputs.
+    """
+    if _reads_each_observation(observed):
+        points = [
+            ObservedDataPoint(
+                at=point.at,
+                outputs=point.outputs or outputs.components(series_id),
+                label=series_id,
+                value=0.0,
+                window=point.window,
+                factor_id=point.factor_id,
+            )
+            for point in observed
+        ]
+        return predictive.at_observations(points, NoNoise()).band(confidence_level)
+    components = (
+        observed[0].outputs
+        if observed and observed[0].outputs
+        else outputs.components(series_id)
+    )
+    factor_id = observed[0].factor_id if observed else None
+    if factor_id is None:
+        return predictive.series_band(components, confidence_level)
+    points = [
+        ObservedDataPoint(
+            at=at, outputs=components, label=series_id, value=0.0, factor_id=factor_id
+        )
+        for at in predictive.positions
+    ]
+    return predictive.at_observations(points, NoNoise()).band(confidence_level)

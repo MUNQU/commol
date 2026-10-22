@@ -17,7 +17,6 @@ from commol import (
     SimulationReplicates,
     SimulationResults,
 )
-from commol.api.plotter import SimulationPlotter
 from commol.context.engine import EngineName
 from tests.support import (
     MEAN_FIELD,
@@ -85,7 +84,7 @@ class TestOneProcess:
         simulation = Simulation(build_stochastic(a_to_b_builder(), engine))
         replicates = simulation.replicates(30, seed=5).run(10)
 
-        figure = SimulationPlotter(simulation, replicates).plot_series()
+        figure = replicates.plot.series()
         report = replicates.report(0.9, positions=[5.0, 10.0], window=5.0, windows=2)
 
         line = figure.get_axes()[0].get_lines()[0]

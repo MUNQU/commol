@@ -30,7 +30,7 @@ kind that is not aggregate through every generic layer.
 | `calibration/` | One file per calibration page: `test_problem.py`, `test_optimizers.py`, `test_starts.py`, `test_constraints.py`, `test_observations.py`, `test_initial_conditions.py`, `test_write_back.py` | [Model Calibration](../guide/calibration.md) and its sub-pages |
 | `uncertainty/` | The parameter sample, the one quantile, the predictive, the scores, the entry points `Calibrator.uncertainty` and `SensitivityAnalysis.run`, and the coverage harness (`test_coverage.py`, marker `coverage_study`) | [Uncertainty](../guide/uncertainty/index.md) |
 | `reporting/` | Reports | [Reports](../guide/reports.md) |
-| `plotting/` | `SimulationPlotter` | [Running Simulations](../guide/simulations.md#plotting) |
+| `plotting/` | The figures of results (`plot` of `SimulationResults`, `SimulationReplicates`, `Predictive` and of the results of sensitivity methods and profiles), their panels (`panels.py`) and their style | [Running Simulations](../guide/simulations.md#plotting) |
 | `docs/` | The documentation examples and the API coverage (marker `docs`) | — |
 | `reference_models/` | Published models against their stated results, one module per model family | — (across features) |
 | `model_kinds/` | The test model kind (`support/kinds.py`) through a simulation, a calibration, a report and a plot; the check that an engine runs its kind; the variants of a structure (`UnstratifiedVariant`). It needs the extension built with `--features test-kind`. | — (across features; [Design decisions](decisions/model-kinds.md#one-interface-for-every-model-kind)) |
@@ -131,7 +131,7 @@ the exact formula).
   `abs=1e-5` for Nelder-Mead on noise-free data.
 - `np.testing.assert_allclose` skips masked values. Read the points of a
   matplotlib collection as floats (`np.asarray(offsets, dtype=float)`, as
-  `_scatter` in `tests/plotting/test_plotter.py` does), so a point at `None`
+  `_scatter` in `tests/plotting/test_figures.py` does), so a point at `None`
   is NaN and fails.
 
 ## Reference models

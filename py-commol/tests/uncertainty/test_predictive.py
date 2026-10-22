@@ -16,7 +16,6 @@ from commol import (
     ParameterSample,
     Predictive,
     SampleMethod,
-    SimulationPlotter,
     member_statistics,
 )
 from tests.support import (
@@ -260,11 +259,8 @@ class TestReaders:
         predictive = Predictive(
             calibrator, _sample([[0.08, 0.04], [0.13, 0.07]]), POSITIONS
         )
-        plotter = SimulationPlotter(
-            calibrator.simulation, predictive.runs()[0], confidence_level=0.9
-        )
 
-        figure = plotter.plot_series(calibration_result=predictive, series=["B"])
+        figure = predictive.plot.series(series=["B"], confidence_level=0.9)
 
         median = figure.axes[0].lines[0].get_ydata()
         assert np.asarray(median) == pytest.approx(

@@ -81,7 +81,7 @@ results = Simulation(model).run(num_steps=100)
 | A description of a model: equations, state graphs, the ODD protocol (text, Markdown, LaTeX) | [Describing a Model](guide/describing-models.md) |
 | Calibration of parameters, initial conditions and scale factors | [Model Calibration](guide/calibration.md) |
 | Parameter samples, predictive bands and scores | [Uncertainty](guide/uncertainty/index.md) |
-| JSON-ready reports and seaborn plots | [Reports](guide/reports.md), [Plotting](guide/simulations.md#plotting) |
+| JSON-ready reports and matplotlib figures | [Reports](guide/reports.md), [Plotting](guide/simulations.md#plotting) |
 
 ## License and authors
 

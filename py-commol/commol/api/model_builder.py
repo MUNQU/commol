@@ -90,7 +90,7 @@ class ModelBuilder:
             Calendar moment of position 0: a `datetime.datetime` with no time
             zone, or a `datetime.date`, read as its midnight. With it,
             ``Model.axis_units()`` converts between dates and positions, and
-            ``SimulationPlotter.plot_series`` labels its ticks with dates. It
+            ``results.plot.series()`` labels its ticks with dates. It
             needs a ``step_unit`` of time whose length is a whole number of
             days or a whole fraction of a day, such as ``"hour"`` or
             ``"day"``; `build` raises ``ValueError`` otherwise, or for a

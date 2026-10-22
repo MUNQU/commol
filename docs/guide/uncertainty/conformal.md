@@ -306,16 +306,14 @@ print(round(sum(misses) / len(misses), 3))  # 0.125
 Every variant returns a `ConformalResult(intervals, scores, guarantee)`.
 `intervals` is a `PredictionIntervals`: its `level`, a `SeriesIntervals` per
 series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`.
-`SimulationPlotter.plot_series(prediction_intervals=...)` draws the band of
-each series on its subplot, and
+`plot.series(prediction_intervals=...)` of a run, of replicates or of a
+predictive draws the band of each series on its panel, and
 `SimulationResults.report(..., prediction_intervals=...)` adds it under the key
 `prediction_intervals`.
 
 ```python
-from commol.api.plotter import SimulationPlotter
-
 run = Simulation(ab_model(0.05)).run(num_steps=90)
-figure = SimulationPlotter(Simulation(ab_model(0.05)), run).plot_series(
+figure = run.plot.series(
     observed_data=observations, prediction_intervals=result.intervals, series=["B"]
 )
 ```

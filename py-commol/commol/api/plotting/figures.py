@@ -1,0 +1,614 @@
+"""The drawing functions of the figures, private to commol.
+
+The `plot` accessors of the results (`commol.api.plotting.accessors`) and the
+`plot` method of a result with one figure call them, with the arguments they
+take. Each draws in a copy of `matplotlib.rcParams` (`_scoped_style`) and
+returns the matplotlib `Figure`. Each panel holds the id of its series as the
+label of its `Axes`, so a later figure given that `Figure` as `axes` draws on
+the same panels.
+
+Importing this module imports matplotlib, the optional extra ``commol[plot]``.
+"""
+
+import functools
+import logging
+import math
+from collections import defaultdict
+from collections.abc import Callable, Sequence
+from datetime import time
+from typing import TYPE_CHECKING
+
+try:
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
+    from matplotlib.ticker import FuncFormatter
+except ModuleNotFoundError as error:
+    raise ImportError(
+        "The figures of commol need matplotlib. Install it with: "
+        "pip install 'commol[plot]'"
+    ) from error
+
+from commol.api.plotting import panels as _panels
+from commol.api.plotting.panels import Panel
+from commol.api.results import same_position
+from commol.context.inference.global_sensitivity import SobolResult
+from commol.context.visualization import PlotConfig
+
+if TYPE_CHECKING:
+    from commol.api.inference.predictive import Predictive
+    from commol.api.results import SimulationReplicates, SimulationResults
+    from commol.context.axis_units import AxisUnits
+    from commol.context.calibration import CalibrationResult, ObservedDataPoint
+    from commol.context.inference.conformal import PredictionIntervals
+    from commol.context.inference.global_sensitivity import (
+        ChaosResult,
+        MorrisResult,
+        PRCCResult,
+    )
+    from commol.context.inference.profiles import ProfileResult
+    from commol.context.model import Model
+
+logger = logging.getLogger(__name__)
+
+PositionLabel = Callable[[float], str]
+LineKeywords = str | int | float | bool | None
+
+
+def _scoped_style[**P, R](draw: Callable[P, R]) -> Callable[P, R]:
+    """
+    Run `draw` in a copy of `matplotlib.rcParams`.
+
+    The style of a `PlotConfig` applies to the figure that `draw` makes, and
+    `matplotlib.rcParams` is as it was before the call when `draw` returns or
+    raises.
+    """
+
+    @functools.wraps(draw)
+    def scoped(*args: P.args, **kwargs: P.kwargs) -> R:
+        with mpl.rc_context():
+            return draw(*args, **kwargs)
+
+    return scoped
+
+
+@_scoped_style
+def _run_series(
+    results: "SimulationResults",
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: PlotConfig | None = None,
+    series: list[str] | None = None,
+    show_legend: bool = True,
+    position_label: PositionLabel | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    prediction_intervals: "PredictionIntervals | None" = None,
+    axes: Figure | None = None,
+    **kwargs: LineKeywords,
+) -> Figure:
+    """The figure of `ResultsPlot.series`."""
+    return _series_figure(
+        _panels.run_panels(results, observed_data, calibration_result, series),
+        results.model,
+        output_file,
+        config,
+        show_legend,
+        position_label,
+        tick_every,
+        x_label,
+        prediction_intervals,
+        axes,
+        kwargs,
+    )
+
+
+@_scoped_style
+def _replicates_series(
+    replicates: "SimulationReplicates",
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: PlotConfig | None = None,
+    series: list[str] | None = None,
+    show_legend: bool = True,
+    position_label: PositionLabel | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    prediction_intervals: "PredictionIntervals | None" = None,
+    confidence_level: float = 0.95,
+    axes: Figure | None = None,
+    **kwargs: LineKeywords,
+) -> Figure:
+    """The figure of `ReplicatesPlot.series`."""
+    return _series_figure(
+        _panels.replicate_panels(
+            replicates, confidence_level, observed_data, calibration_result, series
+        ),
+        replicates.model,
+        output_file,
+        config,
+        show_legend,
+        position_label,
+        tick_every,
+        x_label,
+        prediction_intervals,
+        axes,
+        kwargs,
+    )
+
+
+@_scoped_style
+def _predictive_series(
+    predictive: "Predictive",
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    config: PlotConfig | None = None,
+    series: list[str] | None = None,
+    show_legend: bool = True,
+    position_label: PositionLabel | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    prediction_intervals: "PredictionIntervals | None" = None,
+    confidence_level: float = 0.95,
+    axes: Figure | None = None,
+    **kwargs: LineKeywords,
+) -> Figure:
+    """The figure of `PredictivePlot.series`."""
+    return _series_figure(
+        _panels.predictive_panels(predictive, confidence_level, observed_data, series),
+        predictive.source.simulation.model_definition,
+        output_file,
+        config,
+        show_legend,
+        position_label,
+        tick_every,
+        x_label,
+        prediction_intervals,
+        axes,
+        kwargs,
+    )
+
+
+@_scoped_style
+def _run_cumulative(
+    results: "SimulationResults",
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: PlotConfig | None = None,
+    series: list[str] | None = None,
+    axes: Figure | None = None,
+    **kwargs: LineKeywords,
+) -> Figure:
+    """The figure of `ResultsPlot.cumulative`."""
+    return _cumulative_figure(
+        _panels.cumulative_panels(results, observed_data, calibration_result, series),
+        output_file,
+        config,
+        axes,
+        kwargs,
+    )
+
+
+@_scoped_style
+def _replicates_cumulative(
+    replicates: "SimulationReplicates",
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: PlotConfig | None = None,
+    series: list[str] | None = None,
+    axes: Figure | None = None,
+    **kwargs: LineKeywords,
+) -> Figure:
+    """The figure of `ReplicatesPlot.cumulative`."""
+    return _cumulative_figure(
+        _panels.cumulative_panels(
+            replicates.mean(), observed_data, calibration_result, series
+        ),
+        output_file,
+        config,
+        axes,
+        kwargs,
+    )
+
+
+@_scoped_style
+def _predictive_cumulative(
+    predictive: "Predictive",
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    config: PlotConfig | None = None,
+    series: list[str] | None = None,
+    confidence_level: float = 0.95,
+    axes: Figure | None = None,
+    **kwargs: LineKeywords,
+) -> Figure:
+    """The figure of `PredictivePlot.cumulative`."""
+    return _cumulative_figure(
+        _panels.predictive_cumulative_panels(
+            predictive, confidence_level, observed_data, series
+        ),
+        output_file,
+        config,
+        axes,
+        kwargs,
+    )
+
+
+@_scoped_style
+def _prcc(
+    result: "PRCCResult",
+    output_file: str | None = None,
+    config: PlotConfig | None = None,
+    x_label: str = "Step",
+    axes: Figure | None = None,
+) -> Figure:
+    """The figure of `PRCCResult.plot`."""
+    config = config or PlotConfig()
+    _apply_style(config)
+    groups: dict[str, list[int]] = defaultdict(list)
+    for index, series in enumerate(result.series):
+        groups[series].append(index)
+    names = list(groups)
+    figure, panels = _axes_of(names, config, axes)
+    for ax, name in zip(panels, names, strict=True):
+        indices = groups[name]
+        positions = [
+            position
+            for position in (result.positions[i] for i in indices)
+            if position is not None
+        ]
+        if len(positions) == len(indices):
+            for j, input_name in enumerate(result.inputs):
+                ax.plot(
+                    positions,
+                    [result.coefficients[i][j] for i in indices],
+                    marker="o",
+                    label=input_name,
+                )
+            ax.set_xlabel(x_label)
+            ax.legend()
+        else:
+            ax.bar(result.inputs, result.coefficients[indices[0]])
+        ax.axhline(0.0, color="grey", linewidth=0.8)
+        ax.set_ylim(-1.05, 1.05)
+        ax.set_ylabel("PRCC")
+        ax.set_title(name)
+    _finish(figure, output_file, config, "PRCC")
+    return figure
+
+
+@_scoped_style
+def _morris(
+    result: "MorrisResult",
+    output_file: str | None = None,
+    config: PlotConfig | None = None,
+    axes: Figure | None = None,
+) -> Figure:
+    """The figure of `MorrisResult.plot`."""
+    config = config or PlotConfig()
+    _apply_style(config)
+    figure, panels = _axes_of(result.labels, config, axes)
+    for q, ax in enumerate(panels):
+        for j, input_name in enumerate(result.inputs):
+            mu_star, sigma = result.mu_star[q][j], result.sigma[q][j]
+            ax.scatter([mu_star], [sigma], label=input_name)
+            ax.annotate(input_name, (mu_star, sigma))
+        ax.set_xlabel("μ*")
+        ax.set_ylabel("σ")
+        ax.set_title(result.labels[q])
+        ax.legend()
+    _finish(figure, output_file, config, "Morris")
+    return figure
+
+
+@_scoped_style
+def _sobol(
+    result: "SobolResult | ChaosResult",
+    output_file: str | None = None,
+    config: PlotConfig | None = None,
+    axes: Figure | None = None,
+) -> Figure:
+    """The figure of `SobolResult.plot` and `ChaosResult.plot`."""
+    config = config or PlotConfig()
+    _apply_style(config)
+    inputs = result.inputs
+    figure, panels = _axes_of(result.labels, config, axes)
+    width = 0.4
+    places = list(range(len(inputs)))
+    for q, ax in enumerate(panels):
+        for offset, name, values in (
+            (-width / 2, "First order", result.first[q]),
+            (width / 2, "Total", result.total[q]),
+        ):
+            errors = None
+            if isinstance(result, SobolResult):
+                lower, upper = (
+                    (result.first_lower[q], result.first_upper[q])
+                    if name == "First order"
+                    else (result.total_lower[q], result.total_upper[q])
+                )
+                errors = [
+                    [max(v - low, 0.0) for v, low in zip(values, lower, strict=True)],
+                    [max(high - v, 0.0) for v, high in zip(values, upper, strict=True)],
+                ]
+            ax.bar(
+                [place + offset for place in places],
+                values,
+                width,
+                yerr=errors,
+                capsize=3,
+                label=name,
+            )
+        ax.set_xticks(places)
+        ax.set_xticklabels(inputs)
+        ax.set_ylabel("Sobol index")
+        ax.set_title(result.labels[q])
+        ax.legend()
+    _finish(figure, output_file, config, "Sobol")
+    return figure
+
+
+@_scoped_style
+def _profiles(
+    result: "ProfileResult",
+    output_file: str | None = None,
+    config: PlotConfig | None = None,
+    axes: Figure | None = None,
+) -> Figure:
+    """The figure of `ProfileResult.plot`."""
+    config = config or PlotConfig()
+    _apply_style(config)
+    names = list(result.profiles)
+    figure, panels = _axes_of(names, config, axes)
+    for ax, name in zip(panels, names, strict=True):
+        profile = result.profiles[name]
+        ax.plot(profile.values, profile.statistics, marker="o", markersize=3)
+        ax.axhline(profile.threshold, color="grey", linestyle="--", linewidth=1)
+        interval = result.intervals[name]
+        for end in (interval.lower, interval.upper):
+            if end is not None:
+                ax.axvline(end, color="grey", linestyle=":", linewidth=1)
+        ax.set_xlabel(name)
+        ax.set_ylabel("Profile statistic")
+        ax.set_title(name)
+    _finish(figure, output_file, config, "Profiles")
+    return figure
+
+
+def _series_figure(
+    panels: list[Panel],
+    model: "Model | None",
+    output_file: str | None,
+    config: PlotConfig | None,
+    show_legend: bool,
+    position_label: PositionLabel | None,
+    tick_every: float | None,
+    x_label: str,
+    prediction_intervals: "PredictionIntervals | None",
+    axes: Figure | None,
+    keywords: dict[str, LineKeywords],
+) -> Figure:
+    """Draw the panels of series, with their prediction intervals."""
+    config = config or PlotConfig()
+    _apply_style(config)
+    panels = _panels.with_intervals(panels, prediction_intervals)
+    figure, grid = _axes_of([panel.series for panel in panels], config, axes)
+    for ax, panel in zip(grid, panels, strict=True):
+        _draw_panel(ax, panel, keywords, x_label)
+        _label_positions(ax, panel.line.positions, position_label, tick_every, model)
+        if show_legend:
+            ax.legend()
+    _finish(figure, output_file, config, "Series")
+    return figure
+
+
+def _cumulative_figure(
+    panels: list[Panel],
+    output_file: str | None,
+    config: PlotConfig | None,
+    axes: Figure | None,
+    keywords: dict[str, LineKeywords],
+) -> Figure:
+    """Draw the panels of running totals, of the size of the configuration."""
+    config = config or PlotConfig()
+    _apply_style(config)
+    figure, grid = _axes_of(
+        [panel.series for panel in panels], config, axes, config.figsize
+    )
+    for ax, panel in zip(grid, panels, strict=True):
+        _draw_panel(ax, panel, keywords, "Step")
+        ax.legend()
+    _finish(figure, output_file, config, "Cumulative")
+    return figure
+
+
+def _draw_panel(
+    ax: Axes, panel: Panel, keywords: dict[str, LineKeywords], x_label: str
+) -> None:
+    """
+    Draw one panel: its line, which takes `keywords`, its band, its observed
+    points, its prediction intervals, and its labels.
+    """
+    line = panel.line
+    (drawn,) = ax.plot(line.positions, line.values, label=line.label)
+    drawn.set(**keywords)
+    if panel.band is not None:
+        _fill(ax, panel.band)
+    if panel.observed is not None:
+        ax.scatter(
+            panel.observed.positions,
+            panel.observed.values,
+            label=panel.observed.label,
+            color="red",
+            s=30,
+            alpha=0.7,
+            zorder=5,
+        )
+    if panel.intervals is not None and panel.prediction is not None:
+        _fill(ax, panel.intervals)
+        ax.plot(
+            panel.prediction.positions,
+            panel.prediction.values,
+            linestyle="--",
+            label=panel.prediction.label,
+        )
+    ax.set_label(panel.series)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(panel.unit)
+    ax.set_title(panel.name)
+    ax.grid(True, alpha=0.3)
+
+
+def _fill(ax: Axes, band: _panels.Band) -> None:
+    """Fill a band."""
+    ax.fill_between(band.positions, band.lower, band.upper, alpha=0.3, label=band.label)
+
+
+def _apply_style(config: PlotConfig) -> None:
+    """
+    Apply the matplotlib style of `config`.
+
+    It sets `matplotlib.rcParams`, so only a function under `_scoped_style`
+    calls it: the style stays in the figure of that function.
+    """
+    if config.style:
+        plt.style.use(config.style)
+
+
+def _axes_of(
+    ids: Sequence[str],
+    config: PlotConfig,
+    axes: Figure | None,
+    figsize: tuple[float, float] | None = None,
+) -> tuple[Figure, list[Axes]]:
+    """
+    The figure and the panel of each id.
+
+    With `axes`, the panel of an id is the `Axes` of that figure whose label
+    is the id. Otherwise a new figure of the layout of `config`, of `figsize`
+    or of the size of its panels, whose panels beyond the ids are hidden.
+
+    Raises
+    ------
+    ValueError
+        If `axes` has no panel of an id.
+    """
+    if axes is not None:
+        by_label = {ax.get_label(): ax for ax in axes.axes}
+        missing = [series_id for series_id in ids if series_id not in by_label]
+        if missing:
+            raise ValueError(
+                f"The figure has no panel of {missing}. Its panels: "
+                f"{[label for label in by_label if label]}."
+            )
+        return axes, [by_label[series_id] for series_id in ids]
+    rows, cols = config.layout or _layout(len(ids))
+    figure, grid = plt.subplots(
+        rows,
+        cols,
+        figsize=figsize or (cols * 4.5, rows * 3.5 + 1.0),
+        dpi=config.dpi,
+        squeeze=False,
+    )
+    panels = list(grid.flat)
+    for ax, series_id in zip(panels, ids, strict=False):
+        ax.set_label(series_id)
+    for ax in panels[len(ids) :]:
+        ax.set_visible(False)
+    return figure, panels[: len(ids)]
+
+
+def _layout(count: int) -> tuple[int, int]:
+    """The rows and columns of a figure of `count` panels."""
+    if count == 1:
+        return (1, 1)
+    if count == 2:
+        return (1, 2)
+    if count <= 4:
+        return (2, 2)
+    cols = math.ceil(math.sqrt(count))
+    return (math.ceil(count / cols), cols)
+
+
+def _finish(
+    figure: Figure, output_file: str | None, config: PlotConfig, name: str
+) -> None:
+    """Lay the figure out, and save it to `output_file` when there is one."""
+    figure.tight_layout()
+    if output_file:
+        figure.savefig(output_file, dpi=config.dpi, bbox_inches="tight")
+        logger.info(f"{name} figure saved to {output_file}")
+
+
+def _label_positions(
+    ax: Axes,
+    positions: Sequence[float],
+    position_label: PositionLabel | None,
+    tick_every: float | None,
+    model: "Model | None",
+) -> None:
+    """
+    Label the x axis with `position_label`, or with dates on a dated axis.
+
+    With no `position_label` and a model with an origin, a tick shows the
+    date of its position: at the plotted positions `tick_every` apart, or at
+    the ticks matplotlib places when `tick_every` is None. With neither, the
+    ticks show the position.
+    """
+    if position_label is None:
+        if model is None or model.origin is None:
+            return
+        axis = model.axis_units()
+        if tick_every is None:
+            ax.xaxis.set_major_formatter(
+                FuncFormatter(lambda at, _: _date_label(axis, at))
+            )
+            ax.tick_params(axis="x", labelrotation=45)
+            return
+        position_label = functools.partial(_date_label, axis)
+    _apply_x_labels(ax, positions, position_label, tick_every)
+
+
+def _apply_x_labels(
+    ax: Axes,
+    positions: Sequence[float],
+    position_label: PositionLabel,
+    tick_every: float | None,
+) -> None:
+    """
+    Label the x axis at the plotted positions `tick_every` apart.
+
+    The tick grid is phased to the first plotted position rather than to
+    position 0: a series read at its observations is plotted at their
+    positions, so anchoring at 0 would put ticks on positions that carry no
+    plotted point.
+    """
+    if tick_every is not None and positions:
+        anchor = positions[0]
+        ticks = [
+            position
+            for position in positions
+            if same_position(
+                (position - anchor) / tick_every,
+                round((position - anchor) / tick_every),
+            )
+        ]
+    else:
+        ticks = list(positions)
+    ax.set_xticks(ticks)
+    ax.set_xticklabels(
+        [position_label(position) for position in ticks], rotation=45, ha="right"
+    )
+
+
+def _date_label(axis: "AxisUnits", position: float) -> str:
+    """The date of a position, with its time when it is not midnight."""
+    moment = axis.moment_of(position)
+    if moment.time() == time():
+        return moment.date().isoformat()
+    return moment.isoformat(sep=" ")

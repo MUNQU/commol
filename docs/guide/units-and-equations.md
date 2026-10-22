@@ -234,7 +234,7 @@ Rules of the origin, each a `ValueError`:
 | The moment has no time zone. | A step has no time zone, so `(moment - origin) / step` stays exact through a change of summer time. Convert an aware moment with `moment.astimezone(zone).replace(tzinfo=None)`. |
 | The step unit is a unit of time whose length is a whole number of days or a whole fraction of a day, such as `hour`, `day` or `week`. | `month` and `year` are units of a fixed length (a month is 1/12 of a year, about 30.44 days), not the length of a calendar month or year, so their positions would not fall on calendar dates. |
 
-With an origin, [`SimulationPlotter.plot_series`](simulations.md#plotting)
+With an origin, [`results.plot.series()`](simulations.md#plotting)
 labels its ticks with dates when it has no `position_label`.
 
 ## Next steps

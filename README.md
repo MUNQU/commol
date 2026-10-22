@@ -40,6 +40,8 @@ its scores.
 pip install commol
 ```
 
+The figures need matplotlib: `pip install 'commol[plot]'`.
+
 Commol requires Python 3.12 or later. Prebuilt wheels are available for Linux
 and macOS (x86_64 and arm64) and for Windows (x86_64); on other platforms pip
 builds Commol from source, which needs a Rust toolchain (see
