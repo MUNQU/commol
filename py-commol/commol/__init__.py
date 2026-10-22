@@ -1,7 +1,6 @@
 """Compartment models with a Rust engine: build, simulate and calibrate them."""
 
 import logging
-from typing import TextIO
 
 from commol.api import (
     Calibrator,
@@ -172,16 +171,6 @@ __version__: str = build_info().version
 """The PEP 440 version of the installed commol; `build_info` adds its commit."""
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
-
-
-def add_stderr_logger(level: int = logging.INFO) -> logging.StreamHandler[TextIO]:
-    logger = logging.getLogger(__name__)
-    handler: logging.StreamHandler[TextIO] = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-    logger.addHandler(handler)
-    logger.setLevel(level)
-    logger.propagate = False
-    return handler
 
 
 __all__ = [
