@@ -36682,6 +36682,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Fixed
+
 ## [0.7.0] - 2026-10-22
 
 This release reads a run through the classes of commol. The axis of a model gives the window grid (`AxisUnits.window_end` and the other methods) and, from a calendar origin, the date of each position. `Simulation.sample`, `total_series` and `windowed_totals` read bins, accumulators and output names, and each report is a method of the object it describes. Before you upgrade, read the two **Breaking** entries: the module functions of the window grid and the report functions are removed, and the table under Changed gives the method that replaces each one. See [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md) and [Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md).
