@@ -163,6 +163,7 @@ nav:
           - Sensitivity Analysis: guide/uncertainty/sensitivity.md
           - Local Approximations: guide/uncertainty/local.md
           - Profile Likelihood: guide/uncertainty/profiles.md
+      - Threads and Parallelism: guide/parallelism.md
       - Examples: guide/examples.md
   - API Reference:
       - API Overview: api/index.md
@@ -178,6 +179,7 @@ nav:
       - Sensitivity: api/sensitivity.md
       - Reports: api/reports.md
       - Package: api/package.md
+      - Parallelism: api/parallelism.md
       - Model Structure: advanced/model-structure.md
   - Development:
       - Codebase Guide:

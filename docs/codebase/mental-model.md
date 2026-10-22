@@ -108,7 +108,8 @@ Simulation.run(n) / run_at(at)     -> difference: X += derivatives, once per ste
                                       stochastic steps: a chain binomial draw per step
                                       (a stochastic engine: set_seed, then reset)
 Simulation.replicates(n).run(…)    -> Engine.run_replicates: one seed per replicate,
-                                      run in parallel (run_replicates, rayon)
+                                      run in parallel (run_replicates, in the rayon
+                                      pool of commol.threads: parallel, Parallelism)
 Calibrator(simulation, problem)    -> commol_rs.calibration.calibrate(engine, ...):
                                       parameters by id; values of the kind, such as
                                       initial conditions, through the engine

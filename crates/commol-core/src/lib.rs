@@ -20,6 +20,7 @@
 #![warn(missing_docs)]
 
 pub mod math_expression;
+pub mod parallelism;
 pub mod simulation_engine;
 /// Data types of a model definition.
 pub mod types;
@@ -29,6 +30,8 @@ pub use math_expression::{
     ENGINE_VARIABLES, MathExpression, MathExpressionContext, MathExpressionError,
     RateMathExpression, SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX,
 };
+
+pub use parallelism::{Levels, Parallelism, inner_levels_in_parallel};
 
 // Re-export simulation engine trait
 pub use simulation_engine::{

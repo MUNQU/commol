@@ -4,6 +4,7 @@
 //! Each function takes the problem built once by a `Calibrator` and returns
 //! the intervals and scores as plain values; Python builds the result.
 
+use crate::parallelism::parallel;
 use commol_inference::conformal::{
     self, ConformalError, ConformalRun, ConformalSettings, NonconformityScore, Pooling, Predictor,
 };
@@ -132,7 +133,7 @@ fn split_conformal(
     let settings = settings(score, by, level)?;
     let calibration: Vec<_> = calibration.into_iter().map(|o| o.inner).collect();
     let predictor = predictor(fit.as_deref(), sample);
-    py.detach(|| {
+    parallel(py, || {
         conformal::split_conformal(
             &problem.inner,
             predictor,
@@ -140,7 +141,7 @@ fn split_conformal(
             &positions,
             settings,
         )
-    })
+    })?
     .map(PyConformalRun::from)
     .map_err(conformal_error)
 }
@@ -182,9 +183,11 @@ fn rolling_conformal(
     let settings = settings(score, by, level)?;
     let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
         .map_err(PyValueError::new_err)?;
-    py.detach(|| conformal::rolling_conformal(&runner, &origins, &positions, settings))
-        .map(PyConformalRun::from)
-        .map_err(conformal_error)
+    parallel(py, || {
+        conformal::rolling_conformal(&runner, &origins, &positions, settings)
+    })?
+    .map(PyConformalRun::from)
+    .map_err(conformal_error)
 }
 
 /// The blocks of `runner`'s problem with `block_length` positions, or the
@@ -240,9 +243,10 @@ fn jackknife_plus(
     let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
         .map_err(PyValueError::new_err)?;
     let (scheme, chosen) = blocks(&runner, block_length, BlockDrawing::NonOverlapping)?;
-    let run = py
-        .detach(|| conformal::jackknife_plus(&runner, &scheme, &positions, settings))
-        .map_err(conformal_error)?;
+    let run = parallel(py, || {
+        conformal::jackknife_plus(&runner, &scheme, &positions, settings)
+    })?
+    .map_err(conformal_error)?;
     Ok(PyConformalRun {
         bound: Some(run.bound),
         blocks: Some(run.blocks),
@@ -291,9 +295,10 @@ fn enbpi(
     let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
         .map_err(PyValueError::new_err)?;
     let (scheme, chosen) = blocks(&runner, block_length, BlockDrawing::NonOverlapping)?;
-    let run = py
-        .detach(|| conformal::enbpi(&runner, &scheme, replicates, &positions, settings))
-        .map_err(conformal_error)?;
+    let run = parallel(py, || {
+        conformal::enbpi(&runner, &scheme, replicates, &positions, settings)
+    })?
+    .map_err(conformal_error)?;
     Ok(PyConformalRun {
         blocks: Some(scheme.count()),
         block_length: Some(chosen.length),
@@ -335,9 +340,11 @@ fn adaptive_conformal(
     let settings = settings(score, by, level)?;
     let stream: Vec<_> = stream.into_iter().map(|o| o.inner).collect();
     let predictor = predictor(fit.as_deref(), sample);
-    py.detach(|| conformal::adaptive_conformal(&problem.inner, predictor, &stream, step, settings))
-        .map(PyConformalRun::from)
-        .map_err(conformal_error)
+    parallel(py, || {
+        conformal::adaptive_conformal(&problem.inner, predictor, &stream, step, settings)
+    })?
+    .map(PyConformalRun::from)
+    .map_err(conformal_error)
 }
 
 /// Register the conformal functions with the inference module

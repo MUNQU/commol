@@ -1,3 +1,4 @@
+from contextvars import ContextVar
 from typing import ClassVar, Literal, Protocol
 
 class RustProcessProtocol(Protocol):
@@ -1087,6 +1088,18 @@ class MathExpressionProtocol(Protocol):
     def __init__(self, expression: str) -> None: ...
     def validate(self) -> None: ...
 
+class ParallelismProtocol(Protocol):
+    def __init__(self, threads: int, levels: str) -> None: ...
+    @property
+    def threads(self) -> int: ...
+    @property
+    def levels(self) -> str: ...
+
+class ParallelismModule(Protocol):
+    Parallelism: type[ParallelismProtocol]
+    def current(self) -> ParallelismProtocol: ...
+    def setting(self) -> ContextVar[ParallelismProtocol | None]: ...
+
 class CoreModule(Protocol):
     Model: type[RustModelProtocol]
     Process: type[RustProcessProtocol]
@@ -1099,12 +1112,14 @@ class RustCommolModule(Protocol):
     engine: EngineModule
     calibration: CalibrationModule
     inference: InferenceModule
+    parallelism: ParallelismModule
 
 core: CoreModule
 model: ModelModule
 engine: EngineModule
 calibration: CalibrationModule
 inference: InferenceModule
+parallelism: ParallelismModule
 rust_commol: RustCommolModule
 __version__: str
 __commit__: str | None

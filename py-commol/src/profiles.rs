@@ -4,6 +4,7 @@
 //! the threshold, traces every profile in Rust and returns them as plain
 //! values; Python builds the result.
 
+use crate::parallelism::parallel;
 use commol_inference::profiles::{
     Profile, ProfileEnd, ProfileTracer, ProfileVerdict, ProfiledQuantity, StructuralReading,
     Structure, Undetermined, beale, bootstrap_thresholds, chi_square,
@@ -303,18 +304,17 @@ fn trace_profiles(
                     .map_err(value_error)?;
             let (resampler, _) = problem.resampler(&settings.spec, runner.fit())?;
             let count = settings.replicates;
-            let run = py
-                .detach(|| {
-                    bootstrap_thresholds(
-                        &runner,
-                        resampler.as_ref(),
-                        count,
-                        &quantities,
-                        &centers,
-                        level,
-                    )
-                })
-                .map_err(PyRuntimeError::new_err)?;
+            let run = parallel(py, || {
+                bootstrap_thresholds(
+                    &runner,
+                    resampler.as_ref(),
+                    count,
+                    &quantities,
+                    &centers,
+                    level,
+                )
+            })?
+            .map_err(PyRuntimeError::new_err)?;
             rises = Some(run.rises);
             replicates = Some(run.replicates);
             failed = run.failed;
@@ -326,7 +326,7 @@ fn trace_profiles(
             )));
         }
     };
-    let traced = py.detach(|| tracer.trace_all(&quantities, &thresholds, max_steps));
+    let traced = parallel(py, || tracer.trace_all(&quantities, &thresholds, max_steps))?;
     let mut profiles = Vec::with_capacity(traced.len());
     for (index, (profile, quantity)) in traced.into_iter().zip(&quantities).enumerate() {
         let profile = profile.map_err(PyRuntimeError::new_err)?;
@@ -336,7 +336,7 @@ fn trace_profiles(
         // Every profile of a parameter gets the error of a refit at the fit;
         // one that does not cross on both sides also gets its resets.
         let (structure, refit_error) = match quantity {
-            ProfiledQuantity::Parameter(parameter) => py.detach(|| {
+            ProfiledQuantity::Parameter(parameter) => parallel(py, || {
                 let read = !matches!(
                     profile.verdict(tracer.tolerance()),
                     None | Some(ProfileVerdict::Identifiable)
@@ -345,7 +345,7 @@ fn trace_profiles(
                     read.then(|| tracer.read_structure(*parameter, &profile)),
                     tracer.refit_error(*parameter, &profile),
                 )
-            }),
+            })?,
             ProfiledQuantity::Prediction(_) => (None, None),
         };
         let verdict = tracer.verdict_with(&profile, structure.as_ref());

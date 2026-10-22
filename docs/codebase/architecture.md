@@ -30,7 +30,7 @@ flowchart TB
 | Half | Folder | Job |
 |---|---|---|
 | Python | `py-commol/commol/` | The public API (`api/`) and the model as validated data (`context/`). |
-| Bridge | `py-commol/src/` | Exposes the Rust functions to Python (PyO3). |
+| Bridge | `py-commol/src/` | Exposes the Rust functions to Python (PyO3), and runs their parallel work in the thread pool of `commol.threads` (`parallel`). |
 | Rust | `crates/` | Every rule about how a model becomes numbers, how it is calibrated, and how the uncertainty of a calibration is measured. |
 
 **Golden rule:** Python never computes how a model expands or runs. It asks
@@ -110,8 +110,9 @@ flowchart TB
 4. `Calibrator` (`api/calibrator.py`) takes the compiled engine of a
    `Simulation` and builds the calibration problem in Rust once
    (`commol_rs.inference.CalibrationProblem`, `py-commol/src/inference.rs`).
-   `run(starts=n)` runs the optimizer loop in Rust from each start and
-   returns the best `CalibrationResult`.
+   `run(starts=n)` runs the optimizer loop in Rust from each start, the
+   starts and the particles of a swarm in parallel in the pool of
+   `commol.threads`, and returns the best `CalibrationResult`.
 5. `apply_calibration_parameters` writes the result back into the `Model`.
 6. `Calibrator.uncertainty(method)` runs a method on the same problem. A method
    with draws returns a `ParameterSample`; a `Predictive`

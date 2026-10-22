@@ -382,9 +382,10 @@ class Calibrator:
 
         Start 0 is the initial guess of each parameter. Each further start is a
         row of a Latin hypercube over the bounds, drawn from `seed`, so the
-        starts cover the parameter space. They run in parallel; the result is
-        the best of them, and lists every start. Distinct ends with equal
-        losses are a sign that the data do not identify the parameters.
+        starts cover the parameter space. They run in parallel, on the
+        threads of `commol.threads`; the result is the best of them, and lists
+        every start. Distinct ends with equal losses are a sign that the data
+        do not identify the parameters.
 
         Parameters
         ----------

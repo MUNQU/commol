@@ -50,6 +50,7 @@ dependencies = [
  "rand 0.10.3",
  "rand_distr 0.6.0",
  "rand_xoshiro",
+ "rayon",
  "thiserror 2.0.21",
  "web-time",
 ]
