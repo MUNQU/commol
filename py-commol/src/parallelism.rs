@@ -44,6 +44,8 @@ pub struct PyParallelism {
     inner: Parallelism,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyParallelism {
     #[new]
@@ -101,7 +103,7 @@ fn setting_variable(py: Python<'_>) -> PyResult<Py<PyAny>> {
 pub(crate) fn parallel<T: Send>(py: Python<'_>, job: impl FnOnce() -> T + Send) -> PyResult<T> {
     let parallelism = current_setting(py)?;
     py.detach(|| parallelism.install(job))
-        .map_err(PyRuntimeError::new_err) // coverage: the system refuses a thread
+        .map_err(PyRuntimeError::new_err)
 }
 
 /// Register the setting of the threads.

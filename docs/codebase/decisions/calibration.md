@@ -232,7 +232,7 @@ meanwhile takes its own; `score_in` makes no `rayon` call.
 The augmented Lagrangian of the argmin fork scores its inner swarm through
 `AugmentedLagrangianCost`, whose `bulk_cost` is the default of the fork: it
 scores in parallel whatever the levels, and it returns the error of any
-failing particle.
+failing particle (#320).
 
 | Alternative | Why not |
 |---|---|

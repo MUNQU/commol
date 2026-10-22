@@ -137,7 +137,7 @@ impl Parallelism {
             .thread_name(|index| format!("commol-{index}"))
             .start_handler(move |_| LEVELS.set(levels))
             .build()
-            .map_err(|error| format!("Cannot start {} threads: {error}", self.threads))?; // coverage: the system refuses a thread
+            .map_err(|error| format!("Cannot start {} threads: {error}", self.threads))?;
         let pool = Arc::new(pool);
         pools.insert(*self, Arc::clone(&pool));
         Ok(pool)
