@@ -7,7 +7,7 @@ matplotlib is imported when the figure is drawn.
 """
 
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
@@ -23,6 +23,7 @@ def plot_compared(
     series: list[str] | None = None,
     window: float | None = None,
     observed_data: "list[ObservedDataPoint] | None" = None,
+    panels: Literal["series", "observations"] = "series",
     axes: "Figure | None" = None,
     output_file: str | None = None,
     config: "PlotConfig | None" = None,
@@ -35,7 +36,7 @@ def plot_compared(
 ) -> "Figure":
     """
     Draw several results of the same model on the same panels, one panel per
-    series.
+    series or one per observed series.
 
     Each panel has one line per result, labelled with its key and in the
     same color in every panel (``C0`` for the first key, ``C1`` for the
@@ -50,21 +51,26 @@ def plot_compared(
         the first; the model of the first names the series.
     series : list[str] | None
         What to draw, one panel each, as in ``ResultsPlot.series``. If None,
-        every output.
+        every output. Only with ``panels="series"``.
     window : float | None
         The length of a window on the axis. Each line is then the gain of
         the series over each complete window, as `Simulation.windowed_totals`
         reads it, at the end of the window; a band is the band of these
         gains. If None, each line is the line of the ``plot.series`` of its
-        result with `observed_data`.
+        result with `observed_data`. Only with ``panels="series"``.
     observed_data : list[ObservedDataPoint] | None
         Observations, each drawn once as a point on the panel of its label.
         Without `window`, they also set how each line is read, as in
         ``ResultsPlot.series``.
+    panels : Literal["series", "observations"]
+        ``"series"``: one panel per entry of `series`. ``"observations"``:
+        one panel per label of `observed_data`, with each result read only
+        at the observations, through the observation operator of each one,
+        as ``ResultsPlot.observations`` reads one result.
     axes : Figure | None
         A figure of commol to draw on: each series is drawn on its panel,
-        the `Axes` whose label is the id of the series. If None, a new
-        figure.
+        the `Axes` whose label is the id of the series (or the label of the
+        observed series). If None, a new figure.
     output_file : str | None
         Path to save the figure to. If None, the figure is only returned.
     config : PlotConfig | None
@@ -97,13 +103,22 @@ def plot_compared(
         first (the message names its key and the outputs that differ); an
         entry of ``series`` is neither an output nor a bin or accumulator
         id; `window` is not positive; the confidence level is out of range;
-        or ``axes`` has no panel of a series.
+        ``axes`` has no panel of a series; `panels` is neither ``"series"``
+        nor ``"observations"``; or, with ``panels="observations"``, `series`
+        or `window` is given, there are no observations, or a result has no
+        value at the position of an observation or at the start of its
+        window.
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
 
     Examples
     --------
     >>> figure = plot_compared({"k1 = 0.3": results, "k1 = 0.5": faster})
+    >>> checked = plot_compared(
+    ...     {"k1 = 0.3": results, "k1 = 0.5": faster},
+    ...     observed_data=observed,
+    ...     panels="observations",
+    ... )
     """
     from commol.api.plotting.figures import _compared_series
 
@@ -112,6 +127,7 @@ def plot_compared(
         series=series,
         window=window,
         observed_data=observed_data,
+        panels=panels,
         axes=axes,
         output_file=output_file,
         config=config,

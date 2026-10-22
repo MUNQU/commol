@@ -179,6 +179,43 @@ class ObservationPanel:
     band: Band | None = None
 
 
+@dataclass(frozen=True)
+class ComparedObservationPanel:
+    """
+    One observed series of a figure that compares results, with each result
+    read only at its observations.
+
+    Attributes
+    ----------
+    series : str
+        The label of the observations. The `Axes` of the panel has it as its
+        label.
+    name : str
+        The title of the panel.
+    unit : str
+        The unit of the values, or ``""`` when they have none.
+    windows : list[float | None]
+        The window of each observation, or None for a value read at its
+        position.
+    models : list[Trace]
+        The model value of each observation in each result, labelled with
+        its key, in the order of the results.
+    bands : list[Band | None]
+        The band of each result at each observation, in the same order: of
+        its replicates or of its draws, or None for a run.
+    observed : Trace
+        The observed values, drawn once.
+    """
+
+    series: str
+    name: str
+    unit: str
+    windows: list[float | None]
+    models: list[Trace]
+    bands: list[Band | None]
+    observed: Trace
+
+
 class _Outputs:
     """The outputs of results, and the bins and accumulators of their model."""
 
@@ -619,23 +656,11 @@ def compared_panels(
         If there are no results, a result does not have the outputs of the
         first, or `window` is not positive.
     """
-    if not results:
-        raise ValueError("Give at least one result to compare.")
+    outputs = _compared_outputs(results)
     if window is not None:
         check_window(window)
-    outputs = {label: _outputs_of(result) for label, result in results.items()}
-    (first, reference), *others = outputs.items()
-    for label, other in others:
-        missing = [name for name in reference.outputs if name not in other.outputs]
-        extra = [name for name in other.outputs if name not in reference.outputs]
-        if missing or extra:
-            differences = [f"it lacks {missing}"] if missing else []
-            differences += [f"it also has {extra}"] if extra else []
-            raise ValueError(
-                f"'{label}' does not have the outputs of '{first}': "
-                f"{' and '.join(differences)}."
-            )
-    selected = reference.select(series)
+    first = next(iter(results))
+    selected = outputs[first].select(series)
     observed = list(observed_data or ())
     by_label = {
         label: _result_panels(
@@ -658,6 +683,65 @@ def compared_panels(
     ]
 
 
+def compared_observation_panels(
+    results: Mapping[str, Compared],
+    confidence_level: float,
+    observed_data: Iterable[ObservedDataPoint],
+) -> list[ComparedObservationPanel]:
+    """
+    The panels of the observed series of results drawn together: each result
+    read through the operator of each observation, and the observations once.
+
+    The model and the band of a result are those of its own figure of
+    observed series (`run_observation_panels`,
+    `replicate_observation_panels` or `predictive_observation_panels`). The
+    first result gives the title and the unit of each panel.
+
+    Parameters
+    ----------
+    results : Mapping[str, SimulationResults | SimulationReplicates | Predictive]
+        The results, by the label of their lines.
+    confidence_level : float
+        The level of the band of replicates and of draws.
+    observed_data : Iterable[ObservedDataPoint]
+        The observations: one panel per label, in the order of its first
+        observation.
+
+    Returns
+    -------
+    list[ComparedObservationPanel]
+        One panel per observed series, in order.
+
+    Raises
+    ------
+    ValueError
+        If there are no results, a result does not have the outputs of the
+        first, there are no observations, or a result has no value at the
+        position of an observation or at the start of its window.
+    """
+    _compared_outputs(results)
+    observed = list(observed_data)
+    by_label = {
+        label: _result_observation_panels(result, confidence_level, observed)
+        for label, result in results.items()
+    }
+    first = next(iter(results))
+    return [
+        ComparedObservationPanel(
+            series=panel.series,
+            name=panel.name,
+            unit=panel.unit,
+            windows=panel.windows,
+            models=[
+                replace(by_label[label][index].model, label=label) for label in results
+            ],
+            bands=[_labelled(by_label[label][index].band, label) for label in results],
+            observed=panel.observed,
+        )
+        for index, panel in enumerate(by_label[first])
+    ]
+
+
 def model_of(result: Compared) -> "Model | None":
     """The model of a run, of replicates or of the source of a predictive."""
     if isinstance(result, SimulationResults | SimulationReplicates):
@@ -672,6 +756,46 @@ def _outputs_of(result: Compared) -> _Outputs:
     if isinstance(result, SimulationResults):
         return _Outputs(result, result.model)
     return _Outputs(result.output_names, model_of(result))
+
+
+def _compared_outputs(results: Mapping[str, Compared]) -> dict[str, _Outputs]:
+    """
+    The outputs of each result of a comparison, checked against the first.
+
+    Raises
+    ------
+    ValueError
+        If there are no results, or a result does not have the outputs of the
+        first.
+    """
+    if not results:
+        raise ValueError("Give at least one result to compare.")
+    outputs = {label: _outputs_of(result) for label, result in results.items()}
+    (first, reference), *others = outputs.items()
+    for label, other in others:
+        missing = [name for name in reference.outputs if name not in other.outputs]
+        extra = [name for name in other.outputs if name not in reference.outputs]
+        if missing or extra:
+            differences = [f"it lacks {missing}"] if missing else []
+            differences += [f"it also has {extra}"] if extra else []
+            raise ValueError(
+                f"'{label}' does not have the outputs of '{first}': "
+                f"{' and '.join(differences)}."
+            )
+    return outputs
+
+
+def _result_observation_panels(
+    result: Compared,
+    confidence_level: float,
+    observed_data: list[ObservedDataPoint],
+) -> list[ObservationPanel]:
+    """The panels of the observed series of one result of a comparison."""
+    if isinstance(result, SimulationReplicates):
+        return replicate_observation_panels(result, confidence_level, observed_data)
+    if isinstance(result, SimulationResults):
+        return run_observation_panels(result, observed_data)
+    return predictive_observation_panels(result, confidence_level, observed_data)
 
 
 def _result_panels(

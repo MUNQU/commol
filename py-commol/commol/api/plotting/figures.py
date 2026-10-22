@@ -16,7 +16,7 @@ import math
 from collections import defaultdict
 from collections.abc import Callable, Mapping, Sequence
 from datetime import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 try:
     import matplotlib as mpl
@@ -32,7 +32,12 @@ except ModuleNotFoundError as error:
     ) from error
 
 from commol.api.plotting import panels as _panels
-from commol.api.plotting.panels import Compared, ObservationPanel, Panel
+from commol.api.plotting.panels import (
+    Compared,
+    ComparedObservationPanel,
+    ObservationPanel,
+    Panel,
+)
 from commol.api.results import same_position
 from commol.context.inference.global_sensitivity import SobolResult
 from commol.context.visualization import PlotConfig
@@ -246,6 +251,7 @@ def _compared_series(
     series: list[str] | None = None,
     window: float | None = None,
     observed_data: "list[ObservedDataPoint] | None" = None,
+    panels: Literal["series", "observations"] = "series",
     axes: Figure | None = None,
     output_file: str | None = None,
     config: PlotConfig | None = None,
@@ -259,17 +265,42 @@ def _compared_series(
     """The figure of `plot_compared`."""
     config = config or PlotConfig()
     _apply_style(config)
-    panels = _panels.compared_panels(
-        results, confidence_level, observed_data, series, window
-    )
-    model = _panels.model_of(next(iter(results.values())))
-    figure, grid = _axes_of([panel.series for panel in panels], config, axes)
-    for ax, panel in zip(grid, panels, strict=True):
-        _draw_compared_panel(ax, panel, kwargs, x_label)
-        positions = sorted({at for line in panel.lines for at in line.positions})
-        _label_positions(ax, positions, position_label, tick_every, model)
-        if show_legend:
-            ax.legend()
+    if panels == "observations":
+        if series is not None or window is not None:
+            raise ValueError(
+                "The panels of observed series are the labels of `observed_data`, "
+                "read through their observation operators: give no `series` "
+                "and no `window`."
+            )
+        figure = _compared_observations_figure(
+            _panels.compared_observation_panels(
+                results, confidence_level, observed_data or []
+            ),
+            _panels.model_of(next(iter(results.values()))),
+            config,
+            show_legend,
+            position_label,
+            tick_every,
+            x_label,
+            axes,
+            kwargs,
+        )
+    elif panels == "series":
+        figure = _compared_series_figure(
+            _panels.compared_panels(
+                results, confidence_level, observed_data, series, window
+            ),
+            _panels.model_of(next(iter(results.values()))),
+            config,
+            show_legend,
+            position_label,
+            tick_every,
+            x_label,
+            axes,
+            kwargs,
+        )
+    else:
+        raise ValueError(f"`panels` is 'series' or 'observations', not {panels!r}.")
     _finish(figure, output_file, config, "Compared")
     return figure
 
@@ -554,6 +585,58 @@ def _cumulative_figure(
     return figure
 
 
+def _compared_series_figure(
+    panels: list[_panels.ComparedPanel],
+    model: "Model | None",
+    config: PlotConfig,
+    show_legend: bool,
+    position_label: PositionLabel | None,
+    tick_every: float | None,
+    x_label: str,
+    axes: Figure | None,
+    keywords: dict[str, LineKeywords],
+) -> Figure:
+    """Draw the panels of series of a comparison."""
+    figure, grid = _axes_of([panel.series for panel in panels], config, axes)
+    for ax, panel in zip(grid, panels, strict=True):
+        _draw_compared_panel(ax, panel, keywords, x_label)
+        positions = sorted({at for line in panel.lines for at in line.positions})
+        _label_positions(ax, positions, position_label, tick_every, model)
+        if show_legend:
+            ax.legend()
+    return figure
+
+
+def _compared_observations_figure(
+    panels: list[ComparedObservationPanel],
+    model: "Model | None",
+    config: PlotConfig,
+    show_legend: bool,
+    position_label: PositionLabel | None,
+    tick_every: float | None,
+    x_label: str,
+    axes: Figure | None,
+    keywords: dict[str, LineKeywords],
+) -> Figure:
+    """Draw the panels of observed series of a comparison."""
+    figure, grid = _axes_of([panel.series for panel in panels], config, axes)
+    for ax, panel in zip(grid, panels, strict=True):
+        for index, (trace, band) in enumerate(
+            zip(panel.models, panel.bands, strict=True)
+        ):
+            _draw_observation_model(
+                ax, trace, panel.windows, band, keywords, f"C{index}"
+            )
+        _draw_observed(ax, panel.observed)
+        _label_panel(ax, panel, x_label)
+        _label_positions(
+            ax, panel.observed.positions, position_label, tick_every, model
+        )
+        if show_legend:
+            ax.legend()
+    return figure
+
+
 def _observations_figure(
     panels: list[ObservationPanel],
     model: "Model | None",
@@ -588,6 +671,23 @@ def _draw_observation_panel(
     """
     Draw one observed series: the model value of each observation, its band,
     the observed values and the labels.
+    """
+    _draw_observation_model(ax, panel.model, panel.windows, panel.band, keywords)
+    _draw_observed(ax, panel.observed)
+    _label_panel(ax, panel, x_label)
+
+
+def _draw_observation_model(
+    ax: Axes,
+    model: _panels.Trace,
+    windows: list[float | None],
+    band: _panels.Band | None,
+    keywords: dict[str, LineKeywords],
+    color: ColorType | None = None,
+) -> None:
+    """
+    Draw the model value of each observation and its band, in `color` or in
+    the next color of the cycle.
 
     A value with a window is a total over ``(at - window, at]``: a step over
     its window with a marker at ``at``, and its band a rectangle over the same
@@ -596,10 +696,7 @@ def _draw_observation_panel(
     `keywords` go to the steps and to the guide; the markers and the band
     take their colour.
     """
-    model, band = panel.model, panel.band
-    points = list(
-        zip(model.positions, panel.windows, model.values, range(len(model.values)))
-    )
+    points = list(zip(model.positions, windows, model.values, range(len(model.values))))
     windowed = [(at, window, value, i) for at, window, value, i in points if window]
     single = [(at, value, i) for at, window, value, i in points if not window]
     lines = []
@@ -609,7 +706,7 @@ def _draw_observation_panel(
         for at, window, value, _ in windowed:
             xs += [at - window, at, math.nan]
             ys += [value, value, math.nan]
-        (steps,) = ax.plot(xs, ys, label=model.label)
+        (steps,) = ax.plot(xs, ys, label=model.label, color=color)
         lines.append(steps)
     if single:
         (guide,) = ax.plot(
@@ -617,7 +714,7 @@ def _draw_observation_panel(
             [value for _, value, _ in single],
             linestyle=":",
             linewidth=1,
-            color=lines[0].get_color() if lines else None,
+            color=lines[0].get_color() if lines else color,
             label="_nolegend_" if lines else model.label,
         )
         lines.append(guide)
@@ -655,8 +752,6 @@ def _draw_observation_panel(
                 ),
                 color,
             )
-    _draw_observed(ax, panel.observed)
-    _label_panel(ax, panel, x_label)
 
 
 def _draw_panel(
@@ -721,7 +816,7 @@ def _draw_observed(ax: Axes, observed: _panels.Trace) -> None:
 
 def _label_panel(
     ax: Axes,
-    panel: Panel | _panels.ComparedPanel | ObservationPanel,
+    panel: Panel | _panels.ComparedPanel | ObservationPanel | ComparedObservationPanel,
     x_label: str,
 ) -> None:
     """

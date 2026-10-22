@@ -1451,6 +1451,181 @@ def test_a_figure_of_observed_series_needs_observations() -> None:
         _events_model().run(5).plot.observations([])
 
 
+def _events_run(k: float) -> tuple[Simulation, SimulationResults]:
+    """30 steps of a stratified model from A to B at ``k`` that counts its events."""
+    simulation = Simulation(
+        build(
+            a_to_b_builder(
+                parameters={"k": k},
+                accumulator="events",
+                stratifications={"group": {"g1": 0.2, "g2": 0.3, "g3": 0.5}},
+            )
+        )
+    )
+    return simulation, simulation.run(30)
+
+
+def test_compared_results_draw_a_panel_per_observed_series() -> None:
+    """
+    One panel per label of the observations, with each result read through
+    the operator of each observation in its own color, and the observations
+    drawn once.
+    """
+    simulation, slow = _events_run(0.05)
+    _, fast = _events_run(0.2)
+    observed = [
+        ObservedDataPoint(at=at, output="B_g1", value=1.0) for at in (10, 20)
+    ] + [
+        ObservedDataPoint(
+            at=at,
+            outputs=["events_g2", "events_g3"],
+            label="events_late",
+            value=2.0,
+            window=5,
+        )
+        for at in (10, 20, 30)
+    ]
+
+    fig = commol.plot_compared(
+        {"slow": slow, "fast": fast}, observed_data=observed, panels="observations"
+    )
+
+    one, summed = _visible(fig)
+    assert [ax.get_label() for ax in (one, summed)] == ["B_g1", "events_late"]
+    for run, markers in zip((slow, fast), _markers(summed), strict=True):
+        np.testing.assert_allclose(
+            markers,
+            [
+                [10, 20, 30],
+                simulation.windowed_totals(
+                    run, ["events_g2", "events_g3"], 5, [10, 20, 30]
+                ),
+            ],
+        )
+    for run, markers in zip((slow, fast), _markers(one), strict=True):
+        np.testing.assert_allclose(
+            markers, [[10, 20], simulation.sample(run, ["B_g1"], [10, 20])]
+        )
+    for ax in (one, summed):
+        (points,) = ax.collections
+        assert points.get_label() == "Observed"
+        assert [to_rgba(line.get_color())[:3] for line in ax.lines[::2]] == [
+            to_rgba("C0")[:3],
+            to_rgba("C1")[:3],
+        ]
+        assert _legend(ax) == {"slow", "fast", "Observed"}
+    np.testing.assert_allclose(_scatter(summed), [[10, 2.0], [20, 2.0], [30, 2.0]])
+
+
+def _markers(ax) -> list[np.ndarray]:
+    """The positions and values of the markers of each model of a panel."""
+    return [
+        np.asarray([line.get_xdata(), line.get_ydata()], dtype=float)
+        for line in ax.lines
+        if line.get_marker() == "o"
+    ]
+
+
+def test_compared_observed_series_show_the_band_of_each_result() -> None:
+    """
+    Replicates show their mean and the band across them, and a predictive
+    the median and the band of its draws, read through the observation
+    operator; each band in the color of its key, its legend led by the key.
+    """
+    model = build_stochastic(
+        a_to_b_builder(parameters={"k1": 0.1}, rate="k1", accumulator="events"),
+        "StochasticSteps",
+    )
+    simulation = Simulation(model)
+    replicates = simulation.replicates(5, seed=2).run(40)
+    predictive = _predictive([0.02, 0.1])
+    observed = [
+        ObservedDataPoint(at=at, output="events", value=1.0, window=10)
+        for at in (20, 30)
+    ]
+
+    fig = commol.plot_compared(
+        {"replicates": replicates, "draws": predictive},
+        observed_data=observed,
+        panels="observations",
+        confidence_level=0.9,
+    )
+
+    (ax,) = fig.axes
+    per_run = [
+        simulation.windowed_totals(run, ["events"], 10, [20, 30]) for run in replicates
+    ]
+    statistics = member_statistics(per_run, 0.9)
+    draws = predictive.at_observations(observed, NoNoise()).band(0.9)
+    mean, median = _markers(ax)
+    np.testing.assert_allclose(mean[1], np.mean(per_run, axis=0))
+    np.testing.assert_allclose(median[1], draws.median)
+    bars = _bars(ax)
+    expected = [
+        (at - 10, 10, lower, upper - lower)
+        for lower_upper in (
+            zip(statistics["ci_lower"], statistics["ci_upper"], strict=True),
+            zip(draws.lower, draws.upper, strict=True),
+        )
+        for at, (lower, upper) in zip((20, 30), lower_upper, strict=True)
+    ]
+    np.testing.assert_allclose(bars, expected)
+    colors = [to_rgba(patch.get_facecolor())[:3] for patch in ax.patches]
+    assert colors == [to_rgba(c)[:3] for c in ("C0", "C0", "C1", "C1")]
+    assert _legend(ax) == {
+        "replicates",
+        f"replicates: 90% of the replicates:\n{MODEL_BAND}",
+        "draws",
+        f"draws: 90% of the draws:\n{MODEL_BAND}",
+        "Observed",
+    }
+
+
+def test_compared_observed_series_draw_on_given_axes() -> None:
+    """The panel of a label that names a series is the panel of that series."""
+    _, slow = _events_run(0.05)
+    _, fast = _events_run(0.2)
+    fig = slow.plot.series(series=["B_g1"], show_legend=False)
+    observed = [ObservedDataPoint(at=at, output="B_g1", value=1.0) for at in (5, 12)]
+
+    again = commol.plot_compared(
+        {"slow": slow, "fast": fast},
+        observed_data=observed,
+        panels="observations",
+        axes=fig,
+        show_legend=False,
+    )
+
+    assert again is fig
+    (ax,) = _visible(fig)
+    assert len(_markers(ax)) == 2
+    assert ax.get_legend() is None
+
+
+@pytest.mark.parametrize(
+    ("arguments", "message"),
+    [
+        ({"series": ["B_g1"]}, "give no `series` and no `window`"),
+        ({"window": 5.0}, "give no `series` and no `window`"),
+        ({"observed_data": []}, "at least one observation"),
+        ({"panels": "bins"}, "`panels` is 'series' or 'observations', not 'bins'"),
+    ],
+    ids=["series", "window", "no observations", "unknown panels"],
+)
+def test_compared_observed_series_reject_what_they_cannot_draw(
+    arguments: dict, message: str
+) -> None:
+    _, run = _events_run(0.1)
+    arguments = {
+        "observed_data": [ObservedDataPoint(at=10, output="B_g1", value=1.0)],
+        "panels": "observations",
+        **arguments,
+    }
+
+    with pytest.raises(ValueError, match=message):
+        commol.plot_compared({"run": run}, **arguments)
+
+
 class TestSeriesSelection:
     @pytest.fixture
     def stratified(self) -> SimulationResults:

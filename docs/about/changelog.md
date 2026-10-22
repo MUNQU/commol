@@ -70,6 +70,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PropagationResult.effective_size` gives Kish's effective size of the
   weights. A filter conditions the result on the condition of the mask.
 
+<!-- Added #305 -->
+
+- `plot_compared(…, panels="observations")` draws one panel per observed
+  series (one `label` of `observed_data`), with each result read through the
+  observation operator of each observation, as `plot.observations` reads one
+  result: the steps, markers and band of each result in the color of its key,
+  and the observations once. The default, `panels="series"`, draws one panel
+  per series. See
+  [Plotting](../guide/simulations.md#compare-results-on-the-same-panels).
+
 ### Changed
 
 <!-- Changed #246 -->
