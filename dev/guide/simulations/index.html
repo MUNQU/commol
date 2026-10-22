@@ -1127,6 +1127,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#compare-results-on-the-same-panels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compare results on the same panels
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3421,6 +3432,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#compare-results-on-the-same-panels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compare results on the same panels
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4055,6 +4077,10 @@ extra <code>commol[plot]</code>:</p>
 <td>The results of <a href="../uncertainty/sensitivity/#plots">sensitivity methods</a> and of <a href="../uncertainty/profiles/#plots">profiles</a></td>
 <td><code>result.plot(…)</code></td>
 </tr>
+<tr>
+<td>Several runs, replicates or predictives</td>
+<td><code>plot_compared({label: result}, …)</code>: each result on the same panels (<a href="#compare-results-on-the-same-panels">compare results</a>).</td>
+</tr>
 </tbody>
 </table>
 <p>A figure draws one panel per series and returns the matplotlib <code>Figure</code>. It
@@ -4202,6 +4228,56 @@ the size, dpi and layout are those of the given figure.</p>
 </span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">series</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">])</span>
 </span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="n">faster</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">series</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">axes</span><span class="o">=</span><span class="n">figure</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span>
 </span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="nb">print</span><span class="p">([</span><span class="n">ax</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">ax</span> <span class="ow">in</span> <span class="n">figure</span><span class="o">.</span><span class="n">axes</span> <span class="k">if</span> <span class="n">ax</span><span class="o">.</span><span class="n">get_visible</span><span class="p">()])</span>  <span class="c1"># [&#39;B&#39;, &#39;C&#39;]</span>
+</span></code></pre></div>
+<h3 id="compare-results-on-the-same-panels">Compare results on the same panels<a class="headerlink" href="#compare-results-on-the-same-panels" title="Permanent link">&para;</a></h3>
+<p><code>plot_compared({label: result}, …)</code> draws several results of the same model on
+the same panels and returns the <code>Figure</code>. A value is a <code>SimulationResults</code>, a
+<code>SimulationReplicates</code> or a <a href="../uncertainty/#the-predictive"><code>Predictive</code></a>.
+It is a function, not a method: a comparison describes no single result.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_compared</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">plot_compared</span><span class="p">({</span><span class="s2">&quot;k1 = 0.3&quot;</span><span class="p">:</span> <span class="n">results</span><span class="p">,</span> <span class="s2">&quot;k1 = 0.5&quot;</span><span class="p">:</span> <span class="n">faster</span><span class="p">},</span> <span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">])</span>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="nb">print</span><span class="p">([</span><span class="n">line</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">figure</span><span class="o">.</span><span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lines</span><span class="p">])</span>  <span class="c1"># [&#39;k1 = 0.3&#39;, &#39;k1 = 0.5&#39;]</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>How it is drawn</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Each result</td>
+<td>One line per panel, labelled with its key, in the same color in every panel: <code>C0</code> of the matplotlib style for the first key, <code>C1</code> for the second, and so on.</td>
+</tr>
+<tr>
+<td>Replicates</td>
+<td>Their mean and the band of <code>confidence_level</code> of the replicates, in the color of their key.</td>
+</tr>
+<tr>
+<td>A predictive</td>
+<td>The weighted median of its draws and their band of <code>confidence_level</code>, in the color of their key. The legend of a band starts with the key: <code>fit: 95% of the draws</code>.</td>
+</tr>
+<tr>
+<td><code>observed_data</code></td>
+<td>Drawn once, as points on the panel of their label. Without <code>window</code>, they also set how each line is read, as in <code>plot.series</code>.</td>
+</tr>
+<tr>
+<td><code>window</code></td>
+<td>Each line is the gain of the series over each complete window, at the end of the window, as <code>Simulation.windowed_totals</code> reads it. A band is the band of the gains of the replicates or of the draws.</td>
+</tr>
+</tbody>
+</table>
+<p>The first result names the series and gives the title and the unit of each
+panel. Every result has the outputs of the first; otherwise <code>plot_compared</code>
+raises <code>ValueError</code> that names the key of the result and the outputs that
+differ. <code>axes=</code> draws on the panels of an earlier figure, and <code>series</code>,
+<code>config</code>, <code>show_legend</code>, <code>x_label</code>, <code>tick_every</code>, <code>position_label</code>,
+<code>output_file</code> and other keyword arguments (for <code>Axes.plot</code>, on every line)
+work as in <code>plot.series</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">weekly</span> <span class="o">=</span> <span class="n">plot_compared</span><span class="p">({</span><span class="s2">&quot;k1 = 0.3&quot;</span><span class="p">:</span> <span class="n">results</span><span class="p">,</span> <span class="s2">&quot;k1 = 0.5&quot;</span><span class="p">:</span> <span class="n">faster</span><span class="p">},</span> <span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span> <span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="nb">print</span><span class="p">([</span><span class="nb">float</span><span class="p">(</span><span class="n">at</span><span class="p">)</span> <span class="k">for</span> <span class="n">at</span> <span class="ow">in</span> <span class="n">weekly</span><span class="o">.</span><span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get_xdata</span><span class="p">()][:</span><span class="mi">3</span><span class="p">])</span>  <span class="c1"># [7.0, 14.0, 21.0]</span>
 </span></code></pre></div>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>

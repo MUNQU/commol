@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- `plot_compared({label: result}, …)` draws several runs, replicates or predictives of the same model on the same panels: one line per result, labelled with its key and in the same color in every panel, the band of each set of replicates and of each predictive, and the observations once. `window=` draws the gain of each series over each window. A result without the outputs of the first raises `ValueError` that names its key. See [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#compare-results-on-the-same-panels).
+
 - Every figure takes `axes=`, the `Figure` of an earlier figure of commol, and draws each series on the panel of that series: each panel has the id of its series as the label of its `Axes`. A series with no panel raises `ValueError` that names it. See [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#several-results-on-one-figure).
 
 - A quantity of interest reads a series and reduces it. The series is a name or a list of names, their `Level`, or `Increments(outputs, window)`: the gain of their sum over each window that ends at a position. So `Peak(series=Increments("acc", window=7), positions=ends)` is the largest gain of `acc` over a window of 7, and `PeakPosition` with the same arguments the end of that window, with no class of their own. `commol` exports `Level` and `Increments`. See [Quantities of interest](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#quantities-of-interest).

@@ -4051,6 +4051,15 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Added #251 -->
 
+<ul>
+<li><code>plot_compared({label: result}, …)</code> draws several runs, replicates or
+  predictives of the same model on the same panels: one line per result,
+  labelled with its key and in the same color in every panel, the band of
+  each set of replicates and of each predictive, and the observations once.
+  <code>window=</code> draws the gain of each series over each window. A result without
+  the outputs of the first raises <code>ValueError</code> that names its key. See
+  <a href="../../guide/simulations/#compare-results-on-the-same-panels">Plotting</a>.</li>
+</ul>
 <!-- Added #276 -->
 
 <ul>

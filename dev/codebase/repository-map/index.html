@@ -3608,7 +3608,7 @@
 </tr>
 <tr>
 <td><code>api/plotting/</code></td>
-<td>The figures of results: the <code>plot</code> accessors of <code>SimulationResults</code>, <code>SimulationReplicates</code> and <code>Predictive</code> (<code>accessors.py</code>), the private drawing functions, which also draw the <code>plot()</code> of the results of sensitivity methods and profiles (<code>figures.py</code>, the only module that imports matplotlib), and the data of each panel, computed without matplotlib (<code>panels.py</code>).</td>
+<td>The figures of results: the <code>plot</code> accessors of <code>SimulationResults</code>, <code>SimulationReplicates</code> and <code>Predictive</code> (<code>accessors.py</code>), <code>plot_compared</code>, the figure of several of them on the same panels (<code>compared.py</code>), the private drawing functions, which also draw the <code>plot()</code> of the results of sensitivity methods and profiles (<code>figures.py</code>, the only module that imports matplotlib), and the data of each panel, computed without matplotlib (<code>panels.py</code>).</td>
 <td>Computation of results; a public drawing function.</td>
 </tr>
 <tr>
@@ -3836,7 +3836,7 @@
 <tr>
 <td>Change a figure</td>
 <td><code>py-commol/commol/api/plotting/</code> (<code>panels.py</code>, the data; <code>figures.py</code>, the drawing)</td>
-<td><code>api/plotting/accessors.py</code>, the <code>plot</code> method of the result, <code>docs/guide/simulations.md</code> (Plotting)</td>
+<td><code>api/plotting/accessors.py</code>, <code>api/plotting/compared.py</code> (<code>plot_compared</code>), the <code>plot</code> method of the result, <code>docs/guide/simulations.md</code> (Plotting)</td>
 </tr>
 <tr>
 <td>Add a function or variable to rate expressions</td>
