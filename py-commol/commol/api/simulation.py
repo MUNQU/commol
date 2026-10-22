@@ -11,7 +11,7 @@ from commol.commol_rs import _commol_rs as commol_rs
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import EngineProtocol
 
-from commol.api.results import SimulationReplicates, SimulationResults
+from commol.api.results import SimulationReplicates, SimulationResults, sample
 from commol.api.windows import windowed_totals
 from commol.context._model.engine_state import build_engine
 from commol.context.model import Model
@@ -488,6 +488,45 @@ class Simulation:
         return windowed_totals(
             self.total_series(results, ids), results.positions, window, at
         )
+
+    def sample(
+        self,
+        results: SimulationResults,
+        ids: Iterable[str],
+        at: Iterable[float],
+    ) -> list[float]:
+        """
+        Value of the given bins and accumulators at each position of `at`.
+
+        A bin holds an amount at a position, so the value is read at that
+        position, not over the window before it; `windowed_totals` reads the
+        gain of an accumulator over a window.
+
+        Parameters
+        ----------
+        results : SimulationResults
+            Simulation results, with their positions.
+        ids : Iterable[str]
+            Bin and accumulator ids, each for all its outputs
+            (`outputs_for`), and output names, each for itself. Their outputs
+            are summed before they are read.
+        at : Iterable[float]
+            Positions to read, each a position of `results`.
+
+        Returns
+        -------
+        list[float]
+            One value per position in `at`.
+
+        Raises
+        ------
+        KeyError
+            If an id is not a bin, accumulator or output of the model, or an
+            expected output is missing from `results`.
+        ValueError
+            If the results have no value at a position in `at`.
+        """
+        return sample(self.total_series(results, ids), results.positions, at)
 
 
 class ReplicateRuns:
