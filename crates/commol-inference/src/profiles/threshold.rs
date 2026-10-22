@@ -12,6 +12,7 @@ use commol_core::SimulationEngine;
 use commol_random::replicate_seed;
 use rayon::prelude::*;
 
+use crate::error::MethodError;
 use crate::profiles::tracer::ProfiledQuantity;
 use crate::resampling::{FitUnit, ReplicateRunner, Resampler};
 use crate::special::{f_one_quantile, normal_quantile};
@@ -22,21 +23,21 @@ use crate::statistics;
 ///
 /// # Errors
 ///
-/// Returns a message when the problem has a loss instead of observation
-/// models, or `confidence_level` is not strictly between 0 and 1
-/// ([`statistics::interval_levels`]).
+/// [`MethodError::Invalid`] when the problem has a loss instead of
+/// observation models, or `confidence_level` is not strictly between 0 and
+/// 1 ([`statistics::interval_levels`]).
 pub fn chi_square<E: SimulationEngine>(
     problem: &CalibrationProblem<E>,
     confidence_level: f64,
-) -> Result<f64, String> {
-    statistics::interval_levels(confidence_level)?;
+) -> Result<f64, MethodError> {
+    statistics::interval_levels(confidence_level).map_err(MethodError::Invalid)?;
     if problem.discrepancy().likelihood().is_none() {
-        return Err(
+        return Err(MethodError::Invalid(
             "The chi-square threshold reads −log L and needs observation models; the problem \
              has a loss. With a loss, use Threshold.beale (a sum of squares of independent \
              Gaussian errors) or Threshold.bootstrap_calibrated"
                 .to_string(),
-        );
+        ));
     }
     let z = normal_quantile((1.0 + confidence_level) / 2.0);
     Ok(z * z / 2.0)
@@ -49,20 +50,20 @@ pub fn chi_square<E: SimulationEngine>(
 ///
 /// # Errors
 ///
-/// Returns a message when the problem has no sum of squares (another loss,
-/// or observation models), it has no more observations than parameters, or
-/// `confidence_level` is not strictly between 0 and 1.
+/// [`MethodError::Invalid`] when the problem has no sum of squares (another
+/// loss, or observation models), it has no more observations than
+/// parameters, or `confidence_level` is not strictly between 0 and 1.
 pub fn beale<E: SimulationEngine>(
     problem: &CalibrationProblem<E>,
     fit_loss: f64,
     confidence_level: f64,
-) -> Result<f64, String> {
-    statistics::interval_levels(confidence_level)?;
+) -> Result<f64, MethodError> {
+    statistics::interval_levels(confidence_level).map_err(MethodError::Invalid)?;
     if problem.discrepancy().loss() != Some(LossConfig::SumSquaredError) {
-        return Err(
+        return Err(MethodError::Invalid(
             "Beale's threshold reads a sum of squares; the problem needs the loss 'sse'"
                 .to_string(),
-        );
+        ));
     }
     let n = problem
         .discrepancy()
@@ -72,10 +73,10 @@ pub fn beale<E: SimulationEngine>(
         .count();
     let p = problem.num_parameters();
     if n <= p {
-        return Err(format!(
+        return Err(MethodError::Invalid(format!(
             "Beale's threshold needs more observations than parameters: {n} observations, \
              {p} parameters"
-        ));
+        )));
     }
     let nu = (n - p) as f64;
     Ok(fit_loss * f_one_quantile(nu, confidence_level) / nu)
@@ -113,8 +114,9 @@ pub struct BootstrapThresholds {
 ///
 /// # Errors
 ///
-/// Returns a message when `confidence_level` is not strictly between 0 and
-/// 1, the lengths differ, or every replicate fails ([`FitUnit::require`]).
+/// [`MethodError::Invalid`] when `confidence_level` is not strictly between
+/// 0 and 1 or the lengths differ; [`MethodError::Failed`] when every
+/// replicate fails ([`FitUnit::require`]).
 pub fn bootstrap_thresholds<E>(
     runner: &ReplicateRunner<'_, E>,
     resampler: &dyn Resampler,
@@ -122,17 +124,17 @@ pub fn bootstrap_thresholds<E>(
     quantities: &[ProfiledQuantity],
     centers: &[f64],
     confidence_level: f64,
-) -> Result<BootstrapThresholds, String>
+) -> Result<BootstrapThresholds, MethodError>
 where
     E: SimulationEngine + Send + Sync,
 {
-    statistics::interval_levels(confidence_level)?;
+    statistics::interval_levels(confidence_level).map_err(MethodError::Invalid)?;
     if quantities.len() != centers.len() {
-        return Err(format!(
+        return Err(MethodError::Invalid(format!(
             "One center per quantity: {} quantities, {} centers",
             quantities.len(),
             centers.len()
-        ));
+        )));
     }
     let perturbations = runner.perturbations(resampler, replicates);
     let fits = runner.fit_all(&perturbations);
@@ -143,6 +145,7 @@ where
             let index = *index;
             let rises = runner
                 .replicate_problem(&perturbations[index])
+                .map_err(|error| error.to_string())
                 .and_then(|problem| {
                     let seed = replicate_seed(replicate_seed(runner.seed(), index as u64), 0);
                     quantities

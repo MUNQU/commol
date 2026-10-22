@@ -14,7 +14,7 @@ use commol_inference::quantity::{
     MissingPositions, Quantities, Quantity, ReplicateRule, Series, Undefined,
 };
 use commol_inference::statistics::{self, NotANumber};
-use commol_inference::{NanRun, PredictiveError, Priors};
+use commol_inference::{MethodError, NanRun, PredictiveError, Priors};
 use commol_stochastic::StochasticSteps;
 
 fn names(outputs: &[&str]) -> Vec<String> {
@@ -326,10 +326,10 @@ fn every_estimator_rejects_a_nan() {
     let fitted = ChaosExpansion::fit(&unit, &with_nan(5), 1, Truncation::TOTAL_DEGREE).unwrap_err();
     let quantile = statistics::quantiles(&[0.0, f64::NAN, 1.0], &[1.0; 3], &[0.5]).unwrap_err();
 
-    assert_eq!(ranked, nan_at_one_and_three());
-    assert_eq!(effects, nan_at_one_and_three());
-    assert_eq!(indices, nan_at_one_and_three());
-    assert_eq!(fitted, nan_at_one_and_three());
+    assert_eq!(ranked, MethodError::Prediction(nan_at_one_and_three()));
+    assert_eq!(effects, MethodError::Prediction(nan_at_one_and_three()));
+    assert_eq!(indices, MethodError::Prediction(nan_at_one_and_three()));
+    assert_eq!(fitted, MethodError::Prediction(nan_at_one_and_three()));
     assert_eq!(quantile, NotANumber { points: vec![1] });
     assert!(String::from(quantile).contains("[1] are NaN"));
     let message = morris(&screening, &[vec![0.0]]).unwrap_err().to_string();
@@ -381,11 +381,11 @@ fn a_nan_run_is_named_by_its_point_and_inputs() {
 
     // A propagation keeps the NaN of each run.
     assert!(propagation.values.iter().all(|row| row[1].is_nan()));
-    let PredictiveError::NotANumber {
+    let MethodError::Prediction(PredictiveError::NotANumber {
         quantity: 1,
         points,
         run: Some(run),
-    } = &error
+    }) = &error
     else {
         panic!("{error:?}");
     };
@@ -678,12 +678,12 @@ fn a_over_gain(rule: ReplicateRule) -> Vec<Quantity> {
 }
 
 /// The point and the replicate of the first run a NaN error names.
-fn named_run(error: PredictiveError) -> (Vec<usize>, NanRun) {
-    let PredictiveError::NotANumber {
+fn named_run(error: MethodError) -> (Vec<usize>, NanRun) {
+    let MethodError::Prediction(PredictiveError::NotANumber {
         quantity: 0,
         points,
         run: Some(run),
-    } = error
+    }) = error
     else {
         panic!("{error:?}");
     };

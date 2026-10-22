@@ -5,23 +5,11 @@
 //! report.
 
 use crate::parallelism::parallel;
-use commol_inference::identifiability::{
-    self, IdentifiabilityError, Reference, StructuralVerdict, Subset,
-};
-use commol_inference::sensitivity::{Design, FiniteDifferences, SensitivityError};
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use commol_inference::identifiability::{self, Reference, StructuralVerdict, Subset};
+use commol_inference::sensitivity::{Design, FiniteDifferences};
 use pyo3::prelude::*;
 
-use crate::inference::{PyCalibrationProblem, PyParameterSample};
-
-fn identifiability_error(error: IdentifiabilityError) -> PyErr {
-    match error {
-        IdentifiabilityError::Sensitivity(SensitivityError::Failed(message)) => {
-            PyRuntimeError::new_err(message)
-        }
-        other => PyValueError::new_err(other.to_string()),
-    }
-}
+use crate::inference::{PyCalibrationProblem, PyParameterSample, method_error};
 
 fn source(
     problem: &PyCalibrationProblem,
@@ -32,8 +20,7 @@ fn source(
     } else {
         Design::Observations
     };
-    FiniteDifferences::new(&problem.inner, design)
-        .map_err(|error| identifiability_error(IdentifiabilityError::Sensitivity(error)))
+    FiniteDifferences::new(&problem.inner, design).map_err(method_error)
 }
 
 /// The rank of the scaled sensitivities at one point
@@ -90,7 +77,7 @@ fn structural_rank(
     let analysis = parallel(py, || {
         identifiability::structural_rank(&source, points, seed)
     })?
-    .map_err(identifiability_error)?;
+    .map_err(method_error)?;
     Ok(PyStructuralAnalysis {
         points: analysis
             .points
@@ -176,7 +163,7 @@ fn collinearity(
     let analysis = parallel(py, || {
         identifiability::collinearity(&source, &points, &weights, max_subset_size, threshold)
     })?
-    .map_err(identifiability_error)?;
+    .map_err(method_error)?;
     Ok(PyCollinearityAnalysis {
         sensitivity: analysis.sensitivity,
         pair_gamma: analysis.pair_gamma,
@@ -230,7 +217,7 @@ fn sample_identifiability(
     };
     let analysis =
         identifiability::sample_identifiability(&sample.inner, reference, correlation_threshold)
-            .map_err(identifiability_error)?;
+            .map_err(method_error)?;
     Ok(PySampleAnalysis {
         contraction: analysis.contraction,
         correlation: analysis.correlation,
@@ -274,7 +261,7 @@ fn starts_identifiability(
         parameter_tolerance,
         loss_tolerance,
     )
-    .map_err(identifiability_error)?;
+    .map_err(method_error)?;
     Ok(PyStartsAnalysis {
         near_best: analysis.near_best,
         spread: analysis.spread,

@@ -2,8 +2,8 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-How the uncertainty methods share one sample, one registry, their ports and
-one sampler, what a replicate may change, and why an analysis needs no data.
+How the uncertainty methods share one sample, one registry, one error type,
+their ports and one sampler, and what a replicate may change.
 
 ## A sample carries its weights
 
@@ -56,49 +56,44 @@ changes what they run and before a release
 **Guards:** `tests/uncertainty/test_entry_point.py`,
 `tests/uncertainty/test_coverage.py`.
 
-## Sensitivities come from one port
+## Methods raise one error type
 
-Every reader of derivatives of the predicted observations asks
-`SensitivitySource` (`crates/commol-inference/src/sensitivity/`); only a source
-knows how its derivatives are made. `FiniteDifferences` is the first: central
-differences, one-sided of second order at a bound, with the step
-`h = η^{1/3} · max(|θ|, w)` (at most `w / 8`), where `η` is the output
-accuracy of the engine (`SimulationEngine::output_accuracy`: machine epsilon,
-or the `rtol` of the ODE engine) and `w` the width of the bounds (1 when infinite). Each entry
-carries an estimated error, from the steps `h` and `2h` and the accuracy of
-the runs; the structural rank counts a singular value only above the norm of
-that error (Weyl's inequality). The scaled sensitivities
-`S_ij = J_ij · |θ_j| / s_i` do not depend on units. A stochastic engine is
-refused: its runs change in jumps with the parameters.
+Every public function of a method in `commol-inference` returns one error,
+`MethodError` (`crates/commol-inference/src/error.rs`), and every error has
+one of two kinds (`MethodError::kind`):
 
-| Alternative | Why not |
-|---|---|
-| Each method differentiates on its own | The step, the error and the scaling would differ between methods. |
-| Exact derivatives first | Symbolic differentiation of expressions and sensitivity equations in two engines; a later source behind the same port. |
-| Machine epsilon as the accuracy of every engine | With `rtol = 1e-6` the solver's error over the step is a fifth of the derivative, and the rank reads noise. |
-| A fixed rank threshold such as `1e-10` | Below the error of finite differences, so every model looks identifiable. |
+| Kind | When | Python |
+|---|---|---|
+| `Invalid` | A setting, an input, the data or the model does not fit the method: a level out of range, too few replicates or blocks, a fit outside the support, a loss of 0 where a method needs a scale, a stochastic engine where a method needs derivatives. | `ValueError`; `InfeasibleStateError` (a `ValueError`) for a draw that leaves the values its model allows |
+| `Failed` | A computation that could start failed: an engine run, an optimizer, every replicate or too few of them, a sampler that stops before its target. | `RuntimeError` |
 
-**Guards:** `crates/commol-inference/tests/test_sensitivity.rs`,
-`crates/commol-inference/tests/test_identifiability.rs`,
-`tests/uncertainty/test_identifiability.py`.
+A structured error that a caller reads stays a variant of its own, with a
+fixed kind: `Prediction` (a `PredictiveError`; `Failed` when the run of a draw
+fails, `Invalid` otherwise), `Sensitivity` (a `SensitivityError`; `Invalid`
+for a stochastic engine, `Failed` otherwise) and `NoFeasiblePoint`
+(`Invalid`). The building blocks that are not methods (`ParameterSample`,
+`Predictive`, the scores, the distributions, the designs) keep their own
+errors, which convert into `MethodError`; the ports (`TemperedTarget`,
+`Kernel`, `Target`, `ObservationNoise`) return a message, and the method
+that calls them reports it as `Failed`.
 
-## Two verdicts per parameter
-
-An `IdentifiabilityReport` gives each parameter a structural verdict (what
-any data of the design of the observations can determine) and a practical
-verdict (what these data determine). Only `StructuralRank` on the design of
-the observations gives the structural verdict; a dense design keeps its
-verdicts in its section. Merging reports keeps a verdict the reports agree
-on, and makes one they disagree on `conflicting`, with every reason.
-Thresholds and tolerances of the methods are required arguments: they are
-modelling judgments.
+The bindings map a `MethodError` in one function, `method_error`
+(`py-commol/src/inference.rs`), and every binding of a method uses it; no
+binding repeats a check of the engine to choose the exception. The same
+mistake raises the same exception in every method, and the "Raises" section
+of each method lists `ValueError` and `RuntimeError` by this rule.
 
 | Alternative | Why not |
 |---|---|
-| One verdict | A parameter structurally identifiable and poorly determined by the data, the usual case, would look like a conflict. |
-| Defaults for the thresholds | A judgment hidden in the library. |
+| One error enum per method family | The same mistake raised `ValueError` in one family and `RuntimeError` in another, and each binding chose again. |
+| A `String` error | The binding cannot tell an input error from a failure, so it chose one exception for both. |
+| One variant per cause | Callers read the message, not the cause; two kinds set the exception, and the structured errors that callers read stay variants. |
 
-**Guards:** `tests/uncertainty/test_identifiability.py` (`TestReport`).
+**Guards:** `crates/commol-inference/tests/test_errors.rs`,
+`test_an_input_error_of_any_method_is_a_value_error` and
+`test_a_failed_computation_of_any_method_is_a_runtime_error` in
+`tests/uncertainty/test_entry_point.py`.
+
 ## A replicate changes only the data
 
 A resampling method makes each replicate with

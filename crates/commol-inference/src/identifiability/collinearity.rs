@@ -14,7 +14,8 @@
 
 use rayon::prelude::*;
 
-use super::{IdentifiabilityError, skippable};
+use super::skippable;
+use crate::error::MethodError;
 use crate::sensitivity::{Matrix, SensitivitySource};
 use crate::statistics::quantiles;
 
@@ -87,10 +88,10 @@ fn index_of_normalized(normalized: &Matrix) -> f64 {
 ///
 /// # Errors
 ///
-/// [`IdentifiabilityError::Invalid`] when there is no point, the weights do
+/// [`MethodError::Invalid`] when there is no point, the weights do
 /// not match the points, or `max_subset_size` is below 2 or above the number
-/// of parameters; [`IdentifiabilityError::NoFeasiblePoint`] when every point
-/// is infeasible; [`IdentifiabilityError::Sensitivity`] when the
+/// of parameters; [`MethodError::NoFeasiblePoint`] when every point
+/// is infeasible; [`MethodError::Sensitivity`] when the
 /// sensitivities fail for another reason.
 pub fn collinearity<S: SensitivitySource>(
     source: &S,
@@ -98,17 +99,17 @@ pub fn collinearity<S: SensitivitySource>(
     weights: &[f64],
     max_subset_size: usize,
     threshold: f64,
-) -> Result<Collinearity, IdentifiabilityError> {
+) -> Result<Collinearity, MethodError> {
     let count = source.parameters().len();
     if points.is_empty() || points.len() != weights.len() {
-        return Err(IdentifiabilityError::Invalid(format!(
+        return Err(MethodError::Invalid(format!(
             "Collinearity needs one weight per point, got {} points and {} weights",
             points.len(),
             weights.len()
         )));
     }
     if max_subset_size < 2 || max_subset_size > count {
-        return Err(IdentifiabilityError::Invalid(format!(
+        return Err(MethodError::Invalid(format!(
             "max_subset_size must be from 2 to the number of parameters ({count}), got \
              {max_subset_size}"
         )));
@@ -124,7 +125,7 @@ pub fn collinearity<S: SensitivitySource>(
                 skipped.push(error.to_string());
                 continue;
             }
-            Err(error) => return Err(IdentifiabilityError::Sensitivity(error)),
+            Err(error) => return Err(MethodError::Sensitivity(error)),
         };
         let rows = scaled.nrows() as f64;
         for (j, draws) in sensitivity_draws.iter_mut().enumerate() {
@@ -134,7 +135,7 @@ pub fn collinearity<S: SensitivitySource>(
         used_weights.push(weight);
     }
     if columns.is_empty() {
-        return Err(IdentifiabilityError::NoFeasiblePoint {
+        return Err(MethodError::NoFeasiblePoint {
             points: points.len(),
             reasons: skipped,
         });

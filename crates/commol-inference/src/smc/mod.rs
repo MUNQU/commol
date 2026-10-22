@@ -57,7 +57,9 @@ pub trait TemperedTarget: Sync {
     ///
     /// # Errors
     ///
-    /// Returns a message when the model fails, a failure no point avoids.
+    /// Returns a message when the model fails, a failure no point avoids;
+    /// the sampler reports it as
+    /// [`MethodError::Failed`](crate::MethodError::Failed).
     fn evaluate(
         &self,
         values: &[f64],

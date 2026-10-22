@@ -13,7 +13,7 @@ use commol_inference::smc::{
     AbcTarget, Distance, GibbsTarget, RandomWalk, SmcRun, SmcSampler, TemperedTarget,
     abc_rejection, bootstrap_coverage_eta, information_matching_eta, next_level,
 };
-use commol_inference::{Distribution, Family, Priors};
+use commol_inference::{Distribution, Family, MethodError, Priors};
 use commol_random::Generator;
 
 /// A prior of independent distributions and a kernel `exp(−level · v)`,
@@ -295,7 +295,9 @@ fn move_count_follows_the_acceptance_rate() {
 #[test]
 fn a_sampler_checks_its_settings() {
     let new = |particles, threshold, cess, stay| {
-        SmcSampler::new(particles, RandomWalk::new(), threshold, cess, stay).unwrap_err()
+        SmcSampler::new(particles, RandomWalk::new(), threshold, cess, stay)
+            .unwrap_err()
+            .to_string()
     };
     assert!(new(1, 0.5, 0.5, 0.1).contains("particles"));
     assert!(new(10, 0.0, 0.5, 0.1).contains("resample_threshold"));
@@ -339,7 +341,10 @@ fn abc_rejection_needs_two_draws() {
         distance: |values| values[0],
     };
     let error = abc_rejection(&target, 1, 0.5, 1).unwrap_err();
-    assert_eq!(error, "draws must be at least 2, got 1");
+    assert_eq!(
+        error,
+        MethodError::Invalid("draws must be at least 2, got 1".to_string())
+    );
 }
 
 #[test]
@@ -466,8 +471,11 @@ const PARTICLES: usize = 200;
 fn a_prior_entirely_outside_the_support_is_an_error() {
     let target = Scripted::new(unit_uniform(), |_, _| Ok(None));
     let error = sampler(PARTICLES, 0.1).run(&target, 1).unwrap_err();
+    assert!(matches!(error, MethodError::Invalid(_)), "{error}");
     assert!(
-        error.contains("Every draw of the prior is outside the support"),
+        error
+            .to_string()
+            .contains("Every draw of the prior is outside the support"),
         "{error}"
     );
 }
@@ -479,7 +487,8 @@ fn moves_that_accept_nothing_are_an_error() {
         Ok((call < PARTICLES).then(|| 50.0 * values[0]))
     });
     let error = sampler(PARTICLES, 0.1).run(&target, 2).unwrap_err();
-    assert!(error.contains("accept no proposal"), "{error}");
+    assert!(matches!(error, MethodError::Failed(_)), "{error}");
+    assert!(error.to_string().contains("accept no proposal"), "{error}");
 }
 
 #[test]
@@ -492,7 +501,7 @@ fn a_failure_of_the_model_in_a_move_stops_the_run() {
         }
     });
     let error = sampler(PARTICLES, 0.1).run(&target, 3).unwrap_err();
-    assert_eq!(error, "the engine failed");
+    assert_eq!(error, MethodError::Failed("the engine failed".to_string()));
 
     // The first move of the step runs; a later one fails.
     let later = Scripted::new(unit_uniform(), |values, call| {
@@ -503,7 +512,7 @@ fn a_failure_of_the_model_in_a_move_stops_the_run() {
         }
     });
     let error = sampler(PARTICLES, 0.01).run(&later, 3).unwrap_err();
-    assert_eq!(error, "the engine failed");
+    assert_eq!(error, MethodError::Failed("the engine failed".to_string()));
 }
 
 #[test]
@@ -644,7 +653,10 @@ fn brittle_problem(flat: bool) -> (CalibrationProblem<Brittle>, Priors) {
 fn a_gibbs_target_needs_a_finite_eta_above_zero() {
     let (problem, priors) = brittle_problem(false);
     for eta in [0.0, -1.0, f64::NAN, f64::INFINITY] {
-        let error = GibbsTarget::new(&problem, &priors, eta).err().unwrap();
+        let error = GibbsTarget::new(&problem, &priors, eta)
+            .err()
+            .unwrap()
+            .to_string();
         assert!(error.contains("finite number above 0"), "{error}");
     }
 }
@@ -679,13 +691,14 @@ fn bootstrap_coverage_fails_when_every_replicate_fails() {
         &[0.21],
         &mut sampler(PARTICLES, 0.1),
         &blocks,
-        3,
+        5,
         0.8,
         7,
     )
-    .unwrap_err();
+    .unwrap_err()
+    .to_string();
     assert!(
-        error.starts_with("Every replicate failed: 0 of 3 replicates fitted"),
+        error.starts_with("Every replicate failed: 0 of 5 replicates fitted"),
         "{error}"
     );
 }
@@ -707,7 +720,8 @@ fn bootstrap_coverage_fails_when_no_eta_narrows_the_intervals() {
         8,
     )
     .unwrap_err();
-    assert!(error.contains("still cover the fit"), "{error}");
+    assert!(matches!(error, MethodError::Failed(_)), "{error}");
+    assert!(error.to_string().contains("still cover the fit"), "{error}");
 }
 
 #[test]
@@ -726,7 +740,10 @@ fn a_calibration_of_eta_needs_a_fit_inside_the_support() {
         8,
     )
     .unwrap_err();
-    assert_eq!(error, "The fit is outside the support of the problem");
+    assert_eq!(
+        error,
+        MethodError::Invalid("The fit is outside the support of the problem".to_string())
+    );
     let error = information_matching_eta(&problem, &[0.6], Some(1))
         .unwrap_err()
         .to_string();

@@ -9,6 +9,7 @@ use commol_core::SimulationEngine;
 use commol_random::{Generator, replicate_seed};
 use rayon::prelude::*;
 
+use crate::error::MethodError;
 use crate::resampling::resamplers::{Perturbation, Resampler};
 use crate::sample::ParameterSample;
 
@@ -56,15 +57,15 @@ impl FitUnit {
     ///
     /// # Errors
     ///
-    /// Returns a message that says how many fitted, of how many, how many
-    /// the method needs, and the first three reasons; it says that every fit
-    /// failed only when none fitted.
+    /// [`MethodError::Failed`], whose message says how many fitted, of how
+    /// many, how many the method needs, and the first three reasons; it says
+    /// that every fit failed only when none fitted.
     pub fn require(
         self,
         fitted: usize,
         failed: &[(usize, String)],
         needed: usize,
-    ) -> Result<(), String> {
+    ) -> Result<(), MethodError> {
         if fitted >= needed {
             return Ok(());
         }
@@ -80,11 +81,11 @@ impl FitUnit {
              reasons: {}",
             reasons.join("; ")
         );
-        Err(if fitted == 0 {
+        Err(MethodError::Failed(if fitted == 0 {
             format!("Every {name} failed: {count}")
         } else {
             format!("Only {count}")
-        })
+        }))
     }
 }
 
@@ -105,7 +106,7 @@ impl ReplicateFits {
     /// # Errors
     ///
     /// Returns the message of [`FitUnit::require`], which names `unit`.
-    pub fn require(&self, unit: FitUnit, needed: usize) -> Result<(), String> {
+    pub fn require(&self, unit: FitUnit, needed: usize) -> Result<(), MethodError> {
         unit.require(self.fits.len(), &self.failed, needed)
     }
 }
@@ -135,23 +136,26 @@ where
     ///
     /// # Errors
     ///
-    /// Returns a message when `starts` is 0 or `fit` has the wrong length.
+    /// [`MethodError::Invalid`] when `starts` is 0 or `fit` has the wrong
+    /// length.
     pub fn new(
         problem: &'a CalibrationProblem<E>,
         config: &'a OptimizationConfig,
         fit: &[f64],
         starts: usize,
         seed: u64,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, MethodError> {
         if starts == 0 {
-            return Err("A replicate needs at least one start".to_string());
+            return Err(MethodError::Invalid(
+                "A replicate needs at least one start".to_string(),
+            ));
         }
         if fit.len() != problem.num_parameters() {
-            return Err(format!(
+            return Err(MethodError::Invalid(format!(
                 "The fit has {} values for {} parameters",
                 fit.len(),
                 problem.num_parameters()
-            ));
+            )));
         }
         Ok(Self {
             problem,
@@ -190,27 +194,29 @@ where
     ///
     /// # Errors
     ///
-    /// Returns the reason when the data are not valid.
+    /// [`MethodError::Invalid`] when the data are not valid.
     pub fn replicate_problem(
         &self,
         perturbation: &Perturbation,
-    ) -> Result<CalibrationProblem<E>, String> {
+    ) -> Result<CalibrationProblem<E>, MethodError> {
         match perturbation {
             Perturbation::Weights(weights) => self.problem.with_data(&self.values, weights),
             Perturbation::Values(values) => self.problem.with_data(values, &self.weights),
         }
+        .map_err(MethodError::Invalid)
     }
 
     /// Fit replicate `index` with the data of `perturbation`.
     ///
     /// # Errors
     ///
-    /// Returns the reason when the data are not valid or every start fails.
+    /// As [`Self::replicate_problem`], and [`MethodError::Failed`] with the
+    /// reason of the first start when every start fails.
     pub fn fit_one(
         &self,
         index: usize,
         perturbation: &Perturbation,
-    ) -> Result<CalibrationResult, String> {
+    ) -> Result<CalibrationResult, MethodError> {
         let problem = self.replicate_problem(perturbation)?;
         let seed = replicate_seed(self.seed, index as u64);
         let mut starts = start_points(problem.parameters(), self.starts, replicate_seed(seed, 1));
@@ -233,7 +239,7 @@ where
                 }
             }
         }
-        best.ok_or_else(|| first_error.unwrap_or_default())
+        best.ok_or_else(|| MethodError::Failed(first_error.unwrap_or_default()))
     }
 
     /// The perturbations of `replicates` replicates of `resampler`:
@@ -265,7 +271,7 @@ where
                     not_converged += usize::from(!result.converged);
                     fits.push((index, result));
                 }
-                Err(reason) => failed.push((index, reason)),
+                Err(reason) => failed.push((index, reason.to_string())),
             }
         }
         ReplicateFits {
@@ -297,13 +303,14 @@ pub struct BootstrapRun {
 ///
 /// # Errors
 ///
-/// Returns the message of [`FitUnit::require`] when every replicate
-/// fails.
+/// [`MethodError::Failed`] of [`FitUnit::require`] when every replicate
+/// fails; [`MethodError::Invalid`] when the problem names a parameter twice,
+/// so its fits are no sample.
 pub fn bootstrap<E>(
     runner: &ReplicateRunner<'_, E>,
     resampler: &dyn Resampler,
     replicates: usize,
-) -> Result<BootstrapRun, String>
+) -> Result<BootstrapRun, MethodError>
 where
     E: SimulationEngine + Send + Sync,
 {
@@ -335,7 +342,8 @@ where
         values,
         &log_weights,
         Some(groups),
-    )?;
+    )
+    .map_err(MethodError::Invalid)?;
     Ok(BootstrapRun {
         sample,
         failed: fits.failed,

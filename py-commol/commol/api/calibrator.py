@@ -256,7 +256,10 @@ class Calibrator:
         ------
         ValueError
             If the result's parameters are not the problem's, the level is not
-            strictly between 0 and 1, or the engine rejects a position.
+            strictly between 0 and 1, the engine is stochastic, or the engine
+            rejects a position.
+        RuntimeError
+            If the derivatives fail at the fit.
         """
         if result.sample.names != self.parameter_names:
             raise ValueError(
@@ -539,8 +542,16 @@ class Calibrator:
             If `method` is an identifiability method; the message names
             ``Calibrator.identifiability``.
         ValueError
-            If no runner is registered for the configuration's type; the
-            message names the registered ones.
+            If no runner is registered for the configuration's type (the
+            message names the registered ones), or
+            a setting, an input, the data or the model does not fit the
+            method; the message says why.
+        RuntimeError
+            If a computation of the method that could start fails: an engine
+            run, an optimizer, every replicate, or a sampler that does not
+            reach its target.
+        InfeasibleStateError
+            If a draw of a prediction leaves the values its model allows.
         """
         from commol.api.inference.registry import run_method
 
@@ -572,8 +583,12 @@ class Calibrator:
             If `method` is an uncertainty method; the message names
             ``Calibrator.uncertainty``.
         ValueError
-            If no runner is registered for the configuration's type, or the
-            method fails (see the method).
+            If no runner is registered for the configuration's type, or
+            a setting, an input, the data or the model does not fit the
+            method; the message says why.
+        RuntimeError
+            If a computation of the method that could start fails: an engine
+            run or an optimizer.
         """
         from commol.api.inference.registry import run_method
 

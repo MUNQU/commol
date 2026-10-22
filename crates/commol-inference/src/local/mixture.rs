@@ -17,11 +17,11 @@ use commol_calibration::{CalibrationProblem, Workspace};
 use commol_core::SimulationEngine;
 use commol_random::Generator;
 
-use super::LocalError;
 use super::approximation::{CurvatureKind, curvature_at};
 use super::curvature::on_bound;
 use super::gaussian::{Gaussian, inverse};
 use crate::distribution::open_uniform;
+use crate::error::MethodError;
 use crate::importance::{ImportanceRun, Proposal, importance_sample};
 use crate::psis::{RELIABLE_K_HAT, log_sum_exp};
 use crate::target::{Target, discrepancy_in_support};
@@ -97,9 +97,9 @@ pub struct MixtureRun {
 ///
 /// # Errors
 ///
-/// [`LocalError::Refused`] when no end gives a component, or the curvature
+/// [`MethodError::Invalid`] when no end gives a component, or the curvature
 /// does not apply (a stochastic engine, the mean absolute error);
-/// [`LocalError::Failed`] when a run, the derivatives or the importance
+/// [`MethodError::Failed`] when a run, the derivatives or the importance
 /// sampler fail.
 #[allow(clippy::too_many_arguments)]
 pub fn laplace_mixture<E, T>(
@@ -110,7 +110,7 @@ pub fn laplace_mixture<E, T>(
     draws: usize,
     kind: CurvatureKind,
     seed: u64,
-) -> Result<MixtureRun, LocalError>
+) -> Result<MixtureRun, MethodError>
 where
     E: SimulationEngine + Send + Sync,
     T: Target + Sync,
@@ -121,7 +121,7 @@ where
     let mut notes = Vec::new();
     let mut scored = Vec::new();
     for end in ends {
-        match discrepancy_in_support(problem, end, &mut workspace).map_err(LocalError::Failed)? {
+        match discrepancy_in_support(problem, end, &mut workspace).map_err(MethodError::Failed)? {
             Some(objective) => scored.push((objective, end)),
             None => notes.push(format!("The end {end:?} is outside the support")),
         }
@@ -165,7 +165,7 @@ where
         let gaussian = Gaussian::new(transform.clone(), unbounded, covariance, None)?;
         let log_target = target
             .log_density(end, &mut workspace)
-            .map_err(LocalError::Failed)?;
+            .map_err(MethodError::Failed)?;
         let d = end.len() as f64;
         let log_determinant: f64 = gaussian
             .factor()
@@ -185,7 +185,7 @@ where
         });
     }
     if components.is_empty() {
-        return Err(LocalError::Refused(format!(
+        return Err(MethodError::Invalid(format!(
             "No end of the starts gives a component of the mixture: {}",
             notes.join("; ")
         )));
@@ -193,7 +193,7 @@ where
     let evidences: Vec<f64> = components.iter().map(|c| c.log_evidence).collect();
     let total = log_sum_exp(&evidences);
     if !total.is_finite() {
-        return Err(LocalError::Refused(
+        return Err(MethodError::Invalid(
             "Every optimum of the starts has a target density of 0".to_string(),
         ));
     }
@@ -204,8 +204,8 @@ where
         log_weights: components.iter().map(|c| c.log_evidence - total).collect(),
         components: &components,
     };
-    let sample =
-        importance_sample(target, &mixture, &transform, draws, seed).map_err(LocalError::Failed)?;
+    let sample = importance_sample(target, &mixture, &transform, draws, seed)
+        .map_err(MethodError::Failed)?;
     if !sample.reliable {
         notes.push(format!(
             "The Pareto shape of the importance weights is k̂ = {:.2}, above {RELIABLE_K_HAT}: \

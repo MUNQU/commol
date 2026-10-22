@@ -198,6 +198,7 @@ nav:
               - Calibration: codebase/decisions/calibration.md
               - Optimizers: codebase/decisions/optimizers.md
               - Uncertainty: codebase/decisions/uncertainty.md
+              - Identifiability: codebase/decisions/identifiability.md
               - Sensitivity Analysis: codebase/decisions/sensitivity.md
               - Local approximations: codebase/decisions/local-approximations.md
               - Profiles: codebase/decisions/profiles.md

@@ -13,6 +13,7 @@ use super::TemperedTarget;
 use super::gibbs::reached_the_posterior;
 use super::kernel::Kernel;
 use super::sampler::{SmcRun, SmcSampler};
+use crate::error::MethodError;
 use crate::priors::Priors;
 use crate::target::discrepancy_in_support;
 
@@ -28,15 +29,18 @@ impl<'a, E: SimulationEngine> LikelihoodTarget<'a, E> {
     ///
     /// # Errors
     ///
-    /// Returns a message when the problem has a loss instead of observation
-    /// models.
-    pub fn new(problem: &'a CalibrationProblem<E>, priors: &'a Priors) -> Result<Self, String> {
+    /// [`MethodError::Invalid`] when the problem has a loss instead of
+    /// observation models.
+    pub fn new(
+        problem: &'a CalibrationProblem<E>,
+        priors: &'a Priors,
+    ) -> Result<Self, MethodError> {
         if problem.discrepancy().likelihood().is_none() {
-            return Err(
+            return Err(MethodError::Invalid(
                 "BayesianPosterior(...) needs observation models; the problem has a loss. Use \
                  GibbsPosterior(...) for the posterior of a loss"
                     .to_string(),
-            );
+            ));
         }
         Ok(Self {
             problem,
@@ -87,14 +91,15 @@ impl<E: SimulationEngine + Sync> TemperedTarget for LikelihoodTarget<'_, E> {
 ///
 /// # Errors
 ///
-/// Returns a message when the problem has a loss, the sampler fails, or no
-/// level after one below 1 keeps the effective sample size.
+/// [`MethodError::Invalid`] when the problem has a loss; as
+/// [`SmcSampler::run`]; [`MethodError::Failed`] when the sampler stops
+/// before the temperature 1.
 pub fn bayesian_posterior<E, K>(
     problem: &CalibrationProblem<E>,
     priors: &Priors,
     sampler: &mut SmcSampler<K>,
     seed: u64,
-) -> Result<SmcRun, String>
+) -> Result<SmcRun, MethodError>
 where
     E: SimulationEngine + Sync,
     K: Kernel,

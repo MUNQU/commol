@@ -12,11 +12,11 @@ use std::collections::HashMap;
 use commol_calibration::ObservedDataPoint;
 use commol_core::SimulationEngine;
 
-use crate::conformal::ConformalError;
 use crate::conformal::intervals::{ConformalRun, PredictionIntervals};
 use crate::conformal::predict::{set_predictions, targets};
 use crate::conformal::quantile::conformal_quantile;
 use crate::conformal::score::{ConformalSettings, NonconformityScore, scales};
+use crate::error::MethodError;
 use crate::resampling::{FitUnit, Perturbation, ReplicateRunner};
 
 /// The indices of the observations of each series after `origin`, in
@@ -48,8 +48,8 @@ fn check<E: SimulationEngine + Send + Sync>(
     origins: &[f64],
     positions: &[f64],
     settings: ConformalSettings,
-) -> Result<(), ConformalError> {
-    let invalid = |message: String| Err(ConformalError::Invalid(message));
+) -> Result<(), MethodError> {
+    let invalid = |message: String| Err(MethodError::Invalid(message));
     if settings.score == NonconformityScore::Spread {
         return invalid(
             "RollingConformal fits once per origin, so its predictions have no spread for \
@@ -98,7 +98,7 @@ pub fn rolling_conformal<E>(
     origins: &[f64],
     positions: &[f64],
     settings: ConformalSettings,
-) -> Result<ConformalRun, ConformalError>
+) -> Result<ConformalRun, MethodError>
 where
     E: SimulationEngine + Send + Sync,
 {
@@ -117,9 +117,7 @@ where
         })
         .collect();
     let refits = runner.fit_all(&perturbations);
-    refits
-        .require(FitUnit::Origin, 1)
-        .map_err(ConformalError::Failed)?;
+    refits.require(FitUnit::Origin, 1)?;
     let (fitted_origins, fits): (Vec<f64>, Vec<Vec<f64>>) = refits
         .fits
         .iter()
@@ -131,8 +129,7 @@ where
         })
         .unzip();
     let predictions = set_predictions(problem, &fits, observed)?;
-    let observed_scales =
-        scales(settings.score, observed, observed, None).map_err(ConformalError::Invalid)?;
+    let observed_scales = scales(settings.score, observed, observed, None)?;
     let mut by_horizon: HashMap<(String, usize), Vec<f64>> = HashMap::new();
     let mut scores = Vec::new();
     for (predicted, &origin) in predictions.iter().zip(&fitted_origins) {
@@ -154,8 +151,7 @@ where
     sorted.sort_by(f64::total_cmp);
     let targets = targets(observed, positions);
     let centre = set_predictions(problem, &[runner.fit().to_vec()], &targets)?.remove(0);
-    let target_scales =
-        scales(settings.score, observed, &targets, None).map_err(ConformalError::Invalid)?;
+    let target_scales = scales(settings.score, observed, &targets, None)?;
     let intervals = PredictionIntervals::symmetric(
         settings.confidence_level,
         targets.clone(),

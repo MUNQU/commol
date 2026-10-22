@@ -13,11 +13,11 @@ use commol_calibration::ObservedDataPoint;
 use commol_core::SimulationEngine;
 use commol_random::{Generator, replicate_seed};
 
-use crate::conformal::ConformalError;
 use crate::conformal::intervals::{ConformalRun, PredictionIntervals, quantile_lookup};
 use crate::conformal::predict::{ensemble_mean, ensemble_spread, set_predictions, targets};
 use crate::conformal::quantile::group_quantiles;
 use crate::conformal::score::{ConformalSettings, NonconformityScore, scales};
+use crate::error::MethodError;
 use crate::resampling::{BlockScheme, FitUnit, Perturbation, ReplicateRunner};
 
 /// Blocks drawn with replacement: one multinomial count per block, of as
@@ -77,7 +77,7 @@ pub fn enbpi<E>(
     replicates: usize,
     positions: &[f64],
     settings: ConformalSettings,
-) -> Result<ConformalRun, ConformalError>
+) -> Result<ConformalRun, MethodError>
 where
     E: SimulationEngine + Send + Sync,
 {
@@ -95,9 +95,7 @@ where
         .map(|counts| Perturbation::Weights(resampler.weights(counts)))
         .collect();
     let refits = runner.fit_all(&perturbations);
-    refits
-        .require(FitUnit::Replicate, 1)
-        .map_err(ConformalError::Failed)?;
+    refits.require(FitUnit::Replicate, 1)?;
     let (counts_of_fit, fits): (Vec<&Vec<usize>>, Vec<Vec<f64>>) = refits
         .fits
         .iter()
@@ -116,7 +114,7 @@ where
                 .collect();
             if members.is_empty() {
                 let (first, last) = spans[block];
-                Err(ConformalError::Invalid(format!(
+                Err(MethodError::Invalid(format!(
                     "Block [{first}, {last}] is left out by none of the {} replicates that \
                      fitted, so its observations have no leave-one-out prediction; ask for more \
                      replicates",
@@ -140,8 +138,7 @@ where
         .collect();
     let spread =
         (settings.score == NonconformityScore::Spread).then(|| ensemble_spread(&predictions));
-    let scales = scales(settings.score, observed, &points, spread.as_deref())
-        .map_err(ConformalError::Invalid)?;
+    let scales = scales(settings.score, observed, &points, spread.as_deref())?;
     let block_of = scheme.block_of();
     let labels: Vec<String> = observed.iter().map(|obs| obs.label.clone()).collect();
     let scores: Vec<f64> = observed

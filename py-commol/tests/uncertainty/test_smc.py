@@ -348,7 +348,7 @@ class TestGibbsPosterior:
                 replicates=10, block_length="auto", confidence_level=0.8
             )
         )
-        with pytest.raises(RuntimeError, match="loss at the fit is 0"):
+        with pytest.raises(ValueError, match="loss at the fit is 0"):
             Calibrator(Simulation(model), problem).uncertainty(method)
 
     def test_bootstrap_coverage_finds_an_eta_whose_intervals_cover(self) -> None:

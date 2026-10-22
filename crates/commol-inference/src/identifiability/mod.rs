@@ -22,50 +22,7 @@ pub use structural::{
     Combination, PointRank, StructuralAnalysis, StructuralVerdict, structural_rank,
 };
 
-use std::fmt;
-
 use crate::sensitivity::SensitivityError;
-
-/// Why an analysis has no result.
-#[derive(Debug, Clone, PartialEq)]
-pub enum IdentifiabilityError {
-    /// Every point of the analysis is infeasible.
-    NoFeasiblePoint {
-        /// How many points were tried.
-        points: usize,
-        /// Why each was skipped.
-        reasons: Vec<String>,
-    },
-    /// The sensitivities failed for a reason no point avoids.
-    Sensitivity(SensitivityError),
-    /// A setting or an input is not valid.
-    Invalid(String),
-}
-
-impl fmt::Display for IdentifiabilityError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NoFeasiblePoint { points, reasons } => {
-                let mut distinct: Vec<&String> = Vec::new();
-                for reason in reasons {
-                    if !distinct.contains(&reason) {
-                        distinct.push(reason);
-                    }
-                }
-                let distinct: Vec<&str> = distinct.iter().map(|reason| reason.as_str()).collect();
-                write!(
-                    f,
-                    "Every one of the {points} points is infeasible: {}",
-                    distinct.join("; ")
-                )
-            }
-            Self::Sensitivity(error) => write!(f, "{error}"),
-            Self::Invalid(message) => f.write_str(message),
-        }
-    }
-}
-
-impl std::error::Error for IdentifiabilityError {}
 
 /// Whether a failure of the sensitivities is a point to skip.
 fn skippable(error: &SensitivityError) -> bool {

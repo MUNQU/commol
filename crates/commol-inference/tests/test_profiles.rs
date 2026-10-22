@@ -10,6 +10,7 @@ use commol_calibration::{
     optimize_subproblem,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
+use commol_inference::MethodError;
 use commol_inference::profiles::{
     ProfileEnd, ProfileTracer, ProfiledQuantity, beale, bootstrap_thresholds, chi_square,
 };
@@ -569,12 +570,16 @@ fn a_tracer_refuses_a_fit_it_cannot_start_from() {
     let problem = line_problem(&VALUES);
     assert_eq!(
         ProfileTracer::new(&problem, &config, &[1.0], 0).err(),
-        Some("The fit has 1 values for 2 parameters".to_string())
+        Some(MethodError::Invalid(
+            "The fit has 1 values for 2 parameters".to_string()
+        ))
     );
     let tracer = ProfileTracer::new(&problem, &config, &[1.0, 0.5], 0).unwrap();
     assert_eq!(
         tracer.center(&ProfiledQuantity::Parameter(2)),
-        Err("Parameter 2 does not exist; the problem has 2".to_string())
+        Err(MethodError::Invalid(
+            "Parameter 2 does not exist; the problem has 2".to_string()
+        ))
     );
     // a ≥ 20 cannot hold inside the bounds of a.
     let constrained = CalibrationProblem::new(
@@ -590,7 +595,9 @@ fn a_tracer_refuses_a_fit_it_cannot_start_from() {
     .unwrap();
     assert_eq!(
         ProfileTracer::new(&constrained, &config, &[1.0, 0.5], 0).err(),
-        Some("The fit a profile starts from is not feasible".to_string())
+        Some(MethodError::Invalid(
+            "The fit a profile starts from is not feasible".to_string()
+        ))
     );
 }
 
@@ -644,13 +651,15 @@ fn the_tolerance_follows_the_optimizer() {
 fn thresholds_refuse_what_they_cannot_read() {
     let problem = line_problem(&VALUES);
     assert_eq!(
-        chi_square(&problem, 0.9).unwrap_err(),
+        chi_square(&problem, 0.9).unwrap_err().to_string(),
         "The chi-square threshold reads −log L and needs observation models; the problem \
          has a loss. With a loss, use Threshold.beale (a sum of squares of independent \
          Gaussian errors) or Threshold.bootstrap_calibrated"
     );
     assert_eq!(
-        beale(&line_problem(&VALUES[..2]), 1.0, 0.9).unwrap_err(),
+        beale(&line_problem(&VALUES[..2]), 1.0, 0.9)
+            .unwrap_err()
+            .to_string(),
         "Beale's threshold needs more observations than parameters: 2 observations, \
          2 parameters"
     );
@@ -658,10 +667,14 @@ fn thresholds_refuse_what_they_cannot_read() {
     let runner = ReplicateRunner::new(&problem, &config, &[1.0, 0.5], 1, 0).unwrap();
     let quantity = [ProfiledQuantity::Parameter(0)];
     assert_eq!(
-        bootstrap_thresholds(&runner, &ZeroWeights, 2, &quantity, &[], 0.9).unwrap_err(),
+        bootstrap_thresholds(&runner, &ZeroWeights, 2, &quantity, &[], 0.9)
+            .unwrap_err()
+            .to_string(),
         "One center per quantity: 1 quantities, 0 centers"
     );
-    let error = bootstrap_thresholds(&runner, &ZeroWeights, 2, &quantity, &[1.0], 0.9).unwrap_err();
+    let error = bootstrap_thresholds(&runner, &ZeroWeights, 2, &quantity, &[1.0], 0.9)
+        .unwrap_err()
+        .to_string();
     assert!(
         error.starts_with("Every replicate failed: 0 of 2 replicates fitted"),
         "{error}"
@@ -774,7 +787,9 @@ fn thresholds_fail_when_every_refit_fails() {
     assert!(runner.fit_one(0, &perturbation).is_ok());
 
     let quantity = [ProfiledQuantity::Parameter(2)];
-    let error = bootstrap_thresholds(&runner, &Unchanged, 2, &quantity, &[0.95], 0.9).unwrap_err();
+    let error = bootstrap_thresholds(&runner, &Unchanged, 2, &quantity, &[0.95], 0.9)
+        .unwrap_err()
+        .to_string();
 
     assert!(
         error.starts_with("Every replicate failed: 0 of 2 replicates fitted"),

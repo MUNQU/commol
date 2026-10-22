@@ -15,10 +15,11 @@ use commol_random::stream_seed;
 
 use crate::batch::BatchRunner;
 use crate::design::InputSpace;
+use crate::error::MethodError;
 use crate::global_sensitivity::{
     ChaosExpansion, Morris, Prcc, Sobol, Truncation, morris, prcc, sobol,
 };
-use crate::predictive::{PredictiveError, draw_seeds, run_sets};
+use crate::predictive::{draw_seeds, run_sets};
 use crate::quantity::{Quantities, Quantity};
 use crate::sample::ParameterSample;
 
@@ -66,8 +67,8 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
     ///
     /// # Errors
     ///
-    /// Returns a message when the inputs are not the parameters, in order
-    /// and with their bounds, or as [`ForwardModel::unobserved`].
+    /// [`MethodError::Invalid`] when the inputs are not the parameters, in
+    /// order and with their bounds, or as [`ForwardModel::unobserved`].
     pub fn new(
         engine: E,
         parameters: Vec<CalibrationParameter>,
@@ -75,19 +76,19 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         replicates: Option<usize>,
         inputs: InputSpace,
         seed: u64,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, MethodError> {
         let names: Vec<String> = parameters.iter().map(|p| p.id.clone()).collect();
         let bounds: Vec<(f64, f64)> = parameters
             .iter()
             .map(|p| (p.min_bound, p.max_bound))
             .collect();
         if inputs.names() != names.as_slice() || inputs.bounds() != bounds {
-            return Err(format!(
+            return Err(MethodError::Invalid(format!(
                 "The inputs are {:?} with the bounds {:?}; the parameters are {names:?} with \
                  the bounds {bounds:?}, in this order",
                 inputs.names(),
                 inputs.bounds()
-            ));
+            )));
         }
         let forward = ForwardModel::unobserved(
             engine,
@@ -95,7 +96,8 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
             remainder,
             replicates,
             stream_seed(seed, REPLICATES_STREAM),
-        )?;
+        )
+        .map_err(MethodError::Invalid)?;
         Ok(Self {
             forward,
             inputs,
@@ -119,14 +121,14 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
     ///
     /// # Errors
     ///
-    /// [`PredictiveError::Mismatch`] when independent inputs have no
+    /// [`MethodError::Invalid`] when independent inputs have no
     /// `draws`, or inputs from a sample have `draws`.
     pub fn draws(
         &self,
         method: &str,
         draws: Option<usize>,
-    ) -> Result<ParameterSample, PredictiveError> {
-        let invalid = PredictiveError::Mismatch;
+    ) -> Result<ParameterSample, MethodError> {
+        let invalid = MethodError::Invalid;
         match (&self.inputs, draws) {
             (InputSpace::Sample(sample), None) => Ok(sample.clone()),
             (InputSpace::Sample(_), Some(_)) => Err(invalid(
@@ -166,7 +168,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         &self,
         draws: Option<usize>,
         quantities: &[Quantity],
-    ) -> Result<Propagation, PredictiveError> {
+    ) -> Result<Propagation, MethodError> {
         let sample = self.draws("Propagation", draws)?;
         let mut values = Vec::new();
         let mut weights = Vec::new();
@@ -205,7 +207,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         &self,
         draws: Option<usize>,
         quantities: &[Quantity],
-    ) -> Result<(ParameterSample, Prcc), PredictiveError> {
+    ) -> Result<(ParameterSample, Prcc), MethodError> {
         let sample = self.draws("PRCC", draws)?;
         let outputs = self.means(sample.values(), quantities)?;
         let result = prcc(sample.values(), &outputs, sample.weights())?;
@@ -224,11 +226,11 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         trajectories: usize,
         levels: usize,
         quantities: &[Quantity],
-    ) -> Result<(Morris, usize), PredictiveError> {
+    ) -> Result<(Morris, usize), MethodError> {
         let design = self
             .inputs
             .morris("Morris", trajectories, levels, self.design_seed())
-            .map_err(PredictiveError::Mismatch)?;
+            .map_err(MethodError::Invalid)?;
         let outputs = self.means(&design.points, quantities)?;
         let result = morris(&design, &outputs)?;
         Ok((result, design.points.len()))
@@ -248,17 +250,17 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         replicates: usize,
         confidence_level: f64,
         quantities: &[Quantity],
-    ) -> Result<(Sobol, usize), PredictiveError> {
+    ) -> Result<(Sobol, usize), MethodError> {
         if replicates < 2 {
-            return Err(PredictiveError::Mismatch(format!(
+            return Err(MethodError::Invalid(format!(
                 "Sobol needs at least 2 bootstrap replicates, got {replicates}"
             )));
         }
-        crate::statistics::interval_levels(confidence_level).map_err(PredictiveError::Mismatch)?;
+        crate::statistics::interval_levels(confidence_level).map_err(MethodError::Invalid)?;
         let design = self
             .inputs
             .saltelli("Sobol", draws, self.design_seed())
-            .map_err(PredictiveError::Mismatch)?;
+            .map_err(MethodError::Invalid)?;
         let outputs = self.means(&design.points, quantities)?;
         sobol(
             &design,
@@ -285,15 +287,15 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         truncation: Truncation,
         draws: usize,
         quantities: &[Quantity],
-    ) -> Result<(ChaosExpansion, usize), PredictiveError> {
+    ) -> Result<(ChaosExpansion, usize), MethodError> {
         let method = "PolynomialChaos";
         self.inputs
             .independent(method)
-            .map_err(PredictiveError::Mismatch)?;
+            .map_err(MethodError::Invalid)?;
         let inputs = self.inputs.names().len();
         let terms = ChaosExpansion::terms(inputs, degree, truncation);
         if draws <= terms {
-            return Err(PredictiveError::Mismatch(format!(
+            return Err(MethodError::Invalid(format!(
                 "Polynomial chaos of degree {degree} in {inputs} inputs has {terms} terms and \
                  needs more points than terms, got {draws}"
             )));
@@ -301,11 +303,11 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         let points = self
             .inputs
             .latin_hypercube(method, draws, self.design_seed())
-            .map_err(PredictiveError::Mismatch)?;
+            .map_err(MethodError::Invalid)?;
         let unit = self
             .inputs
             .to_unit(method, &points)
-            .map_err(PredictiveError::Mismatch)?;
+            .map_err(MethodError::Invalid)?;
         let outputs = self.means(&points, quantities)?;
         let expansion = ChaosExpansion::fit(&unit, &outputs, degree, truncation)?;
         Ok((expansion, points.len()))
@@ -313,9 +315,9 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
 
     /// The quantities, compiled for the engine and checked against its
     /// positions.
-    fn compile(&self, quantities: &[Quantity]) -> Result<Quantities, PredictiveError> {
+    fn compile(&self, quantities: &[Quantity]) -> Result<Quantities, MethodError> {
         let compiled = Quantities::new(quantities, &self.forward.base_engine().output_names())
-            .map_err(PredictiveError::Mismatch)?;
+            .map_err(MethodError::Invalid)?;
         BatchRunner::new(&self.forward, &compiled)?;
         Ok(compiled)
     }
@@ -326,9 +328,9 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         &self,
         points: &[Vec<f64>],
         quantities: &[Quantity],
-    ) -> Result<Vec<Vec<f64>>, PredictiveError> {
+    ) -> Result<Vec<Vec<f64>>, MethodError> {
         let compiled = self.compile(quantities)?;
-        BatchRunner::new(&self.forward, &compiled)?.means(points)
+        Ok(BatchRunner::new(&self.forward, &compiled)?.means(points)?)
     }
 
     fn design_seed(&self) -> u64 {

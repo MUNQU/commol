@@ -7,19 +7,16 @@
 //! builds the result.
 
 use crate::parallelism::parallel;
-use commol_inference::local::LocalError;
 use commol_inference::resampling::{
     BlockDrawing, BlockScheme, FitUnit, ResidualScale, Residuals, automatic_block_length,
 };
-use commol_inference::smc::{
-    self, AbcTarget, Distance, LikelihoodTarget, RandomWalk, SmcRun, SmcSampler, Stop,
-};
+use commol_inference::smc::{self, AbcTarget, Distance, RandomWalk, SmcRun, SmcSampler, Stop};
 use commol_inference::{Distribution, Family, Priors};
 use commol_random::{Generator, replicate_seed};
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
-use crate::inference::PyCalibrationProblem;
+use crate::inference::{PyCalibrationProblem, method_error};
 
 /// A prior as Python passes it: the parameter, the kind and its parameters.
 pub(crate) type PriorArgs = (String, String, Vec<f64>);
@@ -193,7 +190,7 @@ fn sampler(
         target_cess,
         stay_probability,
     )
-    .map_err(value_error)
+    .map_err(method_error)
 }
 
 pub(crate) fn problem_priors(
@@ -222,7 +219,7 @@ pub(crate) fn problem_priors(
 ///
 /// Raises:
 ///     ValueError: If a prior or a setting is not valid
-///     RuntimeError: If the run fails
+///     RuntimeError: If a run fails or the sampler stops before its target
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 fn gibbs_posterior(
@@ -241,7 +238,7 @@ fn gibbs_posterior(
     let run = parallel(py, || {
         smc::gibbs_posterior(&problem.inner, &priors, eta, &mut sampler, seed)
     })?
-    .map_err(PyRuntimeError::new_err)?;
+    .map_err(method_error)?;
     Ok(PySmcRun::of(run.run))
 }
 
@@ -260,7 +257,7 @@ fn gibbs_posterior(
 /// Raises:
 ///     ValueError: If the problem has a loss, or a prior or a setting is not
 ///         valid
-///     RuntimeError: If the run fails
+///     RuntimeError: If a run fails or the sampler stops before its target
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 fn bayesian_posterior(
@@ -274,12 +271,11 @@ fn bayesian_posterior(
     seed: u64,
 ) -> PyResult<PySmcRun> {
     let priors = problem_priors(problem, priors)?;
-    LikelihoodTarget::new(&problem.inner, &priors).map_err(value_error)?;
     let mut sampler = sampler(particles, resample_threshold, target_cess, stay_probability)?;
     let run = parallel(py, || {
         smc::bayesian_posterior(&problem.inner, &priors, &mut sampler, seed)
     })?
-    .map_err(PyRuntimeError::new_err)?;
+    .map_err(method_error)?;
     Ok(PySmcRun::of(run))
 }
 
@@ -303,10 +299,7 @@ fn information_matching_eta(
     fit: Vec<f64>,
     block_length: Option<usize>,
 ) -> PyResult<f64> {
-    smc::information_matching_eta(&problem.inner, &fit, block_length).map_err(|error| match error {
-        LocalError::Refused(message) => value_error(message),
-        LocalError::Failed(message) => PyRuntimeError::new_err(message),
-    })
+    smc::information_matching_eta(&problem.inner, &fit, block_length).map_err(method_error)
 }
 
 /// The `η` of bootstrap coverage
@@ -326,9 +319,11 @@ fn information_matching_eta(
 ///     seed: Seed of every random number
 ///
 /// Raises:
-///     ValueError: If a prior or a setting is not valid
-///     RuntimeError: If every replicate fails or the coverage does not
-///         cross the level
+///     ValueError: If a prior or a setting is not valid, the replicates
+///         are too few for the level, the fit is outside the support, or the
+///         loss at the fit is 0
+///     RuntimeError: If the run at the fit fails, every replicate fails, or
+///         the coverage does not cross the level
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 fn bootstrap_coverage_eta(
@@ -352,7 +347,7 @@ fn bootstrap_coverage_eta(
         Some(length) => length,
         None => {
             let residuals = Residuals::new(&problem.inner, &fit, ResidualScale::Additive)
-                .map_err(value_error)?;
+                .map_err(method_error)?;
             automatic_block_length(
                 observed,
                 residuals.residuals(),
@@ -361,7 +356,7 @@ fn bootstrap_coverage_eta(
             .length
         }
     };
-    let blocks = BlockScheme::new(observed, length).map_err(value_error)?;
+    let blocks = BlockScheme::new(observed, length).map_err(method_error)?;
     let calibration = parallel(py, || {
         smc::bootstrap_coverage_eta(
             &problem.inner,
@@ -374,7 +369,7 @@ fn bootstrap_coverage_eta(
             seed,
         )
     })?
-    .map_err(PyRuntimeError::new_err)?;
+    .map_err(method_error)?;
     Ok(PyEtaCoverage {
         eta: calibration.eta,
         coverage: calibration.coverage,
@@ -402,7 +397,7 @@ fn bootstrap_coverage_eta(
 ///
 /// Raises:
 ///     ValueError: If a prior or a setting is not valid
-///     RuntimeError: If the run fails
+///     RuntimeError: If a run fails or the sampler stops before its target
 #[pyfunction]
 #[pyo3(signature = (problem, priors, metric, particles, target_cess, min_acceptance, stay_probability, seed))]
 #[allow(clippy::too_many_arguments)]
@@ -418,14 +413,14 @@ fn abc_smc(
     seed: u64,
 ) -> PyResult<(PySmcRun, bool)> {
     let priors = problem_priors(problem, priors)?;
-    let distance = Distance::from_metric(metric).map_err(value_error)?;
+    let distance = Distance::from_metric(metric).map_err(method_error)?;
     // With weights of 0 or 1, a particle of weight 0 cannot move: every
     // step resamples.
     let mut sampler = sampler(particles, 1.0, target_cess, stay_probability)?
         .with_min_acceptance(min_acceptance)
-        .map_err(value_error)?;
-    let target = AbcTarget::new(&problem.inner, &priors, distance).map_err(value_error)?;
-    let run = parallel(py, || sampler.run(&target, seed))?.map_err(PyRuntimeError::new_err)?;
+        .map_err(method_error)?;
+    let target = AbcTarget::new(&problem.inner, &priors, distance).map_err(method_error)?;
+    let run = parallel(py, || sampler.run(&target, seed))?.map_err(method_error)?;
     Ok((PySmcRun::of(run), target.stochastic()))
 }
 
@@ -446,7 +441,7 @@ fn abc_smc(
 ///
 /// Raises:
 ///     ValueError: If a prior or a setting is not valid
-///     RuntimeError: If the run fails
+///     RuntimeError: If a run fails or the sampler stops before its target
 #[pyfunction]
 #[pyo3(signature = (problem, priors, metric, draws, quantile, seed))]
 fn abc_rejection(
@@ -459,10 +454,10 @@ fn abc_rejection(
     seed: u64,
 ) -> PyResult<(PySmcRun, bool)> {
     let priors = problem_priors(problem, priors)?;
-    let distance = Distance::from_metric(metric).map_err(value_error)?;
-    let target = AbcTarget::new(&problem.inner, &priors, distance).map_err(value_error)?;
+    let distance = Distance::from_metric(metric).map_err(method_error)?;
+    let target = AbcTarget::new(&problem.inner, &priors, distance).map_err(method_error)?;
     let run = parallel(py, || smc::abc_rejection(&target, draws, quantile, seed))?
-        .map_err(PyRuntimeError::new_err)?;
+        .map_err(method_error)?;
     Ok((PySmcRun::of(run), target.stochastic()))
 }
 

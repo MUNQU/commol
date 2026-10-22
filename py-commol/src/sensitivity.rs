@@ -15,7 +15,7 @@ use pyo3::prelude::*;
 
 use crate::calibration::{PyCalibrationParameter, PyObservedDataPoint};
 use crate::engine::{Engine, PyEngine};
-use crate::inference::{PyObservationDraws, PyParameterSample, PyPredictive, predictive_error};
+use crate::inference::{PyObservationDraws, PyParameterSample, PyPredictive, method_error};
 use crate::quantity::read_quantities;
 use crate::smc::{PriorArgs, priors};
 
@@ -104,7 +104,7 @@ impl PyForwardAnalysis {
             inputs,
             seed,
         )
-        .map_err(value_error)?;
+        .map_err(method_error)?;
         Ok(Self { inner })
     }
 
@@ -123,7 +123,7 @@ impl PyForwardAnalysis {
     ) -> PyResult<PropagationValues> {
         let quantities = read_quantities(quantities)?;
         let result =
-            parallel(py, || self.inner.propagate(draws, &quantities))?.map_err(predictive_error)?;
+            parallel(py, || self.inner.propagate(draws, &quantities))?.map_err(method_error)?;
         let draws = (result.sample.values().to_vec(), result.sample.log_weights());
         Ok((draws, result.values, result.weights, result.draw_seeds))
     }
@@ -139,7 +139,7 @@ impl PyForwardAnalysis {
     fn prcc(&self, py: Python<'_>, draws: Option<usize>, quantities: &str) -> PyResult<PrccValues> {
         let quantities = read_quantities(quantities)?;
         let (sample, result) =
-            parallel(py, || self.inner.prcc(draws, &quantities))?.map_err(predictive_error)?;
+            parallel(py, || self.inner.prcc(draws, &quantities))?.map_err(method_error)?;
         Ok((
             (sample.values().to_vec(), sample.log_weights()),
             result.coefficients,
@@ -165,7 +165,7 @@ impl PyForwardAnalysis {
     ) -> PyResult<MorrisValues> {
         let quantities = read_quantities(quantities)?;
         let (result, runs) = parallel(py, || self.inner.morris(trajectories, levels, &quantities))?
-            .map_err(predictive_error)?;
+            .map_err(method_error)?;
         Ok((result.mu, result.mu_star, result.sigma, runs))
     }
 
@@ -189,7 +189,7 @@ impl PyForwardAnalysis {
             self.inner
                 .sobol(draws, replicates, confidence_level, &quantities)
         })?
-        .map_err(predictive_error)?;
+        .map_err(method_error)?;
         let [first_lower, first_upper] = result.first_interval;
         let [total_lower, total_upper] = result.total_interval;
         Ok(SobolValues {
@@ -222,12 +222,12 @@ impl PyForwardAnalysis {
         draws: usize,
         quantities: &str,
     ) -> PyResult<PyChaosRun> {
-        let truncation = Truncation::new(q_norm, max_interaction).map_err(value_error)?;
+        let truncation = Truncation::new(q_norm, max_interaction).map_err(method_error)?;
         let quantities = read_quantities(quantities)?;
         let (expansion, runs) = parallel(py, || {
             self.inner.chaos(degree, truncation, draws, &quantities)
         })?
-        .map_err(predictive_error)?;
+        .map_err(method_error)?;
         Ok(PyChaosRun {
             mean: expansion.mean(),
             variance: expansion.variance(),
@@ -263,7 +263,7 @@ impl PyForwardAnalysis {
             )
         })?
         .map(|inner| PyPredictive { inner })
-        .map_err(predictive_error)
+        .map_err(method_error)
     }
 
     /// Every draw's value of `observations`, read through the observation
@@ -291,7 +291,7 @@ impl PyForwardAnalysis {
             )
         })?
         .map(|inner| PyObservationDraws { inner })
-        .map_err(predictive_error)
+        .map_err(method_error)
     }
 }
 
@@ -370,9 +370,9 @@ fn chaos_evaluate(
     points: Vec<Vec<f64>>,
 ) -> PyResult<Vec<Vec<f64>>> {
     let inputs = input_space(&parameters, Some(distributions), None)?;
-    let truncation = Truncation::new(q_norm, max_interaction).map_err(value_error)?;
+    let truncation = Truncation::new(q_norm, max_interaction).map_err(method_error)?;
     let expansion = ChaosExpansion::new(parameters.len(), degree, truncation, coefficients)
-        .map_err(value_error)?;
+        .map_err(method_error)?;
     let unit = inputs
         .to_unit("PolynomialChaos", &points)
         .map_err(value_error)?;

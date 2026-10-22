@@ -3,11 +3,11 @@
 use commol_calibration::{CalibrationProblem, ObservedDataPoint};
 use commol_core::SimulationEngine;
 
-use crate::conformal::ConformalError;
 use crate::conformal::intervals::{ConformalRun, PredictionIntervals, quantile_lookup};
 use crate::conformal::predict::{Predictor, predict, targets};
 use crate::conformal::quantile::group_quantiles;
 use crate::conformal::score::{ConformalSettings, scales};
+use crate::error::MethodError;
 
 /// Split conformal intervals of `predictor` at `positions`, for each series
 /// of `calibration`: the scores of the held-out `calibration` observations
@@ -27,12 +27,12 @@ pub fn split_conformal<E>(
     calibration: &[ObservedDataPoint],
     positions: &[f64],
     settings: ConformalSettings,
-) -> Result<ConformalRun, ConformalError>
+) -> Result<ConformalRun, MethodError>
 where
     E: SimulationEngine + Send + Sync,
 {
     if calibration.is_empty() {
-        return Err(ConformalError::Invalid(
+        return Err(MethodError::Invalid(
             "calibration_data is empty; split conformal scores held-out observations".to_string(),
         ));
     }
@@ -44,8 +44,7 @@ where
         problem.observed_data(),
         &points,
         predictions.spread.as_deref(),
-    )
-    .map_err(ConformalError::Invalid)?;
+    )?;
     let held_out = calibration.len();
     let labels: Vec<String> = calibration.iter().map(|obs| obs.label.clone()).collect();
     let scores: Vec<f64> = calibration

@@ -19,7 +19,7 @@
 use nalgebra::DMatrix;
 
 use super::check_numbers;
-use crate::predictive::PredictiveError;
+use crate::error::MethodError;
 use crate::special::beta_i;
 use crate::statistics::effective_size;
 
@@ -43,9 +43,9 @@ pub struct Prcc {
 ///
 /// # Errors
 ///
-/// [`PredictiveError::NotANumber`] with the first quantity that is NaN at a
+/// [`MethodError::Prediction`] of [`PredictiveError::NotANumber`](crate::predictive::PredictiveError::NotANumber) with the first quantity that is NaN at a
 /// draw, and every draw where it is, before any value is ranked;
-/// [`PredictiveError::Mismatch`] when the draws, the outputs and the weights
+/// [`MethodError::Invalid`] when the draws, the outputs and the weights
 /// differ in number, there is no input, an input is NaN, a weight is
 /// negative or every weight is zero, the effective size is not above one
 /// more than the number of inputs, or the ranks of the inputs are collinear.
@@ -53,10 +53,10 @@ pub fn prcc(
     inputs: &[Vec<f64>],
     outputs: &[Vec<f64>],
     weights: &[f64],
-) -> Result<Prcc, PredictiveError> {
+) -> Result<Prcc, MethodError> {
     let draws = inputs.len();
     if outputs.len() != draws || weights.len() != draws {
-        return Err(PredictiveError::Mismatch(format!(
+        return Err(MethodError::Invalid(format!(
             "PRCC needs one row of outputs and one weight per draw: {draws} draws, {} rows of \
              outputs and {} weights",
             outputs.len(),
@@ -65,7 +65,7 @@ pub fn prcc(
     }
     check_numbers(outputs)?;
     let quantities = outputs.first().map_or(0, Vec::len);
-    let invalid = |message: String| Err(PredictiveError::Mismatch(message));
+    let invalid = |message: String| Err(MethodError::Invalid(message));
     let count = inputs.first().map_or(0, Vec::len);
     if count == 0 {
         return invalid("PRCC needs at least one input".to_string());
@@ -259,10 +259,7 @@ mod tests {
 
     /// `prcc` on another thread, with the time it may take before the test
     /// fails as a hang.
-    fn within_a_second(
-        inputs: Vec<Vec<f64>>,
-        outputs: Vec<Vec<f64>>,
-    ) -> Result<Prcc, PredictiveError> {
+    fn within_a_second(inputs: Vec<Vec<f64>>, outputs: Vec<Vec<f64>>) -> Result<Prcc, MethodError> {
         let (sender, receiver) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
             let weights = vec![1.0; inputs.len()];
@@ -282,11 +279,11 @@ mod tests {
         let error = within_a_second(inputs, outputs).unwrap_err();
         assert_eq!(
             error,
-            PredictiveError::NotANumber {
+            MethodError::Prediction(crate::predictive::PredictiveError::NotANumber {
                 quantity: 1,
                 points: vec![1, 3],
                 run: None
-            }
+            })
         );
         let message = error.to_string();
         assert!(

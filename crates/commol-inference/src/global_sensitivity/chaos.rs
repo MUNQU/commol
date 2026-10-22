@@ -23,7 +23,7 @@
 use nalgebra::DMatrix;
 
 use super::check_numbers;
-use crate::predictive::PredictiveError;
+use crate::error::MethodError;
 
 /// The terms a basis of `degree` keeps: those whose degrees `α` have
 /// `Σ α_i^q ≤ degree^q` and hold at most `max_interaction` inputs.
@@ -45,20 +45,20 @@ impl Truncation {
     ///
     /// # Errors
     ///
-    /// Returns a message when `q_norm` is not in `(0, 1]` or
+    /// [`MethodError::Invalid`] when `q_norm` is not in `(0, 1]` or
     /// `max_interaction` is 0.
-    pub fn new(q_norm: f64, max_interaction: Option<usize>) -> Result<Self, String> {
+    pub fn new(q_norm: f64, max_interaction: Option<usize>) -> Result<Self, MethodError> {
         if !(q_norm > 0.0 && q_norm <= 1.0) {
-            return Err(format!(
+            return Err(MethodError::Invalid(format!(
                 "The q-norm of a polynomial chaos basis must be in (0, 1], got {q_norm}"
-            ));
+            )));
         }
         if max_interaction == Some(0) {
-            return Err(
+            return Err(MethodError::Invalid(
                 "The largest interaction order of a polynomial chaos basis must be at least 1, \
                  got 0"
                     .to_string(),
-            );
+            ));
         }
         Ok(Self {
             q_norm,
@@ -119,25 +119,27 @@ impl ChaosExpansion {
     ///
     /// # Errors
     ///
-    /// Returns a message when there is no input, or a row of coefficients
-    /// has not one value per term.
+    /// [`MethodError::Invalid`] when there is no input, or a row of
+    /// coefficients has not one value per term.
     pub fn new(
         inputs: usize,
         degree: usize,
         truncation: Truncation,
         coefficients: Vec<Vec<f64>>,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, MethodError> {
         if inputs == 0 {
-            return Err("Polynomial chaos needs at least one input".to_string());
+            return Err(MethodError::Invalid(
+                "Polynomial chaos needs at least one input".to_string(),
+            ));
         }
         let indices = basis(inputs, degree, truncation);
         if let Some(row) = coefficients.iter().find(|row| row.len() != indices.len()) {
-            return Err(format!(
+            return Err(MethodError::Invalid(format!(
                 "An expansion of degree {degree} in {inputs} inputs has {} terms; a row of \
                  coefficients has {}",
                 indices.len(),
                 row.len()
-            ));
+            )));
         }
         Ok(Self {
             degree,
@@ -181,8 +183,8 @@ impl ChaosExpansion {
     ///
     /// # Errors
     ///
-    /// [`PredictiveError::NotANumber`] with the first quantity that is NaN at
-    /// a point, before any fit; [`PredictiveError::Mismatch`] when the points
+    /// [`MethodError::Prediction`] of [`PredictiveError::NotANumber`](crate::predictive::PredictiveError::NotANumber) with the first quantity that is NaN at
+    /// a point, before any fit; [`MethodError::Invalid`] when the points
     /// and the outputs differ in number, there is no input, there are not
     /// more points than terms, or the polynomials of the points are
     /// collinear.
@@ -191,9 +193,9 @@ impl ChaosExpansion {
         outputs: &[Vec<f64>],
         degree: usize,
         truncation: Truncation,
-    ) -> Result<Self, PredictiveError> {
+    ) -> Result<Self, MethodError> {
         check_numbers(outputs)?;
-        Self::least_squares(unit, outputs, degree, truncation).map_err(PredictiveError::Mismatch)
+        Self::least_squares(unit, outputs, degree, truncation).map_err(MethodError::Invalid)
     }
 
     fn least_squares(
@@ -615,12 +617,14 @@ mod tests {
             assert!(
                 Truncation::new(q, None)
                     .unwrap_err()
+                    .to_string()
                     .contains("must be in (0, 1]")
             );
         }
         assert!(
             Truncation::new(0.5, Some(0))
                 .unwrap_err()
+                .to_string()
                 .contains("at least 1")
         );
         let truncation = Truncation::new(0.5, Some(3)).unwrap();
@@ -708,6 +712,7 @@ mod tests {
         assert!(
             ChaosExpansion::new(2, 1, Truncation::TOTAL_DEGREE, vec![vec![1.0, 2.0]])
                 .unwrap_err()
+                .to_string()
                 .contains("3 terms")
         );
         assert!(ChaosExpansion::new(0, 1, Truncation::TOTAL_DEGREE, vec![]).is_err());

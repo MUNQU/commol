@@ -9,13 +9,12 @@ use commol_calibration::{
     OptimizationConfig,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
-use commol_inference::PredictiveError;
 use commol_inference::conformal::{
-    AdaptiveLevel, ConformalError, ConformalSettings, NonconformityScore, Pooling, Predictor,
-    adaptive_conformal, conformal_quantile, enbpi, jackknife_plus, rolling_conformal, scales,
-    split_conformal,
+    AdaptiveLevel, ConformalSettings, NonconformityScore, Pooling, Predictor, adaptive_conformal,
+    conformal_quantile, enbpi, jackknife_plus, rolling_conformal, scales, split_conformal,
 };
 use commol_inference::resampling::{BlockScheme, ReplicateRunner};
+use commol_inference::{MethodError, PredictiveError};
 
 /// One output `x = c` at every position; a run with `c` above `cap`
 /// fails.
@@ -137,9 +136,9 @@ fn settings(score: NonconformityScore) -> ConformalSettings {
     ConformalSettings::new(score, Pooling::Series, 0.5).unwrap()
 }
 
-fn invalid(result: Result<impl std::fmt::Debug, ConformalError>) -> String {
+fn invalid(result: Result<impl std::fmt::Debug, MethodError>) -> String {
     match result {
-        Err(ConformalError::Invalid(message)) => message,
+        Err(MethodError::Invalid(message)) => message,
         other => panic!("not rejected as invalid: {other:?}"),
     }
 }
@@ -186,18 +185,23 @@ fn an_adaptive_level_or_step_out_of_range_is_rejected() {
 #[test]
 fn scores_and_poolings_name_their_valid_values() {
     for name in [None, Some("other")] {
-        let score = NonconformityScore::from_name(name).unwrap_err();
+        let score = NonconformityScore::from_name(name).unwrap_err().to_string();
         assert!(
             score.contains("\"absolute\", \"normalized\" or \"spread\""),
             "{score}"
         );
-        let by = Pooling::from_name(name).unwrap_err();
+        let by = Pooling::from_name(name).unwrap_err().to_string();
         assert!(by.contains("\"series\" or \"all\""), "{by}");
     }
     let pair = ConformalSettings::new(NonconformityScore::Normalized, Pooling::Series, 0.9);
-    assert!(pair.unwrap_err().contains("by=\"all\""));
+    assert!(pair.unwrap_err().to_string().contains("by=\"all\""));
     let level = ConformalSettings::new(NonconformityScore::Absolute, Pooling::All, 1.0);
-    assert!(level.unwrap_err().contains("strictly between 0 and 1"));
+    assert!(
+        level
+            .unwrap_err()
+            .to_string()
+            .contains("strictly between 0 and 1")
+    );
 }
 
 #[test]
@@ -207,24 +211,24 @@ fn a_score_without_its_scale_is_rejected() {
     other.label = "y".to_string();
 
     let normalized = scales(NonconformityScore::Normalized, &observed, &[other], None);
-    assert!(normalized.unwrap_err().contains("none of 'y'"));
+    assert!(normalized.unwrap_err().to_string().contains("none of 'y'"));
     let spread = scales(NonconformityScore::Spread, &observed, &observed, None);
-    assert!(spread.unwrap_err().contains("give a sample"));
+    assert!(spread.unwrap_err().to_string().contains("give a sample"));
     let flat = scales(
         NonconformityScore::Spread,
         &observed[..1],
         &observed[..1],
         Some(&[0.0]),
     );
-    assert!(flat.unwrap_err().contains("positive spread"));
+    assert!(flat.unwrap_err().to_string().contains("positive spread"));
 }
 
 #[test]
 fn a_conformal_error_says_why() {
-    let error = ConformalError::from(PredictiveError::Mismatch("names differ".to_string()));
+    let error = MethodError::from(PredictiveError::Mismatch("names differ".to_string()));
     assert_eq!(error.to_string(), "names differ");
     assert_eq!(
-        ConformalError::Failed("no fit".to_string()).to_string(),
+        MethodError::Failed("no fit".to_string()).to_string(),
         "no fit"
     );
 }
@@ -300,7 +304,7 @@ fn jackknife_plus_needs_two_blocks_and_two_refits() {
     let runner = ReplicateRunner::new(&half, &config, &[10.0], 1, 1).unwrap();
     let two_blocks = BlockScheme::new(half.observed_data(), 5).unwrap();
     match jackknife_plus(&runner, &two_blocks, &[11.0], absolute) {
-        Err(ConformalError::Failed(message)) => assert!(
+        Err(MethodError::Failed(message)) => assert!(
             message.starts_with("Only 1 of 2 blocks fitted, and the method needs 2"),
             "{message}"
         ),
@@ -375,9 +379,9 @@ fn an_enbpi_replicate_with_no_weight_is_a_failed_refit() {
     assert_eq!(run.scores.len(), 9);
 }
 
-fn failed(result: Result<impl std::fmt::Debug, ConformalError>) -> String {
+fn failed(result: Result<impl std::fmt::Debug, MethodError>) -> String {
     match result {
-        Err(ConformalError::Failed(message)) => message,
+        Err(MethodError::Failed(message)) => message,
         other => panic!("not a failure: {other:?}"),
     }
 }

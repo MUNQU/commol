@@ -420,7 +420,9 @@ fn a_residual_is_added_or_multiplies_by_its_exponential() {
 #[test]
 fn the_multiplicative_scale_needs_positive_values() {
     let problem = line_problem(&[1.0, 0.0, 2.0]);
-    let error = Residuals::new(&problem, &[1.0, 0.0], ResidualScale::Multiplicative).unwrap_err();
+    let error = Residuals::new(&problem, &[1.0, 0.0], ResidualScale::Multiplicative)
+        .unwrap_err()
+        .to_string();
     assert!(error.contains("Observation 'x' at 1"), "{error}");
     assert!(error.contains("residual_scale=\"additive\""), "{error}");
 }
@@ -574,7 +576,8 @@ fn a_failed_replicate_is_reported_not_sampled() {
         },
         3,
     )
-    .unwrap_err();
+    .unwrap_err()
+    .to_string();
     assert!(
         error.starts_with(
             "Every replicate failed: 0 of 3 replicates fitted, and the method needs 1; the \
@@ -662,7 +665,7 @@ fn a_jackknife_needs_two_blocks() {
     let config = config();
     let runner = ReplicateRunner::new(&problem, &config, &[1.0, 1.0], 1, 0).unwrap();
     let scheme = BlockScheme::new(problem.observed_data(), 3).unwrap();
-    let error = block_jackknife(&runner, &scheme).unwrap_err();
+    let error = block_jackknife(&runner, &scheme).unwrap_err().to_string();
     assert!(error.contains("block_length 3 makes 1 block"), "{error}");
 }
 
@@ -752,8 +755,12 @@ fn a_runner_takes_a_start_and_one_fit_value_per_parameter() {
     let problem = line_problem(&[1.0, 2.0, 3.0]);
     let config = config();
 
-    let starts = ReplicateRunner::new(&problem, &config, &[1.0, 1.0], 0, 0).err();
-    let fit = ReplicateRunner::new(&problem, &config, &[1.0], 1, 0).err();
+    let starts = ReplicateRunner::new(&problem, &config, &[1.0, 1.0], 0, 0)
+        .err()
+        .map(|error| error.to_string());
+    let fit = ReplicateRunner::new(&problem, &config, &[1.0], 1, 0)
+        .err()
+        .map(|error| error.to_string());
 
     assert_eq!(
         starts.as_deref(),
@@ -775,7 +782,7 @@ fn a_jackknife_whose_fits_all_fail_says_every_block_failed() {
     });
     let runner = ReplicateRunner::new(&problem, &broken, &[1.0, 1.0], 2, 0).unwrap();
 
-    let error = block_jackknife(&runner, &scheme).unwrap_err();
+    let error = block_jackknife(&runner, &scheme).unwrap_err().to_string();
 
     assert!(
         error.starts_with(
@@ -800,7 +807,7 @@ fn a_jackknife_with_one_fitted_block_says_how_many_fitted() {
     let runner = ReplicateRunner::new(&problem, &config, &[20.0], 1, 0).unwrap();
     let scheme = BlockScheme::new(problem.observed_data(), 1).unwrap();
 
-    let error = block_jackknife(&runner, &scheme).unwrap_err();
+    let error = block_jackknife(&runner, &scheme).unwrap_err().to_string();
 
     assert!(
         error.starts_with(
@@ -868,15 +875,24 @@ fn a_name_gives_its_setting_and_an_unknown_name_lists_the_names() {
         Ok(Multipliers::Mammen)
     ));
     assert_eq!(
-        ResidualScale::from_name("log").err().as_deref(),
+        ResidualScale::from_name("log")
+            .err()
+            .map(|error| error.to_string())
+            .as_deref(),
         Some("residual_scale is 'log'; it must be \"additive\" or \"multiplicative\"")
     );
     assert_eq!(
-        ResidualBlocks::from_name("circular").err().as_deref(),
+        ResidualBlocks::from_name("circular")
+            .err()
+            .map(|error| error.to_string())
+            .as_deref(),
         Some("scheme is 'circular'; it must be \"moving\" or \"stationary\"")
     );
     assert_eq!(
-        Multipliers::from_name("gauss").err().as_deref(),
+        Multipliers::from_name("gauss")
+            .err()
+            .map(|error| error.to_string())
+            .as_deref(),
         Some("multipliers is 'gauss'; it must be \"rademacher\" or \"mammen\"")
     );
 }
@@ -890,7 +906,7 @@ fn a_bootstrap_of_a_parameter_named_twice_has_no_sample() {
     let scheme = BlockScheme::new(problem.observed_data(), 1).unwrap();
     let resampler = BayesianBootstrap::new(problem.observed_data(), &scheme);
 
-    let error = bootstrap(&runner, &resampler, 2).unwrap_err();
+    let error = bootstrap(&runner, &resampler, 2).unwrap_err().to_string();
 
     assert_eq!(error, "A sample names 'k' twice; one name per column");
 }

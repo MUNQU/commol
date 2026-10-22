@@ -12,10 +12,10 @@
 use commol_calibration::CalibrationProblem;
 use commol_core::SimulationEngine;
 
-use super::LocalError;
 use super::approximation::{CurvatureKind, curvature_at};
 use super::curvature::Curvature;
 use super::gaussian::{Gaussian, inverse};
+use crate::error::MethodError;
 use crate::resampling::{BlockDrawing, BlockScheme, automatic_block_length};
 use crate::sensitivity::Matrix;
 
@@ -25,10 +25,10 @@ use crate::sensitivity::Matrix;
 ///
 /// # Errors
 ///
-/// [`LocalError::Refused`] when there are not more blocks than parameters,
+/// [`MethodError::Invalid`] when there are not more blocks than parameters,
 /// since `B` would have rank below the parameters, or when `H` or the
 /// sandwich is singular.
-pub fn sandwich(curvature: &Curvature, blocks: &BlockScheme) -> Result<Gaussian, LocalError> {
+pub fn sandwich(curvature: &Curvature, blocks: &BlockScheme) -> Result<Gaussian, MethodError> {
     let meat = block_meat(curvature, blocks)?;
     let bread = inverse(curvature.matrix())?;
     let covariance = &bread * meat * &bread;
@@ -45,9 +45,9 @@ pub fn sandwich(curvature: &Curvature, blocks: &BlockScheme) -> Result<Gaussian,
 ///
 /// # Errors
 ///
-/// [`LocalError::Refused`] when there are not more blocks than parameters,
+/// [`MethodError::Invalid`] when there are not more blocks than parameters,
 /// since `B` would have rank below the parameters.
-pub fn block_meat(curvature: &Curvature, blocks: &BlockScheme) -> Result<Matrix, LocalError> {
+pub fn block_meat(curvature: &Curvature, blocks: &BlockScheme) -> Result<Matrix, MethodError> {
     let count = blocks.count();
     let p = curvature.fit().len();
     if count <= p {
@@ -58,7 +58,7 @@ pub fn block_meat(curvature: &Curvature, blocks: &BlockScheme) -> Result<Matrix,
                 format!("{n} {word}s")
             }
         };
-        return Err(LocalError::Refused(format!(
+        return Err(MethodError::Invalid(format!(
             "block_length {} makes {} for {}: the sum of the scores over blocks needs more \
              blocks than parameters, or its rank is below the parameters. Use shorter blocks",
             blocks.length(),
@@ -95,13 +95,13 @@ pub type Estimates = Vec<(String, f64)>;
 ///
 /// # Errors
 ///
-/// [`LocalError::Refused`] when the block length does not fit the
+/// [`MethodError::Invalid`] when the block length does not fit the
 /// positions.
 pub fn blocks_at<E: SimulationEngine>(
     problem: &CalibrationProblem<E>,
     curvature: &Curvature,
     block_length: Option<usize>,
-) -> Result<(BlockScheme, Option<Estimates>), LocalError> {
+) -> Result<(BlockScheme, Option<Estimates>), MethodError> {
     let observed = problem.observed_data();
     let (length, estimates) = match block_length {
         Some(length) => (length, None),
@@ -116,7 +116,7 @@ pub fn blocks_at<E: SimulationEngine>(
             (automatic.length, Some(automatic.estimates))
         }
     };
-    let blocks = BlockScheme::new(observed, length).map_err(LocalError::Refused)?;
+    let blocks = BlockScheme::new(observed, length)?;
     Ok((blocks, estimates))
 }
 
@@ -141,14 +141,14 @@ pub struct SandwichRun {
 ///
 /// # Errors
 ///
-/// As [`curvature_at`] and [`sandwich`], and [`LocalError::Refused`] when
+/// As [`curvature_at`] and [`sandwich`], and [`MethodError::Invalid`] when
 /// the block length does not fit the positions.
 pub fn sandwich_approximation<E>(
     problem: &CalibrationProblem<E>,
     fit: &[f64],
     kind: CurvatureKind,
     block_length: Option<usize>,
-) -> Result<SandwichRun, LocalError>
+) -> Result<SandwichRun, MethodError>
 where
     E: SimulationEngine + Send + Sync,
 {

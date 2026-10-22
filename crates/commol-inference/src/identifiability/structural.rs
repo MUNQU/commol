@@ -16,7 +16,8 @@
 
 use commol_calibration::start_points;
 
-use super::{IdentifiabilityError, skippable};
+use super::skippable;
+use crate::error::MethodError;
 use crate::sensitivity::{Matrix, SensitivitySource};
 
 /// Below this projection on the null space a parameter is identifiable.
@@ -84,17 +85,17 @@ pub struct StructuralAnalysis {
 ///
 /// # Errors
 ///
-/// [`IdentifiabilityError::Invalid`] when `points` is 0;
-/// [`IdentifiabilityError::NoFeasiblePoint`] when every point is infeasible;
-/// [`IdentifiabilityError::Sensitivity`] when the sensitivities fail for
+/// [`MethodError::Invalid`] when `points` is 0;
+/// [`MethodError::NoFeasiblePoint`] when every point is infeasible;
+/// [`MethodError::Sensitivity`] when the sensitivities fail for
 /// another reason.
 pub fn structural_rank<S: SensitivitySource>(
     source: &S,
     points: usize,
     seed: u64,
-) -> Result<StructuralAnalysis, IdentifiabilityError> {
+) -> Result<StructuralAnalysis, MethodError> {
     if points == 0 {
-        return Err(IdentifiabilityError::Invalid(
+        return Err(MethodError::Invalid(
             "A structural rank needs at least one point".to_string(),
         ));
     }
@@ -112,7 +113,7 @@ pub fn structural_rank<S: SensitivitySource>(
                 skipped.push(error.to_string());
                 continue;
             }
-            Err(error) => return Err(IdentifiabilityError::Sensitivity(error)),
+            Err(error) => return Err(MethodError::Sensitivity(error)),
         };
         let threshold = sensitivities.errors.norm();
         let (singular_values, right) = singular_decomposition(&sensitivities.jacobian);
@@ -126,7 +127,7 @@ pub fn structural_rank<S: SensitivitySource>(
         });
     }
     if ranks.is_empty() {
-        return Err(IdentifiabilityError::NoFeasiblePoint {
+        return Err(MethodError::NoFeasiblePoint {
             points,
             reasons: skipped,
         });

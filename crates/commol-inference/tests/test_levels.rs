@@ -72,10 +72,12 @@ fn every_confidence_level_has_one_check() {
         interval_levels(0.0).unwrap_err(),
         sample().interval(0.0).unwrap_err(),
         coverage(&draws, &[1.5], 0.0).unwrap_err(),
-        ConformalSettings::new(NonconformityScore::Absolute, Pooling::All, 0.0).unwrap_err(),
-        AdaptiveLevel::new(0.0, 0.01).unwrap_err(),
-        chi_square(&problem, 0.0).unwrap_err(),
-        beale(&problem, 1.0, 0.0).unwrap_err(),
+        ConformalSettings::new(NonconformityScore::Absolute, Pooling::All, 0.0)
+            .unwrap_err()
+            .to_string(),
+        AdaptiveLevel::new(0.0, 0.01).unwrap_err().to_string(),
+        chi_square(&problem, 0.0).unwrap_err().to_string(),
+        beale(&problem, 1.0, 0.0).unwrap_err().to_string(),
         bootstrap_thresholds(
             &runner,
             &resampler,
@@ -84,7 +86,8 @@ fn every_confidence_level_has_one_check() {
             &[0.1],
             0.0,
         )
-        .unwrap_err(),
+        .unwrap_err()
+        .to_string(),
     ];
 
     for error in errors {
@@ -105,19 +108,29 @@ fn every_share_has_one_check() {
             "target_cess",
             SmcSampler::new(10, RandomWalk::new(), 0.5, 1.0, 0.1)
                 .err()
-                .unwrap(),
+                .unwrap()
+                .to_string(),
         ),
         (
             "stay_probability",
             SmcSampler::new(10, RandomWalk::new(), 0.5, 0.5, 1.0)
                 .err()
-                .unwrap(),
+                .unwrap()
+                .to_string(),
         ),
         (
             "min_acceptance",
-            sampler().unwrap().with_min_acceptance(1.0).err().unwrap(),
+            sampler()
+                .unwrap()
+                .with_min_acceptance(1.0)
+                .err()
+                .unwrap()
+                .to_string(),
         ),
-        ("quantile", abc_rejection(&target, 10, 1.0, 0).unwrap_err()),
+        (
+            "quantile",
+            abc_rejection(&target, 10, 1.0, 0).unwrap_err().to_string(),
+        ),
         (
             "correlation_threshold",
             sample_identifiability(&sample(), Reference::Bounds, 1.0)

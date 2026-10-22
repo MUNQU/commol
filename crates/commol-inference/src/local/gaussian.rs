@@ -4,9 +4,9 @@
 use commol_random::{Generator, stream_seed};
 use nalgebra::DVector;
 
-use super::LocalError;
 use super::curvature::Curvature;
 use crate::distribution::{Distribution, Family};
+use crate::error::MethodError;
 use crate::sensitivity::Matrix;
 use crate::smc::kernel::standard_normals;
 use crate::transform::Transform;
@@ -32,18 +32,18 @@ impl Gaussian {
     ///
     /// # Errors
     ///
-    /// [`LocalError::Refused`] when the covariance is not positive definite.
+    /// [`MethodError::Invalid`] when the covariance is not positive definite.
     pub fn new(
         transform: Transform,
         center: Vec<f64>,
         covariance: Matrix,
         degrees_of_freedom: Option<f64>,
-    ) -> Result<Self, LocalError> {
+    ) -> Result<Self, MethodError> {
         let factor = covariance
             .clone()
             .cholesky()
             .ok_or_else(|| {
-                LocalError::Refused(
+                MethodError::Invalid(
                     "The covariance is not positive definite: the data do not determine every \
                      parameter at the fit. Calibrator.identifiability(...) shows which"
                         .to_string(),
@@ -154,8 +154,8 @@ impl Gaussian {
 ///
 /// # Errors
 ///
-/// [`LocalError::Refused`] when the curvature is not positive definite.
-pub fn laplace(curvature: &Curvature) -> Result<Gaussian, LocalError> {
+/// [`MethodError::Invalid`] when the curvature is not positive definite.
+pub fn laplace(curvature: &Curvature) -> Result<Gaussian, MethodError> {
     let covariance = inverse(curvature.matrix())?;
     Gaussian::new(
         curvature.transform().clone(),
@@ -170,14 +170,14 @@ pub fn laplace(curvature: &Curvature) -> Result<Gaussian, LocalError> {
 ///
 /// # Errors
 ///
-/// [`LocalError::Refused`] when the matrix is not positive definite.
-pub(crate) fn inverse(matrix: &Matrix) -> Result<Matrix, LocalError> {
+/// [`MethodError::Invalid`] when the matrix is not positive definite.
+pub(crate) fn inverse(matrix: &Matrix) -> Result<Matrix, MethodError> {
     matrix
         .clone()
         .cholesky()
         .map(|cholesky| cholesky.inverse())
         .ok_or_else(|| {
-            LocalError::Refused(
+            MethodError::Invalid(
                 "The curvature at the fit is not positive definite: the data do not \
                  determine every parameter there, or the fit is not a minimum. \
                  Calibrator.identifiability(...) shows which parameters the data determine"

@@ -9,8 +9,7 @@
 use commol_calibration::{CalibrationProblem, ObservedDataPoint};
 use commol_core::SimulationEngine;
 
-use super::LocalError;
-use super::curvature::sensitivity_error;
+use crate::error::MethodError;
 use crate::sensitivity::{FiniteDifferences, Matrix, SensitivityError, SensitivitySource};
 use crate::special::{normal_quantile, student_t_quantile};
 use crate::statistics::interval_levels;
@@ -36,9 +35,9 @@ pub struct DeltaBand {
 ///
 /// # Errors
 ///
-/// [`LocalError::Refused`] when the confidence level is not strictly between
+/// [`MethodError::Invalid`] when the confidence level is not strictly between
 /// 0 and 1, a position is one the engine rejects, or the engine is
-/// stochastic; [`LocalError::Failed`] when the derivatives fail.
+/// stochastic; [`MethodError::Failed`] when the derivatives fail.
 pub fn delta_band<E>(
     problem: &CalibrationProblem<E>,
     fit: &[f64],
@@ -46,11 +45,11 @@ pub fn delta_band<E>(
     degrees_of_freedom: Option<f64>,
     positions: &[f64],
     confidence_level: f64,
-) -> Result<DeltaBand, LocalError>
+) -> Result<DeltaBand, MethodError>
 where
     E: SimulationEngine + Send + Sync,
 {
-    let [_, upper_level] = interval_levels(confidence_level).map_err(LocalError::Refused)?;
+    let [_, upper_level] = interval_levels(confidence_level).map_err(MethodError::Invalid)?;
     let quantile = match degrees_of_freedom {
         Some(df) => student_t_quantile(upper_level, df),
         None => normal_quantile(upper_level),
@@ -67,10 +66,10 @@ where
     // A position the engine rejects is the caller's.
     let source =
         FiniteDifferences::of_observations(problem, observations).map_err(|error| match error {
-            SensitivityError::Failed(message) => LocalError::Refused(message),
-            error => sensitivity_error(error),
+            SensitivityError::Failed(message) => MethodError::Invalid(message),
+            error => MethodError::Sensitivity(error),
         })?;
-    let sensitivities = source.jacobian(fit).map_err(sensitivity_error)?;
+    let sensitivities = source.jacobian(fit).map_err(MethodError::Sensitivity)?;
     let derivatives = Transform::new(&problem.parameter_bounds()).derivatives(fit);
     let p = fit.len();
     let mut center = Vec::with_capacity(outputs.len());

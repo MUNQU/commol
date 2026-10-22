@@ -115,6 +115,12 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
       its result has `failed` (the entries of `FitUnit::failed`, logged as
       warnings) and `not_converged` at the top
       ([Design decisions](decisions/results.md#fits-that-fail-have-one-place)).
+- [ ] Every public function of the method returns `MethodError`, of the
+      kind `Invalid` for a setting, an input, the data or the model that does
+      not fit the method, and `Failed` for a computation that fails; the
+      binding maps it with `method_error`, and the "Raises" section of its
+      docstring lists `ValueError` and `RuntimeError` by that rule
+      ([Design decisions](decisions/uncertainty.md#methods-raise-one-error-type)).
 - [ ] `register(YourMethod, runner)` in `api/inference/registry.py` (import it
       from `commol.api.inference`).
 - [ ] A coverage study (`tests/support/coverage.py`, marker `coverage_study`)

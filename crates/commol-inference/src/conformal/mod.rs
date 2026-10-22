@@ -38,32 +38,3 @@ pub use quantile::{conformal_quantile, group_quantiles, lower_quantile, upper_qu
 pub use rolling::rolling_conformal;
 pub use score::{ConformalSettings, NonconformityScore, Pooling, scales};
 pub use split::split_conformal;
-
-use crate::predictive::PredictiveError;
-
-/// Why a conformal method gave no intervals.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ConformalError {
-    /// The settings or the data do not fit the method; the message says
-    /// why.
-    Invalid(String),
-    /// A point could not be predicted.
-    Prediction(PredictiveError),
-    /// The method's refits failed; the message gives the first reasons.
-    Failed(String),
-}
-
-impl From<PredictiveError> for ConformalError {
-    fn from(error: PredictiveError) -> Self {
-        Self::Prediction(error)
-    }
-}
-
-impl std::fmt::Display for ConformalError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Invalid(message) | Self::Failed(message) => f.write_str(message),
-            Self::Prediction(error) => error.fmt(f),
-        }
-    }
-}
