@@ -3095,7 +3095,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#090-2026-10-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.9.0] - 2026-10-22
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.9.0] - 2026-10-22">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3687,7 +3698,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#090-2026-10-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.9.0] - 2026-10-22
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.9.0] - 2026-10-22">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4254,22 +4276,30 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h2 id="090-2026-10-22">[0.9.0] - 2026-10-22<a class="headerlink" href="#090-2026-10-22" title="Permanent link">&para;</a></h2>
+<p>This release gives control over the work of a calibration and over what a
+result records. <code>commol.threads(n, levels)</code> sets how many threads the parallel
+methods use and which levels run in parallel, a particle swarm can stop when
+it has converged, a polynomial chaos takes a truncated basis for many inputs,
+and <code>Ratio</code> gives a sensitivity analysis the ratio of two quantities. A
+calibration result records its seed, and <code>commol.build_info()</code> names the
+version and the commit of the package. Before you upgrade, read the
+<strong>Breaking</strong> entry: <code>CalibrationResult</code> requires <code>seed</code>. See
+<a href="../../guide/parallelism/">Parallelism</a> and
+<a href="../../guide/uncertainty/sensitivity/">Sensitivity Analysis</a>.</p>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
-<!-- Added #226 -->
-
 <ul>
-<li><code>PolynomialChaos(q_norm=..., max_interaction=...)</code>: a truncated basis for
+<li>
+<p><code>PolynomialChaos(q_norm=..., max_interaction=...)</code>: a truncated basis for
   many inputs. <code>max_interaction</code> keeps the terms of at most that many inputs,
   and <code>q_norm</code>, in <code>(0, 1]</code>, the terms whose degrees have
   <code>Σ α_i^q ≤ degree^q</code>; the defaults keep the total-degree basis. 20 inputs
   at degree 4 with <code>max_interaction=2</code> have 1,221 terms instead of 10,626,
   and the number is known before any run. <code>ChaosResult</code> records both. See
-  <a href="../../guide/uncertainty/sensitivity/#bases-for-many-inputs">Bases for many inputs</a>.</li>
-</ul>
-<!-- Added #230 -->
-
-<ul>
-<li><code>ParticleSwarmConfig.improvement_stop(window=..., tol_abs=..., tol_rel=...)</code>
+  <a href="../../guide/uncertainty/sensitivity/#bases-for-many-inputs">Bases for many inputs</a>.</p>
+</li>
+<li>
+<p><code>ParticleSwarmConfig.improvement_stop(window=..., tol_abs=..., tol_rel=...)</code>
   and <code>ParticleSwarmConfig.radius_stop(tol)</code>: a particle swarm stops when its
   best loss improved by at most <code>tol_abs + tol_rel·|best loss|</code> over the last
   <code>window</code> iterations, or when every particle is within <code>tol</code> of the best
@@ -4277,12 +4307,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   default and have no default values. A run that stops by a rule reports
   <code>converged=True</code>, so a profile that holds a prediction with a swarm also
   converges. See
-  <a href="../../guide/calibration-optimizers/#stop-rules">Stop rules</a>.</li>
-</ul>
-<!-- Added #239 -->
-
-<ul>
-<li><code>commol.set_threads(n)</code>, the context manager <code>commol.threads(n, levels)</code>,
+  <a href="../../guide/calibration-optimizers/#stop-rules">Stop rules</a>.</p>
+</li>
+<li>
+<p><code>commol.set_threads(n)</code>, the context manager <code>commol.threads(n, levels)</code>,
   <code>commol.get_threads()</code> and <code>commol.get_levels()</code> choose the number of
   threads of every parallel method and the levels that run in parallel. The
   setting holds per Python thread (<code>contextvars</code>); without it, commol uses
@@ -4290,33 +4318,27 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   iteration in parallel, in the order of the particles, with
   <code>levels="all"</code>, the default; <code>levels="outer"</code> keeps them in order. A seed
   gives the same result, history included, with any number of threads and
-  either level. See <a href="../../guide/parallelism/">Threads and Parallelism</a>.</li>
-</ul>
-<!-- Added #252 -->
-
-<ul>
-<li>A calibration result records the seed it used, <code>CalibrationResult.seed</code>
+  either level. See <a href="../../guide/parallelism/">Threads and Parallelism</a>.</p>
+</li>
+<li>
+<p>A calibration result records the seed it used, <code>CalibrationResult.seed</code>
   (<code>Calibrator.seed</code>: <code>problem.seed</code>, or the seed the calibrator drew), and
   the sample of every uncertainty method and of <code>Calibrator.point_sample</code>
   names it in <code>method.settings["seed"]</code>. Set as <code>problem.seed</code>, it repeats
   the run, also from a result read back from JSON. See
-  <a href="../../guide/calibration-optimizers/#reproducibility">Reproducibility</a>.</li>
-</ul>
-<!-- Added #253 -->
-
-<ul>
-<li><code>commol.__version__</code> gives the installed version, and <code>commol.build_info()</code>
+  <a href="../../guide/calibration-optimizers/#reproducibility">Reproducibility</a>.</p>
+</li>
+<li>
+<p><code>commol.__version__</code> gives the installed version, and <code>commol.build_info()</code>
   gives a <code>BuildInfo</code> with the version and the full commit the extension was
   built from (<code>None</code> when the source has no git metadata, such as a source
   distribution). A build that is not a release, such as an install from a
   git commit, names its commit as a PEP 440 local version:
   <code>0.1.0+g&lt;first 7 characters of the commit&gt;</code>. See
-  <a href="../../getting-started/installation/#check-the-installation">Check the installation</a>.</li>
-</ul>
-<!-- Added #282 -->
-
-<ul>
-<li><code>Ratio(numerator, denominator, replicates)</code> is a quantity of interest: one
+  <a href="../../getting-started/installation/#check-the-installation">Check the installation</a>.</p>
+</li>
+<li>
+<p><code>Ratio(numerator, denominator, replicates)</code> is a quantity of interest: one
   <code>ValueAt</code>, <code>Gain</code> or <code>Peak</code> over another, in each run, so PRCC, Morris,
   Sobol and a polynomial chaos read a ratio whose denominator depends on the
   inputs. <code>replicates</code> is required: with a stochastic engine, a point of a
@@ -4324,64 +4346,43 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   of the replicates with a positive denominator (<code>"within_positive"</code>) or the
   ratio of the means (<code>"pooled"</code>). A denominator of 0 makes the ratio of a
   run NaN, and every method follows the NaN rule. See
-  <a href="../../guide/uncertainty/sensitivity/#a-ratio-of-two-quantities">A ratio of two quantities</a>.</li>
+  <a href="../../guide/uncertainty/sensitivity/#a-ratio-of-two-quantities">A ratio of two quantities</a>.</p>
+</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
-<!-- Changed #226 -->
-
-<!-- Changed #230 -->
-
 <ul>
-<li>The tolerance of a profile under a particle swarm with the improvement stop
+<li>
+<p>The tolerance of a profile under a particle swarm with the improvement stop
   rule is the improvement the rule allows at the fit,
   <code>tol_abs + tol_rel·|objective at the fit|</code>; without that rule it stays
   <code>1e-6·max(1, |objective at the fit|)</code>. See
-  <a href="../../guide/uncertainty/profiles/#verdicts-and-the-identifiability-report">Verdicts</a>.</li>
-</ul>
-<!-- Changed #239 -->
-
-<ul>
-<li>The parallel methods run in a thread pool of commol, not in the global pool
+  <a href="../../guide/uncertainty/profiles/#verdicts-and-the-identifiability-report">Verdicts</a>.</p>
+</li>
+<li>
+<p>The parallel methods run in a thread pool of commol, not in the global pool
   of <code>rayon</code>: the environment variable <code>RAYON_NUM_THREADS</code> no longer limits
   them; use <code>commol.set_threads</code>. A particle swarm, which scored its particles
-  one after the other, now scores them in parallel by default.</li>
+  one after the other, now scores them in parallel by default.</p>
+</li>
+<li>
+<p><strong>Breaking:</strong> <code>CalibrationResult</code> requires <code>seed</code>; a result saved by an
+  earlier version, or built by hand, needs one to load.</p>
+</li>
 </ul>
-<!-- Changed #252 -->
-
-<ul>
-<li><strong>Breaking:</strong> <code>CalibrationResult</code> requires <code>seed</code>; a result saved by an
-  earlier version, or built by hand, needs one to load.</li>
-</ul>
-<!-- Changed #253 -->
-
-<!-- Changed #282 -->
-
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
-<!-- Fixed #226 -->
-
-<!-- Fixed #230 -->
-
-<!-- Fixed #239 -->
-
-<!-- Fixed #252 -->
-
 <ul>
-<li>A particle swarm without <code>problem.seed</code> takes the seed the calibrator
+<li>
+<p>A particle swarm without <code>problem.seed</code> takes the seed the calibrator
   draws and logs, so that seed repeats it; before, it drew one of its own
-  that no result or log kept.</li>
-</ul>
-<!-- Fixed #253 -->
-
-<!-- Fixed #282 -->
-
-<!-- Fixed #320 -->
-
-<ul>
-<li>A profile that holds a prediction with a particle swarm scores its
+  that no result or log kept.</p>
+</li>
+<li>
+<p>A profile that holds a prediction with a particle swarm scores its
   particles in parallel only when the levels of <code>commol.threads</code> are
   <code>"all"</code>, and stops with the error of the first failing particle, as every
   other swarm does; before, it scored them in parallel at any level and
-  reported the error of any failing particle.</li>
+  reported the error of any failing particle.</p>
+</li>
 </ul>
 <h2 id="080-2026-10-22">[0.8.0] - 2026-10-22<a class="headerlink" href="#080-2026-10-22" title="Permanent link">&para;</a></h2>
 <p>This release compares runs. <code>Scenarios</code> runs every draw of a sample under
@@ -6135,6 +6136,7 @@ the details of these versions.</p>
 <h2 id="version-history">Version History<a class="headerlink" href="#version-history" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Unreleased</strong> - Current development version</li>
+<li><strong>0.9.0</strong> - Control over the work and the record: threads and levels, swarm stop rules, truncated chaos bases, ratios, seeds and build info</li>
 <li><strong>0.8.0</strong> - Comparing runs: scenarios, quantities of a series, figures as methods and runs on the same panels</li>
 <li><strong>0.7.0</strong> - Reading a run through objects: the window grid and dates on the axis, series by output name and reports as methods</li>
 <li><strong>0.6.1</strong> - Fixes of 0.6.0: checks at build, messages of infeasible draws, PRCC with NaN, quantity labels and starts, plots</li>
