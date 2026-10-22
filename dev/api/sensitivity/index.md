@@ -132,6 +132,32 @@ class SensitivityAnalysis:
         """
         return self._rust.predictive(sample.rust_sample, positions)
 
+    def with_model(self, model: "Model") -> "SensitivityAnalysis":
+        """
+        The same analysis on another model, with the same seed.
+
+        The draws of a predictive of the copy take the seeds they take here,
+        so `Scenarios` runs every scenario on common random numbers.
+
+        Parameters
+        ----------
+        model : Model
+            The model, such as a copy of this one with other parameter values.
+
+        Returns
+        -------
+        SensitivityAnalysis
+            An analysis of `model`, with `inputs`, `replicates` and `seed`.
+
+        Raises
+        ------
+        ValueError
+            If an input is not a value of `model`.
+        """
+        return SensitivityAnalysis(
+            Simulation(model), self.inputs, replicates=self.replicates, seed=self.seed
+        )
+
     def rust_observation_draws(
         self,
         sample: ParameterSample,
@@ -422,6 +448,64 @@ def rust_predictive(
         The runs, computed in Rust.
     """
     return self._rust.predictive(sample.rust_sample, positions)
+```
+
+#### with_model
+
+```python
+with_model(model: Model) -> SensitivityAnalysis
+```
+
+The same analysis on another model, with the same seed.
+
+The draws of a predictive of the copy take the seeds they take here, so `Scenarios` runs every scenario on common random numbers.
+
+Parameters:
+
+| Name    | Type    | Description                                                        | Default    |
+| ------- | ------- | ------------------------------------------------------------------ | ---------- |
+| `model` | `Model` | The model, such as a copy of this one with other parameter values. | *required* |
+
+Returns:
+
+| Type                  | Description                                             |
+| --------------------- | ------------------------------------------------------- |
+| `SensitivityAnalysis` | An analysis of model, with inputs, replicates and seed. |
+
+Raises:
+
+| Type         | Description                          |
+| ------------ | ------------------------------------ |
+| `ValueError` | If an input is not a value of model. |
+
+Source code in `commol/api/sensitivity.py`
+
+```python
+def with_model(self, model: "Model") -> "SensitivityAnalysis":
+    """
+    The same analysis on another model, with the same seed.
+
+    The draws of a predictive of the copy take the seeds they take here,
+    so `Scenarios` runs every scenario on common random numbers.
+
+    Parameters
+    ----------
+    model : Model
+        The model, such as a copy of this one with other parameter values.
+
+    Returns
+    -------
+    SensitivityAnalysis
+        An analysis of `model`, with `inputs`, `replicates` and `seed`.
+
+    Raises
+    ------
+    ValueError
+        If an input is not a value of `model`.
+    """
+    return SensitivityAnalysis(
+        Simulation(model), self.inputs, replicates=self.replicates, seed=self.seed
+    )
 ```
 
 #### rust_observation_draws

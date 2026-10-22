@@ -112,6 +112,73 @@ class Calibrator:
         """
         return self._rust_problem.predictive(sample.rust_sample, positions, self.seed)
 
+    def with_model(self, model: "Model") -> "Calibrator":
+        """
+        The same calibration problem on another model, with the same seed.
+
+        The draws of a predictive of the copy take the seeds they take here,
+        so `Scenarios` runs every scenario on common random numbers.
+
+        Parameters
+        ----------
+        model : Model
+            The model, such as a copy of this one with other parameter values.
+
+        Returns
+        -------
+        Calibrator
+            A calibrator of `model`, with `problem` and its seed set to
+            `seed`.
+
+        Raises
+        ------
+        ValueError
+            If a parameter, observation, position or constraint of the problem
+            does not fit `model`.
+        """
+        return Calibrator(
+            Simulation(model), self.problem.model_copy(update={"seed": self.seed})
+        )
+
+    def point_sample(self, result: CalibrationResult) -> ParameterSample:
+        """
+        The point estimate of a fit as a sample of one draw.
+
+        A `Predictive` or `Scenarios` of it runs the model at the fit, so a
+        fit is read as any sample is.
+
+        Parameters
+        ----------
+        result : CalibrationResult
+            A fit of this calibration problem.
+
+        Returns
+        -------
+        ParameterSample
+            One draw at ``result.best_parameters``, with the names and bounds
+            of the parameters of the problem and ``SampleMethod(name="point")``.
+
+        Raises
+        ------
+        ValueError
+            If the names of `result` are not those of the problem; the message
+            names the names that differ.
+        """
+        names = self.parameter_names
+        missing = [name for name in names if name not in result.best_parameters]
+        extra = [name for name in result.best_parameters if name not in names]
+        if missing or extra:
+            raise ValueError(
+                f"The result is not a fit of this problem: it lacks {missing} and "
+                f"has {extra}, which the problem does not have."
+            )
+        return ParameterSample.equally_weighted(
+            names,
+            [(p.min_bound, p.max_bound) for p in self.problem.parameters],
+            [[result.best_parameters[name] for name in names]],
+            SampleMethod(name="point"),
+        )
+
     def delta_band(
         self, result: LocalResult, positions: Sequence[float], confidence_level: float
     ) -> DeltaBand:
@@ -834,6 +901,137 @@ def rust_predictive(
         The runs, computed in Rust.
     """
     return self._rust_problem.predictive(sample.rust_sample, positions, self.seed)
+```
+
+#### with_model
+
+```python
+with_model(model: Model) -> Calibrator
+```
+
+The same calibration problem on another model, with the same seed.
+
+The draws of a predictive of the copy take the seeds they take here, so `Scenarios` runs every scenario on common random numbers.
+
+Parameters:
+
+| Name    | Type    | Description                                                        | Default    |
+| ------- | ------- | ------------------------------------------------------------------ | ---------- |
+| `model` | `Model` | The model, such as a copy of this one with other parameter values. | *required* |
+
+Returns:
+
+| Type         | Description                                                   |
+| ------------ | ------------------------------------------------------------- |
+| `Calibrator` | A calibrator of model, with problem and its seed set to seed. |
+
+Raises:
+
+| Type         | Description                                                                            |
+| ------------ | -------------------------------------------------------------------------------------- |
+| `ValueError` | If a parameter, observation, position or constraint of the problem does not fit model. |
+
+Source code in `commol/api/calibrator.py`
+
+```python
+def with_model(self, model: "Model") -> "Calibrator":
+    """
+    The same calibration problem on another model, with the same seed.
+
+    The draws of a predictive of the copy take the seeds they take here,
+    so `Scenarios` runs every scenario on common random numbers.
+
+    Parameters
+    ----------
+    model : Model
+        The model, such as a copy of this one with other parameter values.
+
+    Returns
+    -------
+    Calibrator
+        A calibrator of `model`, with `problem` and its seed set to
+        `seed`.
+
+    Raises
+    ------
+    ValueError
+        If a parameter, observation, position or constraint of the problem
+        does not fit `model`.
+    """
+    return Calibrator(
+        Simulation(model), self.problem.model_copy(update={"seed": self.seed})
+    )
+```
+
+#### point_sample
+
+```python
+point_sample(result: CalibrationResult) -> ParameterSample
+```
+
+The point estimate of a fit as a sample of one draw.
+
+A `Predictive` or `Scenarios` of it runs the model at the fit, so a fit is read as any sample is.
+
+Parameters:
+
+| Name     | Type                | Description                        | Default    |
+| -------- | ------------------- | ---------------------------------- | ---------- |
+| `result` | `CalibrationResult` | A fit of this calibration problem. | *required* |
+
+Returns:
+
+| Type              | Description                                                                                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `ParameterSample` | One draw at result.best_parameters, with the names and bounds of the parameters of the problem and SampleMethod(name="point"). |
+
+Raises:
+
+| Type         | Description                                                                                   |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| `ValueError` | If the names of result are not those of the problem; the message names the names that differ. |
+
+Source code in `commol/api/calibrator.py`
+
+```python
+def point_sample(self, result: CalibrationResult) -> ParameterSample:
+    """
+    The point estimate of a fit as a sample of one draw.
+
+    A `Predictive` or `Scenarios` of it runs the model at the fit, so a
+    fit is read as any sample is.
+
+    Parameters
+    ----------
+    result : CalibrationResult
+        A fit of this calibration problem.
+
+    Returns
+    -------
+    ParameterSample
+        One draw at ``result.best_parameters``, with the names and bounds
+        of the parameters of the problem and ``SampleMethod(name="point")``.
+
+    Raises
+    ------
+    ValueError
+        If the names of `result` are not those of the problem; the message
+        names the names that differ.
+    """
+    names = self.parameter_names
+    missing = [name for name in names if name not in result.best_parameters]
+    extra = [name for name in result.best_parameters if name not in names]
+    if missing or extra:
+        raise ValueError(
+            f"The result is not a fit of this problem: it lacks {missing} and "
+            f"has {extra}, which the problem does not have."
+        )
+    return ParameterSample.equally_weighted(
+        names,
+        [(p.min_bound, p.max_bound) for p in self.problem.parameters],
+        [[result.best_parameters[name] for name in names]],
+        SampleMethod(name="point"),
+    )
 ```
 
 #### delta_band

@@ -4045,6 +4045,22 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <!-- Added #246 -->
 
+<ul>
+<li><code>Scenarios(source, sample, scenarios, positions)</code> runs every draw of a
+  sample under each scenario, a set of parameter values that override those
+  of the model, and is a mapping from the name of a scenario to its
+  <code>Predictive</code>. Every scenario runs with the seed of the source, so run <code>k</code>
+  of each scenario is the same draw with the same seed (common random
+  numbers). <code>compare(name, baseline, quantities, confidence_level)</code> takes
+  the difference of each quantity of interest within each run and reduces
+  the differences with the weights of the runs; <code>summary</code> reduces one
+  scenario. Both give a <code>ScenarioSummary</code> per label, with no interval when
+  there is one run. <code>Predictive.quantities(quantities)</code> gives the quantities
+  of every draw, <code>Calibrator.point_sample(result)</code> the point estimate of a fit
+  as a sample of one draw, and <code>Calibrator.with_model</code> and
+  <code>SensitivityAnalysis.with_model</code> the same source on another model with the
+  same seed. See <a href="../../guide/uncertainty/#scenarios">Scenarios</a>.</li>
+</ul>
 <!-- Added #247 -->
 
 <ul>

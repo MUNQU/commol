@@ -3593,7 +3593,7 @@
 </tr>
 <tr>
 <td><code>api/inference/</code></td>
-<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), the scores (<code>api/inference/scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), the runners of the identifiability methods (<code>api/inference/identifiability.py</code>), which build the report, the runners of the resampling methods (<code>api/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>api/inference/smc.py</code>), of the local approximations (<code>api/inference/local.py</code>), of the conformal methods (<code>api/inference/conformal.py</code>), which build <code>ConformalResult</code>, of the sensitivity methods (<code>api/inference/global_sensitivity.py</code>), and of the profiles (<code>api/inference/profiles.py</code>), which build <code>ProfileResult</code>.</td>
+<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), <code>Scenarios</code>, the predictive of each scenario and their paired comparison (<code>scenarios.py</code>), the scores (<code>api/inference/scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), the runners of the identifiability methods (<code>api/inference/identifiability.py</code>), which build the report, the runners of the resampling methods (<code>api/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>api/inference/smc.py</code>), of the local approximations (<code>api/inference/local.py</code>), of the conformal methods (<code>api/inference/conformal.py</code>), which build <code>ConformalResult</code>, of the sensitivity methods (<code>api/inference/global_sensitivity.py</code>), and of the profiles (<code>api/inference/profiles.py</code>), which build <code>ProfileResult</code>.</td>
 <td>Transforms of predictions; quantile formulas.</td>
 </tr>
 <tr>
@@ -3909,9 +3909,9 @@
 <td><code>crates/commol-calibration/src/likelihood/density.rs</code> (<code>information</code>, <code>scores</code>), <code>discrepancy.rs</code> (<code>term_derivatives</code>), <code>py-commol/src/local.rs</code>, <code>py-commol/commol/context/inference/local.py</code>, <code>api/inference/local.py</code>, <code>docs/guide/uncertainty/local.md</code></td>
 </tr>
 <tr>
-<td>Change the parameter sample, the predictive, the scores or the quantile</td>
+<td>Change the parameter sample, the predictive, the scenarios, the scores or the quantile</td>
 <td><code>crates/commol-inference/src/sample.rs</code>, <code>predictive.rs</code>, <code>scores.rs</code>, <code>statistics.rs</code></td>
-<td><code>py-commol/commol/context/inference/sample.py</code>, <code>api/inference/</code>, <code>docs/guide/uncertainty/index.md</code></td>
+<td><code>py-commol/commol/context/inference/sample.py</code>, <code>api/inference/</code> (<code>scenarios.py</code>), <code>docs/guide/uncertainty/index.md</code></td>
 </tr>
 <tr>
 <td>Change the Python API</td>

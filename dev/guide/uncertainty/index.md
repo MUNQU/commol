@@ -184,11 +184,82 @@ print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75
 | `series_band(outputs, confidence_level, cumulative=False)`                                | The band of the sum of some outputs, or of its running total; each draw is reduced first                                                                                                                                                                                      |
 | `at_observations(observed_data, noise)`                                                   | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with `noise` drawn from the calibrator's seed: `NoNoise()`, `ResidualNoise(...)` or `DistributionNoise()` (`ObservationDraws`)                       |
 | `runs()`, `weights`                                                                       | The trajectory and weight of every draw                                                                                                                                                                                                                                       |
+| `quantities(quantities)`                                                                  | The quantities of interest of every draw, one dict per draw, as `SimulationResults.quantities` reads one run                                                                                                                                                                  |
 | `draw_seeds`                                                                              | The seed of each draw of the sample: `Simulation.replicates(n, seed=draw_seeds[j])` of the model at the values of draw `j` gives its runs                                                                                                                                     |
 | `report(confidence_level, positions, window, windows, observed_data=(), accumulators=())` | The report of a run, with each number reduced across the draws with their weights ([Reports](https://munqu.github.io/commol/latest/guide/reports/#the-report-of-an-ensemble))                                                                                                 |
 | `plot.series(…)`, `plot.cumulative(…)`, `plot.observations(…)`                            | The weighted median of the draws of each series and their band, those of its running total, or those of each observed series, read through `at_observations(…, NoNoise())` ([Plotting](https://munqu.github.io/commol/latest/guide/simulations/#a-panel-per-observed-series)) |
 
 `predictive.plot.series()` and `predictive.plot.cumulative()` draw the band of the predictive, each draw read through the observation operator of its observations, and `Predictive.report` reduces its draws with their weights. `Model.applied_parameters` takes the sample itself (`sample=`, with a `confidence_level`).
+
+## Scenarios
+
+`Scenarios(source, sample, scenarios, positions)` runs every draw of a sample under each scenario: a set of parameter values that override those of the model of the source, any value `Model.update_parameters` takes (a number, a formula, the points of a series). Each scenario holds the `Predictive` of the sample on a copy of the model with its values; the source and its model stay unchanged. `Scenarios` is a mapping from the name of a scenario to its predictive, so `plot_compared(scenarios)` draws them on the same panels ([Plotting](https://munqu.github.io/commol/latest/guide/simulations/#compare-results-on-the-same-panels)).
+
+Run `k` of every scenario is the same draw, and every scenario takes the seed of the source (`Calibrator.with_model`, `SensitivityAnalysis.with_model`), so with a stochastic engine run `k` of each scenario runs with the same seed: common random numbers, whose noise cancels in a difference. `compare(name, baseline, quantities, confidence_level)` takes the difference `name − baseline` of each quantity within each run, then reduces the differences across the runs with their weights. So the interval of a difference is the interval of the paired differences, not the difference of two intervals.
+
+```python
+from commol import Peak, Scenarios, ValueAt
+
+# k1 is fitted; k2 is a value of the model that a scenario overrides.
+problem_k1 = CalibrationProblem(
+    observed_data=fitted,
+    parameters=[
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+    ],
+    loss_function="sse",
+    optimization_config=NelderMeadConfig(max_iterations=2000),
+    seed=42,
+)
+calibrator_k1 = Calibrator(Simulation(basic_model(None, 0.1)), problem_k1)
+sample_k1 = ParameterSample.equally_weighted(
+    names=["k1"],
+    bounds=[(0.0, 1.0)],
+    values=[[0.38], [0.40], [0.42]],
+    method=SampleMethod(name="by hand"),
+)
+
+scenarios = Scenarios(
+    calibrator_k1,
+    sample_k1,
+    {"fitted": {}, "slower": {"k2": 0.05}},
+    positions=list(range(61)),
+)
+quantities = [ValueAt(series="C", at=60), Peak(series="B", positions=list(range(61)))]
+for summary in scenarios.compare("slower", "fitted", quantities, confidence_level=0.9):
+    print(summary.label, round(summary.median), round(summary.lower), round(summary.upper))
+# C at 60 -72 -73 -69
+# peak of B 213 209 218
+```
+
+| Member                                                  | Returns                                                                                                             |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `scenarios[name]`                                       | The `Predictive` of one scenario: its `runs()`, bands, plots and reports                                            |
+| `summary(name, quantities, confidence_level)`           | The weighted mean, median and central interval of each quantity across the runs of one scenario (`ScenarioSummary`) |
+| `compare(name, baseline, quantities, confidence_level)` | The same for the difference `name − baseline`, taken run by run                                                     |
+| `weights`                                               | The weight of each run, the same in every scenario                                                                  |
+
+A quantity is one of the quantities of interest ([Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#quantities-of-interest)), reduced in Rust by `Predictive.quantities`; a `Trajectory` gives one summary per position. The runs read them at `positions`, so the positions hold `quantity_schedule(quantities)`. For anything else, `scenarios[name].runs()` gives the runs, in the order of `weights`.
+
+The point estimate of a fit is a sample of one draw: `Calibrator.point_sample(result)` gives it, with the names and bounds of the problem and `SampleMethod(name="point")`. With one run, a summary gives the value of that run and no interval (`lower` and `upper` are None).
+
+```python
+fit = calibrator_k1.run()
+point = Scenarios(
+    calibrator_k1,
+    calibrator_k1.point_sample(fit),
+    {"fitted": {}, "slower": {"k2": 0.05}},
+    positions=list(range(61)),
+)
+[at_fit] = point.compare("slower", "fitted", [ValueAt(series="C", at=60)], 0.9)
+print(round(at_fit.median), at_fit.lower)  # -72 None
+```
+
+| Case                                                | Result                                                                    |
+| --------------------------------------------------- | ------------------------------------------------------------------------- |
+| A scenario sets a parameter of the sample           | `ValueError` that names the scenario and the parameter: each draw sets it |
+| A scenario sets a parameter the model does not have | `ValueError` that names the scenario and the parameter                    |
+| A quantity reads a position the runs lack           | `ValueError` that lists each such position with its quantity              |
+| A quantity is NaN in a run                          | `ValueError` that names the quantity                                      |
 
 ## Scores
 
@@ -221,6 +292,7 @@ print(type(result).__name__, len(result.sample))  # BootstrapResult 20
 - [ ] You report a band of the model as a band of the model, not as a prediction interval.
 - [ ] You score observations the method did not see.
 - [ ] The effective size of a weighted sample is large enough for the intervals you read.
+- [ ] You compare scenarios with `Scenarios.compare`, run by run, not as the difference of two intervals.
 
 ## Next steps
 

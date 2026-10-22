@@ -1366,6 +1366,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scenarios
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#scores" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3240,6 +3251,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scenarios
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#scores" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3769,6 +3791,10 @@ calibration gives for the same values: the remainder and the excess
 <td>The trajectory and weight of every draw</td>
 </tr>
 <tr>
+<td><code>quantities(quantities)</code></td>
+<td>The quantities of interest of every draw, one dict per draw, as <code>SimulationResults.quantities</code> reads one run</td>
+</tr>
+<tr>
 <td><code>draw_seeds</code></td>
 <td>The seed of each draw of the sample: <code>Simulation.replicates(n, seed=draw_seeds[j])</code> of the model at the values of draw <code>j</code> gives its runs</td>
 </tr>
@@ -3786,6 +3812,127 @@ calibration gives for the same values: the remainder and the excess
 the predictive, each draw read through the observation operator of its
 observations, and <code>Predictive.report</code> reduces its draws with their weights. <code>Model.applied_parameters</code> takes the
 sample itself (<code>sample=</code>, with a <code>confidence_level</code>).</p>
+<h2 id="scenarios">Scenarios<a class="headerlink" href="#scenarios" title="Permanent link">&para;</a></h2>
+<p><code>Scenarios(source, sample, scenarios, positions)</code> runs every draw of a sample
+under each scenario: a set of parameter values that override those of the
+model of the source, any value <code>Model.update_parameters</code> takes (a number, a
+formula, the points of a series). Each scenario holds the <code>Predictive</code> of the
+sample on a copy of the model with its values; the source and its model stay
+unchanged. <code>Scenarios</code> is a mapping from the name of a scenario to its
+predictive, so <code>plot_compared(scenarios)</code> draws them on the same panels
+(<a href="../simulations/#compare-results-on-the-same-panels">Plotting</a>).</p>
+<p>Run <code>k</code> of every scenario is the same draw, and every scenario takes the seed
+of the source (<code>Calibrator.with_model</code>, <code>SensitivityAnalysis.with_model</code>), so
+with a stochastic engine run <code>k</code> of each scenario runs with the same seed:
+common random numbers, whose noise cancels in a difference. <code>compare(name,
+baseline, quantities, confidence_level)</code> takes the difference <code>name −
+baseline</code> of each quantity within each run, then reduces the differences
+across the runs with their weights. So the interval of a difference is the
+interval of the paired differences, not the difference of two intervals.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Peak</span><span class="p">,</span> <span class="n">Scenarios</span><span class="p">,</span> <span class="n">ValueAt</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># k1 is fitted; k2 is a value of the model that a scenario overrides.</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">problem_k1</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">fitted</span><span class="p">,</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="p">],</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">NelderMeadConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">2000</span><span class="p">),</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="p">)</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="n">calibrator_k1</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">basic_model</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)),</span> <span class="n">problem_k1</span><span class="p">)</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="n">sample_k1</span> <span class="o">=</span> <span class="n">ParameterSample</span><span class="o">.</span><span class="n">equally_weighted</span><span class="p">(</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>    <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;k1&quot;</span><span class="p">],</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    <span class="n">bounds</span><span class="o">=</span><span class="p">[(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)],</span>
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>    <span class="n">values</span><span class="o">=</span><span class="p">[[</span><span class="mf">0.38</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.40</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.42</span><span class="p">]],</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>    <span class="n">method</span><span class="o">=</span><span class="n">SampleMethod</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;by hand&quot;</span><span class="p">),</span>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="p">)</span>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="n">scenarios</span> <span class="o">=</span> <span class="n">Scenarios</span><span class="p">(</span>
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>    <span class="n">calibrator_k1</span><span class="p">,</span>
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>    <span class="n">sample_k1</span><span class="p">,</span>
+</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>    <span class="p">{</span><span class="s2">&quot;fitted&quot;</span><span class="p">:</span> <span class="p">{},</span> <span class="s2">&quot;slower&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;k2&quot;</span><span class="p">:</span> <span class="mf">0.05</span><span class="p">}},</span>
+</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>    <span class="n">positions</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">61</span><span class="p">)),</span>
+</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="p">)</span>
+</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="n">quantities</span> <span class="o">=</span> <span class="p">[</span><span class="n">ValueAt</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">at</span><span class="o">=</span><span class="mi">60</span><span class="p">),</span> <span class="n">Peak</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">61</span><span class="p">)))]</span>
+</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="k">for</span> <span class="n">summary</span> <span class="ow">in</span> <span class="n">scenarios</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="s2">&quot;slower&quot;</span><span class="p">,</span> <span class="s2">&quot;fitted&quot;</span><span class="p">,</span> <span class="n">quantities</span><span class="p">,</span> <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">):</span>
+</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">label</span><span class="p">,</span> <span class="nb">round</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">median</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">lower</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">upper</span><span class="p">))</span>
+</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="c1"># C at 60 -72 -73 -69</span>
+</span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a><span class="c1"># peak of B 213 209 218</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Member</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scenarios[name]</code></td>
+<td>The <code>Predictive</code> of one scenario: its <code>runs()</code>, bands, plots and reports</td>
+</tr>
+<tr>
+<td><code>summary(name, quantities, confidence_level)</code></td>
+<td>The weighted mean, median and central interval of each quantity across the runs of one scenario (<code>ScenarioSummary</code>)</td>
+</tr>
+<tr>
+<td><code>compare(name, baseline, quantities, confidence_level)</code></td>
+<td>The same for the difference <code>name − baseline</code>, taken run by run</td>
+</tr>
+<tr>
+<td><code>weights</code></td>
+<td>The weight of each run, the same in every scenario</td>
+</tr>
+</tbody>
+</table>
+<p>A quantity is one of the quantities of interest
+(<a href="sensitivity/#quantities-of-interest">Sensitivity Analysis</a>), reduced in
+Rust by <code>Predictive.quantities</code>; a <code>Trajectory</code> gives one summary per
+position. The runs read them at <code>positions</code>, so the positions hold
+<code>quantity_schedule(quantities)</code>. For anything else, <code>scenarios[name].runs()</code>
+gives the runs, in the order of <code>weights</code>.</p>
+<p>The point estimate of a fit is a sample of one draw:
+<code>Calibrator.point_sample(result)</code> gives it, with the names and bounds of the
+problem and <code>SampleMethod(name="point")</code>. With one run, a summary gives the
+value of that run and no interval (<code>lower</code> and <code>upper</code> are None).</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">fit</span> <span class="o">=</span> <span class="n">calibrator_k1</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">point</span> <span class="o">=</span> <span class="n">Scenarios</span><span class="p">(</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">calibrator_k1</span><span class="p">,</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">calibrator_k1</span><span class="o">.</span><span class="n">point_sample</span><span class="p">(</span><span class="n">fit</span><span class="p">),</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="p">{</span><span class="s2">&quot;fitted&quot;</span><span class="p">:</span> <span class="p">{},</span> <span class="s2">&quot;slower&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;k2&quot;</span><span class="p">:</span> <span class="mf">0.05</span><span class="p">}},</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">positions</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">61</span><span class="p">)),</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="p">)</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="p">[</span><span class="n">at_fit</span><span class="p">]</span> <span class="o">=</span> <span class="n">point</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="s2">&quot;slower&quot;</span><span class="p">,</span> <span class="s2">&quot;fitted&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">ValueAt</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">at</span><span class="o">=</span><span class="mi">60</span><span class="p">)],</span> <span class="mf">0.9</span><span class="p">)</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">at_fit</span><span class="o">.</span><span class="n">median</span><span class="p">),</span> <span class="n">at_fit</span><span class="o">.</span><span class="n">lower</span><span class="p">)</span>  <span class="c1"># -72 None</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A scenario sets a parameter of the sample</td>
+<td><code>ValueError</code> that names the scenario and the parameter: each draw sets it</td>
+</tr>
+<tr>
+<td>A scenario sets a parameter the model does not have</td>
+<td><code>ValueError</code> that names the scenario and the parameter</td>
+</tr>
+<tr>
+<td>A quantity reads a position the runs lack</td>
+<td><code>ValueError</code> that lists each such position with its quantity</td>
+</tr>
+<tr>
+<td>A quantity is NaN in a run</td>
+<td><code>ValueError</code> that names the quantity</td>
+</tr>
+</tbody>
+</table>
 <h2 id="scores">Scores<a class="headerlink" href="#scores" title="Permanent link">&para;</a></h2>
 <p>The functions of <code>commol.scores</code> compare a predictive with observations, and
 return a <code>Score</code>: the value of each observation, the mean of each series and
@@ -3850,16 +3997,17 @@ other kind with a <code>TypeError</code> that names the right one. The sensitivi
 methods, subclasses of <code>SensitivityMethod[R]</code>, run with no data through
 <code>SensitivityAnalysis(simulation, inputs).run(method)</code>, the third entry point
 of the registry (<a href="sensitivity/">Sensitivity Analysis</a>).</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">BayesianBootstrap</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">result</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span><span class="n">BayesianBootstrap</span><span class="p">(</span><span class="n">replicates</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">block_length</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nb">print</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">sample</span><span class="p">))</span>  <span class="c1"># BootstrapResult 20</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">BayesianBootstrap</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">result</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span><span class="n">BayesianBootstrap</span><span class="p">(</span><span class="n">replicates</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">block_length</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nb">print</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">sample</span><span class="p">))</span>  <span class="c1"># BootstrapResult 20</span>
 </span></code></pre></div>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
 <li>[ ] You report a band of the model as a band of the model, not as a prediction interval.</li>
 <li>[ ] You score observations the method did not see.</li>
 <li>[ ] The effective size of a weighted sample is large enough for the intervals you read.</li>
+<li>[ ] You compare scenarios with <code>Scenarios.compare</code>, run by run, not as the difference of two intervals.</li>
 </ul>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>
