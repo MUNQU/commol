@@ -7,7 +7,7 @@
 //! Python builds the result classes.
 
 use commol_inference::design::InputSpace;
-use commol_inference::global_sensitivity::{ChaosExpansion, ForwardAnalysis};
+use commol_inference::global_sensitivity::{ChaosExpansion, ForwardAnalysis, Truncation};
 use commol_inference::{NoNoise, Predictive, observation_draws};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -207,23 +207,28 @@ impl PyForwardAnalysis {
     }
 
     /// A polynomial chaos expansion of `degree` on a Latin hypercube of
-    /// `draws` points, and its Sobol indices
+    /// `draws` points, and its Sobol indices; the basis keeps the terms whose
+    /// degrees have a q-norm of `q_norm` at most `degree` and hold at most
+    /// `max_interaction` inputs (`None`: no limit)
     ///
     /// Raises:
-    ///     ValueError: If the inputs come from a sample, there are not more
-    ///         points than terms, or a quantity does not fit the model or is
-    ///         NaN at a point
+    ///     ValueError: If the truncation is not valid, the inputs come from a
+    ///         sample, there are not more points than terms, or a quantity
+    ///         does not fit the model or is NaN at a point
     ///     InfeasibleStateError: If a point leaves the values its model allows
     fn chaos(
         &self,
         py: Python<'_>,
         degree: usize,
+        q_norm: f64,
+        max_interaction: Option<usize>,
         draws: usize,
         quantities: &str,
     ) -> PyResult<PyChaosRun> {
+        let truncation = Truncation::new(q_norm, max_interaction).map_err(value_error)?;
         let quantities = read_quantities(quantities)?;
         let (expansion, runs) = py
-            .detach(|| self.inner.chaos(degree, draws, &quantities))
+            .detach(|| self.inner.chaos(degree, truncation, draws, &quantities))
             .map_err(predictive_error)?;
         Ok(PyChaosRun {
             mean: expansion.mean(),
@@ -335,14 +340,16 @@ pub struct PyChaosRun {
 
 /// The value of each quantity of a polynomial chaos expansion at each point
 ///
-/// The terms come from the degree and the number of inputs, so only the
-/// coefficients cross.
+/// The terms come from the degree, the truncation and the number of inputs,
+/// so only the coefficients cross.
 ///
 /// Args:
 ///     parameters: The inputs, in order, with their bounds
 ///     distributions: The distribution of each input, `(input, kind,
 ///         parameters)`
-///     degree: The total degree of the expansion
+///     degree: The degree of the expansion
+///     q_norm: The q of the q-norm of the basis, in (0, 1]
+///     max_interaction: The largest number of inputs of a term, or None
 ///     coefficients: The coefficient of each term for each quantity
 ///     points: The values of the inputs at each point, `[point][input]`
 ///
@@ -350,20 +357,24 @@ pub struct PyChaosRun {
 ///     The value of each quantity at each point, `[point][quantity]`
 ///
 /// Raises:
-///     ValueError: If a distribution does not fit its bounds, a row of
-///         coefficients has not one value per term, or a point has not one
-///         value per input or a value outside the bounds of its input
+///     ValueError: If a distribution does not fit its bounds, the truncation
+///         is not valid, a row of coefficients has not one value per term,
+///         or a point has not one value per input or a value outside the
+///         bounds of its input
 #[pyfunction]
 fn chaos_evaluate(
     parameters: Vec<PyCalibrationParameter>,
     distributions: Vec<PriorArgs>,
     degree: usize,
+    q_norm: f64,
+    max_interaction: Option<usize>,
     coefficients: Vec<Vec<f64>>,
     points: Vec<Vec<f64>>,
 ) -> PyResult<Vec<Vec<f64>>> {
     let inputs = input_space(&parameters, Some(distributions), None)?;
-    let expansion =
-        ChaosExpansion::new(parameters.len(), degree, coefficients).map_err(value_error)?;
+    let truncation = Truncation::new(q_norm, max_interaction).map_err(value_error)?;
+    let expansion = ChaosExpansion::new(parameters.len(), degree, truncation, coefficients)
+        .map_err(value_error)?;
     let unit = inputs
         .to_unit("PolynomialChaos", &points)
         .map_err(value_error)?;

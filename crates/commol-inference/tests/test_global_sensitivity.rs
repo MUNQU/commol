@@ -10,7 +10,9 @@ use commol_difference::DifferenceEquations;
 use commol_inference::Priors;
 use commol_inference::batch::BatchRunner;
 use commol_inference::design::InputSpace;
-use commol_inference::global_sensitivity::{ChaosExpansion, ForwardAnalysis, morris, prcc, sobol};
+use commol_inference::global_sensitivity::{
+    ChaosExpansion, ForwardAnalysis, Truncation, morris, prcc, sobol,
+};
 use commol_inference::quantity::{Quantities, Quantity, Series};
 use commol_inference::{ParameterSample, Predictive, PredictiveError};
 use commol_stochastic::StochasticSteps;
@@ -440,7 +442,7 @@ fn chaos_indices_of_ishigami_with_fewer_runs() {
     let unit = inputs.to_unit("PolynomialChaos", &points).unwrap();
     let outputs: Vec<Vec<f64>> = points.iter().map(|x| vec![ishigami(x)]).collect();
 
-    let chaos = ChaosExpansion::fit(&unit, &outputs, 10).unwrap();
+    let chaos = ChaosExpansion::fit(&unit, &outputs, 10, Truncation::TOTAL_DEGREE).unwrap();
 
     let (first, total) = (chaos.first(), chaos.total());
     for i in 0..3 {
@@ -464,6 +466,59 @@ fn chaos_indices_of_ishigami_with_fewer_runs() {
     let x = [0.5, -1.0, 2.0];
     let u = inputs.to_unit("PolynomialChaos", &[x.to_vec()]).unwrap();
     assert!((chaos.evaluate(&u[0])[0] - ishigami(&x)).abs() < 0.2);
+}
+
+#[test]
+fn a_truncated_chaos_basis_fits_many_inputs() {
+    // The Ishigami function of x1, x2 and x3, padded with 17 inputs it does
+    // not read.
+    let names: Vec<String> = (1..=20).map(|i| format!("x{i}")).collect();
+    let pi = std::f64::consts::PI;
+    let inputs =
+        InputSpace::Independent(Priors::uniform_on_bounds(&names, &[(-pi, pi); 20]).unwrap());
+    let pairs = Truncation::new(1.0, Some(2)).unwrap();
+    // 1 + 20 · 4 + C(20, 2) · 6, against 10,626 for the total degree.
+    assert_eq!(ChaosExpansion::terms(20, 4, pairs), 1_221);
+    let basis = ChaosExpansion::new(20, 4, pairs, vec![]).unwrap();
+    assert_eq!(basis.indices.len(), 1_221);
+    let used = |index: &Vec<usize>| index.iter().filter(|&&a| a > 0).count();
+    assert!(basis.indices.iter().all(|index| used(index) <= 2));
+    assert_eq!(
+        basis
+            .indices
+            .iter()
+            .filter(|index| used(index) == 2)
+            .count(),
+        190 * 6
+    );
+
+    // A fit of those 1,221 terms needs more points than terms, and a dense
+    // least squares of that size takes minutes in a test build; a q-norm of
+    // 0.5 keeps 271 of them, the pairs of degree one each.
+    let truncation = Truncation::new(0.5, Some(2)).unwrap();
+    assert_eq!(ChaosExpansion::terms(20, 4, truncation), 1 + 20 * 4 + 190);
+    let points = inputs.latin_hypercube("PolynomialChaos", 800, 4).unwrap();
+    let unit = inputs.to_unit("PolynomialChaos", &points).unwrap();
+    let outputs: Vec<Vec<f64>> = points.iter().map(|x| vec![ishigami(x)]).collect();
+
+    let chaos = ChaosExpansion::fit(&unit, &outputs, 4, truncation).unwrap();
+
+    let (first, total) = (chaos.first(), chaos.total());
+    for i in 0..2 {
+        assert!(
+            (first[0][i] - ISHIGAMI_FIRST[i]).abs() < 0.06,
+            "S1 of x{}: {}",
+            i + 1,
+            first[0][i]
+        );
+    }
+    // The inputs the function does not read explain almost nothing.
+    for (i, share) in total[0].iter().enumerate().skip(3) {
+        assert!(*share < 0.05, "ST of x{}: {share}", i + 1);
+    }
+    // Degree 4 misses the higher harmonics of x2 and the x3^4 of the
+    // interaction, but predicts better than the mean.
+    assert!(chaos.loo_error[0] < 0.7, "{}", chaos.loo_error[0]);
 }
 
 fn decay_inputs() -> InputSpace {
@@ -621,7 +676,9 @@ fn an_analysis_runs_each_method_in_one_call() {
 
     let (screening, morris_runs) = analysis.morris(3, 4, &a_at(3.0)).unwrap();
     let (indices, sobol_runs) = analysis.sobol(16, 20, 0.9, &a_at(3.0)).unwrap();
-    let (chaos, chaos_runs) = analysis.chaos(2, 10, &a_at(3.0)).unwrap();
+    let (chaos, chaos_runs) = analysis
+        .chaos(2, Truncation::TOTAL_DEGREE, 10, &a_at(3.0))
+        .unwrap();
 
     assert_eq!(morris_runs, 3 * 2);
     assert!(screening.mu[0][0] < 0.0);
@@ -630,7 +687,10 @@ fn an_analysis_runs_each_method_in_one_call() {
     assert!((indices.total[0][0] - 1.0).abs() < 0.2);
     assert_eq!(chaos_runs, 10);
     assert!((chaos.total()[0][0] - 1.0).abs() < 1e-9);
-    let few = analysis.chaos(2, 3, &a_at(3.0)).unwrap_err().to_string();
+    let few = analysis
+        .chaos(2, Truncation::TOTAL_DEGREE, 3, &a_at(3.0))
+        .unwrap_err()
+        .to_string();
     assert!(
         few.contains("has 3 terms and needs more points than terms, got 3"),
         "{few}"

@@ -21,7 +21,7 @@ pub mod prcc;
 pub mod sobol;
 
 pub use analysis::{ForwardAnalysis, Propagation};
-pub use chaos::ChaosExpansion;
+pub use chaos::{ChaosExpansion, Truncation};
 pub use morris::{Morris, morris};
 pub use prcc::{Prcc, prcc};
 pub use sobol::{Sobol, sobol};

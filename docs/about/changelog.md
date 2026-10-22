@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Added #226 -->
 
+- `PolynomialChaos(q_norm=..., max_interaction=...)`: a truncated basis for
+  many inputs. `max_interaction` keeps the terms of at most that many inputs,
+  and `q_norm`, in `(0, 1]`, the terms whose degrees have
+  `Σ α_i^q ≤ degree^q`; the defaults keep the total-degree basis. 20 inputs
+  at degree 4 with `max_interaction=2` have 1,221 terms instead of 10,626,
+  and the number is known before any run. `ChaosResult` records both. See
+  [Bases for many inputs](../guide/uncertainty/sensitivity.md#bases-for-many-inputs).
+
 <!-- Added #230 -->
 
 <!-- Added #239 -->

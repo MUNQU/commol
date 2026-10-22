@@ -295,7 +295,7 @@ for label, value in one_run.quantities(quantities).items():
 | `PRCC(draws, quantities)` | How steadily each quantity rises or falls with each input | `draws`, more than the inputs + 1 | Independent or a sample |
 | `Morris(trajectories, levels, quantities)` | Which inputs matter, in few runs | `trajectories · (inputs + 1)` | Independent |
 | `Sobol(base_draws, bootstrap, confidence_level, quantities)` | The share of the variance each input explains, alone and with interactions, with intervals | `base_draws · (inputs + 2)` | Independent |
-| `PolynomialChaos(degree, draws, quantities)` | A polynomial surrogate and its Sobol indices, in far fewer runs for a smooth quantity | `draws`, more than the terms | Independent |
+| `PolynomialChaos(degree, draws, quantities, q_norm=1.0, max_interaction=None)` | A polynomial surrogate and its Sobol indices, in far fewer runs for a smooth quantity | `draws`, more than the terms | Independent |
 
 Start with Morris to drop the inputs that do not matter, then Sobol or a
 polynomial chaos on the rest. For a slow model, a polynomial chaos needs the
@@ -411,7 +411,8 @@ for name, i in [("k1", 0), ("k2", 1)]:
 
 `PolynomialChaos` (Sudret 2008) takes every input to `u = F(x)`, uniform on
 `[0, 1]`, and fits orthonormal Legendre polynomials of `u` of total degree
-`degree` by least squares on a Latin hypercube of `draws` points. One basis
+`degree`, or a truncation of that basis ([below](#bases-for-many-inputs)), by
+least squares on a Latin hypercube of `draws` points. One basis
 fits every distribution, truncated ones too. The Sobol indices come from the
 squares of the coefficients. `loo_error` is the leave-one-out error relative
 to the variance: the indices are those of the expansion, and they are those
@@ -425,6 +426,38 @@ chaos = analysis.run(PolynomialChaos(degree=4, draws=60, quantities=[peak]))
 print(round(chaos.loo_error[0], 4), [round(s, 2) for s in chaos.total[0]])  # 0.0036 [0.61, 0.39]
 print([round(value) for value in chaos.predict([[0.4, 0.1]])[0]])  # [428]
 ```
+
+### Bases for many inputs
+
+The total-degree basis has `(k + degree)! / (k! degree!)` terms in `k`
+inputs: 10,626 for 20 inputs at degree 4. A fit needs more draws than terms,
+so a model of many inputs needs a smaller basis. You choose how to truncate
+it, with two keyword arguments:
+
+| Argument | Keeps | Default |
+|---|---|---|
+| `max_interaction` | The terms of at most this many inputs | `None`: no limit |
+| `q_norm` | The terms whose degrees `α` have `Σ α_i^q ≤ degree^q`, with `q` in `(0, 1]`: below 1, a term of several inputs keeps a lower degree than a term of one | `1.0`: the total degree |
+
+The defaults keep the total-degree basis. With `max_interaction=2`, 20 inputs
+at degree 4 have `1 + 20 · 4 + C(20, 2) · 6 = 1,221` terms. The number of
+terms is known before any run, so too few `draws` raise before the first run.
+A truncation drops the terms it does not keep: the total indices hold only
+the interactions of the basis, and `loo_error` says how much of the model
+the smaller basis misses.
+
+```python
+additive = analysis.run(
+    PolynomialChaos(degree=4, max_interaction=1, draws=30, quantities=[peak])
+)
+print(len(additive.indices), round(additive.loo_error[0], 4))  # 9 0.0071
+print([round(s, 2) for s in additive.total[0]])  # [0.61, 0.39]
+```
+
+With one input per term, the 9 terms against the 15 of the total degree hold
+no interaction, so each total index equals the first-order one. Here the
+leave-one-out error stays small: the interaction of `k1` and `k2` adds little
+to the peak.
 
 ## Plots
 
@@ -459,6 +492,9 @@ figure = indices.plot()
       NaN (a bootstrap replicate of no variance); if not, raise `base_draws`.
 - [ ] The leave-one-out error of a polynomial chaos is small before you read
       its indices, and `predict` reads values inside the bounds of the inputs.
+- [ ] A truncated basis of a polynomial chaos (`max_interaction`, `q_norm`)
+      keeps the interactions you expect to matter; its total indices hold no
+      other.
 
 ## Next steps
 

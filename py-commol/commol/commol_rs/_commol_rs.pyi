@@ -814,7 +814,14 @@ class ForwardAnalysisProtocol(Protocol):
         confidence_level: float,
         quantities: str,
     ) -> SobolRunProtocol: ...
-    def chaos(self, degree: int, draws: int, quantities: str) -> ChaosRunProtocol: ...
+    def chaos(
+        self,
+        degree: int,
+        q_norm: float,
+        max_interaction: int | None,
+        draws: int,
+        quantities: str,
+    ) -> ChaosRunProtocol: ...
     def predictive(
         self, sample: ParameterSampleProtocol, positions: list[float]
     ) -> PredictiveProtocol: ...
@@ -860,6 +867,8 @@ class InferenceModule(Protocol):
         parameters: list[CalibrationParameterProtocol],
         distributions: list[tuple[str, str, list[float]]],
         degree: int,
+        q_norm: float,
+        max_interaction: int | None,
         coefficients: list[list[float]],
         points: list[list[float]],
     ) -> list[list[float]]: ...

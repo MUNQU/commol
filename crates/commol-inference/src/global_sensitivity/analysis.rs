@@ -15,7 +15,9 @@ use commol_random::stream_seed;
 
 use crate::batch::BatchRunner;
 use crate::design::InputSpace;
-use crate::global_sensitivity::{ChaosExpansion, Morris, Prcc, Sobol, morris, prcc, sobol};
+use crate::global_sensitivity::{
+    ChaosExpansion, Morris, Prcc, Sobol, Truncation, morris, prcc, sobol,
+};
 use crate::predictive::{PredictiveError, draw_seeds, run_sets};
 use crate::quantity::{Quantities, Quantity};
 use crate::sample::ParameterSample;
@@ -267,9 +269,9 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         .map(|result| (result, design.points.len()))
     }
 
-    /// A polynomial chaos expansion of `degree` fitted on a Latin hypercube
-    /// of `draws` points, and the number of points run. The number of terms
-    /// is checked before any run.
+    /// A polynomial chaos expansion of `degree`, truncated by `truncation`,
+    /// fitted on a Latin hypercube of `draws` points, and the number of
+    /// points run. The number of terms is checked before any run.
     ///
     /// # Errors
     ///
@@ -279,6 +281,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
     pub fn chaos(
         &self,
         degree: usize,
+        truncation: Truncation,
         draws: usize,
         quantities: &[Quantity],
     ) -> Result<(ChaosExpansion, usize), PredictiveError> {
@@ -287,7 +290,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
             .independent(method)
             .map_err(PredictiveError::Mismatch)?;
         let inputs = self.inputs.names().len();
-        let terms = ChaosExpansion::terms(inputs, degree);
+        let terms = ChaosExpansion::terms(inputs, degree, truncation);
         if draws <= terms {
             return Err(PredictiveError::Mismatch(format!(
                 "Polynomial chaos of degree {degree} in {inputs} inputs has {terms} terms and \
@@ -303,7 +306,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
             .to_unit(method, &points)
             .map_err(PredictiveError::Mismatch)?;
         let outputs = self.means(&points, quantities)?;
-        let expansion = ChaosExpansion::fit(&unit, &outputs, degree)?;
+        let expansion = ChaosExpansion::fit(&unit, &outputs, degree, truncation)?;
         Ok((expansion, points.len()))
     }
 

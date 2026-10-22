@@ -7,7 +7,9 @@ use commol_core::{Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
 use commol_inference::batch::BatchRunner;
 use commol_inference::design::InputSpace;
-use commol_inference::global_sensitivity::{ChaosExpansion, ForwardAnalysis, morris, prcc, sobol};
+use commol_inference::global_sensitivity::{
+    ChaosExpansion, ForwardAnalysis, Truncation, morris, prcc, sobol,
+};
 use commol_inference::quantity::{
     MissingPositions, Quantities, Quantity, Replicates, Series, Undefined,
 };
@@ -318,7 +320,7 @@ fn every_estimator_rejects_a_nan() {
     let ranked = prcc(&points, &with_nan(5), &[1.0; 5]).unwrap_err();
     let effects = morris(&screening, &with_nan(screening.points.len())).unwrap_err();
     let indices = sobol(&saltelli, &with_nan(saltelli.points.len()), 10, 0.9, 1).unwrap_err();
-    let fitted = ChaosExpansion::fit(&unit, &with_nan(5), 1).unwrap_err();
+    let fitted = ChaosExpansion::fit(&unit, &with_nan(5), 1, Truncation::TOTAL_DEGREE).unwrap_err();
     let quantile = statistics::quantiles(&[0.0, f64::NAN, 1.0], &[1.0; 3], &[0.5]).unwrap_err();
 
     assert_eq!(ranked, nan_at_one_and_three());
@@ -702,7 +704,10 @@ fn a_zero_denominator_follows_the_nan_rule_in_every_method() {
                 .sobol(4, 2, 0.9, &quantities)
                 .map(|_| ())
                 .unwrap_err(),
-            analysis.chaos(1, 8, &quantities).map(|_| ()).unwrap_err(),
+            analysis
+                .chaos(1, Truncation::TOTAL_DEGREE, 8, &quantities)
+                .map(|_| ())
+                .unwrap_err(),
         ];
 
         for error in errors {
