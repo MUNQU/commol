@@ -41,6 +41,8 @@ from .problems import (
     line_calibrator,
     observed,
     swarm,
+    TWO_WELLS_FIT,
+    two_wells_calibrator,
 )
 from .parallelism import (
     assert_on_threads_of_setting,
@@ -98,4 +100,6 @@ __all__ = [
     "stratify",
     "total",
     "total_at",
+    "TWO_WELLS_FIT",
+    "two_wells_calibrator",
 ]

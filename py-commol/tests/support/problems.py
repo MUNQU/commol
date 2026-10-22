@@ -7,6 +7,7 @@ from commol import (
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
+    NormalObservations,
     ObservationModel,
     ObservedDataPoint,
     ParticleSwarmConfig,
@@ -134,6 +135,39 @@ def flow_calibrator(
         observation_models=dict(observation_models) if observation_models else None,
         optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-14),
         seed=seed,
+    )
+    return Calibrator(Simulation(model), problem)
+
+
+TWO_WELLS_FIT = 2.492033
+"""The best ``c`` of ``two_wells_calibrator``: ``c³ − 3c + 2`` at the mean."""
+
+
+def two_wells_calibrator() -> Calibrator:
+    """
+    Fit the flow ``g(c) = c³ − 3c + 2`` from A to B (``a_to_b_builder``, 10⁶
+    in A) to eight windowed observations of mean 10, with a normal model of
+    ``sd = 1``, ``c`` in ``[−1.5, 4]`` and the seed 2.
+
+    ``g`` has a local maximum ``g(−1) = 4`` below the data, so the initial
+    guess ``c = −1`` is a local minimum of ``−log L`` and a fit from it alone
+    stays there; the best fit is ``TWO_WELLS_FIT``, where ``g`` is the mean.
+    Every row of a Latin hypercube in the upper part of the bounds reaches it.
+    """
+    model = build(
+        a_to_b_builder(
+            parameters={"c": None},
+            rate="(c * c * c - 3 * c + 2) * A / A",
+            amounts={"A": 1e6, "B": 0},
+        )
+    )
+    values = [10.4, 9.7, 10.2, 9.9, 10.1, 9.6, 10.3, 9.8]
+    problem = CalibrationProblem(
+        observed_data=flow_observations(values, windowed=True),
+        parameters=[bounded("c", -1.5, 4.0, initial_guess=-1.0)],
+        observation_models={"B": NormalObservations(sd=1.0)},
+        optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-12),
+        seed=2,
     )
     return Calibrator(Simulation(model), problem)
 

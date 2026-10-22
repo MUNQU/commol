@@ -126,14 +126,21 @@ describes it (MUNQU/commol#132).
 
 ## Laplace approximation and the delta method
 
-`Laplace(draws)` fits the problem (`Calibrator.run()`) and returns a
-`LaplaceResult`: the fit, the covariance `Σ = H⁻¹` of the normal on the
+`Laplace(draws, starts=1)` fits the problem (`Calibrator.run(starts)`) and
+returns a `LaplaceResult`: the fit, the covariance `Σ = H⁻¹` of the normal on the
 unbounded scale, the draws mapped back (`sample`, equal weights) and the
 notes. It needs `observation_models`: a loss has no noise scale, so its
 curvature is no inverse variance, and `Laplace` with a loss raises a
 `ValueError`. To get a Laplace approximation, give a model with a noise
 parameter, such as `NormalObservations(sd="sd")` with `sd` calibrated, or
 use `Sandwich`, which needs none.
+
+Every local approximation sits at the best of its `starts`: the initial guess,
+then rows of a Latin hypercube over the bounds, as
+[several starts](../calibration-optimizers.md#several-starts) of
+`Calibrator.run`. One start (the default) can end at a local minimum; more
+starts find the best one of the optima they reach. `Sandwich` takes `starts`
+the same way.
 
 With a noise parameter the fit estimates the noise by maximum likelihood:
 for `NormalObservations(sd="sd")`, `σ̂² = SSE/n`, not `SSE/(n − p)`. The
@@ -158,7 +165,7 @@ print(widths)  # [6.01, 12.01, 18.02]
 
 ## Sandwich
 
-`Sandwich(block_length, draws)` gives the covariance `H⁻¹ B H⁻¹`, where `B`
+`Sandwich(block_length, draws, starts=1)` gives the covariance `H⁻¹ B H⁻¹`, where `B`
 sums the outer products of the **scores** of blocks of observations:
 `B = G/(G − 1) · Σ_b s_b s_bᵀ`, with `s_b` the sum of the gradients of the
 terms of block `b` (the clustered estimator CR1, Cameron and Miller 2015).
@@ -193,8 +200,8 @@ rescaling the objective does not change the sandwich).
 
 ## Laplace mixture and importance sampling
 
-A multi-start fit can end at several optima. `LaplaceMixture(starts, draws,
-target)` runs `Calibrator.run(starts)`, keeps the distinct ends (an end
+A multi-start fit can end at several optima. `LaplaceMixture(draws, target,
+starts=1)` runs `Calibrator.run(starts)`, keeps the distinct ends (an end
 closer than one Mahalanobis unit to a kept one merges into it), puts a
 Laplace approximation at each, weights each by its Laplace evidence, draws
 from the mixture, and weights every draw by the target over the mixture on

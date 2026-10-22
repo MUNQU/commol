@@ -47,6 +47,8 @@ from tests.support import (
     build_stochastic,
     flow_calibrator,
     flow_observations,
+    TWO_WELLS_FIT,
+    two_wells_calibrator,
 )
 
 NOISE = 2.0
@@ -279,6 +281,7 @@ class TestGibbsPosterior:
         assert result.sample.method.settings["eta"] == {
             "kind": "information_matching",
             "block_length": 1,
+            "starts": 1,
         }
 
     def test_eta_is_required_and_positive(self) -> None:
@@ -564,6 +567,31 @@ class TestResult:
         assert abc.sample.method.settings["seed"] == 3
         assert gibbs.diagnostics.stop_reason is None
         assert gibbs.log_evidence < 0.0
+
+
+@pytest.mark.parametrize(
+    "eta",
+    [
+        InformationMatchingEta(block_length=1, starts=3),
+        BootstrapCoverageEta(
+            replicates=2, block_length=1, confidence_level=0.5, starts=3
+        ),
+    ],
+    ids=["information_matching", "bootstrap_coverage"],
+)
+def test_the_eta_calibrations_fit_from_their_starts(
+    eta: InformationMatchingEta | BootstrapCoverageEta,
+) -> None:
+    calibrator = two_wells_calibrator()
+    # One start stays at the local minimum of the initial guess.
+    assert calibrator.run().best_parameters["c"] == pytest.approx(-1.0, abs=1e-6)
+
+    result = calibrator.uncertainty(_gibbs(eta=eta, particles=50))
+
+    assert result.fit is not None
+    assert len(result.fit.starts) == 3
+    assert result.fit == calibrator.run(starts=3)
+    assert result.fit.best_parameters["c"] == pytest.approx(TWO_WELLS_FIT, abs=1e-5)
 
 
 @pytest.mark.parametrize(

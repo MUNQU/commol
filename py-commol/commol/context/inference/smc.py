@@ -44,12 +44,16 @@ class InformationMatchingEta(BaseModel):
     block_length : int | "auto"
         Positions per block of the scores; there must be more blocks than
         parameters.
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["information_matching"] = "information_matching"
     block_length: BlockLength = Field(description="Positions per block.")
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 
 
 class BootstrapCoverageEta(BaseModel):
@@ -69,6 +73,9 @@ class BootstrapCoverageEta(BaseModel):
         Positions per block of the bootstrap.
     confidence_level : float
         The level of the intervals, strictly between 0 and 1.
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -77,6 +84,7 @@ class BootstrapCoverageEta(BaseModel):
     replicates: int = Field(ge=1, description="Number of bootstrap data sets.")
     block_length: BlockLength = Field(description="Positions per block.")
     confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 
 
 type Eta = (
@@ -205,7 +213,8 @@ class GibbsResult(SMCResult):
     eta : float
         The `η` the posterior ran with.
     fit : CalibrationResult | None
-        The fit a calibration of `η` read; None when `η` is a number.
+        The fit a calibration of `η` read, ``Calibrator.run(starts)``; None
+        when `η` is a number.
     coverage : float | None
         With `BootstrapCoverageEta`, the coverage of the fit by the intervals of
         the bootstrap posteriors at `η`; otherwise None.

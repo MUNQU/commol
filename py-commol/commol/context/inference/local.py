@@ -61,7 +61,7 @@ class LocalResult(BaseModel):
     Attributes
     ----------
     fit : CalibrationResult
-        The fit the approximation is centred on: ``Calibrator.run()``.
+        The fit the approximation is centred on: ``Calibrator.run(starts)``.
     covariance : list[list[float]]
         The covariance of the distribution on the unbounded scale of the
         parameters, in the order of the problem's parameters.
@@ -100,7 +100,7 @@ class LaplaceResult(LocalResult):
     Attributes
     ----------
     fit : CalibrationResult
-        The fit the approximation is centred on: ``Calibrator.run()``.
+        The fit the approximation is centred on: ``Calibrator.run(starts)``.
     covariance : list[list[float]]
         ``Σ = H⁻¹`` on the unbounded scale of the parameters.
     sample : ParameterSample
@@ -129,12 +129,16 @@ class Laplace(UncertaintyMethod[LaplaceResult]):
         Number of draws of the normal, at least 1.
     curvature : {"gauss_newton", "hessian"}
         The curvature (default ``"gauss_newton"``).
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     draws: int = Field(ge=1, description="Number of draws.")
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
     )
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 
 
 class SandwichResult(LocalResult):
@@ -146,7 +150,7 @@ class SandwichResult(LocalResult):
     Attributes
     ----------
     fit : CalibrationResult
-        The fit the sandwich is centred on: ``Calibrator.run()``.
+        The fit the sandwich is centred on: ``Calibrator.run(starts)``.
     covariance : list[list[float]]
         ``H⁻¹ B H⁻¹`` on the unbounded scale of the parameters.
     sample : ParameterSample
@@ -207,6 +211,9 @@ class Sandwich(UncertaintyMethod[SandwichResult]):
     curvature : {"gauss_newton", "hessian"}
         The curvature ``H`` (default ``"gauss_newton"``). With the Hessian,
         the sandwich also holds when the mean is wrong.
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     block_length: BlockLength = Field(description="Positions per block.")
@@ -214,6 +221,7 @@ class Sandwich(UncertaintyMethod[SandwichResult]):
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
     )
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 
 
 class LikelihoodTarget(WithPriors):
@@ -335,8 +343,8 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
     Attributes
     ----------
     starts : int
-        Starts of the fit, at least 1: the initial guess, then rows of a
-        Latin hypercube over the bounds.
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     draws : int
         Number of draws of the mixture, at least 25, so that the tail of the
         weights has 5.
@@ -347,7 +355,7 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
         The curvature of each component (default ``"gauss_newton"``).
     """
 
-    starts: int = Field(ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
     draws: int = Field(ge=25, description="Number of draws.")
     target: MixtureTarget = Field(description="The posterior to sample.")
     curvature: CurvatureName = Field(

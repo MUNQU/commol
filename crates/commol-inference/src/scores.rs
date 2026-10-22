@@ -153,7 +153,7 @@ const PIT_STREAM: u64 = 5;
 /// The probability integral transform of each observation: `F(y)` of the
 /// weighted draws, randomized between `F(y⁻)` and `F(y)` where draws tie
 /// with `y` (so a discrete predictive gives uniform values too), with the
-/// generator seeded with the stream [`PIT_STREAM`] of the seed of the draws.
+/// generator seeded with the stream `PIT_STREAM` of the seed of the draws.
 /// The same draws give the same values. Calibrated predictions give uniform
 /// values.
 ///
