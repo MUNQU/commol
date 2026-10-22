@@ -226,7 +226,7 @@ calibration gives for the same values: the remainder and the excess
 | `at_observations(observed_data, noise)` | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with `noise` drawn from the calibrator's seed: `NoNoise()`, `ResidualNoise(...)` or `DistributionNoise()` (`ObservationDraws`) |
 | `runs()`, `weights` | The trajectory and weight of every draw |
 | `report(confidence_level, positions, window, windows, observed_data=(), accumulators=())` | The report of a run, with each number reduced across the draws with their weights ([Reports](../reports.md#the-report-of-an-ensemble)) |
-| `plot.series(…)`, `plot.cumulative(…)` | The weighted median of the draws of each series and their band, or those of its running total ([Plotting](../simulations.md#plotting)) |
+| `plot.series(…)`, `plot.cumulative(…)`, `plot.observations(…)` | The weighted median of the draws of each series and their band, those of its running total, or those of each observed series, read through `at_observations(…, NoNoise())` ([Plotting](../simulations.md#a-panel-per-observed-series)) |
 
 `predictive.plot.series()` and `predictive.plot.cumulative()` draw the band of
 the predictive, each draw read through the observation operator of its

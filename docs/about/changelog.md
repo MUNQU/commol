@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Added #247 -->
 
+- `plot.observations(observed_data, …)` of `SimulationResults`,
+  `SimulationReplicates` and `Predictive` draws one panel per observed series
+  (one `label`), with the model read through the observation operator of each
+  observation: the sum of its `outputs`, its `window` and its factor. A
+  series that sums some outputs, such as `B_g2 + B_g3`, gets its own panel. A
+  value with a window is a step over its window, and the band of replicates
+  or of a predictive (`at_observations(…, NoNoise())`) a rectangle over it;
+  its legend says that it is a band of the model, not a prediction interval.
+  See [Plotting](../guide/simulations.md#a-panel-per-observed-series).
+
 <!-- Added #250 -->
 
 <!-- Added #251 -->

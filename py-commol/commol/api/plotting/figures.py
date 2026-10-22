@@ -24,6 +24,7 @@ try:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
     from matplotlib.ticker import FuncFormatter
+    from matplotlib.typing import ColorType
 except ModuleNotFoundError as error:
     raise ImportError(
         "The figures of commol need matplotlib. Install it with: "
@@ -31,7 +32,7 @@ except ModuleNotFoundError as error:
     ) from error
 
 from commol.api.plotting import panels as _panels
-from commol.api.plotting.panels import Compared, Panel
+from commol.api.plotting.panels import Compared, ObservationPanel, Panel
 from commol.api.results import same_position
 from commol.context.inference.global_sensitivity import SobolResult
 from commol.context.visualization import PlotConfig
@@ -274,6 +275,98 @@ def _compared_series(
 
 
 @_scoped_style
+def _run_observations(
+    results: "SimulationResults",
+    observed_data: "list[ObservedDataPoint]",
+    output_file: str | None = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: PlotConfig | None = None,
+    show_legend: bool = True,
+    position_label: PositionLabel | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    axes: Figure | None = None,
+    **kwargs: LineKeywords,
+) -> Figure:
+    """The figure of `ResultsPlot.observations`."""
+    return _observations_figure(
+        _panels.run_observation_panels(results, observed_data, calibration_result),
+        results.model,
+        output_file,
+        config,
+        show_legend,
+        position_label,
+        tick_every,
+        x_label,
+        axes,
+        kwargs,
+    )
+
+
+@_scoped_style
+def _replicates_observations(
+    replicates: "SimulationReplicates",
+    observed_data: "list[ObservedDataPoint]",
+    output_file: str | None = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: PlotConfig | None = None,
+    show_legend: bool = True,
+    position_label: PositionLabel | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    confidence_level: float = 0.95,
+    axes: Figure | None = None,
+    **kwargs: LineKeywords,
+) -> Figure:
+    """The figure of `ReplicatesPlot.observations`."""
+    return _observations_figure(
+        _panels.replicate_observation_panels(
+            replicates, confidence_level, observed_data, calibration_result
+        ),
+        replicates.model,
+        output_file,
+        config,
+        show_legend,
+        position_label,
+        tick_every,
+        x_label,
+        axes,
+        kwargs,
+    )
+
+
+@_scoped_style
+def _predictive_observations(
+    predictive: "Predictive",
+    observed_data: "list[ObservedDataPoint]",
+    output_file: str | None = None,
+    config: PlotConfig | None = None,
+    show_legend: bool = True,
+    position_label: PositionLabel | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    confidence_level: float = 0.95,
+    axes: Figure | None = None,
+    **kwargs: LineKeywords,
+) -> Figure:
+    """The figure of `PredictivePlot.observations`."""
+    return _observations_figure(
+        _panels.predictive_observation_panels(
+            predictive, confidence_level, observed_data
+        ),
+        predictive.source.simulation.model_definition,
+        output_file,
+        config,
+        show_legend,
+        position_label,
+        tick_every,
+        x_label,
+        axes,
+        kwargs,
+    )
+
+
+@_scoped_style
 def _prcc(
     result: "PRCCResult",
     output_file: str | None = None,
@@ -461,6 +554,111 @@ def _cumulative_figure(
     return figure
 
 
+def _observations_figure(
+    panels: list[ObservationPanel],
+    model: "Model | None",
+    output_file: str | None,
+    config: PlotConfig | None,
+    show_legend: bool,
+    position_label: PositionLabel | None,
+    tick_every: float | None,
+    x_label: str,
+    axes: Figure | None,
+    keywords: dict[str, LineKeywords],
+) -> Figure:
+    """Draw the panels of observed series."""
+    config = config or PlotConfig()
+    _apply_style(config)
+    figure, grid = _axes_of([panel.series for panel in panels], config, axes)
+    for ax, panel in zip(grid, panels, strict=True):
+        _draw_observation_panel(ax, panel, keywords, x_label)
+        _label_positions(ax, panel.model.positions, position_label, tick_every, model)
+        if show_legend:
+            ax.legend()
+    _finish(figure, output_file, config, "Observations")
+    return figure
+
+
+def _draw_observation_panel(
+    ax: Axes,
+    panel: ObservationPanel,
+    keywords: dict[str, LineKeywords],
+    x_label: str,
+) -> None:
+    """
+    Draw one observed series: the model value of each observation, its band,
+    the observed values and the labels.
+
+    A value with a window is a total over ``(at - window, at]``: a step over
+    its window with a marker at ``at``, and its band a rectangle over the same
+    window. A value with no window is a marker; a dotted line joins these
+    markers only as a guide, and their band is filled between them.
+    `keywords` go to the steps and to the guide; the markers and the band
+    take their colour.
+    """
+    model, band = panel.model, panel.band
+    points = list(
+        zip(model.positions, panel.windows, model.values, range(len(model.values)))
+    )
+    windowed = [(at, window, value, i) for at, window, value, i in points if window]
+    single = [(at, value, i) for at, window, value, i in points if not window]
+    lines = []
+    if windowed:
+        xs: list[float] = []
+        ys: list[float] = []
+        for at, window, value, _ in windowed:
+            xs += [at - window, at, math.nan]
+            ys += [value, value, math.nan]
+        (steps,) = ax.plot(xs, ys, label=model.label)
+        lines.append(steps)
+    if single:
+        (guide,) = ax.plot(
+            [at for at, _, _ in single],
+            [value for _, value, _ in single],
+            linestyle=":",
+            linewidth=1,
+            color=lines[0].get_color() if lines else None,
+            label="_nolegend_" if lines else model.label,
+        )
+        lines.append(guide)
+    for line in lines:
+        line.set(**keywords)
+    color = lines[0].get_color()
+    ax.plot(
+        model.positions,
+        model.values,
+        marker="o",
+        linestyle="none",
+        color=color,
+        label="_nolegend_",
+    )
+    if band is not None:
+        if windowed:
+            ax.bar(
+                [at - window for at, window, _, _ in windowed],
+                [band.upper[i] - band.lower[i] for _, _, _, i in windowed],
+                width=[window for _, window, _, _ in windowed],
+                bottom=[band.lower[i] for _, _, _, i in windowed],
+                align="edge",
+                color=color,
+                alpha=0.3,
+                label=band.label,
+            )
+        if single:
+            _fill(
+                ax,
+                _panels.Band(
+                    [at for at, _, _ in single],
+                    [band.lower[i] for _, _, i in single],
+                    [band.upper[i] for _, _, i in single],
+                    "_nolegend_" if windowed else band.label,
+                ),
+                color,
+            )
+    _draw_observed(ax, panel.observed)
+    _label_panel(ax, panel, x_label)
+
+
 def _draw_panel(
     ax: Axes, panel: Panel, keywords: dict[str, LineKeywords], x_label: str
 ) -> None:
@@ -521,7 +719,11 @@ def _draw_observed(ax: Axes, observed: _panels.Trace) -> None:
     )
 
 
-def _label_panel(ax: Axes, panel: Panel | _panels.ComparedPanel, x_label: str) -> None:
+def _label_panel(
+    ax: Axes,
+    panel: Panel | _panels.ComparedPanel | ObservationPanel,
+    x_label: str,
+) -> None:
     """
     Label a panel: the id of its series as the label of its `Axes`, the
     axes, the title and the grid.
@@ -533,7 +735,7 @@ def _label_panel(ax: Axes, panel: Panel | _panels.ComparedPanel, x_label: str) -
     ax.grid(True, alpha=0.3)
 
 
-def _fill(ax: Axes, band: _panels.Band, color: str | None = None) -> None:
+def _fill(ax: Axes, band: _panels.Band, color: ColorType | None = None) -> None:
     """Fill a band, in `color` or in the next color of the cycle."""
     ax.fill_between(
         band.positions,
