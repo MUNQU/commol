@@ -25,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Added #239 -->
 
+- `commol.set_threads(n)`, the context manager `commol.threads(n, levels)`,
+  `commol.get_threads()` and `commol.get_levels()` choose the number of
+  threads of every parallel method and the levels that run in parallel. The
+  setting holds per Python thread (`contextvars`); without it, commol uses
+  one thread per core. A particle swarm scores the particles of each
+  iteration in parallel, in the order of the particles, with
+  `levels="all"`, the default; `levels="outer"` keeps them in order. A seed
+  gives the same result, history included, with any number of threads and
+  either level. See [Threads and Parallelism](../guide/parallelism.md).
+
 <!-- Added #252 -->
 
 - A calibration result records the seed it used, `CalibrationResult.seed`
@@ -63,6 +73,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!-- Changed #230 -->
 
 <!-- Changed #239 -->
+
+- The parallel methods run in a thread pool of commol, not in the global pool
+  of `rayon`: the environment variable `RAYON_NUM_THREADS` no longer limits
+  them; use `commol.set_threads`. A particle swarm, which scored its particles
+  one after the other, now scores them in parallel by default.
 
 <!-- Changed #252 -->
 
