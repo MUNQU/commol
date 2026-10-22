@@ -199,6 +199,7 @@ With one replicate the CRPS is the absolute error. The [predictive](https://munq
 | `converged`               | `True` only when the optimizer met its convergence test or `target_cost`; a run that used all `max_iterations` is `False`. See [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#converged-and-termination_reason). |
 | `termination_reason`      | Why it stopped                                                                                                                                                                                                                                     |
 | `starts`, `failed_runs`   | Every start that finished, and why each failed one did. See [Several starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts).                                                                                  |
+| `seed`                    | The seed of the calibration's random numbers (`Calibrator.seed`). See [Reproducibility](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#reproducibility).                                                                      |
 
 ```python
 print(result.converged, result.termination_reason)

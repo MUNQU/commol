@@ -26,12 +26,21 @@ On other platforms, `pip` builds Commol from the source distribution, which need
 ## Check the installation
 
 ```python
-import importlib.metadata
+import commol
 
-from commol import ModelBuilder, Simulation
-
-print(importlib.metadata.version("commol"))
+print(commol.__version__)
+print(commol.build_info())
 ```
+
+`commol.__version__` is the version you installed. `commol.build_info()` gives it with the full commit of the source; save it with a result to name the code that made it.
+
+| Installed from                               | `__version__`                               | `build_info().commit`                  |
+| -------------------------------------------- | ------------------------------------------- | -------------------------------------- |
+| A wheel of a release on PyPI                 | The release, such as `0.9.0`                | The commit of the release              |
+| The source distribution of a release         | The release                                 | `None`: the source has no git metadata |
+| A git commit, or a clone (`maturin develop`) | `0.1.0+g<first 7 characters of the commit>` | The full commit                        |
+
+A build that is not a release has the placeholder version `0.1.0` of the source, so its local version (`+g…`) is what names its commit. The metadata of the package (`pip show commol`) gives the placeholder alone.
 
 ## Build from source
 

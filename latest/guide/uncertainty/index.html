@@ -1668,6 +1668,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threads and Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../examples/" class="md-nav__link">
         
   
@@ -2071,6 +2099,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/package/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parallelism
   
 
     
@@ -2598,6 +2682,34 @@
     
   
     Calibration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../codebase/decisions/optimizers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimizers
   
 
     
@@ -3684,7 +3796,7 @@ predictive and the scores read it, never the result of a method.</p>
 </tr>
 <tr>
 <td><code>method</code></td>
-<td>The name and settings of the method that made it (<code>SampleMethod</code>)</td>
+<td>The name and settings of the method that made it (<code>SampleMethod</code>); the settings of a method of <code>Calibrator.uncertainty</code> name the seed of the calibrator, <code>settings["seed"]</code>, which repeats the sample when set as <code>problem.seed</code></td>
 </tr>
 </tbody>
 </table>
@@ -3895,7 +4007,7 @@ position. The runs read them at <code>positions</code>, so the positions hold
 gives the runs, in the order of <code>weights</code>.</p>
 <p>The point estimate of a fit is a sample of one draw:
 <code>Calibrator.point_sample(result)</code> gives it, with the names and bounds of the
-problem and <code>SampleMethod(name="point")</code>. With one run, a summary gives the
+problem and <code>SampleMethod(name="point", settings={"seed": result.seed})</code>. With one run, a summary gives the
 value of that run and no interval (<code>lower</code> and <code>upper</code> are None).</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">fit</span> <span class="o">=</span> <span class="n">calibrator_k1</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">point</span> <span class="o">=</span> <span class="n">Scenarios</span><span class="p">(</span>

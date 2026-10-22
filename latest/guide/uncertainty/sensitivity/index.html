@@ -1597,6 +1597,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Polynomial chaos">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bases-for-many-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bases for many inputs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1700,6 +1717,34 @@
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threads and Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2115,6 +2160,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/package/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parallelism
   
 
     
@@ -2642,6 +2743,34 @@
     
   
     Calibration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../codebase/decisions/optimizers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimizers
   
 
     
@@ -3358,6 +3487,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Polynomial chaos">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bases-for-many-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bases for many inputs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3601,6 +3747,10 @@ never returns to Python. The quantities live in
 <td><code>Gain(outputs, start, end)</code></td>
 <td>The value at <code>end</code> minus the value at <code>start</code>: what entered a cumulative output over <code>(start, end]</code>, as an observation with a window</td>
 </tr>
+<tr>
+<td><code>Ratio(numerator, denominator, replicates)</code></td>
+<td>One quantity of one value over another, in each run (<a href="#a-ratio-of-two-quantities">A ratio of two quantities</a>)</td>
+</tr>
 </tbody>
 </table>
 <p>The series is a modelling choice. The peak of a level is the largest amount;
@@ -3650,7 +3800,7 @@ one window, and <code>PeakPosition</code> gives the end of that window:</p>
 </tr>
 <tr>
 <td>With a stochastic engine, a quantity is computed for each replicate</td>
-<td>A design point holds the mean of its replicates; a propagation keeps each</td>
+<td>A design point holds the mean of its replicates, or for a <code>Ratio</code> what its <code>replicates</code> says; a propagation keeps each</td>
 </tr>
 </tbody>
 </table>
@@ -3678,60 +3828,99 @@ condition, such as <code>np.isfinite(values[:, i])</code> or a value above a thr
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">late</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="mf">0.9</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">median</span><span class="p">))</span>  <span class="c1"># 216</span>
 </span></code></pre></div>
 <h3 id="a-ratio-of-two-quantities">A ratio of two quantities<a class="headerlink" href="#a-ratio-of-two-quantities" title="Permanent link">&para;</a></h3>
-<p>A ratio is taken within each run, before the runs are reduced: divide the two
-columns of <code>PropagationResult.values</code> row by row, leave out the rows that are
-not finite, and summarise the ratios with <code>member_statistics</code> and the weights
-of the rows. The share of the initial amount that entered <code>C</code> by position 100
-is the gain of <code>C</code> over <code>(0, 100]</code> divided by the sum of the bins at 0:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Gain</span><span class="p">,</span> <span class="n">ValueAt</span><span class="p">,</span> <span class="n">member_statistics</span>
+<p><code>Ratio(numerator, denominator, replicates)</code> divides two quantities of one
+value each (<code>ValueAt</code>, <code>Gain</code>, <code>Peak</code>), numerator N over denominator D, in
+each run. It is one quantity, so every method reads it, the sensitivity
+methods too. A <code>PeakPosition</code> or a <code>Trajectory</code> as an operand is a
+<code>ValueError</code>. The share of what entered <code>C</code> by position 100 that entered by
+position 50 has a denominator that depends on both inputs:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Gain</span><span class="p">,</span> <span class="n">Ratio</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">parts</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">Propagation</span><span class="p">(</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>        <span class="n">draws</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="n">quantities</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>            <span class="n">Gain</span><span class="p">(</span><span class="n">outputs</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>            <span class="n">ValueAt</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">at</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="p">],</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="p">)</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="p">)</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="n">values</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">parts</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="n">finite</span> <span class="o">=</span> <span class="n">parts</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">values</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">values</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]))</span>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="n">kept</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">finite</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="n">shares</span> <span class="o">=</span> <span class="p">(</span><span class="n">kept</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">kept</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="n">share</span> <span class="o">=</span> <span class="n">member_statistics</span><span class="p">(</span><span class="n">per_member</span><span class="o">=</span><span class="n">shares</span><span class="p">,</span> <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">finite</span><span class="o">.</span><span class="n">weights</span><span class="p">)</span>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">share</span><span class="p">[</span><span class="s2">&quot;ci_lower&quot;</span><span class="p">],</span> <span class="mi">2</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">share</span><span class="p">[</span><span class="s2">&quot;median&quot;</span><span class="p">],</span> <span class="mi">2</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">share</span><span class="p">[</span><span class="s2">&quot;ci_upper&quot;</span><span class="p">],</span> <span class="mi">2</span><span class="p">))</span>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="c1"># 0.81 0.98 1.0</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">early</span> <span class="o">=</span> <span class="n">Ratio</span><span class="p">(</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">numerator</span><span class="o">=</span><span class="n">Gain</span><span class="p">(</span><span class="n">outputs</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">50</span><span class="p">),</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">denominator</span><span class="o">=</span><span class="n">Gain</span><span class="p">(</span><span class="n">outputs</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">replicates</span><span class="o">=</span><span class="s2">&quot;within&quot;</span><span class="p">,</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;early share&quot;</span><span class="p">,</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="p">)</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="n">spread</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">Propagation</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">early</span><span class="p">]))</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="n">share</span> <span class="o">=</span> <span class="n">spread</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="mf">0.9</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="nb">print</span><span class="p">(</span><span class="n">share</span><span class="o">.</span><span class="n">label</span><span class="p">,</span> <span class="nb">round</span><span class="p">(</span><span class="n">share</span><span class="o">.</span><span class="n">lower</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">share</span><span class="o">.</span><span class="n">median</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">share</span><span class="o">.</span><span class="n">upper</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="c1"># early share 0.61 0.94 0.99</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="n">ranked</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">PRCC</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">early</span><span class="p">]))</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="nb">print</span><span class="p">(</span><span class="n">ranked</span><span class="o">.</span><span class="n">inputs</span><span class="p">,</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">ranked</span><span class="o">.</span><span class="n">coefficients</span><span class="p">[</span><span class="mi">0</span><span class="p">]])</span>  <span class="c1"># [&#39;k1&#39;, &#39;k2&#39;] [0.92, 0.69]</span>
 </span></code></pre></div>
+<p>The default label is <code>"(N) / (D)"</code>, from the labels of the two quantities.
+<code>replicates</code> is required, with no default: with a stochastic engine, it says
+how the replicates of a point of PRCC, Morris, Sobol or a polynomial chaos
+combine (<code>Quantities::combine</code> in <code>crates/commol-inference/src/quantity.rs</code>).
+They are three estimands, and the choice is yours:</p>
 <table>
 <thead>
 <tr>
-<th>Rule</th>
-<th>Why</th>
+<th><code>replicates</code></th>
+<th>Value of a point</th>
+<th>No value when</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Divide each row, then reduce</td>
-<td>The mean of the ratios, E[N/D], is not the ratio of the means, E[N]/E[D]: the ratio of two summaries is another quantity</td>
+<td><code>"within"</code></td>
+<td>The mean of the ratio of each replicate, E[N/D]</td>
+<td>A replicate has D = 0</td>
 </tr>
 <tr>
-<td>Leave out the rows that are not finite with <code>where</code></td>
-<td>A denominator of 0 gives an infinite ratio or NaN, and <code>member_statistics</code> raises on a NaN; <code>where</code> renormalises the weights of the kept rows, so the summary is conditioned on a finite ratio</td>
+<td><code>"within_positive"</code></td>
+<td>The mean of the ratio of the replicates with D &gt; 0, E[N/D | D &gt; 0]</td>
+<td>No replicate has D &gt; 0</td>
 </tr>
 <tr>
-<td>Pass the weights of the rows</td>
-<td>A row is one run: with a sample of weights, or a stochastic engine, whose replicates share the weight of their draw, equal weights give another distribution</td>
+<td><code>"pooled"</code></td>
+<td>The ratio of the means, E[N]/E[D]</td>
+<td>E[D] = 0</td>
 </tr>
 </tbody>
 </table>
-<p><code>PropagationResult.values</code> has one row per run, so the same division holds for
-the replicates of a stochastic engine (one row per replicate of each draw, draw
-by draw) and for the quantities of one run (below). The indices of a
-sensitivity method on a ratio equal those of its numerator only when the
-denominator is fixed and is not an input, as the sum of the bins at 0 is here:
-run the method on the numerator. commol has no quantity for a ratio, so a
-sensitivity method cannot read the ratio of a denominator that depends on the
-inputs.</p>
+<p>A deterministic engine has one run per point, so the three give N/D. A
+<code>Propagation</code>, <code>Scenarios</code> and the quantities of one run keep the ratio of
+each run, N/D, for each replicate.</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>So</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The ratio of a run with D = 0 is NaN, also when N is not 0</td>
+<td>N/0 is not ±inf, which a check for NaN misses; the NaN rule of <a href="#a-quantity-that-is-nan">A quantity that is NaN</a> holds in every method</td>
+</tr>
+<tr>
+<td>A point with no value is NaN in every method</td>
+<td>The error names the point and its inputs, and the replicate that is NaN, when one is</td>
+</tr>
+<tr>
+<td><code>"within"</code> with D = 0 in one replicate</td>
+<td>The point has no value. A Sobol design of 10^5 replicates almost surely holds one such replicate when D can reach 0</td>
+</tr>
+<tr>
+<td><code>"within_positive"</code></td>
+<td>It conditions on D &gt; 0, so it hides the effect of an input on the chance that D &gt; 0: analyse that chance on its own. Its points average different numbers of replicates, so their noise differs</td>
+</tr>
+<tr>
+<td><code>"pooled"</code></td>
+<td>The ratio of two means is another quantity than the mean of the ratios: it differs from <code>"within"</code> when D is small or 0 in some replicates</td>
+</tr>
+</tbody>
+</table>
+<p>The indices of a ratio equal those of its numerator only when the denominator
+is fixed and is not an input, such as the sum of the bins at 0: then run
+the method on the numerator. When the denominator can be near 0, a ratio has
+large values in a few runs, and the Sobol and the chaos indices, which divide
+variances, are unstable; PRCC works on ranks, so it stays valid.</p>
+<p>A propagation keeps the NaN of each run in <code>values</code>, so <code>summary()</code> raises on
+a ratio with D = 0 in a run. <code>PropagationResult.where</code> keeps the runs where
+the ratio is finite, and the summary is then conditioned on that.</p>
 <h3 id="the-quantities-of-one-run">The quantities of one run<a class="headerlink" href="#the-quantities-of-one-run" title="Permanent link">&para;</a></h3>
 <p><code>results.quantities(quantities)</code> reduces one run to its quantities, as
 <code>dict[str, float]</code> with one value per label, and
@@ -3818,7 +4007,7 @@ at <code>0.3 - 0.1</code> reads the row of <code>0.2</code>.</p>
 <td>Independent</td>
 </tr>
 <tr>
-<td><code>PolynomialChaos(degree, draws, quantities)</code></td>
+<td><code>PolynomialChaos(degree, draws, quantities, q_norm=1.0, max_interaction=None)</code></td>
 <td>A polynomial surrogate and its Sobol indices, in far fewer runs for a smooth quantity</td>
 <td><code>draws</code>, more than the terms</td>
 <td>Independent</td>
@@ -3917,7 +4106,8 @@ propagation, which take it.</p>
 <h2 id="polynomial-chaos">Polynomial chaos<a class="headerlink" href="#polynomial-chaos" title="Permanent link">&para;</a></h2>
 <p><code>PolynomialChaos</code> (Sudret 2008) takes every input to <code>u = F(x)</code>, uniform on
 <code>[0, 1]</code>, and fits orthonormal Legendre polynomials of <code>u</code> of total degree
-<code>degree</code> by least squares on a Latin hypercube of <code>draws</code> points. One basis
+<code>degree</code>, or a truncation of that basis (<a href="#bases-for-many-inputs">below</a>), by
+least squares on a Latin hypercube of <code>draws</code> points. One basis
 fits every distribution, truncated ones too. The Sobol indices come from the
 squares of the coefficients. <code>loo_error</code> is the leave-one-out error relative
 to the variance: the indices are those of the expansion, and they are those
@@ -3929,6 +4119,48 @@ quantities at any input values, as a surrogate.</p>
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">chaos</span><span class="o">.</span><span class="n">loo_error</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">4</span><span class="p">),</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">chaos</span><span class="o">.</span><span class="n">total</span><span class="p">[</span><span class="mi">0</span><span class="p">]])</span>  <span class="c1"># 0.0036 [0.61, 0.39]</span>
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">chaos</span><span class="o">.</span><span class="n">predict</span><span class="p">([[</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">]])[</span><span class="mi">0</span><span class="p">]])</span>  <span class="c1"># [428]</span>
 </span></code></pre></div>
+<h3 id="bases-for-many-inputs">Bases for many inputs<a class="headerlink" href="#bases-for-many-inputs" title="Permanent link">&para;</a></h3>
+<p>The total-degree basis has <code>(k + degree)! / (k! degree!)</code> terms in <code>k</code>
+inputs: 10,626 for 20 inputs at degree 4. A fit needs more draws than terms,
+so a model of many inputs needs a smaller basis. You choose how to truncate
+it, with two keyword arguments:</p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Keeps</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_interaction</code></td>
+<td>The terms of at most this many inputs</td>
+<td><code>None</code>: no limit</td>
+</tr>
+<tr>
+<td><code>q_norm</code></td>
+<td>The terms whose degrees <code>α</code> have <code>Σ α_i^q ≤ degree^q</code>, with <code>q</code> in <code>(0, 1]</code>: below 1, a term of several inputs keeps a lower degree than a term of one</td>
+<td><code>1.0</code>: the total degree</td>
+</tr>
+</tbody>
+</table>
+<p>The defaults keep the total-degree basis. With <code>max_interaction=2</code>, 20 inputs
+at degree 4 have <code>1 + 20 · 4 + C(20, 2) · 6 = 1,221</code> terms. The number of
+terms is known before any run, so too few <code>draws</code> raise before the first run.
+A truncation drops the terms it does not keep: the total indices hold only
+the interactions of the basis, and <code>loo_error</code> says how much of the model
+the smaller basis misses.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">additive</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="n">PolynomialChaos</span><span class="p">(</span><span class="n">degree</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">max_interaction</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">draws</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">peak</span><span class="p">])</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="p">)</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">additive</span><span class="o">.</span><span class="n">indices</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">additive</span><span class="o">.</span><span class="n">loo_error</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">4</span><span class="p">))</span>  <span class="c1"># 9 0.0071</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">additive</span><span class="o">.</span><span class="n">total</span><span class="p">[</span><span class="mi">0</span><span class="p">]])</span>  <span class="c1"># [0.61, 0.39]</span>
+</span></code></pre></div>
+<p>With one input per term, the 9 terms against the 15 of the total degree hold
+no interaction, so each total index equals the first-order one. Here the
+leave-one-out error stays small: the interaction of <code>k1</code> and <code>k2</code> adds little
+to the peak.</p>
 <h2 id="plots">Plots<a class="headerlink" href="#plots" title="Permanent link">&para;</a></h2>
 <p>Each result draws its own figure with <code>plot()</code>, one panel per quantity, and
 returns the matplotlib <code>Figure</code> (<a href="../../simulations/#plotting">Plotting</a>: the
@@ -3938,9 +4170,9 @@ and one bar per input for any other quantity. The <code>plot</code> of a <code>M
 draws <code>sigma</code> against <code>mu_star</code>, one point per input. The <code>plot</code> of a
 <code>SobolResult</code> draws the first-order and total indices with their intervals,
 and the <code>plot</code> of a <code>ChaosResult</code> draws those of the expansion.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">over_axis</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_label</span><span class="o">=</span><span class="s2">&quot;Step&quot;</span><span class="p">)</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">screening</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">indices</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">over_axis</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_label</span><span class="o">=</span><span class="s2">&quot;Step&quot;</span><span class="p">)</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">screening</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">indices</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
 </span></code></pre></div>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
@@ -3958,6 +4190,9 @@ and the <code>plot</code> of a <code>ChaosResult</code> draws those of the expan
       NaN (a bootstrap replicate of no variance); if not, raise <code>base_draws</code>.</li>
 <li>[ ] The leave-one-out error of a polynomial chaos is small before you read
       its indices, and <code>predict</code> reads values inside the bounds of the inputs.</li>
+<li>[ ] A truncated basis of a polynomial chaos (<code>max_interaction</code>, <code>q_norm</code>)
+      keeps the interactions you expect to matter; its total indices hold no
+      other.</li>
 </ul>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>

@@ -18,7 +18,7 @@
         <link rel="prev" href="../local/">
       
       
-        <link rel="next" href="../../examples/">
+        <link rel="next" href="../../parallelism/">
       
       
         
@@ -1629,6 +1629,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threads and Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../examples/" class="md-nav__link">
         
   
@@ -2032,6 +2060,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/package/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parallelism
   
 
     
@@ -2559,6 +2643,34 @@
     
   
     Calibration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../codebase/decisions/optimizers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimizers
   
 
     
@@ -3551,8 +3663,11 @@ them is not a joint region.</p>
 </table>
 <p><code>tolerance</code> is <code>ε = max(τ, ν)</code>. <code>τ</code> is the <code>sd_tolerance</code> of Nelder-Mead, an
 absolute amount: argmin stops when the costs of its simplex spread by less.
-For a particle swarm, <code>τ</code> is <code>1e-6 · max(1, |objective at the fit|)</code> until
-the swarm gets stop rules. <code>ν</code>, the noise floor, is the error of one
+For a particle swarm with the improvement stop rule, <code>τ</code> is the improvement
+the rule allows at the fit, <code>tol_abs + tol_rel · |objective at the fit|</code>: the
+swarm stops when its best value improves by less. A swarm without that rule
+has no tolerance on the objective, and <code>τ</code> is
+<code>1e-6 · max(1, |objective at the fit|)</code>. <code>ν</code>, the noise floor, is the error of one
 evaluation of the objective at the fit, from the accuracy of a run:
 <code>Σ |∂ℓᵢ/∂mᵢ| · eᵢ</code>, with <code>eᵢ = rtol · |mᵢ| + k · atol</code> the error of a run on
 an observation that sums <code>k</code> outputs, its prediction <code>mᵢ</code>, and the accuracy

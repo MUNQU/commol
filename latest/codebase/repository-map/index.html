@@ -1469,6 +1469,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threads and Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/examples/" class="md-nav__link">
         
   
@@ -1872,6 +1900,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/package/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parallelism
   
 
     
@@ -2533,6 +2617,34 @@
     
   
     Calibration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../decisions/optimizers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimizers
   
 
     
@@ -3223,6 +3335,11 @@
 <td>The engines themselves.</td>
 </tr>
 <tr>
+<td><code>crates/commol-core/src/parallelism.rs</code></td>
+<td><code>Parallelism</code> (a number of threads and the <code>Levels</code> that run in parallel), the <code>rayon</code> pool of each setting (<code>install</code>), and <code>inner_levels_in_parallel</code>, which a nested level reads.</td>
+<td>A pool of its own elsewhere; the global pool of <code>rayon</code>.</td>
+</tr>
+<tr>
 <td><code>crates/commol-core/src/math_expression/</code></td>
 <td>Parsing, preprocessing and evaluation of rate expressions; the Cranelift JIT and its global cache (<code>jit/</code>).</td>
 <td>Model-specific variables.</td>
@@ -3349,7 +3466,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/objective.rs</code></td>
-<td><code>OptimizationObjective</code>: the argmin cost function, the only place that turns a violation into a penalty; the history decorator.</td>
+<td><code>OptimizationObjective</code>: the argmin cost function, the only place that turns a violation into a penalty; <code>score_all</code>, the points of a swarm in parallel and in order; the history decorator (<code>Recorded</code>).</td>
 <td>Recording history inside the objective.</td>
 </tr>
 <tr>
@@ -3419,7 +3536,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/global_sensitivity/</code></td>
-<td><code>analysis.rs</code> (<code>ForwardAnalysis</code>: the forward model, the inputs and the seed streams, and each method in one call), and the estimators: <code>prcc.rs</code> (weighted PRCC and its test), <code>morris.rs</code>, <code>sobol.rs</code> (with the bootstrap of rows), <code>chaos.rs</code> (<code>ChaosExpansion</code>, a surrogate).</td>
+<td><code>analysis.rs</code> (<code>ForwardAnalysis</code>: the forward model, the inputs and the seed streams, and each method in one call), and the estimators: <code>prcc.rs</code> (weighted PRCC and its test), <code>morris.rs</code>, <code>sobol.rs</code> (with the bootstrap of rows), <code>chaos.rs</code> (<code>ChaosExpansion</code>, a surrogate, and <code>Truncation</code>, the terms its basis keeps).</td>
 <td>Designs; code of one engine.</td>
 </tr>
 <tr>
@@ -3480,6 +3597,11 @@
 </thead>
 <tbody>
 <tr>
+<td><code>py-commol/build.rs</code>, <code>py-commol/src/build_info.rs</code></td>
+<td>The version and the commit of a build: the build script reads the commit from the git metadata of the source and writes <code>COMMOL_VERSION</code> and <code>COMMOL_COMMIT</code>, which <code>py-commol/src/lib.rs</code> gives as <code>__version__</code> and <code>__commit__</code> of the extension; <code>build_info.rs</code> holds the rule (the placeholder <code>0.1.0</code> is not a release) and its tests.</td>
+<td>Anything that runs the <code>git</code> program.</td>
+</tr>
+<tr>
 <td><code>py-commol/src/core.rs</code></td>
 <td>Bindings of the model types (<code>Model</code>, <code>Process</code>, <code>Aggregate</code>, …).</td>
 <td>Logic.</td>
@@ -3496,7 +3618,7 @@
 </tr>
 <tr>
 <td><code>py-commol/src/test_kind.rs</code></td>
-<td><code>TestEngine</code> and <code>TestStochasticEngine</code>, the engines of the test model kind; only with the <code>test-kind</code> feature.</td>
+<td><code>TestEngine</code> and <code>TestStochasticEngine</code>, the engines of the test model kind, and <code>commol_rs.test_kind.threads_of_runs</code>, the threads that ran them; only with the <code>test-kind</code> feature.</td>
 <td>Anything a release needs.</td>
 </tr>
 <tr>
@@ -3545,6 +3667,11 @@
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
+<td><code>py-commol/src/parallelism.rs</code></td>
+<td><code>commol_rs.parallelism</code>: the setting of the threads (a <code>contextvars</code> variable that holds a <code>Parallelism</code>), <code>current</code>, and <code>parallel</code>, the one helper through which every binding releases the GIL and runs its work in the pool of the setting.</td>
+<td>A call of <code>py.detach</code> in another binding.</td>
+</tr>
+<tr>
 <td><code>py-commol/src/python_observer.rs</code></td>
 <td>The progress table of a verbose optimization, written to Python's <code>sys.stdout</code>.</td>
 <td>Writes to the standard error.</td>
@@ -3587,6 +3714,11 @@
 <td>Loss or optimizer logic.</td>
 </tr>
 <tr>
+<td><code>api/build_info.py</code></td>
+<td><code>BuildInfo</code> and <code>build_info</code>, the version and the commit the extension was built from, and the source of <code>commol.__version__</code>.</td>
+<td>Reading the version or the commit in Python.</td>
+</tr>
+<tr>
 <td><code>api/sensitivity.py</code></td>
 <td><code>SensitivityAnalysis</code>: the inputs, the replicates and the seed of an analysis, its forward model in Rust, and the entry point <code>run</code>.</td>
 <td>Estimators.</td>
@@ -3600,6 +3732,11 @@
 <td><code>api/reporting.py</code></td>
 <td>The private functions that build the blocks of the reports: of a run and of an ensemble (<code>_simulation_report</code>, for <code>SimulationResults.report</code>, <code>SimulationReplicates.report</code> and <code>Predictive.report</code>), of the applied parameters (<code>_applied_parameters_report</code>, for <code>Model.applied_parameters</code>, with the sections the structure adds, <code>ModelStructure.report_sections</code>) and of an identifiability analysis (<code>_identifiability_report</code>, for <code>IdentifiabilityReport.report</code>).</td>
 <td>Domain vocabulary; sections of one model kind; a public report function.</td>
+</tr>
+<tr>
+<td><code>api/parallelism.py</code></td>
+<td><code>set_threads</code>, <code>threads</code>, <code>get_threads</code> and <code>get_levels</code>, which set and read the setting of <code>commol_rs.parallelism</code>.</td>
+<td>Validation (the engine's).</td>
 </tr>
 <tr>
 <td><code>api/patterns.py</code>, <code>api/windows.py</code></td>
@@ -3729,7 +3866,7 @@
 <tbody>
 <tr>
 <td><code>py-commol/tests/</code></td>
-<td>Python tests: one package per page of the user guide (<code>building/</code>, <code>transitions/</code>, <code>rates/</code>, <code>axis_patterns/</code>, <code>initial_conditions/</code>, <code>simulation/</code>, <code>stochastic/</code>, <code>units/</code>, <code>calibration/</code>, <code>uncertainty/</code>, <code>reporting/</code>, <code>plotting/</code>, <code>docs/</code>); <code>reference_models/</code>, published models checked against their stated results; <code>model_kinds/</code>, the test model kind through every generic layer; <code>suite/</code>, the checks of the rules of the tests; and <code>support/</code> with the shared model factories, the test kind (<code>kinds.py</code>), the test uncertainty method (<code>methods.py</code>), the coverage harness (<code>coverage.py</code>), the flow models, the reference solver, the oracles and the assertions. See <a href="../tests/">Tests</a>.</td>
+<td>Python tests: one package per page of the user guide (<code>building/</code>, <code>transitions/</code>, <code>rates/</code>, <code>axis_patterns/</code>, <code>initial_conditions/</code>, <code>simulation/</code>, <code>stochastic/</code>, <code>units/</code>, <code>calibration/</code>, <code>uncertainty/</code>, <code>reporting/</code>, <code>plotting/</code>, <code>docs/</code>); <code>reference_models/</code>, published models checked against their stated results; <code>model_kinds/</code>, the test model kind through every generic layer; <code>suite/</code>, the checks of the rules of the tests; and <code>support/</code> with the shared model factories, the test kind (<code>kinds.py</code>), the threads that run a method (<code>support/parallelism.py</code>), the test uncertainty method (<code>methods.py</code>), the coverage harness (<code>coverage.py</code>), the flow models, the reference solver, the oracles and the assertions. See <a href="../tests/">Tests</a>.</td>
 </tr>
 <tr>
 <td><code>crates/*/tests/</code>, <code>#[cfg(test)]</code> modules</td>
@@ -3920,7 +4057,7 @@
 </tr>
 <tr>
 <td>Expose a Rust function to Python</td>
-<td><code>py-commol/src/</code>; <code>py-commol/src/engine.rs</code> for a function that takes an engine</td>
+<td><code>py-commol/src/</code>; <code>py-commol/src/engine.rs</code> for a function that takes an engine; <code>parallel</code> (<code>py-commol/src/parallelism.rs</code>) to run parallel work, in the threads of <code>commol.threads</code></td>
 <td><code>py-commol/commol/commol_rs/_commol_rs.pyi</code>, <code>py-commol/commol/context/_model/engine_state.py</code> (the only Python caller of the engine queries)</td>
 </tr>
 <tr>

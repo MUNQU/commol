@@ -2352,13 +2352,17 @@ A polynomial chaos expansion (Sudret 2008): a polynomial surrogate of each quant
 
 Every input goes to `u = F(x)`, uniform on `[0, 1]` through its distribution, so one basis of orthonormal Legendre polynomials fits every distribution, truncated ones included. The coefficients come from least squares on a Latin hypercube; the leave-one-out error says how well the expansion predicts the model. It needs independent inputs.
 
+The basis keeps every term whose degrees `α` have `Σ α_i^q ≤ degree^q` and that holds at most `max_interaction` inputs. The defaults keep the total-degree basis, of `(k + degree)! / (k! degree!)` terms in `k` inputs; a truncation keeps the terms of low interaction order, so a basis of many inputs needs far fewer terms and runs. The number of terms is known before any run.
+
 Attributes:
 
-| Name         | Type             | Description                                                                                                 |
-| ------------ | ---------------- | ----------------------------------------------------------------------------------------------------------- |
-| `degree`     | `int`            | The total degree of the basis: in k inputs it has (k + degree)! / (k! degree!) terms.                       |
-| `draws`      | `int`            | The points of the Latin hypercube; more than the terms, and two or three times as many is the usual choice. |
-| `quantities` | `list[Quantity]` | What each run is reduced to.                                                                                |
+| Name              | Type             | Description                                                                                                                      |
+| ----------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `degree`          | `int`            | The degree of the basis: the largest degree of an input in a term, and the total degree of a term when q_norm is 1.              |
+| `q_norm`          | `float`          | The q of the hyperbolic truncation, in (0, 1\]: below 1, a term of several inputs keeps a lower total degree than a term of one. |
+| `max_interaction` | \`int            | None\`                                                                                                                           |
+| `draws`           | `int`            | The points of the Latin hypercube; more than the terms, and two or three times as many is the usual choice.                      |
+| `quantities`      | `list[Quantity]` | What each run is reduced to.                                                                                                     |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -2375,11 +2379,24 @@ class PolynomialChaos(SensitivityMethod[ChaosResult]):
     squares on a Latin hypercube; the leave-one-out error says how well the
     expansion predicts the model. It needs independent inputs.
 
+    The basis keeps every term whose degrees ``α`` have
+    ``Σ α_i^q ≤ degree^q`` and that holds at most ``max_interaction``
+    inputs. The defaults keep the total-degree basis, of
+    ``(k + degree)! / (k! degree!)`` terms in ``k`` inputs; a truncation
+    keeps the terms of low interaction order, so a basis of many inputs
+    needs far fewer terms and runs. The number of terms is known before any
+    run.
+
     Attributes
     ----------
     degree : int
-        The total degree of the basis: in ``k`` inputs it has
-        ``(k + degree)! / (k! degree!)`` terms.
+        The degree of the basis: the largest degree of an input in a term,
+        and the total degree of a term when ``q_norm`` is 1.
+    q_norm : float
+        The q of the hyperbolic truncation, in ``(0, 1]``: below 1, a term
+        of several inputs keeps a lower total degree than a term of one.
+    max_interaction : int | None
+        The largest number of inputs of a term; None for no limit.
     draws : int
         The points of the Latin hypercube; more than the terms, and two or
         three times as many is the usual choice.
@@ -2387,7 +2404,13 @@ class PolynomialChaos(SensitivityMethod[ChaosResult]):
         What each run is reduced to.
     """
 
-    degree: int = Field(ge=1, description="The total degree of the basis.")
+    degree: int = Field(ge=1, description="The degree of the basis.")
+    q_norm: float = Field(
+        default=1.0, gt=0.0, le=1.0, description="The q of the q-norm of the basis."
+    )
+    max_interaction: int | None = Field(
+        default=None, ge=1, description="The largest number of inputs of a term."
+    )
     draws: int = Field(ge=2, description="Points of the Latin hypercube.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
@@ -2404,18 +2427,20 @@ The expansion is a surrogate of the model: `predict` gives the quantities at any
 
 Attributes:
 
-| Name             | Type                | Description                                                                                                        |
-| ---------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `inputs`         | `list[str]`         | The inputs, in order.                                                                                              |
-| `input_space`    | `InputSpace`        | The inputs and their distributions, which predict maps values through.                                             |
-| `labels`         | `list[str]`         | The label of each quantity.                                                                                        |
-| `degree`         | `int`               | The total degree of the basis.                                                                                     |
-| `indices`        | `list[list[int]]`   | The degree of each input in each term, [term][input]; term 0 is the constant.                                      |
-| `coefficients`   | `list[list[float]]` | The coefficient of each term for each quantity, [quantity][term], on orthonormal Legendre polynomials of u = F(x). |
-| `loo_error`      | `list[float]`       | The leave-one-out error of each quantity, relative to its variance; NaN for a quantity of no variance.             |
-| `mean, variance` | `list[float]`       | The mean and the variance of each quantity under the expansion.                                                    |
-| `first, total`   | `list[list[float]]` | The first-order and total Sobol indices, [quantity][input]; NaN for a quantity of no variance.                     |
-| `runs`           | `int`               | The number of points run.                                                                                          |
+| Name              | Type                | Description                                                                                                        |
+| ----------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `inputs`          | `list[str]`         | The inputs, in order.                                                                                              |
+| `input_space`     | `InputSpace`        | The inputs and their distributions, which predict maps values through.                                             |
+| `labels`          | `list[str]`         | The label of each quantity.                                                                                        |
+| `degree`          | `int`               | The degree of the basis: the bound of the q-norm of every term.                                                    |
+| `q_norm`          | `float`             | The q of the q-norm of the basis; 1 for the total-degree basis.                                                    |
+| `max_interaction` | \`int               | None\`                                                                                                             |
+| `indices`         | `list[list[int]]`   | The degree of each input in each term, [term][input]; term 0 is the constant.                                      |
+| `coefficients`    | `list[list[float]]` | The coefficient of each term for each quantity, [quantity][term], on orthonormal Legendre polynomials of u = F(x). |
+| `loo_error`       | `list[float]`       | The leave-one-out error of each quantity, relative to its variance; NaN for a quantity of no variance.             |
+| `mean, variance`  | `list[float]`       | The mean and the variance of each quantity under the expansion.                                                    |
+| `first, total`    | `list[list[float]]` | The first-order and total Sobol indices, [quantity][input]; NaN for a quantity of no variance.                     |
+| `runs`            | `int`               | The number of points run.                                                                                          |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -2441,7 +2466,11 @@ class ChaosResult(BaseModel):
     labels : list[str]
         The label of each quantity.
     degree : int
-        The total degree of the basis.
+        The degree of the basis: the bound of the q-norm of every term.
+    q_norm : float
+        The q of the q-norm of the basis; 1 for the total-degree basis.
+    max_interaction : int | None
+        The largest number of inputs of a term; None for no limit.
     indices : list[list[int]]
         The degree of each input in each term, ``[term][input]``; term 0 is
         the constant.
@@ -2466,6 +2495,8 @@ class ChaosResult(BaseModel):
     input_space: InputSpace
     labels: list[str]
     degree: int
+    q_norm: float
+    max_interaction: int | None
     indices: list[list[int]]
     coefficients: list[list[float]]
     loo_error: list[float]
@@ -2530,12 +2561,15 @@ class ChaosResult(BaseModel):
         ------
         ValueError
             If a point has not one value per input or a value outside the
-            bounds of its input, or the coefficients do not fit the degree.
+            bounds of its input, the truncation is not valid, or the
+            coefficients do not fit the basis.
         """
         return commol_rs.inference.chaos_evaluate(
             engine_state.rust_parameters(self.input_space.parameters),
             self.input_space.rust_distributions() or [],
             self.degree,
+            self.q_norm,
+            self.max_interaction,
             self.coefficients,
             [list(point) for point in values],
         )
@@ -2634,9 +2668,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                   |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If a point has not one value per input or a value outside the bounds of its input, or the coefficients do not fit the degree. |
+| Type         | Description                                                                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a point has not one value per input or a value outside the bounds of its input, the truncation is not valid, or the coefficients do not fit the basis. |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -2660,12 +2694,15 @@ def predict(self, values: Sequence[Sequence[float]]) -> list[list[float]]:
     ------
     ValueError
         If a point has not one value per input or a value outside the
-        bounds of its input, or the coefficients do not fit the degree.
+        bounds of its input, the truncation is not valid, or the
+        coefficients do not fit the basis.
     """
     return commol_rs.inference.chaos_evaluate(
         engine_state.rust_parameters(self.input_space.parameters),
         self.input_space.rust_distributions() or [],
         self.degree,
+        self.q_norm,
+        self.max_interaction,
         self.coefficients,
         [list(point) for point in values],
     )
@@ -3219,6 +3256,145 @@ Source code in `commol/context/inference/quantities.py`
 def axes(self) -> list[tuple[str, float | None]]:
     """Its name and each position."""
     return [(self._name(), at) for at in self.positions]
+```
+
+## Ratio
+
+Bases: `_OneScalar`
+
+The ratio of two quantities of one value each, numerator N over denominator D.
+
+The ratio of a run whose denominator is 0 is NaN, also when the numerator is not 0, and follows the NaN rule of every method. A method that reduces the points of a design (`PRCC`, `Morris`, `Sobol`, `PolynomialChaos`) reads one value per point; with a stochastic engine, `replicates` says how the replicates of a point combine. A `Propagation`, the `Scenarios` and the quantities of one run keep the ratio of each run.
+
+Attributes:
+
+| Name          | Type                                | Description                                                                                                                                                                                     |
+| ------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `numerator`   | \`ValueAt                           | Gain                                                                                                                                                                                            |
+| `denominator` | \`ValueAt                           | Gain                                                                                                                                                                                            |
+| `replicates`  | `{within, within_positive, pooled}` | "within": the mean of the ratio of each replicate, E[N/D]; a replicate with D = 0 leaves the point with no value. "within_positive": the mean of the ratio of the replicates with D > 0, E\[N/D |
+
+Source code in `commol/context/inference/quantities.py`
+
+```python
+class Ratio(_OneScalar):
+    """
+    The ratio of two quantities of one value each, numerator N over
+    denominator D.
+
+    The ratio of a run whose denominator is 0 is NaN, also when the
+    numerator is not 0, and follows the NaN rule of every method. A method
+    that reduces the points of a design (`PRCC`, `Morris`, `Sobol`,
+    `PolynomialChaos`) reads one value per point; with a stochastic engine,
+    `replicates` says how the replicates of a point combine. A `Propagation`,
+    the `Scenarios` and the quantities of one run keep the ratio of each run.
+
+    Attributes
+    ----------
+    numerator : ValueAt | Gain | Peak
+        The quantity divided.
+    denominator : ValueAt | Gain | Peak
+        The quantity it is divided by.
+    replicates : {"within", "within_positive", "pooled"}
+        ``"within"``: the mean of the ratio of each replicate, E[N/D]; a
+        replicate with D = 0 leaves the point with no value.
+        ``"within_positive"``: the mean of the ratio of the replicates with
+        D > 0, E[N/D | D > 0]; a point with no such replicate has no value.
+        ``"pooled"``: the ratio of the means, E[N]/E[D]; a point with
+        E[D] = 0 has no value. With a deterministic engine, the three give
+        N/D, and a point with D = 0 has no value.
+    """
+
+    kind: Literal["ratio"] = "ratio"
+    numerator: _Operand = Field(description="The quantity divided.")
+    denominator: _Operand = Field(description="The quantity it is divided by.")
+    replicates: ReplicateRule = Field(
+        description="How the replicates of a stochastic run combine."
+    )
+
+    @field_validator("numerator", "denominator")
+    @classmethod
+    def one_value(cls, value: QuantityBase) -> QuantityBase:
+        """An operand gives one value per run."""
+        if isinstance(value, PeakPosition | Trajectory):
+            raise ValueError(
+                f"A Ratio divides quantities of one value each (ValueAt, Gain, "
+                f"Peak), got the {type(value).__name__} '{value.labels()[0]}'"
+            )
+        return value
+
+    def default_label(self) -> str:
+        """The numerator over the denominator."""
+        numerator = self.numerator.labels()[0]
+        denominator = self.denominator.labels()[0]
+        return f"({numerator}) / ({denominator})"
+
+    def rust_json(self) -> str:
+        """The ratio as Rust reads it: its JSON, without the labels."""
+        return self.model_dump_json(
+            exclude={"label": True, "numerator": {"label"}, "denominator": {"label"}}
+        )
+```
+
+### Methods:
+
+#### one_value
+
+```python
+one_value(value: QuantityBase) -> QuantityBase
+```
+
+An operand gives one value per run.
+
+Source code in `commol/context/inference/quantities.py`
+
+```python
+@field_validator("numerator", "denominator")
+@classmethod
+def one_value(cls, value: QuantityBase) -> QuantityBase:
+    """An operand gives one value per run."""
+    if isinstance(value, PeakPosition | Trajectory):
+        raise ValueError(
+            f"A Ratio divides quantities of one value each (ValueAt, Gain, "
+            f"Peak), got the {type(value).__name__} '{value.labels()[0]}'"
+        )
+    return value
+```
+
+#### default_label
+
+```python
+default_label() -> str
+```
+
+The numerator over the denominator.
+
+Source code in `commol/context/inference/quantities.py`
+
+```python
+def default_label(self) -> str:
+    """The numerator over the denominator."""
+    numerator = self.numerator.labels()[0]
+    denominator = self.denominator.labels()[0]
+    return f"({numerator}) / ({denominator})"
+```
+
+#### rust_json
+
+```python
+rust_json() -> str
+```
+
+The ratio as Rust reads it: its JSON, without the labels.
+
+Source code in `commol/context/inference/quantities.py`
+
+```python
+def rust_json(self) -> str:
+    """The ratio as Rust reads it: its JSON, without the labels."""
+    return self.model_dump_json(
+        exclude={"label": True, "numerator": {"label"}, "denominator": {"label"}}
+    )
 ```
 
 ## quantity_schedule

@@ -8,6 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-22
+
+This release gives control over the work of a calibration and over what a result records. `commol.threads(n, levels)` sets how many threads the parallel methods use and which levels run in parallel, a particle swarm can stop when it has converged, a polynomial chaos takes a truncated basis for many inputs, and `Ratio` gives a sensitivity analysis the ratio of two quantities. A calibration result records its seed, and `commol.build_info()` names the version and the commit of the package. Before you upgrade, read the **Breaking** entry: `CalibrationResult` requires `seed`. See [Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md) and [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md).
+
+### Added
+
+- `PolynomialChaos(q_norm=..., max_interaction=...)`: a truncated basis for many inputs. `max_interaction` keeps the terms of at most that many inputs, and `q_norm`, in `(0, 1]`, the terms whose degrees have `Σ α_i^q ≤ degree^q`; the defaults keep the total-degree basis. 20 inputs at degree 4 with `max_interaction=2` have 1,221 terms instead of 10,626, and the number is known before any run. `ChaosResult` records both. See [Bases for many inputs](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#bases-for-many-inputs).
+- `ParticleSwarmConfig.improvement_stop(window=..., tol_abs=..., tol_rel=...)` and `ParticleSwarmConfig.radius_stop(tol)`: a particle swarm stops when its best loss improved by at most `tol_abs + tol_rel·|best loss|` over the last `window` iterations, or when every particle is within `tol` of the best position, as a fraction of the size of the search box. Both are off by default and have no default values. A run that stops by a rule reports `converged=True`, so a profile that holds a prediction with a swarm also converges. See [Stop rules](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#stop-rules).
+- `commol.set_threads(n)`, the context manager `commol.threads(n, levels)`, `commol.get_threads()` and `commol.get_levels()` choose the number of threads of every parallel method and the levels that run in parallel. The setting holds per Python thread (`contextvars`); without it, commol uses one thread per core. A particle swarm scores the particles of each iteration in parallel, in the order of the particles, with `levels="all"`, the default; `levels="outer"` keeps them in order. A seed gives the same result, history included, with any number of threads and either level. See [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
+- A calibration result records the seed it used, `CalibrationResult.seed` (`Calibrator.seed`: `problem.seed`, or the seed the calibrator drew), and the sample of every uncertainty method and of `Calibrator.point_sample` names it in `method.settings["seed"]`. Set as `problem.seed`, it repeats the run, also from a result read back from JSON. See [Reproducibility](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#reproducibility).
+- `commol.__version__` gives the installed version, and `commol.build_info()` gives a `BuildInfo` with the version and the full commit the extension was built from (`None` when the source has no git metadata, such as a source distribution). A build that is not a release, such as an install from a git commit, names its commit as a PEP 440 local version: `0.1.0+g<first 7 characters of the commit>`. See [Check the installation](https://munqu.github.io/commol/latest/getting-started/installation/#check-the-installation).
+- `Ratio(numerator, denominator, replicates)` is a quantity of interest: one `ValueAt`, `Gain` or `Peak` over another, in each run, so PRCC, Morris, Sobol and a polynomial chaos read a ratio whose denominator depends on the inputs. `replicates` is required: with a stochastic engine, a point of a design holds the mean of the ratios (`"within"`), the mean of the ratios of the replicates with a positive denominator (`"within_positive"`) or the ratio of the means (`"pooled"`). A denominator of 0 makes the ratio of a run NaN, and every method follows the NaN rule. See [A ratio of two quantities](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#a-ratio-of-two-quantities).
+
+### Changed
+
+- The tolerance of a profile under a particle swarm with the improvement stop rule is the improvement the rule allows at the fit, `tol_abs + tol_rel·|objective at the fit|`; without that rule it stays `1e-6·max(1, |objective at the fit|)`. See [Verdicts](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#verdicts-and-the-identifiability-report).
+- The parallel methods run in a thread pool of commol, not in the global pool of `rayon`: the environment variable `RAYON_NUM_THREADS` no longer limits them; use `commol.set_threads`. A particle swarm, which scored its particles one after the other, now scores them in parallel by default.
+- **Breaking:** `CalibrationResult` requires `seed`; a result saved by an earlier version, or built by hand, needs one to load.
+
+### Fixed
+
+- A particle swarm without `problem.seed` takes the seed the calibrator draws and logs, so that seed repeats it; before, it drew one of its own that no result or log kept.
+- A profile that holds a prediction with a particle swarm scores its particles in parallel only when the levels of `commol.threads` are `"all"`, and stops with the error of the first failing particle, as every other swarm does; before, it scored them in parallel at any level and reported the error of any failing particle.
+
 ## [0.8.0] - 2026-10-22
 
 This release compares runs. `Scenarios` runs every draw of a sample under several sets of parameter values and compares them in pairs, a quantity of interest reads a series and reduces it (the peak of the gains over windows, for example), and `results.quantities` reads the quantities of one run. Figures are methods of the results they draw: `plot.series`, `plot.observations` and `plot_compared`, which draws several runs or samples on the same panels. Before you upgrade, read the **Breaking** entries: `SimulationPlotter` and seaborn are removed and matplotlib is the optional extra `commol[plot]`, the quantities take a `series`, and the runs of the draws of a stochastic sample follow one tree of seeds, so their numbers change. See [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md) and [Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md).
@@ -514,6 +538,7 @@ ______________________________________________________________________
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.9.0** - Control over the work and the record: threads and levels, swarm stop rules, truncated chaos bases, ratios, seeds and build info
 - **0.8.0** - Comparing runs: scenarios, quantities of a series, figures as methods and runs on the same panels
 - **0.7.0** - Reading a run through objects: the window grid and dates on the axis, series by output name and reports as methods
 - **0.6.1** - Fixes of 0.6.0: checks at build, messages of infeasible draws, PRCC with NaN, quantity labels and starts, plots

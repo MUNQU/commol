@@ -18,7 +18,7 @@
         <link rel="prev" href="../engines/">
       
       
-        <link rel="next" href="../uncertainty/">
+        <link rel="next" href="../optimizers/">
       
       
         
@@ -1469,6 +1469,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../guide/parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threads and Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../guide/examples/" class="md-nav__link">
         
   
@@ -1872,6 +1900,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/package/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parallelism
   
 
     
@@ -2485,17 +2569,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#nelder-mead-searches-inside-the-bounds" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Nelder-Mead searches inside the bounds
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#a-simulation-follows-its-model" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2539,10 +2612,60 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-result-records-its-seed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A result records its seed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parallel-work-runs-in-the-pool-of-the-setting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parallel work runs in the pool of the setting
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../optimizers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimizers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3127,17 +3250,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#nelder-mead-searches-inside-the-bounds" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Nelder-Mead searches inside the bounds
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#a-simulation-follows-its-model" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3181,6 +3293,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-result-records-its-seed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A result records its seed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parallel-work-runs-in-the-pool-of-the-setting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parallel work runs in the pool of the setting
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3203,7 +3337,7 @@
 
 <h1 id="calibration">Calibration<a class="headerlink" href="#calibration" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>What weights, bounds, the observation operator and constraints mean in a calibration.</p>
+<p>What weights, bounds, the observation operator and constraints mean in a calibration, and how its work runs in parallel. How the optimizers search is on <a href="../optimizers/">Optimizers</a>.</p>
 <h2 id="one-meaning-of-an-observation-weight">One meaning of an observation weight<a class="headerlink" href="#one-meaning-of-an-observation-weight" title="Permanent link">&para;</a></h2>
 <p><code>LossConfig::term</code> and <code>LossConfig::finish</code> in
 <code>crates/commol-calibration/src/types.rs</code> compute every loss: <code>sse</code> is
@@ -3257,20 +3391,6 @@ process), <code>LossDistance</code> of ABC and information matching of <code>η<
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_likelihood.rs</code>,
 <code>tests/uncertainty/test_observation_models.py</code>.</p>
-<h2 id="nelder-mead-searches-inside-the-bounds">Nelder-Mead searches inside the bounds<a class="headerlink" href="#nelder-mead-searches-inside-the-bounds" title="Permanent link">&para;</a></h2>
-<p>The objective clamps values to their bounds, so the loss is flat outside them,
-and a simplex that crosses a bound collapses there. Nelder-Mead therefore
-searches an unbounded <code>u</code> and scores <code>x = lo + (hi − lo)·(sin u + 1)/2</code>
-(<code>SineTransform</code> and <code>BoundedProblem</code> of the argmin fork, in
-<code>argmin::core::bounds</code>; <code>SearchSpace::transform</code> in <code>optimization.rs</code> builds
-the transform and refuses an infinite bound). Its evaluations and its result
-are recorded in <code>x</code>. <code>converged</code> is true only for
-<code>SolverConverged</code> and <code>TargetCostReached</code> (<code>optimization::converged</code>). An
-error of the model at a vertex of the initial simplex stops the run with its
-message (<code>NelderMead::init</code> of the argmin fork returns it).</p>
-<p><strong>Rule:</strong> report and record values in <code>x</code>, never in <code>u</code>. Every optimizer run,
-the verbose one included, goes through <code>optimization::run</code>.</p>
-<p><strong>Guards:</strong> <code>optimization::tests</code>; <code>tests/calibration/test_optimizers.py</code>.</p>
 <h2 id="a-simulation-follows-its-model">A <code>Simulation</code> follows its model<a class="headerlink" href="#a-simulation-follows-its-model" title="Permanent link">&para;</a></h2>
 <p><code>Simulation</code> keeps the JSON its engine was built from. <code>run</code>, <code>engine</code> and
 <code>simulation_outputs</code> compare it with <code>model_dump_json()</code> and rebuild the engine
@@ -3367,7 +3487,8 @@ the iteration before, or a swarm seeded by <code>replicate_seed(seed, k)</code>.
 prediction is read through the observation operator of a copy of the problem
 whose runs also report at its positions (<code>CalibrationProblem::observing</code>), so
 one run gives the objective and the constraint, and the cost keeps the
-constraint of the last point it scored. A point that is not feasible keeps
+constraint of the last point each thread scored (the augmented Lagrangian
+asks for both on one thread; a swarm scores its particles on several). A point that is not feasible keeps
 its penalty and a constraint of 0. Each point starts from Algencan's scaled
 penalty; the multiplier is the warm start.</p>
 <table>
@@ -3396,13 +3517,67 @@ penalty; the multiplier is the warm start.</p>
 </tr>
 </tbody>
 </table>
-<p>A swarm without stop rules runs each outer iteration to its <code>max_iterations</code>,
-so a held prediction stops at the outer limit and never reports convergence.</p>
+<p>The augmented Lagrangian stops only when an inner run converged. A swarm
+without a stop rule runs each outer iteration to its <code>max_iterations</code>, so a
+held prediction stops at the outer limit and never reports convergence; with
+the improvement rule, it stops when the constraint holds.</p>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_profiles.rs</code>
 (<code>fixing_a_parameter_at_the_fit_keeps_the_loss</code>,
 <code>fixing_a_prediction_at_the_fit_keeps_the_parameters</code>,
 <code>a_problem_observing_more_positions_scores_as_the_problem</code>,
 <code>a_swarm_fits_a_subproblem_and_repeats_from_its_seed</code>).</p>
+<h2 id="a-result-records-its-seed">A result records its seed<a class="headerlink" href="#a-result-records-its-seed" title="Permanent link">&para;</a></h2>
+<p>Every random number of a calibration and of its uncertainty methods comes from
+<code>Calibrator.seed</code>: <code>problem.seed</code>, or a seed the calibrator draws once and
+logs. A particle swarm takes it too, so the seed alone repeats a run. The
+result records it, so a result read from a file repeats too:
+<code>CalibrationResult.seed</code>, and <code>settings["seed"]</code> of the <code>SampleMethod</code> of every
+sample a runner makes (<code>sample_method</code> in <code>api/inference/resampling.py</code>) or
+<code>Calibrator.point_sample</code> makes.</p>
+<p><strong>Guards:</strong> <code>tests/calibration/test_problem.py</code>
+(<code>test_a_result_records_the_seed_of_its_calibration</code>);
+<code>tests/calibration/test_optimizers.py</code>
+(<code>test_the_seed_of_a_result_repeats_a_particle_swarm</code>).</p>
+<h2 id="parallel-work-runs-in-the-pool-of-the-setting">Parallel work runs in the pool of the setting<a class="headerlink" href="#parallel-work-runs-in-the-pool-of-the-setting" title="Permanent link">&para;</a></h2>
+<p>Every binding that runs parallel work calls <code>parallel</code> (<code>py-commol/src/parallelism.rs</code>),
+which releases the GIL and runs the job in <code>Parallelism::install</code>
+(<code>crates/commol-core/src/parallelism.rs</code>): a <code>rayon</code> pool of the number of
+threads of <code>commol.threads</code>, built at its first use and kept for the next job
+with the same setting. Every <code>par_iter</code> inside the job, of commol and of the
+argmin fork, nested levels included, runs in that pool. The setting is a
+<code>contextvars</code> variable that the extension owns, so each Python thread and
+each <code>commol.threads</code> block has its own. A pool is kept per number of
+threads and levels: each thread of a pool holds the levels of its pool
+(<code>start_handler</code>), because a nested job can run on any thread of the pool.</p>
+<p><strong>Rule:</strong> a binding never calls <code>py.detach</code> itself, and no code builds a pool
+or reads <code>RAYON_NUM_THREADS</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The global pool of <code>rayon</code> (<code>build_global</code>)</td>
+<td>It is fixed at its first use, so a block could not change it, and other libraries of the process share it.</td>
+</tr>
+<tr>
+<td>An argument of each method</td>
+<td>One choice about the machine repeated in every call; a block could not set it for a whole script.</td>
+</tr>
+<tr>
+<td>One pool per number of threads, the levels in a thread-local of the caller</td>
+<td>A job that another thread steals reads the levels of that thread, which another setting may have left.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-core/src/parallelism.rs</code> <code>tests</code>;
+<code>tests/uncertainty/test_parallelism.py::test_every_parallel_method_runs_on_the_threads_of_the_setting</code>;
+<code>tests/calibration/test_parallelism.py::test_a_thread_limit_bounds_every_parallel_method</code>.
+They read the threads that ran the test kind (<code>threads_of_runs</code>), not the
+CPU time, so the load of the machine does not change them.</p>
 
 
 

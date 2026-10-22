@@ -74,6 +74,7 @@ results = Simulation(model).run(num_steps=100)
 | Calibration of parameters, initial conditions and scale factors                                        | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                                                                  |
 | Parameter samples, predictive bands and scores                                                         | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                                                                        |
 | JSON-ready reports and matplotlib figures                                                              | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md), [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting) |
+| Parallel starts, replicates, particles and draws, on the threads you choose                            | [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md)                                                            |
 
 ## License and authors
 

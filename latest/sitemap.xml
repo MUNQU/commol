@@ -45,6 +45,14 @@
          <lastmod>2026-10-22</lastmod>
     </url>
     <url>
+         <loc>https://munqu.github.io/commol/latest/api/package/</loc>
+         <lastmod>2026-10-22</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/latest/api/parallelism/</loc>
+         <lastmod>2026-10-22</lastmod>
+    </url>
+    <url>
          <loc>https://munqu.github.io/commol/latest/api/plotting/</loc>
          <lastmod>2026-10-22</lastmod>
     </url>
@@ -122,6 +130,10 @@
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/codebase/decisions/model-structure/</loc>
+         <lastmod>2026-10-22</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/latest/codebase/decisions/optimizers/</loc>
          <lastmod>2026-10-22</lastmod>
     </url>
     <url>
@@ -218,6 +230,10 @@
     </url>
     <url>
          <loc>https://munqu.github.io/commol/latest/guide/mathematical-expressions/</loc>
+         <lastmod>2026-10-22</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/latest/guide/parallelism/</loc>
          <lastmod>2026-10-22</lastmod>
     </url>
     <url>

@@ -83,6 +83,7 @@ results = Simulation(model).run(num_steps=100)
 | Calibration of parameters, initial conditions and scale factors                                        | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                                                                  |
 | Parameter samples, predictive bands and scores                                                         | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                                                                        |
 | JSON-ready reports and matplotlib figures                                                              | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md), [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting) |
+| Parallel starts, replicates, particles and draws, on the threads you choose                            | [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md)                                                            |
 
 ## License and authors
 
@@ -116,12 +117,21 @@ On other platforms, `pip` builds Commol from the source distribution, which need
 ## Check the installation
 
 ```python
-import importlib.metadata
+import commol
 
-from commol import ModelBuilder, Simulation
-
-print(importlib.metadata.version("commol"))
+print(commol.__version__)
+print(commol.build_info())
 ```
+
+`commol.__version__` is the version you installed. `commol.build_info()` gives it with the full commit of the source; save it with a result to name the code that made it.
+
+| Installed from                               | `__version__`                               | `build_info().commit`                  |
+| -------------------------------------------- | ------------------------------------------- | -------------------------------------- |
+| A wheel of a release on PyPI                 | The release, such as `0.9.0`                | The commit of the release              |
+| The source distribution of a release         | The release                                 | `None`: the source has no git metadata |
+| A git commit, or a clone (`maturin develop`) | `0.1.0+g<first 7 characters of the commit>` | The full commit                        |
+
+A build that is not a release has the placeholder version `0.1.0` of the source, so its local version (`+g…`) is what names its commit. The metadata of the package (`pip show commol`) gives the placeholder alone.
 
 ## Build from source
 
@@ -3386,6 +3396,7 @@ With one replicate the CRPS is the absolute error. The [predictive](https://munq
 | `converged`               | `True` only when the optimizer met its convergence test or `target_cost`; a run that used all `max_iterations` is `False`. See [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#converged-and-termination_reason). |
 | `termination_reason`      | Why it stopped                                                                                                                                                                                                                                     |
 | `starts`, `failed_runs`   | Every start that finished, and why each failed one did. See [Several starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts).                                                                                  |
+| `seed`                    | The seed of the calibration's random numbers (`Calibrator.seed`). See [Reproducibility](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#reproducibility).                                                                      |
 
 ```python
 print(result.converged, result.termination_reason)
@@ -3948,14 +3959,14 @@ The search starts at `initial_guess`, or at the midpoint of the bounds; a start 
 
 ## `converged` and `termination_reason`
 
-| `termination_reason`            | `converged` | Meaning                                                                 |
-| ------------------------------- | ----------- | ----------------------------------------------------------------------- |
-| `Terminated(SolverConverged)`   | `True`      | Nelder-Mead: the spread of the simplex values fell below `sd_tolerance` |
-| `Terminated(TargetCostReached)` | `True`      | Particle swarm: the loss reached `target_cost`                          |
-| `Terminated(MaxItersReached)`   | `False`     | The run used all `max_iterations`                                       |
-| Any other reason                | `False`     | The run stopped for another reason, such as a timeout                   |
+| `termination_reason`            | `converged` | Meaning                                                                                                                  |
+| ------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `Terminated(SolverConverged)`   | `True`      | Nelder-Mead: the spread of the simplex values fell below `sd_tolerance`. Particle swarm: a [stop rule](#stop-rules) held |
+| `Terminated(TargetCostReached)` | `True`      | Particle swarm: the loss reached `target_cost`                                                                           |
+| `Terminated(MaxItersReached)`   | `False`     | The run used all `max_iterations`                                                                                        |
+| Any other reason                | `False`     | The run stopped for another reason, such as a timeout                                                                    |
 
-`converged` comes from `converged` in `optimization.rs`. A particle swarm without `target_cost` always stops at `max_iterations`, so it reports `converged=False`; judge it by `final_loss`.
+`converged` comes from `converged` in `optimization.rs`. A particle swarm without a [stop rule](#stop-rules) always stops at `max_iterations`, so it reports `converged=False`; judge it by `final_loss`.
 
 ## Particle swarm
 
@@ -3979,18 +3990,51 @@ print(calibrate(swarm))  # {'k1': 0.4, 'k2': 0.1}
 
 Each method returns the configuration, so they chain:
 
-| Method                                                                              | Arguments             | Effect                                                                                                                                                                                         |
-| ----------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.inertia("constant", factor=0.721)`                                                | `factor`              | A fixed inertia weight.                                                                                                                                                                        |
-| `.inertia("chaotic", w_min=…, w_max=…)`                                             | `w_min < w_max`       | An inertia weight that varies chaotically between the two.                                                                                                                                     |
-| `.acceleration("constant", cognitive=1.193, social=1.193)`                          | `cognitive`, `social` | Fixed pulls towards each particle's best and the swarm's best.                                                                                                                                 |
-| `.acceleration("time_varying", c1_initial=…, c1_final=…, c2_initial=…, c2_final=…)` | four factors          | Pulls that change from explore (high `c1`) to exploit (high `c2`).                                                                                                                             |
-| `.velocity(clamp_factor=None, mutation_threshold=None)`                             | fractions             | `clamp_factor` limits speed to a share of the search box (0.1–0.2 is typical); `mutation_threshold` restarts particles slower than it (0.001–0.01).                                            |
-| `.mutation(strategy, *, scale, probability, application)`                           | see right             | Random jumps to escape local minima: `strategy` `"gaussian"` or `"cauchy"` (larger jumps), `probability` per iteration, `application` `"global_best"`, `"all_particles"` or `"below_average"`. |
+| Method                                                                              | Arguments                     | Effect                                                                                                                                                                                         |
+| ----------------------------------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.inertia("constant", factor=0.721)`                                                | `factor`                      | A fixed inertia weight.                                                                                                                                                                        |
+| `.inertia("chaotic", w_min=…, w_max=…)`                                             | `w_min < w_max`               | An inertia weight that varies chaotically between the two.                                                                                                                                     |
+| `.acceleration("constant", cognitive=1.193, social=1.193)`                          | `cognitive`, `social`         | Fixed pulls towards each particle's best and the swarm's best.                                                                                                                                 |
+| `.acceleration("time_varying", c1_initial=…, c1_final=…, c2_initial=…, c2_final=…)` | four factors                  | Pulls that change from explore (high `c1`) to exploit (high `c2`).                                                                                                                             |
+| `.velocity(clamp_factor=None, mutation_threshold=None)`                             | fractions                     | `clamp_factor` limits speed to a share of the search box (0.1–0.2 is typical); `mutation_threshold` restarts particles slower than it (0.001–0.01).                                            |
+| `.mutation(strategy, *, scale, probability, application)`                           | see right                     | Random jumps to escape local minima: `strategy` `"gaussian"` or `"cauchy"` (larger jumps), `probability` per iteration, `application` `"global_best"`, `"all_particles"` or `"below_average"`. |
+| `.improvement_stop(*, window, tol_abs, tol_rel)`                                    | see [Stop rules](#stop-rules) | Stops when the best loss stops improving.                                                                                                                                                      |
+| `.radius_stop(tol)`                                                                 | see [Stop rules](#stop-rules) | Stops when the swarm has gathered around its best position.                                                                                                                                    |
+
+### Stop rules
+
+A swarm stops at `max_iterations` unless a stop rule holds first. The two rules come from the argmin fork; both are off until you set them, and neither has a default value. A run that stops by a rule reports `converged=True` and `termination_reason` `Terminated(SolverConverged)`.
+
+| Rule                                                | Stops when                                                                                                                                               | Arguments |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| `.improvement_stop(window=…, tol_abs=…, tol_rel=…)` | The best loss improved by at most \`tol_abs + tol_rel·                                                                                                   | best loss |
+| `.radius_stop(tol)`                                 | Every particle is within `tol` of the best position, as a fraction of the size of the search box (the length of its diagonal) (Zielinski and Laur, 2007) | `tol` ≥ 0 |
+
+```python
+stopping = ParticleSwarmConfig(num_particles=30, max_iterations=2000).improvement_stop(
+    window=30, tol_abs=1e-12, tol_rel=1e-9
+)
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=[
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+        CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+    ],
+    loss_function="sse",
+    optimization_config=stopping,
+    seed=7,
+)
+result = Calibrator(Simulation(model(None, None)), problem).run()
+print(result.converged, result.iterations < 2000)  # True True
+```
+
+A swarm can stall for some iterations and then improve again, so a short `window` can stop it early. Mutation and velocity mutation scatter the particles again, and unknowns that the data cannot tell apart keep them spread, so with them the radius can stay above `tol`. Neither rule draws random numbers: with the same seed, a run with a rule is the run without it up to the iteration where it stops. In a [profile](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md), the improvement rule also sets the tolerance of a swarm.
 
 ## Several starts
 
 `Calibrator.run(starts=n)` runs the optimizer from `n` start points in parallel and returns the best result. Start 0 is the initial guess of each parameter (its `initial_guess`, or the midpoint of its bounds). Start `i > 0` is a row of a Latin hypercube over the bounds, drawn from the problem's `seed`: with `n − 1` rows, each parameter has one start in each of `n − 1` equal strata of its bounds, so the starts cover the parameter space (`start_points` in `crates/commol-calibration/src/starts.rs`). A particle swarm draws its own population; its start `i > 0` takes its own seed.
+
+A particle swarm also scores the particles of each iteration in parallel, in the order of the particles, so the result does not depend on the number of threads. `commol.threads` chooses the threads and whether the particles run in parallel: see [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
 
 ```python
 problem = CalibrationProblem(
@@ -4018,7 +4062,12 @@ The result is the start of least loss; if every start fails, `run` raises a `Run
 
 ## Reproducibility
 
-Set `CalibrationProblem(seed=...)`: the starts, a particle swarm and the replicates of a stochastic engine then make the same random choices on every run. Without a seed, `Calibrator.seed` draws one from the operating system and logs it, so the run can be repeated.
+Set `CalibrationProblem(seed=...)`: the starts, a particle swarm and the replicates of a stochastic engine then make the same random choices on every run. Without a seed, `Calibrator.seed` draws one from the operating system and logs it. The result keeps it in `CalibrationResult.seed`, and the sample of each uncertainty method in `sample.method.settings["seed"]`: set it as `problem.seed` to repeat the run, also from a result read back from JSON.
+
+```python
+again = problem.model_copy(update={"seed": result.seed})
+print(Calibrator(Simulation(model(None, None)), again).run(starts=4) == result)  # True
+```
 
 ## History of evaluations
 
@@ -4026,14 +4075,14 @@ Set `CalibrationProblem(seed=...)`: the starts, a particle swarm and the replica
 
 ## Troubleshooting
 
-| Symptom                            | Try                                                                        |
-| ---------------------------------- | -------------------------------------------------------------------------- |
-| A result sits at a bound           | Check the bounds, give a better `initial_guess`, or use particle swarm     |
-| `converged=False`                  | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations` |
-| Different results on each run      | Set `seed`; use more particles or iterations                               |
-| A local minimum                    | `run(starts=n)` from several points                                        |
-| A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations     |
-| Slow                               | Fewer observation steps or particles; Nelder-Mead from a good start        |
+| Symptom                            | Try                                                                                                                                                                                             |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A result sits at a bound           | Check the bounds, give a better `initial_guess`, or use particle swarm                                                                                                                          |
+| `converged=False`                  | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations`; a particle swarm needs a [stop rule](#stop-rules) to converge                                                       |
+| Different results on each run      | Set `seed`; use more particles or iterations                                                                                                                                                    |
+| A local minimum                    | `run(starts=n)` from several points                                                                                                                                                             |
+| A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations                                                                                                                          |
+| Slow                               | Fewer observation steps or particles; Nelder-Mead from a good start; check `commol.get_threads()` ([Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md)) |
 
 ## Next steps
 
@@ -4312,14 +4361,14 @@ print(scores.crps(predictive, held_out, NoNoise()).per_series)
 
 A `ParameterSample` holds draws of the parameters of one problem, each with a weight. Every method with draws returns one; the plots, the reports, the predictive and the scores read it, never the result of a method.
 
-| Field         | Meaning                                                                                      |
-| ------------- | -------------------------------------------------------------------------------------------- |
-| `names`       | One name per column, in the order of the problem's parameters                                |
-| `bounds`      | The bounds of each parameter; every value lies inside them                                   |
-| `values`      | One row per draw                                                                             |
-| `log_weights` | The log weight of each draw, normalized so the weights sum to 1; `-inf` for a weight of zero |
-| `groups`      | The chain, replicate or wave of each draw, or `None`                                         |
-| `method`      | The name and settings of the method that made it (`SampleMethod`)                            |
+| Field         | Meaning                                                                                                                                                                                                                          |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `names`       | One name per column, in the order of the problem's parameters                                                                                                                                                                    |
+| `bounds`      | The bounds of each parameter; every value lies inside them                                                                                                                                                                       |
+| `values`      | One row per draw                                                                                                                                                                                                                 |
+| `log_weights` | The log weight of each draw, normalized so the weights sum to 1; `-inf` for a weight of zero                                                                                                                                     |
+| `groups`      | The chain, replicate or wave of each draw, or `None`                                                                                                                                                                             |
+| `method`      | The name and settings of the method that made it (`SampleMethod`); the settings of a method of `Calibrator.uncertainty` name the seed of the calibrator, `settings["seed"]`, which repeats the sample when set as `problem.seed` |
 
 Every statistic is weighted and computed in Rust. With equal weights it is the unweighted statistic.
 
@@ -4416,7 +4465,7 @@ for summary in scenarios.compare("slower", "fitted", quantities, confidence_leve
 
 A quantity is one of the quantities of interest ([Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#quantities-of-interest)), reduced in Rust by `Predictive.quantities`; a `Trajectory` gives one summary per position. The runs read them at `positions`, so the positions hold `quantity_schedule(quantities)`. For anything else, `scenarios[name].runs()` gives the runs, in the order of `weights`.
 
-The point estimate of a fit is a sample of one draw: `Calibrator.point_sample(result)` gives it, with the names and bounds of the problem and `SampleMethod(name="point")`. With one run, a summary gives the value of that run and no interval (`lower` and `upper` are None).
+The point estimate of a fit is a sample of one draw: `Calibrator.point_sample(result)` gives it, with the names and bounds of the problem and `SampleMethod(name="point", settings={"seed": result.seed})`. With one run, a summary gives the value of that run and no interval (`lower` and `upper` are None).
 
 ```python
 fit = calibrator_k1.run()
@@ -5694,13 +5743,14 @@ A quantity reads a series of each run and reduces it to a scalar, in Rust, throu
 | A name, a list of names, or `Level(outputs)` | The sum of the outputs, their level                                                                    |
 | `Increments(outputs, window)`                | The gain of the sum over `(end - window, end]`: the position is the end of a window, at least `window` |
 
-| Quantity                          | Value                                                                                                                                |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `ValueAt(series, at)`             | The value at `at`                                                                                                                    |
-| `Peak(series, positions)`         | The largest value at the positions                                                                                                   |
-| `PeakPosition(series, positions)` | The first of the positions where the value is largest                                                                                |
-| `Trajectory(series, positions)`   | The value at each position, one scalar per position, for an analysis over the axis                                                   |
-| `Gain(outputs, start, end)`       | The value at `end` minus the value at `start`: what entered a cumulative output over `(start, end]`, as an observation with a window |
+| Quantity                                    | Value                                                                                                                                |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `ValueAt(series, at)`                       | The value at `at`                                                                                                                    |
+| `Peak(series, positions)`                   | The largest value at the positions                                                                                                   |
+| `PeakPosition(series, positions)`           | The first of the positions where the value is largest                                                                                |
+| `Trajectory(series, positions)`             | The value at each position, one scalar per position, for an analysis over the axis                                                   |
+| `Gain(outputs, start, end)`                 | The value at `end` minus the value at `start`: what entered a cumulative output over `(start, end]`, as an observation with a window |
+| `Ratio(numerator, denominator, replicates)` | One quantity of one value over another, in each run ([A ratio of two quantities](#a-ratio-of-two-quantities))                        |
 
 The series is a modelling choice. The peak of a level is the largest amount; for an output that only grows, such as `C` here or an accumulator, it is the value at the last position. The peak of `Increments` is the largest gain over one window, and `PeakPosition` gives the end of that window:
 
@@ -5724,13 +5774,13 @@ for summary in gains.summary(0.9):
 
 Every quantity follows the same rules:
 
-| Rule                                                                       | So                                                                        |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| A quantity reads only the positions it names, with no interpolation        | A position the engine does not report at is a `ValueError`                |
-| Outputs are summed at each row before any reduction                        | The peak of `["A", "B"]` is the peak of `A + B`                           |
-| `PeakPosition` gives the first of the positions where the value is largest | A tie gives the earlier position                                          |
-| A NaN in a value a quantity reads makes it NaN                             | Its peak and the position of its peak are NaN too                         |
-| With a stochastic engine, a quantity is computed for each replicate        | A design point holds the mean of its replicates; a propagation keeps each |
+| Rule                                                                       | So                                                                                                                     |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| A quantity reads only the positions it names, with no interpolation        | A position the engine does not report at is a `ValueError`                                                             |
+| Outputs are summed at each row before any reduction                        | The peak of `["A", "B"]` is the peak of `A + B`                                                                        |
+| `PeakPosition` gives the first of the positions where the value is largest | A tie gives the earlier position                                                                                       |
+| A NaN in a value a quantity reads makes it NaN                             | Its peak and the position of its peak are NaN too                                                                      |
+| With a stochastic engine, a quantity is computed for each replicate        | A design point holds the mean of its replicates, or for a `Ratio` what its `replicates` says; a propagation keeps each |
 
 Each quantity has a `label`, by default what it reads, such as `"B at 10"`. The default label writes each position in full, as Python reads it back, so two positions give two labels: `"B at 1000000"` and `"B at 1000001"`.
 
@@ -5751,36 +5801,46 @@ print(round(late.summary(0.9)[0].median))  # 216
 
 ### A ratio of two quantities
 
-A ratio is taken within each run, before the runs are reduced: divide the two columns of `PropagationResult.values` row by row, leave out the rows that are not finite, and summarise the ratios with `member_statistics` and the weights of the rows. The share of the initial amount that entered `C` by position 100 is the gain of `C` over `(0, 100]` divided by the sum of the bins at 0:
+`Ratio(numerator, denominator, replicates)` divides two quantities of one value each (`ValueAt`, `Gain`, `Peak`), numerator N over denominator D, in each run. It is one quantity, so every method reads it, the sensitivity methods too. A `PeakPosition` or a `Trajectory` as an operand is a `ValueError`. The share of what entered `C` by position 100 that entered by position 50 has a denominator that depends on both inputs:
 
 ```python
-from commol import Gain, ValueAt, member_statistics
+from commol import Gain, Ratio
 
-parts = analysis.run(
-    Propagation(
-        draws=100,
-        quantities=[
-            Gain(outputs="C", start=0, end=100),
-            ValueAt(series=["A", "B", "C"], at=0),
-        ],
-    )
+early = Ratio(
+    numerator=Gain(outputs="C", start=0, end=50),
+    denominator=Gain(outputs="C", start=0, end=100),
+    replicates="within",
+    label="early share",
 )
-values = np.asarray(parts.values)
-finite = parts.where(np.isfinite(values[:, 0] / values[:, 1]))
-kept = np.asarray(finite.values)
-shares = (kept[:, 0] / kept[:, 1]).tolist()
-share = member_statistics(per_member=shares, confidence_level=0.9, weights=finite.weights)
-print(round(share["ci_lower"], 2), round(share["median"], 2), round(share["ci_upper"], 2))
-# 0.81 0.98 1.0
+spread = analysis.run(Propagation(draws=100, quantities=[early]))
+share = spread.summary(0.9)[0]
+print(share.label, round(share.lower, 2), round(share.median, 2), round(share.upper, 2))
+# early share 0.61 0.94 0.99
+ranked = analysis.run(PRCC(draws=200, quantities=[early]))
+print(ranked.inputs, [round(c, 2) for c in ranked.coefficients[0]])  # ['k1', 'k2'] [0.92, 0.69]
 ```
 
-| Rule                                                | Why                                                                                                                                                                                            |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Divide each row, then reduce                        | The mean of the ratios, E[N/D], is not the ratio of the means, E[N]/E\[D\]: the ratio of two summaries is another quantity                                                                     |
-| Leave out the rows that are not finite with `where` | A denominator of 0 gives an infinite ratio or NaN, and `member_statistics` raises on a NaN; `where` renormalises the weights of the kept rows, so the summary is conditioned on a finite ratio |
-| Pass the weights of the rows                        | A row is one run: with a sample of weights, or a stochastic engine, whose replicates share the weight of their draw, equal weights give another distribution                                   |
+The default label is `"(N) / (D)"`, from the labels of the two quantities. `replicates` is required, with no default: with a stochastic engine, it says how the replicates of a point of PRCC, Morris, Sobol or a polynomial chaos combine (`Quantities::combine` in `crates/commol-inference/src/quantity.rs`). They are three estimands, and the choice is yours:
 
-`PropagationResult.values` has one row per run, so the same division holds for the replicates of a stochastic engine (one row per replicate of each draw, draw by draw) and for the quantities of one run (below). The indices of a sensitivity method on a ratio equal those of its numerator only when the denominator is fixed and is not an input, as the sum of the bins at 0 is here: run the method on the numerator. commol has no quantity for a ratio, so a sensitivity method cannot read the ratio of a denominator that depends on the inputs.
+| `replicates`        | Value of a point                                           | No value when         |
+| ------------------- | ---------------------------------------------------------- | --------------------- |
+| `"within"`          | The mean of the ratio of each replicate, E[N/D]            | A replicate has D = 0 |
+| `"within_positive"` | The mean of the ratio of the replicates with D > 0, E\[N/D | D > 0\]               |
+| `"pooled"`          | The ratio of the means, E[N]/E[D]                          | E[D] = 0              |
+
+A deterministic engine has one run per point, so the three give N/D. A `Propagation`, `Scenarios` and the quantities of one run keep the ratio of each run, N/D, for each replicate.
+
+| Rule                                                       | So                                                                                                                                                                                              |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The ratio of a run with D = 0 is NaN, also when N is not 0 | N/0 is not ±inf, which a check for NaN misses; the NaN rule of [A quantity that is NaN](#a-quantity-that-is-nan) holds in every method                                                          |
+| A point with no value is NaN in every method               | The error names the point and its inputs, and the replicate that is NaN, when one is                                                                                                            |
+| `"within"` with D = 0 in one replicate                     | The point has no value. A Sobol design of 10^5 replicates almost surely holds one such replicate when D can reach 0                                                                             |
+| `"within_positive"`                                        | It conditions on D > 0, so it hides the effect of an input on the chance that D > 0: analyse that chance on its own. Its points average different numbers of replicates, so their noise differs |
+| `"pooled"`                                                 | The ratio of two means is another quantity than the mean of the ratios: it differs from `"within"` when D is small or 0 in some replicates                                                      |
+
+The indices of a ratio equal those of its numerator only when the denominator is fixed and is not an input, such as the sum of the bins at 0: then run the method on the numerator. When the denominator can be near 0, a ratio has large values in a few runs, and the Sobol and the chaos indices, which divide variances, are unstable; PRCC works on ranks, so it stays valid.
+
+A propagation keeps the NaN of each run in `values`, so `summary()` raises on a ratio with D = 0 in a run. `PropagationResult.where` keeps the runs where the ratio is finite, and the summary is then conditioned on that.
 
 ### The quantities of one run
 
@@ -5808,13 +5868,13 @@ for label, value in one_run.quantities(quantities).items():
 
 ## Which method for which budget
 
-| Method                                                       | Answers                                                                                    | Runs                              | Inputs                  |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | --------------------------------- | ----------------------- |
-| `Propagation(draws, quantities)`                             | The distribution of each quantity, and the band of every output                            | `draws`                           | Independent or a sample |
-| `PRCC(draws, quantities)`                                    | How steadily each quantity rises or falls with each input                                  | `draws`, more than the inputs + 1 | Independent or a sample |
-| `Morris(trajectories, levels, quantities)`                   | Which inputs matter, in few runs                                                           | `trajectories · (inputs + 1)`     | Independent             |
-| `Sobol(base_draws, bootstrap, confidence_level, quantities)` | The share of the variance each input explains, alone and with interactions, with intervals | `base_draws · (inputs + 2)`       | Independent             |
-| `PolynomialChaos(degree, draws, quantities)`                 | A polynomial surrogate and its Sobol indices, in far fewer runs for a smooth quantity      | `draws`, more than the terms      | Independent             |
+| Method                                                                         | Answers                                                                                    | Runs                              | Inputs                  |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | --------------------------------- | ----------------------- |
+| `Propagation(draws, quantities)`                                               | The distribution of each quantity, and the band of every output                            | `draws`                           | Independent or a sample |
+| `PRCC(draws, quantities)`                                                      | How steadily each quantity rises or falls with each input                                  | `draws`, more than the inputs + 1 | Independent or a sample |
+| `Morris(trajectories, levels, quantities)`                                     | Which inputs matter, in few runs                                                           | `trajectories · (inputs + 1)`     | Independent             |
+| `Sobol(base_draws, bootstrap, confidence_level, quantities)`                   | The share of the variance each input explains, alone and with interactions, with intervals | `base_draws · (inputs + 2)`       | Independent             |
+| `PolynomialChaos(degree, draws, quantities, q_norm=1.0, max_interaction=None)` | A polynomial surrogate and its Sobol indices, in far fewer runs for a smooth quantity      | `draws`, more than the terms      | Independent             |
 
 Start with Morris to drop the inputs that do not matter, then Sobol or a polynomial chaos on the rest. For a slow model, a polynomial chaos needs the fewest runs; read its leave-one-out error before its indices.
 
@@ -5891,7 +5951,7 @@ for name, i in [("k1", 0), ("k2", 1)]:
 
 ## Polynomial chaos
 
-`PolynomialChaos` (Sudret 2008) takes every input to `u = F(x)`, uniform on `[0, 1]`, and fits orthonormal Legendre polynomials of `u` of total degree `degree` by least squares on a Latin hypercube of `draws` points. One basis fits every distribution, truncated ones too. The Sobol indices come from the squares of the coefficients. `loo_error` is the leave-one-out error relative to the variance: the indices are those of the expansion, and they are those of the model only as far as the expansion predicts it. `predict` gives the quantities at any input values, as a surrogate.
+`PolynomialChaos` (Sudret 2008) takes every input to `u = F(x)`, uniform on `[0, 1]`, and fits orthonormal Legendre polynomials of `u` of total degree `degree`, or a truncation of that basis ([below](#bases-for-many-inputs)), by least squares on a Latin hypercube of `draws` points. One basis fits every distribution, truncated ones too. The Sobol indices come from the squares of the coefficients. `loo_error` is the leave-one-out error relative to the variance: the indices are those of the expansion, and they are those of the model only as far as the expansion predicts it. `predict` gives the quantities at any input values, as a surrogate.
 
 ```python
 from commol import PolynomialChaos
@@ -5900,6 +5960,27 @@ chaos = analysis.run(PolynomialChaos(degree=4, draws=60, quantities=[peak]))
 print(round(chaos.loo_error[0], 4), [round(s, 2) for s in chaos.total[0]])  # 0.0036 [0.61, 0.39]
 print([round(value) for value in chaos.predict([[0.4, 0.1]])[0]])  # [428]
 ```
+
+### Bases for many inputs
+
+The total-degree basis has `(k + degree)! / (k! degree!)` terms in `k` inputs: 10,626 for 20 inputs at degree 4. A fit needs more draws than terms, so a model of many inputs needs a smaller basis. You choose how to truncate it, with two keyword arguments:
+
+| Argument          | Keeps                                                                                                                                                  | Default                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
+| `max_interaction` | The terms of at most this many inputs                                                                                                                  | `None`: no limit        |
+| `q_norm`          | The terms whose degrees `α` have `Σ α_i^q ≤ degree^q`, with `q` in `(0, 1]`: below 1, a term of several inputs keeps a lower degree than a term of one | `1.0`: the total degree |
+
+The defaults keep the total-degree basis. With `max_interaction=2`, 20 inputs at degree 4 have `1 + 20 · 4 + C(20, 2) · 6 = 1,221` terms. The number of terms is known before any run, so too few `draws` raise before the first run. A truncation drops the terms it does not keep: the total indices hold only the interactions of the basis, and `loo_error` says how much of the model the smaller basis misses.
+
+```python
+additive = analysis.run(
+    PolynomialChaos(degree=4, max_interaction=1, draws=30, quantities=[peak])
+)
+print(len(additive.indices), round(additive.loo_error[0], 4))  # 9 0.0071
+print([round(s, 2) for s in additive.total[0]])  # [0.61, 0.39]
+```
+
+With one input per term, the 9 terms against the 15 of the total degree hold no interaction, so each total index equals the first-order one. Here the leave-one-out error stays small: the interaction of `k1` and `k2` adds little to the peak.
 
 ## Plots
 
@@ -5920,6 +6001,7 @@ figure = indices.plot()
 - [ ] A quantity that is NaN is filtered with `where(mask)` only on a condition you can defend, and the summary is read as conditioned on it.
 - [ ] The intervals of Sobol are narrow enough to rank the inputs, and none is NaN (a bootstrap replicate of no variance); if not, raise `base_draws`.
 - [ ] The leave-one-out error of a polynomial chaos is small before you read its indices, and `predict` reads values inside the bounds of the inputs.
+- [ ] A truncated basis of a polynomial chaos (`max_interaction`, `q_norm`) keeps the interactions you expect to matter; its total indices hold no other.
 
 ## Next steps
 
@@ -6113,7 +6195,7 @@ Every side of every quantity runs in parallel. A held parameter leaves the value
 | `practically_non_identifiable`  | Stays below on at least one side, up to a bound or `max_steps`                                                    | Practical `poorly_determined`                                                                                                |
 | `structurally_non_identifiable` | Flat within `tolerance` over its whole range inside the box of the parameters, or proven flat by the resets below | Structural `in_combination` or `non_identifiable` from the resets; with no structural verdict, practical `poorly_determined` |
 
-`tolerance` is `ε = max(τ, ν)`. `τ` is the `sd_tolerance` of Nelder-Mead, an absolute amount: argmin stops when the costs of its simplex spread by less. For a particle swarm, `τ` is `1e-6 · max(1, |objective at the fit|)` until the swarm gets stop rules. `ν`, the noise floor, is the error of one evaluation of the objective at the fit, from the accuracy of a run: `Σ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on an observation that sums `k` outputs, its prediction `mᵢ`, and the accuracy of the engine (machine epsilon for a difference model, the `rtol` and `atol` of the ODE solver). A solver holds its tolerances at each step, so `ν` is an estimate, not a bound. A threshold at or below `ε` gives no verdict: the profile cannot tell a rise from numerical error, and `notes` says so.
+`tolerance` is `ε = max(τ, ν)`. `τ` is the `sd_tolerance` of Nelder-Mead, an absolute amount: argmin stops when the costs of its simplex spread by less. For a particle swarm with the improvement stop rule, `τ` is the improvement the rule allows at the fit, `tol_abs + tol_rel · |objective at the fit|`: the swarm stops when its best value improves by less. A swarm without that rule has no tolerance on the objective, and `τ` is `1e-6 · max(1, |objective at the fit|)`. `ν`, the noise floor, is the error of one evaluation of the objective at the fit, from the accuracy of a run: `Σ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on an observation that sums `k` outputs, its prediction `mᵢ`, and the accuracy of the engine (machine epsilon for a difference model, the `rtol` and `atol` of the ODE solver). A solver holds its tolerances at each step, so `ν` is an estimate, not a bound. A threshold at or below `ε` gives no verdict: the profile cannot tell a rise from numerical error, and `notes` says so.
 
 A refit whose free parameter sits on a bound, within `1e-8` of the width of its bounds, that it is not on at the fit has left the box of the parameters: the bound, not the data, makes its rise. The flatness reads only the points inside the box, and a note names the parameter and the value where the ridge leaves it. A side whose crossing point has a free parameter on a bound it is not on over the whole side from the fit crosses because of the box: it counts as open, and its interval end stays, with a note. A parameter that stays on its bound from the fit to the crossing is not seen this way: the verdict holds within the box.
 
@@ -6957,19 +7039,21 @@ results = Simulation(model).run(num_steps=60)
 
 Every public name of `commol`, generated from the docstrings. The guide pages explain how to use them; these pages list every argument, attribute and error.
 
-| Page                                                                                  | Names                                                                                                                                                                                                                                                                                                                          |
-| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md)      | `ModelBuilder`                                                                                                                                                                                                                                                                                                                 |
-| [Model](https://munqu.github.io/commol/latest/api/model/index.md)                     | `Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete`, `Groups`, `ModelDescription`, `InitialCompartment`, `SeriesValue`, `UnitConsistencyError`                                                                                                                                                                       |
-| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)           | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `ODESolver`, `StochasticEventsSettings`, `StochasticStepsSettings`, `InfeasibleStateError`, `windowed_totals`, `sample`                                                                                                                            |
-| [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)               | `SimulationResults.plot`, `SimulationReplicates.plot`, `Predictive.plot`, `PRCCResult.plot`, `MorrisResult.plot`, `SobolResult.plot`, `ChaosResult.plot`, `ProfileResult.plot`, `PlotConfig`                                                                                                                                   |
-| [AxisPattern](https://munqu.github.io/commol/latest/api/axis-patterns/index.md)       | `AxisPattern`                                                                                                                                                                                                                                                                                                                  |
-| [AxisUnits](https://munqu.github.io/commol/latest/api/axis-units/index.md)            | `AxisUnits`                                                                                                                                                                                                                                                                                                                    |
-| [Calibration](https://munqu.github.io/commol/latest/api/calibrator/index.md)          | `Calibrator`, `CalibrationProblem`, `Quantile`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `NelderMeadConfig`, `ParticleSwarmConfig`, `CalibrationResult`, `StartSummary`, `CalibrationHistory`, `CalibrationEvaluation`, `LossFunction`, `OptimizationAlgorithm`                                   |
-| [Uncertainty](https://munqu.github.io/commol/latest/api/uncertainty/index.md)         | `InferenceMethod`, `UncertaintyMethod`, `ParameterSample`, `SampleMethod`, `ParameterSummary`, `Predictive`, `PredictiveBand`, `SeriesBand`, `ObservationDraws`, `Scenarios`, `ScenarioSummary`, `commol.scores`, `weighted_quantiles`, `member_statistics`, `ci_percentiles`                                                  |
-| [Sensitivity](https://munqu.github.io/commol/latest/api/sensitivity/index.md)         | `SensitivityAnalysis`, `InputSpace`, `SensitivityMethod`, `Propagation`, `PropagationResult`, `QuantitySummary`, `PRCC`, `PRCCResult`, `Morris`, `MorrisResult`, `Sobol`, `SobolResult`, `PolynomialChaos`, `ChaosResult`, `Level`, `Increments`, `ValueAt`, `Gain`, `Peak`, `PeakPosition`, `Trajectory`, `quantity_schedule` |
-| [Identifiability](https://munqu.github.io/commol/latest/api/identifiability/index.md) | `IdentifiabilityMethod`, `StructuralRank`, `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, `IdentifiabilityReport`                                                                                                                                                                                           |
-| [Reports](https://munqu.github.io/commol/latest/api/reports/index.md)                 | `Model.applied_parameters`, `SimulationResults.report`, `SimulationReplicates.report`, `Predictive.report`, `IdentifiabilityReport.report`                                                                                                                                                                                     |
+| Page                                                                                  | Names                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md)      | `ModelBuilder`                                                                                                                                                                                                                                                                                                                          |
+| [Model](https://munqu.github.io/commol/latest/api/model/index.md)                     | `Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete`, `Groups`, `ModelDescription`, `InitialCompartment`, `SeriesValue`, `UnitConsistencyError`                                                                                                                                                                                |
+| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)           | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `ODESolver`, `StochasticEventsSettings`, `StochasticStepsSettings`, `InfeasibleStateError`, `windowed_totals`, `sample`                                                                                                                                     |
+| [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)               | `SimulationResults.plot`, `SimulationReplicates.plot`, `Predictive.plot`, `PRCCResult.plot`, `MorrisResult.plot`, `SobolResult.plot`, `ChaosResult.plot`, `ProfileResult.plot`, `PlotConfig`                                                                                                                                            |
+| [AxisPattern](https://munqu.github.io/commol/latest/api/axis-patterns/index.md)       | `AxisPattern`                                                                                                                                                                                                                                                                                                                           |
+| [AxisUnits](https://munqu.github.io/commol/latest/api/axis-units/index.md)            | `AxisUnits`                                                                                                                                                                                                                                                                                                                             |
+| [Calibration](https://munqu.github.io/commol/latest/api/calibrator/index.md)          | `Calibrator`, `CalibrationProblem`, `Quantile`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `NelderMeadConfig`, `ParticleSwarmConfig`, `CalibrationResult`, `StartSummary`, `CalibrationHistory`, `CalibrationEvaluation`, `LossFunction`, `OptimizationAlgorithm`                                            |
+| [Uncertainty](https://munqu.github.io/commol/latest/api/uncertainty/index.md)         | `InferenceMethod`, `UncertaintyMethod`, `ParameterSample`, `SampleMethod`, `ParameterSummary`, `Predictive`, `PredictiveBand`, `SeriesBand`, `ObservationDraws`, `Scenarios`, `ScenarioSummary`, `commol.scores`, `weighted_quantiles`, `member_statistics`, `ci_percentiles`                                                           |
+| [Sensitivity](https://munqu.github.io/commol/latest/api/sensitivity/index.md)         | `SensitivityAnalysis`, `InputSpace`, `SensitivityMethod`, `Propagation`, `PropagationResult`, `QuantitySummary`, `PRCC`, `PRCCResult`, `Morris`, `MorrisResult`, `Sobol`, `SobolResult`, `PolynomialChaos`, `ChaosResult`, `Level`, `Increments`, `ValueAt`, `Gain`, `Peak`, `PeakPosition`, `Trajectory`, `Ratio`, `quantity_schedule` |
+| [Identifiability](https://munqu.github.io/commol/latest/api/identifiability/index.md) | `IdentifiabilityMethod`, `StructuralRank`, `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, `IdentifiabilityReport`                                                                                                                                                                                                    |
+| [Parallelism](https://munqu.github.io/commol/latest/api/parallelism/index.md)         | `set_threads`, `threads`, `get_threads`, `get_levels`                                                                                                                                                                                                                                                                                   |
+| [Reports](https://munqu.github.io/commol/latest/api/reports/index.md)                 | `Model.applied_parameters`, `SimulationResults.report`, `SimulationReplicates.report`, `Predictive.report`, `IdentifiabilityReport.report`                                                                                                                                                                                              |
+| [Package](https://munqu.github.io/commol/latest/api/package/index.md)                 | `__version__`, `build_info`, `BuildInfo`                                                                                                                                                                                                                                                                                                |
 
 Import every name from the package root, as in `from commol import Simulation`. `UnitConsistencyError` is in `commol.utils.equations`; the scores are the module `commol.scores` (`from commol import scores`).
 
@@ -9133,7 +9217,8 @@ class Calibrator:
         -------
         ParameterSample
             One draw at ``result.best_parameters``, with the names and bounds
-            of the parameters of the problem and ``SampleMethod(name="point")``.
+            of the parameters of the problem and
+            ``SampleMethod(name="point", settings={"seed": result.seed})``.
 
         Raises
         ------
@@ -9153,7 +9238,7 @@ class Calibrator:
             names,
             [(p.min_bound, p.max_bound) for p in self.problem.parameters],
             [[result.best_parameters[name] for name in names]],
-            SampleMethod(name="point"),
+            SampleMethod(name="point", settings={"seed": result.seed}),
         )
 
     def delta_band(
@@ -9315,9 +9400,10 @@ class Calibrator:
 
         Start 0 is the initial guess of each parameter. Each further start is a
         row of a Latin hypercube over the bounds, drawn from `seed`, so the
-        starts cover the parameter space. They run in parallel; the result is
-        the best of them, and lists every start. Distinct ends with equal
-        losses are a sign that the data do not identify the parameters.
+        starts cover the parameter space. They run in parallel, on the
+        threads of `commol.threads`; the result is the best of them, and lists
+        every start. Distinct ends with equal losses are a sign that the data
+        do not identify the parameters.
 
         Parameters
         ----------
@@ -9330,8 +9416,9 @@ class Calibrator:
         CalibrationResult
             The best start: the optimized parameter values, in the order of
             the problem's parameters, its final loss and convergence, every
-            start (``starts``) and the reason of each start that failed
-            (``failed_runs``, also logged as warnings).
+            start (``starts``), the reason of each start that failed
+            (``failed_runs``, also logged as warnings) and the seed
+            (``seed``).
 
         Raises
         ------
@@ -9392,6 +9479,7 @@ class Calibrator:
             termination_reason=best.termination_reason,
             starts=[summary for summary, _ in summaries],
             failed_runs=failed_runs,
+            seed=self.seed,
         )
         logger.info(
             (
@@ -9429,6 +9517,7 @@ class Calibrator:
             iterations=rust_result.iterations,
             converged=rust_result.converged,
             termination_reason=rust_result.termination_reason,
+            seed=self.seed,
         )
         evaluations = [
             CalibrationEvaluation(
@@ -9567,6 +9656,8 @@ class Calibrator:
                 mutation_threshold=velocity.mutation_threshold,
             )
 
+        improvement = opt_config.improvement_stop_config
+        radius = opt_config.radius_stop_config
         ps_config = rust_calibration.ParticleSwarmConfig(
             num_particles=opt_config.num_particles,
             max_iterations=opt_config.max_iterations,
@@ -9576,7 +9667,13 @@ class Calibrator:
             mutation=rust_mutation,
             velocity=rust_velocity,
             initialization=opt_config.initialization,
-            seed=self.problem.seed,
+            seed=self.seed,
+            improvement_stop=(
+                None
+                if improvement is None
+                else (improvement.window, improvement.tol_abs, improvement.tol_rel)
+            ),
+            radius_stop=None if radius is None else radius.tol,
         )
         return rust_calibration.OptimizationConfig.particle_swarm(ps_config)
 
@@ -9958,9 +10055,9 @@ Parameters:
 
 Returns:
 
-| Type              | Description                                                                                                                    |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `ParameterSample` | One draw at result.best_parameters, with the names and bounds of the parameters of the problem and SampleMethod(name="point"). |
+| Type              | Description                                                                                                                                                    |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ParameterSample` | One draw at result.best_parameters, with the names and bounds of the parameters of the problem and SampleMethod(name="point", settings={"seed": result.seed}). |
 
 Raises:
 
@@ -9987,7 +10084,8 @@ def point_sample(self, result: CalibrationResult) -> ParameterSample:
     -------
     ParameterSample
         One draw at ``result.best_parameters``, with the names and bounds
-        of the parameters of the problem and ``SampleMethod(name="point")``.
+        of the parameters of the problem and
+        ``SampleMethod(name="point", settings={"seed": result.seed})``.
 
     Raises
     ------
@@ -10007,7 +10105,7 @@ def point_sample(self, result: CalibrationResult) -> ParameterSample:
         names,
         [(p.min_bound, p.max_bound) for p in self.problem.parameters],
         [[result.best_parameters[name] for name in names]],
-        SampleMethod(name="point"),
+        SampleMethod(name="point", settings={"seed": result.seed}),
     )
 ```
 
@@ -10224,7 +10322,7 @@ run(starts: int = 1) -> CalibrationResult
 
 Runs the calibration optimization from one or more starts.
 
-Start 0 is the initial guess of each parameter. Each further start is a row of a Latin hypercube over the bounds, drawn from `seed`, so the starts cover the parameter space. They run in parallel; the result is the best of them, and lists every start. Distinct ends with equal losses are a sign that the data do not identify the parameters.
+Start 0 is the initial guess of each parameter. Each further start is a row of a Latin hypercube over the bounds, drawn from `seed`, so the starts cover the parameter space. They run in parallel, on the threads of `commol.threads`; the result is the best of them, and lists every start. Distinct ends with equal losses are a sign that the data do not identify the parameters.
 
 Parameters:
 
@@ -10234,9 +10332,9 @@ Parameters:
 
 Returns:
 
-| Type                | Description                                                                                                                                                                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CalibrationResult` | The best start: the optimized parameter values, in the order of the problem's parameters, its final loss and convergence, every start (starts) and the reason of each start that failed (failed_runs, also logged as warnings). |
+| Type                | Description                                                                                                                                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CalibrationResult` | The best start: the optimized parameter values, in the order of the problem's parameters, its final loss and convergence, every start (starts), the reason of each start that failed (failed_runs, also logged as warnings) and the seed (seed). |
 
 Raises:
 
@@ -10254,9 +10352,10 @@ def run(self, starts: int = 1) -> CalibrationResult:
 
     Start 0 is the initial guess of each parameter. Each further start is a
     row of a Latin hypercube over the bounds, drawn from `seed`, so the
-    starts cover the parameter space. They run in parallel; the result is
-    the best of them, and lists every start. Distinct ends with equal
-    losses are a sign that the data do not identify the parameters.
+    starts cover the parameter space. They run in parallel, on the
+    threads of `commol.threads`; the result is the best of them, and lists
+    every start. Distinct ends with equal losses are a sign that the data
+    do not identify the parameters.
 
     Parameters
     ----------
@@ -10269,8 +10368,9 @@ def run(self, starts: int = 1) -> CalibrationResult:
     CalibrationResult
         The best start: the optimized parameter values, in the order of
         the problem's parameters, its final loss and convergence, every
-        start (``starts``) and the reason of each start that failed
-        (``failed_runs``, also logged as warnings).
+        start (``starts``), the reason of each start that failed
+        (``failed_runs``, also logged as warnings) and the seed
+        (``seed``).
 
     Raises
     ------
@@ -10331,6 +10431,7 @@ def run(self, starts: int = 1) -> CalibrationResult:
         termination_reason=best.termination_reason,
         starts=[summary for summary, _ in summaries],
         failed_runs=failed_runs,
+        seed=self.seed,
     )
     logger.info(
         (
@@ -10392,6 +10493,7 @@ def run_with_history(self) -> CalibrationHistory:
         iterations=rust_result.iterations,
         converged=rust_result.converged,
         termination_reason=rust_result.termination_reason,
+        seed=self.seed,
     )
     evaluations = [
         CalibrationEvaluation(
@@ -11750,12 +11852,14 @@ Attributes:
 
 Methods:
 
-| Name           | Description                                                  |
-| -------------- | ------------------------------------------------------------ |
-| `inertia`      | Set inertia weight strategy ("constant" or "chaotic")        |
-| `acceleration` | Set acceleration coefficients ("constant" or "time_varying") |
-| `mutation`     | Enable mutation to escape local optima                       |
-| `velocity`     | Configure velocity control                                   |
+| Name               | Description                                                  |
+| ------------------ | ------------------------------------------------------------ |
+| `inertia`          | Set inertia weight strategy ("constant" or "chaotic")        |
+| `acceleration`     | Set acceleration coefficients ("constant" or "time_varying") |
+| `mutation`         | Enable mutation to escape local optima                       |
+| `velocity`         | Configure velocity control                                   |
+| `improvement_stop` | Stop when the best loss stops improving                      |
+| `radius_stop`      | Stop when the swarm has gathered around its best position    |
 
 Source code in `commol/context/calibration.py`
 
@@ -11785,6 +11889,10 @@ class ParticleSwarmConfig(BaseModel):
         Enable mutation to escape local optima
     velocity(clamp_factor, mutation_threshold)
         Configure velocity control
+    improvement_stop(window, tol_abs, tol_rel)
+        Stop when the best loss stops improving
+    radius_stop(tol)
+        Stop when the swarm has gathered around its best position
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -11815,6 +11923,8 @@ class ParticleSwarmConfig(BaseModel):
     )
     _mutation: PSOMutationConfig | None = PrivateAttr(default=None)
     _velocity: PSOVelocityConfig | None = PrivateAttr(default=None)
+    _improvement_stop: PSOImprovementStop | None = PrivateAttr(default=None)
+    _radius_stop: PSORadiusStop | None = PrivateAttr(default=None)
 
     @field_validator("initialization")
     @classmethod
@@ -12023,6 +12133,60 @@ class ParticleSwarmConfig(BaseModel):
         )
         return self
 
+    def improvement_stop(self, *, window: int, tol_abs: float, tol_rel: float) -> Self:
+        """
+        Stop when the best loss stops improving.
+
+        The run stops when the best loss improved by at most
+        ``tol_abs + tol_rel * |best loss|`` over the last `window` iterations,
+        and reports ``converged=True``. Off by default. A swarm can stall for
+        some iterations and then improve again, so a short window can stop it
+        early.
+
+        Parameters
+        ----------
+        window : int
+            Iterations over which the improvement is measured (> 0).
+        tol_abs : float
+            Absolute tolerance on the improvement (>= 0).
+        tol_rel : float
+            Tolerance on the improvement relative to the best loss (>= 0).
+
+        Returns
+        -------
+        Self
+            The config instance for method chaining
+        """
+        self._improvement_stop = PSOImprovementStop(
+            window=window, tol_abs=tol_abs, tol_rel=tol_rel
+        )
+        return self
+
+    def radius_stop(self, tol: float) -> Self:
+        """
+        Stop when the swarm has gathered around its best position.
+
+        The run stops when the largest distance of a particle from the best
+        position, divided by the size of the search box, is at most `tol`, and
+        reports ``converged=True``. Off by default. Mutation and velocity
+        mutation scatter the swarm again, so with them the radius can stay
+        above `tol`; values that the data do not tell apart keep the swarm
+        spread.
+
+        Parameters
+        ----------
+        tol : float
+            Tolerance on the radius of the swarm, relative to the size of the
+            search box (>= 0).
+
+        Returns
+        -------
+        Self
+            The config instance for method chaining
+        """
+        self._radius_stop = PSORadiusStop(tol=tol)
+        return self
+
     @property
     def inertia_config(self) -> PSOConstantInertia | PSOChaoticInertia | None:
         """Get the inertia configuration (for internal use)."""
@@ -12044,6 +12208,16 @@ class ParticleSwarmConfig(BaseModel):
     def velocity_config(self) -> PSOVelocityConfig | None:
         """Get the velocity configuration (for internal use)."""
         return self._velocity
+
+    @property
+    def improvement_stop_config(self) -> PSOImprovementStop | None:
+        """Get the improvement stop rule (for internal use)."""
+        return self._improvement_stop
+
+    @property
+    def radius_stop_config(self) -> PSORadiusStop | None:
+        """Get the radius stop rule (for internal use)."""
+        return self._radius_stop
 ```
 
 ### Attributes
@@ -12079,6 +12253,22 @@ velocity_config: PSOVelocityConfig | None
 ```
 
 Get the velocity configuration (for internal use).
+
+#### improvement_stop_config
+
+```python
+improvement_stop_config: PSOImprovementStop | None
+```
+
+Get the improvement stop rule (for internal use).
+
+#### radius_stop_config
+
+```python
+radius_stop_config: PSORadiusStop | None
+```
+
+Get the radius stop rule (for internal use).
 
 ### Methods:
 
@@ -12390,6 +12580,114 @@ def velocity(
     return self
 ```
 
+#### improvement_stop
+
+```python
+improvement_stop(*, window: int, tol_abs: float, tol_rel: float) -> Self
+```
+
+Stop when the best loss stops improving.
+
+The run stops when the best loss improved by at most `tol_abs + tol_rel * |best loss|` over the last `window` iterations, and reports `converged=True`. Off by default. A swarm can stall for some iterations and then improve again, so a short window can stop it early.
+
+Parameters:
+
+| Name      | Type    | Description                                                    | Default    |
+| --------- | ------- | -------------------------------------------------------------- | ---------- |
+| `window`  | `int`   | Iterations over which the improvement is measured (> 0).       | *required* |
+| `tol_abs` | `float` | Absolute tolerance on the improvement (>= 0).                  | *required* |
+| `tol_rel` | `float` | Tolerance on the improvement relative to the best loss (>= 0). | *required* |
+
+Returns:
+
+| Type   | Description                             |
+| ------ | --------------------------------------- |
+| `Self` | The config instance for method chaining |
+
+Source code in `commol/context/calibration.py`
+
+```python
+def improvement_stop(self, *, window: int, tol_abs: float, tol_rel: float) -> Self:
+    """
+    Stop when the best loss stops improving.
+
+    The run stops when the best loss improved by at most
+    ``tol_abs + tol_rel * |best loss|`` over the last `window` iterations,
+    and reports ``converged=True``. Off by default. A swarm can stall for
+    some iterations and then improve again, so a short window can stop it
+    early.
+
+    Parameters
+    ----------
+    window : int
+        Iterations over which the improvement is measured (> 0).
+    tol_abs : float
+        Absolute tolerance on the improvement (>= 0).
+    tol_rel : float
+        Tolerance on the improvement relative to the best loss (>= 0).
+
+    Returns
+    -------
+    Self
+        The config instance for method chaining
+    """
+    self._improvement_stop = PSOImprovementStop(
+        window=window, tol_abs=tol_abs, tol_rel=tol_rel
+    )
+    return self
+```
+
+#### radius_stop
+
+```python
+radius_stop(tol: float) -> Self
+```
+
+Stop when the swarm has gathered around its best position.
+
+The run stops when the largest distance of a particle from the best position, divided by the size of the search box, is at most `tol`, and reports `converged=True`. Off by default. Mutation and velocity mutation scatter the swarm again, so with them the radius can stay above `tol`; values that the data do not tell apart keep the swarm spread.
+
+Parameters:
+
+| Name  | Type    | Description                                                                          | Default    |
+| ----- | ------- | ------------------------------------------------------------------------------------ | ---------- |
+| `tol` | `float` | Tolerance on the radius of the swarm, relative to the size of the search box (>= 0). | *required* |
+
+Returns:
+
+| Type   | Description                             |
+| ------ | --------------------------------------- |
+| `Self` | The config instance for method chaining |
+
+Source code in `commol/context/calibration.py`
+
+```python
+def radius_stop(self, tol: float) -> Self:
+    """
+    Stop when the swarm has gathered around its best position.
+
+    The run stops when the largest distance of a particle from the best
+    position, divided by the size of the search box, is at most `tol`, and
+    reports ``converged=True``. Off by default. Mutation and velocity
+    mutation scatter the swarm again, so with them the radius can stay
+    above `tol`; values that the data do not tell apart keep the swarm
+    spread.
+
+    Parameters
+    ----------
+    tol : float
+        Tolerance on the radius of the swarm, relative to the size of the
+        search box (>= 0).
+
+    Returns
+    -------
+    Self
+        The config instance for method chaining
+    """
+    self._radius_stop = PSORadiusStop(tol=tol)
+    return self
+```
+
 ## CalibrationResult
 
 Bases: `BaseModel`
@@ -12398,15 +12696,16 @@ Result of a calibration: the best of its starts.
 
 Attributes:
 
-| Name                 | Type                 | Description                                                                       |
-| -------------------- | -------------------- | --------------------------------------------------------------------------------- |
-| `best_parameters`    | `dict[str, float]`   | The calibrated value of each parameter, in the order of the problem's parameters. |
-| `final_loss`         | `float`              | Loss at the best parameters.                                                      |
-| `iterations`         | `int`                | Iterations of the best start.                                                     |
-| `converged`          | `bool`               | Whether the best start converged.                                                 |
-| `termination_reason` | `str`                | Why the best start stopped.                                                       |
-| `starts`             | `list[StartSummary]` | Every start that finished, in order; the first is the initial guess.              |
-| `failed_runs`        | `list[str]`          | Why each start that failed did, with its number.                                  |
+| Name                 | Type                 | Description                                                                                                                                                                                 |
+| -------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `best_parameters`    | `dict[str, float]`   | The calibrated value of each parameter, in the order of the problem's parameters.                                                                                                           |
+| `final_loss`         | `float`              | Loss at the best parameters.                                                                                                                                                                |
+| `iterations`         | `int`                | Iterations of the best start.                                                                                                                                                               |
+| `converged`          | `bool`               | Whether the best start converged.                                                                                                                                                           |
+| `termination_reason` | `str`                | Why the best start stopped.                                                                                                                                                                 |
+| `starts`             | `list[StartSummary]` | Every start that finished, in order; the first is the initial guess.                                                                                                                        |
+| `failed_runs`        | `list[str]`          | Why each start that failed did, with its number.                                                                                                                                            |
+| `seed`               | `int`                | The seed of the calibration's random numbers (Calibrator.seed): problem.seed, or the seed the calibrator drew. Set as problem.seed, it repeats the calibration and its uncertainty methods. |
 
 Source code in `commol/context/calibration.py`
 
@@ -12432,6 +12731,11 @@ class CalibrationResult(BaseModel):
         Every start that finished, in order; the first is the initial guess.
     failed_runs : list[str]
         Why each start that failed did, with its number.
+    seed : int
+        The seed of the calibration's random numbers (`Calibrator.seed`):
+        ``problem.seed``, or the seed the calibrator drew. Set as
+        ``problem.seed``, it repeats the calibration and its uncertainty
+        methods.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -12453,6 +12757,9 @@ class CalibrationResult(BaseModel):
     failed_runs: list[str] = Field(
         default_factory=list, description="Why each failed start failed"
     )
+    seed: int = Field(
+        default=..., ge=0, description="Seed of the calibration's random numbers"
+    )
 
     @override
     def __str__(self) -> str:
@@ -12465,7 +12772,8 @@ class CalibrationResult(BaseModel):
             f"  best_parameters={self.best_parameters},\n"
             f"  termination_reason='{self.termination_reason}',\n"
             f"  starts={len(self.starts)},\n"
-            f"  failed_runs={len(self.failed_runs)}\n"
+            f"  failed_runs={len(self.failed_runs)},\n"
+            f"  seed={self.seed}\n"
             f")"
         )
 ```
@@ -12494,7 +12802,8 @@ def __str__(self) -> str:
         f"  best_parameters={self.best_parameters},\n"
         f"  termination_reason='{self.termination_reason}',\n"
         f"  starts={len(self.starts)},\n"
-        f"  failed_runs={len(self.failed_runs)}\n"
+        f"  failed_runs={len(self.failed_runs)},\n"
+        f"  seed={self.seed}\n"
         f")"
     )
 ```
@@ -20404,6 +20713,265 @@ class UnitConsistencyError(Exception):
     pass
 ```
 
+# Package API
+
+[Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
+
+The version of the installed commol and the commit it was built from. Save them with a result to name the code that made it. Guide: [Check the installation](https://munqu.github.io/commol/latest/getting-started/installation/#check-the-installation).
+
+`commol.__version__` is the PEP 440 version, the same as `build_info().version`: the version of a release, or the placeholder version with the commit as a local version (`0.1.0+g<first 7 characters of the commit>`) for a build that is not a release.
+
+## build_info
+
+```python
+build_info() -> BuildInfo
+```
+
+Return the version of the installed commol and the commit it was built from.
+
+Save it with a result to name the code that made it.
+
+Returns:
+
+| Type        | Description                                                         |
+| ----------- | ------------------------------------------------------------------- |
+| `BuildInfo` | The version and the full commit, read when the extension was built. |
+
+Source code in `commol/api/build_info.py`
+
+```python
+def build_info() -> BuildInfo:
+    """
+    Return the version of the installed commol and the commit it was built from.
+
+    Save it with a result to name the code that made it.
+
+    Returns
+    -------
+    BuildInfo
+        The version and the full commit, read when the extension was built.
+    """
+    return BuildInfo(version=_commol_rs.__version__, commit=_commol_rs.__commit__)
+```
+
+## BuildInfo
+
+Bases: `BaseModel`
+
+The version of the installed commol and the commit it was built from.
+
+Attributes:
+
+| Name      | Type  | Description                                                                                                                                                                                                                                                                                                |
+| --------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version` | `str` | The PEP 440 version, the one commol.__version__ gives. A release gives its version, such as "0.9.0". A build that is not a release, such as an install from a git commit or an editable install, gives the placeholder version of the source with the commit as a local version, such as "0.1.0+g0123abc". |
+| `commit`  | \`str | None\`                                                                                                                                                                                                                                                                                                     |
+
+Source code in `commol/api/build_info.py`
+
+```python
+class BuildInfo(BaseModel):
+    """
+    The version of the installed commol and the commit it was built from.
+
+    Attributes
+    ----------
+    version : str
+        The PEP 440 version, the one `commol.__version__` gives. A release
+        gives its version, such as ``"0.9.0"``. A build that is not a release,
+        such as an install from a git commit or an editable install, gives the
+        placeholder version of the source with the commit as a local version,
+        such as ``"0.1.0+g0123abc"``.
+    commit : str | None
+        The full hash of the git commit of the source, or None when the source
+        has no git metadata, such as a source distribution.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    version: str
+    commit: str | None
+```
+
+# Parallelism API
+
+[Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
+
+The threads of every parallel method and the levels that run in parallel. Guide: [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
+
+## set_threads
+
+```python
+set_threads(n: int, levels: Levels | None = None) -> None
+```
+
+Set the number of threads of every parallel method, in this context.
+
+The setting holds in the current Python thread (a `contextvars` context), not in other threads. Without it, commol uses one thread per core and every level in parallel.
+
+Parameters:
+
+| Name     | Type           | Description                                                                           | Default    |
+| -------- | -------------- | ------------------------------------------------------------------------------------- | ---------- |
+| `n`      | `int`          | The number of threads, at least 1.                                                    | *required* |
+| `levels` | `(all, outer)` | Which levels run in parallel when a method nests them; None keeps the current levels. | `"all"`    |
+
+Raises:
+
+| Type         | Description                                |
+| ------------ | ------------------------------------------ |
+| `ValueError` | If n is below 1 or levels is neither name. |
+
+Source code in `commol/api/parallelism.py`
+
+```python
+def set_threads(n: int, levels: Levels | None = None) -> None:
+    """
+    Set the number of threads of every parallel method, in this context.
+
+    The setting holds in the current Python thread (a `contextvars`
+    context), not in other threads. Without it, commol uses one thread per
+    core and every level in parallel.
+
+    Parameters
+    ----------
+    n : int
+        The number of threads, at least 1.
+    levels : {"all", "outer"} | None
+        Which levels run in parallel when a method nests them; `None` keeps
+        the current levels.
+
+    Raises
+    ------
+    ValueError
+        If `n` is below 1 or `levels` is neither name.
+    """
+    commol_rs.parallelism.setting().set(_choice(n, levels))
+```
+
+## threads
+
+```python
+threads(n: int | None = None, levels: Levels | None = None) -> Generator[None]
+```
+
+Limit the threads of every parallel method within a block.
+
+The previous setting comes back when the block ends, also on an error.
+
+Parameters:
+
+| Name     | Type           | Description                                                                           | Default                                                           |
+| -------- | -------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `n`      | \`int          | None\`                                                                                | The number of threads, at least 1; None keeps the current number. |
+| `levels` | `(all, outer)` | Which levels run in parallel when a method nests them; None keeps the current levels. | `"all"`                                                           |
+
+Yields:
+
+| Type   | Description                      |
+| ------ | -------------------------------- |
+| `None` | The block runs with the setting. |
+
+Raises:
+
+| Type         | Description                                |
+| ------------ | ------------------------------------------ |
+| `ValueError` | If n is below 1 or levels is neither name. |
+
+Source code in `commol/api/parallelism.py`
+
+```python
+@contextmanager
+def threads(n: int | None = None, levels: Levels | None = None) -> Generator[None]:
+    """
+    Limit the threads of every parallel method within a block.
+
+    The previous setting comes back when the block ends, also on an error.
+
+    Parameters
+    ----------
+    n : int | None
+        The number of threads, at least 1; `None` keeps the current number.
+    levels : {"all", "outer"} | None
+        Which levels run in parallel when a method nests them; `None` keeps
+        the current levels.
+
+    Yields
+    ------
+    None
+        The block runs with the setting.
+
+    Raises
+    ------
+    ValueError
+        If `n` is below 1 or `levels` is neither name.
+    """
+    variable = commol_rs.parallelism.setting()
+    token = variable.set(_choice(n, levels))
+    try:
+        yield
+    finally:
+        variable.reset(token)
+```
+
+## get_threads
+
+```python
+get_threads() -> int
+```
+
+The number of threads of the parallel methods in this context.
+
+Returns:
+
+| Type  | Description                                              |
+| ----- | -------------------------------------------------------- |
+| `int` | The number set, or the number of cores when none is set. |
+
+Source code in `commol/api/parallelism.py`
+
+```python
+def get_threads() -> int:
+    """
+    The number of threads of the parallel methods in this context.
+
+    Returns
+    -------
+    int
+        The number set, or the number of cores when none is set.
+    """
+    return commol_rs.parallelism.current().threads
+```
+
+## get_levels
+
+```python
+get_levels() -> Levels
+```
+
+The levels that run in parallel in this context.
+
+Returns:
+
+| Type           | Description                                |
+| -------------- | ------------------------------------------ |
+| `{all, outer}` | The levels set, or "all" when none is set. |
+
+Source code in `commol/api/parallelism.py`
+
+```python
+def get_levels() -> Levels:
+    """
+    The levels that run in parallel in this context.
+
+    Returns
+    -------
+    {"all", "outer"}
+        The levels set, or `"all"` when none is set.
+    """
+    return cast(Levels, commol_rs.parallelism.current().levels)
+```
+
 # Plotting API
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
@@ -25999,13 +26567,17 @@ A polynomial chaos expansion (Sudret 2008): a polynomial surrogate of each quant
 
 Every input goes to `u = F(x)`, uniform on `[0, 1]` through its distribution, so one basis of orthonormal Legendre polynomials fits every distribution, truncated ones included. The coefficients come from least squares on a Latin hypercube; the leave-one-out error says how well the expansion predicts the model. It needs independent inputs.
 
+The basis keeps every term whose degrees `α` have `Σ α_i^q ≤ degree^q` and that holds at most `max_interaction` inputs. The defaults keep the total-degree basis, of `(k + degree)! / (k! degree!)` terms in `k` inputs; a truncation keeps the terms of low interaction order, so a basis of many inputs needs far fewer terms and runs. The number of terms is known before any run.
+
 Attributes:
 
-| Name         | Type             | Description                                                                                                 |
-| ------------ | ---------------- | ----------------------------------------------------------------------------------------------------------- |
-| `degree`     | `int`            | The total degree of the basis: in k inputs it has (k + degree)! / (k! degree!) terms.                       |
-| `draws`      | `int`            | The points of the Latin hypercube; more than the terms, and two or three times as many is the usual choice. |
-| `quantities` | `list[Quantity]` | What each run is reduced to.                                                                                |
+| Name              | Type             | Description                                                                                                                      |
+| ----------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `degree`          | `int`            | The degree of the basis: the largest degree of an input in a term, and the total degree of a term when q_norm is 1.              |
+| `q_norm`          | `float`          | The q of the hyperbolic truncation, in (0, 1\]: below 1, a term of several inputs keeps a lower total degree than a term of one. |
+| `max_interaction` | \`int            | None\`                                                                                                                           |
+| `draws`           | `int`            | The points of the Latin hypercube; more than the terms, and two or three times as many is the usual choice.                      |
+| `quantities`      | `list[Quantity]` | What each run is reduced to.                                                                                                     |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -26022,11 +26594,24 @@ class PolynomialChaos(SensitivityMethod[ChaosResult]):
     squares on a Latin hypercube; the leave-one-out error says how well the
     expansion predicts the model. It needs independent inputs.
 
+    The basis keeps every term whose degrees ``α`` have
+    ``Σ α_i^q ≤ degree^q`` and that holds at most ``max_interaction``
+    inputs. The defaults keep the total-degree basis, of
+    ``(k + degree)! / (k! degree!)`` terms in ``k`` inputs; a truncation
+    keeps the terms of low interaction order, so a basis of many inputs
+    needs far fewer terms and runs. The number of terms is known before any
+    run.
+
     Attributes
     ----------
     degree : int
-        The total degree of the basis: in ``k`` inputs it has
-        ``(k + degree)! / (k! degree!)`` terms.
+        The degree of the basis: the largest degree of an input in a term,
+        and the total degree of a term when ``q_norm`` is 1.
+    q_norm : float
+        The q of the hyperbolic truncation, in ``(0, 1]``: below 1, a term
+        of several inputs keeps a lower total degree than a term of one.
+    max_interaction : int | None
+        The largest number of inputs of a term; None for no limit.
     draws : int
         The points of the Latin hypercube; more than the terms, and two or
         three times as many is the usual choice.
@@ -26034,7 +26619,13 @@ class PolynomialChaos(SensitivityMethod[ChaosResult]):
         What each run is reduced to.
     """
 
-    degree: int = Field(ge=1, description="The total degree of the basis.")
+    degree: int = Field(ge=1, description="The degree of the basis.")
+    q_norm: float = Field(
+        default=1.0, gt=0.0, le=1.0, description="The q of the q-norm of the basis."
+    )
+    max_interaction: int | None = Field(
+        default=None, ge=1, description="The largest number of inputs of a term."
+    )
     draws: int = Field(ge=2, description="Points of the Latin hypercube.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
@@ -26051,18 +26642,20 @@ The expansion is a surrogate of the model: `predict` gives the quantities at any
 
 Attributes:
 
-| Name             | Type                | Description                                                                                                        |
-| ---------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `inputs`         | `list[str]`         | The inputs, in order.                                                                                              |
-| `input_space`    | `InputSpace`        | The inputs and their distributions, which predict maps values through.                                             |
-| `labels`         | `list[str]`         | The label of each quantity.                                                                                        |
-| `degree`         | `int`               | The total degree of the basis.                                                                                     |
-| `indices`        | `list[list[int]]`   | The degree of each input in each term, [term][input]; term 0 is the constant.                                      |
-| `coefficients`   | `list[list[float]]` | The coefficient of each term for each quantity, [quantity][term], on orthonormal Legendre polynomials of u = F(x). |
-| `loo_error`      | `list[float]`       | The leave-one-out error of each quantity, relative to its variance; NaN for a quantity of no variance.             |
-| `mean, variance` | `list[float]`       | The mean and the variance of each quantity under the expansion.                                                    |
-| `first, total`   | `list[list[float]]` | The first-order and total Sobol indices, [quantity][input]; NaN for a quantity of no variance.                     |
-| `runs`           | `int`               | The number of points run.                                                                                          |
+| Name              | Type                | Description                                                                                                        |
+| ----------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `inputs`          | `list[str]`         | The inputs, in order.                                                                                              |
+| `input_space`     | `InputSpace`        | The inputs and their distributions, which predict maps values through.                                             |
+| `labels`          | `list[str]`         | The label of each quantity.                                                                                        |
+| `degree`          | `int`               | The degree of the basis: the bound of the q-norm of every term.                                                    |
+| `q_norm`          | `float`             | The q of the q-norm of the basis; 1 for the total-degree basis.                                                    |
+| `max_interaction` | \`int               | None\`                                                                                                             |
+| `indices`         | `list[list[int]]`   | The degree of each input in each term, [term][input]; term 0 is the constant.                                      |
+| `coefficients`    | `list[list[float]]` | The coefficient of each term for each quantity, [quantity][term], on orthonormal Legendre polynomials of u = F(x). |
+| `loo_error`       | `list[float]`       | The leave-one-out error of each quantity, relative to its variance; NaN for a quantity of no variance.             |
+| `mean, variance`  | `list[float]`       | The mean and the variance of each quantity under the expansion.                                                    |
+| `first, total`    | `list[list[float]]` | The first-order and total Sobol indices, [quantity][input]; NaN for a quantity of no variance.                     |
+| `runs`            | `int`               | The number of points run.                                                                                          |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -26088,7 +26681,11 @@ class ChaosResult(BaseModel):
     labels : list[str]
         The label of each quantity.
     degree : int
-        The total degree of the basis.
+        The degree of the basis: the bound of the q-norm of every term.
+    q_norm : float
+        The q of the q-norm of the basis; 1 for the total-degree basis.
+    max_interaction : int | None
+        The largest number of inputs of a term; None for no limit.
     indices : list[list[int]]
         The degree of each input in each term, ``[term][input]``; term 0 is
         the constant.
@@ -26113,6 +26710,8 @@ class ChaosResult(BaseModel):
     input_space: InputSpace
     labels: list[str]
     degree: int
+    q_norm: float
+    max_interaction: int | None
     indices: list[list[int]]
     coefficients: list[list[float]]
     loo_error: list[float]
@@ -26177,12 +26776,15 @@ class ChaosResult(BaseModel):
         ------
         ValueError
             If a point has not one value per input or a value outside the
-            bounds of its input, or the coefficients do not fit the degree.
+            bounds of its input, the truncation is not valid, or the
+            coefficients do not fit the basis.
         """
         return commol_rs.inference.chaos_evaluate(
             engine_state.rust_parameters(self.input_space.parameters),
             self.input_space.rust_distributions() or [],
             self.degree,
+            self.q_norm,
+            self.max_interaction,
             self.coefficients,
             [list(point) for point in values],
         )
@@ -26281,9 +26883,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                   |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If a point has not one value per input or a value outside the bounds of its input, or the coefficients do not fit the degree. |
+| Type         | Description                                                                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a point has not one value per input or a value outside the bounds of its input, the truncation is not valid, or the coefficients do not fit the basis. |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -26307,12 +26909,15 @@ def predict(self, values: Sequence[Sequence[float]]) -> list[list[float]]:
     ------
     ValueError
         If a point has not one value per input or a value outside the
-        bounds of its input, or the coefficients do not fit the degree.
+        bounds of its input, the truncation is not valid, or the
+        coefficients do not fit the basis.
     """
     return commol_rs.inference.chaos_evaluate(
         engine_state.rust_parameters(self.input_space.parameters),
         self.input_space.rust_distributions() or [],
         self.degree,
+        self.q_norm,
+        self.max_interaction,
         self.coefficients,
         [list(point) for point in values],
     )
@@ -26866,6 +27471,145 @@ Source code in `commol/context/inference/quantities.py`
 def axes(self) -> list[tuple[str, float | None]]:
     """Its name and each position."""
     return [(self._name(), at) for at in self.positions]
+```
+
+## Ratio
+
+Bases: `_OneScalar`
+
+The ratio of two quantities of one value each, numerator N over denominator D.
+
+The ratio of a run whose denominator is 0 is NaN, also when the numerator is not 0, and follows the NaN rule of every method. A method that reduces the points of a design (`PRCC`, `Morris`, `Sobol`, `PolynomialChaos`) reads one value per point; with a stochastic engine, `replicates` says how the replicates of a point combine. A `Propagation`, the `Scenarios` and the quantities of one run keep the ratio of each run.
+
+Attributes:
+
+| Name          | Type                                | Description                                                                                                                                                                                     |
+| ------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `numerator`   | \`ValueAt                           | Gain                                                                                                                                                                                            |
+| `denominator` | \`ValueAt                           | Gain                                                                                                                                                                                            |
+| `replicates`  | `{within, within_positive, pooled}` | "within": the mean of the ratio of each replicate, E[N/D]; a replicate with D = 0 leaves the point with no value. "within_positive": the mean of the ratio of the replicates with D > 0, E\[N/D |
+
+Source code in `commol/context/inference/quantities.py`
+
+```python
+class Ratio(_OneScalar):
+    """
+    The ratio of two quantities of one value each, numerator N over
+    denominator D.
+
+    The ratio of a run whose denominator is 0 is NaN, also when the
+    numerator is not 0, and follows the NaN rule of every method. A method
+    that reduces the points of a design (`PRCC`, `Morris`, `Sobol`,
+    `PolynomialChaos`) reads one value per point; with a stochastic engine,
+    `replicates` says how the replicates of a point combine. A `Propagation`,
+    the `Scenarios` and the quantities of one run keep the ratio of each run.
+
+    Attributes
+    ----------
+    numerator : ValueAt | Gain | Peak
+        The quantity divided.
+    denominator : ValueAt | Gain | Peak
+        The quantity it is divided by.
+    replicates : {"within", "within_positive", "pooled"}
+        ``"within"``: the mean of the ratio of each replicate, E[N/D]; a
+        replicate with D = 0 leaves the point with no value.
+        ``"within_positive"``: the mean of the ratio of the replicates with
+        D > 0, E[N/D | D > 0]; a point with no such replicate has no value.
+        ``"pooled"``: the ratio of the means, E[N]/E[D]; a point with
+        E[D] = 0 has no value. With a deterministic engine, the three give
+        N/D, and a point with D = 0 has no value.
+    """
+
+    kind: Literal["ratio"] = "ratio"
+    numerator: _Operand = Field(description="The quantity divided.")
+    denominator: _Operand = Field(description="The quantity it is divided by.")
+    replicates: ReplicateRule = Field(
+        description="How the replicates of a stochastic run combine."
+    )
+
+    @field_validator("numerator", "denominator")
+    @classmethod
+    def one_value(cls, value: QuantityBase) -> QuantityBase:
+        """An operand gives one value per run."""
+        if isinstance(value, PeakPosition | Trajectory):
+            raise ValueError(
+                f"A Ratio divides quantities of one value each (ValueAt, Gain, "
+                f"Peak), got the {type(value).__name__} '{value.labels()[0]}'"
+            )
+        return value
+
+    def default_label(self) -> str:
+        """The numerator over the denominator."""
+        numerator = self.numerator.labels()[0]
+        denominator = self.denominator.labels()[0]
+        return f"({numerator}) / ({denominator})"
+
+    def rust_json(self) -> str:
+        """The ratio as Rust reads it: its JSON, without the labels."""
+        return self.model_dump_json(
+            exclude={"label": True, "numerator": {"label"}, "denominator": {"label"}}
+        )
+```
+
+### Methods:
+
+#### one_value
+
+```python
+one_value(value: QuantityBase) -> QuantityBase
+```
+
+An operand gives one value per run.
+
+Source code in `commol/context/inference/quantities.py`
+
+```python
+@field_validator("numerator", "denominator")
+@classmethod
+def one_value(cls, value: QuantityBase) -> QuantityBase:
+    """An operand gives one value per run."""
+    if isinstance(value, PeakPosition | Trajectory):
+        raise ValueError(
+            f"A Ratio divides quantities of one value each (ValueAt, Gain, "
+            f"Peak), got the {type(value).__name__} '{value.labels()[0]}'"
+        )
+    return value
+```
+
+#### default_label
+
+```python
+default_label() -> str
+```
+
+The numerator over the denominator.
+
+Source code in `commol/context/inference/quantities.py`
+
+```python
+def default_label(self) -> str:
+    """The numerator over the denominator."""
+    numerator = self.numerator.labels()[0]
+    denominator = self.denominator.labels()[0]
+    return f"({numerator}) / ({denominator})"
+```
+
+#### rust_json
+
+```python
+rust_json() -> str
+```
+
+The ratio as Rust reads it: its JSON, without the labels.
+
+Source code in `commol/context/inference/quantities.py`
+
+```python
+def rust_json(self) -> str:
+    """The ratio as Rust reads it: its JSON, without the labels."""
+    return self.model_dump_json(
+        exclude={"label": True, "numerator": {"label"}, "denominator": {"label"}}
+    )
 ```
 
 ## quantity_schedule
@@ -39751,6 +40495,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-22
+
+This release gives control over the work of a calibration and over what a result records. `commol.threads(n, levels)` sets how many threads the parallel methods use and which levels run in parallel, a particle swarm can stop when it has converged, a polynomial chaos takes a truncated basis for many inputs, and `Ratio` gives a sensitivity analysis the ratio of two quantities. A calibration result records its seed, and `commol.build_info()` names the version and the commit of the package. Before you upgrade, read the **Breaking** entry: `CalibrationResult` requires `seed`. See [Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md) and [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md).
+
+### Added
+
+- `PolynomialChaos(q_norm=..., max_interaction=...)`: a truncated basis for many inputs. `max_interaction` keeps the terms of at most that many inputs, and `q_norm`, in `(0, 1]`, the terms whose degrees have `Σ α_i^q ≤ degree^q`; the defaults keep the total-degree basis. 20 inputs at degree 4 with `max_interaction=2` have 1,221 terms instead of 10,626, and the number is known before any run. `ChaosResult` records both. See [Bases for many inputs](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#bases-for-many-inputs).
+- `ParticleSwarmConfig.improvement_stop(window=..., tol_abs=..., tol_rel=...)` and `ParticleSwarmConfig.radius_stop(tol)`: a particle swarm stops when its best loss improved by at most `tol_abs + tol_rel·|best loss|` over the last `window` iterations, or when every particle is within `tol` of the best position, as a fraction of the size of the search box. Both are off by default and have no default values. A run that stops by a rule reports `converged=True`, so a profile that holds a prediction with a swarm also converges. See [Stop rules](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#stop-rules).
+- `commol.set_threads(n)`, the context manager `commol.threads(n, levels)`, `commol.get_threads()` and `commol.get_levels()` choose the number of threads of every parallel method and the levels that run in parallel. The setting holds per Python thread (`contextvars`); without it, commol uses one thread per core. A particle swarm scores the particles of each iteration in parallel, in the order of the particles, with `levels="all"`, the default; `levels="outer"` keeps them in order. A seed gives the same result, history included, with any number of threads and either level. See [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
+- A calibration result records the seed it used, `CalibrationResult.seed` (`Calibrator.seed`: `problem.seed`, or the seed the calibrator drew), and the sample of every uncertainty method and of `Calibrator.point_sample` names it in `method.settings["seed"]`. Set as `problem.seed`, it repeats the run, also from a result read back from JSON. See [Reproducibility](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#reproducibility).
+- `commol.__version__` gives the installed version, and `commol.build_info()` gives a `BuildInfo` with the version and the full commit the extension was built from (`None` when the source has no git metadata, such as a source distribution). A build that is not a release, such as an install from a git commit, names its commit as a PEP 440 local version: `0.1.0+g<first 7 characters of the commit>`. See [Check the installation](https://munqu.github.io/commol/latest/getting-started/installation/#check-the-installation).
+- `Ratio(numerator, denominator, replicates)` is a quantity of interest: one `ValueAt`, `Gain` or `Peak` over another, in each run, so PRCC, Morris, Sobol and a polynomial chaos read a ratio whose denominator depends on the inputs. `replicates` is required: with a stochastic engine, a point of a design holds the mean of the ratios (`"within"`), the mean of the ratios of the replicates with a positive denominator (`"within_positive"`) or the ratio of the means (`"pooled"`). A denominator of 0 makes the ratio of a run NaN, and every method follows the NaN rule. See [A ratio of two quantities](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#a-ratio-of-two-quantities).
+
+### Changed
+
+- The tolerance of a profile under a particle swarm with the improvement stop rule is the improvement the rule allows at the fit, `tol_abs + tol_rel·|objective at the fit|`; without that rule it stays `1e-6·max(1, |objective at the fit|)`. See [Verdicts](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#verdicts-and-the-identifiability-report).
+- The parallel methods run in a thread pool of commol, not in the global pool of `rayon`: the environment variable `RAYON_NUM_THREADS` no longer limits them; use `commol.set_threads`. A particle swarm, which scored its particles one after the other, now scores them in parallel by default.
+- **Breaking:** `CalibrationResult` requires `seed`; a result saved by an earlier version, or built by hand, needs one to load.
+
+### Fixed
+
+- A particle swarm without `problem.seed` takes the seed the calibrator draws and logs, so that seed repeats it; before, it drew one of its own that no result or log kept.
+- A profile that holds a prediction with a particle swarm scores its particles in parallel only when the levels of `commol.threads` are `"all"`, and stops with the error of the first failing particle, as every other swarm does; before, it scored them in parallel at any level and reported the error of any failing particle.
+
 ## [0.8.0] - 2026-10-22
 
 This release compares runs. `Scenarios` runs every draw of a sample under several sets of parameter values and compares them in pairs, a quantity of interest reads a series and reduces it (the peak of the gains over windows, for example), and `results.quantities` reads the quantities of one run. Figures are methods of the results they draw: `plot.series`, `plot.observations` and `plot_compared`, which draws several runs or samples on the same panels. Before you upgrade, read the **Breaking** entries: `SimulationPlotter` and seaborn are removed and matplotlib is the optional extra `commol[plot]`, the quantities take a `series`, and the runs of the draws of a stochastic sample follow one tree of seeds, so their numbers change. See [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md) and [Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md).
@@ -40257,6 +41025,7 @@ ______________________________________________________________________
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.9.0** - Control over the work and the record: threads and levels, swarm stop rules, truncated chaos bases, ratios, seeds and build info
 - **0.8.0** - Comparing runs: scenarios, quantities of a series, figures as methods and runs on the same panels
 - **0.7.0** - Reading a run through objects: the window grid and dates on the axis, series by output name and reports as methods
 - **0.6.1** - Fixes of 0.6.0: checks at build, messages of infeasible draws, PRCC with NaN, quantity labels and starts, plots
