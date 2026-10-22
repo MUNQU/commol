@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-23
+
+This release makes equivalent things the same across commol, after an audit
+of the code, the repository and the documentation at 0.9.0. A setting that
+means the same thing has one name, every method takes its seed from its
+source and fits from its starts, equivalent results hold their failed fits in
+one place, equivalent methods raise one error type, a replicate summary takes
+the one quantile of commol, and commol adds no log handler. Before you
+upgrade, read each **Breaking** entry: most code changes only the names of
+settings and the type of an exception. See
+[Uncertainty](../guide/uncertainty/index.md) and
+[Log messages](../getting-started/quickstart.md#log-messages).
+
 ### Added
 
 - `Laplace`, `Sandwich`, `InformationMatchingEta` and `BootstrapCoverageEta`
@@ -1573,6 +1586,7 @@ the details of these versions.
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.10.0** - One way for equivalent things: setting names, seeds and starts, result shapes, error types, the quantile and logging
 - **0.9.0** - Control over the work and the record: threads and levels, swarm stop rules, truncated chaos bases, ratios, seeds and build info
 - **0.8.0** - Comparing runs: scenarios, quantities of a series, figures as methods and runs on the same panels
 - **0.7.0** - Reading a run through objects: the window grid and dates on the axis, series by output name and reports as methods
