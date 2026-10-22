@@ -42,7 +42,12 @@ from .problems import (
     observed,
     swarm,
 )
-from .parallelism import cores
+from .parallelism import (
+    assert_on_threads_of_setting,
+    decay_swarm_calibrator,
+    threads_of_runs,
+    two_decays,
+)
 from .reference import ABC_START, reference_run, abc_flows, total
 from .simulation import initial_state, run
 
@@ -67,7 +72,10 @@ __all__ = [
     "build",
     "build_ode",
     "conditional_pathway_builder",
-    "cores",
+    "assert_on_threads_of_setting",
+    "decay_swarm_calibrator",
+    "threads_of_runs",
+    "two_decays",
     "final_size",
     "flow_calibrator",
     "flow_observations",

@@ -124,6 +124,15 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     parallelism::register(&parallelism_module)?;
     m.add_submodule(&parallelism_module)?;
 
+    // Test kind module: the queries of the test model kind, only in a build
+    // with the `test-kind` feature
+    #[cfg(feature = "test-kind")]
+    {
+        let test_kind_module = PyModule::new(py, "test_kind")?;
+        test_kind::register(&test_kind_module)?;
+        m.add_submodule(&test_kind_module)?;
+    }
+
     // Module-level metadata: the version and the commit of the build, which
     // the build script reads (`build_info.rs`); no commit is an empty string.
     let commit = Some(env!("COMMOL_COMMIT")).filter(|commit| !commit.is_empty());

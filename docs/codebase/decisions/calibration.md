@@ -211,8 +211,10 @@ or reads `RAYON_NUM_THREADS`.
 | One pool per number of threads, the levels in a thread-local of the caller | A job that another thread steals reads the levels of that thread, which another setting may have left. |
 
 **Guards:** `crates/commol-core/src/parallelism.rs` `tests`;
-`tests/uncertainty/test_parallelism.py::test_one_thread_keeps_every_parallel_method_on_one_core`;
+`tests/uncertainty/test_parallelism.py::test_every_parallel_method_runs_on_the_threads_of_the_setting`;
 `tests/calibration/test_parallelism.py::test_a_thread_limit_bounds_every_parallel_method`.
+They read the threads that ran the test kind (`threads_of_runs`), not the
+CPU time, so the load of the machine does not change them.
 
 ## A swarm scores in parallel and keeps the order of its particles
 

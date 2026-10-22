@@ -1070,6 +1070,10 @@ mod tests {
     }
 
     /// `(x − 0.7)²`, which keeps the names of the threads that score it.
+    /// When the inner levels run in parallel, a score waits until a second
+    /// thread scores too: the other particles wait in the queue of the
+    /// waiting thread, so another thread of the pool steals one, whatever
+    /// the load of the machine. The wait gives up after 10 seconds.
     #[derive(Default)]
     struct Threads {
         names: std::sync::Mutex<std::collections::HashSet<String>>,
@@ -1080,9 +1084,16 @@ mod tests {
         type Output = f64;
 
         fn cost(&self, x: &Self::Param) -> Result<Self::Output, Error> {
-            std::thread::sleep(std::time::Duration::from_millis(1));
             let name = std::thread::current().name().unwrap_or("").to_string();
             self.names.lock().unwrap().insert(name);
+            if commol_core::inner_levels_in_parallel() {
+                let start = std::time::Instant::now();
+                while self.names.lock().unwrap().len() < 2
+                    && start.elapsed() < std::time::Duration::from_secs(10)
+                {
+                    std::thread::sleep(std::time::Duration::from_micros(100));
+                }
+            }
             Ok((x[0] - 0.7).powi(2))
         }
 

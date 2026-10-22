@@ -6,23 +6,28 @@ import pytest
 import commol
 from commol import BayesianBootstrap, GibbsPosterior, Priors
 from commol.api.parallelism import Levels
-from tests.support import abc_swarm_calibrator, cores, swarm
+from tests.support import (
+    abc_swarm_calibrator,
+    assert_on_threads_of_setting,
+    decay_swarm_calibrator,
+    swarm,
+    threads_of_runs,
+)
 
 LEVELS: tuple[Levels, ...] = ("all", "outer")
 
 
 def test_a_thread_limit_bounds_every_parallel_method() -> None:
-    calibrator = abc_swarm_calibrator(swarm(20, 40))
+    calibrator = decay_swarm_calibrator(swarm(20, 10))
     bootstrap = BayesianBootstrap(replicates=8, block_length=1)
 
-    with commol.threads(2):
-        starts = cores(lambda: calibrator.run(starts=8))
-        replicates = cores(lambda: calibrator.uncertainty(bootstrap))
+    for levels in LEVELS:
+        with commol.threads(2, levels=levels):
+            starts = threads_of_runs(lambda: calibrator.run(starts=8))
+            replicates = threads_of_runs(lambda: calibrator.uncertainty(bootstrap))
 
-    # The threads of a pool spin a little after each job while Python goes
-    # on, hence the margin; without the limit, the runs keep every core busy.
-    assert starts <= 2.5
-    assert replicates <= 2.5
+        assert_on_threads_of_setting(starts, 2)
+        assert_on_threads_of_setting(replicates, 2)
 
 
 def test_a_thread_limit_below_one_is_rejected() -> None:

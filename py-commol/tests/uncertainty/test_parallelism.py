@@ -1,5 +1,5 @@
-"""The level of parallelism of the uncertainty methods, and the one thread
-that every parallel method keeps to when the setting asks for one."""
+"""The level of parallelism of the uncertainty methods, and the threads of
+the setting that every parallel method runs on."""
 
 from collections.abc import Callable
 
@@ -12,7 +12,6 @@ from commol import (
     Calibrator,
     GibbsPosterior,
     InputSpace,
-    Peak,
     Predictive,
     Priors,
     ProfileLikelihood,
@@ -20,16 +19,18 @@ from commol import (
     Simulation,
     Sobol,
     Threshold,
+    ValueAt,
 )
 from tests.support import (
-    abc_builder,
     abc_swarm_calibrator,
+    assert_on_threads_of_setting,
     bounded,
-    build,
-    build_stochastic,
-    cores,
+    decay_swarm_calibrator,
     swarm,
+    threads_of_runs,
+    two_decays,
 )
+from tests.support.kinds import TEST_STOCHASTIC_ENGINE
 
 
 def test_the_level_of_parallelism_does_not_change_a_bootstrap() -> None:
@@ -46,29 +47,28 @@ def test_the_level_of_parallelism_does_not_change_a_bootstrap() -> None:
 
 def _bootstrap_predictive(calibrator: Calibrator) -> object:
     result = calibrator.uncertainty(BayesianBootstrap(replicates=4, block_length=1))
-    return Predictive(calibrator, result.sample, list(range(101)))
+    return Predictive(calibrator, result.sample, list(range(21)))
 
 
 def _sobol(_: Calibrator) -> object:
-    simulation = Simulation(build(abc_builder()))
+    simulation = Simulation(two_decays(k1=0.3, k2=0.1))
     inputs = InputSpace.uniform_on_bounds(
         [bounded("k1", 0.2, 0.6), bounded("k2", 0.05, 0.2)]
     )
     analysis = SensitivityAnalysis(simulation, inputs, seed=7)
-    positions = [float(t) for t in range(101)]
     return analysis.run(
         Sobol(
-            base_draws=256,
-            bootstrap=20,
+            base_draws=64,
+            bootstrap=10,
             confidence_level=0.9,
-            quantities=[Peak(series="B", positions=positions)],
+            quantities=[ValueAt(series=["x", "y"], at=5.0)],
         )
     )
 
 
 def _replicates(_: Calibrator) -> object:
-    simulation = Simulation(build_stochastic(abc_builder()))
-    return simulation.replicates(64, seed=3).run(100)
+    simulation = Simulation(two_decays(k1=0.3, k2=0.1, engine=TEST_STOCHASTIC_ENGINE))
+    return simulation.replicates(32, seed=3).run(10)
 
 
 METHODS: dict[str, Callable[[Calibrator], object]] = {
@@ -81,7 +81,7 @@ METHODS: dict[str, Callable[[Calibrator], object]] = {
         GibbsPosterior(
             priors=Priors.uniform_on_bounds(),
             eta=1.0,
-            particles=64,
+            particles=32,
             target_cess=0.5,
             resample_threshold=0.5,
             stay_probability=0.05,
@@ -89,7 +89,7 @@ METHODS: dict[str, Callable[[Calibrator], object]] = {
     ),
     "profile": lambda calibrator: calibrator.uncertainty(
         ProfileLikelihood(
-            parameters=["k1", "k2"], threshold=Threshold.beale(0.95), max_steps=6
+            parameters=["k1", "k2"], threshold=Threshold.beale(0.95), max_steps=4
         )
     ),
     "sobol": _sobol,
@@ -98,15 +98,15 @@ METHODS: dict[str, Callable[[Calibrator], object]] = {
 
 
 @pytest.mark.parametrize("method", METHODS.values(), ids=METHODS.keys())
-def test_one_thread_keeps_every_parallel_method_on_one_core(
-    method: Callable[[Calibrator], object],
+@pytest.mark.parametrize("limit", [1, 2])
+def test_every_parallel_method_runs_on_the_threads_of_the_setting(
+    method: Callable[[Calibrator], object], limit: int
 ) -> None:
-    calibrator = abc_swarm_calibrator(swarm(10, 20))
+    calibrator = decay_swarm_calibrator(swarm(8, 10))
 
-    with commol.threads(1):
-        used = cores(lambda: method(calibrator))
+    with commol.threads(limit):
+        threads = threads_of_runs(lambda: method(calibrator))
 
-    # A parallel loop outside the pool of the setting runs on every core.
-    # The thread of the pool spins a little after each job while Python
-    # goes on, hence the margin.
-    assert used <= 1.25
+    # A parallel loop outside the pool of the setting runs on the threads
+    # of the global rayon pool, which are no "commol-" threads.
+    assert_on_threads_of_setting(threads, limit)

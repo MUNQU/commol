@@ -7,14 +7,56 @@
 //! exponential time of that rate, so the mean of its runs is the same curve.
 //! The engines exist to test that the generic layers run a kind that is not
 //! aggregate, and a stochastic engine.
+//!
+//! Each run of either engine records the thread that runs it, so a test
+//! reads which threads ran a method ([`threads_of_runs`]).
 
 use std::collections::HashMap;
+use std::sync::Mutex;
+use std::thread::ThreadId;
 
 use commol_core::{
     DecayOutput, Model, ModelStructure, ModelValue, ParameterValue, SimulationEngine,
     SimulationError, TestStructure, ValuePlan,
 };
 use commol_random::{Generator, SumTree, sample};
+use pyo3::prelude::*;
+
+/// A thread that ran a test engine: its name, and the number of threads of
+/// its rayon pool, or `None` when it is no thread of a rayon pool.
+type RunThread = (String, Option<usize>);
+
+/// The threads that ran a test engine since the last [`threads_of_runs`].
+static RUN_THREADS: Mutex<Vec<(ThreadId, RunThread)>> = Mutex::new(Vec::new());
+
+/// Record the thread that runs a test engine.
+fn record_thread() {
+    let thread = std::thread::current();
+    let mut threads = RUN_THREADS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if threads.iter().all(|(id, _)| *id != thread.id()) {
+        let pool = rayon::current_thread_index().map(|_| rayon::current_num_threads());
+        let name = thread.name().unwrap_or_default().to_string();
+        threads.push((thread.id(), (name, pool)));
+    }
+}
+
+/// The threads that ran a test engine since the last call, each once: its
+/// name, and the number of threads of its rayon pool (`None` outside one)
+#[pyfunction]
+fn threads_of_runs() -> Vec<RunThread> {
+    let mut threads = RUN_THREADS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    threads.drain(..).map(|(_, thread)| thread).collect()
+}
+
+/// Register the queries of the test kind.
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(threads_of_runs, m)?)?;
+    Ok(())
+}
 
 /// The engine of the test model kind.
 #[derive(Clone)]
@@ -130,6 +172,7 @@ impl SimulationEngine for TestEngine {
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), SimulationError> {
+        record_thread();
         commol_core::check_positions(positions, self.position, check_position)?;
         buffer.clear();
         for &position in positions {
@@ -142,6 +185,7 @@ impl SimulationEngine for TestEngine {
     }
 
     fn step(&mut self) -> Result<(), SimulationError> {
+        record_thread();
         self.position += 1.0;
         Ok(())
     }
@@ -306,6 +350,7 @@ impl SimulationEngine for TestStochasticEngine {
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), SimulationError> {
+        record_thread();
         commol_core::check_positions(positions, self.position, check_position)?;
         buffer.clear();
         for &position in positions {
@@ -316,6 +361,7 @@ impl SimulationEngine for TestStochasticEngine {
     }
 
     fn step(&mut self) -> Result<(), SimulationError> {
+        record_thread();
         self.advance_to(self.position + 1.0)
     }
 
