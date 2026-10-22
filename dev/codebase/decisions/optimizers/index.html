@@ -3254,11 +3254,10 @@ history does not depend on the order in which the threads finish. With
 several failing points, the error is that of the first in the order of the
 points. A score takes the buffers of its thread out of the thread-local
 <code>WORKSPACE</code> while it runs (<code>with_workspace</code>), so a job that the thread steals
-meanwhile takes its own; <code>score_in</code> makes no <code>rayon</code> call.</p>
-<p>The augmented Lagrangian of the argmin fork scores its inner swarm through
-<code>AugmentedLagrangianCost</code>, whose <code>bulk_cost</code> is the default of the fork: it
-scores in parallel whatever the levels, and it returns the error of any
-failing particle (#320).</p>
+meanwhile takes its own; <code>score_in</code> makes no <code>rayon</code> call. The swarm of a held
+prediction scores <code>AugmentedLagrangianCost</code> of the fork, which runs in
+parallel when <code>PredictionCost::parallelize</code> says so, at the same levels, and
+also returns the error of the first failing point.</p>
 <table>
 <thead>
 <tr>
@@ -3284,7 +3283,8 @@ failing particle (#320).</p>
 <p><strong>Guards:</strong> <code>crates/commol-calibration/src/optimization.rs</code> <code>tests</code>
 (<code>a_swarm_gives_the_same_result_with_parallel_particles</code>,
 <code>the_error_of_a_swarm_is_its_first_failing_particle</code>,
-<code>a_swarm_on_a_subproblem_gives_one_fit_whatever_the_threads</code>);
+<code>a_swarm_on_a_subproblem_gives_one_fit_whatever_the_threads</code>,
+<code>a_swarm_on_a_held_prediction_follows_the_levels</code>);
 <code>objective::tests::a_score_holds_no_borrow_of_the_workspace</code>;
 <code>tests/calibration/test_parallelism.py::test_a_seed_gives_one_result_whatever_the_threads_and_the_level</code>.</p>
 <h2 id="a-swarm-stops-by-a-rule-the-modeller-sets">A swarm stops by a rule the modeller sets<a class="headerlink" href="#a-swarm-stops-by-a-rule-the-modeller-sets" title="Permanent link">&para;</a></h2>

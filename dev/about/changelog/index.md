@@ -34,6 +34,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - A particle swarm without `problem.seed` takes the seed the calibrator draws and logs, so that seed repeats it; before, it drew one of its own that no result or log kept.
 
+- A profile that holds a prediction with a particle swarm scores its particles in parallel only when the levels of `commol.threads` are `"all"`, and stops with the error of the first failing particle, as every other swarm does; before, it scored them in parallel at any level and reported the error of any failing particle.
+
 ## [0.8.0] - 2026-10-22
 
 This release compares runs. `Scenarios` runs every draw of a sample under several sets of parameter values and compares them in pairs, a quantity of interest reads a series and reduces it (the peak of the gains over windows, for example), and `results.quantities` reads the quantities of one run. Figures are methods of the results they draw: `plot.series`, `plot.observations` and `plot_compared`, which draws several runs or samples on the same panels. Before you upgrade, read the **Breaking** entries: `SimulationPlotter` and seaborn are removed and matplotlib is the optional extra `commol[plot]`, the quantities take a `series`, and the runs of the draws of a stochastic sample follow one tree of seeds, so their numbers change. See [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md) and [Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md).

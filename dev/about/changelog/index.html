@@ -4374,6 +4374,15 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Fixed #282 -->
 
+<!-- Fixed #320 -->
+
+<ul>
+<li>A profile that holds a prediction with a particle swarm scores its
+  particles in parallel only when the levels of <code>commol.threads</code> are
+  <code>"all"</code>, and stops with the error of the first failing particle, as every
+  other swarm does; before, it scored them in parallel at any level and
+  reported the error of any failing particle.</li>
+</ul>
 <h2 id="080-2026-10-22">[0.8.0] - 2026-10-22<a class="headerlink" href="#080-2026-10-22" title="Permanent link">&para;</a></h2>
 <p>This release compares runs. <code>Scenarios</code> runs every draw of a sample under
 several sets of parameter values and compares them in pairs, a quantity of
