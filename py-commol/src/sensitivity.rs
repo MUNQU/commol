@@ -21,6 +21,10 @@ use crate::smc::{PriorArgs, priors};
 /// The draws of a method and their log weights, `(values, log_weights)`.
 type Draws = (Vec<Vec<f64>>, Vec<f64>);
 
+/// The draws, the quantities and weight of each run, and the seed of each
+/// draw of a propagation.
+type PropagationValues = (Draws, Vec<Vec<f64>>, Vec<f64>, Vec<u64>);
+
 /// `μ`, `μ*`, `σ` and the number of points of a Morris screening.
 type MorrisValues = (Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>, usize);
 
@@ -103,8 +107,8 @@ impl PyForwardAnalysis {
         Ok(Self { inner })
     }
 
-    /// Monte Carlo propagation: the draws, and the quantities and weight of
-    /// each run
+    /// Monte Carlo propagation: the draws, the quantities and weight of each
+    /// run, and the seed of each draw
     ///
     /// Raises:
     ///     ValueError: If the draws do not fit the inputs, or a quantity is
@@ -115,13 +119,13 @@ impl PyForwardAnalysis {
         py: Python<'_>,
         draws: Option<usize>,
         quantities: &str,
-    ) -> PyResult<(Draws, Vec<Vec<f64>>, Vec<f64>)> {
+    ) -> PyResult<PropagationValues> {
         let quantities = read_quantities(quantities)?;
         let result = py
             .detach(|| self.inner.propagate(draws, &quantities))
             .map_err(predictive_error)?;
         let draws = (result.sample.values().to_vec(), result.sample.log_weights());
-        Ok((draws, result.values, result.weights))
+        Ok((draws, result.values, result.weights, result.draw_seeds))
     }
 
     /// The PRCC of each input for each quantity: the draws, the coefficients

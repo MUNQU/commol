@@ -206,8 +206,12 @@ print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75
 parallel in Rust, through the forward model of its source: a `Calibrator`, or
 a `SensitivityAnalysis` of the inputs of the sample. With a stochastic engine
 every replicate of a draw is a draw of the predictive, with an equal share of
-its weight and a seed of its own, derived from the seed of the source, so
-every draw shows fresh noise and the predictive repeats from that seed.
+its weight. The runs follow one tree of seeds: draw `j` takes the seed
+`draw_seeds[j]`, derived from the seed of the source, and its replicate `i`
+takes the seed that replicate `i` of `Simulation.replicates(n,
+seed=draw_seeds[j])` takes. So every draw shows fresh noise, the predictive
+repeats from the seed of the source, and the runs of a draw change neither
+with the number of replicates nor with the number of draws.
 The positions are sorted and unique, and each one is a position the engine
 reports at; otherwise `Predictive` raises `ValueError` before any draw runs.
 A draw whose run leaves the values its model allows raises
@@ -225,6 +229,7 @@ calibration gives for the same values: the remainder and the excess
 | `series_band(outputs, confidence_level, cumulative=False)` | The band of the sum of some outputs, or of its running total; each draw is reduced first |
 | `at_observations(observed_data, noise)` | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with `noise` drawn from the calibrator's seed: `NoNoise()`, `ResidualNoise(...)` or `DistributionNoise()` (`ObservationDraws`) |
 | `runs()`, `weights` | The trajectory and weight of every draw |
+| `draw_seeds` | The seed of each draw of the sample: `Simulation.replicates(n, seed=draw_seeds[j])` of the model at the values of draw `j` gives its runs |
 | `report(confidence_level, positions, window, windows, observed_data=(), accumulators=())` | The report of a run, with each number reduced across the draws with their weights ([Reports](../reports.md#the-report-of-an-ensemble)) |
 | `plot.series(…)`, `plot.cumulative(…)`, `plot.observations(…)` | The weighted median of the draws of each series and their band, those of its running total, or those of each observed series, read through `at_observations(…, NoNoise())` ([Plotting](../simulations.md#a-panel-per-observed-series)) |
 

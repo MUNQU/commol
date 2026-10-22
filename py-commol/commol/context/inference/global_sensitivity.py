@@ -286,6 +286,11 @@ class PropagationResult(BaseModel):
     weights : list[float]
         The weight of each run; with a stochastic engine each replicate has
         an equal share of its draw's weight. They sum to 1.
+    draw_seeds : list[int]
+        The seed of each draw of `sample`, in its order. With a stochastic
+        engine, replicate ``i`` of draw ``j`` runs with the seed replicate
+        ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])`` takes, so
+        those replicates of the model at that draw give the runs of the draw.
 
     A quantity that reads a NaN is NaN in `values`, and `summary` raises on
     it: `where` keeps the runs a condition chooses, which conditions the
@@ -298,6 +303,7 @@ class PropagationResult(BaseModel):
     labels: list[str]
     values: list[list[float]]
     weights: list[float]
+    draw_seeds: list[int]
 
     @property
     def effective_size(self) -> float:
@@ -317,8 +323,8 @@ class PropagationResult(BaseModel):
         distribution of each quantity given the condition of the mask, such
         as ``np.isfinite(values[:, i])`` or a compartment above a threshold,
         not the distribution over every run. `effective_size` says how many
-        runs the kept weights are worth. `sample` stays the draws of the
-        inputs.
+        runs the kept weights are worth. `sample` and `draw_seeds` stay those
+        of the draws of the inputs.
 
         Parameters
         ----------

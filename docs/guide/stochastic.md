@@ -189,7 +189,10 @@ in parallel. A run does not depend on the positions it reports at: the output
 at a position is the state after the last event before it. See
 [Randomness, seeds and replicates](simulations.md#randomness-seeds-and-replicates)
 for the seeds, `SimulationReplicates` and its statistics, plots of the mean and
-a band, and reports.
+a band, and reports. A `Predictive` or a `Propagation` of a sample gives draw
+`j` a seed of its own, `draw_seeds[j]`, and runs its replicates as
+`simulation.replicates(n, seed=draw_seeds[j])` runs them, so those replicates
+of the model at the values of the draw repeat its runs.
 
 ```python
 again = simulation.run(num_steps=100, seed=1)

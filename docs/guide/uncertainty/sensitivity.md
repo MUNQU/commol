@@ -266,7 +266,7 @@ for label, value in one_run.quantities(quantities).items():
 | The run lacks a position a quantity reads | `ValueError` that lists each such position with its quantity, and says to call `Simulation.run_at` |
 | A quantity names an output the results do not have | `ValueError` that names the output |
 | `run(n)` of the ODE engine | It interpolates the positions that are not breakpoints, so a value differs from that of a run that ends there by about the relative tolerance of the solver, and `PeakPosition` can change on a near-tie |
-| The replicates of a stochastic engine | Each replicate is reduced on its own. A `Propagation` seeds replicate `i` of draw `j` with `replicate_seed(stream_seed(seed, 4), j · replicates + i)` (`run_sets` in `crates/commol-inference/src/predictive.rs`), so its runs are not those of `Simulation.replicates(n, seed=seed)` or `run(seed=seed)` |
+| The replicates of a stochastic engine | Each replicate is reduced on its own. A `Propagation` gives draw `j` the seed `draw_seeds[j]`, so `Simulation.replicates(n, seed=result.draw_seeds[j])` of the model at the values of draw `j` gives the runs of that draw. The seed of the analysis itself gives other runs |
 
 ## Which method for which budget
 
@@ -286,7 +286,8 @@ fewest runs; read its leave-one-out error before its indices.
 
 `Propagation` returns a `PropagationResult`: the `sample` of the draws (a
 Latin hypercube of the distributions, or the input sample as it is), the
-quantities of each run, and their `weights`. `summary(confidence_level)` gives
+quantities of each run, their `weights`, and the seed of each draw
+(`draw_seeds`). `summary(confidence_level)` gives
 the weighted mean, median and central interval of each quantity. The sample is
 a `ParameterSample`, so `Predictive(analysis, result.sample, positions)` gives
 the bands and plots of a calibration.

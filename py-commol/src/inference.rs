@@ -891,6 +891,13 @@ impl PyPredictive {
         self.inner.weights().to_vec()
     }
 
+    /// The seed of each draw of the sample: replicate `i` of draw `j` of a
+    /// stochastic engine runs with `replicate_seed(draw_seeds[j], i)`
+    #[getter]
+    fn draw_seeds(&self) -> Vec<u64> {
+        self.inner.draw_seeds().to_vec()
+    }
+
     /// The band of `confidence_level`: `(mean, median, lower, upper)`, each
     /// `[position][output]`
     #[allow(clippy::type_complexity)]

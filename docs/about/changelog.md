@@ -123,6 +123,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the point, inputs, replicate and seed of the first such run.
   `PropagationResult.values` keeps the NaN of each run.
 
+<!-- Changed #309 -->
+
+- **Breaking:** the runs of the draws of a sample follow one tree of seeds.
+  Draw `j` of a stochastic `Predictive`, `Propagation`, `at_observations` or
+  score takes a seed of its own, and its replicate `i` takes the seed that
+  replicate `i` of `Simulation.replicates(n, seed=…)` takes from it. Before,
+  the seed of a replicate depended on the number of replicates. So the
+  numbers of these methods with a stochastic engine change from 0.7.0. The
+  runs of a draw no longer change with the number of replicates or of
+  draws, and `Predictive.draw_seeds` and `PropagationResult.draw_seeds` give
+  the seed of each draw: `Simulation.replicates(n, seed=draw_seeds[j])` of
+  the model at the values of draw `j` gives its runs. See
+  [The predictive](../guide/uncertainty/index.md#the-predictive).
+
 ### Fixed
 
 <!-- Fixed #246 -->

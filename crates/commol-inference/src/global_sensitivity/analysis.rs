@@ -16,7 +16,7 @@ use commol_random::stream_seed;
 use crate::batch::BatchRunner;
 use crate::design::InputSpace;
 use crate::global_sensitivity::{ChaosExpansion, Morris, Prcc, Sobol, morris, prcc, sobol};
-use crate::predictive::{PredictiveError, run_sets};
+use crate::predictive::{PredictiveError, draw_seeds, run_sets};
 use crate::quantity::{Quantities, Quantity};
 use crate::sample::ParameterSample;
 
@@ -41,6 +41,10 @@ pub struct Propagation {
     /// The weight of each run; a replicate has an equal share of its draw's
     /// weight.
     pub weights: Vec<f64>,
+    /// The seed of each draw of `sample` ([`crate::predictive::draw_seeds`]):
+    /// with a stochastic engine, replicate `i` of draw `j` runs with
+    /// `replicate_seed(draw_seeds[j], i)`.
+    pub draw_seeds: Vec<u64>,
 }
 
 /// A forward model with no observations, the inputs it varies and the seed
@@ -180,6 +184,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
             }
         }
         Ok(Propagation {
+            draw_seeds: draw_seeds(self.seed, sample.values().len()),
             sample,
             values,
             weights,

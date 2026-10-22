@@ -7,7 +7,10 @@ use commol_calibration::{
 };
 use commol_core::Model;
 use commol_difference::DifferenceEquations;
-use commol_inference::{NoNoise, ParameterSample, Predictive, PredictiveError, observation_draws};
+use commol_inference::{
+    NoNoise, ParameterSample, Predictive, PredictiveError, draw_seeds, observation_draws,
+};
+use commol_random::replicate_seed;
 
 /// A → B at the proportional rate `k`, in discrete steps from A = 1000.
 fn problem() -> CalibrationProblem<DifferenceEquations> {
@@ -183,9 +186,9 @@ fn a_band_of_an_output_the_rows_lack_is_an_error() {
     );
 }
 
-/// A → B at `k`, from A = 1000, with the chain binomial, two replicates per
-/// evaluation.
-fn stochastic_problem() -> CalibrationProblem<commol_stochastic::StochasticSteps> {
+/// A → B at `k`, from A = 1000, with the chain binomial, `replicates`
+/// replicates per evaluation.
+fn stochastic_problem(replicates: usize) -> CalibrationProblem<commol_stochastic::StochasticSteps> {
     let json = r#"{"name":"m","parameters":[{"id":"k","value":0.1}],
         "engine":{"type":"StochasticSteps","settings":null},
         "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
@@ -202,15 +205,19 @@ fn stochastic_problem() -> CalibrationProblem<commol_stochastic::StochasticSteps
     )
     .unwrap()
     .with_replicates(Some(
-        commol_calibration::Replicates::new(2, 3, commol_calibration::ReplicateSummary::Mean)
-            .unwrap(),
+        commol_calibration::Replicates::new(
+            replicates,
+            3,
+            commol_calibration::ReplicateSummary::Mean,
+        )
+        .unwrap(),
     ))
     .unwrap()
 }
 
 #[test]
 fn every_draw_of_a_stochastic_predictive_draws_its_own_noise() {
-    let problem = stochastic_problem();
+    let problem = stochastic_problem(2);
     // Three draws of one parameter value: with the replicates of the
     // problem they would run the same two paths.
     let draws = sample(vec![vec![0.2]; 3]);
@@ -240,4 +247,36 @@ fn every_draw_of_a_stochastic_predictive_draws_its_own_noise() {
     .unwrap();
     let observed_a: Vec<f64> = observed.values.iter().map(|row| row[0]).collect();
     assert_eq!(observed_a, a_at_5);
+}
+
+#[test]
+fn a_draw_keeps_its_runs_when_the_replicates_change() {
+    let draws = sample(vec![vec![0.2], vec![0.3], vec![0.4]]);
+    let two = Predictive::new(stochastic_problem(2).forward(), &draws, &[5.0], 11).unwrap();
+    let four = Predictive::new(stochastic_problem(4).forward(), &draws, &[5.0], 11).unwrap();
+    let fewer_draws = sample(vec![vec![0.2], vec![0.3]]);
+    let of_two_draws =
+        Predictive::new(stochastic_problem(2).forward(), &fewer_draws, &[5.0], 11).unwrap();
+
+    assert_eq!(two.draw_seeds(), draw_seeds(11, 3).as_slice());
+    assert_eq!(four.draw_seeds(), two.draw_seeds());
+    assert_eq!(of_two_draws.draw_seeds(), &two.draw_seeds()[..2]);
+    for draw in 0..3 {
+        assert_eq!(
+            &two.trajectories()[2 * draw..2 * draw + 2],
+            &four.trajectories()[4 * draw..4 * draw + 2],
+        );
+    }
+    assert_eq!(of_two_draws.trajectories(), &two.trajectories()[..4]);
+    // Replicate i of draw j runs with the seed replicate i of the seed of
+    // the draw.
+    let problem = stochastic_problem(4);
+    let forward = problem.forward();
+    for (draw, values) in draws.values().iter().enumerate() {
+        for replicate in 0..4 {
+            let seed = replicate_seed(four.draw_seeds()[draw], replicate as u64);
+            let run = forward.run_once_at(values, &[5.0], Some(seed)).unwrap();
+            assert_eq!(run, four.trajectories()[4 * draw + replicate]);
+        }
+    }
 }
