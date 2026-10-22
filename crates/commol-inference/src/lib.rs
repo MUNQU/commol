@@ -6,7 +6,7 @@
 //! | Module | Holds |
 //! |---|---|
 //! | [`sample`] | [`ParameterSample`]: weighted draws of the parameters |
-//! | [`statistics`] | The one quantile convention, weighted moments and effective size |
+//! | [`statistics`] | The one quantile convention, weighted moments and effective size, from `commol-calibration` |
 //! | [`target`] | [`Target`]: a log density, `−∞` outside the support |
 //! | [`predictive`] | [`Predictive`]: the run of every draw, its bands, and every draw's value of observations |
 //! | [`scores`] | Coverage, interval scores, CRPS and PIT of a predictive |
@@ -55,10 +55,10 @@ pub mod scores;
 pub mod sensitivity;
 pub mod smc;
 mod special;
-pub mod statistics;
 pub mod target;
 pub mod transform;
 
+pub use commol_calibration::statistics;
 pub use distribution::{Distribution, Family};
 pub use predictive::{
     Band, DistributionNoise, NanRun, NoNoise, ObservationDraws, ObservationNoise, Predictive,

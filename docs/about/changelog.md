@@ -38,6 +38,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `correlation_threshold`) says `<name> is strictly between 0 and 1, got
   <value>`.
 
+- **Breaking:** a calibration with `replicate_summary=Quantile(q)` compares
+  the observations with the one quantile of commol, the one of
+  `weighted_quantiles`, `SimulationReplicates.quantiles` and every interval
+  (NumPy's `method="hazen"` with equal weights), instead of NumPy's default
+  `linear` quantile. `Quantile(0.25)` of the replicates 1, 2, 3, 4, 5 is now
+  1.75, not 2.0. So for `q` other than 0.5 the loss and the fitted values
+  change slightly; `"median"` and `Quantile(0.5)` do not change. Your code
+  does not change; run again a calibration with `Quantile(q)` whose result
+  you stored. See
+  [One confidence-interval convention](../codebase/decisions/results.md#one-confidence-interval-convention).
+
 ### Removed
 
 - **Breaking:** `commol.add_stderr_logger` is removed: commol configures no

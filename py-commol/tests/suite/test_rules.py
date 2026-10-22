@@ -301,6 +301,51 @@ def test_every_ignored_rust_test_says_how_it_runs() -> None:
     )
 
 
+RUST_SORT = re.compile(r"\.sort(?:_unstable)?(?:_by(?:_key)?)?\s*\(")
+QUANTILE_FILES = {
+    "crates/commol-calibration/src/statistics.rs": "the one quantile of commol",
+    "crates/commol-inference/src/conformal/quantile.rs": (
+        "the conformal rank, an order statistic that gives an interval its "
+        "coverage, not an estimate of a quantile"
+    ),
+}
+"""The files whose functions may sort values to take a quantile, and why."""
+
+
+def test_commol_has_one_quantile() -> None:
+    """No function outside ``statistics.rs`` sorts values to take a quantile:
+    a function named for a quantile that sorts, itself or through a function
+    of its file."""
+    wrong = []
+    for root in RUST_ROOTS:
+        for path in sorted((root / "src").rglob("*.rs")):
+            if relative(path) in QUANTILE_FILES:
+                continue
+            functions = list(rust_functions(path))
+            sorting = {
+                function.name
+                for function in functions
+                if RUST_SORT.search(function.body)
+            }
+            wrong += [
+                f"{relative(path)}:{function.line} {function.name}"
+                for function in functions
+                if "quantile" in function.name
+                and not RUST_TEST.search(function.attributes)
+                and (
+                    function.name in sorting
+                    or any(
+                        call.group("name") in sorting
+                        for call in RUST_CALL.finditer(function.body)
+                    )
+                )
+            ]
+    assert not wrong, (
+        "Take a quantile with statistics::quantiles, the one quantile of "
+        "commol:\n" + "\n".join(wrong)
+    )
+
+
 # Expected failures
 
 ISSUE = re.compile(r"#\d+")

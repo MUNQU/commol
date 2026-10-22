@@ -12,8 +12,11 @@ from commol import (
     Calibrator,
     NelderMeadConfig,
     ObservedDataPoint,
+    Quantile,
     Simulation,
+    weighted_quantiles,
 )
+from commol.context.calibration import CalibrationResult, ReplicateSummary
 from commol.context.engine import EngineName
 from tests.support import STOCHASTIC_ENGINES, a_to_b_builder, bounded, build_stochastic
 
@@ -31,26 +34,34 @@ def _data(engine: EngineName) -> list[ObservedDataPoint]:
     ]
 
 
-def _calibrate(engine: EngineName, summary: str):
+def _calibrator(
+    engine: EngineName, summary: ReplicateSummary, max_iterations: int = 200
+) -> Calibrator:
     builder = a_to_b_builder(parameters={"k": None})
     problem = CalibrationProblem(
         observed_data=_data(engine),
         parameters=[bounded("k", 0.01, 0.5, initial_guess=0.3)],
         loss_function="sse",
-        optimization_config=NelderMeadConfig(max_iterations=200, sd_tolerance=1e-10),
+        optimization_config=NelderMeadConfig(
+            max_iterations=max_iterations, sd_tolerance=1e-10
+        ),
         replicates=40,
-        replicate_summary=summary,  # ty: ignore[invalid-argument-type]
+        replicate_summary=summary,
         seed=7,
     )
     simulation = Simulation(build_stochastic(builder, engine))
-    return Calibrator(simulation, problem).run()
+    return Calibrator(simulation, problem)
+
+
+def _calibrate(engine: EngineName, summary: ReplicateSummary) -> CalibrationResult:
+    return _calibrator(engine, summary).run()
 
 
 @pytest.mark.parametrize("engine", STOCHASTIC_ENGINES)
 class TestCalibration:
     @pytest.mark.parametrize("summary", ["mean", "crps"])
     def test_a_rate_is_recovered_from_the_runs(
-        self, engine: EngineName, summary: str
+        self, engine: EngineName, summary: ReplicateSummary
     ) -> None:
         result = _calibrate(engine, summary)
 
@@ -63,6 +74,28 @@ class TestCalibration:
 
         assert first.best_parameters == second.best_parameters
         assert first.final_loss == second.final_loss
+
+
+def test_a_quantile_summary_agrees_with_the_quantiles_of_the_replicates() -> None:
+    calibrator = _calibrator("StochasticEvents", Quantile(0.25), max_iterations=3)
+    observed = [point.value for point in calibrator.problem.observed_data]
+
+    history = calibrator.run_with_history()
+
+    names = calibrator.parameter_names
+    assert history.evaluations
+    for evaluation in history.evaluations:
+        values = [evaluation.parameters[name] for name in names]
+        (replicates,) = calibrator.rust_problem.predict_observations([values])
+        summaries = [
+            weighted_quantiles([replicate[i] for replicate in replicates], [0.25])[0]
+            for i in range(len(observed))
+        ]
+        expected = sum(
+            (value - summary) ** 2
+            for value, summary in zip(observed, summaries, strict=True)
+        )
+        assert evaluation.loss == pytest.approx(expected, rel=1e-12)
 
 
 @pytest.mark.parametrize("verbose", [False, True])

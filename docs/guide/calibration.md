@@ -190,7 +190,7 @@ because what to fit is a modelling choice:
 |---|---|---|
 | `"mean"` | The mean of the replicates | `loss_function` |
 | `"median"` | The median | `loss_function` |
-| `Quantile(q)` | The quantile `q` | `loss_function` |
+| `Quantile(q)` | The quantile `q`, a level between 0 and 1 | `loss_function` |
 | `"crps"` | The empirical distribution of the replicates | The continuous ranked probability score, `E|X − y| − ½ E|X − X'|`, a proper scoring rule; its loss is the weighted mean score, whatever `loss_function` is |
 
 ```python
@@ -218,6 +218,7 @@ print(round(result.best_parameters["k1"], 1))  # 0.4
 | A deterministic engine does not use `replicates` and `replicate_summary` | The same |
 | A stochastic engine needs a loss: with `observation_models`, `Calibrator` raises a `ValueError` | `PyCalibrationProblem::new` in `py-commol/src/inference.rs`; `Discrepancy::set_summary` |
 | The summaries and the CRPS are computed in `LossConfig`, and the observation weights apply to every option | `LossConfig::replicate_loss` in `crates/commol-calibration/src/types.rs` |
+| The median and `Quantile(q)` are the one quantile of commol, the one of `weighted_quantiles` and `SimulationReplicates.quantiles` (NumPy's `method="hazen"`): `Quantile(0.25)` of the replicates 1, 2, 3, 4, 5 is 1.75 | `ReplicateSummary::summarize`; `statistics::quantiles` in `crates/commol-calibration/src/statistics.rs` |
 | A constraint at positions is checked on every replicate | `CalibrationProblem::evaluate` |
 
 With one replicate the CRPS is the absolute error. The

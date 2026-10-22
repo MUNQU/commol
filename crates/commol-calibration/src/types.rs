@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::statistics;
+
 /// Type of value being calibrated
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CalibrationParameterType {
@@ -294,10 +296,11 @@ impl LossConfig {
 pub enum ReplicateSummary {
     /// The mean of the replicates.
     Mean,
-    /// The median of the replicates.
+    /// The median of the replicates: [`Self::Quantile`] at 0.5.
     Median,
-    /// A quantile of the replicates, in `[0, 1]`, linearly interpolated
-    /// between order statistics.
+    /// A quantile of the replicates at a level in `[0, 1]`: the one quantile
+    /// of commol ([`statistics::quantiles`] with equal weights, NumPy's
+    /// `method="hazen"`).
     Quantile(f64),
     /// The empirical distribution of the replicates, scored by the
     /// continuous ranked probability score ([`crps`]).
@@ -325,13 +328,14 @@ impl ReplicateSummary {
         }
     }
 
-    /// The summary of a set of replicate values, which are reordered.
+    /// The summary of a set of replicate values. It is NaN when a value is
+    /// NaN.
     ///
     /// # Panics
     ///
     /// Panics on [`Self::Crps`], which scores a distribution instead of
     /// summarizing it, and when `values` is empty.
-    pub fn summarize(self, values: &mut [f64]) -> f64 {
+    pub fn summarize(self, values: &[f64]) -> f64 {
         assert!(!values.is_empty(), "a summary of no replicates");
         match self {
             Self::Mean => values.iter().sum::<f64>() / values.len() as f64,
@@ -342,14 +346,11 @@ impl ReplicateSummary {
     }
 }
 
-/// The quantile `level` of `values`, with linear interpolation between order
-/// statistics (the default of NumPy). The values are sorted.
-fn quantile(values: &mut [f64], level: f64) -> f64 {
-    values.sort_by(f64::total_cmp);
-    let position = (values.len() - 1) as f64 * level.clamp(0.0, 1.0);
-    let lower = position.floor() as usize;
-    let upper = position.ceil() as usize;
-    values[lower] + (position - lower as f64) * (values[upper] - values[lower])
+/// The quantile `level` of equally weighted `values`, NaN when a value is
+/// NaN.
+fn quantile(values: &[f64], level: f64) -> f64 {
+    let weights = vec![1.0; values.len()];
+    statistics::quantiles(values, &weights, &[level]).map_or(f64::NAN, |q| q[0])
 }
 
 /// The continuous ranked probability score of the empirical distribution of
@@ -413,16 +414,15 @@ impl Replicates {
     ///
     /// # Errors
     ///
-    /// Returns a message when `count` is 0 or a quantile level is outside
+    /// Returns a message when `count` is 0, or the message of
+    /// [`statistics::check_levels`] when a quantile level is outside
     /// `[0, 1]`.
     pub fn new(count: usize, seed: u64, summary: ReplicateSummary) -> Result<Self, String> {
         if count == 0 {
             return Err("A stochastic engine needs at least one replicate".to_string());
         }
         if let ReplicateSummary::Quantile(level) = summary {
-            if !(0.0..=1.0).contains(&level) {
-                return Err(format!("A quantile level is between 0 and 1, got {level}"));
-            }
+            statistics::check_levels(&[level])?;
         }
         Ok(Self {
             seeds: (0..count as u64)
@@ -681,26 +681,29 @@ mod replicate_tests {
     #[test]
     #[should_panic(expected = "the CRPS scores a distribution")]
     fn the_crps_is_not_a_summary() {
-        ReplicateSummary::Crps.summarize(&mut [1.0, 2.0]);
+        ReplicateSummary::Crps.summarize(&[1.0, 2.0]);
     }
 
     #[test]
     fn summaries_reduce_the_replicates() {
         let values = [5.0, 1.0, 3.0, 2.0, 4.0];
-        assert_eq!(ReplicateSummary::Mean.summarize(&mut values.clone()), 3.0);
-        assert_eq!(ReplicateSummary::Median.summarize(&mut values.clone()), 3.0);
-        assert_eq!(
-            ReplicateSummary::Quantile(0.25).summarize(&mut values.clone()),
-            2.0
-        );
-        assert_eq!(
-            ReplicateSummary::Quantile(0.1).summarize(&mut values.clone()),
-            1.4
-        );
-        assert_eq!(
-            ReplicateSummary::Quantile(1.0).summarize(&mut values.clone()),
-            5.0
-        );
+        assert_eq!(ReplicateSummary::Mean.summarize(&values), 3.0);
+        assert_eq!(ReplicateSummary::Median.summarize(&values), 3.0);
+        assert_eq!(ReplicateSummary::Quantile(0.25).summarize(&values), 1.75);
+        assert_eq!(ReplicateSummary::Quantile(0.1).summarize(&values), 1.0);
+        assert_eq!(ReplicateSummary::Quantile(1.0).summarize(&values), 5.0);
+    }
+
+    #[test]
+    fn a_replicate_that_is_not_a_number_gives_no_summary() {
+        let values = [1.0, f64::NAN, 3.0];
+        for summary in [
+            ReplicateSummary::Mean,
+            ReplicateSummary::Median,
+            ReplicateSummary::Quantile(0.9),
+        ] {
+            assert!(summary.summarize(&values).is_nan(), "{summary:?}");
+        }
     }
 
     #[test]
