@@ -3095,6 +3095,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#removed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3360,7 +3377,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#removed" class="md-nav__link">
+  <a href="#removed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Removed
@@ -3421,7 +3438,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#removed_1" class="md-nav__link">
+  <a href="#removed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Removed
@@ -3471,7 +3488,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#removed_2" class="md-nav__link">
+  <a href="#removed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Removed
@@ -3698,6 +3715,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#removed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3963,7 +3997,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#removed" class="md-nav__link">
+  <a href="#removed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Removed
@@ -4024,7 +4058,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#removed_1" class="md-nav__link">
+  <a href="#removed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Removed
@@ -4074,7 +4108,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#removed_2" class="md-nav__link">
+  <a href="#removed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Removed
@@ -4276,6 +4310,14 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Breaking:</strong> <code>commol.add_stderr_logger</code> is removed: commol configures no
+  logging, and adds only a <code>NullHandler</code> to the logger <code>commol</code>. Call
+  <code>logging.basicConfig(level=logging.INFO)</code> instead, or add a handler of your
+  own to <code>logging.getLogger("commol")</code>. See
+  <a href="../../getting-started/quickstart/#log-messages">Log messages</a>.</li>
+</ul>
 <h2 id="090-2026-10-22">[0.9.0] - 2026-10-22<a class="headerlink" href="#090-2026-10-22" title="Permanent link">&para;</a></h2>
 <p>This release gives control over the work of a calibration and over what a
 result records. <code>commol.threads(n, levels)</code> sets how many threads the parallel
@@ -5182,7 +5224,7 @@ place), and every interval uses one quantile, so the intervals of
   a character that is not a letter, a digit or <code>_</code>, so the digits of an id
   belong to its name and an exponent belongs to its number.</li>
 </ul>
-<h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
+<h3 id="removed_1">Removed<a class="headerlink" href="#removed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>commol.api.model_loader.ModelLoader</code>: a copy of <code>Model.from_json</code> that no
   page documented and nothing called.</li>
@@ -5328,7 +5370,7 @@ place), and every interval uses one quantile, so the intervals of
   checked as its flow, the rate times its source: <code>k2</code> in <code>1/day</code> from a bin in
   <code>item</code> passes as <code>item/day</code> instead of failing as <code>1/day</code>.</li>
 </ul>
-<h3 id="removed_1">Removed<a class="headerlink" href="#removed_1" title="Permanent link">&para;</a></h3>
+<h3 id="removed_2">Removed<a class="headerlink" href="#removed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Breaking:</strong> <code>Model.print_equations</code>, <code>ModelStructure.print_equations</code> and
   <code>PrintEquationsOutputFormat</code>. <code>model.describe().render("text")</code> shows the
@@ -5833,7 +5875,7 @@ place), and every interval uses one quantile, so the intervals of
   (<a href="../../guide/core-concepts/#what-a-rate-means">What a rate means</a>) instead
   of "every flow applies once per step".</li>
 </ul>
-<h3 id="removed_2">Removed<a class="headerlink" href="#removed_2" title="Permanent link">&para;</a></h3>
+<h3 id="removed_3">Removed<a class="headerlink" href="#removed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>TimeScale</code> (<code>commol.api.time_scale</code>). Its rate conversions gave per-step
   rates only, which a differential model reads as too small.</li>

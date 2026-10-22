@@ -6,6 +6,8 @@ The version of the installed commol and the commit it was built from. Save them 
 
 `commol.__version__` is the PEP 440 version, the same as `build_info().version`: the version of a release, or the placeholder version with the commit as a local version (`0.1.0+g<first 7 characters of the commit>`) for a build that is not a release.
 
+Commol logs to the logger `commol` and its children, and adds only a `logging.NullHandler`. Your application chooses where the messages go. Guide: [Log messages](https://munqu.github.io/commol/latest/getting-started/quickstart/#log-messages).
+
 ## build_info
 
 ```python

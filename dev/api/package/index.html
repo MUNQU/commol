@@ -3203,6 +3203,9 @@ them with a result to name the code that made it. Guide:
 <code>build_info().version</code>: the version of a release, or the placeholder
 version with the commit as a local version (<code>0.1.0+g&lt;first 7 characters of
 the commit&gt;</code>) for a build that is not a release.</p>
+<p>Commol logs to the logger <code>commol</code> and its children, and adds only a
+<code>logging.NullHandler</code>. Your application chooses where the messages go. Guide:
+<a href="../../getting-started/quickstart/#log-messages">Log messages</a>.</p>
 
 
 <div class="doc doc-object doc-function">
