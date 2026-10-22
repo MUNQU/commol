@@ -1118,10 +1118,13 @@ mod tests {
     /// When the inner levels run in parallel, a score waits until a second
     /// thread scores too: the other particles wait in the queue of the
     /// waiting thread, so another thread of the pool steals one, whatever
-    /// the load of the machine. The wait gives up after 10 seconds.
+    /// the load of the machine. The wait gives up after 10 seconds. Every
+    /// line of the wait runs whatever the order of the threads, so the
+    /// coverage of a run does not depend on it.
     #[derive(Default)]
     struct Threads {
         names: std::sync::Mutex<std::collections::HashSet<String>>,
+        scored: std::sync::Condvar,
     }
 
     impl CostFunction for Threads {
@@ -1130,14 +1133,15 @@ mod tests {
 
         fn cost(&self, x: &Self::Param) -> Result<Self::Output, Error> {
             let name = std::thread::current().name().unwrap_or("").to_string();
-            self.names.lock().unwrap().insert(name);
+            let mut names = self.names.lock().unwrap();
+            names.insert(name);
+            self.scored.notify_all();
             if commol_core::inner_levels_in_parallel() {
-                let start = std::time::Instant::now();
-                while self.names.lock().unwrap().len() < 2
-                    && start.elapsed() < std::time::Duration::from_secs(10)
-                {
-                    std::thread::sleep(std::time::Duration::from_micros(100));
-                }
+                let wait = std::time::Duration::from_secs(10);
+                drop(
+                    self.scored
+                        .wait_timeout_while(names, wait, |names| names.len() < 2),
+                );
             }
             Ok((x[0] - 0.7).powi(2))
         }
