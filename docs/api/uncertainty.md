@@ -4,7 +4,8 @@
 
 What every uncertainty method takes and returns: the configuration base, the
 weighted parameter sample, the predictive and its observation noise, the
-resampling, profile and conformal methods, the scores and the one quantile.
+scenarios, the resampling, profile and conformal methods, the scores and the
+one quantile.
 Guide: [Uncertainty](../guide/uncertainty/index.md).
 
 ::: commol.context.inference.method.InferenceMethod
@@ -24,6 +25,10 @@ Guide: [Uncertainty](../guide/uncertainty/index.md).
 ::: commol.api.inference.predictive.SeriesBand
 
 ::: commol.api.inference.predictive.ObservationDraws
+
+::: commol.api.inference.scenarios.Scenarios
+
+::: commol.api.inference.scenarios.ScenarioSummary
 
 ::: commol.context.inference.noise.NoNoise
 

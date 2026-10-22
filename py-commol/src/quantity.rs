@@ -106,7 +106,8 @@ fn missing_message(missing: &[MissingPositions], names: &[String]) -> String {
         .collect();
     format!(
         "The run has no value at positions the quantities read: {}. Run the \
-         simulation at quantity_schedule(quantities) with Simulation.run_at.",
+         simulation at quantity_schedule(quantities) with Simulation.run_at, or \
+         give those positions to the Predictive or the Scenarios.",
         listed.join("; ")
     )
 }

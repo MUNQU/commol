@@ -229,3 +229,22 @@ same `ConformalResult` as every variant.
 **Guards:** `crates/commol-inference/tests/test_conformal.rs`,
 `tests/uncertainty/test_conformal.py`, the studies of
 `tests/uncertainty/test_coverage.py`.
+
+## Scenarios pair the draws of one sample
+
+`Scenarios` (`py-commol/commol/api/inference/scenarios.py`) holds one
+`Predictive` per scenario, each on a copy of the model with its overrides,
+from `source.with_model(model)` with the seed of the source. Run `k` of every
+scenario is then the same draw with the same seed, so `compare` takes each
+difference within a run before it reduces across runs. A quantity is one of
+`Quantity`, read in Rust (`Predictive.quantities`); a fit is a sample of one
+draw (`Calibrator.point_sample`), and one run gives no interval.
+
+| Alternative | Why not |
+|---|---|
+| `predictive.under(overrides)` and `p1.compare(p2)` | Two predictives that must share the sample and the seeds: arguments that must agree. |
+| A callable quantity | A second path in Python, per draw; `scenarios[name].runs()` gives the runs. |
+| The difference of two intervals | It ignores the pairs, so it is too wide. |
+
+**Guards:** `tests/uncertainty/test_scenarios.py::test_the_draws_of_every_scenario_share_their_seeds`,
+`tests/uncertainty/test_scenarios.py::test_the_interval_of_a_difference_is_taken_draw_by_draw`.

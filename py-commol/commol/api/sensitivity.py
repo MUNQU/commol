@@ -17,6 +17,7 @@ from commol.context.inference.noise import NoNoise, ObservationNoise
 from commol.context.inference.sample import ParameterSample
 
 if TYPE_CHECKING:
+    from commol.context.model import Model
     from commol.commol_rs._commol_rs import (
         ForwardAnalysisProtocol,
         ObservationDrawsProtocol,
@@ -146,6 +147,32 @@ class SensitivityAnalysis:
             The runs, computed in Rust.
         """
         return self._rust.predictive(sample.rust_sample, positions)
+
+    def with_model(self, model: "Model") -> "SensitivityAnalysis":
+        """
+        The same analysis on another model, with the same seed.
+
+        The draws of a predictive of the copy take the seeds they take here,
+        so `Scenarios` runs every scenario on common random numbers.
+
+        Parameters
+        ----------
+        model : Model
+            The model, such as a copy of this one with other parameter values.
+
+        Returns
+        -------
+        SensitivityAnalysis
+            An analysis of `model`, with `inputs`, `replicates` and `seed`.
+
+        Raises
+        ------
+        ValueError
+            If an input is not a value of `model`.
+        """
+        return SensitivityAnalysis(
+            Simulation(model), self.inputs, replicates=self.replicates, seed=self.seed
+        )
 
     def rust_observation_draws(
         self,

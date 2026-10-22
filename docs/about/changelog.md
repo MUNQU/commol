@@ -13,6 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Added #246 -->
 
+- `Scenarios(source, sample, scenarios, positions)` runs every draw of a
+  sample under each scenario, a set of parameter values that override those
+  of the model, and is a mapping from the name of a scenario to its
+  `Predictive`. Every scenario runs with the seed of the source, so run `k`
+  of each scenario is the same draw with the same seed (common random
+  numbers). `compare(name, baseline, quantities, confidence_level)` takes
+  the difference of each quantity of interest within each run and reduces
+  the differences with the weights of the runs; `summary` reduces one
+  scenario. Both give a `ScenarioSummary` per label, with no interval when
+  there is one run. `Predictive.quantities(quantities)` gives the quantities
+  of every draw, `Calibrator.point_sample(result)` the point estimate of a fit
+  as a sample of one draw, and `Calibrator.with_model` and
+  `SensitivityAnalysis.with_model` the same source on another model with the
+  same seed. See [Scenarios](../guide/uncertainty/index.md#scenarios).
+
 <!-- Added #247 -->
 
 - `plot.observations(observed_data, …)` of `SimulationResults`,

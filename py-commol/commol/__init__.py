@@ -39,6 +39,8 @@ from commol.api.inference import (
     ObservationDraws,
     Predictive,
     PredictiveBand,
+    ScenarioSummary,
+    Scenarios,
     SeriesBand,
 )
 from commol.context.calibration import (
@@ -295,6 +297,8 @@ __all__ = [
     "PlotConfig",
     "Predictive",
     "PredictiveBand",
+    "ScenarioSummary",
+    "Scenarios",
     "Process",
     "SeriesValue",
     "Quantile",

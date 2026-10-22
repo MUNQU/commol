@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from commol.api.plotting.accessors import PredictivePlot
-from commol.api.results import SimulationResults
+from commol.api.results import SimulationResults, quantities_of_runs
 from commol.context.calibration import ObservedDataPoint
 from commol.context.inference.noise import ObservationNoise
 from commol.context.inference.sample import ParameterSample
@@ -15,6 +15,8 @@ if TYPE_CHECKING:
     from commol.api.reporting import SimulationReport
     from commol.api.simulation import Simulation
     from commol.context.inference.conformal import PredictionIntervals
+    from commol.context.inference.quantities import QuantityBase
+    from commol.context.model import Model
     from commol.commol_rs._commol_rs import (
         ObservationDrawsProtocol,
         PredictiveProtocol,
@@ -48,6 +50,10 @@ class PredictiveSource(Protocol):
         noise: ObservationNoise,
     ) -> "ObservationDrawsProtocol":
         """Every draw's value of `observed_data` with `noise`."""
+        ...
+
+    def with_model(self, model: "Model") -> "PredictiveSource":
+        """The same source on `model`, with the same seed."""
         ...
 
     def rust_log_score(
@@ -274,6 +280,37 @@ class Predictive:
             )
             for rows in self._rust.trajectories
         ]
+
+    def quantities(
+        self, quantities: "Sequence[QuantityBase]"
+    ) -> list[dict[str, float]]:
+        """
+        The quantities of interest of every draw, in the order of `weights`.
+
+        Each run is reduced on its own, as `SimulationResults.quantities`
+        reduces one, with the Rust code of `Propagation`. The predictive runs
+        at `positions`, so they must hold ``quantity_schedule(quantities)``.
+
+        Parameters
+        ----------
+        quantities : Sequence[Quantity]
+            The quantities; a `Trajectory` gives one scalar per position.
+
+        Returns
+        -------
+        list[dict[str, float]]
+            One dict per draw of the predictive, with one value per label of
+            the quantities.
+
+        Raises
+        ------
+        ValueError
+            If there is no quantity, two scalars have one label, a quantity
+            names an output the model does not have, or `positions` lack a
+            position a quantity reads; the message lists every such position
+            with its quantity.
+        """
+        return quantities_of_runs(self.runs(), self.positions, quantities)
 
     def report(
         self,
