@@ -171,7 +171,7 @@ print(calibrate_k1(windowed))  # 0.4
 | Mixed windows  | Observations may use different windows, and positions need not be multiples of the window. |
 | Combinations   | Works with `factor_id` and `outputs`.                                                      |
 
-`windowed_totals` (module function) and `Simulation.windowed_totals` apply the same reduction outside calibration, so a report shows exactly what the loss compared. See [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals).
+`windowed_totals` (module function) and `Simulation.windowed_totals` apply the same reduction outside calibration, so a report shows exactly what the loss compared. See [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals). An observation without `window` reads its output at `at`; `sample` and `Simulation.sample` read a run there in the same way ([Values at positions](https://munqu.github.io/commol/latest/guide/simulations/#values-at-positions)).
 
 ## Positions between integers
 

@@ -3939,6 +3939,13 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <!-- Added #245 -->
 
+<ul>
+<li><code>commol.sample(series, positions, at)</code> reads a series at given positions,
+  and <code>Simulation.sample(results, ids, at)</code> reads bins and accumulators by id
+  at given positions, next to <code>Simulation.windowed_totals</code>: for example, the
+  amount in a bin at the end of each window. An id stands for all its outputs,
+  summed; an output name stands for itself.</li>
+</ul>
 <!-- Added #254 -->
 
 <ul>

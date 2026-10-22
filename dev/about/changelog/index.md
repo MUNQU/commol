@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- `commol.sample(series, positions, at)` reads a series at given positions, and `Simulation.sample(results, ids, at)` reads bins and accumulators by id at given positions, next to `Simulation.windowed_totals`: for example, the amount in a bin at the end of each window. An id stands for all its outputs, summed; an output name stands for itself.
+
 - An axis of time can start at a calendar date: `ModelBuilder(origin=...)` takes a `date` or a `datetime` with no time zone, and `Model.axis_units()` gives `position_of`, `moment_of`, `day_ends` and `week_ends` (weeks that start on a weekday of the caller). `SimulationPlotter.plot_series` labels the ticks of such a model with dates when it has no `position_label`. An origin needs a step unit of time of a whole number of days or a whole fraction of a day: `month` and `year` raise `ValueError`.
 
 - `Simulation.total_series` and `Simulation.windowed_totals` take output names as well as bin and accumulator ids. An output name stands for itself, so `simulation.windowed_totals(results, ["moved_g2", "moved_g3"], 2)` sums two strata of the accumulator `moved`; a bin or accumulator id still stands for all its outputs. An id that is neither raises `KeyError` with the bins, accumulators and outputs of the model.

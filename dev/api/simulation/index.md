@@ -438,6 +438,45 @@ class Simulation:
         return windowed_totals(
             self.total_series(results, ids), results.positions, window, at
         )
+
+    def sample(
+        self,
+        results: SimulationResults,
+        ids: Iterable[str],
+        at: Iterable[float],
+    ) -> list[float]:
+        """
+        Value of the given bins and accumulators at each position of `at`.
+
+        A bin holds an amount at a position, so the value is read at that
+        position, not over the window before it; `windowed_totals` reads the
+        gain of an accumulator over a window.
+
+        Parameters
+        ----------
+        results : SimulationResults
+            Simulation results, with their positions.
+        ids : Iterable[str]
+            Bin and accumulator ids, each for all its outputs
+            (`outputs_for`), and output names, each for itself. Their outputs
+            are summed before they are read.
+        at : Iterable[float]
+            Positions to read, each a position of `results`.
+
+        Returns
+        -------
+        list[float]
+            One value per position in `at`.
+
+        Raises
+        ------
+        KeyError
+            If an id is not a bin, accumulator or output of the model, or an
+            expected output is missing from `results`.
+        ValueError
+            If the results have no value at a position in `at`.
+        """
+        return sample(self.total_series(results, ids), results.positions, at)
 ```
 
 ### Attributes
@@ -1025,6 +1064,80 @@ def windowed_totals(
     return windowed_totals(
         self.total_series(results, ids), results.positions, window, at
     )
+```
+
+#### sample
+
+```python
+sample(results: SimulationResults, ids: Iterable[str], at: Iterable[float]) -> list[float]
+```
+
+Value of the given bins and accumulators at each position of `at`.
+
+A bin holds an amount at a position, so the value is read at that position, not over the window before it; `windowed_totals` reads the gain of an accumulator over a window.
+
+Parameters:
+
+| Name      | Type                | Description                                                                                                                                        | Default    |
+| --------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `results` | `SimulationResults` | Simulation results, with their positions.                                                                                                          | *required* |
+| `ids`     | `Iterable[str]`     | Bin and accumulator ids, each for all its outputs (outputs_for), and output names, each for itself. Their outputs are summed before they are read. | *required* |
+| `at`      | `Iterable[float]`   | Positions to read, each a position of results.                                                                                                     | *required* |
+
+Returns:
+
+| Type          | Description                   |
+| ------------- | ----------------------------- |
+| `list[float]` | One value per position in at. |
+
+Raises:
+
+| Type         | Description                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------- |
+| `KeyError`   | If an id is not a bin, accumulator or output of the model, or an expected output is missing from results. |
+| `ValueError` | If the results have no value at a position in at.                                                         |
+
+Source code in `commol/api/simulation.py`
+
+```python
+def sample(
+    self,
+    results: SimulationResults,
+    ids: Iterable[str],
+    at: Iterable[float],
+) -> list[float]:
+    """
+    Value of the given bins and accumulators at each position of `at`.
+
+    A bin holds an amount at a position, so the value is read at that
+    position, not over the window before it; `windowed_totals` reads the
+    gain of an accumulator over a window.
+
+    Parameters
+    ----------
+    results : SimulationResults
+        Simulation results, with their positions.
+    ids : Iterable[str]
+        Bin and accumulator ids, each for all its outputs
+        (`outputs_for`), and output names, each for itself. Their outputs
+        are summed before they are read.
+    at : Iterable[float]
+        Positions to read, each a position of `results`.
+
+    Returns
+    -------
+    list[float]
+        One value per position in `at`.
+
+    Raises
+    ------
+    KeyError
+        If an id is not a bin, accumulator or output of the model, or an
+        expected output is missing from `results`.
+    ValueError
+        If the results have no value at a position in `at`.
+    """
+    return sample(self.total_series(results, ids), results.positions, at)
 ```
 
 ## SimulationResults
@@ -2593,7 +2706,7 @@ A run left the values its model allows, such as an amount below zero.
 
 A difference-equations step that leaves a compartment below zero raises it. It is a `ValueError`; a calibration treats such a run as infeasible.
 
-## Windows
+## Windows and positions
 
 ## windowed_totals
 
@@ -2686,4 +2799,68 @@ def windowed_totals(
             - series[index_at(positions, max(start, 0.0))]
         )
     return totals
+```
+
+## sample
+
+```python
+sample(series: Sequence[float], positions: Sequence[float], at: Iterable[float]) -> list[float]
+```
+
+Read a series at the given positions.
+
+Compartment counts are instantaneous, so they are read at the position rather than averaged over the interval leading to it.
+
+Parameters:
+
+| Name        | Type              | Description                         | Default    |
+| ----------- | ----------------- | ----------------------------------- | ---------- |
+| `series`    | `Sequence[float]` | One value per position.             | *required* |
+| `positions` | `Sequence[float]` | Positions of the series, ascending. | *required* |
+| `at`        | `Iterable[float]` | Positions to read.                  | *required* |
+
+Returns:
+
+| Type          | Description                   |
+| ------------- | ----------------------------- |
+| `list[float]` | One value per position in at. |
+
+Raises:
+
+| Type         | Description                                  |
+| ------------ | -------------------------------------------- |
+| `ValueError` | If a position in at is not one of positions. |
+
+Source code in `commol/api/results.py`
+
+```python
+def sample(
+    series: Sequence[float], positions: Sequence[float], at: Iterable[float]
+) -> list[float]:
+    """
+    Read a series at the given positions.
+
+    Compartment counts are instantaneous, so they are read at the position
+    rather than averaged over the interval leading to it.
+
+    Parameters
+    ----------
+    series : Sequence[float]
+        One value per position.
+    positions : Sequence[float]
+        Positions of the series, ascending.
+    at : Iterable[float]
+        Positions to read.
+
+    Returns
+    -------
+    list[float]
+        One value per position in `at`.
+
+    Raises
+    ------
+    ValueError
+        If a position in `at` is not one of `positions`.
+    """
+    return [series[index_at(positions, position)] for position in at]
 ```

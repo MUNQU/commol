@@ -3484,7 +3484,10 @@ model's prediction becomes the gain over the window:</p>
 </table>
 <p><code>windowed_totals</code> (module function) and <code>Simulation.windowed_totals</code> apply the
 same reduction outside calibration, so a report shows exactly what the loss
-compared. See <a href="../simulations/#windowed-totals">Windowed totals</a>.</p>
+compared. See <a href="../simulations/#windowed-totals">Windowed totals</a>. An
+observation without <code>window</code> reads its output at <code>at</code>; <code>sample</code> and
+<code>Simulation.sample</code> read a run there in the same way
+(<a href="../simulations/#values-at-positions">Values at positions</a>).</p>
 <h2 id="positions-between-integers">Positions between integers<a class="headerlink" href="#positions-between-integers" title="Permanent link">&para;</a></h2>
 <p>A <code>DifferentialEquations</code> model runs in continuous time, so an observation may
 be at any position, such as <code>2.5</code>, and a window may cover any length. The

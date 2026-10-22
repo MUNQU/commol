@@ -2455,6 +2455,7 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | `group_outputs(ids)`                             | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id.                                                                                                                                                                                                                                                                                                                                                                        |
 | `total_series(results, ids)`                     | `list[float]`          | The sum of the given outputs at each position of the results. A bin or accumulator id stands for all its outputs; an output name stands for itself.                                                                                                                                                                                                                                                                              |
 | `windowed_totals(results, ids, window, at=None)` | `list[float]`          | What the given accumulators, or outputs of them, gained in each window.                                                                                                                                                                                                                                                                                                                                                          |
+| `sample(results, ids, at)`                       | `list[float]`          | The sum of the given outputs at each position of `at`, such as a bin at the end of each window.                                                                                                                                                                                                                                                                                                                                  |
 | `engine`                                         | engine                 | The underlying Rust engine, for the model as it is now: the engine `model.engine.type` names (`engine.engine_type`). `engine.step()` advances it one step; `engine.reset()` returns it to the initial state.                                                                                                                                                                                                                     |
 
 Every `run` starts again from the initial state, so two calls with the same model give the same result (`Simulation.run` resets the engine first). To continue a run step by step, use the engine:
@@ -2660,6 +2661,29 @@ print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], range(8), 3))  # [6, 15]
 ```
 
 A window of the grid is a whole number of steps. The `window` of `windowed_totals` need not be: see [Reporting at any position](#reporting-at-any-position).
+
+## Values at positions
+
+A bin holds an amount at a position, so it is read at the position, not over the window before it. `sample` reads the given bins and accumulators at each position of `at`; the ids are the ones of `total_series`, and their outputs are summed first. Next to `windowed_totals`, it gives the amount in a bin at the end of each window and what an accumulator gained over that window:
+
+```python
+ends = stratified.axis_units().window_ends(7, "step", 21)  # [7.0, 14.0, 21.0]
+
+in_a = stratified_simulation.sample(stratified_results, ["A"], ends)
+gained = stratified_simulation.windowed_totals(stratified_results, ["cum_ab"], 7, ends)
+print([round(value) for value in in_a])    # [478, 229, 109]
+print([round(value) for value in gained])  # [522, 250, 119]
+```
+
+`sample(series, positions, at)` of `py-commol/commol/api/results.py` reads any series:
+
+```python
+from commol import sample
+
+print(sample([0, 1, 3, 6, 10], range(5), [1, 4]))  # [1, 10]
+```
+
+Each position of `at` must be a position of the results, within a relative `1e-9`; otherwise `ValueError` asks you to run the simulation there with `run_at`.
 
 ## Differential equations
 
@@ -3655,7 +3679,7 @@ print(calibrate_k1(windowed))  # 0.4
 | Mixed windows  | Observations may use different windows, and positions need not be multiples of the window. |
 | Combinations   | Works with `factor_id` and `outputs`.                                                      |
 
-`windowed_totals` (module function) and `Simulation.windowed_totals` apply the same reduction outside calibration, so a report shows exactly what the loss compared. See [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals).
+`windowed_totals` (module function) and `Simulation.windowed_totals` apply the same reduction outside calibration, so a report shows exactly what the loss compared. See [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals). An observation without `window` reads its output at `at`; `sample` and `Simulation.sample` read a run there in the same way ([Values at positions](https://munqu.github.io/commol/latest/guide/simulations/#values-at-positions)).
 
 ## Positions between integers
 
@@ -6645,7 +6669,7 @@ Every public name of `commol`, generated from the docstrings. The guide pages ex
 | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md)      | `ModelBuilder`                                                                                                                                                                                                                                                                               |
 | [Model](https://munqu.github.io/commol/latest/api/model/index.md)                     | `Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete`, `Groups`, `ModelDescription`, `InitialCompartment`, `SeriesValue`, `UnitConsistencyError`                                                                                                                                     |
-| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)           | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `ODESolver`, `StochasticEventsSettings`, `StochasticStepsSettings`, `InfeasibleStateError`, `windowed_totals`                                                                                                    |
+| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)           | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `ODESolver`, `StochasticEventsSettings`, `StochasticStepsSettings`, `InfeasibleStateError`, `windowed_totals`, `sample`                                                                                          |
 | [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)               | `SimulationPlotter`, `PlotConfig`                                                                                                                                                                                                                                                            |
 | [AxisPattern](https://munqu.github.io/commol/latest/api/axis-patterns/index.md)       | `AxisPattern`                                                                                                                                                                                                                                                                                |
 | [AxisUnits](https://munqu.github.io/commol/latest/api/axis-units/index.md)            | `AxisUnits`                                                                                                                                                                                                                                                                                  |
@@ -25395,6 +25419,45 @@ class Simulation:
         return windowed_totals(
             self.total_series(results, ids), results.positions, window, at
         )
+
+    def sample(
+        self,
+        results: SimulationResults,
+        ids: Iterable[str],
+        at: Iterable[float],
+    ) -> list[float]:
+        """
+        Value of the given bins and accumulators at each position of `at`.
+
+        A bin holds an amount at a position, so the value is read at that
+        position, not over the window before it; `windowed_totals` reads the
+        gain of an accumulator over a window.
+
+        Parameters
+        ----------
+        results : SimulationResults
+            Simulation results, with their positions.
+        ids : Iterable[str]
+            Bin and accumulator ids, each for all its outputs
+            (`outputs_for`), and output names, each for itself. Their outputs
+            are summed before they are read.
+        at : Iterable[float]
+            Positions to read, each a position of `results`.
+
+        Returns
+        -------
+        list[float]
+            One value per position in `at`.
+
+        Raises
+        ------
+        KeyError
+            If an id is not a bin, accumulator or output of the model, or an
+            expected output is missing from `results`.
+        ValueError
+            If the results have no value at a position in `at`.
+        """
+        return sample(self.total_series(results, ids), results.positions, at)
 ```
 
 ### Attributes
@@ -25982,6 +26045,80 @@ def windowed_totals(
     return windowed_totals(
         self.total_series(results, ids), results.positions, window, at
     )
+```
+
+#### sample
+
+```python
+sample(results: SimulationResults, ids: Iterable[str], at: Iterable[float]) -> list[float]
+```
+
+Value of the given bins and accumulators at each position of `at`.
+
+A bin holds an amount at a position, so the value is read at that position, not over the window before it; `windowed_totals` reads the gain of an accumulator over a window.
+
+Parameters:
+
+| Name      | Type                | Description                                                                                                                                        | Default    |
+| --------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `results` | `SimulationResults` | Simulation results, with their positions.                                                                                                          | *required* |
+| `ids`     | `Iterable[str]`     | Bin and accumulator ids, each for all its outputs (outputs_for), and output names, each for itself. Their outputs are summed before they are read. | *required* |
+| `at`      | `Iterable[float]`   | Positions to read, each a position of results.                                                                                                     | *required* |
+
+Returns:
+
+| Type          | Description                   |
+| ------------- | ----------------------------- |
+| `list[float]` | One value per position in at. |
+
+Raises:
+
+| Type         | Description                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------- |
+| `KeyError`   | If an id is not a bin, accumulator or output of the model, or an expected output is missing from results. |
+| `ValueError` | If the results have no value at a position in at.                                                         |
+
+Source code in `commol/api/simulation.py`
+
+```python
+def sample(
+    self,
+    results: SimulationResults,
+    ids: Iterable[str],
+    at: Iterable[float],
+) -> list[float]:
+    """
+    Value of the given bins and accumulators at each position of `at`.
+
+    A bin holds an amount at a position, so the value is read at that
+    position, not over the window before it; `windowed_totals` reads the
+    gain of an accumulator over a window.
+
+    Parameters
+    ----------
+    results : SimulationResults
+        Simulation results, with their positions.
+    ids : Iterable[str]
+        Bin and accumulator ids, each for all its outputs
+        (`outputs_for`), and output names, each for itself. Their outputs
+        are summed before they are read.
+    at : Iterable[float]
+        Positions to read, each a position of `results`.
+
+    Returns
+    -------
+    list[float]
+        One value per position in `at`.
+
+    Raises
+    ------
+    KeyError
+        If an id is not a bin, accumulator or output of the model, or an
+        expected output is missing from `results`.
+    ValueError
+        If the results have no value at a position in `at`.
+    """
+    return sample(self.total_series(results, ids), results.positions, at)
 ```
 
 ## SimulationResults
@@ -27550,7 +27687,7 @@ A run left the values its model allows, such as an amount below zero.
 
 A difference-equations step that leaves a compartment below zero raises it. It is a `ValueError`; a calibration treats such a run as infeasible.
 
-## Windows
+## Windows and positions
 
 ## windowed_totals
 
@@ -27643,6 +27780,70 @@ def windowed_totals(
             - series[index_at(positions, max(start, 0.0))]
         )
     return totals
+```
+
+## sample
+
+```python
+sample(series: Sequence[float], positions: Sequence[float], at: Iterable[float]) -> list[float]
+```
+
+Read a series at the given positions.
+
+Compartment counts are instantaneous, so they are read at the position rather than averaged over the interval leading to it.
+
+Parameters:
+
+| Name        | Type              | Description                         | Default    |
+| ----------- | ----------------- | ----------------------------------- | ---------- |
+| `series`    | `Sequence[float]` | One value per position.             | *required* |
+| `positions` | `Sequence[float]` | Positions of the series, ascending. | *required* |
+| `at`        | `Iterable[float]` | Positions to read.                  | *required* |
+
+Returns:
+
+| Type          | Description                   |
+| ------------- | ----------------------------- |
+| `list[float]` | One value per position in at. |
+
+Raises:
+
+| Type         | Description                                  |
+| ------------ | -------------------------------------------- |
+| `ValueError` | If a position in at is not one of positions. |
+
+Source code in `commol/api/results.py`
+
+```python
+def sample(
+    series: Sequence[float], positions: Sequence[float], at: Iterable[float]
+) -> list[float]:
+    """
+    Read a series at the given positions.
+
+    Compartment counts are instantaneous, so they are read at the position
+    rather than averaged over the interval leading to it.
+
+    Parameters
+    ----------
+    series : Sequence[float]
+        One value per position.
+    positions : Sequence[float]
+        Positions of the series, ascending.
+    at : Iterable[float]
+        Positions to read.
+
+    Returns
+    -------
+    list[float]
+        One value per position in `at`.
+
+    Raises
+    ------
+    ValueError
+        If a position in `at` is not one of `positions`.
+    """
+    return [series[index_at(positions, position)] for position in at]
 ```
 
 # Uncertainty API
@@ -36482,6 +36683,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+
+- `commol.sample(series, positions, at)` reads a series at given positions, and `Simulation.sample(results, ids, at)` reads bins and accumulators by id at given positions, next to `Simulation.windowed_totals`: for example, the amount in a bin at the end of each window. An id stands for all its outputs, summed; an output name stands for itself.
 
 - An axis of time can start at a calendar date: `ModelBuilder(origin=...)` takes a `date` or a `datetime` with no time zone, and `Model.axis_units()` gives `position_of`, `moment_of`, `day_ends` and `week_ends` (weeks that start on a weekday of the caller). `SimulationPlotter.plot_series` labels the ticks of such a model with dates when it has no `position_label`. An origin needs a step unit of time of a whole number of days or a whole fraction of a day: `month` and `year` raise `ValueError`.
 
