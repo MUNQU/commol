@@ -9310,7 +9310,10 @@ class Calibrator:
         ------
         ValueError
             If the result's parameters are not the problem's, the level is not
-            strictly between 0 and 1, or the engine rejects a position.
+            strictly between 0 and 1, the engine is stochastic, or the engine
+            rejects a position.
+        RuntimeError
+            If the derivatives fail at the fit.
         """
         if result.sample.names != self.parameter_names:
             raise ValueError(
@@ -9593,8 +9596,16 @@ class Calibrator:
             If `method` is an identifiability method; the message names
             ``Calibrator.identifiability``.
         ValueError
-            If no runner is registered for the configuration's type; the
-            message names the registered ones.
+            If no runner is registered for the configuration's type (the
+            message names the registered ones), or
+            a setting, an input, the data or the model does not fit the
+            method; the message says why.
+        RuntimeError
+            If a computation of the method that could start fails: an engine
+            run, an optimizer, every replicate, or a sampler that does not
+            reach its target.
+        InfeasibleStateError
+            If a draw of a prediction leaves the values its model allows.
         """
         from commol.api.inference.registry import run_method
 
@@ -9626,8 +9637,12 @@ class Calibrator:
             If `method` is an uncertainty method; the message names
             ``Calibrator.uncertainty``.
         ValueError
-            If no runner is registered for the configuration's type, or the
-            method fails (see the method).
+            If no runner is registered for the configuration's type, or
+            a setting, an input, the data or the model does not fit the
+            method; the message says why.
+        RuntimeError
+            If a computation of the method that could start fails: an engine
+            run or an optimizer.
         """
         from commol.api.inference.registry import run_method
 
@@ -10170,9 +10185,10 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                    |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `ValueError` | If the result's parameters are not the problem's, the level is not strictly between 0 and 1, or the engine rejects a position. |
+| Type           | Description                                                                                                                                              |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`   | If the result's parameters are not the problem's, the level is not strictly between 0 and 1, the engine is stochastic, or the engine rejects a position. |
+| `RuntimeError` | If the derivatives fail at the fit.                                                                                                                      |
 
 Source code in `commol/api/calibrator.py`
 
@@ -10210,7 +10226,10 @@ def delta_band(
     ------
     ValueError
         If the result's parameters are not the problem's, the level is not
-        strictly between 0 and 1, or the engine rejects a position.
+        strictly between 0 and 1, the engine is stochastic, or the engine
+        rejects a position.
+    RuntimeError
+        If the derivatives fail at the fit.
     """
     if result.sample.names != self.parameter_names:
         raise ValueError(
@@ -10568,10 +10587,12 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                     |
-| ------------ | ----------------------------------------------------------------------------------------------- |
-| `TypeError`  | If method is an identifiability method; the message names Calibrator.identifiability.           |
-| `ValueError` | If no runner is registered for the configuration's type; the message names the registered ones. |
+| Type                   | Description                                                                                                                                                                                   |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`            | If method is an identifiability method; the message names Calibrator.identifiability.                                                                                                         |
+| `ValueError`           | If no runner is registered for the configuration's type (the message names the registered ones), or a setting, an input, the data or the model does not fit the method; the message says why. |
+| `RuntimeError`         | If a computation of the method that could start fails: an engine run, an optimizer, every replicate, or a sampler that does not reach its target.                                             |
+| `InfeasibleStateError` | If a draw of a prediction leaves the values its model allows.                                                                                                                                 |
 
 Source code in `commol/api/calibrator.py`
 
@@ -10601,8 +10622,16 @@ def uncertainty(self, method: UncertaintyMethod[ResultT]) -> ResultT:
         If `method` is an identifiability method; the message names
         ``Calibrator.identifiability``.
     ValueError
-        If no runner is registered for the configuration's type; the
-        message names the registered ones.
+        If no runner is registered for the configuration's type (the
+        message names the registered ones), or
+        a setting, an input, the data or the model does not fit the
+        method; the message says why.
+    RuntimeError
+        If a computation of the method that could start fails: an engine
+        run, an optimizer, every replicate, or a sampler that does not
+        reach its target.
+    InfeasibleStateError
+        If a draw of a prediction leaves the values its model allows.
     """
     from commol.api.inference.registry import run_method
 
@@ -10633,10 +10662,11 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                    |
-| ------------ | ---------------------------------------------------------------------------------------------- |
-| `TypeError`  | If method is an uncertainty method; the message names Calibrator.uncertainty.                  |
-| `ValueError` | If no runner is registered for the configuration's type, or the method fails (see the method). |
+| Type           | Description                                                                                                                                           |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`    | If method is an uncertainty method; the message names Calibrator.uncertainty.                                                                         |
+| `ValueError`   | If no runner is registered for the configuration's type, or a setting, an input, the data or the model does not fit the method; the message says why. |
+| `RuntimeError` | If a computation of the method that could start fails: an engine run or an optimizer.                                                                 |
 
 Source code in `commol/api/calibrator.py`
 
@@ -10667,8 +10697,12 @@ def identifiability(self, method: IdentifiabilityMethod[ResultT]) -> ResultT:
         If `method` is an uncertainty method; the message names
         ``Calibrator.uncertainty``.
     ValueError
-        If no runner is registered for the configuration's type, or the
-        method fails (see the method).
+        If no runner is registered for the configuration's type, or
+        a setting, an input, the data or the model does not fit the
+        method; the message says why.
+    RuntimeError
+        If a computation of the method that could start fails: an engine
+        run or an optimizer.
     """
     from commol.api.inference.registry import run_method
 
@@ -24523,7 +24557,13 @@ class SensitivityAnalysis:
             entry point.
         ValueError
             If the method does not take these inputs, such as a method of
-            independent inputs on inputs from a sample.
+            independent inputs on inputs from a sample, or a setting, a
+            quantity or the model does not fit the method; the message says
+            why.
+        RuntimeError
+            If a run of the design fails.
+        InfeasibleStateError
+            If a point of the design leaves the values its model allows.
         """
         return run_method(self, method, SensitivityMethod)
 ```
@@ -24910,10 +24950,12 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                               |
-| ------------ | --------------------------------------------------------------------------------------------------------- |
-| `TypeError`  | If method is not a sensitivity method; the message names its entry point.                                 |
-| `ValueError` | If the method does not take these inputs, such as a method of independent inputs on inputs from a sample. |
+| Type                   | Description                                                                                                                                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`            | If method is not a sensitivity method; the message names its entry point.                                                                                                                      |
+| `ValueError`           | If the method does not take these inputs, such as a method of independent inputs on inputs from a sample, or a setting, a quantity or the model does not fit the method; the message says why. |
+| `RuntimeError`         | If a run of the design fails.                                                                                                                                                                  |
+| `InfeasibleStateError` | If a point of the design leaves the values its model allows.                                                                                                                                   |
 
 Source code in `commol/api/sensitivity.py`
 
@@ -24939,7 +24981,13 @@ def run(self, method: SensitivityMethod[ResultT]) -> ResultT:
         entry point.
     ValueError
         If the method does not take these inputs, such as a method of
-        independent inputs on inputs from a sample.
+        independent inputs on inputs from a sample, or a setting, a
+        quantity or the model does not fit the method; the message says
+        why.
+    RuntimeError
+        If a run of the design fails.
+    InfeasibleStateError
+        If a point of the design leaves the values its model allows.
     """
     return run_method(self, method, SensitivityMethod)
 ```
@@ -40554,6 +40602,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - **Breaking:** every uncertainty and identifiability method takes its random numbers from the seed of its source, `Calibrator.seed` (`problem.seed`) or `SensitivityAnalysis.seed`, and has no seed of its own. Remove `seed=` from `StructuralRank` and from `scores.pit`, and set `problem.seed` (or the seed of the analysis) to choose the random numbers. The PIT randomizes ties from a stream of the seed of its draws, so its values at tied draws change for the same seed. See [Scores](https://munqu.github.io/commol/latest/guide/uncertainty/#scores).
 - `LaplaceMixture.starts` defaults to 1.
+- **Breaking:** every uncertainty, identifiability and sensitivity method raises one exception for one kind of error: `ValueError` when a setting, an input, the data or the model does not fit the method, and `RuntimeError` when a computation that could start fails (an engine run, an optimizer, every replicate, a sampler that stops before its target). An input error of an SMC method, a bootstrap, the jackknife or a profile that raised `RuntimeError`, such as a loss of 0 at the fit or a fit outside the support for `BootstrapCoverageEta`, now raises `ValueError`. Catch `ValueError` for these errors where your code caught `RuntimeError`. See [Design decisions](https://munqu.github.io/commol/latest/codebase/decisions/uncertainty/#methods-raise-one-error-type).
 - **Breaking:** a setting that means the same thing has one name in every method. The level of an interval is `confidence_level`, a count is a plain plural noun, and the rule that combines the replicates of a ratio is `replicate_rule`. An old name raises a `ValidationError` that names it as not permitted. Rename each old name in your code:
 
 | Where                                                                                    | Before                      | Now                                       |

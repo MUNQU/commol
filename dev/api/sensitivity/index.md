@@ -267,7 +267,13 @@ class SensitivityAnalysis:
             entry point.
         ValueError
             If the method does not take these inputs, such as a method of
-            independent inputs on inputs from a sample.
+            independent inputs on inputs from a sample, or a setting, a
+            quantity or the model does not fit the method; the message says
+            why.
+        RuntimeError
+            If a run of the design fails.
+        InfeasibleStateError
+            If a point of the design leaves the values its model allows.
         """
         return run_method(self, method, SensitivityMethod)
 ```
@@ -654,10 +660,12 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                               |
-| ------------ | --------------------------------------------------------------------------------------------------------- |
-| `TypeError`  | If method is not a sensitivity method; the message names its entry point.                                 |
-| `ValueError` | If the method does not take these inputs, such as a method of independent inputs on inputs from a sample. |
+| Type                   | Description                                                                                                                                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`            | If method is not a sensitivity method; the message names its entry point.                                                                                                                      |
+| `ValueError`           | If the method does not take these inputs, such as a method of independent inputs on inputs from a sample, or a setting, a quantity or the model does not fit the method; the message says why. |
+| `RuntimeError`         | If a run of the design fails.                                                                                                                                                                  |
+| `InfeasibleStateError` | If a point of the design leaves the values its model allows.                                                                                                                                   |
 
 Source code in `commol/api/sensitivity.py`
 
@@ -683,7 +691,13 @@ def run(self, method: SensitivityMethod[ResultT]) -> ResultT:
         entry point.
     ValueError
         If the method does not take these inputs, such as a method of
-        independent inputs on inputs from a sample.
+        independent inputs on inputs from a sample, or a setting, a
+        quantity or the model does not fit the method; the message says
+        why.
+    RuntimeError
+        If a run of the design fails.
+    InfeasibleStateError
+        If a point of the design leaves the values its model allows.
     """
     return run_method(self, method, SensitivityMethod)
 ```

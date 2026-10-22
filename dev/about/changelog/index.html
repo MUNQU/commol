@@ -2555,6 +2555,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/sensitivity/" class="md-nav__link">
         
   
@@ -4396,6 +4424,17 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   the same seed. See <a href="../../guide/uncertainty/#scores">Scores</a>.</li>
 <li>
 <p><code>LaplaceMixture.starts</code> defaults to 1.</p>
+</li>
+<li>
+<p><strong>Breaking:</strong> every uncertainty, identifiability and sensitivity method
+  raises one exception for one kind of error: <code>ValueError</code> when a setting, an
+  input, the data or the model does not fit the method, and <code>RuntimeError</code>
+  when a computation that could start fails (an engine run, an optimizer,
+  every replicate, a sampler that stops before its target). An input error of
+  an SMC method, a bootstrap, the jackknife or a profile that raised
+  <code>RuntimeError</code>, such as a loss of 0 at the fit or a fit outside the
+  support for <code>BootstrapCoverageEta</code>, now raises <code>ValueError</code>. Catch <code>ValueError</code> for these errors where your code caught
+  <code>RuntimeError</code>. See <a href="../../codebase/decisions/uncertainty/#methods-raise-one-error-type">Design decisions</a>.</p>
 </li>
 <li>
 <p><strong>Breaking:</strong> a setting that means the same thing has one name in every

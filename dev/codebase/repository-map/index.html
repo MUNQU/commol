@@ -2693,6 +2693,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/sensitivity/" class="md-nav__link">
         
   
@@ -3498,6 +3526,11 @@
 <td><code>crates/commol-calibration/src/statistics.rs</code></td>
 <td>The one quantile (weighted, midpoints of the cumulative weights; Hazen with equal weights), used by the summary of the replicates of a calibration and by every interval, sample and band of <code>commol-inference</code>, which re-exports the module as <code>commol_inference::statistics</code>; weighted mean and covariance, Kish's effective size; the one check of a confidence level (<code>interval_levels</code>) and of any other setting strictly between 0 and 1 (<code>check_open_unit</code>).</td>
 <td>Quantiles or checks of such a setting anywhere else.</td>
+</tr>
+<tr>
+<td><code>crates/commol-inference/src/error.rs</code></td>
+<td><code>MethodError</code>, the one error of every method, and its <code>ErrorKind</code> (<code>Invalid</code> or <code>Failed</code>), which sets the Python exception.</td>
+<td>An error type of one method.</td>
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/sample.rs</code></td>
