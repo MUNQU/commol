@@ -88,13 +88,14 @@ A quantity reads a series of each run and reduces it to a scalar, in Rust, throu
 | A name, a list of names, or `Level(outputs)` | The sum of the outputs, their level                                                                    |
 | `Increments(outputs, window)`                | The gain of the sum over `(end - window, end]`: the position is the end of a window, at least `window` |
 
-| Quantity                          | Value                                                                                                                                |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `ValueAt(series, at)`             | The value at `at`                                                                                                                    |
-| `Peak(series, positions)`         | The largest value at the positions                                                                                                   |
-| `PeakPosition(series, positions)` | The first of the positions where the value is largest                                                                                |
-| `Trajectory(series, positions)`   | The value at each position, one scalar per position, for an analysis over the axis                                                   |
-| `Gain(outputs, start, end)`       | The value at `end` minus the value at `start`: what entered a cumulative output over `(start, end]`, as an observation with a window |
+| Quantity                                    | Value                                                                                                                                |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `ValueAt(series, at)`                       | The value at `at`                                                                                                                    |
+| `Peak(series, positions)`                   | The largest value at the positions                                                                                                   |
+| `PeakPosition(series, positions)`           | The first of the positions where the value is largest                                                                                |
+| `Trajectory(series, positions)`             | The value at each position, one scalar per position, for an analysis over the axis                                                   |
+| `Gain(outputs, start, end)`                 | The value at `end` minus the value at `start`: what entered a cumulative output over `(start, end]`, as an observation with a window |
+| `Ratio(numerator, denominator, replicates)` | One quantity of one value over another, in each run ([A ratio of two quantities](#a-ratio-of-two-quantities))                        |
 
 The series is a modelling choice. The peak of a level is the largest amount; for an output that only grows, such as `C` here or an accumulator, it is the value at the last position. The peak of `Increments` is the largest gain over one window, and `PeakPosition` gives the end of that window:
 
@@ -118,13 +119,13 @@ for summary in gains.summary(0.9):
 
 Every quantity follows the same rules:
 
-| Rule                                                                       | So                                                                        |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| A quantity reads only the positions it names, with no interpolation        | A position the engine does not report at is a `ValueError`                |
-| Outputs are summed at each row before any reduction                        | The peak of `["A", "B"]` is the peak of `A + B`                           |
-| `PeakPosition` gives the first of the positions where the value is largest | A tie gives the earlier position                                          |
-| A NaN in a value a quantity reads makes it NaN                             | Its peak and the position of its peak are NaN too                         |
-| With a stochastic engine, a quantity is computed for each replicate        | A design point holds the mean of its replicates; a propagation keeps each |
+| Rule                                                                       | So                                                                                                                     |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| A quantity reads only the positions it names, with no interpolation        | A position the engine does not report at is a `ValueError`                                                             |
+| Outputs are summed at each row before any reduction                        | The peak of `["A", "B"]` is the peak of `A + B`                                                                        |
+| `PeakPosition` gives the first of the positions where the value is largest | A tie gives the earlier position                                                                                       |
+| A NaN in a value a quantity reads makes it NaN                             | Its peak and the position of its peak are NaN too                                                                      |
+| With a stochastic engine, a quantity is computed for each replicate        | A design point holds the mean of its replicates, or for a `Ratio` what its `replicates` says; a propagation keeps each |
 
 Each quantity has a `label`, by default what it reads, such as `"B at 10"`. The default label writes each position in full, as Python reads it back, so two positions give two labels: `"B at 1000000"` and `"B at 1000001"`.
 
@@ -145,36 +146,46 @@ print(round(late.summary(0.9)[0].median))  # 216
 
 ### A ratio of two quantities
 
-A ratio is taken within each run, before the runs are reduced: divide the two columns of `PropagationResult.values` row by row, leave out the rows that are not finite, and summarise the ratios with `member_statistics` and the weights of the rows. The share of the initial amount that entered `C` by position 100 is the gain of `C` over `(0, 100]` divided by the sum of the bins at 0:
+`Ratio(numerator, denominator, replicates)` divides two quantities of one value each (`ValueAt`, `Gain`, `Peak`), numerator N over denominator D, in each run. It is one quantity, so every method reads it, the sensitivity methods too. A `PeakPosition` or a `Trajectory` as an operand is a `ValueError`. The share of what entered `C` by position 100 that entered by position 50 has a denominator that depends on both inputs:
 
 ```python
-from commol import Gain, ValueAt, member_statistics
+from commol import Gain, Ratio
 
-parts = analysis.run(
-    Propagation(
-        draws=100,
-        quantities=[
-            Gain(outputs="C", start=0, end=100),
-            ValueAt(series=["A", "B", "C"], at=0),
-        ],
-    )
+early = Ratio(
+    numerator=Gain(outputs="C", start=0, end=50),
+    denominator=Gain(outputs="C", start=0, end=100),
+    replicates="within",
+    label="early share",
 )
-values = np.asarray(parts.values)
-finite = parts.where(np.isfinite(values[:, 0] / values[:, 1]))
-kept = np.asarray(finite.values)
-shares = (kept[:, 0] / kept[:, 1]).tolist()
-share = member_statistics(per_member=shares, confidence_level=0.9, weights=finite.weights)
-print(round(share["ci_lower"], 2), round(share["median"], 2), round(share["ci_upper"], 2))
-# 0.81 0.98 1.0
+spread = analysis.run(Propagation(draws=100, quantities=[early]))
+share = spread.summary(0.9)[0]
+print(share.label, round(share.lower, 2), round(share.median, 2), round(share.upper, 2))
+# early share 0.61 0.94 0.99
+ranked = analysis.run(PRCC(draws=200, quantities=[early]))
+print(ranked.inputs, [round(c, 2) for c in ranked.coefficients[0]])  # ['k1', 'k2'] [0.92, 0.69]
 ```
 
-| Rule                                                | Why                                                                                                                                                                                            |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Divide each row, then reduce                        | The mean of the ratios, E[N/D], is not the ratio of the means, E[N]/E\[D\]: the ratio of two summaries is another quantity                                                                     |
-| Leave out the rows that are not finite with `where` | A denominator of 0 gives an infinite ratio or NaN, and `member_statistics` raises on a NaN; `where` renormalises the weights of the kept rows, so the summary is conditioned on a finite ratio |
-| Pass the weights of the rows                        | A row is one run: with a sample of weights, or a stochastic engine, whose replicates share the weight of their draw, equal weights give another distribution                                   |
+The default label is `"(N) / (D)"`, from the labels of the two quantities. `replicates` is required, with no default: with a stochastic engine, it says how the replicates of a point of PRCC, Morris, Sobol or a polynomial chaos combine (`Quantities::combine` in `crates/commol-inference/src/quantity.rs`). They are three estimands, and the choice is yours:
 
-`PropagationResult.values` has one row per run, so the same division holds for the replicates of a stochastic engine (one row per replicate of each draw, draw by draw) and for the quantities of one run (below). The indices of a sensitivity method on a ratio equal those of its numerator only when the denominator is fixed and is not an input, as the sum of the bins at 0 is here: run the method on the numerator. commol has no quantity for a ratio, so a sensitivity method cannot read the ratio of a denominator that depends on the inputs.
+| `replicates`        | Value of a point                                           | No value when         |
+| ------------------- | ---------------------------------------------------------- | --------------------- |
+| `"within"`          | The mean of the ratio of each replicate, E[N/D]            | A replicate has D = 0 |
+| `"within_positive"` | The mean of the ratio of the replicates with D > 0, E\[N/D | D > 0\]               |
+| `"pooled"`          | The ratio of the means, E[N]/E[D]                          | E[D] = 0              |
+
+A deterministic engine has one run per point, so the three give N/D. A `Propagation`, `Scenarios` and the quantities of one run keep the ratio of each run, N/D, for each replicate.
+
+| Rule                                                       | So                                                                                                                                                                                              |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The ratio of a run with D = 0 is NaN, also when N is not 0 | N/0 is not ±inf, which a check for NaN misses; the NaN rule of [A quantity that is NaN](#a-quantity-that-is-nan) holds in every method                                                          |
+| A point with no value is NaN in every method               | The error names the point and its inputs, and the replicate that is NaN, when one is                                                                                                            |
+| `"within"` with D = 0 in one replicate                     | The point has no value. A Sobol design of 10^5 replicates almost surely holds one such replicate when D can reach 0                                                                             |
+| `"within_positive"`                                        | It conditions on D > 0, so it hides the effect of an input on the chance that D > 0: analyse that chance on its own. Its points average different numbers of replicates, so their noise differs |
+| `"pooled"`                                                 | The ratio of two means is another quantity than the mean of the ratios: it differs from `"within"` when D is small or 0 in some replicates                                                      |
+
+The indices of a ratio equal those of its numerator only when the denominator is fixed and is not an input, such as the sum of the bins at 0: then run the method on the numerator. When the denominator can be near 0, a ratio has large values in a few runs, and the Sobol and the chaos indices, which divide variances, are unstable; PRCC works on ranks, so it stays valid.
+
+A propagation keeps the NaN of each run in `values`, so `summary()` raises on a ratio with D = 0 in a run. `PropagationResult.where` keeps the runs where the ratio is finite, and the summary is then conditioned on that.
 
 ### The quantities of one run
 

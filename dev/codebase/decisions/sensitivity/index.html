@@ -2562,6 +2562,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-ratio-combines-its-replicates-as-the-user-chooses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A ratio combines its replicates as the user chooses
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3115,6 +3126,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-ratio-combines-its-replicates-as-the-user-chooses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A ratio combines its replicates as the user chooses
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3138,7 +3160,8 @@
 <h1 id="sensitivity-analysis">Sensitivity Analysis<a class="headerlink" href="#sensitivity-analysis" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
 <p>How a sensitivity analysis runs a model with no data, what a quantity of
-interest reads from a run, and what a NaN does to a quantity and to a method.</p>
+interest reads from a run, what a NaN does to a quantity and to a method, and
+how the replicates of a ratio combine.</p>
 <h2 id="an-analysis-needs-no-data">An analysis needs no data<a class="headerlink" href="#an-analysis-needs-no-data" title="Permanent link">&para;</a></h2>
 <p><code>ForwardAnalysis</code> runs every method on <code>ForwardModel::unobserved</code> (values
 written as a calibration writes them). Quantities read the observation
@@ -3233,9 +3256,7 @@ the axis (<code>index_at</code> of <code>commol-calibration</code>), then calls 
 <code>Quantities::evaluate</code> of <code>Propagation</code>. The binding (<code>quantities_of_runs</code> in
 <code>py-commol/src/quantity.rs</code>) is a pure function of the quantities and the
 rows. A position the run lacks is an error that lists every such position
-with its quantity; <code>quantity_schedule</code> gives the positions to run at. A ratio
-of two quantities is a division of the rows of <code>PropagationResult.values</code>,
-before any reduction, not a quantity.</p>
+with its quantity; <code>quantity_schedule</code> gives the positions to run at.</p>
 <table>
 <thead>
 <tr>
@@ -3255,10 +3276,6 @@ before any reduction, not a quantity.</p>
 <tr>
 <td>Exact matching of positions</td>
 <td>A position computed as <code>end − window</code> misses the row of the run.</td>
-</tr>
-<tr>
-<td>A <code>Ratio</code> quantity</td>
-<td>NaN would become a normal value of a quantity, and the methods read a ratio row by row correctly already; a derived output cannot divide values at two positions.</td>
 </tr>
 </tbody>
 </table>
@@ -3309,6 +3326,57 @@ renormalises their weights; the user writes the condition.</p>
 (<code>a_nan_makes_the_quantity_nan</code>, <code>every_estimator_rejects_a_nan</code>,
 <code>a_nan_run_is_named_by_its_point_and_inputs</code>),
 <code>tests/uncertainty/test_quantities.py</code> (<code>TestRules</code>, <code>TestFilter</code>).</p>
+<h2 id="a-ratio-combines-its-replicates-as-the-user-chooses">A ratio combines its replicates as the user chooses<a class="headerlink" href="#a-ratio-combines-its-replicates-as-the-user-chooses" title="Permanent link">&para;</a></h2>
+<p><code>Quantity::Ratio</code> divides two quantities of one value each
+(<code>crates/commol-inference/src/quantity.rs</code>). <code>Quantities::terms</code> gives each
+scalar of a run as a numerator and a denominator (1 for a scalar that is not
+a ratio), and <code>Quantities::combine</code> reduces the terms of the replicates of a
+point by the <code>Replicates</code> rule of the scalar: <code>Within</code> (E[N/D], the mean that
+every other scalar takes), <code>WithinPositive</code> (E[N/D | D &gt; 0]) or <code>Pooled</code>
+(E[N]/E[D]). <code>BatchRunner::means</code> reads <code>combine</code>, so PRCC, Morris, Sobol and
+the polynomial chaos see one value per point; <code>Quantities::evaluate</code> gives
+<code>Term::value</code>, N/D, to a propagation and to the quantities of one run. A
+denominator of 0 makes the ratio of a run NaN, whatever the numerator. A point
+with no value is <code>Undefined::Replicate</code> (the first replicate that is NaN) or
+<code>Undefined::Point</code> (no replicate with D &gt; 0, or a pooled denominator of 0),
+and <code>NanRun::replicate</code> is <code>None</code> for the second. The rule has no default:
+the Python class requires <code>replicates</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One estimand, or a default</td>
+<td>E[N/D] and E[N]/E[D] differ when D is small or 0 in some replicates; the choice is the modeller's.</td>
+</tr>
+<tr>
+<td><code>"within"</code> alone, with no conditional rule</td>
+<td>A design of 10^5 replicates almost surely holds a replicate with D = 0 when D can reach 0, and the only way out would be another estimand.</td>
+</tr>
+<tr>
+<td>Skip a replicate with D = 0 under <code>"within"</code></td>
+<td>It conditions on D &gt; 0 with no choice made; <code>"within_positive"</code> names that estimand.</td>
+</tr>
+<tr>
+<td>0/0 = 0, or N/0 = ±inf</td>
+<td>0 changes the estimand unseen; an infinity passes a check for NaN and breaks the indices.</td>
+</tr>
+<tr>
+<td>A ratio of a ratio, a <code>PeakPosition</code> or a <code>Trajectory</code></td>
+<td>A ratio of positions has no use, and a trajectory gives several values; a third operation would go to an expression on the Rust expression engine, not to more classes.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_quantities.rs</code>
+(<code>a_ratio_combines_replicates_as_the_user_chooses</code>,
+<code>a_zero_denominator_is_undefined_unless_the_user_conditions</code>,
+<code>a_draw_with_no_positive_denominator_raises</code>,
+<code>a_zero_denominator_follows_the_nan_rule_in_every_method</code>),
+<code>tests/uncertainty/test_quantities.py</code> (<code>TestRatio</code>).</p>
 
 
 

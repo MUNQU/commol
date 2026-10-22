@@ -4155,6 +4155,17 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Added #282 -->
 
+<ul>
+<li><code>Ratio(numerator, denominator, replicates)</code> is a quantity of interest: one
+  <code>ValueAt</code>, <code>Gain</code> or <code>Peak</code> over another, in each run, so PRCC, Morris,
+  Sobol and a polynomial chaos read a ratio whose denominator depends on the
+  inputs. <code>replicates</code> is required: with a stochastic engine, a point of a
+  design holds the mean of the ratios (<code>"within"</code>), the mean of the ratios
+  of the replicates with a positive denominator (<code>"within_positive"</code>) or the
+  ratio of the means (<code>"pooled"</code>). A denominator of 0 makes the ratio of a
+  run NaN, and every method follows the NaN rule. See
+  <a href="../../guide/uncertainty/sensitivity/#a-ratio-of-two-quantities">A ratio of two quantities</a>.</li>
+</ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <!-- Changed #226 -->
 

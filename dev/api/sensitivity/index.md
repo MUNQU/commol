@@ -3221,6 +3221,145 @@ def axes(self) -> list[tuple[str, float | None]]:
     return [(self._name(), at) for at in self.positions]
 ```
 
+## Ratio
+
+Bases: `_OneScalar`
+
+The ratio of two quantities of one value each, numerator N over denominator D.
+
+The ratio of a run whose denominator is 0 is NaN, also when the numerator is not 0, and follows the NaN rule of every method. A method that reduces the points of a design (`PRCC`, `Morris`, `Sobol`, `PolynomialChaos`) reads one value per point; with a stochastic engine, `replicates` says how the replicates of a point combine. A `Propagation`, the `Scenarios` and the quantities of one run keep the ratio of each run.
+
+Attributes:
+
+| Name          | Type                                | Description                                                                                                                                                                                     |
+| ------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `numerator`   | \`ValueAt                           | Gain                                                                                                                                                                                            |
+| `denominator` | \`ValueAt                           | Gain                                                                                                                                                                                            |
+| `replicates`  | `{within, within_positive, pooled}` | "within": the mean of the ratio of each replicate, E[N/D]; a replicate with D = 0 leaves the point with no value. "within_positive": the mean of the ratio of the replicates with D > 0, E\[N/D |
+
+Source code in `commol/context/inference/quantities.py`
+
+```python
+class Ratio(_OneScalar):
+    """
+    The ratio of two quantities of one value each, numerator N over
+    denominator D.
+
+    The ratio of a run whose denominator is 0 is NaN, also when the
+    numerator is not 0, and follows the NaN rule of every method. A method
+    that reduces the points of a design (`PRCC`, `Morris`, `Sobol`,
+    `PolynomialChaos`) reads one value per point; with a stochastic engine,
+    `replicates` says how the replicates of a point combine. A `Propagation`,
+    the `Scenarios` and the quantities of one run keep the ratio of each run.
+
+    Attributes
+    ----------
+    numerator : ValueAt | Gain | Peak
+        The quantity divided.
+    denominator : ValueAt | Gain | Peak
+        The quantity it is divided by.
+    replicates : {"within", "within_positive", "pooled"}
+        ``"within"``: the mean of the ratio of each replicate, E[N/D]; a
+        replicate with D = 0 leaves the point with no value.
+        ``"within_positive"``: the mean of the ratio of the replicates with
+        D > 0, E[N/D | D > 0]; a point with no such replicate has no value.
+        ``"pooled"``: the ratio of the means, E[N]/E[D]; a point with
+        E[D] = 0 has no value. With a deterministic engine, the three give
+        N/D, and a point with D = 0 has no value.
+    """
+
+    kind: Literal["ratio"] = "ratio"
+    numerator: _Operand = Field(description="The quantity divided.")
+    denominator: _Operand = Field(description="The quantity it is divided by.")
+    replicates: ReplicateRule = Field(
+        description="How the replicates of a stochastic run combine."
+    )
+
+    @field_validator("numerator", "denominator")
+    @classmethod
+    def one_value(cls, value: QuantityBase) -> QuantityBase:
+        """An operand gives one value per run."""
+        if isinstance(value, PeakPosition | Trajectory):
+            raise ValueError(
+                f"A Ratio divides quantities of one value each (ValueAt, Gain, "
+                f"Peak), got the {type(value).__name__} '{value.labels()[0]}'"
+            )
+        return value
+
+    def default_label(self) -> str:
+        """The numerator over the denominator."""
+        numerator = self.numerator.labels()[0]
+        denominator = self.denominator.labels()[0]
+        return f"({numerator}) / ({denominator})"
+
+    def rust_json(self) -> str:
+        """The ratio as Rust reads it: its JSON, without the labels."""
+        return self.model_dump_json(
+            exclude={"label": True, "numerator": {"label"}, "denominator": {"label"}}
+        )
+```
+
+### Methods:
+
+#### one_value
+
+```python
+one_value(value: QuantityBase) -> QuantityBase
+```
+
+An operand gives one value per run.
+
+Source code in `commol/context/inference/quantities.py`
+
+```python
+@field_validator("numerator", "denominator")
+@classmethod
+def one_value(cls, value: QuantityBase) -> QuantityBase:
+    """An operand gives one value per run."""
+    if isinstance(value, PeakPosition | Trajectory):
+        raise ValueError(
+            f"A Ratio divides quantities of one value each (ValueAt, Gain, "
+            f"Peak), got the {type(value).__name__} '{value.labels()[0]}'"
+        )
+    return value
+```
+
+#### default_label
+
+```python
+default_label() -> str
+```
+
+The numerator over the denominator.
+
+Source code in `commol/context/inference/quantities.py`
+
+```python
+def default_label(self) -> str:
+    """The numerator over the denominator."""
+    numerator = self.numerator.labels()[0]
+    denominator = self.denominator.labels()[0]
+    return f"({numerator}) / ({denominator})"
+```
+
+#### rust_json
+
+```python
+rust_json() -> str
+```
+
+The ratio as Rust reads it: its JSON, without the labels.
+
+Source code in `commol/context/inference/quantities.py`
+
+```python
+def rust_json(self) -> str:
+    """The ratio as Rust reads it: its JSON, without the labels."""
+    return self.model_dump_json(
+        exclude={"label": True, "numerator": {"label"}, "denominator": {"label"}}
+    )
+```
+
 ## quantity_schedule
 
 ```python
