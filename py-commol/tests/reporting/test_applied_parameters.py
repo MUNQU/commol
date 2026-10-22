@@ -392,6 +392,7 @@ class TestResultObjects:
             iterations=1,
             converged=True,
             termination_reason="done",
+            seed=0,
         )
 
         report = _model().applied_parameters(result)

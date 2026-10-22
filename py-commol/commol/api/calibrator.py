@@ -199,7 +199,8 @@ class Calibrator:
         -------
         ParameterSample
             One draw at ``result.best_parameters``, with the names and bounds
-            of the parameters of the problem and ``SampleMethod(name="point")``.
+            of the parameters of the problem and
+            ``SampleMethod(name="point", settings={"seed": result.seed})``.
 
         Raises
         ------
@@ -219,7 +220,7 @@ class Calibrator:
             names,
             [(p.min_bound, p.max_bound) for p in self.problem.parameters],
             [[result.best_parameters[name] for name in names]],
-            SampleMethod(name="point"),
+            SampleMethod(name="point", settings={"seed": result.seed}),
         )
 
     def delta_band(
@@ -396,8 +397,9 @@ class Calibrator:
         CalibrationResult
             The best start: the optimized parameter values, in the order of
             the problem's parameters, its final loss and convergence, every
-            start (``starts``) and the reason of each start that failed
-            (``failed_runs``, also logged as warnings).
+            start (``starts``), the reason of each start that failed
+            (``failed_runs``, also logged as warnings) and the seed
+            (``seed``).
 
         Raises
         ------
@@ -458,6 +460,7 @@ class Calibrator:
             termination_reason=best.termination_reason,
             starts=[summary for summary, _ in summaries],
             failed_runs=failed_runs,
+            seed=self.seed,
         )
         logger.info(
             (
@@ -495,6 +498,7 @@ class Calibrator:
             iterations=rust_result.iterations,
             converged=rust_result.converged,
             termination_reason=rust_result.termination_reason,
+            seed=self.seed,
         )
         evaluations = [
             CalibrationEvaluation(
@@ -642,7 +646,7 @@ class Calibrator:
             mutation=rust_mutation,
             velocity=rust_velocity,
             initialization=opt_config.initialization,
-            seed=self.problem.seed,
+            seed=self.seed,
         )
         return rust_calibration.OptimizationConfig.particle_swarm(ps_config)
 

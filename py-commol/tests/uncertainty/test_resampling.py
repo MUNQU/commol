@@ -68,6 +68,7 @@ class TestBayesianBootstrap:
         assert result.sample.weights == pytest.approx([1 / 8] * 8)
         assert result.sample.groups == list(range(8))
         assert result.sample.method.name == "bayesian_bootstrap"
+        assert result.sample.method.settings["seed"] == 4
         assert result.fit == calibrator.run()
         assert result.diagnostics.block_length == 2
         assert result.diagnostics.block_length_estimates is None
@@ -184,6 +185,7 @@ class TestResidualBootstraps:
             other = flow_calibrator(values, windowed=True, seed=9).uncertainty(method)
             assert first == again
             assert first.sample != other.sample
+            assert first.sample.method.settings["seed"] == 8
 
 
 class TestBlockJackknife:

@@ -973,6 +973,33 @@ mod tests {
         assert!(fit.final_loss < 1e-6);
     }
 
+    /// `(x − 0.7)²`.
+    struct Bowl;
+
+    impl CostFunction for Bowl {
+        type Param = Vec<f64>;
+        type Output = f64;
+
+        fn cost(&self, x: &Self::Param) -> Result<Self::Output, Error> {
+            Ok((x[0] - 0.7).powi(2))
+        }
+    }
+
+    #[test]
+    fn a_swarm_without_a_seed_draws_one_from_the_system() {
+        let space = SearchSpace {
+            bounds: vec![(0.0, 1.0)],
+            names: vec!["x".to_string()],
+        };
+        let config = ParticleSwarmConfig {
+            max_iterations: 200,
+            seed: None,
+            ..ParticleSwarmConfig::default()
+        };
+        let (fit, _) = optimize_particle_swarm(&space, Bowl, &config, None::<NoObserver>).unwrap();
+        assert!((fit.best_parameters[0] - 0.7).abs() < 1e-3);
+    }
+
     #[test]
     fn a_name_gives_its_strategy_and_an_unknown_name_lists_the_names() {
         assert!(matches!(

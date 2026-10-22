@@ -153,6 +153,7 @@ def _result(structure: ProfileStructure) -> ProfileResult:
             iterations=10,
             converged=True,
             termination_reason="converged",
+            seed=0,
         ),
         quantity="parameter",
         threshold=Threshold.chi_square(0.9),

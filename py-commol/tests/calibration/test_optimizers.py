@@ -138,6 +138,23 @@ class TestConverged:
         assert result.converged is False
 
 
+class TestSeed:
+    def test_the_seed_of_a_result_repeats_a_particle_swarm(self) -> None:
+        problem = _k_problem(ParticleSwarmConfig(num_particles=5, max_iterations=3))
+
+        result = _calibrate(problem)
+        again = _calibrate(problem.model_copy(update={"seed": result.seed}))
+
+        assert again == result
+
+    def test_a_history_records_the_seed_of_its_calibration(self) -> None:
+        problem = _k_problem(NelderMeadConfig(max_iterations=10), seed=SEED)
+
+        history = Calibrator(Simulation(_ab(None)), problem).run_with_history()
+
+        assert history.result.seed == SEED
+
+
 class TestHistory:
     def test_the_history_starts_at_the_initial_guess_and_holds_the_best_point(
         self, caplog: pytest.LogCaptureFixture

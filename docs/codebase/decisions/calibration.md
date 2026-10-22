@@ -171,3 +171,18 @@ so a held prediction stops at the outer limit and never reports convergence.
 `fixing_a_prediction_at_the_fit_keeps_the_parameters`,
 `a_problem_observing_more_positions_scores_as_the_problem`,
 `a_swarm_fits_a_subproblem_and_repeats_from_its_seed`).
+
+## A result records its seed
+
+Every random number of a calibration and of its uncertainty methods comes from
+`Calibrator.seed`: `problem.seed`, or a seed the calibrator draws once and
+logs. A particle swarm takes it too, so the seed alone repeats a run. The
+result records it, so a result read from a file repeats too:
+`CalibrationResult.seed`, and `settings["seed"]` of the `SampleMethod` of every
+sample a runner makes (`sample_method` in `api/inference/resampling.py`) or
+`Calibrator.point_sample` makes.
+
+**Guards:** `tests/calibration/test_problem.py`
+(`test_a_result_records_the_seed_of_its_calibration`);
+`tests/calibration/test_optimizers.py`
+(`test_the_seed_of_a_result_repeats_a_particle_swarm`).

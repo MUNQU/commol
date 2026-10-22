@@ -91,6 +91,7 @@ def _fit(**factors: float) -> CalibrationResult:
         iterations=1,
         converged=True,
         termination_reason="Test",
+        seed=0,
     )
 
 

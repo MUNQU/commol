@@ -10,7 +10,11 @@ import logging
 from typing import TYPE_CHECKING
 
 from commol.api.inference.registry import register
-from commol.api.inference.resampling import fit_values, rust_block_length
+from commol.api.inference.resampling import (
+    fit_values,
+    rust_block_length,
+    sample_method,
+)
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.inference.local import (
     GibbsTarget,
@@ -81,7 +85,7 @@ def run_laplace(calibrator: "Calibrator", method: Laplace) -> LaplaceResult:
         sample=_sample(
             calibrator,
             run,
-            SampleMethod(name="laplace", settings=method.model_dump(mode="json")),
+            sample_method(calibrator, "laplace", method),
         ),
         notes=_notes(run),
     )
@@ -119,7 +123,7 @@ def run_sandwich(calibrator: "Calibrator", method: Sandwich) -> SandwichResult:
         sample=_sample(
             calibrator,
             run,
-            SampleMethod(name="sandwich", settings=method.model_dump(mode="json")),
+            sample_method(calibrator, "sandwich", method),
         ),
         notes=_notes(run),
         blocks=blocks,
@@ -170,9 +174,7 @@ def run_laplace_mixture(
             bounds=[(p.min_bound, p.max_bound) for p in parameters],
             values=run.values,
             log_weights=run.log_weights,
-            method=SampleMethod(
-                name="laplace_mixture", settings=method.model_dump(mode="json")
-            ),
+            method=sample_method(calibrator, "laplace_mixture", method),
         ),
         components=[
             MixtureComponent(

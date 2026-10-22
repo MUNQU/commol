@@ -194,6 +194,7 @@ class TestCollinearity:
             iterations=0,
             converged=True,
             termination_reason="given",
+            seed=0,
         )
         report = product.identifiability(
             Collinearity(at=at, max_subset_size=3, threshold=20)
@@ -241,6 +242,7 @@ class TestCollinearity:
             iterations=0,
             converged=True,
             termination_reason="given",
+            seed=0,
         )
 
         report = calibrator.identifiability(
@@ -263,6 +265,7 @@ class TestCollinearity:
             iterations=0,
             converged=True,
             termination_reason="given",
+            seed=0,
         )
 
         with pytest.raises(ValueError, match=r"The result has no value of \['s'\]"):
@@ -289,6 +292,7 @@ class TestCollinearity:
             iterations=0,
             converged=True,
             termination_reason="given",
+            seed=0,
         )
         with pytest.raises(ValidationError, match="threshold"):
             Collinearity(at=at, max_subset_size=2)  # ty: ignore[missing-argument]
@@ -310,6 +314,7 @@ def _result(ends: list[dict[str, float]], losses: list[float]) -> CalibrationRes
         iterations=1,
         converged=True,
         termination_reason="given",
+        seed=0,
         starts=starts,
     )
 

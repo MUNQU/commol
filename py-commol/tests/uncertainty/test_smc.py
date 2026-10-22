@@ -424,6 +424,7 @@ class TestABC:
 
         assert first.model_dump() == second.model_dump()
         assert first.sample.values != other.sample.values
+        assert first.sample.method.settings["seed"] == 9
 
     def test_loss_distance_reads_one_replicate(self) -> None:
         # Fifty replicates summarized by their mean would give distances
@@ -559,6 +560,8 @@ class TestResult:
             pairs = zip(result.levels, result.levels[1:])
             assert all((b < a) if falling else (b > a) for a, b in pairs)
         assert gibbs.levels[-1] == 1.0
+        assert gibbs.sample.method.settings["seed"] == 1
+        assert abc.sample.method.settings["seed"] == 3
         assert gibbs.diagnostics.stop_reason is None
         assert gibbs.log_evidence < 0.0
 
