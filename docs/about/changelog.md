@@ -9,9 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [0.8.0] - 2026-10-22
 
-<!-- Added #246 -->
+This release compares runs. `Scenarios` runs every draw of a sample under
+several sets of parameter values and compares them in pairs, a quantity of
+interest reads a series and reduces it (the peak of the gains over windows,
+for example), and `results.quantities` reads the quantities of one run.
+Figures are methods of the results they draw: `plot.series`,
+`plot.observations` and `plot_compared`, which draws several runs or samples
+on the same panels. Before you upgrade, read the **Breaking** entries:
+`SimulationPlotter` and seaborn are removed and matplotlib is the optional
+extra `commol[plot]`, the quantities take a `series`, and the runs of the
+draws of a stochastic sample follow one tree of seeds, so their numbers change.
+See [Sensitivity Analysis](../guide/uncertainty/sensitivity.md) and
+[Simulations](../guide/simulations.md).
+
+### Added
 
 - `Scenarios(source, sample, scenarios, positions)` runs every draw of a
   sample under each scenario, a set of parameter values that override those
@@ -28,8 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SensitivityAnalysis.with_model` the same source on another model with the
   same seed. See [Scenarios](../guide/uncertainty/index.md#scenarios).
 
-<!-- Added #247 -->
-
 - `plot.observations(observed_data, …)` of `SimulationResults`,
   `SimulationReplicates` and `Predictive` draws one panel per observed series
   (one `label`), with the model read through the observation operator of each
@@ -40,8 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its legend says that it is a band of the model, not a prediction interval.
   See [Plotting](../guide/simulations.md#a-panel-per-observed-series).
 
-<!-- Added #250 -->
-
 - `SimulationResults.quantities(quantities)` reduces one run to its
   quantities of interest, as `dict[str, float]`, and
   `SimulationReplicates.quantities(quantities)` gives one such dict per
@@ -51,8 +60,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of two quantities row by row. See
   [The quantities of one run](../guide/uncertainty/sensitivity.md#the-quantities-of-one-run).
 
-<!-- Added #251 -->
-
 - `plot_compared({label: result}, …)` draws several runs, replicates or
   predictives of the same model on the same panels: one line per result,
   labelled with its key and in the same color in every panel, the band of
@@ -61,15 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the outputs of the first raises `ValueError` that names its key. See
   [Plotting](../guide/simulations.md#compare-results-on-the-same-panels).
 
-<!-- Added #276 -->
-
 - Every figure takes `axes=`, the `Figure` of an earlier figure of commol, and
   draws each series on the panel of that series: each panel has the id of its
   series as the label of its `Axes`. A series with no panel raises
   `ValueError` that names it. See
   [Plotting](../guide/simulations.md#several-results-on-one-figure).
-
-<!-- Added #280 -->
 
 - A quantity of interest reads a series and reduces it. The series is a name
   or a list of names, their `Level`, or `Increments(outputs, window)`: the
@@ -85,8 +88,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PropagationResult.effective_size` gives Kish's effective size of the
   weights. A filter conditions the result on the condition of the mask.
 
-<!-- Added #305 -->
-
 - `plot_compared(…, panels="observations")` draws one panel per observed
   series (one `label` of `observed_data`), with each result read through the
   observation operator of each observation, as `plot.observations` reads one
@@ -96,16 +97,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Plotting](../guide/simulations.md#compare-results-on-the-same-panels).
 
 ### Changed
-
-<!-- Changed #246 -->
-
-<!-- Changed #247 -->
-
-<!-- Changed #250 -->
-
-<!-- Changed #251 -->
-
-<!-- Changed #276 -->
 
 - **Breaking:** each figure is a method of the results it draws, and
   `SimulationPlotter` is removed. Each figure returns the matplotlib `Figure`.
@@ -132,8 +123,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "seaborn-v0_8-talk", "seaborn-v0_8-colorblind"]`. The presets
   (`presentation`, `publication`, `notebook`) use these sheets.
 
-<!-- Changed #280 -->
-
 - **Breaking:** `ValueAt`, `Peak`, `PeakPosition` and `Trajectory` take
   `series` in place of `outputs`: `ValueAt(outputs="B", at=10)` is
   `ValueAt(series="B", at=10)`. `Gain(outputs, start, end)` keeps `outputs`,
@@ -148,8 +137,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the point, inputs, replicate and seed of the first such run.
   `PropagationResult.values` keeps the NaN of each run.
 
-<!-- Changed #309 -->
-
 - **Breaking:** the runs of the draws of a sample follow one tree of seeds.
   Draw `j` of a stochastic `Predictive`, `Propagation`, `at_observations` or
   score takes a seed of its own, and its replicate `i` takes the seed that
@@ -163,18 +150,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [The predictive](../guide/uncertainty/index.md#the-predictive).
 
 ### Fixed
-
-<!-- Fixed #246 -->
-
-<!-- Fixed #247 -->
-
-<!-- Fixed #250 -->
-
-<!-- Fixed #251 -->
-
-<!-- Fixed #276 -->
-
-<!-- Fixed #280 -->
 
 - A NaN in the values a `Peak` or a `PeakPosition` reads makes it NaN. The
   peak skipped the NaN, and the position of the peak was the first position
@@ -1395,6 +1370,7 @@ the details of these versions.
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.8.0** - Comparing runs: scenarios, quantities of a series, figures as methods and runs on the same panels
 - **0.7.0** - Reading a run through objects: the window grid and dates on the axis, series by output name and reports as methods
 - **0.6.1** - Fixes of 0.6.0: checks at build, messages of infeasible draws, PRCC with NaN, quantity labels and starts, plots
 - **0.6.0** - Uncertainty methods with a model of the data: likelihood, posteriors, local approximations, conformal intervals, profiles and sensitivity analysis
