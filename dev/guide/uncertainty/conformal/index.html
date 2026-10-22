@@ -3809,7 +3809,14 @@ at each point before it was seen.</p>
 </span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">misses</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">misses</span><span class="p">),</span> <span class="mi">3</span><span class="p">))</span>  <span class="c1"># 0.125</span>
 </span></code></pre></div>
 <h2 id="results-plots-and-reports">Results, plots and reports<a class="headerlink" href="#results-plots-and-reports" title="Permanent link">&para;</a></h2>
-<p>Every variant returns a <code>ConformalResult(intervals, scores, guarantee)</code>.
+<p>Every variant returns a <code>ConformalResult(intervals, scores, guarantee, failed,
+not_converged)</code>. A variant that refits lists each refit that failed in
+<code>failed</code>, named by its unit: <code>"Origin &lt;index&gt; failed: &lt;reason&gt;"</code> for
+<code>RollingConformal</code>, <code>"Block &lt;index&gt; failed: &lt;reason&gt;"</code> for <code>JackknifePlus</code>, and
+<code>"Replicate &lt;index&gt; failed: &lt;reason&gt;"</code> for <code>EnbPI</code>; each is also logged as a
+warning, and gives no score. <code>not_converged</code> counts the refits kept although
+their optimizer did not converge. Split and adaptive conformal do not refit, so
+their <code>failed</code> is empty and their <code>not_converged</code> is 0.
 <code>intervals</code> is a <code>PredictionIntervals</code>: its <code>confidence_level</code>, a
 <code>SeriesIntervals</code> per
 series (<code>positions</code>, <code>prediction</code>, <code>lower</code>, <code>upper</code>), and <code>unbounded</code>.

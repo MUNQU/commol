@@ -3522,8 +3522,9 @@ runs through <code>Calibrator.uncertainty</code>, in parallel in Rust
 </span><span id="__span-0-64"><a id="__codelineno-0-64" name="__codelineno-0-64" href="#__codelineno-0-64"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">lower</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">upper</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>  <span class="c1"># 0.0486 0.0508</span>
 </span><span id="__span-0-65"><a id="__codelineno-0-65" name="__codelineno-0-65" href="#__codelineno-0-65"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">diagnostics</span><span class="o">.</span><span class="n">block_length</span><span class="p">)</span>  <span class="c1"># 1</span>
 </span></code></pre></div>
-<p><code>result.fit</code> is the fit, <code>result.sample</code> holds one draw per replicate, and
-<code>result.diagnostics</code> says what happened to the replicates.</p>
+<p><code>result.fit</code> is the fit, <code>result.sample</code> holds one draw per replicate that
+fitted, <code>result.failed</code> lists the replicates that failed, and
+<code>result.diagnostics</code> gives the block length.</p>
 <h2 id="which-method-to-use">Which method to use<a class="headerlink" href="#which-method-to-use" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3701,7 +3702,7 @@ usually far fewer than a bootstrap.</p>
 </tr>
 <tr>
 <td><code>blocks</code></td>
-<td>The first and last position of each block</td>
+<td>The first and last position of each block that fitted</td>
 </tr>
 <tr>
 <td><code>pseudo_values</code></td>
@@ -3710,6 +3711,18 @@ usually far fewer than a bootstrap.</p>
 <tr>
 <td><code>influence</code></td>
 <td>How far leaving each block out moves each parameter, in standard errors</td>
+</tr>
+<tr>
+<td><code>failed</code></td>
+<td>Each block whose fit failed, <code>"Block &lt;index&gt; failed: &lt;reason&gt;"</code>, with blocks numbered from 0 in order of position; also logged as a warning</td>
+</tr>
+<tr>
+<td><code>not_converged</code></td>
+<td>Fits kept although their optimizer did not converge</td>
+</tr>
+<tr>
+<td><code>diagnostics</code></td>
+<td>The block length, as for a bootstrap</td>
 </tr>
 </tbody>
 </table>
@@ -3721,34 +3734,41 @@ fit depends on: check it.</p>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">jackknife</span><span class="o">.</span><span class="n">influence</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">]))</span>  <span class="c1"># 6</span>
 </span></code></pre></div>
 <h2 id="the-result">The result<a class="headerlink" href="#the-result" title="Permanent link">&para;</a></h2>
-<p>A bootstrap returns a <code>BootstrapResult(fit, sample, diagnostics)</code>. The sample
-has equal weights, and the group of each draw is its replicate.</p>
+<p>A bootstrap returns a <code>BootstrapResult(fit, sample, failed, not_converged,
+diagnostics)</code>. The sample has equal weights, and the group of each draw is its
+replicate.</p>
 <table>
 <thead>
 <tr>
-<th>Diagnostic</th>
+<th>Field</th>
 <th>Meaning</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>block_length</code>, <code>block_length_estimates</code></td>
-<td>The length used, and the estimate of each series with <code>"auto"</code></td>
-</tr>
-<tr>
 <td><code>failed</code></td>
-<td>Each replicate that failed, with its reason; it is not in the sample, and it is logged as a warning</td>
+<td>Each replicate that failed, <code>"Replicate &lt;index&gt; failed: &lt;reason&gt;"</code>; it is not in the sample, and it is logged as a warning</td>
 </tr>
 <tr>
 <td><code>not_converged</code></td>
 <td>Replicates kept although their optimizer did not converge</td>
 </tr>
 <tr>
-<td><code>negative_values</code></td>
+<td><code>diagnostics.block_length</code>, <code>diagnostics.block_length_estimates</code></td>
+<td>The length used, and the estimate of each series with <code>"auto"</code></td>
+</tr>
+<tr>
+<td><code>diagnostics.negative_values</code></td>
 <td>New observed values below zero, over every replicate</td>
 </tr>
 </tbody>
 </table>
+<p>Every result of a method that fits several times lists the fits that failed in
+<code>failed</code> and counts the fits kept without convergence in <code>not_converged</code>, in
+the same way: a bootstrap, the jackknife, a profile with a bootstrap threshold
+and the conformal methods that refit. When too few fits succeed, the method
+raises a <code>RuntimeError</code> that says how many of how many fitted, how many it
+needs, and the first reasons.</p>
 <p><code>result.interval_error(confidence_level)</code> gives the Monte Carlo error of each
 bound of the central interval: an order-statistic interval that holds the bound
 of infinitely many replicates with about 95 % probability. When it is wide
@@ -3795,7 +3815,8 @@ independent, and report that the interval may be narrow.</p>
 <ul>
 <li>[ ] You chose <code>block_length</code>, or read the estimates of <code>"auto"</code>.</li>
 <li>[ ] You chose the residual scale for the data: multiplicative for values that span orders of magnitude.</li>
-<li>[ ] <code>diagnostics.failed</code> is empty, or you know why replicates failed.</li>
+<li>[ ] <code>failed</code> is empty, or you know why replicates failed.</li>
+<li>[ ] <code>not_converged</code> is 0, or you raised <code>max_iterations</code>.</li>
 <li>[ ] <code>interval_error</code> is small against the interval.</li>
 <li>[ ] You report a band of the model as a band of the model, and use <code>ResidualNoise</code> for a prediction interval.</li>
 </ul>

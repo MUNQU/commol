@@ -3512,7 +3512,7 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
 <li><code>ModelBuilder</code> methods return <code>Self</code>, so calls chain.</li>
 <li>Log with the standard <code>logging</code> module. Library code never writes to the
   standard error of the process: a failure is part of the result and the
-  caller logs it (<code>CalibrationResult.failed_runs</code>). Output the user asks for,
+  caller logs it (<code>CalibrationResult.failed</code>). Output the user asks for,
   such as a verbose optimizer's table, goes to Python's <code>sys.stdout</code>.</li>
 </ul>
 <h2 id="rust">Rust<a class="headerlink" href="#rust" title="Permanent link">&para;</a></h2>

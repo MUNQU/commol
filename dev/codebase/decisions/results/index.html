@@ -2748,6 +2748,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#fits-that-fail-have-one-place" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fits that fail have one place
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-description-is-data-rendered-apart" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3261,6 +3272,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#fits-that-fail-have-one-place" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fits that fail have one place
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-description-is-data-rendered-apart" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3492,6 +3514,31 @@ method that fits the data takes <code>starts</code> with the default 1.</p>
 <code>crates/commol-inference/tests/test_predictive.rs::the_pit_of_ties_follows_the_seed_of_the_draws</code>,
 <code>tests/uncertainty/test_local.py::TestStarts</code>,
 <code>tests/uncertainty/test_smc.py::test_the_eta_calibrations_fit_from_their_starts</code>.</p>
+<h2 id="fits-that-fail-have-one-place">Fits that fail have one place<a class="headerlink" href="#fits-that-fail-have-one-place" title="Permanent link">&para;</a></h2>
+<p>Six methods fit one perturbation of the data per replicate: the bootstraps,
+the jackknife, jackknife+, rolling conformal, EnbPI and a bootstrap threshold.
+They share one loop, <code>ReplicateRunner::fit_all</code> (<code>resampling/runner.rs</code>),
+which returns <code>ReplicateFits</code>, and one check, <code>FitUnit::require</code>, whose message
+says how many of how many fits of a replicate, block or origin succeeded and
+how many the method needs. Every Python result of several fits has <code>failed</code>,
+entries <code>"&lt;Start|Replicate|Block|Origin&gt; &lt;index&gt; failed: &lt;reason&gt;"</code> logged as
+warnings, and, for fits of replicates, <code>not_converged</code>, at its top.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One loop per method, or <code>diagnostics.failed</code></td>
+<td>Counts and messages drift apart; three results have no diagnostics.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_resampling.rs::every_replicate_method_counts_the_same_fits</code>,
+<code>tests/uncertainty/test_resampling.py::test_every_method_lists_its_failed_replicates_in_failed</code>.</p>
 <h2 id="a-description-is-data-rendered-apart">A description is data, rendered apart<a class="headerlink" href="#a-description-is-data-rendered-apart" title="Permanent link">&para;</a></h2>
 <p><code>Model.describe(layout)</code> returns a <code>ModelDescription</code>
 (<code>context/description.py</code>): sections with a key, a title and blocks from a

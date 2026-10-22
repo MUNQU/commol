@@ -171,7 +171,7 @@ print(list(band_report["series"]["A"]))  # ['mean', 'median', 'ci_lower', 'ci_up
 
 ## The report of an identifiability analysis
 
-`IdentifiabilityReport.report()` gives the result of `Calibrator.identifiability`, or of `IdentifiabilityReport.merge`, as `parameters` (each parameter, in problem order, with its `structural` and `practical` verdicts, their reasons and combinations, or `None`) and `sections` (the evidence of each method that ran, by section name).
+`IdentifiabilityReport.report()` gives the result of `Calibrator.identifiability`, of `ProfileResult.identifiability()`, or of `IdentifiabilityReport.merge`, as `parameters` (each parameter, in problem order, with its `structural` and `practical` verdicts, their reasons and combinations, or `None`) and `sections` (the evidence of each method that ran, by section name).
 
 ## Checklist
 

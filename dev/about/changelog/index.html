@@ -4457,7 +4457,63 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   you stored. See
   <a href="../../codebase/decisions/results/#one-confidence-interval-convention">One confidence-interval convention</a>.</p>
 </li>
+<li>
+<p><strong>Breaking:</strong> results that hold the same thing hold it in the same place,
+  under the same name. Every result of a method that fits several times lists
+  each fit that failed in <code>failed</code>, <code>"&lt;Start|Replicate|Block|Origin&gt; &lt;index&gt;
+  failed: &lt;reason&gt;"</code>, logged as a warning, and counts the fits kept although
+  their optimizer did not converge in <code>not_converged</code>. Change your code:</p>
+</li>
 </ul>
+<table>
+<thead>
+<tr>
+<th>Before</th>
+<th>Now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CalibrationResult.failed_runs</code></td>
+<td><code>CalibrationResult.failed</code></td>
+</tr>
+<tr>
+<td><code>BootstrapResult.diagnostics.failed</code>, <code>.diagnostics.not_converged</code></td>
+<td><code>BootstrapResult.failed</code>, <code>.not_converged</code></td>
+</tr>
+<tr>
+<td><code>JackknifeResult.diagnostics.failed</code>, <code>.diagnostics.not_converged</code></td>
+<td><code>JackknifeResult.failed</code>, <code>.not_converged</code>; an entry names the block by its index from 0, <code>"Block 2 failed: …"</code>, not by its span</td>
+</tr>
+<tr>
+<td><code>ProfileResult.failed_replicates</code></td>
+<td><code>ProfileResult.failed</code>, and the new <code>ProfileResult.not_converged</code></td>
+</tr>
+<tr>
+<td>The failed refits of <code>RollingConformal</code>, <code>JackknifePlus</code> and <code>EnbPI</code>, only logged as <code>"Refit i failed: …"</code></td>
+<td><code>ConformalResult.failed</code> and <code>ConformalResult.not_converged</code></td>
+</tr>
+<tr>
+<td>The failed replicates of <code>BootstrapCoverageEta</code> in <code>GibbsResult.diagnostics.notes</code></td>
+<td><code>GibbsResult.failed</code></td>
+</tr>
+<tr>
+<td><code>ProfileResult.report()</code></td>
+<td><code>ProfileResult.identifiability()</code>; its <code>report()</code> gives the data</td>
+</tr>
+<tr>
+<td><code>sample.effective_size()</code></td>
+<td><code>sample.effective_size</code>, a property, as on every other object</td>
+</tr>
+</tbody>
+</table>
+<p>When a method has fewer successful fits than it needs, its <code>RuntimeError</code>
+  says how many of how many fitted, how many it needs, and the first
+  reasons, and names the unit: <code>"Only 1 of 5 blocks fitted, and the method
+  needs 2; …"</code>. It says <code>"Every origin failed: …"</code> (or replicate, block) only
+  when none fitted. The jackknife and jackknife+ no longer say that every
+  replicate failed when one fit succeeded. See
+  <a href="../../guide/uncertainty/resampling/#the-result">Resampling</a>.</p>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Breaking:</strong> <code>commol.add_stderr_logger</code> is removed: commol configures no

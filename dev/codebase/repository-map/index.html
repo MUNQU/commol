@@ -3511,7 +3511,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/resampling/</code></td>
-<td>Fits to reweighted or resampled data: <code>blocks.rs</code> (<code>BlockScheme</code>, the automatic block length), <code>residuals.rs</code> (<code>Residuals</code> on a scale, residuals by series and position), <code>resamplers.rs</code> (the <code>Resampler</code> port, <code>Perturbation</code>, the Bayesian, residual and wild bootstraps, <code>ParametricResampler</code>), <code>runner.rs</code> (<code>ReplicateRunner</code>, <code>bootstrap</code>), <code>jackknife.rs</code> (<code>block_jackknife</code>), <code>noise.rs</code> (<code>ResidualNoise</code>).</td>
+<td>Fits to reweighted or resampled data: <code>blocks.rs</code> (<code>BlockScheme</code>, the automatic block length), <code>residuals.rs</code> (<code>Residuals</code> on a scale, residuals by series and position), <code>resamplers.rs</code> (the <code>Resampler</code> port, <code>Perturbation</code>, the Bayesian, residual and wild bootstraps, <code>ParametricResampler</code>), <code>runner.rs</code> (<code>ReplicateRunner</code> and its one loop <code>fit_all</code>, <code>ReplicateFits</code>, <code>FitUnit</code>, <code>bootstrap</code>), <code>jackknife.rs</code> (<code>block_jackknife</code>), <code>noise.rs</code> (<code>ResidualNoise</code>).</td>
 <td>Changes to the problem other than through <code>with_data</code>.</td>
 </tr>
 <tr>

@@ -74,7 +74,7 @@ print(round(lower, 4), round(upper, 4))  # 0.0486 0.0508
 print(result.diagnostics.block_length)  # 1
 ```
 
-`result.fit` is the fit, `result.sample` holds one draw per replicate, and `result.diagnostics` says what happened to the replicates.
+`result.fit` is the fit, `result.sample` holds one draw per replicate that fitted, `result.failed` lists the replicates that failed, and `result.diagnostics` gives the block length.
 
 ## Which method to use
 
@@ -150,14 +150,17 @@ print(len(wild.sample))  # 100
 
 `BlockJackknife(block_length, starts=1)` fits once per block, with that block left out, and returns a `JackknifeResult`. With `B` blocks it needs `B` fits, usually far fewer than a bootstrap.
 
-| Field            | Meaning                                                                 |
-| ---------------- | ----------------------------------------------------------------------- |
-| `estimate`       | The bias-corrected estimate of each parameter                           |
-| `bias`           | `(B − 1)(θ̄ − θ̂)`, with `θ̄` the mean of the fits with one block left out |
-| `standard_error` | `√((B − 1)/B · Σ (θ̂₍₋ᵦ₎ − θ̄)²)`                                         |
-| `blocks`         | The first and last position of each block                               |
-| `pseudo_values`  | `B θ̂ − (B − 1) θ̂₍₋ᵦ₎` per block                                         |
-| `influence`      | How far leaving each block out moves each parameter, in standard errors |
+| Field            | Meaning                                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `estimate`       | The bias-corrected estimate of each parameter                                                                                               |
+| `bias`           | `(B − 1)(θ̄ − θ̂)`, with `θ̄` the mean of the fits with one block left out                                                                     |
+| `standard_error` | `√((B − 1)/B · Σ (θ̂₍₋ᵦ₎ − θ̄)²)`                                                                                                             |
+| `blocks`         | The first and last position of each block that fitted                                                                                       |
+| `pseudo_values`  | `B θ̂ − (B − 1) θ̂₍₋ᵦ₎` per block                                                                                                             |
+| `influence`      | How far leaving each block out moves each parameter, in standard errors                                                                     |
+| `failed`         | Each block whose fit failed, `"Block <index> failed: <reason>"`, with blocks numbered from 0 in order of position; also logged as a warning |
+| `not_converged`  | Fits kept although their optimizer did not converge                                                                                         |
+| `diagnostics`    | The block length, as for a bootstrap                                                                                                        |
 
 The pseudo-values are not draws: their percentiles are not an interval, so the result has no `ParameterSample`. A block with a large influence holds data the fit depends on: check it.
 
@@ -169,14 +172,16 @@ print(len(jackknife.influence["k"]))  # 6
 
 ## The result
 
-A bootstrap returns a `BootstrapResult(fit, sample, diagnostics)`. The sample has equal weights, and the group of each draw is its replicate.
+A bootstrap returns a `BootstrapResult(fit, sample, failed, not_converged, diagnostics)`. The sample has equal weights, and the group of each draw is its replicate.
 
-| Diagnostic                               | Meaning                                                                                             |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `block_length`, `block_length_estimates` | The length used, and the estimate of each series with `"auto"`                                      |
-| `failed`                                 | Each replicate that failed, with its reason; it is not in the sample, and it is logged as a warning |
-| `not_converged`                          | Replicates kept although their optimizer did not converge                                           |
-| `negative_values`                        | New observed values below zero, over every replicate                                                |
+| Field                                                            | Meaning                                                                                                                    |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `failed`                                                         | Each replicate that failed, `"Replicate <index> failed: <reason>"`; it is not in the sample, and it is logged as a warning |
+| `not_converged`                                                  | Replicates kept although their optimizer did not converge                                                                  |
+| `diagnostics.block_length`, `diagnostics.block_length_estimates` | The length used, and the estimate of each series with `"auto"`                                                             |
+| `diagnostics.negative_values`                                    | New observed values below zero, over every replicate                                                                       |
+
+Every result of a method that fits several times lists the fits that failed in `failed` and counts the fits kept without convergence in `not_converged`, in the same way: a bootstrap, the jackknife, a profile with a bootstrap threshold and the conformal methods that refit. When too few fits succeed, the method raises a `RuntimeError` that says how many of how many fitted, how many it needs, and the first reasons.
 
 `result.interval_error(confidence_level)` gives the Monte Carlo error of each bound of the central interval: an order-statistic interval that holds the bound of infinitely many replicates with about 95 % probability. When it is wide against the interval, run more replicates.
 
@@ -215,7 +220,8 @@ A block bootstrap reads the dependence of the noise from few blocks. On a short 
 
 - [ ] You chose `block_length`, or read the estimates of `"auto"`.
 - [ ] You chose the residual scale for the data: multiplicative for values that span orders of magnitude.
-- [ ] `diagnostics.failed` is empty, or you know why replicates failed.
+- [ ] `failed` is empty, or you know why replicates failed.
+- [ ] `not_converged` is 0, or you raised `max_iterations`.
 - [ ] `interval_error` is small against the interval.
 - [ ] You report a band of the model as a band of the model, and use `ResidualNoise` for a prediction interval.
 

@@ -94,15 +94,17 @@ for label, interval in bands.intervals.items():
 
 The **statistic** of a point is the objective of its refit less the objective of the fit: `−log L` with observation models, the loss otherwise. It is 0 at the fit and rises as the quantity moves away from it. The **interval** of the quantity is where the statistic stays below the **threshold**; each interval is pointwise, for one quantity at a time.
 
-| Field of `ProfileResult` | Holds                                                                                                                                                       |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `profiles[name]`         | A `Profile`: the `values`, the `statistics`, every parameter of each refit, the `threshold`, the `ends` of each side and the `evaluations` of the objective |
-| `intervals[name]`        | A `ProfileInterval`: `lower` and `upper`, `None` on a side that does not cross the threshold                                                                |
-| `verdicts[name]`         | What the shape says ([Verdicts](#verdicts-and-the-identifiability-report))                                                                                  |
-| `fit`                    | The fit every profile starts from                                                                                                                           |
-| `tolerance`              | The numerical tolerance of the statistic, `max(τ, ν)` ([Verdicts](#verdicts-and-the-identifiability-report))                                                |
-| `structure`              | What resetting the other parameters says of each flat profile of a parameter (`ProfileStructure`)                                                           |
-| `notes`                  | A threshold below the tolerance, or a refit below the fit                                                                                                   |
+| Field of `ProfileResult` | Holds                                                                                                                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `profiles[name]`         | A `Profile`: the `values`, the `statistics`, every parameter of each refit, the `threshold`, the `ends` of each side and the `evaluations` of the objective         |
+| `intervals[name]`        | A `ProfileInterval`: `lower` and `upper`, `None` on a side that does not cross the threshold                                                                        |
+| `verdicts[name]`         | What the shape says ([Verdicts](#verdicts-and-the-identifiability-report))                                                                                          |
+| `fit`                    | The fit every profile starts from                                                                                                                                   |
+| `tolerance`              | The numerical tolerance of the statistic, `max(τ, ν)` ([Verdicts](#verdicts-and-the-identifiability-report))                                                        |
+| `structure`              | What resetting the other parameters says of each flat profile of a parameter (`ProfileStructure`)                                                                   |
+| `notes`                  | A threshold below the tolerance, or a refit below the fit                                                                                                           |
+| `failed`                 | With `Threshold.bootstrap_calibrated`, each replicate that failed, `"Replicate <index> failed: <reason>"`, also logged as a warning; empty with any other threshold |
+| `not_converged`          | With `Threshold.bootstrap_calibrated`, the replicates kept although their optimizer did not converge                                                                |
 
 | Shape                                             | Means                                                                          |
 | ------------------------------------------------- | ------------------------------------------------------------------------------ |
@@ -198,7 +200,7 @@ A reset whose evaluation fails counts as infeasible. The ends of the box only ru
 
 What the settings give: with Nelder-Mead at its default `sd_tolerance` (`1e-6`), the resets prove a parameter with no effect `non_identifiable` on a difference model and on an ODE model at the default solver tolerances. A ridge needs its profile flat within `ε`: on an ODE model at the default tolerances `ν` is near `1e-4` and the profiles of the ridge below read `in_combination`; on a difference model `ν` is near `1e-13`, a refit lands about `1e-6` from its minimum, and the profile reads practically non-identifiable. Its `in_combination` needs an `sd_tolerance` near `ν`, as the example below uses.
 
-`ProfileResult.report()` turns the verdicts into an [identifiability report](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#the-report) with a `profile` section, which `merge` joins with the other methods. A rate that reads `k1 * s` cannot tell `k1` from `s`: their profiles are flat on the ridge `k1 · s = constant`, resetting `s` breaks it, and the profile of `k1` reads `in_combination`, compensated by `s`, as the structural rank does. The two still disagree in some cases, and the merged verdict is then `conflicting`:
+`ProfileResult.identifiability()` turns the verdicts into an [identifiability report](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#the-report) with a `profile` section, which `merge` joins with the other methods. A rate that reads `k1 * s` cannot tell `k1` from `s`: their profiles are flat on the ridge `k1 · s = constant`, resetting `s` breaks it, and the profile of `k1` reads `in_combination`, compensated by `s`, as the structural rank does. The two still disagree in some cases, and the merged verdict is then `conflicting`:
 
 - the rank reads the rank most points of a Latin hypercube across the whole box have, a profile one ridge through the fit;
 - the rank calls a parameter non-identifiable when its projection on the null space is above 0.95, and identifiable below 0.05: in a sum `k1 + k2` with `k1 ≫ k2`, the rank finds `k2` non-identifiable while its profile, which `k1` compensates, reads `in_combination`;
@@ -249,7 +251,7 @@ print(profiles.notes[0])
 # the bounds, not the data.
 print(profiles.structure["k1"].compensated_by)  # ['s']
 report = product.identifiability(StructuralRank(points=5, design="observations"))
-merged = report.merge(profiles.report())
+merged = report.merge(profiles.identifiability())
 print(merged.verdicts["k1"].structural.verdict, merged.verdicts["s"].structural.verdict)
 # in_combination in_combination
 ```

@@ -3823,8 +3823,8 @@ unweighted statistic.</p>
 <td>Weighted quantiles by <a href="#the-one-quantile">the one convention</a></td>
 </tr>
 <tr>
-<td><code>effective_size()</code></td>
-<td>Kish's effective sample size, <code>1 / Σ wᵢ²</code></td>
+<td><code>effective_size</code></td>
+<td>Kish's effective sample size, <code>1 / Σ wᵢ²</code> (a property)</td>
 </tr>
 <tr>
 <td><code>draws()</code></td>
@@ -3840,7 +3840,7 @@ unweighted statistic.</p>
 </tr>
 </tbody>
 </table>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">sample</span><span class="o">.</span><span class="n">effective_size</span><span class="p">(),</span> <span class="mi">6</span><span class="p">))</span>  <span class="c1"># 3.0</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">sample</span><span class="o">.</span><span class="n">effective_size</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>  <span class="c1"># 3.0</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">print</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">sample</span><span class="o">.</span><span class="n">draws</span><span class="p">()))</span>  <span class="c1"># {&#39;k1&#39;: 0.38, &#39;k2&#39;: 0.09}</span>
 </span></code></pre></div>
 <p>A sample has no single set of parameters, so

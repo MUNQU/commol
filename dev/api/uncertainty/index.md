@@ -317,15 +317,11 @@ class ParameterSample(BaseModel):
             for name, low, high in zip(self.names, lower, upper, strict=True)
         }
 
+    @property
     def effective_size(self) -> float:
         """
-        Kish's effective sample size: ``1 / Σ wᵢ²``.
-
-        Returns
-        -------
-        float
-            Between 1 and the number of draws; equal weights give the number
-            of draws.
+        Kish's effective sample size, ``1 / Σ wᵢ²``: between 1 and the number
+        of draws; equal weights give the number of draws.
         """
         return self._rust.effective_size()
 
@@ -410,6 +406,14 @@ weights: list[float]
 ```
 
 The weight of each draw; they sum to 1.
+
+#### effective_size
+
+```python
+effective_size: float
+```
+
+Kish's effective sample size, `1 / Σ wᵢ²`: between 1 and the number of draws; equal weights give the number of draws.
 
 ### Methods:
 
@@ -799,36 +803,6 @@ def interval(self, confidence_level: float) -> dict[str, tuple[float, float]]:
         name: (low, high)
         for name, low, high in zip(self.names, lower, upper, strict=True)
     }
-```
-
-#### effective_size
-
-```python
-effective_size() -> float
-```
-
-Kish's effective sample size: `1 / Σ wᵢ²`.
-
-Returns:
-
-| Type    | Description                                                                |
-| ------- | -------------------------------------------------------------------------- |
-| `float` | Between 1 and the number of draws; equal weights give the number of draws. |
-
-Source code in `commol/context/inference/sample.py`
-
-```python
-def effective_size(self) -> float:
-    """
-    Kish's effective sample size: ``1 / Σ wᵢ²``.
-
-    Returns
-    -------
-    float
-        Between 1 and the number of draws; equal weights give the number
-        of draws.
-    """
-    return self._rust.effective_size()
 ```
 
 #### resample
@@ -3168,11 +3142,13 @@ The result of a bootstrap.
 
 Attributes:
 
-| Name          | Type                    | Description                                                                                         |
-| ------------- | ----------------------- | --------------------------------------------------------------------------------------------------- |
-| `fit`         | `CalibrationResult`     | The fit every replicate starts from: Calibrator.run(starts).                                        |
-| `sample`      | `ParameterSample`       | One draw per replicate that did not fail, with equal weights; the group of a draw is its replicate. |
-| `diagnostics` | `ResamplingDiagnostics` | The block length, and the replicates that failed, did not converge or made values below zero.       |
+| Name            | Type                    | Description                                                                                                                          |
+| --------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `fit`           | `CalibrationResult`     | The fit every replicate starts from: Calibrator.run(starts).                                                                         |
+| `sample`        | `ParameterSample`       | One draw per replicate that did not fail, with equal weights; the group of a draw is its replicate.                                  |
+| `failed`        | `list[str]`             | Each replicate that failed: "Replicate <index> failed: <reason>", also logged as a warning. A failed replicate is not in the sample. |
+| `not_converged` | `int`                   | Replicates kept although their optimizer did not converge.                                                                           |
+| `diagnostics`   | `ResamplingDiagnostics` | The block length, and the synthetic values below zero.                                                                               |
 
 Source code in `commol/context/inference/resampling.py`
 
@@ -3188,15 +3164,21 @@ class BootstrapResult(BaseModel):
     sample : ParameterSample
         One draw per replicate that did not fail, with equal weights; the
         group of a draw is its replicate.
+    failed : list[str]
+        Each replicate that failed: ``"Replicate <index> failed: <reason>"``,
+        also logged as a warning. A failed replicate is not in the sample.
+    not_converged : int
+        Replicates kept although their optimizer did not converge.
     diagnostics : ResamplingDiagnostics
-        The block length, and the replicates that failed, did not converge or
-        made values below zero.
+        The block length, and the synthetic values below zero.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     fit: CalibrationResult
     sample: ParameterSample
+    failed: list[str] = Field(description="Each replicate that failed.")
+    not_converged: int = Field(description="Replicates that did not converge.")
     diagnostics: ResamplingDiagnostics
 
     def interval_error(self, confidence_level: float) -> dict[str, BoundError]:
@@ -3308,16 +3290,18 @@ With `B` fits `θ̂₍₋ᵦ₎` that leave one block out, around the fit `θ̂`
 
 Attributes:
 
-| Name             | Type                        | Description                                                                                                                                           |
-| ---------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fit`            | `CalibrationResult`         | The fit with every observation.                                                                                                                       |
-| `estimate`       | `dict[str, float]`          | The bias-corrected estimate of each parameter.                                                                                                        |
-| `bias`           | `dict[str, float]`          | The jackknife bias of each parameter.                                                                                                                 |
-| `standard_error` | `dict[str, float]`          | The jackknife standard error of each parameter.                                                                                                       |
-| `blocks`         | `list[tuple[float, float]]` | The first and last position of each block that was left out and fitted, in order.                                                                     |
-| `pseudo_values`  | `dict[str, list[float]]`    | The pseudo-values of each parameter, one per block.                                                                                                   |
-| `influence`      | `dict[str, list[float]]`    | How far leaving each block out moves each parameter, in standard errors: (θ̂₍₋ᵦ₎ − θ̂) / se, one per block. NaN or infinite when a standard error is 0. |
-| `diagnostics`    | `ResamplingDiagnostics`     | The block length and the fits that failed or did not converge.                                                                                        |
+| Name             | Type                        | Description                                                                                                                                                                      |
+| ---------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`            | `CalibrationResult`         | The fit with every observation.                                                                                                                                                  |
+| `estimate`       | `dict[str, float]`          | The bias-corrected estimate of each parameter.                                                                                                                                   |
+| `bias`           | `dict[str, float]`          | The jackknife bias of each parameter.                                                                                                                                            |
+| `standard_error` | `dict[str, float]`          | The jackknife standard error of each parameter.                                                                                                                                  |
+| `blocks`         | `list[tuple[float, float]]` | The first and last position of each block that was left out and fitted, in order.                                                                                                |
+| `pseudo_values`  | `dict[str, list[float]]`    | The pseudo-values of each parameter, one per block.                                                                                                                              |
+| `influence`      | `dict[str, list[float]]`    | How far leaving each block out moves each parameter, in standard errors: (θ̂₍₋ᵦ₎ − θ̂) / se, one per block. NaN or infinite when a standard error is 0.                            |
+| `failed`         | `list[str]`                 | Each block whose fit failed: "Block <index> failed: <reason>", with blocks numbered from 0 in order of position; also logged as a warning. A block that failed is not in blocks. |
+| `not_converged`  | `int`                       | Fits kept although their optimizer did not converge.                                                                                                                             |
+| `diagnostics`    | `ResamplingDiagnostics`     | The block length.                                                                                                                                                                |
 
 Source code in `commol/context/inference/resampling.py`
 
@@ -3351,8 +3335,14 @@ class JackknifeResult(BaseModel):
         How far leaving each block out moves each parameter, in standard
         errors: ``(θ̂₍₋ᵦ₎ − θ̂) / se``, one per block. NaN or infinite when a
         standard error is 0.
+    failed : list[str]
+        Each block whose fit failed: ``"Block <index> failed: <reason>"``,
+        with blocks numbered from 0 in order of position; also logged as a
+        warning. A block that failed is not in `blocks`.
+    not_converged : int
+        Fits kept although their optimizer did not converge.
     diagnostics : ResamplingDiagnostics
-        The block length and the fits that failed or did not converge.
+        The block length.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
@@ -3364,6 +3354,8 @@ class JackknifeResult(BaseModel):
     blocks: list[tuple[float, float]]
     pseudo_values: dict[str, list[float]]
     influence: dict[str, list[float]]
+    failed: list[str] = Field(description="Each block whose fit failed.")
+    not_converged: int = Field(description="Fits that did not converge.")
     diagnostics: ResamplingDiagnostics
 ```
 
@@ -3371,7 +3363,7 @@ class JackknifeResult(BaseModel):
 
 Bases: `BaseModel`
 
-What happened to the replicates of a resampling method.
+The blocks of a resampling method, and the synthetic values below zero.
 
 Attributes:
 
@@ -3379,8 +3371,6 @@ Attributes:
 | ------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
 | `block_length`           | \`int              | None\`                                                                                                                            |
 | `block_length_estimates` | \`dict[str, float] | None\`                                                                                                                            |
-| `failed`                 | `list[str]`        | Each replicate that failed, with its reason. A failed replicate is not in the sample.                                             |
-| `not_converged`          | `int`              | Replicates kept although their optimizer did not converge.                                                                        |
 | `negative_values`        | `int`              | Synthetic observed values below zero, over every replicate. They are kept; many of them point to residual_scale="multiplicative". |
 
 Source code in `commol/context/inference/resampling.py`
@@ -3388,7 +3378,7 @@ Source code in `commol/context/inference/resampling.py`
 ```python
 class ResamplingDiagnostics(BaseModel):
     """
-    What happened to the replicates of a resampling method.
+    The blocks of a resampling method, and the synthetic values below zero.
 
     Attributes
     ----------
@@ -3398,11 +3388,6 @@ class ResamplingDiagnostics(BaseModel):
     block_length_estimates : dict[str, float] | None
         With ``block_length="auto"``, the estimate of each series, by label;
         otherwise None.
-    failed : list[str]
-        Each replicate that failed, with its reason. A failed replicate is not
-        in the sample.
-    not_converged : int
-        Replicates kept although their optimizer did not converge.
     negative_values : int
         Synthetic observed values below zero, over every replicate. They are
         kept; many of them point to ``residual_scale="multiplicative"``.
@@ -3414,8 +3399,6 @@ class ResamplingDiagnostics(BaseModel):
     block_length_estimates: dict[str, float] | None = Field(
         description="The estimate of each series with the automatic length."
     )
-    failed: list[str] = Field(description="Each replicate that failed.")
-    not_converged: int = Field(description="Replicates that did not converge.")
     negative_values: int = Field(description="Synthetic values below zero.")
 ```
 
@@ -4109,19 +4092,20 @@ The result of a profile likelihood.
 
 Attributes:
 
-| Name                | Type                            | Description                                                                                                                          |
-| ------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `fit`               | `CalibrationResult`             | The fit every profile starts from.                                                                                                   |
-| `quantity`          | `{parameter, prediction}`       | What the profiles hold fixed: parameters (ProfileLikelihood) or predictions (PredictionProfile).                                     |
-| `threshold`         | `Threshold`                     | The threshold the profiles ran with.                                                                                                 |
-| `profiles`          | `dict[str, Profile]`            | The profile of each parameter or prediction, by name.                                                                                |
-| `intervals`         | `dict[str, ProfileInterval]`    | The interval of each.                                                                                                                |
-| `verdicts`          | \`dict\[str, ProfileVerdictName | None\]\`                                                                                                                             |
-| `structure`         | `dict[str, ProfileStructure]`   | For each profile of a parameter that does not cross on both sides, what resetting the other parameters says.                         |
-| `tolerance`         | `float`                         | The numerical tolerance of the statistic: max(τ, ν), the tolerance of the optimizer and the noise floor of the objective at the fit. |
-| `evaluation_floor`  | \`float                         | None\`                                                                                                                               |
-| `notes`             | `list[str]`                     | What a reader should know, such as a threshold below the tolerance or a refit below the fit.                                         |
-| `failed_replicates` | `list[str]`                     | With a bootstrap threshold, each replicate that failed.                                                                              |
+| Name               | Type                            | Description                                                                                                                                             |
+| ------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`              | `CalibrationResult`             | The fit every profile starts from.                                                                                                                      |
+| `quantity`         | `{parameter, prediction}`       | What the profiles hold fixed: parameters (ProfileLikelihood) or predictions (PredictionProfile).                                                        |
+| `threshold`        | `Threshold`                     | The threshold the profiles ran with.                                                                                                                    |
+| `profiles`         | `dict[str, Profile]`            | The profile of each parameter or prediction, by name.                                                                                                   |
+| `intervals`        | `dict[str, ProfileInterval]`    | The interval of each.                                                                                                                                   |
+| `verdicts`         | \`dict\[str, ProfileVerdictName | None\]\`                                                                                                                                                |
+| `structure`        | `dict[str, ProfileStructure]`   | For each profile of a parameter that does not cross on both sides, what resetting the other parameters says.                                            |
+| `tolerance`        | `float`                         | The numerical tolerance of the statistic: max(τ, ν), the tolerance of the optimizer and the noise floor of the objective at the fit.                    |
+| `evaluation_floor` | \`float                         | None\`                                                                                                                                                  |
+| `notes`            | `list[str]`                     | What a reader should know, such as a threshold below the tolerance or a refit below the fit.                                                            |
+| `failed`           | `list[str]`                     | With a bootstrap threshold, each replicate that failed: "Replicate <index> failed: <reason>", also logged as a warning. Empty with any other threshold. |
+| `not_converged`    | `int`                           | With a bootstrap threshold, the replicates kept although their optimizer did not converge; 0 with any other threshold.                                  |
 
 Source code in `commol/context/inference/profiles.py`
 
@@ -4163,8 +4147,13 @@ class ProfileResult(_Frozen):
     notes : list[str]
         What a reader should know, such as a threshold below the tolerance or
         a refit below the fit.
-    failed_replicates : list[str]
-        With a bootstrap threshold, each replicate that failed.
+    failed : list[str]
+        With a bootstrap threshold, each replicate that failed:
+        ``"Replicate <index> failed: <reason>"``, also logged as a warning.
+        Empty with any other threshold.
+    not_converged : int
+        With a bootstrap threshold, the replicates kept although their
+        optimizer did not converge; 0 with any other threshold.
     """
 
     fit: CalibrationResult
@@ -4177,7 +4166,8 @@ class ProfileResult(_Frozen):
     evaluation_floor: float | None = None
     structure: dict[str, ProfileStructure] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
-    failed_replicates: list[str] = Field(default_factory=list)
+    failed: list[str] = Field(default_factory=list)
+    not_converged: int = 0
 
     def plot(
         self,
@@ -4218,10 +4208,10 @@ class ProfileResult(_Frozen):
 
         return _profiles(self, output_file=output_file, config=config, axes=axes)
 
-    def report(self) -> IdentifiabilityReport:
+    def identifiability(self) -> IdentifiabilityReport:
         """
         The verdicts of the profiled parameters as an identifiability report,
-        with a ``profile`` section.
+        with a ``profile`` section; its ``report()`` gives them as data.
 
         ``identifiable`` gives the practical verdict ``determined`` and
         ``practically_non_identifiable`` the practical verdict
@@ -4248,8 +4238,9 @@ class ProfileResult(_Frozen):
         """
         if self.quantity != "parameter":
             raise ValueError(
-                "Only the profiles of parameters report on identifiability; this "
-                "result holds the profiles of predictions."
+                "This result holds the profiles of predictions, and predictions "
+                "have no verdict on a parameter; profile the parameters "
+                "(ProfileLikelihood) for their identifiability."
             )
         parameters = list(self.fit.best_parameters)
         verdicts: dict[str, ParameterVerdicts] = {}
@@ -4380,13 +4371,13 @@ def plot(
     return _profiles(self, output_file=output_file, config=config, axes=axes)
 ```
 
-#### report
+#### identifiability
 
 ```python
-report() -> IdentifiabilityReport
+identifiability() -> IdentifiabilityReport
 ```
 
-The verdicts of the profiled parameters as an identifiability report, with a `profile` section.
+The verdicts of the profiled parameters as an identifiability report, with a `profile` section; its `report()` gives them as data.
 
 `identifiable` gives the practical verdict `determined` and `practically_non_identifiable` the practical verdict `poorly_determined`. `structurally_non_identifiable` gives the structural verdict of its `structure`, `in_combination` or `non_identifiable`, with no combination: the reason names the compensating parameters. A flat profile with no structural verdict gives the practical verdict `poorly_determined`. Every reason says that the verdict holds with the other parameters at their fitted values. A parameter with no profile, or no verdict, gets neither. `IdentifiabilityReport.merge` joins it with the reports of other methods.
 
@@ -4405,10 +4396,10 @@ Raises:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-def report(self) -> IdentifiabilityReport:
+def identifiability(self) -> IdentifiabilityReport:
     """
     The verdicts of the profiled parameters as an identifiability report,
-    with a ``profile`` section.
+    with a ``profile`` section; its ``report()`` gives them as data.
 
     ``identifiable`` gives the practical verdict ``determined`` and
     ``practically_non_identifiable`` the practical verdict
@@ -4435,8 +4426,9 @@ def report(self) -> IdentifiabilityReport:
     """
     if self.quantity != "parameter":
         raise ValueError(
-            "Only the profiles of parameters report on identifiability; this "
-            "result holds the profiles of predictions."
+            "This result holds the profiles of predictions, and predictions "
+            "have no verdict on a parameter; profile the parameters "
+            "(ProfileLikelihood) for their identifiability."
         )
     parameters = list(self.fit.best_parameters)
     verdicts: dict[str, ParameterVerdicts] = {}
@@ -5676,11 +5668,12 @@ The result of a Gibbs posterior.
 
 Attributes:
 
-| Name       | Type                | Description                   |
-| ---------- | ------------------- | ----------------------------- |
-| `eta`      | `float`             | The η the posterior ran with. |
-| `fit`      | \`CalibrationResult | None\`                        |
-| `coverage` | \`float             | None\`                        |
+| Name       | Type                | Description                                                                                                                                      |
+| ---------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `eta`      | `float`             | The η the posterior ran with.                                                                                                                    |
+| `fit`      | \`CalibrationResult | None\`                                                                                                                                           |
+| `coverage` | \`float             | None\`                                                                                                                                           |
+| `failed`   | `list[str]`         | With BootstrapCoverageEta, each replicate whose sampler failed: "Replicate <index> failed: <reason>", also logged as a warning. Empty otherwise. |
 
 Source code in `commol/context/inference/smc.py`
 
@@ -5699,11 +5692,16 @@ class GibbsResult(SMCResult):
     coverage : float | None
         With `BootstrapCoverageEta`, the coverage of the fit by the intervals of
         the bootstrap posteriors at `η`; otherwise None.
+    failed : list[str]
+        With `BootstrapCoverageEta`, each replicate whose sampler failed:
+        ``"Replicate <index> failed: <reason>"``, also logged as a warning.
+        Empty otherwise.
     """
 
     eta: float
     fit: CalibrationResult | None
     coverage: float | None
+    failed: list[str] = Field(default_factory=list)
 ```
 
 ## SMCDiagnostics
@@ -6780,11 +6778,13 @@ The result of a conformal method.
 
 Attributes:
 
-| Name        | Type                     | Description                                                             |
-| ----------- | ------------------------ | ----------------------------------------------------------------------- |
-| `intervals` | `PredictionIntervals`    | The intervals at the positions the method was given.                    |
-| `scores`    | `dict[str, list[float]]` | The scores of each series, by label, in the order the method took them. |
-| `guarantee` | `str`                    | The coverage the method guarantees, and what the guarantee assumes.     |
+| Name            | Type                     | Description                                                                                                                                                                                                                                                                 |
+| --------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `intervals`     | `PredictionIntervals`    | The intervals at the positions the method was given.                                                                                                                                                                                                                        |
+| `scores`        | `dict[str, list[float]]` | The scores of each series, by label, in the order the method took them.                                                                                                                                                                                                     |
+| `guarantee`     | `str`                    | The coverage the method guarantees, and what the guarantee assumes.                                                                                                                                                                                                         |
+| `failed`        | `list[str]`              | Each refit that failed, which gives no score: "Origin <index> failed: <reason>" for RollingConformal, "Block <index> failed: <reason>" for JackknifePlus, "Replicate <index> failed: <reason>" for EnbPI; also logged as a warning. Empty for a method that does not refit. |
+| `not_converged` | `int`                    | Refits kept although their optimizer did not converge; 0 for a method that does not refit.                                                                                                                                                                                  |
 
 Source code in `commol/context/inference/conformal.py`
 
@@ -6802,6 +6802,15 @@ class ConformalResult(BaseModel):
         them.
     guarantee : str
         The coverage the method guarantees, and what the guarantee assumes.
+    failed : list[str]
+        Each refit that failed, which gives no score: ``"Origin <index>
+        failed: <reason>"`` for `RollingConformal`, ``"Block <index> failed:
+        <reason>"`` for `JackknifePlus`, ``"Replicate <index> failed:
+        <reason>"`` for `EnbPI`; also logged as a warning. Empty for a method
+        that does not refit.
+    not_converged : int
+        Refits kept although their optimizer did not converge; 0 for a
+        method that does not refit.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
@@ -6809,6 +6818,8 @@ class ConformalResult(BaseModel):
     intervals: PredictionIntervals
     scores: dict[str, list[float]]
     guarantee: str
+    failed: list[str] = Field(description="Each refit that failed.")
+    not_converged: int = Field(description="Refits that did not converge.")
 ```
 
 ## PredictionIntervals

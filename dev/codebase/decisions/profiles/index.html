@@ -3304,7 +3304,7 @@ points of the side, or of the line through the last two.</p>
 <code>S(θ̂) · F(1, n − p; confidence_level) / (n − p)</code> and needs
 the loss <code>"sse"</code>; <code>bootstrap_calibrated</code> calibrates the statistic itself
 (prepivoting, Beran 1988): replicate <code>b</code> of the bootstrap, rebuilt from
-<code>replicate_seed(seed, b)</code> as <code>ReplicateRunner::run</code> builds it, is fitted and
+<code>replicate_seed(seed, b)</code> as <code>ReplicateRunner::perturbations</code> builds it, is fitted and
 then fitted again with the quantity held at its value at the original fit, and
 the threshold is the quantile <code>confidence_level</code> of the rises
 (<code>bootstrap_thresholds</code>, <code>threshold.rs</code>).</p>

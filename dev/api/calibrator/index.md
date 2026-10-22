@@ -355,9 +355,8 @@ class Calibrator:
         CalibrationResult
             The best start: the optimized parameter values, in the order of
             the problem's parameters, its final loss and convergence, every
-            start (``starts``), the reason of each start that failed
-            (``failed_runs``, also logged as warnings) and the seed
-            (``seed``).
+            start (``starts``), each start that failed (``failed``, also
+            logged as warnings) and the seed (``seed``).
 
         Raises
         ------
@@ -389,12 +388,12 @@ class Calibrator:
         )
         names = self.parameter_names
         summaries: list[tuple[StartSummary, "CalibrationResultProtocol"]] = []
-        failed_runs: list[str] = []
+        failed: list[str] = []
         for index, outcome in enumerate(outcomes):
             if outcome.result is None:
                 reason = f"Start {index} failed: {outcome.error}"
                 logger.warning(reason)
-                failed_runs.append(reason)
+                failed.append(reason)
                 continue
             summaries.append(
                 (
@@ -408,7 +407,7 @@ class Calibrator:
                 )
             )
         if not summaries:
-            raise RuntimeError("Every start failed: " + "; ".join(failed_runs))
+            raise RuntimeError("Every start failed: " + "; ".join(failed))
         best = min(summaries, key=lambda summary: summary[0].loss)[1]
         result = CalibrationResult(
             best_parameters=dict(best.best_parameters),
@@ -417,7 +416,7 @@ class Calibrator:
             converged=best.converged,
             termination_reason=best.termination_reason,
             starts=[summary for summary, _ in summaries],
-            failed_runs=failed_runs,
+            failed=failed,
             seed=self.seed,
         )
         logger.info(
@@ -1271,9 +1270,9 @@ Parameters:
 
 Returns:
 
-| Type                | Description                                                                                                                                                                                                                                      |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `CalibrationResult` | The best start: the optimized parameter values, in the order of the problem's parameters, its final loss and convergence, every start (starts), the reason of each start that failed (failed_runs, also logged as warnings) and the seed (seed). |
+| Type                | Description                                                                                                                                                                                                                   |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CalibrationResult` | The best start: the optimized parameter values, in the order of the problem's parameters, its final loss and convergence, every start (starts), each start that failed (failed, also logged as warnings) and the seed (seed). |
 
 Raises:
 
@@ -1307,9 +1306,8 @@ def run(self, starts: int = 1) -> CalibrationResult:
     CalibrationResult
         The best start: the optimized parameter values, in the order of
         the problem's parameters, its final loss and convergence, every
-        start (``starts``), the reason of each start that failed
-        (``failed_runs``, also logged as warnings) and the seed
-        (``seed``).
+        start (``starts``), each start that failed (``failed``, also
+        logged as warnings) and the seed (``seed``).
 
     Raises
     ------
@@ -1341,12 +1339,12 @@ def run(self, starts: int = 1) -> CalibrationResult:
     )
     names = self.parameter_names
     summaries: list[tuple[StartSummary, "CalibrationResultProtocol"]] = []
-    failed_runs: list[str] = []
+    failed: list[str] = []
     for index, outcome in enumerate(outcomes):
         if outcome.result is None:
             reason = f"Start {index} failed: {outcome.error}"
             logger.warning(reason)
-            failed_runs.append(reason)
+            failed.append(reason)
             continue
         summaries.append(
             (
@@ -1360,7 +1358,7 @@ def run(self, starts: int = 1) -> CalibrationResult:
             )
         )
     if not summaries:
-        raise RuntimeError("Every start failed: " + "; ".join(failed_runs))
+        raise RuntimeError("Every start failed: " + "; ".join(failed))
     best = min(summaries, key=lambda summary: summary[0].loss)[1]
     result = CalibrationResult(
         best_parameters=dict(best.best_parameters),
@@ -1369,7 +1367,7 @@ def run(self, starts: int = 1) -> CalibrationResult:
         converged=best.converged,
         termination_reason=best.termination_reason,
         starts=[summary for summary, _ in summaries],
-        failed_runs=failed_runs,
+        failed=failed,
         seed=self.seed,
     )
     logger.info(
@@ -3650,7 +3648,7 @@ Attributes:
 | `converged`          | `bool`               | Whether the best start converged.                                                                                                                                                           |
 | `termination_reason` | `str`                | Why the best start stopped.                                                                                                                                                                 |
 | `starts`             | `list[StartSummary]` | Every start that finished, in order; the first is the initial guess.                                                                                                                        |
-| `failed_runs`        | `list[str]`          | Why each start that failed did, with its number.                                                                                                                                            |
+| `failed`             | `list[str]`          | Each start that failed: "Start <index> failed: <reason>", also logged as a warning.                                                                                                         |
 | `seed`               | `int`                | The seed of the calibration's random numbers (Calibrator.seed): problem.seed, or the seed the calibrator drew. Set as problem.seed, it repeats the calibration and its uncertainty methods. |
 
 Source code in `commol/context/calibration.py`
@@ -3675,8 +3673,9 @@ class CalibrationResult(BaseModel):
         Why the best start stopped.
     starts : list[StartSummary]
         Every start that finished, in order; the first is the initial guess.
-    failed_runs : list[str]
-        Why each start that failed did, with its number.
+    failed : list[str]
+        Each start that failed: ``"Start <index> failed: <reason>"``, also
+        logged as a warning.
     seed : int
         The seed of the calibration's random numbers (`Calibrator.seed`):
         ``problem.seed``, or the seed the calibrator drew. Set as
@@ -3700,8 +3699,8 @@ class CalibrationResult(BaseModel):
     starts: list[StartSummary] = Field(
         default_factory=list, description="Every start that finished"
     )
-    failed_runs: list[str] = Field(
-        default_factory=list, description="Why each failed start failed"
+    failed: list[str] = Field(
+        default_factory=list, description="Each start that failed"
     )
     seed: int = Field(
         default=..., ge=0, description="Seed of the calibration's random numbers"
@@ -3718,7 +3717,7 @@ class CalibrationResult(BaseModel):
             f"  best_parameters={self.best_parameters},\n"
             f"  termination_reason='{self.termination_reason}',\n"
             f"  starts={len(self.starts)},\n"
-            f"  failed_runs={len(self.failed_runs)},\n"
+            f"  failed={len(self.failed)},\n"
             f"  seed={self.seed}\n"
             f")"
         )
@@ -3748,7 +3747,7 @@ def __str__(self) -> str:
         f"  best_parameters={self.best_parameters},\n"
         f"  termination_reason='{self.termination_reason}',\n"
         f"  starts={len(self.starts)},\n"
-        f"  failed_runs={len(self.failed_runs)},\n"
+        f"  failed={len(self.failed)},\n"
         f"  seed={self.seed}\n"
         f")"
     )
