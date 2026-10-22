@@ -47,31 +47,14 @@ by the configuration's type and knows no method. A static type checker infers
 | `method.run(calibrator)` | The configuration, in `context/`, would import `api/`. |
 
 Every random number of a method comes from the `commol-random` generator,
-seeded from the seed of its source: `Calibrator.seed` (`problem.seed`) or
-`SensitivityAnalysis.seed` (`replicate_seed`, `stream_seed`). No method has a
-seed of its own, so one seed repeats a calibration and every method on it. A
-score reads the seed its draws keep: `ObservationDraws.seed`
-(`crates/commol-inference/src/predictive.rs`), from which `scores::pit` takes
-the stream that randomizes ties. Every method that fits the data takes
-`starts`, at least 1 with the default 1, and fits with
-`Calibrator.run(starts)`. Coverage studies
-(`tests/support/coverage.py`, marker `coverage_study`) check that a method's
+seeded from the seed of its source ([Results](results.md#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts)).
+Coverage studies (`tests/support/coverage.py`, marker `coverage_study`) check that a method's
 intervals cover the truth at their level; they run for a pull request that
 changes what they run and before a release
 (`.github/workflows/coverage.yaml`).
 
-| Alternative | Why not |
-|---|---|
-| A `seed` of a method that overrides the seed of the source | Two seeds choose the random numbers of one run, and `problem.seed` no longer repeats it. |
-| A method that fits from one start, with no `starts` | A fit that ends at a local minimum gives a wrong center, and the user cannot ask for more starts. |
-
 **Guards:** `tests/uncertainty/test_entry_point.py`,
-`tests/uncertainty/test_coverage.py`,
-`tests/uncertainty/test_identifiability.py::TestStructuralRank::test_structural_rank_takes_the_seed_of_the_calibrator`,
-`tests/uncertainty/test_scores.py::TestPit::test_the_pit_takes_the_seed_of_the_source`,
-`crates/commol-inference/tests/test_predictive.rs::the_pit_of_ties_follows_the_seed_of_the_draws`,
-`tests/uncertainty/test_local.py::TestStarts`,
-`tests/uncertainty/test_smc.py::test_the_eta_calibrations_fit_from_their_starts`.
+`tests/uncertainty/test_coverage.py`.
 
 ## Sensitivities come from one port
 
