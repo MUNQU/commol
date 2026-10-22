@@ -8,9 +8,9 @@ use argmin::core::CostFunction;
 use commol_calibration::{
     check_model_values, configured_engine, optimize_from, optimize_with_history,
     optimize_with_observer, CalibrationConstraint, CalibrationParameter, CalibrationParameterType,
-    CalibrationProblem, EvaluationError, LossConfig, MutationApplication, MutationStrategy,
-    NelderMeadConfig, NoObserver, ObservedDataPoint, OptimizationConfig, OptimizationObjective,
-    ParticleSwarmConfig, Violation, Workspace,
+    CalibrationProblem, EvaluationError, ImprovementStop, LossConfig, MutationApplication,
+    MutationStrategy, NelderMeadConfig, NoObserver, ObservedDataPoint, OptimizationConfig,
+    OptimizationObjective, ParticleSwarmConfig, Violation, Workspace,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 
@@ -439,4 +439,40 @@ fn a_swarm_with_mutation_a_target_and_an_observer_runs() {
 
         assert!(result.final_loss < 1e-3, "{}", result.final_loss);
     }
+}
+
+#[test]
+fn a_particle_swarm_with_a_stop_rule_converges() {
+    let problem = problem(vec![]).unwrap();
+    let swarm = |improvement_stop, radius_stop| {
+        OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
+            num_particles: 10,
+            max_iterations: 1000,
+            seed: Some(3),
+            improvement_stop,
+            radius_stop,
+            ..ParticleSwarmConfig::default()
+        })
+    };
+    let without = optimize_with_observer(&problem, &swarm(None, None), NoObserver).unwrap();
+    assert!(!without.converged);
+    assert_eq!(without.iterations, 1000);
+
+    let improvement = Some(ImprovementStop {
+        window: 20,
+        tol_abs: 1e-12,
+        tol_rel: 1e-8,
+    });
+    let config = swarm(improvement, None);
+
+    let result = optimize_with_observer(&problem, &config, NoObserver).unwrap();
+
+    assert!(result.converged, "{result:?}");
+    assert_eq!(result.termination_reason, "Terminated(SolverConverged)");
+    assert!(result.iterations < 1000, "{}", result.iterations);
+    assert!(result.final_loss < 1e-6, "{}", result.final_loss);
+    // The values of this problem lie on a curve of zero loss, so the swarm
+    // never gathers around one point: the radius rule does not stop it.
+    let spread = optimize_with_observer(&problem, &swarm(None, Some(1e-4)), NoObserver).unwrap();
+    assert!(!spread.converged);
 }

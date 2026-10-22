@@ -23,6 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Added #230 -->
 
+- `ParticleSwarmConfig.improvement_stop(window=..., tol_abs=..., tol_rel=...)`
+  and `ParticleSwarmConfig.radius_stop(tol)`: a particle swarm stops when its
+  best loss improved by at most `tol_abs + tol_rel·|best loss|` over the last
+  `window` iterations, or when every particle is within `tol` of the best
+  position, as a fraction of the size of the search box. Both are off by
+  default and have no default values. A run that stops by a rule reports
+  `converged=True`, so a profile that holds a prediction with a swarm also
+  converges. See
+  [Stop rules](../guide/calibration-optimizers.md#stop-rules).
+
 <!-- Added #239 -->
 
 - `commol.set_threads(n)`, the context manager `commol.threads(n, levels)`,
@@ -71,6 +81,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!-- Changed #226 -->
 
 <!-- Changed #230 -->
+
+- The tolerance of a profile under a particle swarm with the improvement stop
+  rule is the improvement the rule allows at the fit,
+  `tol_abs + tol_rel·|objective at the fit|`; without that rule it stays
+  `1e-6·max(1, |objective at the fit|)`. See
+  [Verdicts](../guide/uncertainty/profiles.md#verdicts-and-the-identifiability-report).
 
 <!-- Changed #239 -->
 

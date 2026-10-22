@@ -249,6 +249,36 @@ pub struct ParticleSwarmConfig {
 
     /// Random seed for reproducibility (None = use system entropy)
     pub seed: Option<u64>,
+
+    /// Stop when the best cost stops improving (None = disabled)
+    pub improvement_stop: Option<ImprovementStop>,
+
+    /// Stop when the swarm has gathered around the best position: the
+    /// largest distance of a particle from the best position, divided by the
+    /// size of the search box, is at most this tolerance (None = disabled).
+    /// Must be non-negative.
+    pub radius_stop: Option<f64>,
+}
+
+/// The improvement stop rule of a swarm: the run stops when the best cost
+/// improved by at most `tol_abs + tol_rel · |best cost|` over the last
+/// `window` iterations.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ImprovementStop {
+    /// Iterations over which the improvement is measured; greater than 0.
+    pub window: u64,
+    /// Absolute tolerance on the improvement; non-negative.
+    pub tol_abs: f64,
+    /// Tolerance on the improvement relative to the best cost; non-negative.
+    pub tol_rel: f64,
+}
+
+impl ImprovementStop {
+    /// The improvement the rule allows at a best cost of `cost`:
+    /// `tol_abs + tol_rel · |cost|`.
+    pub fn tolerance(&self, cost: f64) -> f64 {
+        self.tol_abs + self.tol_rel * cost.abs()
+    }
 }
 
 impl Default for ParticleSwarmConfig {
@@ -266,6 +296,8 @@ impl Default for ParticleSwarmConfig {
             mutation_probability: 0.0,
             mutation_application: MutationApplication::None,
             seed: None,
+            improvement_stop: None,
+            radius_stop: None,
         }
     }
 }
@@ -436,8 +468,9 @@ impl SearchSpace {
 /// fork: each outer iteration runs the optimizer of `config` on
 /// `f(θ) + λ (g(θ) − c) + (μ/2)(g(θ) − c)²`, Nelder-Mead from the point of
 /// the iteration before, then updates `λ` and `μ` by the rule of Algencan.
-/// A particle swarm runs to its `max_iterations` in each outer iteration,
-/// so the run stops at the outer limit of the settings.
+/// The augmented Lagrangian stops only when an inner run converged, so a
+/// particle swarm without a stop rule, which runs to its `max_iterations`
+/// in each outer iteration, stops at the outer limit of the settings.
 ///
 /// `seed`, when given, replaces the seed of a particle swarm; outer
 /// iteration `k` of a held prediction takes `replicate_seed(seed, k)`.
@@ -677,7 +710,8 @@ pub struct NoObserver;
 
 impl<I> Observe<I> for NoObserver {}
 
-/// Whether a run converged: the solver met its convergence criterion or the
+/// Whether a run converged: the solver met its convergence criterion (the
+/// `sd_tolerance` of Nelder-Mead, a stop rule of a particle swarm) or the
 /// target cost. A run that stops at `max_iterations` did not converge.
 pub fn converged(status: &TerminationStatus) -> bool {
     matches!(
@@ -926,6 +960,17 @@ pub(crate) fn build_particle_swarm_solver(
         solver = solver
             .with_mutation(strategy, config.mutation_probability, application)
             .map_err(|e| format!("Failed to set mutation: {}", e))?;
+    }
+
+    if let Some(stop) = config.improvement_stop {
+        solver = solver
+            .with_improvement_stop(stop.window, stop.tol_abs, stop.tol_rel)
+            .map_err(|e| format!("Failed to set improvement_stop: {e}"))?;
+    }
+    if let Some(tol) = config.radius_stop {
+        solver = solver
+            .with_radius_stop(tol)
+            .map_err(|e| format!("Failed to set radius_stop: {e}"))?;
     }
 
     Ok(solver)
@@ -1237,6 +1282,63 @@ mod tests {
         };
         let (fit, _) = optimize_particle_swarm(&space, Bowl, &config, None::<NoObserver>).unwrap();
         assert!((fit.best_parameters[0] - 0.7).abs() < 1e-3);
+    }
+
+    #[test]
+    fn a_swarm_gathered_around_its_best_stops_by_the_radius_rule() {
+        let space = SearchSpace {
+            bounds: vec![(0.0, 1.0)],
+            names: vec!["x".to_string()],
+        };
+        let config = ParticleSwarmConfig {
+            max_iterations: 1000,
+            seed: Some(2),
+            radius_stop: Some(1e-6),
+            ..ParticleSwarmConfig::default()
+        };
+        let (fit, _) = optimize_particle_swarm(&space, Bowl, &config, None::<NoObserver>).unwrap();
+        assert!(fit.converged, "{fit:?}");
+        assert!(fit.iterations < 1000, "{}", fit.iterations);
+        assert!((fit.best_parameters[0] - 0.7).abs() < 1e-5, "{fit:?}");
+    }
+
+    #[test]
+    fn a_stop_rule_out_of_its_range_names_itself() {
+        let bounds = [(0.0, 1.0)];
+        let build = |improvement_stop, radius_stop| {
+            build_particle_swarm_solver(
+                &bounds,
+                &ParticleSwarmConfig {
+                    improvement_stop,
+                    radius_stop,
+                    ..ParticleSwarmConfig::default()
+                },
+            )
+            .err()
+            .unwrap()
+        };
+        let improvement = |window, tol_abs, tol_rel| {
+            Some(ImprovementStop {
+                window,
+                tol_abs,
+                tol_rel,
+            })
+        };
+        assert_eq!(
+            build(improvement(0, 0.0, 0.0), None),
+            "Failed to set improvement_stop: Invalid parameter: \"`ParticleSwarm`: improvement \
+             stop `window` must be > 0.\""
+        );
+        assert_eq!(
+            build(improvement(5, -1.0, 0.0), None),
+            "Failed to set improvement_stop: Invalid parameter: \"`ParticleSwarm`: improvement \
+             stop `tol_abs` must be >= 0.\""
+        );
+        assert_eq!(
+            build(None, Some(f64::NAN)),
+            "Failed to set radius_stop: Invalid parameter: \"`ParticleSwarm`: radius stop `tol` \
+             must be >= 0.\""
+        );
     }
 
     #[test]

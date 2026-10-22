@@ -63,9 +63,9 @@ pub use objective::{OptimizationObjective, Score};
 pub use observation::{index_at, ObservationOperator};
 pub use optimization::{
     converged, optimize, optimize_from, optimize_subproblem, optimize_with_history,
-    optimize_with_observer, AccelerationStrategy, InertiaWeightStrategy, InitializationStrategy,
-    MutationApplication, MutationStrategy, NelderMeadConfig, NelderMeadState, NoObserver,
-    OptimizationConfig, ParticleSwarmConfig, ParticleSwarmState,
+    optimize_with_observer, AccelerationStrategy, ImprovementStop, InertiaWeightStrategy,
+    InitializationStrategy, MutationApplication, MutationStrategy, NelderMeadConfig,
+    NelderMeadState, NoObserver, OptimizationConfig, ParticleSwarmConfig, ParticleSwarmState,
 };
 pub use starts::{optimize_starts, start_points, StartOutcome};
 pub use subproblem::{predict, ConstraintSettings, Subproblem, SubproblemResult};

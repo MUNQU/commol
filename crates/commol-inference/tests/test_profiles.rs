@@ -5,8 +5,9 @@ use std::collections::HashMap;
 
 use commol_calibration::{
     Argument, CalibrationConstraint, CalibrationParameter, CalibrationProblem, ConstraintSettings,
-    DiscrepancyConfig, LossConfig, NelderMeadConfig, ObservationModel, ObservedDataPoint,
-    OptimizationConfig, ParticleSwarmConfig, Subproblem, Workspace, optimize, optimize_subproblem,
+    DiscrepancyConfig, ImprovementStop, LossConfig, NelderMeadConfig, ObservationModel,
+    ObservedDataPoint, OptimizationConfig, ParticleSwarmConfig, Subproblem, Workspace, optimize,
+    optimize_subproblem,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 use commol_inference::profiles::{
@@ -364,6 +365,31 @@ fn a_swarm_fits_a_subproblem_and_repeats_from_its_seed() {
     let again = optimize_subproblem(&held, &swarm, &[0.0, 0.0], Some(4)).unwrap();
     // A swarm without stop rules runs every outer iteration to its limit.
     assert!(!first.fit.converged);
+    // With the improvement rule, each inner run converges, and the outer run
+    // stops when the constraint holds, before its limit.
+    let stopping = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
+        num_particles: 20,
+        max_iterations: 150,
+        improvement_stop: Some(ImprovementStop {
+            window: 30,
+            tol_abs: 1e-12,
+            tol_rel: 0.0,
+        }),
+        ..ParticleSwarmConfig::default()
+    });
+    let held_longer = held
+        .clone()
+        .with_settings(ConstraintSettings {
+            tolerance: 1e-6,
+            max_outer_iterations: 30,
+            multiplier: None,
+            penalty: None,
+        })
+        .unwrap();
+    let stopped = optimize_subproblem(&held_longer, &stopping, &[0.0, 0.0], Some(4)).unwrap();
+    assert!(stopped.fit.converged, "{:?}", stopped.fit);
+    assert!(stopped.fit.iterations < 30 * 150, "{:?}", stopped.fit);
+    assert!((stopped.prediction.unwrap() - (a + 15.0 * b + 1.0)).abs() < 1e-6);
     let prediction = first.prediction.unwrap();
     assert!(
         (prediction - (a + 15.0 * b + 1.0)).abs() < 1e-2,
@@ -589,10 +615,25 @@ fn the_tolerance_follows_the_optimizer() {
     let fit = optimize(&problem, &config()).unwrap();
     let nelder_mead = config();
     let swarm = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig::default());
-    // Nelder-Mead: its sd_tolerance, 1e-14; a swarm: 1e-6 of the objective
-    // at the fit, at least 1e-6. Both above the noise floor of this line.
+    let stopping = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
+        improvement_stop: Some(ImprovementStop {
+            window: 20,
+            tol_abs: 1e-9,
+            tol_rel: 1e-7,
+        }),
+        radius_stop: Some(1e-3),
+        ..ParticleSwarmConfig::default()
+    });
+    // Nelder-Mead: its sd_tolerance, 1e-14; a swarm with the improvement
+    // rule: the improvement it allows at the fit; a swarm without it: 1e-6
+    // of the objective at the fit, at least 1e-6. All above the noise floor
+    // of this line.
     let scale = fit.final_loss.max(1.0);
-    for (config, expected) in [(&nelder_mead, 1e-14), (&swarm, 1e-6 * scale)] {
+    for (config, expected) in [
+        (&nelder_mead, 1e-14),
+        (&stopping, 1e-9 + 1e-7 * fit.final_loss),
+        (&swarm, 1e-6 * scale),
+    ] {
         let tracer = ProfileTracer::new(&problem, config, &fit.best_parameters, 0).unwrap();
         assert!(tracer.noise_floor() < 1e-14, "{}", tracer.noise_floor());
         assert!((tracer.tolerance() - expected).abs() < 1e-18);

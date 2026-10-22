@@ -621,6 +621,62 @@ class PSOVelocityConfig(BaseModel):
     )
 
 
+class PSOImprovementStop(BaseModel):
+    """
+    The improvement stop rule of a particle swarm.
+
+    The run stops when the best loss improved by at most
+    ``tol_abs + tol_rel * |best loss|`` over the last `window` iterations.
+
+    Attributes
+    ----------
+    window : int
+        Iterations over which the improvement is measured (> 0).
+    tol_abs : float
+        Absolute tolerance on the improvement (>= 0).
+    tol_rel : float
+        Tolerance on the improvement relative to the best loss (>= 0).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    window: int = Field(default=..., gt=0, description="Iterations of the window")
+    tol_abs: float = Field(
+        default=..., ge=0.0, description="Absolute tolerance on the improvement"
+    )
+    tol_rel: float = Field(
+        default=..., ge=0.0, description="Relative tolerance on the improvement"
+    )
+
+
+class PSORadiusStop(BaseModel):
+    """
+    The radius stop rule of a particle swarm.
+
+    The run stops when the largest distance of a particle from the best
+    position, divided by the size of the search box (the norm of the widths of
+    the bounds), is at most `tol` (Zielinski and Laur, 2007).
+
+    Attributes
+    ----------
+    tol : float
+        Tolerance on the radius of the swarm, relative to the size of the
+        search box (>= 0).
+
+    References
+    ----------
+    Zielinski, K., & Laur, R. (2007). Stopping criteria for a constrained
+    single-objective particle swarm optimization algorithm. Informatica,
+    31(1), 51-59.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    tol: float = Field(
+        default=..., ge=0.0, description="Tolerance on the radius of the swarm"
+    )
+
+
 class ParticleSwarmConfig(BaseModel):
     """
     Configuration for the Particle Swarm Optimization algorithm.
@@ -646,6 +702,10 @@ class ParticleSwarmConfig(BaseModel):
         Enable mutation to escape local optima
     velocity(clamp_factor, mutation_threshold)
         Configure velocity control
+    improvement_stop(window, tol_abs, tol_rel)
+        Stop when the best loss stops improving
+    radius_stop(tol)
+        Stop when the swarm has gathered around its best position
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -676,6 +736,8 @@ class ParticleSwarmConfig(BaseModel):
     )
     _mutation: PSOMutationConfig | None = PrivateAttr(default=None)
     _velocity: PSOVelocityConfig | None = PrivateAttr(default=None)
+    _improvement_stop: PSOImprovementStop | None = PrivateAttr(default=None)
+    _radius_stop: PSORadiusStop | None = PrivateAttr(default=None)
 
     @field_validator("initialization")
     @classmethod
@@ -884,6 +946,60 @@ class ParticleSwarmConfig(BaseModel):
         )
         return self
 
+    def improvement_stop(self, *, window: int, tol_abs: float, tol_rel: float) -> Self:
+        """
+        Stop when the best loss stops improving.
+
+        The run stops when the best loss improved by at most
+        ``tol_abs + tol_rel * |best loss|`` over the last `window` iterations,
+        and reports ``converged=True``. Off by default. A swarm can stall for
+        some iterations and then improve again, so a short window can stop it
+        early.
+
+        Parameters
+        ----------
+        window : int
+            Iterations over which the improvement is measured (> 0).
+        tol_abs : float
+            Absolute tolerance on the improvement (>= 0).
+        tol_rel : float
+            Tolerance on the improvement relative to the best loss (>= 0).
+
+        Returns
+        -------
+        Self
+            The config instance for method chaining
+        """
+        self._improvement_stop = PSOImprovementStop(
+            window=window, tol_abs=tol_abs, tol_rel=tol_rel
+        )
+        return self
+
+    def radius_stop(self, tol: float) -> Self:
+        """
+        Stop when the swarm has gathered around its best position.
+
+        The run stops when the largest distance of a particle from the best
+        position, divided by the size of the search box, is at most `tol`, and
+        reports ``converged=True``. Off by default. Mutation and velocity
+        mutation scatter the swarm again, so with them the radius can stay
+        above `tol`; values that the data do not tell apart keep the swarm
+        spread.
+
+        Parameters
+        ----------
+        tol : float
+            Tolerance on the radius of the swarm, relative to the size of the
+            search box (>= 0).
+
+        Returns
+        -------
+        Self
+            The config instance for method chaining
+        """
+        self._radius_stop = PSORadiusStop(tol=tol)
+        return self
+
     @property
     def inertia_config(self) -> PSOConstantInertia | PSOChaoticInertia | None:
         """Get the inertia configuration (for internal use)."""
@@ -905,6 +1021,16 @@ class ParticleSwarmConfig(BaseModel):
     def velocity_config(self) -> PSOVelocityConfig | None:
         """Get the velocity configuration (for internal use)."""
         return self._velocity
+
+    @property
+    def improvement_stop_config(self) -> PSOImprovementStop | None:
+        """Get the improvement stop rule (for internal use)."""
+        return self._improvement_stop
+
+    @property
+    def radius_stop_config(self) -> PSORadiusStop | None:
+        """Get the radius stop rule (for internal use)."""
+        return self._radius_stop
 
 
 class StartSummary(BaseModel):

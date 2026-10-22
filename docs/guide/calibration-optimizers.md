@@ -112,14 +112,14 @@ with the message `Nelder-Mead needs finite bounds`.
 
 | `termination_reason` | `converged` | Meaning |
 |---|---|---|
-| `Terminated(SolverConverged)` | `True` | Nelder-Mead: the spread of the simplex values fell below `sd_tolerance` |
+| `Terminated(SolverConverged)` | `True` | Nelder-Mead: the spread of the simplex values fell below `sd_tolerance`. Particle swarm: a [stop rule](#stop-rules) held |
 | `Terminated(TargetCostReached)` | `True` | Particle swarm: the loss reached `target_cost` |
 | `Terminated(MaxItersReached)` | `False` | The run used all `max_iterations` |
 | Any other reason | `False` | The run stopped for another reason, such as a timeout |
 
 `converged` comes from `converged` in `optimization.rs`. A particle swarm
-without `target_cost` always stops at `max_iterations`, so it reports
-`converged=False`; judge it by `final_loss`.
+without a [stop rule](#stop-rules) always stops at `max_iterations`, so it
+reports `converged=False`; judge it by `final_loss`.
 
 ## Particle swarm
 
@@ -151,6 +151,46 @@ Each method returns the configuration, so they chain:
 | `.acceleration("time_varying", c1_initial=…, c1_final=…, c2_initial=…, c2_final=…)` | four factors | Pulls that change from explore (high `c1`) to exploit (high `c2`). |
 | `.velocity(clamp_factor=None, mutation_threshold=None)` | fractions | `clamp_factor` limits speed to a share of the search box (0.1–0.2 is typical); `mutation_threshold` restarts particles slower than it (0.001–0.01). |
 | `.mutation(strategy, *, scale, probability, application)` | see right | Random jumps to escape local minima: `strategy` `"gaussian"` or `"cauchy"` (larger jumps), `probability` per iteration, `application` `"global_best"`, `"all_particles"` or `"below_average"`. |
+| `.improvement_stop(*, window, tol_abs, tol_rel)` | see [Stop rules](#stop-rules) | Stops when the best loss stops improving. |
+| `.radius_stop(tol)` | see [Stop rules](#stop-rules) | Stops when the swarm has gathered around its best position. |
+
+### Stop rules
+
+A swarm stops at `max_iterations` unless a stop rule holds first. The two rules
+come from the argmin fork; both are off until you set them, and neither has a
+default value. A run that stops by a rule reports `converged=True` and
+`termination_reason` `Terminated(SolverConverged)`.
+
+| Rule | Stops when | Arguments |
+|---|---|---|
+| `.improvement_stop(window=…, tol_abs=…, tol_rel=…)` | The best loss improved by at most `tol_abs + tol_rel·|best loss|` over the last `window` iterations | `window > 0`; `tol_abs`, `tol_rel` ≥ 0 |
+| `.radius_stop(tol)` | Every particle is within `tol` of the best position, as a fraction of the size of the search box (the length of its diagonal) (Zielinski and Laur, 2007) | `tol` ≥ 0 |
+
+```python
+stopping = ParticleSwarmConfig(num_particles=30, max_iterations=2000).improvement_stop(
+    window=30, tol_abs=1e-12, tol_rel=1e-9
+)
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=[
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+        CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+    ],
+    loss_function="sse",
+    optimization_config=stopping,
+    seed=7,
+)
+result = Calibrator(Simulation(model(None, None)), problem).run()
+print(result.converged, result.iterations < 2000)  # True True
+```
+
+A swarm can stall for some iterations and then improve again, so a short
+`window` can stop it early. Mutation and velocity mutation scatter the
+particles again, and unknowns that the data cannot tell apart keep them
+spread, so with them the radius can stay above `tol`. Neither rule draws
+random numbers: with the same seed, a run with a rule is the run without it
+up to the iteration where it stops. In a [profile](uncertainty/profiles.md),
+the improvement rule also sets the tolerance of a swarm.
 
 ## Several starts
 
@@ -222,7 +262,7 @@ order. A point the objective penalizes is not kept.
 | Symptom | Try |
 |---|---|
 | A result sits at a bound | Check the bounds, give a better `initial_guess`, or use particle swarm |
-| `converged=False` | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations` |
+| `converged=False` | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations`; a particle swarm needs a [stop rule](#stop-rules) to converge |
 | Different results on each run | Set `seed`; use more particles or iterations |
 | A local minimum | `run(starts=n)` from several points |
 | A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations |
