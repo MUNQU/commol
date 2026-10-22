@@ -28,6 +28,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_MODEL_BAND = "model band\n(no observation noise),\nnot a prediction interval"
+"""What the band of a panel of observed series is, in its legend."""
+
 
 @dataclass(frozen=True)
 class Trace:
@@ -141,6 +144,41 @@ class ComparedPanel:
 type Compared = SimulationResults | SimulationReplicates | Predictive
 
 
+@dataclass(frozen=True)
+class ObservationPanel:
+    """
+    One observed series, with the model read only at its observations.
+
+    Attributes
+    ----------
+    series : str
+        The label of the observations. The `Axes` of the panel has it as its
+        label.
+    name : str
+        The title of the panel.
+    unit : str
+        The unit of the values, or ``""`` when they have none.
+    windows : list[float | None]
+        The window of each observation, or None for a value read at its
+        position.
+    model : Trace
+        The model value of each observation, read through its own operator,
+        at its position.
+    observed : Trace
+        The observed values.
+    band : Band | None
+        The band of the replicates or of the draws at each observation.
+    """
+
+    series: str
+    name: str
+    unit: str
+    windows: list[float | None]
+    model: Trace
+    observed: Trace
+    band: Band | None = None
+
+
 class _Outputs:
     """The outputs of results, and the bins and accumulators of their model."""
 
@@ -174,6 +212,13 @@ class _Outputs:
             )
         return by_source[series_id]
 
+    def label(self, series_id: str) -> tuple[str, str]:
+        """The name and unit of a series, as the kind of the model names it."""
+        if self.model is None:
+            return series_id, ""
+        name, unit = self.model.structure.series_label(self.model, series_id)
+        return name, unit or ""
+
     def panel(
         self,
         series_id: str,
@@ -182,14 +227,11 @@ class _Outputs:
         observed: Trace | None = None,
     ) -> Panel:
         """The panel of a series, named as the kind of the model names it."""
-        if self.model is None:
-            name, unit = series_id, None
-        else:
-            name, unit = self.model.structure.series_label(self.model, series_id)
+        name, unit = self.label(series_id)
         return Panel(
             series=series_id,
             name=name,
-            unit=unit or "",
+            unit=unit,
             line=line,
             band=band,
             observed=observed,
@@ -375,6 +417,127 @@ def predictive_cumulative_panels(
                 observed=_cumulative_observed(by_series.get(series_id, []), factors),
             )
         )
+    return panels
+
+
+def run_observation_panels(
+    results: SimulationResults,
+    observed_data: Iterable[ObservedDataPoint],
+    calibration_result: CalibrationResult | None = None,
+) -> list[ObservationPanel]:
+    """
+    The panels of the observed series of one run, one per label, in the order
+    of their first observation.
+
+    The model value of each observation is read through its own operator, as
+    the loss reads it: the sum of its outputs at its position, or its
+    increment over its window, times the value of its factor in
+    `calibration_result`.
+
+    Raises
+    ------
+    ValueError
+        If there are no observations, or the results have no value at the
+        position of an observation or at the start of its window.
+    KeyError
+        If an observation names an output the results do not have.
+    """
+    outputs = _outputs_of(results)
+    factors = calibration_result.best_parameters if calibration_result else {}
+    return [
+        _observation_panel(
+            outputs,
+            label,
+            observed,
+            Trace(
+                _positions(observed),
+                _at_observations(results, observed, factors),
+                "Simulation",
+            ),
+        )
+        for label, observed in _observed_series(observed_data).items()
+    ]
+
+
+def replicate_observation_panels(
+    replicates: SimulationReplicates,
+    confidence_level: float,
+    observed_data: Iterable[ObservedDataPoint],
+    calibration_result: CalibrationResult | None = None,
+) -> list[ObservationPanel]:
+    """
+    The panels of the observed series of replicates: the mean of the
+    replicates and the band of `confidence_level` across them, each
+    replicate read through the operator of each observation first
+    (`member_statistics`).
+    """
+    mean = replicates.mean()
+    outputs = _Outputs(mean, replicates.model)
+    factors = calibration_result.best_parameters if calibration_result else {}
+    panels = []
+    for label, observed in _observed_series(observed_data).items():
+        statistics = member_statistics(
+            [_at_observations(run, observed, factors) for run in replicates],
+            confidence_level,
+        )
+        panels.append(
+            _observation_panel(
+                outputs,
+                label,
+                observed,
+                Trace(
+                    _positions(observed),
+                    _at_observations(mean, observed, factors),
+                    f"Mean of {len(replicates)} replicates",
+                ),
+                Band(
+                    _positions(observed),
+                    statistics["ci_lower"],
+                    statistics["ci_upper"],
+                    f"{confidence_level:.0%} of the replicates:\n{_MODEL_BAND}",
+                ),
+            )
+        )
+    return panels
+
+
+def predictive_observation_panels(
+    predictive: "Predictive",
+    confidence_level: float,
+    observed_data: Iterable[ObservedDataPoint],
+) -> list[ObservationPanel]:
+    """
+    The panels of the observed series of a predictive: the weighted median of
+    the draws and their band of `confidence_level`, read through
+    ``Predictive.at_observations(..., NoNoise())``, the values the loss
+    compares.
+    """
+    by_label = _observed_series(observed_data)
+    band = predictive.at_observations(
+        [point for observed in by_label.values() for point in observed], NoNoise()
+    ).band(confidence_level)
+    outputs = _outputs_of(predictive)
+    panels = []
+    start = 0
+    for label, observed in by_label.items():
+        end = start + len(observed)
+        panels.append(
+            _observation_panel(
+                outputs,
+                label,
+                observed,
+                Trace(
+                    _positions(observed), band.median[start:end], "Median of the draws"
+                ),
+                Band(
+                    _positions(observed),
+                    band.lower[start:end],
+                    band.upper[start:end],
+                    f"{confidence_level:.0%} of the draws:\n{_MODEL_BAND}",
+                ),
+            )
+        )
+        start = end
     return panels
 
 
@@ -601,6 +764,68 @@ def _group_observed(
     }
 
 
+def _observed_series(
+    observed_data: Iterable[ObservedDataPoint],
+) -> dict[str, list[ObservedDataPoint]]:
+    """
+    The observations of each label, in order of position.
+
+    Raises
+    ------
+    ValueError
+        If there are no observations.
+    """
+    by_label = _group_observed(observed_data)
+    if not by_label:
+        raise ValueError(
+            "A figure of the observed series needs at least one observation."
+        )
+    return by_label
+
+
+def _positions(observed: list[ObservedDataPoint]) -> list[float]:
+    """The position of each observation."""
+    return [point.at for point in observed]
+
+
+def _at_observations(
+    results: SimulationResults,
+    observed: list[ObservedDataPoint],
+    factors: Mapping[str, float],
+) -> list[float]:
+    """
+    The model value of each observation in one run, through its own
+    operator: the sum of its outputs, its window and its factor.
+    """
+    return [
+        _read(results, point.observed_outputs, point)
+        * _factor(point.factor_id, factors)
+        for point in observed
+    ]
+
+
+def _observation_panel(
+    outputs: _Outputs,
+    label: str,
+    observed: list[ObservedDataPoint],
+    model: Trace,
+    band: Band | None = None,
+) -> ObservationPanel:
+    """The panel of an observed series, named as the kind of the model names it."""
+    name, unit = outputs.label(label)
+    return ObservationPanel(
+        series=label,
+        name=name,
+        unit=unit,
+        windows=[point.window for point in observed],
+        model=model,
+        observed=Trace(
+            _positions(observed), [point.value for point in observed], "Observed"
+        ),
+        band=band,
+    )
+
+
 def _observed(observed: list[ObservedDataPoint]) -> Trace | None:
     """The observed values of a series, or None when it has none."""
     if not observed:
@@ -678,6 +903,19 @@ def _sum(results: Mapping[str, list[float]], outputs: list[str]) -> list[float]:
     return [sum(values) for values in zip(*(results[name] for name in outputs))]
 
 
+def _read(
+    results: SimulationResults, outputs: list[str], point: ObservedDataPoint
+) -> float:
+    """
+    The sum of `outputs` of one run as `point` reads it: at its position, or
+    its increment over its window (`windowed_totals`).
+    """
+    series = _sum(results, outputs)
+    if point.window:
+        return windowed_totals(series, results.positions, point.window, [point.at])[0]
+    return series[index_at(results.positions, point.at)]
+
+
 def _model_line(
     results: SimulationResults,
     outputs: _Outputs,
@@ -702,16 +940,11 @@ def _model_line(
         on its own or at the start of its window.
     """
     if _reads_each_observation(observed):
-        values = []
-        for point in observed:
-            series = _sum(results, point.outputs or outputs.components(series_id))
-            value = (
-                windowed_totals(series, results.positions, point.window, [point.at])[0]
-                if point.window
-                else series[index_at(results.positions, point.at)]
-            )
-            values.append(value * _factor(point.factor_id, factors))
-        return [point.at for point in observed], values
+        return [point.at for point in observed], [
+            _read(results, point.outputs or outputs.components(series_id), point)
+            * _factor(point.factor_id, factors)
+            for point in observed
+        ]
     components = (
         observed[0].outputs
         if observed and observed[0].outputs
