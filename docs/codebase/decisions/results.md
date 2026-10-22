@@ -11,7 +11,7 @@ distribution, interpolated between the midpoints of the cumulative weights
 (`statistics::quantiles` in `crates/commol-inference/src/statistics.rs`). With
 equal weights it equals NumPy's `method="hazen"`; a weight of zero removes a
 value. `ci_percentiles` (`api/inference/intervals.py`) turns a confidence level
-into the two percentile points. `member_statistics` reduces each member to the
+into the two percentile points of `statistics::interval_levels`. `member_statistics` reduces each member to the
 quantity of interest **first**, and then takes weighted quantiles across
 members; taking quantiles first gives a band that describes no member. The
 replicates of a stochastic run (`SimulationReplicates.quantiles`), a sample
@@ -27,6 +27,44 @@ and a predictive use the same quantile.
 
 **Guards:** `crates/commol-inference/src/statistics.rs` tests,
 `tests/uncertainty/test_intervals.py`.
+
+## A setting has one name and one check
+
+A setting that means the same thing has the same name in every method, in
+Python and in Rust. The level of an interval is `confidence_level`: in the
+conformal methods, `Threshold`, `Sobol`, `BootstrapCoverageEta`, and in the
+results that report it (`PredictionIntervals`, `ProfileSection`). A count is
+a plain plural noun: `particles` (`ParticleSwarmConfig` and every SMC method),
+`draws`, `replicates` (every bootstrap, `Sobol`, `EnbPI`), and `count` for the
+argument of `Simulation.replicates`, `ParameterSample.resample` and
+`Distribution.sample`. The rule that combines the replicates of a ratio is
+`Ratio.replicate_rule`, so `replicates` is always a count. The level of a
+quantile keeps the name `level` (`Quantile(level)`): it is not the level of an
+interval.
+
+One Rust function checks each kind of setting, with one message:
+
+| Check | Function | Message |
+|---|---|---|
+| A confidence level | `statistics::interval_levels` | `confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95% interval` |
+| Any other setting strictly between 0 and 1 (`target_cess`, `stay_probability`, `min_acceptance`, the `quantile` of ABC, `correlation_threshold`) | `statistics::check_open_unit(name, value)` | `<name> is strictly between 0 and 1, got <value>` |
+
+Python calls the first through the binding `commol_rs.inference.interval_levels`:
+`ci_percentiles`, `BootstrapResult.interval_error`, `PropagationResult.summary`,
+the scenario summaries, and every `confidence_level` field, whose type is
+`ConfidenceLevel` (`context/inference/levels.py`).
+
+| Alternative | Why not |
+|---|---|
+| A check in each method, with `Field(gt=0.0, lt=1.0)` | The same mistake gives a different message in each method, and the rule is written many times. |
+| An alias for an old name | Two names for one setting, which is what the rule removes. |
+
+**Rule:** a new setting takes the name its meaning already has, and a new
+setting strictly between 0 and 1 is checked by one of the two functions.
+
+**Guards:** `tests/suite/test_rules.py::test_a_setting_has_one_name`,
+`tests/uncertainty/test_intervals.py::test_every_confidence_level_has_one_check`,
+`crates/commol-inference/tests/test_levels.rs`.
 
 ## A description is data, rendered apart
 

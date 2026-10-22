@@ -83,7 +83,7 @@ def _trace(
         parameters,
         predictions,
         kind,
-        threshold.level,
+        threshold.confidence_level,
         max_steps,
         calibrator.seed,
         bootstrap=(

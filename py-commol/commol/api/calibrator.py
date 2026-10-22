@@ -641,7 +641,7 @@ class Calibrator:
         improvement = opt_config.improvement_stop_config
         radius = opt_config.radius_stop_config
         ps_config = rust_calibration.ParticleSwarmConfig(
-            num_particles=opt_config.num_particles,
+            particles=opt_config.particles,
             max_iterations=opt_config.max_iterations,
             verbose=opt_config.verbose,
             inertia=rust_inertia,

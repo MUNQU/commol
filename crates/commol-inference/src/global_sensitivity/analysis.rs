@@ -233,9 +233,9 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         Ok((result, design.points.len()))
     }
 
-    /// Sobol indices on the design of Saltelli with `base` rows, with
-    /// `bootstrap` replicates for intervals at `confidence_level`, and the
-    /// number of points run.
+    /// Sobol indices on the design of Saltelli with `draws` rows, with
+    /// `replicates` bootstrap replicates for intervals at `confidence_level`,
+    /// and the number of points run.
     ///
     /// # Errors
     ///
@@ -243,26 +243,26 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
     /// fit the model, or a point has no run.
     pub fn sobol(
         &self,
-        base: usize,
-        bootstrap: usize,
+        draws: usize,
+        replicates: usize,
         confidence_level: f64,
         quantities: &[Quantity],
     ) -> Result<(Sobol, usize), PredictiveError> {
-        if bootstrap < 2 {
+        if replicates < 2 {
             return Err(PredictiveError::Mismatch(format!(
-                "Sobol needs at least 2 bootstrap replicates, got {bootstrap}"
+                "Sobol needs at least 2 bootstrap replicates, got {replicates}"
             )));
         }
         crate::statistics::interval_levels(confidence_level).map_err(PredictiveError::Mismatch)?;
         let design = self
             .inputs
-            .saltelli("Sobol", base, self.design_seed())
+            .saltelli("Sobol", draws, self.design_seed())
             .map_err(PredictiveError::Mismatch)?;
         let outputs = self.means(&design.points, quantities)?;
         sobol(
             &design,
             &outputs,
-            bootstrap,
+            replicates,
             confidence_level,
             stream_seed(self.seed, BOOTSTRAP_STREAM),
         )

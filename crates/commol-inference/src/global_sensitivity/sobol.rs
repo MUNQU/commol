@@ -45,7 +45,7 @@ pub struct Sobol {
 }
 
 /// The Sobol indices of `design` from the quantities of its points,
-/// `[point][quantity]`, with `bootstrap` replicates for intervals at
+/// `[point][quantity]`, with `replicates` bootstrap replicates for intervals at
 /// `confidence_level`; `seed` seeds the bootstrap alone, so a caller gives
 /// it a stream of its own ([`commol_random::stream_seed`]). The quantities
 /// run in parallel.
@@ -54,23 +54,23 @@ pub struct Sobol {
 ///
 /// [`PredictiveError::NotANumber`] with the first quantity that is NaN at a
 /// point, before any index; [`PredictiveError::Mismatch`] when there is not
-/// one row of quantities per point, `bootstrap` is below 2, or
+/// one row of quantities per point, `replicates` is below 2, or
 /// `confidence_level` is not strictly between 0 and 1.
 pub fn sobol(
     design: &SaltelliDesign,
     outputs: &[Vec<f64>],
-    bootstrap: usize,
+    replicates: usize,
     confidence_level: f64,
     seed: u64,
 ) -> Result<Sobol, PredictiveError> {
     check_numbers(outputs)?;
-    estimate(design, outputs, bootstrap, confidence_level, seed).map_err(PredictiveError::Mismatch)
+    estimate(design, outputs, replicates, confidence_level, seed).map_err(PredictiveError::Mismatch)
 }
 
 fn estimate(
     design: &SaltelliDesign,
     outputs: &[Vec<f64>],
-    bootstrap: usize,
+    replicates: usize,
     confidence_level: f64,
     seed: u64,
 ) -> Result<Sobol, String> {
@@ -81,9 +81,9 @@ fn estimate(
             outputs.len()
         ));
     }
-    if bootstrap < 2 {
+    if replicates < 2 {
         return Err(format!(
-            "Sobol needs at least 2 bootstrap replicates, got {bootstrap}"
+            "Sobol needs at least 2 bootstrap replicates, got {replicates}"
         ));
     }
     let levels = interval_levels(confidence_level)?;
@@ -91,26 +91,26 @@ fn estimate(
     let quantities = outputs.first().map_or(0, Vec::len);
     let all_rows: Vec<usize> = (0..base).collect();
     let mut generator = Generator::from_seed(seed);
-    let resamples: Vec<Vec<usize>> = (0..bootstrap)
+    let resamples: Vec<Vec<usize>> = (0..replicates)
         .map(|_| {
             (0..base)
                 .map(|_| ((generator.uniform() * base as f64) as usize).min(base - 1))
                 .collect()
         })
         .collect();
-    let equal = vec![1.0; bootstrap];
+    let equal = vec![1.0; replicates];
     let per_quantity: Vec<QuantityIndices> = (0..quantities)
         .into_par_iter()
         .map(|q| {
             let column: Vec<f64> = outputs.iter().map(|row| row[q]).collect();
             let value = |matrix: usize, row: usize| column[matrix * base + row];
             let estimate = indices(&value, inputs, &all_rows);
-            let replicates: Vec<Indices> = resamples
+            let replicate_indices: Vec<Indices> = resamples
                 .iter()
                 .map(|rows| indices(&value, inputs, rows))
                 .collect();
             let ends = |pick: &dyn Fn(&Indices) -> f64| -> [f64; 2] {
-                let values: Vec<f64> = replicates.iter().map(pick).collect();
+                let values: Vec<f64> = replicate_indices.iter().map(pick).collect();
                 if values.iter().any(|v| v.is_nan()) {
                     return [f64::NAN; 2];
                 }

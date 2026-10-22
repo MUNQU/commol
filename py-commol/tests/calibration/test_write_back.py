@@ -480,7 +480,7 @@ def _split_problem() -> CalibrationProblem:
             ),
         ],
         loss_function="sse",
-        optimization_config=ParticleSwarmConfig(num_particles=30, max_iterations=150),
+        optimization_config=ParticleSwarmConfig(particles=30, max_iterations=150),
         seed=SEED,
     )
 

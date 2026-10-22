@@ -607,7 +607,7 @@ def with_intervals(
                     [at for at, _, _ in bounded],
                     [lower for _, lower, _ in bounded],
                     [upper for _, _, upper in bounded],
-                    f"{intervals.level:.0%} prediction interval",
+                    f"{intervals.confidence_level:.0%} prediction interval",
                 ),
                 prediction=Trace(series.positions, series.prediction, "Prediction"),
             )

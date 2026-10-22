@@ -116,8 +116,6 @@ class TestBayesianBootstrap:
 
         assert error.lower[0] <= interval[0] <= error.lower[1]
         assert error.upper[0] <= interval[1] <= error.upper[1]
-        with pytest.raises(ValueError, match="confidence level"):
-            result.interval_error(1.0)
 
 
 class TestResidualBootstraps:

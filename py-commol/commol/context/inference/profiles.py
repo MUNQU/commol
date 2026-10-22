@@ -22,6 +22,7 @@ from commol.context.inference.identifiability import (
     ProfileVerdictName,
     StructuralVerdict,
 )
+from commol.context.inference.levels import ConfidenceLevel
 from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import (
     BayesianBootstrap,
@@ -53,7 +54,7 @@ class _Frozen(BaseModel):
 class Threshold(_Frozen):
     """
     How far the statistic of a profile may rise above the fit inside an
-    interval of level `level`.
+    interval of `confidence_level`.
 
     Build one with `chi_square`, `beale` or `bootstrap_calibrated`.
 
@@ -61,14 +62,14 @@ class Threshold(_Frozen):
     ----------
     kind : {"chi_square", "beale", "bootstrap_calibrated"}
         The rule.
-    level : float
+    confidence_level : float
         The level of each pointwise interval, strictly between 0 and 1.
     bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap | None
         The bootstrap of ``"bootstrap_calibrated"``; None otherwise.
     """  # noqa: E501
 
     kind: Literal["chi_square", "beale", "bootstrap_calibrated"]
-    level: float = Field(gt=0.0, lt=1.0)
+    confidence_level: ConfidenceLevel
     bootstrap: ProfileBootstrap | None = None
 
     @model_validator(mode="after")
@@ -83,17 +84,17 @@ class Threshold(_Frozen):
         return self
 
     @classmethod
-    def chi_square(cls, level: float) -> Self:
+    def chi_square(cls, confidence_level: float) -> Self:
         """
-        ``½ χ²₁(level)`` on ``−log L`` (Wilks): the threshold of a problem
-        with observation models.
+        ``½ χ²₁(confidence_level)`` on ``−log L`` (Wilks): the threshold of a
+        problem with observation models.
 
         It assumes that the models hold and that the statistic is near its
         large-sample distribution.
 
         Parameters
         ----------
-        level : float
+        confidence_level : float
             The level of each interval, strictly between 0 and 1.
 
         Returns
@@ -104,23 +105,23 @@ class Threshold(_Frozen):
         Raises
         ------
         ValueError
-            If the level is not strictly between 0 and 1.
+            If ``confidence_level`` is not strictly between 0 and 1.
         """
-        return cls(kind="chi_square", level=_level(level))
+        return cls(kind="chi_square", confidence_level=confidence_level)
 
     @classmethod
-    def beale(cls, level: float) -> Self:
+    def beale(cls, confidence_level: float) -> Self:
         """
-        Beale's threshold of a sum of squares: ``S(θ̂) · F(1, n − p; level) /
-        (n − p)``, with ``n`` observations of positive weight and ``p``
-        parameters.
+        Beale's threshold of a sum of squares:
+        ``S(θ̂) · F(1, n − p; confidence_level) / (n − p)``, with ``n``
+        observations of positive weight and ``p`` parameters.
 
         It assumes independent Gaussian errors of one variance, and is exact
         for a model linear in its parameters. It needs the loss ``"sse"``.
 
         Parameters
         ----------
-        level : float
+        confidence_level : float
             The level of each interval, strictly between 0 and 1.
 
         Returns
@@ -131,12 +132,14 @@ class Threshold(_Frozen):
         Raises
         ------
         ValueError
-            If the level is not strictly between 0 and 1.
+            If ``confidence_level`` is not strictly between 0 and 1.
         """
-        return cls(kind="beale", level=_level(level))
+        return cls(kind="beale", confidence_level=confidence_level)
 
     @classmethod
-    def bootstrap_calibrated(cls, bootstrap: ProfileBootstrap, level: float) -> Self:
+    def bootstrap_calibrated(
+        cls, bootstrap: ProfileBootstrap, confidence_level: float
+    ) -> Self:
         """
         The threshold of each quantity calibrated by `bootstrap`
         (prepivoting, Beran 1988), for any loss.
@@ -145,15 +148,15 @@ class Threshold(_Frozen):
         ``Calibrator.uncertainty(bootstrap)`` builds it, is fitted
         (``θ̂_b``) and then fitted again with the quantity held at its value
         at the fit of the original data: the rise of the replicate is
-        ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile `level` of
-        the rises. It costs one fit and one refit per quantity for each
-        replicate.
+        ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile
+        `confidence_level` of the rises. It costs one fit and one refit per
+        quantity for each replicate.
 
         Parameters
         ----------
         bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap
             The bootstrap, with its replicates and starts.
-        level : float
+        confidence_level : float
             The level of each interval, strictly between 0 and 1.
 
         Returns
@@ -164,17 +167,13 @@ class Threshold(_Frozen):
         Raises
         ------
         ValueError
-            If the level is not strictly between 0 and 1.
+            If ``confidence_level`` is not strictly between 0 and 1.
         """  # noqa: E501
         return cls(
-            kind="bootstrap_calibrated", level=_level(level), bootstrap=bootstrap
+            kind="bootstrap_calibrated",
+            confidence_level=confidence_level,
+            bootstrap=bootstrap,
         )
-
-
-def _level(level: float) -> float:
-    if not 0.0 < level < 1.0:
-        raise ValueError(f"A level is strictly between 0 and 1, got {level}.")
-    return level
 
 
 class PredictionSpec(_Frozen):
@@ -653,7 +652,7 @@ class ProfileResult(_Frozen):
             profile=[
                 ProfileSection(
                     threshold=self.threshold.kind,
-                    level=self.threshold.level,
+                    confidence_level=self.threshold.confidence_level,
                     tolerance=self.tolerance,
                     verdicts=self.verdicts,
                     intervals={

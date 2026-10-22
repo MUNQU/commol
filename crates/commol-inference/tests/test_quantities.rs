@@ -11,7 +11,7 @@ use commol_inference::global_sensitivity::{
     ChaosExpansion, ForwardAnalysis, Truncation, morris, prcc, sobol,
 };
 use commol_inference::quantity::{
-    MissingPositions, Quantities, Quantity, Replicates, Series, Undefined,
+    MissingPositions, Quantities, Quantity, ReplicateRule, Series, Undefined,
 };
 use commol_inference::statistics::{self, NotANumber};
 use commol_inference::{NanRun, PredictiveError, Priors};
@@ -271,7 +271,7 @@ fn each_quantity_crosses_as_json_tagged_by_kind() {
                 start: 0.0,
                 end: 1.0,
             },
-            Replicates::WithinPositive,
+            ReplicateRule::WithinPositive,
         ),
     ];
 
@@ -283,7 +283,10 @@ fn each_quantity_crosses_as_json_tagged_by_kind() {
         r#"[{"kind":"value_at","series":{"kind":"level","outputs":["A","B"]},"at":1.5}"#
     ));
     assert!(json.contains(r#"{"kind":"increments","outputs":["A"],"window":7.0}"#));
-    assert!(json.contains(r#""replicates":"within_positive""#), "{json}");
+    assert!(
+        json.contains(r#""replicate_rule":"within_positive""#),
+        "{json}"
+    );
     assert!(serde_json::from_str::<Quantity>(r#"{"kind":"mean","at":1.0}"#).is_err());
     assert!(quantities.iter().all(|quantity| !quantity.is_empty()));
 }
@@ -431,24 +434,24 @@ fn value_at(outputs: &[&str], at: f64) -> Quantity {
     }
 }
 
-fn ratio_of(numerator: Quantity, denominator: Quantity, replicates: Replicates) -> Quantity {
+fn ratio_of(numerator: Quantity, denominator: Quantity, replicate_rule: ReplicateRule) -> Quantity {
     Quantity::Ratio {
         numerator: Box::new(numerator),
         denominator: Box::new(denominator),
-        replicates,
+        replicate_rule,
     }
 }
 
 /// The ratio of the level of `N` to the level of `D` at 0, combined by
-/// `replicates`.
-fn n_over_d(replicates: Replicates) -> Quantity {
-    ratio_of(value_at(&["N"], 0.0), value_at(&["D"], 0.0), replicates)
+/// `rule`.
+fn n_over_d(rule: ReplicateRule) -> Quantity {
+    ratio_of(value_at(&["N"], 0.0), value_at(&["D"], 0.0), rule)
 }
 
-const RULES: [Replicates; 3] = [
-    Replicates::Within,
-    Replicates::WithinPositive,
-    Replicates::Pooled,
+const RULES: [ReplicateRule; 3] = [
+    ReplicateRule::Within,
+    ReplicateRule::WithinPositive,
+    ReplicateRule::Pooled,
 ];
 
 /// The value of a ratio of `N` to `D` under each rule, for replicates of the
@@ -492,7 +495,7 @@ fn a_ratio_divides_two_values_of_one_run() {
                 start: 7.0,
                 end: 21.0,
             },
-            Replicates::Pooled,
+            ReplicateRule::Pooled,
         ),
         value_at(&["acc"], 21.0),
     ];
@@ -521,7 +524,7 @@ fn a_ratio_takes_values_only() {
             &[ratio_of(
                 operand,
                 value_at(&["acc"], 1.0),
-                Replicates::Within,
+                ReplicateRule::Within,
             )],
             &outputs,
         )
@@ -536,7 +539,7 @@ fn a_ratio_takes_values_only() {
         series: level(&["acc"]),
         positions: vec![1.0],
     });
-    let nested = of(n_over_d(Replicates::Within));
+    let nested = of(n_over_d(ReplicateRule::Within));
 
     assert!(position.contains("got peak_position"), "{position}");
     assert!(trajectory.contains("got trajectory"), "{trajectory}");
@@ -556,13 +559,9 @@ fn one_unit() -> StochasticSteps {
     StochasticSteps::try_from_model(&model).unwrap()
 }
 
-/// The three units over B at `at`, combined by `replicates`.
-fn all_over_b(at: f64, replicates: Replicates) -> Quantity {
-    ratio_of(
-        value_at(&["A", "B", "C"], 1.0),
-        value_at(&["B"], at),
-        replicates,
-    )
+/// The three units over B at `at`, combined by `rule`.
+fn all_over_b(at: f64, rule: ReplicateRule) -> Quantity {
+    ratio_of(value_at(&["A", "B", "C"], 1.0), value_at(&["B"], at), rule)
 }
 
 /// The forward model of [`one_unit`], 8 replicates of `k`.
@@ -584,7 +583,7 @@ fn means_of(quantity: Quantity) -> Result<Vec<Vec<f64>>, PredictiveError> {
 fn a_zero_denominator_is_undefined_unless_the_user_conditions() {
     let forward = one_unit_forward();
     let within = Quantities::new(
-        &[all_over_b(1.0, Replicates::Within)],
+        &[all_over_b(1.0, ReplicateRule::Within)],
         &forward.base_engine().output_names(),
     )
     .unwrap();
@@ -598,8 +597,8 @@ fn a_zero_denominator_is_undefined_unless_the_user_conditions() {
     assert!(ratios.iter().all(|&ratio| ratio.is_nan() || ratio == 3.0));
     assert!(ratios.contains(&3.0), "{ratios:?}");
 
-    let error = means_of(all_over_b(1.0, Replicates::Within)).unwrap_err();
-    let positive = means_of(all_over_b(1.0, Replicates::WithinPositive)).unwrap();
+    let error = means_of(all_over_b(1.0, ReplicateRule::Within)).unwrap_err();
+    let positive = means_of(all_over_b(1.0, ReplicateRule::WithinPositive)).unwrap();
 
     assert_eq!(
         error,
@@ -620,8 +619,8 @@ fn a_zero_denominator_is_undefined_unless_the_user_conditions() {
 #[test]
 fn a_draw_with_no_positive_denominator_raises() {
     // B is 0 at 0 in every replicate.
-    for replicates in [Replicates::WithinPositive, Replicates::Pooled] {
-        let error = means_of(all_over_b(0.0, replicates)).unwrap_err();
+    for rule in [ReplicateRule::WithinPositive, ReplicateRule::Pooled] {
+        let error = means_of(all_over_b(0.0, rule)).unwrap_err();
 
         assert_eq!(
             error,
@@ -665,8 +664,8 @@ fn gated() -> ForwardAnalysis<DifferenceEquations> {
     .unwrap()
 }
 
-/// A at 1 over the gain of B over (0, 1], combined by `replicates`.
-fn a_over_gain(replicates: Replicates) -> Vec<Quantity> {
+/// A at 1 over the gain of B over (0, 1], combined by `rule`.
+fn a_over_gain(rule: ReplicateRule) -> Vec<Quantity> {
     vec![ratio_of(
         value_at(&["A"], 1.0),
         Quantity::Gain {
@@ -674,7 +673,7 @@ fn a_over_gain(replicates: Replicates) -> Vec<Quantity> {
             start: 0.0,
             end: 1.0,
         },
-        replicates,
+        rule,
     )]
 }
 
@@ -695,8 +694,11 @@ fn named_run(error: PredictiveError) -> (Vec<usize>, NanRun) {
 fn a_zero_denominator_follows_the_nan_rule_in_every_method() {
     let analysis = gated();
 
-    for (replicates, replicate) in [(Replicates::Within, Some(0)), (Replicates::Pooled, None)] {
-        let quantities = a_over_gain(replicates);
+    for (rule, replicate) in [
+        (ReplicateRule::Within, Some(0)),
+        (ReplicateRule::Pooled, None),
+    ] {
+        let quantities = a_over_gain(rule);
         let errors = [
             analysis.prcc(Some(8), &quantities).map(|_| ()).unwrap_err(),
             analysis.morris(3, 4, &quantities).map(|_| ()).unwrap_err(),
@@ -719,7 +721,7 @@ fn a_zero_denominator_follows_the_nan_rule_in_every_method() {
     }
     // A propagation keeps the NaN of each run, which its quantiles reject.
     let propagation = analysis
-        .propagate(Some(8), &a_over_gain(Replicates::Within))
+        .propagate(Some(8), &a_over_gain(ReplicateRule::Within))
         .unwrap();
     let ratios: Vec<f64> = propagation.values.iter().map(|row| row[0]).collect();
     let undefined: Vec<usize> = (0..ratios.len())

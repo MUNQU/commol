@@ -119,7 +119,7 @@ class TestFitting:
 
     def test_a_parameter_and_an_initial_amount_together(self, b_every_5_steps) -> None:
         config = (
-            ParticleSwarmConfig(num_particles=40, max_iterations=1000, verbose=False)
+            ParticleSwarmConfig(particles=40, max_iterations=1000, verbose=False)
             .acceleration(
                 "time_varying",
                 c1_initial=2.5,

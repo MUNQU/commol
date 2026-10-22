@@ -177,9 +177,10 @@ class SeriesIntervalsReport(TypedDict):
 
 
 class PredictionIntervalsReport(TypedDict):
-    """Prediction intervals at a level, by series, and the unbounded ones."""
+    """Prediction intervals at a confidence level, by series, and the unbounded
+    ones."""
 
-    level: float
+    confidence_level: float
     series: dict[str, SeriesIntervalsReport]
     unbounded: dict[str, list[float]]
 

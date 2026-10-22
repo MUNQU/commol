@@ -88,7 +88,7 @@ fn check<E: SimulationEngine + Send + Sync>(
 ///
 /// When the scores of a horizon are exchangeable across origins, the
 /// interval at that horizon covers a new observation with probability at
-/// least `settings.level`.
+/// least `settings.confidence_level`.
 ///
 /// # Errors
 ///
@@ -160,7 +160,7 @@ where
     let target_scales =
         scales(settings.score, observed, &targets, None).map_err(ConformalError::Invalid)?;
     let intervals = PredictionIntervals::symmetric(
-        settings.level,
+        settings.confidence_level,
         targets.clone(),
         centre,
         &target_scales,
@@ -169,7 +169,7 @@ where
             let horizon = sorted.partition_point(|&p| p < target.at) + 1;
             by_horizon
                 .get(&(settings.by.group(&target.label).to_string(), horizon))
-                .map(|scores| conformal_quantile(scores, settings.level))
+                .map(|scores| conformal_quantile(scores, settings.confidence_level))
         },
     );
     Ok(ConformalRun {

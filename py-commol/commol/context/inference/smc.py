@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.distributions import WithPriors
+from commol.context.inference.levels import ConfidenceLevel
 from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
@@ -75,9 +76,7 @@ class BootstrapCoverageEta(BaseModel):
     kind: Literal["bootstrap_coverage"] = "bootstrap_coverage"
     replicates: int = Field(ge=1, description="Number of bootstrap data sets.")
     block_length: BlockLength = Field(description="Positions per block.")
-    confidence_level: float = Field(
-        gt=0.0, lt=1.0, description="The level of the intervals."
-    )
+    confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
 
 
 type Eta = (

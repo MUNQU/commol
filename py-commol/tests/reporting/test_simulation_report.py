@@ -249,7 +249,7 @@ class TestPredictionIntervals:
     def test_a_report_holds_prediction_intervals(self) -> None:
         results = _accumulator_model().run(WINDOW * WINDOWS)
         intervals = PredictionIntervals(
-            level=0.8,
+            confidence_level=0.8,
             series={
                 "B": SeriesIntervals(
                     positions=[41.0, 42.0],
@@ -270,7 +270,7 @@ class TestPredictionIntervals:
             "prediction_intervals",
         ]
         assert report["prediction_intervals"] == {
-            "level": 0.8,
+            "confidence_level": 0.8,
             "series": {
                 "B": {
                     "positions": [41.0, 42.0],

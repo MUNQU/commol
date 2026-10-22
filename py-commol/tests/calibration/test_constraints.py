@@ -83,9 +83,7 @@ class TestParameterConstraints:
             truth_run,
             constraints,
             k2_bound=0.5,
-            config=ParticleSwarmConfig(
-                num_particles=20, max_iterations=200, verbose=False
-            ),
+            config=ParticleSwarmConfig(particles=20, max_iterations=200, verbose=False),
         )
 
         assert fitted["k1"] / fitted["k2"] <= 5.1
@@ -118,7 +116,7 @@ class TestOutputConstraints:
             [constraint],
             k2_bound=0.5,
             config=ParticleSwarmConfig(
-                num_particles=20,
+                particles=20,
                 max_iterations=200,
                 verbose=False,
                 initialization="latin_hypercube",
@@ -160,7 +158,7 @@ class TestOutputConstraints:
             ],
             loss_function="sse",
             optimization_config=ParticleSwarmConfig(
-                num_particles=12, max_iterations=40, verbose=False
+                particles=12, max_iterations=40, verbose=False
             ),
             seed=SEED,
         )

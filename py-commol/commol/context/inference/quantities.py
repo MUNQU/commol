@@ -383,7 +383,7 @@ class Ratio(_OneScalar):
     numerator is not 0, and follows the NaN rule of every method. A method
     that reduces the points of a design (`PRCC`, `Morris`, `Sobol`,
     `PolynomialChaos`) reads one value per point; with a stochastic engine,
-    `replicates` says how the replicates of a point combine. A `Propagation`,
+    `replicate_rule` says how the replicates of a point combine. A `Propagation`,
     the `Scenarios` and the quantities of one run keep the ratio of each run.
 
     Attributes
@@ -392,7 +392,7 @@ class Ratio(_OneScalar):
         The quantity divided.
     denominator : ValueAt | Gain | Peak
         The quantity it is divided by.
-    replicates : {"within", "within_positive", "pooled"}
+    replicate_rule : {"within", "within_positive", "pooled"}
         ``"within"``: the mean of the ratio of each replicate, E[N/D]; a
         replicate with D = 0 leaves the point with no value.
         ``"within_positive"``: the mean of the ratio of the replicates with
@@ -405,7 +405,7 @@ class Ratio(_OneScalar):
     kind: Literal["ratio"] = "ratio"
     numerator: _Operand = Field(description="The quantity divided.")
     denominator: _Operand = Field(description="The quantity it is divided by.")
-    replicates: ReplicateRule = Field(
+    replicate_rule: ReplicateRule = Field(
         description="How the replicates of a stochastic run combine."
     )
 

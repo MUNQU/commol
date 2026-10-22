@@ -15,7 +15,7 @@ use crate::conformal::score::{ConformalSettings, scales};
 ///
 /// When the scores of the held-out observations and of a new one are
 /// exchangeable, the interval of the new one covers it with probability at
-/// least `settings.level`.
+/// least `settings.confidence_level`.
 ///
 /// # Errors
 ///
@@ -57,9 +57,9 @@ where
                 .of(obs.value, predictions.centre[i], scales[i])
         })
         .collect();
-    let quantiles = group_quantiles(&labels, &scores, settings.by, settings.level);
+    let quantiles = group_quantiles(&labels, &scores, settings.by, settings.confidence_level);
     let intervals = PredictionIntervals::symmetric(
-        settings.level,
+        settings.confidence_level,
         targets.clone(),
         predictions.centre[held_out..].to_vec(),
         &scales[held_out..],

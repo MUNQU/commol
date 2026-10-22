@@ -535,7 +535,7 @@ class SimulationReplicates(list[SimulationResults]):
 
         A stochastic `Propagation` gives draw ``j`` the seed
         ``draw_seeds[j]`` and runs its replicate ``i`` with the seed replicate
-        ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])`` takes. So
+        ``i`` of ``Simulation.replicates(count, seed=draw_seeds[j])`` takes. So
         those replicates, of the model at the values of draw ``j``, give the
         quantities of the runs of that draw.
 

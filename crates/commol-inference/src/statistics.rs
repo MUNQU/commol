@@ -123,20 +123,30 @@ pub fn quantiles(values: &[f64], weights: &[f64], levels: &[f64]) -> Result<Vec<
         .collect())
 }
 
-/// The two quantiles of a central interval of `confidence_level`:
-/// `(1 − c)/2` and `(1 + c)/2`.
+/// Check that the setting `name` is strictly between 0 and 1.
 ///
 /// # Errors
 ///
-/// Returns a message when `confidence_level` is not strictly between 0 and
-/// 1.
-pub fn interval_levels(confidence_level: f64) -> Result<[f64; 2], String> {
-    if !(confidence_level > 0.0 && confidence_level < 1.0) {
-        return Err(format!(
-            "A confidence level is strictly between 0 and 1, got {confidence_level}; use 0.95 \
-             for a 95% interval"
-        ));
+/// Returns "`name` is strictly between 0 and 1, got `value`" when it is
+/// not, NaN included.
+pub fn check_open_unit(name: &str, value: f64) -> Result<(), String> {
+    if value > 0.0 && value < 1.0 {
+        Ok(())
+    } else {
+        Err(format!("{name} is strictly between 0 and 1, got {value}"))
     }
+}
+
+/// The two quantiles of a central interval of `confidence_level`:
+/// `(1 − c)/2` and `(1 + c)/2`. It is the one check of a confidence level.
+///
+/// # Errors
+///
+/// Returns the message of [`check_open_unit`] for `confidence_level`, with
+/// the example 0.95, when it is not strictly between 0 and 1.
+pub fn interval_levels(confidence_level: f64) -> Result<[f64; 2], String> {
+    check_open_unit("confidence_level", confidence_level)
+        .map_err(|error| format!("{error}; use 0.95 for a 95% interval"))?;
     Ok([
         (1.0 - confidence_level) / 2.0,
         (1.0 + confidence_level) / 2.0,

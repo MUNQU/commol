@@ -178,7 +178,7 @@ def swarm(
 ) -> ParticleSwarmConfig:
     """A quiet swarm, with a Gaussian mutation of the particles below average."""
     config = ParticleSwarmConfig(
-        num_particles=particles, max_iterations=iterations, verbose=False
+        particles=particles, max_iterations=iterations, verbose=False
     )
     if mutation:
         config = config.mutation(

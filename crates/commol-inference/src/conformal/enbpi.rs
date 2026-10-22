@@ -165,9 +165,9 @@ where
                 / offset as f64
         })
         .collect();
-    let quantiles = group_quantiles(&labels, &scores, settings.by, settings.level);
+    let quantiles = group_quantiles(&labels, &scores, settings.by, settings.confidence_level);
     let intervals = PredictionIntervals::symmetric(
-        settings.level,
+        settings.confidence_level,
         targets.clone(),
         centre,
         &scales[offset..],

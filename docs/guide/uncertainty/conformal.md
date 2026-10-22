@@ -70,7 +70,7 @@ result = calibrator.uncertainty(
         calibration_data=held_out,
         score="absolute",
         by="series",
-        level=0.9,
+        confidence_level=0.9,
         positions=[85.0, 90.0],
     )
 )
@@ -109,7 +109,8 @@ each series where that happens. At level 0.9 a quantile needs 9 scores.
 
 ## Scores and pooling
 
-Every variant takes a `score`, a `by` and a `level`, none with a default: they
+Every variant takes a `score`, a `by` and a `confidence_level`, none with a
+default: they
 change the width of the intervals, which is a modelling choice.
 
 | `score` | Score of `y` against `ŷ` | Interval | Use it when |
@@ -146,7 +147,7 @@ spread = calibrator.uncertainty(
         calibration_data=held_out,
         score="spread",
         by="series",
-        level=0.9,
+        confidence_level=0.9,
         positions=[85.0, 90.0],
         sample=sample,
     )
@@ -179,7 +180,7 @@ print(widths)  # [6.3, 5.2]
 
 ## Split conformal
 
-`SplitConformal(calibration_data, score, by, level, positions, sample=None,
+`SplitConformal(calibration_data, score, by, confidence_level, positions, sample=None,
 starts=1)` fits the problem's observations (`Calibrator.run(starts)`), or
 reads a `sample`, scores `calibration_data` and gives intervals at `positions`
 for each series of `calibration_data`. A series of `calibration_data` is read
@@ -187,7 +188,7 @@ as its observations define it: its outputs, factor and window.
 
 ## Rolling origins
 
-`RollingConformal(origins, score, by, level, positions, starts=1)` gives
+`RollingConformal(origins, score, by, confidence_level, positions, starts=1)` gives
 intervals ahead of the data, with one quantile per horizon. Horizon `k` is the
 `k`-th observation of a series after an origin: a count, not a distance on the
 axis, because positions can be irregular. Each origin fits the observations at
@@ -213,7 +214,7 @@ rolling = calibrator_all.uncertainty(
         origins=[float(step) for step in range(30, 71)],
         score="absolute",
         by="series",
-        level=0.8,
+        confidence_level=0.8,
         positions=[81.0, 82.0, 83.0],
     )
 )
@@ -222,7 +223,7 @@ print(rolling.intervals.unbounded)  # {}
 
 ## Jackknife+
 
-`JackknifePlus(block_length, score, by, level, positions, starts=1)` refits
+`JackknifePlus(block_length, score, by, confidence_level, positions, starts=1)` refits
 once per block left out (Barber et al. 2021). Observation `i` of block `b` has
 the residual `Rᵢ` of the fit `μ̂₋ᵦ` that left its block out, and the interval at
 a point `x` is
@@ -250,14 +251,14 @@ computes it, and `result.guarantee` states it.
 from commol import JackknifePlus
 
 jackknife = calibrator.uncertainty(
-    JackknifePlus(block_length=4, score="absolute", by="series", level=0.9, positions=[45.0])
+    JackknifePlus(block_length=4, score="absolute", by="series", confidence_level=0.9, positions=[45.0])
 )
 print(jackknife.guarantee)  # ... at least 0.7318 ... with K = 10 blocks of 4 positions ...
 ```
 
 ## EnbPI
 
-`EnbPI(replicates, block_length, score, by, level, positions, starts=1)` draws
+`EnbPI(replicates, block_length, score, by, confidence_level, positions, starts=1)` draws
 its own replicates (Xu and Xie 2021): each draws as many blocks as there are,
 with replacement, and fits with each observation's weight multiplied by the
 count of its block, so the blocks it did not draw get weight 0. The
@@ -270,7 +271,7 @@ replicates: a block is left out by a replicate with probability about
 
 ## Adaptive conformal inference
 
-`AdaptiveConformal(level, step, score, by, stream, sample=None, starts=1)`
+`AdaptiveConformal(confidence_level, step, score, by, stream, sample=None, starts=1)`
 walks the observations of `stream` in order of position (Gibbs and Candès
 2021). The interval of each point is the quantile, at the working level
 `1 − α_t`, of the scores of the earlier points of the stream; then the point
@@ -290,7 +291,7 @@ at each point before it was seen.
 from commol import AdaptiveConformal
 
 adaptive = calibrator.uncertainty(
-    AdaptiveConformal(level=0.9, step=0.05, score="absolute", by="series", stream=held_out)
+    AdaptiveConformal(confidence_level=0.9, step=0.05, score="absolute", by="series", stream=held_out)
 )
 series = adaptive.intervals.series["B"]
 misses = [
@@ -304,7 +305,8 @@ print(round(sum(misses) / len(misses), 3))  # 0.125
 ## Results, plots and reports
 
 Every variant returns a `ConformalResult(intervals, scores, guarantee)`.
-`intervals` is a `PredictionIntervals`: its `level`, a `SeriesIntervals` per
+`intervals` is a `PredictionIntervals`: its `confidence_level`, a
+`SeriesIntervals` per
 series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`.
 `plot.series(prediction_intervals=...)` of a run, of replicates or of a
 predictive draws the band of each series on its panel, and

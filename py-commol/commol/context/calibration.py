@@ -683,7 +683,7 @@ class ParticleSwarmConfig(BaseModel):
 
     Attributes
     ----------
-    num_particles : int
+    particles : int
         Number of particles in the swarm (default: 20)
     max_iterations : int
         Maximum number of iterations (default: 1000)
@@ -711,7 +711,7 @@ class ParticleSwarmConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Core parameters
-    num_particles: int = Field(
+    particles: int = Field(
         default=20, gt=0, description="Number of particles in the swarm"
     )
     max_iterations: int = Field(

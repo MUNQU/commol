@@ -11,7 +11,7 @@ use crate::conformal::score::Pooling;
 #[derive(Debug, Clone)]
 pub struct PredictionIntervals {
     /// The level of the intervals, `1 − α`.
-    pub level: f64,
+    pub confidence_level: f64,
     /// Where each interval is: a series (label) and a position, read as the
     /// series' observations define it.
     pub targets: Vec<ObservedDataPoint>,
@@ -29,7 +29,7 @@ impl PredictionIntervals {
     /// [`Pooling::group`]). A group with no quantile has unbounded
     /// intervals.
     pub fn symmetric(
-        level: f64,
+        confidence_level: f64,
         targets: Vec<ObservedDataPoint>,
         prediction: Vec<f64>,
         scales: &[f64],
@@ -45,7 +45,7 @@ impl PredictionIntervals {
             })
             .unzip();
         Self {
-            level,
+            confidence_level,
             targets,
             prediction,
             lower,

@@ -35,13 +35,14 @@ points of the side, or of the line through the last two.
 
 ## A threshold states the noise
 
-`Threshold` has no default. `chi_square` gives `½ χ²₁(level)` on `−log L` and
-refuses a loss; `beale` gives `S(θ̂) · F(1, n − p; level) / (n − p)` and needs
+`Threshold` has no default. `chi_square` gives `½ χ²₁(confidence_level)` on
+`−log L` and refuses a loss; `beale` gives
+`S(θ̂) · F(1, n − p; confidence_level) / (n − p)` and needs
 the loss `"sse"`; `bootstrap_calibrated` calibrates the statistic itself
 (prepivoting, Beran 1988): replicate `b` of the bootstrap, rebuilt from
 `replicate_seed(seed, b)` as `ReplicateRunner::run` builds it, is fitted and
 then fitted again with the quantity held at its value at the original fit, and
-the threshold is the quantile `level` of the rises
+the threshold is the quantile `confidence_level` of the rises
 (`bootstrap_thresholds`, `threshold.rs`).
 
 | Alternative | Why not |

@@ -192,7 +192,7 @@ def run_sobol(analysis: "SensitivityAnalysis", method: Sobol) -> SobolResult:
     """
     labels, quantities = expand_quantities(method.quantities)
     run = analysis.rust_analysis.sobol(
-        method.base_draws, method.bootstrap, method.confidence_level, quantities
+        method.draws, method.replicates, method.confidence_level, quantities
     )
     return SobolResult(
         inputs=analysis.inputs.names,

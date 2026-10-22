@@ -25,7 +25,7 @@
 //!
 //! A method that reduces the points of a design reads one value per point:
 //! [`Quantities::combine`] combines the replicates of the point, the mean of
-//! each quantity, and for a ratio the rule its [`Replicates`] names.
+//! each quantity, and for a ratio the rule its [`ReplicateRule`] names.
 //!
 //! A quantity crosses from Python as JSON, with `kind` as the tag of each
 //! enum. The quantities of a design are evaluated in Rust, run after run, so
@@ -120,7 +120,7 @@ pub enum Quantity {
         /// The quantity it is divided by.
         denominator: Box<Quantity>,
         /// How the replicates of a stochastic run combine.
-        replicates: Replicates,
+        replicate_rule: ReplicateRule,
     },
 }
 
@@ -128,7 +128,7 @@ pub enum Quantity {
 /// numerator N and denominator D.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Replicates {
+pub enum ReplicateRule {
     /// The mean of the ratio of each replicate, `E[N/D]`: a replicate with
     /// D = 0 leaves the point with no value.
     Within,
@@ -177,8 +177,8 @@ pub enum Undefined {
     /// is.
     Replicate(usize),
     /// No replicate is NaN, but a ratio has no value at the point: no
-    /// replicate has D > 0 under [`Replicates::WithinPositive`], or `E[D] = 0`
-    /// under [`Replicates::Pooled`].
+    /// replicate has D > 0 under [`ReplicateRule::WithinPositive`], or `E[D] = 0`
+    /// under [`ReplicateRule::Pooled`].
     Point,
 }
 
@@ -274,9 +274,9 @@ pub struct Quantities {
     schedule: Vec<f64>,
     operator: ObservationOperator,
     reductions: Vec<Reduction>,
-    /// How the replicates of each scalar combine: [`Replicates::Within`]
+    /// How the replicates of each scalar combine: [`ReplicateRule::Within`]
     /// for a scalar that is not a ratio, whose denominator is 1.
-    rules: Vec<Replicates>,
+    rules: Vec<ReplicateRule>,
     count: usize,
     /// The positions each quantity reads, ascending: its positions and the
     /// starts of its windows.
@@ -435,8 +435,8 @@ impl Quantities {
             };
             reductions.push(read.reduction(quantity)?);
             let rule = match quantity {
-                Quantity::Ratio { replicates, .. } => *replicates,
-                _ => Replicates::Within,
+                Quantity::Ratio { replicate_rule, .. } => *replicate_rule,
+                _ => ReplicateRule::Within,
             };
             rules.extend(std::iter::repeat_n(rule, quantity.len()));
             let mut positions: Vec<f64> = points[first..]
@@ -580,7 +580,7 @@ impl Quantities {
 
     /// The value of each scalar at a point, from the [`Self::terms`] of
     /// each of its replicates, `[replicate][scalar]`: the mean over the
-    /// replicates, and for a ratio the rule of its [`Replicates`].
+    /// replicates, and for a ratio the rule of its [`ReplicateRule`].
     ///
     /// # Errors
     ///
@@ -600,11 +600,14 @@ impl Quantities {
 
 /// The value of a scalar from its term in each replicate, combined by
 /// `rule`.
-fn combine(terms: impl Iterator<Item = Term> + Clone, rule: Replicates) -> Result<f64, Undefined> {
+fn combine(
+    terms: impl Iterator<Item = Term> + Clone,
+    rule: ReplicateRule,
+) -> Result<f64, Undefined> {
     let nan = |(replicate, term): (usize, Term)| {
         match rule {
-            Replicates::Within => term.value().is_nan(),
-            Replicates::WithinPositive | Replicates::Pooled => {
+            ReplicateRule::Within => term.value().is_nan(),
+            ReplicateRule::WithinPositive | ReplicateRule::Pooled => {
                 term.numerator.is_nan() || term.denominator.is_nan()
             }
         }
@@ -618,8 +621,8 @@ fn combine(terms: impl Iterator<Item = Term> + Clone, rule: Replicates) -> Resul
         values.iter().map(|value| value / count).sum::<f64>()
     };
     let value = match rule {
-        Replicates::Within => mean(&terms.map(Term::value).collect::<Vec<_>>()),
-        Replicates::WithinPositive => {
+        ReplicateRule::Within => mean(&terms.map(Term::value).collect::<Vec<_>>()),
+        ReplicateRule::WithinPositive => {
             let ratios: Vec<f64> = terms
                 .filter(|term| term.denominator > 0.0)
                 .map(Term::value)
@@ -629,7 +632,7 @@ fn combine(terms: impl Iterator<Item = Term> + Clone, rule: Replicates) -> Resul
             }
             mean(&ratios)
         }
-        Replicates::Pooled => {
+        ReplicateRule::Pooled => {
             let (numerators, denominators): (Vec<f64>, Vec<f64>) =
                 terms.map(|term| (term.numerator, term.denominator)).unzip();
             Term {

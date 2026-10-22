@@ -210,12 +210,12 @@ has residuals of.
 A conformal variant only chooses which predictions and which held-out values
 feed a `NonconformityScore`; the score, its scale and the quantile
 `⌈(n + 1)(1 − α)⌉` live once (`crates/commol-inference/src/conformal/score.rs`,
-`quantile.rs`). `score`, `by` and `level` are required in every variant, and
-`check_conformal_settings` rejects in Rust `"normalized"` per series. A horizon
-of `RollingConformal` is a count of observations after the origin. `EnbPI`
-draws its own block counts through `ReplicateRunner::fit_one`, and
-`AdaptiveConformal` keeps its state in Rust (`AdaptiveLevel`) and returns the
-same `ConformalResult` as every variant.
+`quantile.rs`). `score`, `by` and `confidence_level` are required in every
+variant, and `check_conformal_settings` rejects in Rust `"normalized"` per
+series. A horizon of `RollingConformal` is a count of observations after the
+origin. `EnbPI` draws its own block counts through `ReplicateRunner::fit_one`,
+and `AdaptiveConformal` keeps its state in Rust (`AdaptiveLevel`) and returns
+the same `ConformalResult` as every variant.
 
 | Alternative | Why not |
 |---|---|

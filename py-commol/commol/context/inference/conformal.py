@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import ObservedDataPoint
+from commol.context.inference.levels import ConfidenceLevel
 from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
@@ -58,11 +59,11 @@ class SeriesIntervals(BaseModel):
 class PredictionIntervals(BaseModel):
     """
     Prediction intervals for observations: where new observations of each
-    series fall, at a level.
+    series fall, at a confidence level.
 
     Attributes
     ----------
-    level : float
+    confidence_level : float
         The level of the intervals, ``1 − α``.
     series : dict[str, SeriesIntervals]
         The intervals of each series, by label.
@@ -74,7 +75,7 @@ class PredictionIntervals(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
 
-    level: float
+    confidence_level: float
     series: dict[str, SeriesIntervals]
     unbounded: dict[str, list[float]]
 
@@ -104,7 +105,7 @@ class ConformalResult(BaseModel):
 class ConformalMethod(UncertaintyMethod[ConformalResult]):
     """
     What every conformal method takes: a score, the pooling of its
-    quantiles, and a level, none of them with a default.
+    quantiles, and a confidence level, none of them with a default.
 
     Attributes
     ----------
@@ -114,13 +115,13 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
         of ``"absolute"``.
     by : {"series", "all"}
         Whether each series gets its own quantile, or all series share one.
-    level : float
+    confidence_level : float
         The level of the intervals, strictly between 0 and 1.
     """
 
     score: ConformalScore = Field(description="The nonconformity score.")
     by: Pooling = Field(description="Which scores each quantile reads.")
-    level: float = Field(gt=0.0, lt=1.0, description="The level of the intervals.")
+    confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
 
     @model_validator(mode="before")
     @classmethod
@@ -151,7 +152,7 @@ class SplitConformal(ConformalMethod):
     It fits the problem's observations and scores `calibration_data`,
     observations held out of the fit. When the scores of the held-out and of
     new observations are exchangeable, each interval covers a new
-    observation with probability at least `level`.
+    observation with probability at least `confidence_level`.
 
     Attributes
     ----------

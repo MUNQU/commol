@@ -45,7 +45,7 @@ A number below 1 raises `ValueError`, which names the number.
 | The conformal methods | The fits of their folds or blocks |
 | The sensitivity methods | The runs of the design |
 | The local approximations, the identifiability methods | The runs of the finite differences, the points |
-| `Simulation.replicates(n)` | The replicates of a stochastic engine |
+| `Simulation.replicates(count)` | The replicates of a stochastic engine |
 
 One run of a model is never split: each thread runs whole runs.
 
@@ -91,7 +91,7 @@ problem = CalibrationProblem(
         CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0)
     ],
     loss_function="sse",
-    optimization_config=ParticleSwarmConfig(num_particles=10, max_iterations=30),
+    optimization_config=ParticleSwarmConfig(particles=10, max_iterations=30),
     seed=3,
 )
 calibrator = Calibrator(Simulation(model(None)), problem)

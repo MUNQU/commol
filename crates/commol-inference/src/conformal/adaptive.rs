@@ -24,26 +24,23 @@ pub struct AdaptiveLevel {
 }
 
 impl AdaptiveLevel {
-    /// A working level that starts at, and aims for, `α = 1 − level`, with
-    /// the step `γ = step`.
+    /// A working level that starts at, and aims for,
+    /// `α = 1 − confidence_level`, with the step `γ = step`.
     ///
     /// # Errors
     ///
-    /// Returns a message when `level` is not strictly between 0 and 1 or
-    /// `step` is not positive and finite.
-    pub fn new(level: f64, step: f64) -> Result<Self, String> {
-        if !(level > 0.0 && level < 1.0) {
-            return Err(format!(
-                "level is {level}; it must be strictly between 0 and 1"
-            ));
-        }
+    /// Returns a message when `confidence_level` is not strictly between 0
+    /// and 1 ([`crate::statistics::interval_levels`]) or `step` is not
+    /// positive and finite.
+    pub fn new(confidence_level: f64, step: f64) -> Result<Self, String> {
+        crate::statistics::interval_levels(confidence_level)?;
         if !(step > 0.0 && step.is_finite()) {
             return Err(format!("step is {step}; it must be positive"));
         }
         Ok(Self {
-            target: 1.0 - level,
+            target: 1.0 - confidence_level,
             step,
-            alpha: 1.0 - level,
+            alpha: 1.0 - confidence_level,
         })
     }
 
@@ -87,7 +84,7 @@ pub fn adaptive_conformal<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
-    AdaptiveLevel::new(settings.level, step).map_err(ConformalError::Invalid)?;
+    AdaptiveLevel::new(settings.confidence_level, step).map_err(ConformalError::Invalid)?;
     let mut order: Vec<usize> = (0..stream.len()).collect();
     order.sort_by(|&a, &b| stream[a].at.total_cmp(&stream[b].at));
     let predictions = predict(problem, predictor, stream)?;
@@ -100,7 +97,7 @@ where
     .map_err(ConformalError::Invalid)?;
     let mut groups: HashMap<&str, (AdaptiveLevel, Vec<f64>)> = HashMap::new();
     let mut intervals = PredictionIntervals {
-        level: settings.level,
+        confidence_level: settings.confidence_level,
         targets: Vec::with_capacity(stream.len()),
         prediction: Vec::with_capacity(stream.len()),
         lower: Vec::with_capacity(stream.len()),
@@ -112,7 +109,8 @@ where
         let (level, seen) = groups
             .entry(settings.by.group(&point.label))
             .or_insert_with(|| {
-                let level = AdaptiveLevel::new(settings.level, step).expect("checked above");
+                let level =
+                    AdaptiveLevel::new(settings.confidence_level, step).expect("checked above");
                 (level, Vec::new())
             });
         let centre = predictions.centre[i];

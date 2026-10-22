@@ -209,7 +209,7 @@ impl MutationApplication {
 #[derive(Debug, Clone)]
 pub struct ParticleSwarmConfig {
     /// Number of particles in the swarm
-    pub num_particles: usize,
+    pub particles: usize,
 
     /// Maximum number of iterations
     pub max_iterations: u64,
@@ -284,7 +284,7 @@ impl ImprovementStop {
 impl Default for ParticleSwarmConfig {
     fn default() -> Self {
         Self {
-            num_particles: 20,
+            particles: 20,
             max_iterations: 1000,
             target_cost: None,
             inertia_strategy: None,      // Use argmin's default
@@ -877,10 +877,10 @@ pub(crate) fn build_particle_swarm_solver(
 
     // Always use SmallRng for consistency, either seeded or from system entropy
     let mut solver = if let Some(seed) = config.seed {
-        ParticleSwarm::new((lower_bound, upper_bound), config.num_particles)
+        ParticleSwarm::new((lower_bound, upper_bound), config.particles)
             .with_rng_generator(SmallRng::seed_from_u64(seed))
     } else {
-        ParticleSwarm::new((lower_bound, upper_bound), config.num_particles)
+        ParticleSwarm::new((lower_bound, upper_bound), config.particles)
             .with_rng_generator(SmallRng::from_rng(&mut rand::rng()))
     };
 
@@ -1039,7 +1039,7 @@ mod tests {
     /// A swarm of 12 particles, 15 iterations, with mutation, seeded.
     fn swarm() -> OptimizationConfig {
         OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
-            num_particles: 12,
+            particles: 12,
             max_iterations: 15,
             mutation_strategy: MutationStrategy::Gaussian(0.1),
             mutation_probability: 0.5,
@@ -1081,7 +1081,7 @@ mod tests {
     fn a_swarm_on_a_subproblem_gives_one_fit_whatever_the_threads() {
         let problem = two_rates();
         let config = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
-            num_particles: 8,
+            particles: 8,
             max_iterations: 6,
             seed: Some(5),
             ..ParticleSwarmConfig::default()
@@ -1154,7 +1154,7 @@ mod tests {
             names: vec!["x".to_string()],
         };
         let config = ParticleSwarmConfig {
-            num_particles: 16,
+            particles: 16,
             max_iterations: 5,
             seed: Some(1),
             ..ParticleSwarmConfig::default()
@@ -1255,7 +1255,7 @@ mod tests {
             settings,
         };
         let config = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
-            num_particles: 32,
+            particles: 32,
             max_iterations: 10,
             seed: Some(5),
             ..ParticleSwarmConfig::default()

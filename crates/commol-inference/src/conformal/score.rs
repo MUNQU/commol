@@ -79,7 +79,7 @@ impl Pooling {
     }
 }
 
-/// The score, the pooling and the level of a conformal method.
+/// The score, the pooling and the confidence level of a conformal method.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ConformalSettings {
     /// The score.
@@ -87,7 +87,7 @@ pub struct ConformalSettings {
     /// Which scores each quantile reads.
     pub by: Pooling,
     /// The level of the intervals, `1 − α`.
-    pub level: f64,
+    pub confidence_level: f64,
 }
 
 impl ConformalSettings {
@@ -110,21 +110,25 @@ impl ConformalSettings {
         Ok(())
     }
 
-    /// The settings of a score, a pooling and a level.
+    /// The settings of a score, a pooling and a confidence level.
     ///
     /// # Errors
     ///
     /// Returns a message when the pair is rejected ([`Self::check_pair`])
-    /// or `level` is not strictly between 0 and 1.
-    pub fn new(score: NonconformityScore, by: Pooling, level: f64) -> Result<Self, String> {
+    /// or `confidence_level` is not strictly between 0 and 1
+    /// ([`crate::statistics::interval_levels`]).
+    pub fn new(
+        score: NonconformityScore,
+        by: Pooling,
+        confidence_level: f64,
+    ) -> Result<Self, String> {
         Self::check_pair(score, by)?;
-        if !(level > 0.0 && level < 1.0) {
-            return Err(format!(
-                "level is {level}; it must be strictly between 0 and 1, such as 0.9 for 90% \
-                 intervals"
-            ));
-        }
-        Ok(Self { score, by, level })
+        crate::statistics::interval_levels(confidence_level)?;
+        Ok(Self {
+            score,
+            by,
+            confidence_level,
+        })
     }
 }
 

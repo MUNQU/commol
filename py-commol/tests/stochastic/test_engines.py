@@ -180,3 +180,11 @@ class TestTheEngine:
             RuntimeError, match="The rate of flow 't_ab' at .* is not a"
         ):
             simulation.run(2, seed=1)
+
+
+def test_replicates_takes_a_count() -> None:
+    simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
+
+    replicates = simulation.replicates(count=3, seed=7).run(5)
+
+    assert len(replicates) == 3

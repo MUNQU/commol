@@ -215,7 +215,7 @@ class TestSplitConformal:
                     ),
                     score="absolute",
                     by="series",
-                    level=level,
+                    confidence_level=level,
                     positions=[61.0],
                 )
             )
@@ -237,7 +237,7 @@ def _jackknife_plus_study(block_length: int, level: float) -> CoverageStudy:
                 block_length=block_length,
                 score="absolute",
                 by="series",
-                level=level,
+                confidence_level=level,
                 positions=[31.0],
             )
         )
@@ -291,7 +291,7 @@ class TestEnbPI:
                     block_length=5,
                     score="absolute",
                     by="series",
-                    level=level,
+                    confidence_level=level,
                     positions=[61.0],
                 )
             )

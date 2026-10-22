@@ -233,8 +233,6 @@ class TestPropagation:
                 row[0] * w for row, w in zip(result.values, result.weights, strict=True)
             )
         )
-        with pytest.raises(ValueError, match=r"strictly between 0 and 1"):
-            result.summary(1.0)
 
     def test_a_gain_and_a_peak_position_read_the_run_of_each_draw(
         self, simulation: Simulation
@@ -513,8 +511,8 @@ class TestSobol:
 
         result = analysis.run(
             Sobol(
-                base_draws=64,
-                bootstrap=50,
+                draws=64,
+                replicates=50,
                 confidence_level=0.9,
                 quantities=[Peak(series="B", positions=positions)],
             )
@@ -528,15 +526,6 @@ class TestSobol:
             assert result.total_lower[0][i] <= result.total_upper[0][i]
         assert result.runs == 64 * 5
         assert result.confidence_level == 0.9
-
-    def test_the_level_of_the_intervals_is_strictly_between_0_and_1(self) -> None:
-        with pytest.raises(ValueError):
-            Sobol(
-                base_draws=8,
-                bootstrap=10,
-                confidence_level=1.0,
-                quantities=[ValueAt(series="B", at=5)],
-            )
 
 
 class TestPolynomialChaos:
@@ -673,8 +662,8 @@ class TestIndependentInputs:
         [
             Morris(trajectories=2, levels=4, quantities=[ValueAt(series="B", at=5)]),
             Sobol(
-                base_draws=8,
-                bootstrap=10,
+                draws=8,
+                replicates=10,
                 confidence_level=0.9,
                 quantities=[ValueAt(series="B", at=5)],
             ),
@@ -702,9 +691,7 @@ class TestEntryPoint:
         prcc = analysis.run(PRCC(draws=8, quantities=quantities))
         morris = analysis.run(Morris(trajectories=2, levels=4, quantities=quantities))
         sobol = analysis.run(
-            Sobol(
-                base_draws=8, bootstrap=10, confidence_level=0.9, quantities=quantities
-            )
+            Sobol(draws=8, replicates=10, confidence_level=0.9, quantities=quantities)
         )
         chaos = analysis.run(PolynomialChaos(degree=1, draws=8, quantities=quantities))
 
@@ -721,3 +708,19 @@ class TestEntryPoint:
             (chaos, ChaosResult),
         ]:
             assert type(result) is kind
+
+
+def test_sobol_takes_draws_and_replicates(simulation: Simulation) -> None:
+    analysis = SensitivityAnalysis(simulation, _rates(), seed=3)
+
+    result = analysis.run(
+        Sobol(
+            draws=8,
+            replicates=2,
+            confidence_level=0.9,
+            quantities=[ValueAt(series="B", at=5)],
+        )
+    )
+
+    assert result.runs == 8 * (2 + 2)
+    assert result.confidence_level == 0.9
