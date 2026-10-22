@@ -52,6 +52,10 @@ When a method has fewer successful fits than it needs, its `RuntimeError` says h
 
 - **Breaking:** `commol.add_stderr_logger` is removed: commol configures no logging, and adds only a `NullHandler` to the logger `commol`. Call `logging.basicConfig(level=logging.INFO)` instead, or add a handler of your own to `logging.getLogger("commol")`. See [Log messages](https://munqu.github.io/commol/latest/getting-started/quickstart/#log-messages).
 
+### Fixed
+
+- `IdentifiabilityReport.report()` gives the `profile` section, the evidence of each profile likelihood; before, the report data had no such section.
+
 ## [0.9.0] - 2026-10-22
 
 This release gives control over the work of a calibration and over what a result records. `commol.threads(n, levels)` sets how many threads the parallel methods use and which levels run in parallel, a particle swarm can stop when it has converged, a polynomial chaos takes a truncated basis for many inputs, and `Ratio` gives a sensitivity analysis the ratio of two quantities. A calibration result records its seed, and `commol.build_info()` names the version and the commit of the package. Before you upgrade, read the **Breaking** entry: `CalibrationResult` requires `seed`. See [Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md) and [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md).
