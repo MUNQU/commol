@@ -40594,6 +40594,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-23
+
+This release makes equivalent things the same across commol, after an audit of the code, the repository and the documentation at 0.9.0. A setting that means the same thing has one name, every method takes its seed from its source and fits from its starts, equivalent results hold their failed fits in one place, equivalent methods raise one error type, a replicate summary takes the one quantile of commol, and commol adds no log handler. Before you upgrade, read each **Breaking** entry: most code changes only the names of settings and the type of an exception. See [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md) and [Log messages](https://munqu.github.io/commol/latest/getting-started/quickstart/#log-messages).
+
 ### Added
 
 - `Laplace`, `Sandwich`, `InformationMatchingEta` and `BootstrapCoverageEta` take `starts`, at least 1 with the default 1: their fit is the best of `starts` starts, `Calibrator.run(starts)`, as in every bootstrap, jackknife, conformal method and profile. Code that does not pass it runs as before. See [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/#laplace-approximation-and-the-delta-method) and [What `η` means](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means).
@@ -41173,6 +41177,7 @@ ______________________________________________________________________
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.10.0** - One way for equivalent things: setting names, seeds and starts, result shapes, error types, the quantile and logging
 - **0.9.0** - Control over the work and the record: threads and levels, swarm stop rules, truncated chaos bases, ratios, seeds and build info
 - **0.8.0** - Comparing runs: scenarios, quantities of a series, figures as methods and runs on the same panels
 - **0.7.0** - Reading a run through objects: the window grid and dates on the axis, series by output name and reports as methods
