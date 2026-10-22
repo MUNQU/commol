@@ -77,6 +77,32 @@ with its quantity; `quantity_schedule` gives the positions to run at.
 `tests/simulation/test_quantities.py`,
 `tests/uncertainty/test_sensitivity.py::TestPropagation::test_propagation_values_have_one_row_per_replicate_of_each_draw`.
 
+## The modeller truncates a polynomial chaos basis
+
+`Truncation` (`global_sensitivity/chaos.rs`) keeps the terms of a basis of
+`degree` whose degrees have `Σ α_i^q ≤ degree^q` and that hold at most
+`max_interaction` inputs; `PolynomialChaos` passes `q_norm` and
+`max_interaction`, whose defaults, 1 and no limit, keep the total-degree
+basis. `ChaosExpansion::terms` counts the terms with no basis built, the sum
+over the interaction orders `r` of `C(inputs, r)` times the ordered tuples
+of `r` positive degrees the truncation keeps, so `ForwardAnalysis::chaos`
+refuses too few draws before any run. The basis is built by the recursion of
+the total degree, which stops a branch that cannot hold the degrees left, so
+its terms keep the order of the total-degree basis. A `ChaosResult` holds
+the truncation, and `predict` rebuilds the terms from it.
+
+| Alternative | Why not |
+|---|---|
+| A fixed budget of terms | A hidden default that refuses valid analyses. |
+| An automatic choice (least-angle regression, adaptive bases) | It needs a criterion, which is a modelling choice too; a later proposal can choose terms from the data. |
+| One class per truncation, joined in a union | The two bounds are independent and combine. |
+| Filter the total-degree basis | The basis of many inputs that the truncation exists to avoid is built anyway. |
+
+**Guards:** `crates/commol-inference/src/global_sensitivity/chaos.rs`
+(tests module),
+`crates/commol-inference/tests/test_global_sensitivity.rs::a_truncated_chaos_basis_fits_many_inputs`,
+`tests/uncertainty/test_sensitivity.py::TestPolynomialChaos`.
+
 ## NaN propagates in a run and stops a reduction across runs
 
 Inside a run, a NaN in a value a quantity reads makes the quantity NaN: a peak

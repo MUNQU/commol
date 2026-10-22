@@ -34,6 +34,8 @@ def test_each_sensitivity_result_draws_its_figure(
         input_space=InputSpace.uniform_on_bounds([bounded(name) for name in INPUTS]),
         labels=["B at 20"],
         degree=1,
+        q_norm=1.0,
+        max_interaction=None,
         indices=[[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],
         coefficients=[[1.0, 0.5, 0.5, 0.0]],
         loo_error=[0.0],

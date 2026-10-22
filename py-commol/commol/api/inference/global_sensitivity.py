@@ -232,12 +232,20 @@ def run_chaos(analysis: "SensitivityAnalysis", method: PolynomialChaos) -> Chaos
         NaN at a point.
     """
     labels, quantities = expand_quantities(method.quantities)
-    run = analysis.rust_analysis.chaos(method.degree, method.draws, quantities)
+    run = analysis.rust_analysis.chaos(
+        method.degree,
+        method.q_norm,
+        method.max_interaction,
+        method.draws,
+        quantities,
+    )
     return ChaosResult(
         inputs=analysis.inputs.names,
         input_space=analysis.inputs,
         labels=labels,
         degree=method.degree,
+        q_norm=method.q_norm,
+        max_interaction=method.max_interaction,
         indices=run.indices,
         coefficients=run.coefficients,
         loo_error=run.loo_error,

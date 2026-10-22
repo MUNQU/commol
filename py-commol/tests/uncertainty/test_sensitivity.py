@@ -578,6 +578,94 @@ class TestPolynomialChaos:
                 )
             )
 
+    def test_a_truncation_keeps_the_terms_of_few_inputs(
+        self, simulation: Simulation
+    ) -> None:
+        analysis = SensitivityAnalysis(simulation, _rates(), seed=5)
+        quantities: list[Quantity] = [ValueAt(series="B", at=20)]
+
+        result = analysis.run(
+            PolynomialChaos(
+                degree=4,
+                q_norm=0.5,
+                max_interaction=1,
+                draws=30,
+                quantities=quantities,
+            )
+        )
+
+        # The terms of one input only, to degree 4: 1 + 2 · 4.
+        assert result.indices == [
+            [0, 0],
+            [1, 0],
+            [0, 1],
+            [2, 0],
+            [0, 2],
+            [3, 0],
+            [0, 3],
+            [4, 0],
+            [0, 4],
+        ]
+        assert (result.q_norm, result.max_interaction) == (0.5, 1)
+        # No term holds both inputs, so each total index is a first-order one.
+        assert result.total[0] == pytest.approx(result.first[0])
+        assert len(result.predict([[0.3, 0.5]])[0]) == 1
+        with pytest.raises(ValueError, match=r"has 9 terms and needs more points"):
+            analysis.run(
+                PolynomialChaos(
+                    degree=4, max_interaction=1, draws=9, quantities=quantities
+                )
+            )
+
+    def test_the_default_basis_is_the_total_degree(self) -> None:
+        method = PolynomialChaos(
+            degree=2, draws=8, quantities=[ValueAt(series="B", at=5)]
+        )
+        assert (method.q_norm, method.max_interaction) == (1.0, None)
+
+    @pytest.mark.parametrize(
+        "truncation",
+        [{"q_norm": 0.0}, {"q_norm": 1.5}, {"max_interaction": 0}],
+        ids=["q-norm zero", "q-norm above one", "no input"],
+    )
+    def test_a_truncation_out_of_range_is_rejected(
+        self, truncation: dict[str, float]
+    ) -> None:
+        with pytest.raises(ValueError, match=r"Input should be"):
+            PolynomialChaos.model_validate(
+                {
+                    "degree": 2,
+                    "draws": 8,
+                    "quantities": [ValueAt(series="B", at=5)],
+                    **truncation,
+                }
+            )
+
+    def test_a_result_predicts_on_the_terms_of_its_truncation(self) -> None:
+        inputs = _rates()
+        result = ChaosResult(
+            inputs=["k1", "k2"],
+            input_space=inputs,
+            labels=["B at 5"],
+            degree=2,
+            q_norm=1.0,
+            max_interaction=1,
+            indices=[[0, 0], [1, 0], [0, 1], [2, 0], [0, 2]],
+            coefficients=[[1.0, 0.0, 0.0, 0.0, 0.0]],
+            loo_error=[0.0],
+            mean=[1.0],
+            variance=[0.0],
+            first=[[math.nan, math.nan]],
+            total=[[math.nan, math.nan]],
+            runs=10,
+        )
+
+        assert result.predict([[0.3, 0.5]]) == [[1.0]]
+        with pytest.raises(ValueError, match=r"must be in \(0, 1\], got 2"):
+            result.model_copy(update={"q_norm": 2.0}).predict([[0.3, 0.5]])
+        with pytest.raises(ValueError, match=r"has 6 terms; a row of coefficients"):
+            result.model_copy(update={"max_interaction": None}).predict([[0.3, 0.5]])
+
 
 class TestIndependentInputs:
     @pytest.mark.parametrize(
