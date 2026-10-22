@@ -52,7 +52,7 @@ crates/commol-inference/     parameter sample, predictive, scores, quantiles
 |---|---|
 | A Python library with a fluent builder of the process | `py-commol/commol/api/model_builder.py` |
 | A validated, serializable model definition: a header, a process, a structure and an engine | `py-commol/commol/context/` (Pydantic): `model.py`, `process.py`, `structure.py`, `aggregate.py` |
-| Generic layers that work with any model kind | `Simulation`, `Calibrator`, reports and plots use only `ModelStructure`; Rust calibration uses only `SimulationEngine` (see [Design decisions](decisions/model-kinds.md#one-interface-for-every-model-kind)) |
+| Generic layers that work with any model kind | `Simulation`, `Calibrator`, reports and figures use only `ModelStructure`; Rust calibration uses only `SimulationEngine` (see [Design decisions](decisions/model-kinds.md#one-interface-for-every-model-kind)) |
 | One model compiler for every engine: expansion, flows, rates, the change of one event of each flow, the right-hand side | `crates/commol-model/` |
 | A Rust difference-equations engine | `crates/commol-difference/` |
 | A Rust ODE engine on `diffsol` | `crates/commol-differential/` |

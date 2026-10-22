@@ -88,19 +88,37 @@ function reports anything.
 **Guard:** `tests/reporting/` (`test_reports.py` checks that each method
 gives the block of its definition, with its key order).
 
-## A plot keeps the global style
+## Figures
 
-A `PlotConfig` sets its seaborn style, palette and context through
-`matplotlib.rcParams`, which is global to the process. Each public method of
-`SimulationPlotter` is under `_scoped_style` (`api/plotter.py`): it draws in a
-copy of `rcParams` (`matplotlib.rc_context`), so the style is in its figure and
-`rcParams` is as it was when the method returns or raises. A new plot method
-takes the same decorator; `_apply_seaborn_style` outside it changes the style
-of every later figure of the user.
+A figure is read from the object of results whose data it draws, as a report
+is: `SimulationResults.plot`, `SimulationReplicates.plot` and `Predictive.plot`
+are accessors with `series(...)` and `cumulative(...)`, and `PRCCResult`,
+`MorrisResult`, `SobolResult`, `ChaosResult` and `ProfileResult` have
+`plot(...)`. The figures read the model of the results (`results.model`, or
+`source.simulation` of a predictive), and only its structure:
+`ModelStructure.outputs_by_source` and `series_label`.
 
-**Guard:** `tests/plotting/test_plotter.py::test_a_figure_leaves_the_global_style`,
-`tests/plotting/test_sensitivity.py::test_a_sensitivity_figure_leaves_the_global_style`
-and `tests/plotting/test_profiles.py::test_a_profile_figure_leaves_the_global_style`.
+`api/plotting/` has three layers:
+
+| Module | What it holds |
+|---|---|
+| `api/plotting/accessors.py` | The accessors, the public layer. Each method takes the arguments of its drawing function and passes them on. |
+| `api/plotting/figures.py` | The drawing functions, private (`_run_series`, `_prcc`, …). Only this module imports matplotlib. |
+| `api/plotting/panels.py` | The data of each panel (name, unit, line, band, observed values, prediction intervals), computed without matplotlib. |
+
+| Rule | Why, against the alternative |
+|---|---|
+| Figures are methods of the results, over drawing functions that take `axes=` | `SimulationPlotter(simulation, results)` took two objects that must agree, and a third for a predictive; a facade built from one result has no place for several results on one figure. |
+| The accessors and `plot()` are the only public way to draw a figure | One public way per figure, as for reports. Public drawing functions too would double the documentation and the tests, and drift. |
+| A figure returns a matplotlib `Figure`; `axes=` takes a `Figure` of commol, and finds the panel of each series by the label of its `Axes` (`ax.set_label` with the id of the series) | One return type. A `dict` of `Axes` loses the `Figure`, a tuple comes from every call, and a commol object locks the API in. A series with no panel raises `ValueError` that names it. |
+| matplotlib is the optional extra `commol[plot]`, imported when a figure is drawn | The core needs no plotting library, and `import commol` loads none. Without it, a figure raises `ImportError` with the install line. seaborn drew only `lineplot` and `scatterplot`, which `Axes.plot` and `Axes.scatter` draw the same. |
+| The style of a figure stays in that figure | `PlotConfig.style` takes matplotlib styles, applied in a copy of `matplotlib.rcParams`: every drawing function is under `_scoped_style` (`api/plotting/figures.py`, `matplotlib.rc_context`), so `rcParams` is as it was when the function returns or raises. seaborn set the style, palette and context of the whole process. A new drawing function takes the same decorator; `_apply_style` outside it changes the style of every later figure of the user. |
+
+**Guards:** `tests/plotting/test_figures.py` (`test_a_figure_leaves_the_global_style`,
+`test_import_commol_loads_no_plotting_library`,
+`test_each_accessor_passes_on_the_arguments_of_its_function`,
+`test_a_figure_draws_on_given_axes`) and
+`tests/plotting/test_panels.py::test_the_panels_of_a_run_need_no_matplotlib`.
 
 ## Model files are written in full
 

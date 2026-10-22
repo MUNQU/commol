@@ -1,13 +1,12 @@
-"""SimulationPlotter draws the prediction intervals it is given."""
+"""A figure of series draws the prediction intervals it is given."""
 
 import numpy as np
 import pytest
 
 from commol import PredictionIntervals, SeriesIntervals, Simulation
-from commol.api.plotter import SimulationPlotter
 
 
-def test_plotter_draws_prediction_intervals(abc_simulation: Simulation) -> None:
+def test_a_figure_draws_prediction_intervals(abc_simulation: Simulation) -> None:
     intervals = PredictionIntervals(
         level=0.9,
         series={
@@ -20,9 +19,10 @@ def test_plotter_draws_prediction_intervals(abc_simulation: Simulation) -> None:
         },
         unbounded={},
     )
-    plotter = SimulationPlotter(abc_simulation, abc_simulation.run(40))
 
-    figure = plotter.plot_series(prediction_intervals=intervals, series=["A", "B"])
+    figure = abc_simulation.run(40).plot.series(
+        prediction_intervals=intervals, series=["A", "B"]
+    )
 
     no_band, band_axes = figure.axes[:2]
     assert not [c for c in no_band.collections if c.get_paths()]
@@ -35,3 +35,4 @@ def test_plotter_draws_prediction_intervals(abc_simulation: Simulation) -> None:
     assert "90% prediction interval" in [
         t.get_text() for t in band_axes.get_legend().texts
     ]
+    assert band_axes.lines[1].get_linestyle() == "--"

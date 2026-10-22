@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from commol.api.plotting.accessors import PredictivePlot
 from commol.api.results import SimulationResults
 from commol.context.calibration import ObservedDataPoint
 from commol.context.inference.noise import ObservationNoise
@@ -237,6 +238,14 @@ class Predictive:
     def weights(self) -> list[float]:
         """The weight of each draw of the predictive; they sum to 1."""
         return self._rust.weights
+
+    @property
+    def plot(self) -> PredictivePlot:
+        """
+        The figures of the draws: ``plot.series()`` and ``plot.cumulative()``,
+        the weighted median and the band of each series.
+        """
+        return PredictivePlot(self)
 
     def runs(self) -> list[SimulationResults]:
         """

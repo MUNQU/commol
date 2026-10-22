@@ -9,7 +9,7 @@ statistic stays below a threshold (Raue et al. 2009; Kreutz et al. 2012).
 Every interval is pointwise: it holds one quantity, not several at once.
 """
 
-from typing import Literal, Self
+from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -29,6 +29,11 @@ from commol.context.inference.resampling import (
     ResidualBootstrap,
     WildBootstrap,
 )
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
+
+    from commol.context.visualization import PlotConfig
 
 ProfileEndName = Literal["crossed", "bound", "max_steps", "unreachable"]
 """Why one side of a profile ends: it rose past the threshold, reached a
@@ -534,6 +539,45 @@ class ProfileResult(_Frozen):
     structure: dict[str, ProfileStructure] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
     failed_replicates: list[str] = Field(default_factory=list)
+
+    def plot(
+        self,
+        output_file: str | None = None,
+        config: "PlotConfig | None" = None,
+        axes: "Figure | None" = None,
+    ) -> "Figure":
+        """
+        Draw each profile: one panel per parameter or prediction, with the
+        statistic of each point, the threshold, and the ends of the interval.
+
+        A profile that stays under the threshold up to a bound is open on that
+        side; a flat one stays near 0 over its whole range.
+
+        Parameters
+        ----------
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        axes : Figure | None
+            A figure of commol to draw on: each panel is the `Axes` whose
+            label is the name of its profile. If None, a new figure.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            If ``axes`` has no panel of a profile.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _profiles
+
+        return _profiles(self, output_file=output_file, config=config, axes=axes)
 
     def report(self) -> IdentifiabilityReport:
         """

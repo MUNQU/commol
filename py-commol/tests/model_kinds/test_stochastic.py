@@ -18,7 +18,6 @@ from commol import (
     Quantile,
     Simulation,
 )
-from commol.api.plotter import SimulationPlotter
 from commol.api.results import SimulationReplicates
 from tests.support.kinds import TEST_STOCHASTIC_ENGINE, decay, decay_model
 from tests.support.problems import bounded
@@ -138,7 +137,7 @@ class TestLayers:
         simulation = _stochastic()
         replicates = simulation.replicates(20, seed=4).run(4)
 
-        figure = SimulationPlotter(simulation, replicates).plot_series()
+        figure = replicates.plot.series()
 
         axis = figure.get_axes()[0]
         assert axis.get_lines()[0].get_ydata().tolist() == replicates.mean()["x"]

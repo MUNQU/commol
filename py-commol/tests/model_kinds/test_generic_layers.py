@@ -14,7 +14,6 @@ from commol import (
     ObservedDataPoint,
     Simulation,
 )
-from commol.api.plotter import SimulationPlotter
 from tests.support import assert_close
 from tests.support.kinds import decay, decay_model
 from tests.support.problems import bounded
@@ -87,7 +86,7 @@ class TestPlot:
     def test_a_plot_names_the_series_as_the_kind_does(self) -> None:
         simulation = Simulation(decay_model())
 
-        figure = SimulationPlotter(simulation, simulation.run(5)).plot_series()
+        figure = simulation.run(5).plot.series()
 
         axis = figure.get_axes()[0]
         assert axis.get_title() == "Output x"

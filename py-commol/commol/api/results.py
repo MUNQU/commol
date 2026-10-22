@@ -2,8 +2,8 @@
 
 `SimulationResults` holds one run; `SimulationReplicates` holds the replicates
 of a stochastic engine, one run per seed, with their mean, quantiles and
-member statistics. Both know the `Model` they ran, and report themselves
-(`report`).
+member statistics. Both know the `Model` they ran, report themselves
+(`report`) and draw their figures (`plot`).
 """
 
 import bisect
@@ -12,6 +12,8 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING
 
 import numpy as np
+
+from commol.api.plotting.accessors import ReplicatesPlot, ResultsPlot
 
 if TYPE_CHECKING:
     from commol.api.reporting import SimulationReport
@@ -138,6 +140,16 @@ class SimulationResults(dict[str, list[float]]):
             ``positions[i]``.
         """
         return [list(row) for row in zip(*self.values())] if self else []
+
+    @property
+    def plot(self) -> ResultsPlot:
+        """
+        The figures of the run: ``plot.series()`` and ``plot.cumulative()``.
+
+        They name each series from `model`; results with no model draw only
+        their outputs.
+        """
+        return ResultsPlot(self)
 
     def report(
         self,
@@ -342,6 +354,14 @@ class SimulationReplicates(list[SimulationResults]):
     def seeds(self) -> list[int]:
         """The seed of each replicate, in order."""
         return [run.seed for run in self if run.seed is not None]
+
+    @property
+    def plot(self) -> ReplicatesPlot:
+        """
+        The figures of the replicates: ``plot.series()``, their mean and band,
+        and ``plot.cumulative()``.
+        """
+        return ReplicatesPlot(self)
 
     def _values(self, name: str) -> np.ndarray:
         return np.asarray([run[name] for run in self], dtype=float)

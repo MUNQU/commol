@@ -7,7 +7,7 @@ How a model is composed, and what lets the generic layers run any model kind.
 ## One interface for every model kind
 
 The layers that do not depend on how a model is built (`Simulation`,
-`Calibrator`, the uncertainty methods, the reports and `SimulationPlotter`)
+`Calibrator`, the uncertainty methods, the reports and the figures)
 use only `Model` and the methods of `ModelStructure`
 (`py-commol/commol/context/structure.py`), and in Rust only the
 `SimulationEngine` trait (`crates/commol-core/src/simulation_engine.rs`). What

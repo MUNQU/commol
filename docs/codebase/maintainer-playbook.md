@@ -191,7 +191,7 @@ To add a kind of model, such as an agent network (see
       so `Model.from_json` reads the kind.
 - [ ] Do not write a builder: `ModelBuilder.build(structure, engine)` builds
       every kind. Do not change `Simulation`, `Calibrator`, the reports or the
-      plotter: if one of them needs something of the kind, add a method to
+      figures: if one of them needs something of the kind, add a method to
       `ModelStructure` with a default.
 - [ ] For a variant of a structure, subclass it with `variant` as a `Literal`
       default, and add the variant and its checks to Rust

@@ -79,7 +79,7 @@ the property, not only in `run`.
 only code that turns a run into observed quantities: the row of each
 observation, the sum of its outputs, its increment over its window and its
 factor. The loss, the predictions of `PyCalibrationProblem`, the predictive's
-`at_observations` and every score read it, and the plotter reads a windowed or
+`at_observations` and every score read it, and the figures read a windowed or
 scaled series of a predictive through it. The calibration problem is split
 into one layer per job, each in its own module: `ForwardModel` (`forward.rs`)
 is the only code that clones, resets, writes values to or runs the engine;

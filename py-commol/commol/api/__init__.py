@@ -3,7 +3,6 @@ plotting and reporting."""
 
 from .calibrator import Calibrator
 from .model_builder import ModelBuilder
-from .plotter import SimulationPlotter
 from .inference.intervals import ci_percentiles, member_statistics, weighted_quantiles
 from .results import SimulationReplicates, SimulationResults, sample
 from .sensitivity import SensitivityAnalysis
@@ -15,7 +14,6 @@ __all__ = [
     "Calibrator",
     "SensitivityAnalysis",
     "ModelBuilder",
-    "SimulationPlotter",
     "Simulation",
     "SimulationResults",
     "SimulationReplicates",

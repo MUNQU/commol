@@ -69,7 +69,7 @@ the first midnight after `start`; the first end can close a partial period.
 day starts a week is the user's choice. The number of a period is not on the
 axis.
 
-`SimulationPlotter.plot_series` labels the ticks with `_date_label` (the date,
+`plot.series` of results labels the ticks with `_date_label` (the date,
 and the time when it is not midnight) when the model has an origin and the
 call has no `position_label`. With no `tick_every`, it formats the ticks that
 matplotlib places, so a long run does not get one label per position.
@@ -78,7 +78,7 @@ matplotlib places, so a long run does not get one label per position.
 an application keeps no origin of its own.
 
 **Guards:** `tests/units/test_calendar_axis.py`,
-`tests/plotting/test_plotter.py::test_an_axis_with_origin_labels_ticks_with_dates`.
+`tests/plotting/test_figures.py::test_an_axis_with_origin_labels_ticks_with_dates`.
 
 ## One step unit in the unit check
 
@@ -184,7 +184,7 @@ predictive reads windows through the observation operator
 ([One observation operator](calibration.md#one-observation-operator)). Window `w`
 covers `(w · W, (w + 1) · W]`; `window_index` places a position with
 `max(ceil(at / W) − 1, 0)`, and the `observed` block of a report (`_observed_report` in `api/reporting.py`) calls it.
-`SimulationPlotter.plot_series` reads the model of a windowed observation the
+`plot.series` of results reads the model of a windowed observation the
 same way, through its own window at its own position, never on a grid of
 windows from 0: an observation at 10.5 with a window of 7 falls on no window
 end of that grid.
@@ -192,9 +192,9 @@ end of that grid.
 **Guards:** `tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss` (the loss at
 the generating parameters is zero),
 `tests/reporting/test_simulation_report.py::test_observed_report_places_each_observation_by_window_index`
-`tests/plotting/test_plotter.py::TestPredictiveSeries::test_a_windowed_band_of_one_draw_is_its_windowed_run`
+`tests/plotting/test_figures.py::TestPredictiveSeries::test_a_windowed_band_of_one_draw_is_its_windowed_run`
 and
-`tests/plotting/test_plotter.py::test_each_observed_point_is_read_through_its_own_window_and_position`.
+`tests/plotting/test_figures.py::test_each_observed_point_is_read_through_its_own_window_and_position`.
 
 ## The engine owns positions
 
@@ -238,4 +238,4 @@ positions it was asked for (`Predictive.positions`).
 
 **Guards:** `tests/simulation/test_runs.py::TestResults`,
 `tests/reporting/test_simulation_report.py::TestNonIntegerPositions`,
-`tests/plotting/test_plotter.py::TestDifferentialModel`.
+`tests/plotting/test_figures.py::TestDifferentialModel`.

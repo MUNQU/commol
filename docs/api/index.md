@@ -10,7 +10,7 @@ explain how to use them; these pages list every argument, attribute and error.
 | [ModelBuilder](model-builder.md) | `ModelBuilder` |
 | [Model](model.md) | `Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete`, `Groups`, `ModelDescription`, `InitialCompartment`, `SeriesValue`, `UnitConsistencyError` |
 | [Simulation](simulation.md) | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `ODESolver`, `StochasticEventsSettings`, `StochasticStepsSettings`, `InfeasibleStateError`, `windowed_totals`, `sample` |
-| [Plotting](plotting.md) | `SimulationPlotter`, `PlotConfig` |
+| [Plotting](plotting.md) | `SimulationResults.plot`, `SimulationReplicates.plot`, `Predictive.plot`, `PRCCResult.plot`, `MorrisResult.plot`, `SobolResult.plot`, `ChaosResult.plot`, `ProfileResult.plot`, `PlotConfig` |
 | [AxisPattern](axis-patterns.md) | `AxisPattern` |
 | [AxisUnits](axis-units.md) | `AxisUnits` |
 | [Calibration](calibrator.md) | `Calibrator`, `CalibrationProblem`, `Quantile`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `NelderMeadConfig`, `ParticleSwarmConfig`, `CalibrationResult`, `StartSummary`, `CalibrationHistory`, `CalibrationEvaluation`, `LossFunction`, `OptimizationAlgorithm` |

@@ -12,36 +12,31 @@ class PlotConfig(BaseModel):
     Attributes
     ----------
     figsize : tuple[float, float]
-        Figure size in inches (width, height).
+        Figure size in inches (width, height), of a figure of running totals;
+        the other figures take their size from their panels.
     dpi : int
         Dots per inch for figure resolution.
     layout : tuple[int, int] | None
-        Subplot layout as (rows, cols). If None, automatically calculated based on
-        number of bins.
-    style : str | None
-        Seaborn style preset. Must be a valid seaborn style value:
-        "darkgrid", "whitegrid", "dark", "white", or "ticks".
-        See: https://seaborn.pydata.org/generated/seaborn.set_style.html
-    palette : str | None
-        Seaborn color palette name. Must be a valid seaborn palette value:
-        "deep", "muted", "bright", "pastel", "dark", "colorblind",
-        or any matplotlib colormap like "Set1", "Set2", "tab10", etc.
-        See: https://seaborn.pydata.org/tutorial/color_palettes.html
-    context : str | None
-        Seaborn context for scaling plot elements. Must be a valid seaborn context:
-        "paper", "notebook", "talk", or "poster".
-        See: https://seaborn.pydata.org/generated/seaborn.set_context.html
+        Panel layout as (rows, cols). If None, computed from the number of
+        panels.
+    style : str | list[str] | None
+        A matplotlib style, or a list of styles applied in order: a name of
+        ``matplotlib.style.available`` (such as ``"ggplot"`` or
+        ``"seaborn-v0_8-whitegrid"``) or the path of a style file.
+        See: https://matplotlib.org/stable/users/explain/customizing.html
 
     Notes
     -----
-    ``style``, ``palette`` and ``context`` apply to the figure of one call of
-    `SimulationPlotter` only: after the call, ``matplotlib.rcParams`` is as it
-    was before it, so the figures that you draw with matplotlib keep your style.
+    The style applies to the figure of one call only: after the call,
+    ``matplotlib.rcParams`` is as it was before it, so the figures that you
+    draw with matplotlib keep your style. Given ``axes=``, a figure draws on
+    the panels of an earlier figure, and `figsize`, `dpi` and `layout` are
+    those of that figure.
 
     Examples
     --------
     >>> # Direct configuration
-    >>> config = PlotConfig(style="whitegrid", palette="Set2", context="talk")
+    >>> config = PlotConfig(style=["seaborn-v0_8-whitegrid", "seaborn-v0_8-talk"])
 
     >>> # Using presets
     >>> config = PlotConfig.presentation()
@@ -60,21 +55,11 @@ class PlotConfig(BaseModel):
     )
     layout: tuple[int, int] | None = Field(
         default=None,
-        description="Subplot layout as (rows, cols). If None, auto-calculated.",
+        description="Panel layout as (rows, cols). If None, computed.",
     )
-    style: str | None = Field(
+    style: str | list[str] | None = Field(
         default=None,
-        description=(
-            "Seaborn style preset: 'darkgrid', 'whitegrid', 'dark', 'white', 'ticks'"
-        ),
-    )
-    palette: str | None = Field(
-        default=None,
-        description="Seaborn color palette name (e.g., 'deep', 'Set2', 'colorblind')",
-    )
-    context: str | None = Field(
-        default=None,
-        description="Seaborn context: 'paper', 'notebook', 'talk', 'poster'",
+        description="A matplotlib style, or styles applied in order",
     )
 
     @classmethod
@@ -82,7 +67,8 @@ class PlotConfig(BaseModel):
         """
         Create a configuration optimized for presentations.
 
-        Large figure size, high DPI, and "talk" context for readable text on slides.
+        Large figure size, high DPI, a white grid, the large text of the
+        "talk" style and a palette for colour-blind readers.
 
         Returns
         -------
@@ -92,9 +78,11 @@ class PlotConfig(BaseModel):
         return cls(
             figsize=(16, 10),
             dpi=150,
-            style="whitegrid",
-            context="talk",
-            palette="colorblind",
+            style=[
+                "seaborn-v0_8-whitegrid",
+                "seaborn-v0_8-talk",
+                "seaborn-v0_8-colorblind",
+            ],
         )
 
     @classmethod
@@ -102,8 +90,8 @@ class PlotConfig(BaseModel):
         """
         Create a configuration optimized for academic publications.
 
-        Smaller figure size suitable for journal columns, high DPI for print quality,
-        and minimal styling.
+        Smaller figure size suitable for journal columns, high DPI for print
+        quality, ticks and the small text of the "paper" style.
 
         Returns
         -------
@@ -113,8 +101,7 @@ class PlotConfig(BaseModel):
         return cls(
             figsize=(8, 6),
             dpi=300,
-            style="ticks",
-            context="paper",
+            style=["seaborn-v0_8-ticks", "seaborn-v0_8-paper"],
         )
 
     @classmethod
@@ -132,6 +119,5 @@ class PlotConfig(BaseModel):
         return cls(
             figsize=(12, 8),
             dpi=100,
-            style="whitegrid",
-            context="notebook",
+            style=["seaborn-v0_8-whitegrid", "seaborn-v0_8-notebook"],
         )
