@@ -2196,12 +2196,11 @@ class SimulationReplicates(list[SimulationResults]):
         the replicates is a reduction of these values, such as
         `member_statistics`.
 
-        A stochastic `Propagation` seeds replicate ``i`` of draw ``j`` with
-        ``replicate_seed(stream_seed(seed, 4), j * replicates + i)``, a stream
-        of the seed of the analysis (`crates/commol-inference/src/predictive.rs`,
-        `run_sets`). So the replicates of ``Simulation.replicates(n,
-        seed=s)`` repeat the runs of the first draw only when ``s`` is that
-        stream seed, and ``Simulation.run(seed=s)`` repeats none of them.
+        A stochastic `Propagation` gives draw ``j`` the seed
+        ``draw_seeds[j]`` and runs its replicate ``i`` with the seed replicate
+        ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])`` takes. So
+        those replicates, of the model at the values of draw ``j``, give the
+        quantities of the runs of that draw.
 
         Parameters
         ----------
@@ -2561,7 +2560,7 @@ The quantities of interest of each replicate, as `SimulationResults.quantities` 
 
 Each replicate is reduced on its own, with no mean: a summary across the replicates is a reduction of these values, such as `member_statistics`.
 
-A stochastic `Propagation` seeds replicate `i` of draw `j` with `replicate_seed(stream_seed(seed, 4), j * replicates + i)`, a stream of the seed of the analysis (`crates/commol-inference/src/predictive.rs`, `run_sets`). So the replicates of `Simulation.replicates(n, seed=s)` repeat the runs of the first draw only when `s` is that stream seed, and `Simulation.run(seed=s)` repeats none of them.
+A stochastic `Propagation` gives draw `j` the seed `draw_seeds[j]` and runs its replicate `i` with the seed replicate `i` of `Simulation.replicates(n, seed=draw_seeds[j])` takes. So those replicates, of the model at the values of draw `j`, give the quantities of the runs of that draw.
 
 Parameters:
 
@@ -2595,12 +2594,11 @@ def quantities(
     the replicates is a reduction of these values, such as
     `member_statistics`.
 
-    A stochastic `Propagation` seeds replicate ``i`` of draw ``j`` with
-    ``replicate_seed(stream_seed(seed, 4), j * replicates + i)``, a stream
-    of the seed of the analysis (`crates/commol-inference/src/predictive.rs`,
-    `run_sets`). So the replicates of ``Simulation.replicates(n,
-    seed=s)`` repeat the runs of the first draw only when ``s`` is that
-    stream seed, and ``Simulation.run(seed=s)`` repeats none of them.
+    A stochastic `Propagation` gives draw ``j`` the seed
+    ``draw_seeds[j]`` and runs its replicate ``i`` with the seed replicate
+    ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])`` takes. So
+    those replicates, of the model at the values of draw ``j``, give the
+    quantities of the runs of that draw.
 
     Parameters
     ----------

@@ -4190,6 +4190,21 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>PropagationResult.values</code> keeps the NaN of each run.</p>
 </li>
 </ul>
+<!-- Changed #309 -->
+
+<ul>
+<li><strong>Breaking:</strong> the runs of the draws of a sample follow one tree of seeds.
+  Draw <code>j</code> of a stochastic <code>Predictive</code>, <code>Propagation</code>, <code>at_observations</code> or
+  score takes a seed of its own, and its replicate <code>i</code> takes the seed that
+  replicate <code>i</code> of <code>Simulation.replicates(n, seed=…)</code> takes from it. Before,
+  the seed of a replicate depended on the number of replicates. So the
+  numbers of these methods with a stochastic engine change from 0.7.0. The
+  runs of a draw no longer change with the number of replicates or of
+  draws, and <code>Predictive.draw_seeds</code> and <code>PropagationResult.draw_seeds</code> give
+  the seed of each draw: <code>Simulation.replicates(n, seed=draw_seeds[j])</code> of
+  the model at the values of draw <code>j</code> gives its runs. See
+  <a href="../../guide/uncertainty/#the-predictive">The predictive</a>.</li>
+</ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <!-- Fixed #246 -->
 

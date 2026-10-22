@@ -149,7 +149,7 @@ Initial conditions that calibration sets go through the same rounding. With no r
 
 ## Seeds and replicates
 
-A run is reproducible from its model and its seed: `simulation.run(…, seed=s)` gives one run, and `simulation.replicates(n, seed=s).run(…)` gives `n` runs with one seed each, in parallel. A run does not depend on the positions it reports at: the output at a position is the state after the last event before it. See [Randomness, seeds and replicates](https://munqu.github.io/commol/latest/guide/simulations/#randomness-seeds-and-replicates) for the seeds, `SimulationReplicates` and its statistics, plots of the mean and a band, and reports.
+A run is reproducible from its model and its seed: `simulation.run(…, seed=s)` gives one run, and `simulation.replicates(n, seed=s).run(…)` gives `n` runs with one seed each, in parallel. A run does not depend on the positions it reports at: the output at a position is the state after the last event before it. See [Randomness, seeds and replicates](https://munqu.github.io/commol/latest/guide/simulations/#randomness-seeds-and-replicates) for the seeds, `SimulationReplicates` and its statistics, plots of the mean and a band, and reports. A `Predictive` or a `Propagation` of a sample gives draw `j` a seed of its own, `draw_seeds[j]`, and runs its replicates as `simulation.replicates(n, seed=draw_seeds[j])` runs them, so those replicates of the model at the values of the draw repeat its runs.
 
 ```python
 again = simulation.run(num_steps=100, seed=1)

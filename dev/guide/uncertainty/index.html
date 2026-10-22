@@ -3728,8 +3728,12 @@ values, and <code>member_statistics</code> reduces ensemble members with it.</p>
 parallel in Rust, through the forward model of its source: a <code>Calibrator</code>, or
 a <code>SensitivityAnalysis</code> of the inputs of the sample. With a stochastic engine
 every replicate of a draw is a draw of the predictive, with an equal share of
-its weight and a seed of its own, derived from the seed of the source, so
-every draw shows fresh noise and the predictive repeats from that seed.
+its weight. The runs follow one tree of seeds: draw <code>j</code> takes the seed
+<code>draw_seeds[j]</code>, derived from the seed of the source, and its replicate <code>i</code>
+takes the seed that replicate <code>i</code> of <code>Simulation.replicates(n,
+seed=draw_seeds[j])</code> takes. So every draw shows fresh noise, the predictive
+repeats from the seed of the source, and the runs of a draw change neither
+with the number of replicates nor with the number of draws.
 The positions are sorted and unique, and each one is a position the engine
 reports at; otherwise <code>Predictive</code> raises <code>ValueError</code> before any draw runs.
 A draw whose run leaves the values its model allows raises
@@ -3763,6 +3767,10 @@ calibration gives for the same values: the remainder and the excess
 <tr>
 <td><code>runs()</code>, <code>weights</code></td>
 <td>The trajectory and weight of every draw</td>
+</tr>
+<tr>
+<td><code>draw_seeds</code></td>
+<td>The seed of each draw of the sample: <code>Simulation.replicates(n, seed=draw_seeds[j])</code> of the model at the values of draw <code>j</code> gives its runs</td>
 </tr>
 <tr>
 <td><code>report(confidence_level, positions, window, windows, observed_data=(), accumulators=())</code></td>

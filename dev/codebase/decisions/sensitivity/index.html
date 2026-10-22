@@ -3143,8 +3143,10 @@ interest reads from a run, and what a NaN does to a quantity and to a method.</p
 <p><code>ForwardAnalysis</code> runs every method on <code>ForwardModel::unobserved</code> (values
 written as a calibration writes them). Quantities read the observation
 operator. A design point is the mean of its replicates on common seeds; a
-predictive or a propagation gives each replicate of each draw its own seed
-(<code>run_sets</code>), and each purpose has a stream (<code>stream_seed</code>). Morris, Sobol
+predictive or a propagation gives each draw its own seed and each of its
+replicates a seed of that one (<code>run_sets</code>, <code>draw_seeds</code>; see
+<a href="../engines/#stochastic-engines-and-seeds">Stochastic engines and seeds</a>), and
+each purpose has a stream (<code>stream_seed</code>). Morris, Sobol
 and chaos refuse a sample; PRCC reads its weights.</p>
 <table>
 <thead>
@@ -3170,10 +3172,20 @@ and chaos refuse a sample; PRCC reads its weights.</p>
 <td>Hermite polynomials for a normal input</td>
 <td>Every distribution is truncated, so they are not orthogonal.</td>
 </tr>
+<tr>
+<td>Replicate <code>i</code> of draw <code>j</code> of a sample at the flat index <code>j · n + i</code> of one stream</td>
+<td>The seed of a draw depends on <code>n</code>, and no public seed gives the runs of a draw.</td>
+</tr>
+<tr>
+<td>The seed of the source for a sample of one draw, the tree for more</td>
+<td>Two rules that depend on the size of the sample.</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_global_sensitivity.rs</code>,
-<code>tests/uncertainty/test_sensitivity.py</code>.</p>
+<code>crates/commol-inference/tests/test_predictive.rs::a_draw_keeps_its_runs_when_the_replicates_change</code>,
+<code>tests/uncertainty/test_sensitivity.py</code>,
+<code>tests/simulation/test_quantities.py::test_the_replicates_of_a_draw_are_those_of_its_seed</code>.</p>
 <h2 id="a-quantity-is-a-series-and-a-reduction">A quantity is a series and a reduction<a class="headerlink" href="#a-quantity-is-a-series-and-a-reduction" title="Permanent link">&para;</a></h2>
 <p>A quantity reads a <code>Series</code> of a run, the <code>Level</code> of some outputs or their
 <code>Increments</code> over windows of one width, and reduces it: the value at a

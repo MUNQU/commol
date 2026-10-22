@@ -3776,7 +3776,7 @@ at <code>0.3 - 0.1</code> reads the row of <code>0.2</code>.</p>
 </tr>
 <tr>
 <td>The replicates of a stochastic engine</td>
-<td>Each replicate is reduced on its own. A <code>Propagation</code> seeds replicate <code>i</code> of draw <code>j</code> with <code>replicate_seed(stream_seed(seed, 4), j · replicates + i)</code> (<code>run_sets</code> in <code>crates/commol-inference/src/predictive.rs</code>), so its runs are not those of <code>Simulation.replicates(n, seed=seed)</code> or <code>run(seed=seed)</code></td>
+<td>Each replicate is reduced on its own. A <code>Propagation</code> gives draw <code>j</code> the seed <code>draw_seeds[j]</code>, so <code>Simulation.replicates(n, seed=result.draw_seeds[j])</code> of the model at the values of draw <code>j</code> gives the runs of that draw. The seed of the analysis itself gives other runs</td>
 </tr>
 </tbody>
 </table>
@@ -3829,7 +3829,8 @@ fewest runs; read its leave-one-out error before its indices.</p>
 <h2 id="propagation">Propagation<a class="headerlink" href="#propagation" title="Permanent link">&para;</a></h2>
 <p><code>Propagation</code> returns a <code>PropagationResult</code>: the <code>sample</code> of the draws (a
 Latin hypercube of the distributions, or the input sample as it is), the
-quantities of each run, and their <code>weights</code>. <code>summary(confidence_level)</code> gives
+quantities of each run, their <code>weights</code>, and the seed of each draw
+(<code>draw_seeds</code>). <code>summary(confidence_level)</code> gives
 the weighted mean, median and central interval of each quantity. The sample is
 a <code>ParameterSample</code>, so <code>Predictive(analysis, result.sample, positions)</code> gives
 the bands and plots of a calibration.</p>

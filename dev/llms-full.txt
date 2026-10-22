@@ -3088,7 +3088,7 @@ Initial conditions that calibration sets go through the same rounding. With no r
 
 ## Seeds and replicates
 
-A run is reproducible from its model and its seed: `simulation.run(…, seed=s)` gives one run, and `simulation.replicates(n, seed=s).run(…)` gives `n` runs with one seed each, in parallel. A run does not depend on the positions it reports at: the output at a position is the state after the last event before it. See [Randomness, seeds and replicates](https://munqu.github.io/commol/latest/guide/simulations/#randomness-seeds-and-replicates) for the seeds, `SimulationReplicates` and its statistics, plots of the mean and a band, and reports.
+A run is reproducible from its model and its seed: `simulation.run(…, seed=s)` gives one run, and `simulation.replicates(n, seed=s).run(…)` gives `n` runs with one seed each, in parallel. A run does not depend on the positions it reports at: the output at a position is the state after the last event before it. See [Randomness, seeds and replicates](https://munqu.github.io/commol/latest/guide/simulations/#randomness-seeds-and-replicates) for the seeds, `SimulationReplicates` and its statistics, plots of the mean and a band, and reports. A `Predictive` or a `Propagation` of a sample gives draw `j` a seed of its own, `draw_seeds[j]`, and runs its replicates as `simulation.replicates(n, seed=draw_seeds[j])` runs them, so those replicates of the model at the values of the draw repeat its runs.
 
 ```python
 again = simulation.run(num_steps=100, seed=1)
@@ -4341,7 +4341,7 @@ print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75
 
 ## The predictive
 
-`Predictive(source, sample, positions)` runs every draw at `positions`, in parallel in Rust, through the forward model of its source: a `Calibrator`, or a `SensitivityAnalysis` of the inputs of the sample. With a stochastic engine every replicate of a draw is a draw of the predictive, with an equal share of its weight and a seed of its own, derived from the seed of the source, so every draw shows fresh noise and the predictive repeats from that seed. The positions are sorted and unique, and each one is a position the engine reports at; otherwise `Predictive` raises `ValueError` before any draw runs. A draw whose run leaves the values its model allows raises `InfeasibleStateError` with the index of its parameter set and the message of the run: the compartment, the step and the flows, as `Simulation.run` reports them ([Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)). A draw whose initial amounts leave the remainder below zero raises `InfeasibleStateError` with the index of its parameter set and the message a calibration gives for the same values: the remainder and the excess ([Calibrating initial conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md)).
+`Predictive(source, sample, positions)` runs every draw at `positions`, in parallel in Rust, through the forward model of its source: a `Calibrator`, or a `SensitivityAnalysis` of the inputs of the sample. With a stochastic engine every replicate of a draw is a draw of the predictive, with an equal share of its weight. The runs follow one tree of seeds: draw `j` takes the seed `draw_seeds[j]`, derived from the seed of the source, and its replicate `i` takes the seed that replicate `i` of `Simulation.replicates(n, seed=draw_seeds[j])` takes. So every draw shows fresh noise, the predictive repeats from the seed of the source, and the runs of a draw change neither with the number of replicates nor with the number of draws. The positions are sorted and unique, and each one is a position the engine reports at; otherwise `Predictive` raises `ValueError` before any draw runs. A draw whose run leaves the values its model allows raises `InfeasibleStateError` with the index of its parameter set and the message of the run: the compartment, the step and the flows, as `Simulation.run` reports them ([Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)). A draw whose initial amounts leave the remainder below zero raises `InfeasibleStateError` with the index of its parameter set and the message a calibration gives for the same values: the remainder and the excess ([Calibrating initial conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md)).
 
 | Member                                                                                    | Returns                                                                                                                                                                                                                                                                       |
 | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -4349,6 +4349,7 @@ print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75
 | `series_band(outputs, confidence_level, cumulative=False)`                                | The band of the sum of some outputs, or of its running total; each draw is reduced first                                                                                                                                                                                      |
 | `at_observations(observed_data, noise)`                                                   | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with `noise` drawn from the calibrator's seed: `NoNoise()`, `ResidualNoise(...)` or `DistributionNoise()` (`ObservationDraws`)                       |
 | `runs()`, `weights`                                                                       | The trajectory and weight of every draw                                                                                                                                                                                                                                       |
+| `draw_seeds`                                                                              | The seed of each draw of the sample: `Simulation.replicates(n, seed=draw_seeds[j])` of the model at the values of draw `j` gives its runs                                                                                                                                     |
 | `report(confidence_level, positions, window, windows, observed_data=(), accumulators=())` | The report of a run, with each number reduced across the draws with their weights ([Reports](https://munqu.github.io/commol/latest/guide/reports/#the-report-of-an-ensemble))                                                                                                 |
 | `plot.series(…)`, `plot.cumulative(…)`, `plot.observations(…)`                            | The weighted median of the draws of each series and their band, those of its running total, or those of each observed series, read through `at_observations(…, NoNoise())` ([Plotting](https://munqu.github.io/commol/latest/guide/simulations/#a-panel-per-observed-series)) |
 
@@ -5715,12 +5716,12 @@ for label, value in one_run.quantities(quantities).items():
 # peak of C 946
 ```
 
-| Case                                               | Result                                                                                                                                                                                                                                                                                                    |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The run lacks a position a quantity reads          | `ValueError` that lists each such position with its quantity, and says to call `Simulation.run_at`                                                                                                                                                                                                        |
-| A quantity names an output the results do not have | `ValueError` that names the output                                                                                                                                                                                                                                                                        |
-| `run(n)` of the ODE engine                         | It interpolates the positions that are not breakpoints, so a value differs from that of a run that ends there by about the relative tolerance of the solver, and `PeakPosition` can change on a near-tie                                                                                                  |
-| The replicates of a stochastic engine              | Each replicate is reduced on its own. A `Propagation` seeds replicate `i` of draw `j` with `replicate_seed(stream_seed(seed, 4), j · replicates + i)` (`run_sets` in `crates/commol-inference/src/predictive.rs`), so its runs are not those of `Simulation.replicates(n, seed=seed)` or `run(seed=seed)` |
+| Case                                               | Result                                                                                                                                                                                                                                                                       |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The run lacks a position a quantity reads          | `ValueError` that lists each such position with its quantity, and says to call `Simulation.run_at`                                                                                                                                                                           |
+| A quantity names an output the results do not have | `ValueError` that names the output                                                                                                                                                                                                                                           |
+| `run(n)` of the ODE engine                         | It interpolates the positions that are not breakpoints, so a value differs from that of a run that ends there by about the relative tolerance of the solver, and `PeakPosition` can change on a near-tie                                                                     |
+| The replicates of a stochastic engine              | Each replicate is reduced on its own. A `Propagation` gives draw `j` the seed `draw_seeds[j]`, so `Simulation.replicates(n, seed=result.draw_seeds[j])` of the model at the values of draw `j` gives the runs of that draw. The seed of the analysis itself gives other runs |
 
 ## Which method for which budget
 
@@ -5736,7 +5737,7 @@ Start with Morris to drop the inputs that do not matter, then Sobol or a polynom
 
 ## Propagation
 
-`Propagation` returns a `PropagationResult`: the `sample` of the draws (a Latin hypercube of the distributions, or the input sample as it is), the quantities of each run, and their `weights`. `summary(confidence_level)` gives the weighted mean, median and central interval of each quantity. The sample is a `ParameterSample`, so `Predictive(analysis, result.sample, positions)` gives the bands and plots of a calibration.
+`Propagation` returns a `PropagationResult`: the `sample` of the draws (a Latin hypercube of the distributions, or the input sample as it is), the quantities of each run, their `weights`, and the seed of each draw (`draw_seeds`). `summary(confidence_level)` gives the weighted mean, median and central interval of each quantity. The sample is a `ParameterSample`, so `Predictive(analysis, result.sample, positions)` gives the bands and plots of a calibration.
 
 ```python
 from commol import Predictive, Propagation, ValueAt
@@ -24532,15 +24533,16 @@ Its `sample` is a `ParameterSample`, so `Predictive(analysis, result.sample, pos
 
 Attributes:
 
-| Name                                                                          | Type                                                                   | Description                                                                                                                  |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `sample`                                                                      | `ParameterSample`                                                      | The draws of the inputs: a Latin hypercube of their distributions, or the sample of the input space itself.                  |
-| `labels`                                                                      | `list[str]`                                                            | The label of each quantity.                                                                                                  |
-| `values`                                                                      | `list[list[float]]`                                                    | The quantities of each run, [run]\[quantity\]: one run per draw, or with a stochastic engine one per replicate of each draw. |
-| `weights`                                                                     | `list[float]`                                                          | The weight of each run; with a stochastic engine each replicate has an equal share of its draw's weight. They sum to 1.      |
-| `` A quantity that reads a NaN is NaN in `values`, and `summary` raises on `` |                                                                        |                                                                                                                              |
-| `it`                                                                          | `` `where` keeps the runs a condition chooses, which conditions the `` |                                                                                                                              |
-| `result on that condition.`                                                   |                                                                        |                                                                                                                              |
+| Name                                                                          | Type                                                                   | Description                                                                                                                                                                                                                                                   |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sample`                                                                      | `ParameterSample`                                                      | The draws of the inputs: a Latin hypercube of their distributions, or the sample of the input space itself.                                                                                                                                                   |
+| `labels`                                                                      | `list[str]`                                                            | The label of each quantity.                                                                                                                                                                                                                                   |
+| `values`                                                                      | `list[list[float]]`                                                    | The quantities of each run, [run]\[quantity\]: one run per draw, or with a stochastic engine one per replicate of each draw.                                                                                                                                  |
+| `weights`                                                                     | `list[float]`                                                          | The weight of each run; with a stochastic engine each replicate has an equal share of its draw's weight. They sum to 1.                                                                                                                                       |
+| `draw_seeds`                                                                  | `list[int]`                                                            | The seed of each draw of sample, in its order. With a stochastic engine, replicate i of draw j runs with the seed replicate i of Simulation.replicates(n, seed=draw_seeds[j]) takes, so those replicates of the model at that draw give the runs of the draw. |
+| `` A quantity that reads a NaN is NaN in `values`, and `summary` raises on `` |                                                                        |                                                                                                                                                                                                                                                               |
+| `it`                                                                          | `` `where` keeps the runs a condition chooses, which conditions the `` |                                                                                                                                                                                                                                                               |
+| `result on that condition.`                                                   |                                                                        |                                                                                                                                                                                                                                                               |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -24566,6 +24568,11 @@ class PropagationResult(BaseModel):
     weights : list[float]
         The weight of each run; with a stochastic engine each replicate has
         an equal share of its draw's weight. They sum to 1.
+    draw_seeds : list[int]
+        The seed of each draw of `sample`, in its order. With a stochastic
+        engine, replicate ``i`` of draw ``j`` runs with the seed replicate
+        ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])`` takes, so
+        those replicates of the model at that draw give the runs of the draw.
 
     A quantity that reads a NaN is NaN in `values`, and `summary` raises on
     it: `where` keeps the runs a condition chooses, which conditions the
@@ -24578,6 +24585,7 @@ class PropagationResult(BaseModel):
     labels: list[str]
     values: list[list[float]]
     weights: list[float]
+    draw_seeds: list[int]
 
     @property
     def effective_size(self) -> float:
@@ -24597,8 +24605,8 @@ class PropagationResult(BaseModel):
         distribution of each quantity given the condition of the mask, such
         as ``np.isfinite(values[:, i])`` or a compartment above a threshold,
         not the distribution over every run. `effective_size` says how many
-        runs the kept weights are worth. `sample` stays the draws of the
-        inputs.
+        runs the kept weights are worth. `sample` and `draw_seeds` stay those
+        of the draws of the inputs.
 
         Parameters
         ----------
@@ -24706,7 +24714,7 @@ where(mask: ArrayLike) -> PropagationResult
 
 The runs where `mask` is true, with their weights renormalised to sum to 1.
 
-A filter conditions the result: a summary of the runs it keeps is the distribution of each quantity given the condition of the mask, such as `np.isfinite(values[:, i])` or a compartment above a threshold, not the distribution over every run. `effective_size` says how many runs the kept weights are worth. `sample` stays the draws of the inputs.
+A filter conditions the result: a summary of the runs it keeps is the distribution of each quantity given the condition of the mask, such as `np.isfinite(values[:, i])` or a compartment above a threshold, not the distribution over every run. `effective_size` says how many runs the kept weights are worth. `sample` and `draw_seeds` stay those of the draws of the inputs.
 
 Parameters:
 
@@ -24738,8 +24746,8 @@ def where(self, mask: ArrayLike) -> "PropagationResult":
     distribution of each quantity given the condition of the mask, such
     as ``np.isfinite(values[:, i])`` or a compartment above a threshold,
     not the distribution over every run. `effective_size` says how many
-    runs the kept weights are worth. `sample` stays the draws of the
-    inputs.
+    runs the kept weights are worth. `sample` and `draw_seeds` stay those
+    of the draws of the inputs.
 
     Parameters
     ----------
@@ -28732,12 +28740,11 @@ class SimulationReplicates(list[SimulationResults]):
         the replicates is a reduction of these values, such as
         `member_statistics`.
 
-        A stochastic `Propagation` seeds replicate ``i`` of draw ``j`` with
-        ``replicate_seed(stream_seed(seed, 4), j * replicates + i)``, a stream
-        of the seed of the analysis (`crates/commol-inference/src/predictive.rs`,
-        `run_sets`). So the replicates of ``Simulation.replicates(n,
-        seed=s)`` repeat the runs of the first draw only when ``s`` is that
-        stream seed, and ``Simulation.run(seed=s)`` repeats none of them.
+        A stochastic `Propagation` gives draw ``j`` the seed
+        ``draw_seeds[j]`` and runs its replicate ``i`` with the seed replicate
+        ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])`` takes. So
+        those replicates, of the model at the values of draw ``j``, give the
+        quantities of the runs of that draw.
 
         Parameters
         ----------
@@ -29097,7 +29104,7 @@ The quantities of interest of each replicate, as `SimulationResults.quantities` 
 
 Each replicate is reduced on its own, with no mean: a summary across the replicates is a reduction of these values, such as `member_statistics`.
 
-A stochastic `Propagation` seeds replicate `i` of draw `j` with `replicate_seed(stream_seed(seed, 4), j * replicates + i)`, a stream of the seed of the analysis (`crates/commol-inference/src/predictive.rs`, `run_sets`). So the replicates of `Simulation.replicates(n, seed=s)` repeat the runs of the first draw only when `s` is that stream seed, and `Simulation.run(seed=s)` repeats none of them.
+A stochastic `Propagation` gives draw `j` the seed `draw_seeds[j]` and runs its replicate `i` with the seed replicate `i` of `Simulation.replicates(n, seed=draw_seeds[j])` takes. So those replicates, of the model at the values of draw `j`, give the quantities of the runs of that draw.
 
 Parameters:
 
@@ -29131,12 +29138,11 @@ def quantities(
     the replicates is a reduction of these values, such as
     `member_statistics`.
 
-    A stochastic `Propagation` seeds replicate ``i`` of draw ``j`` with
-    ``replicate_seed(stream_seed(seed, 4), j * replicates + i)``, a stream
-    of the seed of the analysis (`crates/commol-inference/src/predictive.rs`,
-    `run_sets`). So the replicates of ``Simulation.replicates(n,
-    seed=s)`` repeat the runs of the first draw only when ``s`` is that
-    stream seed, and ``Simulation.run(seed=s)`` repeats none of them.
+    A stochastic `Propagation` gives draw ``j`` the seed
+    ``draw_seeds[j]`` and runs its replicate ``i`` with the seed replicate
+    ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])`` takes. So
+    those replicates, of the model at the values of draw ``j``, give the
+    quantities of the runs of that draw.
 
     Parameters
     ----------
@@ -30766,6 +30772,17 @@ class Predictive:
         return self._rust.weights
 
     @property
+    def draw_seeds(self) -> list[int]:
+        """
+        The seed of each draw of `sample`, in its order.
+
+        With a stochastic engine, replicate ``i`` of draw ``j`` runs with the
+        seed replicate ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])``
+        takes, so those replicates of the model at that draw give its runs.
+        """
+        return self._rust.draw_seeds
+
+    @property
     def plot(self) -> PredictivePlot:
         """
         The figures of the draws: ``plot.series()`` and ``plot.cumulative()``,
@@ -31003,6 +31020,16 @@ weights: list[float]
 ```
 
 The weight of each draw of the predictive; they sum to 1.
+
+#### draw_seeds
+
+```python
+draw_seeds: list[int]
+```
+
+The seed of each draw of `sample`, in its order.
+
+With a stochastic engine, replicate `i` of draw `j` runs with the seed replicate `i` of `Simulation.replicates(n, seed=draw_seeds[j])` takes, so those replicates of the model at that draw give its runs.
 
 #### plot
 
@@ -38658,6 +38685,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Breaking:** `ValueAt`, `Peak`, `PeakPosition` and `Trajectory` take `series` in place of `outputs`: `ValueAt(outputs="B", at=10)` is `ValueAt(series="B", at=10)`. `Gain(outputs, start, end)` keeps `outputs`, and the outputs of a quantity read back as a list. The quantities live in `commol.context.inference.quantities`, and cross to Rust as the JSON of their classes.
 
 - Every reduction across runs raises `ValueError` on a quantity that is NaN: `PropagationResult.summary()`, `member_statistics`, `weighted_quantiles`, and Morris, Sobol and the polynomial chaos before they estimate, as PRCC did. The message of a method names the quantity, the points where it is NaN, and the point, inputs, replicate and seed of the first such run. `PropagationResult.values` keeps the NaN of each run.
+
+- **Breaking:** the runs of the draws of a sample follow one tree of seeds. Draw `j` of a stochastic `Predictive`, `Propagation`, `at_observations` or score takes a seed of its own, and its replicate `i` takes the seed that replicate `i` of `Simulation.replicates(n, seed=…)` takes from it. Before, the seed of a replicate depended on the number of replicates. So the numbers of these methods with a stochastic engine change from 0.7.0. The runs of a draw no longer change with the number of replicates or of draws, and `Predictive.draw_seeds` and `PropagationResult.draw_seeds` give the seed of each draw: `Simulation.replicates(n, seed=draw_seeds[j])` of the model at the values of draw `j` gives its runs. See [The predictive](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive).
 
 ### Fixed
 

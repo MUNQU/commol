@@ -3364,6 +3364,10 @@ event only when the event happens.</p>
 <td>Replicate <code>i</code> of seed <code>s</code> takes <code>replicate_seed(s, i)</code>, the SplitMix64 of <code>s + i</code>. <code>run_replicates</code> runs them in parallel (<code>rayon</code>); a deterministic engine has no replicates.</td>
 </tr>
 <tr>
+<td>Draws of a sample</td>
+<td>One tree of seeds: draw <code>j</code> takes <code>replicate_seed(stream_seed(seed, DRAWS_STREAM), j)</code> (<code>draw_seeds</code> in <code>crates/commol-inference/src/predictive.rs</code>), and its replicate <code>i</code> takes <code>replicate_seed</code> of that seed and <code>i</code>, the rule of <code>Simulation.replicates</code>. <code>Predictive</code> and <code>Propagation</code> give the seed of each draw (<code>draw_seeds</code>), and the runs of a draw depend on neither the number of replicates nor the number of draws.</td>
+</tr>
+<tr>
 <td>Calibration</td>
 <td>Common random numbers: the same replicate seeds at every evaluation, so the loss is a deterministic function of the parameters (<code>CalibrationProblem::with_replicates</code>). The user chooses the summary (<code>ReplicateSummary</code>); <code>LossConfig</code> computes it.</td>
 </tr>
