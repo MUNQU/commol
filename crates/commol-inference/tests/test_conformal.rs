@@ -17,10 +17,12 @@ use commol_inference::conformal::{
 };
 use commol_inference::resampling::{BlockScheme, ReplicateRunner};
 
-/// One output `x = c` at every position.
+/// One output `x = c` at every position; a run with `c` above `cap`
+/// fails.
 #[derive(Clone, Debug)]
 struct Constant {
     parameters: HashMap<String, f64>,
+    cap: f64,
 }
 
 #[derive(Clone, Debug)]
@@ -44,8 +46,12 @@ impl SimulationEngine for Constant {
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), SimulationError> {
+        let c = self.parameters["c"];
+        if c > self.cap {
+            return Err(SimulationError::Failed(format!("c = {c} is above the cap")));
+        }
         buffer.clear();
-        buffer.extend(positions.iter().map(|_| vec![self.parameters["c"]]));
+        buffer.extend(positions.iter().map(|_| vec![c]));
         Ok(())
     }
 
@@ -99,9 +105,14 @@ fn observations(values: &[f64], unweighted: &[f64]) -> Vec<ObservedDataPoint> {
 }
 
 fn problem(observed: Vec<ObservedDataPoint>) -> CalibrationProblem<Constant> {
+    capped_problem(observed, f64::INFINITY)
+}
+
+fn capped_problem(observed: Vec<ObservedDataPoint>, cap: f64) -> CalibrationProblem<Constant> {
     CalibrationProblem::new(
         Constant {
             parameters: HashMap::from([("c".to_string(), 0.0)]),
+            cap,
         },
         observed,
         vec![CalibrationParameter::new("c".to_string(), -50.0, 50.0)],
@@ -289,9 +300,36 @@ fn jackknife_plus_needs_two_blocks_and_two_refits() {
     let runner = ReplicateRunner::new(&half, &config, &[10.0], 1, 1).unwrap();
     let two_blocks = BlockScheme::new(half.observed_data(), 5).unwrap();
     match jackknife_plus(&runner, &two_blocks, &[11.0], absolute) {
-        Err(ConformalError::Failed(message)) => assert!(message.contains("two refits")),
+        Err(ConformalError::Failed(message)) => assert!(
+            message.starts_with("Only 1 of 2 blocks fitted, and the method needs 2"),
+            "{message}"
+        ),
         other => panic!("not a failure: {other:?}"),
     }
+}
+
+#[test]
+fn jackknife_plus_with_one_fitted_block_says_how_many_fitted() {
+    // The fit is the mean, 20. Leaving out 100 moves it down to 0; leaving
+    // out a 0 moves it up to 25, past the cap 22, where the run fails.
+    let problem = capped_problem(observations(&[0.0, 0.0, 0.0, 0.0, 100.0], &[]), 22.0);
+    let config = config();
+    let runner = ReplicateRunner::new(&problem, &config, &[20.0], 1, 1).unwrap();
+    let scheme = BlockScheme::new(problem.observed_data(), 1).unwrap();
+
+    let message = failed(jackknife_plus(
+        &runner,
+        &scheme,
+        &[6.0],
+        settings(NonconformityScore::Absolute),
+    ));
+
+    assert!(
+        message.starts_with(
+            "Only 1 of 5 blocks fitted, and the method needs 2; the first reasons: block 0: "
+        ),
+        "{message}"
+    );
 }
 
 #[test]
@@ -345,7 +383,7 @@ fn failed(result: Result<impl std::fmt::Debug, ConformalError>) -> String {
 }
 
 #[test]
-fn rolling_conformal_fails_when_every_origin_fails() {
+fn a_rolling_conformal_with_no_fit_names_its_origins() {
     // The only origin, at 2, has only observations of weight 0 to fit.
     let problem = problem(observations(&VALUES, &[1.0, 2.0]));
     let config = config();
@@ -359,7 +397,10 @@ fn rolling_conformal_fails_when_every_origin_fails() {
     ));
 
     assert!(
-        message.starts_with("Every replicate failed (1); the first reasons: replicate 0:"),
+        message.starts_with(
+            "Every origin failed: 0 of 1 origins fitted, and the method needs 1; the first \
+             reasons: origin 0: "
+        ),
         "{message}"
     );
 }
@@ -388,7 +429,10 @@ fn enbpi_fails_when_every_replicate_fails() {
     ));
 
     assert!(
-        message.starts_with("Every replicate failed (1); the first reasons: replicate 0:"),
+        message.starts_with(
+            "Every replicate failed: 0 of 1 replicates fitted, and the method needs 1; the \
+             first reasons: replicate 0: "
+        ),
         "{message}"
     );
 }

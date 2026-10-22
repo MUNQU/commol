@@ -11,15 +11,13 @@ use std::collections::HashMap;
 
 use commol_calibration::ObservedDataPoint;
 use commol_core::SimulationEngine;
-use rayon::prelude::*;
 
 use crate::conformal::ConformalError;
 use crate::conformal::intervals::{ConformalRun, PredictionIntervals};
 use crate::conformal::predict::{set_predictions, targets};
 use crate::conformal::quantile::conformal_quantile;
 use crate::conformal::score::{ConformalSettings, NonconformityScore, scales};
-use crate::resampling::runner::every_replicate_failed;
-use crate::resampling::{Perturbation, ReplicateRunner};
+use crate::resampling::{FitUnit, Perturbation, ReplicateRunner};
 
 /// The indices of the observations of each series after `origin`, in
 /// position order, by label in order of first appearance.
@@ -94,7 +92,7 @@ fn check<E: SimulationEngine + Send + Sync>(
 ///
 /// Returns an error when the score is `"spread"`, a position is not after
 /// the data, an origin has no observation before or after it, every fit
-/// fails, or a point cannot be predicted.
+/// fails ([`FitUnit::require`]), or a point cannot be predicted.
 pub fn rolling_conformal<E>(
     runner: &ReplicateRunner<'_, E>,
     origins: &[f64],
@@ -107,32 +105,31 @@ where
     check(runner, origins, positions, settings)?;
     let problem = runner.problem();
     let observed = problem.observed_data();
-    let outcomes: Vec<_> = origins
-        .par_iter()
-        .enumerate()
-        .map(|(index, &origin)| {
-            let weights = observed
-                .iter()
-                .map(|obs| if obs.at <= origin { obs.weight } else { 0.0 })
-                .collect();
-            runner.fit_one(index, &Perturbation::Weights(weights))
+    let perturbations: Vec<Perturbation> = origins
+        .iter()
+        .map(|&origin| {
+            Perturbation::Weights(
+                observed
+                    .iter()
+                    .map(|obs| if obs.at <= origin { obs.weight } else { 0.0 })
+                    .collect(),
+            )
         })
         .collect();
-    let mut fits = Vec::new();
-    let mut fitted_origins = Vec::new();
-    let mut failed = Vec::new();
-    for (index, outcome) in outcomes.into_iter().enumerate() {
-        match outcome {
-            Ok(result) => {
-                fits.push(problem.applied_parameter_values(&result.best_parameters));
-                fitted_origins.push(origins[index]);
-            }
-            Err(reason) => failed.push((index, reason)),
-        }
-    }
-    if fits.is_empty() {
-        return Err(ConformalError::Failed(every_replicate_failed(&failed)));
-    }
+    let refits = runner.fit_all(&perturbations);
+    refits
+        .require(FitUnit::Origin, 1)
+        .map_err(ConformalError::Failed)?;
+    let (fitted_origins, fits): (Vec<f64>, Vec<Vec<f64>>) = refits
+        .fits
+        .iter()
+        .map(|(index, result)| {
+            (
+                origins[*index],
+                problem.applied_parameter_values(&result.best_parameters),
+            )
+        })
+        .unzip();
     let predictions = set_predictions(problem, &fits, observed)?;
     let observed_scales =
         scales(settings.score, observed, observed, None).map_err(ConformalError::Invalid)?;
@@ -175,6 +172,7 @@ where
     Ok(ConformalRun {
         intervals,
         scores,
-        failed,
+        failed: refits.failed,
+        not_converged: refits.not_converged,
     })
 }

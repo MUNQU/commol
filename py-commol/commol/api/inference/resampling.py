@@ -94,20 +94,35 @@ def rust_block_length(block_length: BlockLength) -> int | None:
     return None if block_length == "auto" else block_length
 
 
+def log_failed(failed: list[str], log: logging.Logger = logger) -> list[str]:
+    """
+    Log each fit that failed as a warning.
+
+    Parameters
+    ----------
+    failed : list[str]
+        Each fit that failed, as the Rust runner names it.
+    log : logging.Logger
+        The logger of the method's runner.
+
+    Returns
+    -------
+    list[str]
+        `failed`, for the result.
+    """
+    for entry in failed:
+        log.warning(entry)
+    return failed
+
+
 def _diagnostics(
     block_length: int | None,
     estimates: list[tuple[str, float]] | None,
-    failed: list[str],
-    not_converged: int,
     negative_values: int,
 ) -> ResamplingDiagnostics:
-    for reason in failed:
-        logger.warning(reason)
     return ResamplingDiagnostics(
         block_length=block_length,
         block_length_estimates=dict(estimates) if estimates is not None else None,
-        failed=failed,
-        not_converged=not_converged,
         negative_values=negative_values,
     )
 
@@ -128,12 +143,10 @@ def _bootstrap_result(
             method,
             groups=run.groups,
         ),
+        failed=log_failed(run.failed),
+        not_converged=run.not_converged,
         diagnostics=_diagnostics(
-            run.block_length,
-            run.block_length_estimates,
-            [f"Replicate {index} failed: {reason}" for index, reason in run.failed],
-            run.not_converged,
-            run.negative_values,
+            run.block_length, run.block_length_estimates, run.negative_values
         ),
     )
 
@@ -319,16 +332,9 @@ def run_block_jackknife(
         blocks=run.spans,
         pseudo_values=by_parameter(run.pseudo_values),
         influence=by_parameter(run.influence),
-        diagnostics=_diagnostics(
-            run.block_length,
-            run.block_length_estimates,
-            [
-                f"Block [{first}, {last}] failed: {reason}"
-                for (first, last), reason in run.failed
-            ],
-            run.not_converged,
-            0,
-        ),
+        failed=log_failed(run.failed),
+        not_converged=run.not_converged,
+        diagnostics=_diagnostics(run.block_length, run.block_length_estimates, 0),
     )
 
 

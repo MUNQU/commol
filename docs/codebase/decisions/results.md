@@ -112,6 +112,24 @@ method that fits the data takes `starts` with the default 1.
 `tests/uncertainty/test_local.py::TestStarts`,
 `tests/uncertainty/test_smc.py::test_the_eta_calibrations_fit_from_their_starts`.
 
+## Fits that fail have one place
+
+Six methods fit one perturbation of the data per replicate: the bootstraps,
+the jackknife, jackknife+, rolling conformal, EnbPI and a bootstrap threshold.
+They share one loop, `ReplicateRunner::fit_all` (`resampling/runner.rs`),
+which returns `ReplicateFits`, and one check, `FitUnit::require`, whose message
+says how many of how many fits of a replicate, block or origin succeeded and
+how many the method needs. Every Python result of several fits has `failed`,
+entries `"<Start|Replicate|Block|Origin> <index> failed: <reason>"` logged as
+warnings, and, for fits of replicates, `not_converged`, at its top.
+
+| Alternative | Why not |
+|---|---|
+| One loop per method, or `diagnostics.failed` | Counts and messages drift apart; three results have no diagnostics. |
+
+**Guards:** `crates/commol-inference/tests/test_resampling.rs::every_replicate_method_counts_the_same_fits`,
+`tests/uncertainty/test_resampling.py::test_every_method_lists_its_failed_replicates_in_failed`.
+
 ## A description is data, rendered apart
 
 `Model.describe(layout)` returns a `ModelDescription`

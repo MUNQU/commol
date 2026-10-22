@@ -249,7 +249,7 @@ within a relative tolerance but the best; use data with noise.
 An `IdentifiabilityReport` holds, for each parameter, a **structural** and a
 **practical** verdict, and the sections of the methods that ran
 (`structural`, `collinearity`, `sample`, `starts`, `profile`). The profiles of
-a `ProfileLikelihood` give their report with `ProfileResult.report()`; a flat
+a `ProfileLikelihood` give their report with `ProfileResult.identifiability()`; a flat
 profile gives the structural verdict `in_combination` when resetting the
 other parameters to their fitted values breaks it, and `non_identifiable`
 when nothing the data read depends on the parameter

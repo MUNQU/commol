@@ -684,7 +684,10 @@ fn bootstrap_coverage_fails_when_every_replicate_fails() {
         7,
     )
     .unwrap_err();
-    assert!(error.starts_with("Every replicate failed (3)"), "{error}");
+    assert!(
+        error.starts_with("Every replicate failed: 0 of 3 replicates fitted"),
+        "{error}"
+    );
 }
 
 #[test]

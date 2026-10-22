@@ -114,6 +114,8 @@ is pointwise, for one quantity at a time.
 | `tolerance` | The numerical tolerance of the statistic, `max(τ, ν)` ([Verdicts](#verdicts-and-the-identifiability-report)) |
 | `structure` | What resetting the other parameters says of each flat profile of a parameter (`ProfileStructure`) |
 | `notes` | A threshold below the tolerance, or a refit below the fit |
+| `failed` | With `Threshold.bootstrap_calibrated`, each replicate that failed, `"Replicate <index> failed: <reason>"`, also logged as a warning; empty with any other threshold |
+| `not_converged` | With `Threshold.bootstrap_calibrated`, the replicates kept although their optimizer did not converge |
 
 | Shape | Means |
 |---|---|
@@ -284,7 +286,7 @@ about `1e-6` from its minimum, and the profile reads practically
 non-identifiable. Its `in_combination` needs an `sd_tolerance` near `ν`, as
 the example below uses.
 
-`ProfileResult.report()` turns the verdicts into an
+`ProfileResult.identifiability()` turns the verdicts into an
 [identifiability report](identifiability.md#the-report) with a `profile`
 section, which `merge` joins with the other methods. A rate that reads
 `k1 * s` cannot tell `k1` from `s`: their profiles are flat on the ridge
@@ -347,7 +349,7 @@ print(profiles.notes[0])
 # the bounds, not the data.
 print(profiles.structure["k1"].compensated_by)  # ['s']
 report = product.identifiability(StructuralRank(points=5, design="observations"))
-merged = report.merge(profiles.report())
+merged = report.merge(profiles.identifiability())
 print(merged.verdicts["k1"].structural.verdict, merged.verdicts["s"].structural.verdict)
 # in_combination in_combination
 ```

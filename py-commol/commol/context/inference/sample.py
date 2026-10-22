@@ -307,15 +307,11 @@ class ParameterSample(BaseModel):
             for name, low, high in zip(self.names, lower, upper, strict=True)
         }
 
+    @property
     def effective_size(self) -> float:
         """
-        Kish's effective sample size: ``1 / Σ wᵢ²``.
-
-        Returns
-        -------
-        float
-            Between 1 and the number of draws; equal weights give the number
-            of draws.
+        Kish's effective sample size, ``1 / Σ wᵢ²``: between 1 and the number
+        of draws; equal weights give the number of draws.
         """
         return self._rust.effective_size()
 

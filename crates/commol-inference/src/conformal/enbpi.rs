@@ -12,15 +12,13 @@
 use commol_calibration::ObservedDataPoint;
 use commol_core::SimulationEngine;
 use commol_random::{Generator, replicate_seed};
-use rayon::prelude::*;
 
 use crate::conformal::ConformalError;
 use crate::conformal::intervals::{ConformalRun, PredictionIntervals, quantile_lookup};
 use crate::conformal::predict::{ensemble_mean, ensemble_spread, set_predictions, targets};
 use crate::conformal::quantile::group_quantiles;
 use crate::conformal::score::{ConformalSettings, NonconformityScore, scales};
-use crate::resampling::runner::every_replicate_failed;
-use crate::resampling::{BlockScheme, Perturbation, ReplicateRunner};
+use crate::resampling::{BlockScheme, FitUnit, Perturbation, ReplicateRunner};
 
 /// Blocks drawn with replacement: one multinomial count per block, of as
 /// many draws as there are blocks, multiplies the weight of every
@@ -66,13 +64,13 @@ impl BlockMultinomial {
 /// the problem, from `replicates` replicates of the blocks of `scheme`.
 ///
 /// Replicate `b` draws its blocks from `replicate_seed(runner.seed(), b)`,
-/// as [`ReplicateRunner::run`] does.
+/// as [`ReplicateRunner::perturbations`] does.
 ///
 /// # Errors
 ///
 /// Returns an error when a block is left out by no replicate that fitted,
-/// every replicate fails, a point cannot be predicted, or the score has no
-/// scale at a point.
+/// every replicate fails ([`FitUnit::require`]), a point cannot be
+/// predicted, or the score has no scale at a point.
 pub fn enbpi<E>(
     runner: &ReplicateRunner<'_, E>,
     scheme: &BlockScheme,
@@ -86,30 +84,30 @@ where
     let problem = runner.problem();
     let observed = problem.observed_data();
     let resampler = BlockMultinomial::new(observed, scheme);
-    let outcomes: Vec<_> = (0..replicates)
-        .into_par_iter()
+    let counts: Vec<Vec<usize>> = (0..replicates)
         .map(|index| {
             let mut generator = Generator::from_seed(replicate_seed(runner.seed(), index as u64));
-            let counts = resampler.counts(&mut generator);
-            let perturbation = Perturbation::Weights(resampler.weights(&counts));
-            (counts, runner.fit_one(index, &perturbation))
+            resampler.counts(&mut generator)
         })
         .collect();
-    let mut fits = Vec::new();
-    let mut counts_of_fit = Vec::new();
-    let mut failed = Vec::new();
-    for (index, (counts, outcome)) in outcomes.into_iter().enumerate() {
-        match outcome {
-            Ok(result) => {
-                fits.push(problem.applied_parameter_values(&result.best_parameters));
-                counts_of_fit.push(counts);
-            }
-            Err(reason) => failed.push((index, reason)),
-        }
-    }
-    if fits.is_empty() {
-        return Err(ConformalError::Failed(every_replicate_failed(&failed)));
-    }
+    let perturbations: Vec<Perturbation> = counts
+        .iter()
+        .map(|counts| Perturbation::Weights(resampler.weights(counts)))
+        .collect();
+    let refits = runner.fit_all(&perturbations);
+    refits
+        .require(FitUnit::Replicate, 1)
+        .map_err(ConformalError::Failed)?;
+    let (counts_of_fit, fits): (Vec<&Vec<usize>>, Vec<Vec<f64>>) = refits
+        .fits
+        .iter()
+        .map(|(index, result)| {
+            (
+                &counts[*index],
+                problem.applied_parameter_values(&result.best_parameters),
+            )
+        })
+        .unzip();
     let spans = scheme.spans();
     let left_out: Vec<Vec<usize>> = (0..scheme.count())
         .map(|block| {
@@ -176,6 +174,7 @@ where
     Ok(ConformalRun {
         intervals,
         scores: labels.into_iter().zip(scores).collect(),
-        failed,
+        failed: refits.failed,
+        not_converged: refits.not_converged,
     })
 }

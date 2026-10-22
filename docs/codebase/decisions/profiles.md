@@ -40,7 +40,7 @@ points of the side, or of the line through the last two.
 `S(θ̂) · F(1, n − p; confidence_level) / (n − p)` and needs
 the loss `"sse"`; `bootstrap_calibrated` calibrates the statistic itself
 (prepivoting, Beran 1988): replicate `b` of the bootstrap, rebuilt from
-`replicate_seed(seed, b)` as `ReplicateRunner::run` builds it, is fitted and
+`replicate_seed(seed, b)` as `ReplicateRunner::perturbations` builds it, is fitted and
 then fitted again with the quantity held at its value at the original fit, and
 the threshold is the quantile `confidence_level` of the rises
 (`bootstrap_thresholds`, `threshold.rs`).

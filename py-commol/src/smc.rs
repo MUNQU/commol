@@ -9,7 +9,7 @@
 use crate::parallelism::parallel;
 use commol_inference::local::LocalError;
 use commol_inference::resampling::{
-    BlockDrawing, BlockScheme, ResidualScale, Residuals, automatic_block_length,
+    BlockDrawing, BlockScheme, FitUnit, ResidualScale, Residuals, automatic_block_length,
 };
 use commol_inference::smc::{
     self, AbcTarget, Distance, LikelihoodTarget, RandomWalk, SmcRun, SmcSampler, Stop,
@@ -175,8 +175,8 @@ pub struct PyEtaCoverage {
     eta: f64,
     /// The coverage of the fit by the intervals at `η`
     coverage: f64,
-    /// The index and reason of each replicate that failed
-    failed: Vec<(usize, String)>,
+    /// Each replicate that failed: "Replicate <index> failed: <reason>"
+    failed: Vec<String>,
 }
 
 /// The sampler of the settings of a method
@@ -378,7 +378,7 @@ fn bootstrap_coverage_eta(
     Ok(PyEtaCoverage {
         eta: calibration.eta,
         coverage: calibration.coverage,
-        failed: calibration.failed,
+        failed: FitUnit::Replicate.entries(&calibration.failed),
     })
 }
 

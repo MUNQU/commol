@@ -1,5 +1,6 @@
 //! The replicate runner: fits a copy of the problem with the data of each
-//! replicate, in parallel. It knows no resampler.
+//! replicate, in parallel, in one loop that every method of several fits
+//! shares.
 
 use commol_calibration::{
     CalibrationProblem, CalibrationResult, OptimizationConfig, optimize_from, start_points,
@@ -11,15 +12,102 @@ use rayon::prelude::*;
 use crate::resampling::resamplers::{Perturbation, Resampler};
 use crate::sample::ParameterSample;
 
-/// The fit of one replicate, or why it failed.
+/// What a method fits once per perturbation: a replicate of the data, a
+/// block left out, or an origin. Its messages name it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FitUnit {
+    /// A replicate of the data (a bootstrap, EnbPI).
+    Replicate,
+    /// A block left out (the jackknife, jackknife+).
+    Block,
+    /// The origin of a rolling fit.
+    Origin,
+}
+
+impl FitUnit {
+    /// The name of one, in lower case.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Replicate => "replicate",
+            Self::Block => "block",
+            Self::Origin => "origin",
+        }
+    }
+
+    /// The entry of the fit `index` that failed for `reason`:
+    /// `"Block 2 failed: <reason>"`.
+    pub fn failed(self, index: usize, reason: &str) -> String {
+        let name = self.name();
+        let capital = name[..1].to_uppercase() + &name[1..];
+        format!("{capital} {index} failed: {reason}")
+    }
+
+    /// The entries of `failed`, the index and reason of each fit that
+    /// failed ([`FitUnit::failed`]).
+    pub fn entries(self, failed: &[(usize, String)]) -> Vec<String> {
+        failed
+            .iter()
+            .map(|(index, reason)| self.failed(*index, reason))
+            .collect()
+    }
+
+    /// Check that `fitted` of `fitted + failed.len()` fits are at least
+    /// `needed`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that says how many fitted, of how many, how many
+    /// the method needs, and the first three reasons; it says that every fit
+    /// failed only when none fitted.
+    pub fn require(
+        self,
+        fitted: usize,
+        failed: &[(usize, String)],
+        needed: usize,
+    ) -> Result<(), String> {
+        if fitted >= needed {
+            return Ok(());
+        }
+        let name = self.name();
+        let total = fitted + failed.len();
+        let reasons: Vec<String> = failed
+            .iter()
+            .take(3)
+            .map(|(index, reason)| format!("{name} {index}: {reason}"))
+            .collect();
+        let count = format!(
+            "{fitted} of {total} {name}s fitted, and the method needs {needed}; the first \
+             reasons: {}",
+            reasons.join("; ")
+        );
+        Err(if fitted == 0 {
+            format!("Every {name} failed: {count}")
+        } else {
+            format!("Only {count}")
+        })
+    }
+}
+
+/// The fits of the replicates of a method, in the order of their indices.
 #[derive(Debug, Clone)]
-pub struct ReplicateOutcome {
-    /// The index of the replicate.
-    pub index: usize,
-    /// The number of synthetic observed values below zero.
-    pub negative_values: usize,
-    /// The best fit of the replicate's starts, or the reason it failed.
-    pub result: Result<CalibrationResult, String>,
+pub struct ReplicateFits {
+    /// The index and the best fit of each replicate that succeeded.
+    pub fits: Vec<(usize, CalibrationResult)>,
+    /// The index and reason of each replicate that failed.
+    pub failed: Vec<(usize, String)>,
+    /// The number of fits kept although their optimizer did not converge.
+    pub not_converged: usize,
+}
+
+impl ReplicateFits {
+    /// Check that at least `needed` replicates fitted ([`FitUnit::require`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns the message of [`FitUnit::require`], which names `unit`.
+    pub fn require(&self, unit: FitUnit, needed: usize) -> Result<(), String> {
+        unit.require(self.fits.len(), &self.failed, needed)
+    }
 }
 
 /// Fits replicates of a problem from its fit.
@@ -148,24 +236,43 @@ where
         best.ok_or_else(|| first_error.unwrap_or_default())
     }
 
-    /// Fit `replicates` replicates of `resampler` in parallel, in order.
-    pub fn run(&self, resampler: &dyn Resampler, replicates: usize) -> Vec<ReplicateOutcome> {
+    /// The perturbations of `replicates` replicates of `resampler`:
+    /// replicate `b` draws from `replicate_seed(seed, b)`.
+    pub fn perturbations(&self, resampler: &dyn Resampler, replicates: usize) -> Vec<Perturbation> {
         (0..replicates)
             .into_par_iter()
             .map(|index| {
                 let mut generator = Generator::from_seed(replicate_seed(self.seed, index as u64));
-                let perturbation = resampler.replicate(&mut generator);
-                let negative_values = match &perturbation {
-                    Perturbation::Values(values) => values.iter().filter(|&&v| v < 0.0).count(),
-                    Perturbation::Weights(_) => 0,
-                };
-                ReplicateOutcome {
-                    index,
-                    negative_values,
-                    result: self.fit_one(index, &perturbation),
-                }
+                resampler.replicate(&mut generator)
             })
             .collect()
+    }
+
+    /// Fit one replicate per perturbation, in parallel: replicate `b` has
+    /// the data of `perturbations[b]` ([`ReplicateRunner::fit_one`]).
+    pub fn fit_all(&self, perturbations: &[Perturbation]) -> ReplicateFits {
+        let outcomes: Vec<_> = perturbations
+            .par_iter()
+            .enumerate()
+            .map(|(index, perturbation)| self.fit_one(index, perturbation))
+            .collect();
+        let mut fits = Vec::new();
+        let mut failed = Vec::new();
+        let mut not_converged = 0;
+        for (index, outcome) in outcomes.into_iter().enumerate() {
+            match outcome {
+                Ok(result) => {
+                    not_converged += usize::from(!result.converged);
+                    fits.push((index, result));
+                }
+                Err(reason) => failed.push((index, reason)),
+            }
+        }
+        ReplicateFits {
+            fits,
+            failed,
+            not_converged,
+        }
     }
 }
 
@@ -190,7 +297,8 @@ pub struct BootstrapRun {
 ///
 /// # Errors
 ///
-/// Returns the first reasons when every replicate fails.
+/// Returns the message of [`FitUnit::require`] when every replicate
+/// fails.
 pub fn bootstrap<E>(
     runner: &ReplicateRunner<'_, E>,
     resampler: &dyn Resampler,
@@ -199,27 +307,27 @@ pub fn bootstrap<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
-    let outcomes = runner.run(resampler, replicates);
+    let perturbations = runner.perturbations(resampler, replicates);
+    let negative_values = perturbations
+        .iter()
+        .map(|perturbation| match perturbation {
+            Perturbation::Values(values) => values.iter().filter(|&&v| v < 0.0).count(),
+            Perturbation::Weights(_) => 0,
+        })
+        .sum();
+    let fits = runner.fit_all(&perturbations);
+    fits.require(FitUnit::Replicate, 1)?;
     let problem = runner.problem();
-    let mut values = Vec::new();
-    let mut groups = Vec::new();
-    let mut failed = Vec::new();
-    let mut not_converged = 0;
-    let mut negative_values = 0;
-    for outcome in outcomes {
-        negative_values += outcome.negative_values;
-        match outcome.result {
-            Ok(result) => {
-                not_converged += usize::from(!result.converged);
-                values.push(problem.applied_parameter_values(&result.best_parameters));
-                groups.push(outcome.index);
-            }
-            Err(reason) => failed.push((outcome.index, reason)),
-        }
-    }
-    if values.is_empty() {
-        return Err(every_replicate_failed(&failed));
-    }
+    let (groups, values): (Vec<usize>, Vec<Vec<f64>>) = fits
+        .fits
+        .iter()
+        .map(|(index, fit)| {
+            (
+                *index,
+                problem.applied_parameter_values(&fit.best_parameters),
+            )
+        })
+        .unzip();
     let log_weights = vec![0.0; values.len()];
     let sample = ParameterSample::new(
         problem.parameter_names(),
@@ -230,21 +338,37 @@ where
     )?;
     Ok(BootstrapRun {
         sample,
-        failed,
-        not_converged,
+        failed: fits.failed,
+        not_converged: fits.not_converged,
         negative_values,
     })
 }
 
-pub(crate) fn every_replicate_failed(failed: &[(usize, String)]) -> String {
-    let reasons: Vec<String> = failed
-        .iter()
-        .take(3)
-        .map(|(index, reason)| format!("replicate {index}: {reason}"))
-        .collect();
-    format!(
-        "Every replicate failed ({}); the first reasons: {}",
-        failed.len(),
-        reasons.join("; ")
-    )
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_entry_names_the_unit_and_the_index_of_its_fit() {
+        let failed = [(2, "no weight".to_string())];
+        assert_eq!(
+            FitUnit::Block.entries(&failed),
+            ["Block 2 failed: no weight"]
+        );
+        assert_eq!(
+            FitUnit::Origin.failed(0, "x"),
+            "Origin 0 failed: x".to_string()
+        );
+        assert_eq!(
+            FitUnit::Replicate.failed(1, "x"),
+            "Replicate 1 failed: x".to_string()
+        );
+    }
+
+    #[test]
+    fn enough_fits_pass_the_check() {
+        let failed = [(0, "x".to_string())];
+        assert_eq!(FitUnit::Block.require(2, &failed, 2), Ok(()));
+        assert!(FitUnit::Block.require(1, &failed, 2).is_err());
+    }
 }

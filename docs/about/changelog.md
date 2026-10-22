@@ -67,6 +67,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   you stored. See
   [One confidence-interval convention](../codebase/decisions/results.md#one-confidence-interval-convention).
 
+- **Breaking:** results that hold the same thing hold it in the same place,
+  under the same name. Every result of a method that fits several times lists
+  each fit that failed in `failed`, `"<Start|Replicate|Block|Origin> <index>
+  failed: <reason>"`, logged as a warning, and counts the fits kept although
+  their optimizer did not converge in `not_converged`. Change your code:
+
+  | Before | Now |
+  |---|---|
+  | `CalibrationResult.failed_runs` | `CalibrationResult.failed` |
+  | `BootstrapResult.diagnostics.failed`, `.diagnostics.not_converged` | `BootstrapResult.failed`, `.not_converged` |
+  | `JackknifeResult.diagnostics.failed`, `.diagnostics.not_converged` | `JackknifeResult.failed`, `.not_converged`; an entry names the block by its index from 0, `"Block 2 failed: …"`, not by its span |
+  | `ProfileResult.failed_replicates` | `ProfileResult.failed`, and the new `ProfileResult.not_converged` |
+  | The failed refits of `RollingConformal`, `JackknifePlus` and `EnbPI`, only logged as `"Refit i failed: …"` | `ConformalResult.failed` and `ConformalResult.not_converged` |
+  | The failed replicates of `BootstrapCoverageEta` in `GibbsResult.diagnostics.notes` | `GibbsResult.failed` |
+  | `ProfileResult.report()` | `ProfileResult.identifiability()`; its `report()` gives the data |
+  | `sample.effective_size()` | `sample.effective_size`, a property, as on every other object |
+
+  When a method has fewer successful fits than it needs, its `RuntimeError`
+  says how many of how many fitted, how many it needs, and the first
+  reasons, and names the unit: `"Only 1 of 5 blocks fitted, and the method
+  needs 2; …"`. It says `"Every origin failed: …"` (or replicate, block) only
+  when none fitted. The jackknife and jackknife+ no longer say that every
+  replicate failed when one fit succeeded. See
+  [Resampling](../guide/uncertainty/resampling.md#the-result).
+
 ### Removed
 
 - **Breaking:** `commol.add_stderr_logger` is removed: commol configures no

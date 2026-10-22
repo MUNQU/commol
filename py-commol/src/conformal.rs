@@ -12,7 +12,7 @@ use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
 use commol_inference::resampling::{
-    BlockDrawing, BlockScheme, ReplicateRunner, ResidualScale, Residuals,
+    BlockDrawing, BlockScheme, FitUnit, ReplicateRunner, ResidualScale, Residuals,
 };
 
 use crate::calibration::{PyObservedDataPoint, PyOptimizationConfig};
@@ -47,8 +47,10 @@ pub struct PyConformalRun {
     upper: Vec<f64>,
     /// Each score with the label of its series
     scores: Vec<(String, f64)>,
-    /// The index and reason of each refit that failed
-    failed: Vec<(usize, String)>,
+    /// Each refit that failed: "<Unit> <index> failed: <reason>"
+    failed: Vec<String>,
+    /// Refits kept although their optimizer did not converge
+    not_converged: usize,
     /// The guaranteed coverage, when the method computes one
     bound: Option<f64>,
     /// The number of blocks refitted, for a method with blocks
@@ -59,8 +61,10 @@ pub struct PyConformalRun {
     block_length_estimates: Option<Vec<(String, f64)>>,
 }
 
-impl From<ConformalRun> for PyConformalRun {
-    fn from(run: ConformalRun) -> Self {
+impl PyConformalRun {
+    /// The run of a method whose refits are of `unit`; a method with no
+    /// refits has no failed refit, whatever its unit
+    fn of(run: ConformalRun, unit: FitUnit) -> Self {
         let intervals = run.intervals;
         Self {
             labels: intervals.targets.iter().map(|t| t.label.clone()).collect(),
@@ -69,7 +73,8 @@ impl From<ConformalRun> for PyConformalRun {
             lower: intervals.lower,
             upper: intervals.upper,
             scores: run.scores,
-            failed: run.failed,
+            failed: unit.entries(&run.failed),
+            not_converged: run.not_converged,
             bound: None,
             blocks: None,
             block_length: None,
@@ -142,7 +147,7 @@ fn split_conformal(
             settings,
         )
     })?
-    .map(PyConformalRun::from)
+    .map(|run| PyConformalRun::of(run, FitUnit::Replicate))
     .map_err(conformal_error)
 }
 
@@ -186,7 +191,7 @@ fn rolling_conformal(
     parallel(py, || {
         conformal::rolling_conformal(&runner, &origins, &positions, settings)
     })?
-    .map(PyConformalRun::from)
+    .map(|run| PyConformalRun::of(run, FitUnit::Origin))
     .map_err(conformal_error)
 }
 
@@ -252,7 +257,7 @@ fn jackknife_plus(
         blocks: Some(run.blocks),
         block_length: Some(chosen.length),
         block_length_estimates: chosen.estimates,
-        ..PyConformalRun::from(run.run)
+        ..PyConformalRun::of(run.run, FitUnit::Block)
     })
 }
 
@@ -303,7 +308,7 @@ fn enbpi(
         blocks: Some(scheme.count()),
         block_length: Some(chosen.length),
         block_length_estimates: chosen.estimates,
-        ..PyConformalRun::from(run)
+        ..PyConformalRun::of(run, FitUnit::Replicate)
     })
 }
 
@@ -343,7 +348,7 @@ fn adaptive_conformal(
     parallel(py, || {
         conformal::adaptive_conformal(&problem.inner, predictor, &stream, step, settings)
     })?
-    .map(PyConformalRun::from)
+    .map(|run| PyConformalRun::of(run, FitUnit::Replicate))
     .map_err(conformal_error)
 }
 

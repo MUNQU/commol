@@ -144,7 +144,7 @@ class TestFailedStarts:
         )
         return calibrator
 
-    def test_a_failed_start_is_in_the_result_and_in_the_log(
+    def test_a_failed_start_is_in_failed(
         self, truth_run: dict[str, list[float]], caplog: pytest.LogCaptureFixture
     ) -> None:
         calibrator = self._with_outcomes(
@@ -154,7 +154,7 @@ class TestFailedStarts:
         with caplog.at_level(logging.WARNING, logger="commol.api.calibrator"):
             result = calibrator.run(starts=2)
 
-        assert result.failed_runs == ["Start 1 failed: Simulation failed: x"]
+        assert result.failed == ["Start 1 failed: Simulation failed: x"]
         assert [r.getMessage() for r in caplog.records if r.levelname == "WARNING"] == [
             "Start 1 failed: Simulation failed: x"
         ]

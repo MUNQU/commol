@@ -220,7 +220,7 @@ problem = CalibrationProblem(
     seed=7,
 )
 result = Calibrator(Simulation(model(None, None)), problem).run(starts=4)
-print(len(result.starts), result.failed_runs)  # 4 []
+print(len(result.starts), result.failed)  # 4 []
 print(result.starts[0].start)  # {'k1': 0.5, 'k2': 0.5}
 print({name: round(value, 2) for name, value in result.best_parameters.items()})  # {'k1': 0.4, 'k2': 0.1}
 ```
@@ -228,7 +228,7 @@ print({name: round(value, 2) for name, value in result.best_parameters.items()})
 | `CalibrationResult` field | Meaning |
 |---|---|
 | `starts` | One `StartSummary` per start that finished, in order: `start`, `end`, `loss`, `converged` |
-| `failed_runs` | Why each start that failed did, with its number; each is also logged as a warning (`logging`, logger `commol.api.calibrator`) |
+| `failed` | Each start that failed, `"Start <index> failed: <reason>"`; each is also logged as a warning (`logging`, logger `commol.api.calibrator`) |
 
 The result is the start of least loss; if every start fails, `run` raises a
 `RuntimeError` with every reason. Starts that end at distinct points with equal

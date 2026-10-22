@@ -9,11 +9,11 @@
 
 use commol_calibration::{CalibrationProblem, LossConfig, Subproblem, optimize_subproblem};
 use commol_core::SimulationEngine;
-use commol_random::{Generator, replicate_seed};
+use commol_random::replicate_seed;
 use rayon::prelude::*;
 
 use crate::profiles::tracer::ProfiledQuantity;
-use crate::resampling::{ReplicateRunner, Resampler};
+use crate::resampling::{FitUnit, ReplicateRunner, Resampler};
 use crate::special::{f_one_quantile, normal_quantile};
 use crate::statistics;
 
@@ -91,17 +91,21 @@ pub struct BootstrapThresholds {
     pub rises: Vec<Vec<f64>>,
     /// The replicates that did not fail.
     pub replicates: Vec<usize>,
-    /// The index and reason of each replicate that failed.
+    /// The index and reason of each replicate that failed: its fit, or the
+    /// fit of a quantity held at its center.
     pub failed: Vec<(usize, String)>,
+    /// The number of replicates kept although the optimizer of their fit
+    /// did not converge.
+    pub not_converged: usize,
 }
 
 /// The thresholds of `quantities`, held at their values `centers` at the
 /// fit, calibrated by the bootstrap (prepivoting, Beran 1988).
 ///
 /// Replicate `b` draws its data with `resampler` from the generator of
-/// `replicate_seed(runner.seed(), b)`, as [`ReplicateRunner::run`] does, so
-/// it is the replicate of that bootstrap. It is fitted
-/// ([`ReplicateRunner::fit_one`], giving `θ̂_b` and its loss `L_b(θ̂_b)`),
+/// `replicate_seed(runner.seed(), b)` ([`ReplicateRunner::perturbations`]),
+/// so it is the replicate of that bootstrap. It is fitted
+/// ([`ReplicateRunner::fit_all`], giving `θ̂_b` and its loss `L_b(θ̂_b)`),
 /// and each quantity is held at its center on the replicate's data from
 /// `θ̂_b`: the rise is `PL_b(center) − L_b(θ̂_b)`, at least 0. The threshold
 /// of a quantity is the quantile `confidence_level` of its rises.
@@ -110,7 +114,7 @@ pub struct BootstrapThresholds {
 /// # Errors
 ///
 /// Returns a message when `confidence_level` is not strictly between 0 and
-/// 1, the lengths differ, or every replicate fails.
+/// 1, the lengths differ, or every replicate fails ([`FitUnit::require`]).
 pub fn bootstrap_thresholds<E>(
     runner: &ReplicateRunner<'_, E>,
     resampler: &dyn Resampler,
@@ -130,44 +134,49 @@ where
             centers.len()
         ));
     }
-    let outcomes: Vec<(usize, Result<Vec<f64>, String>)> = (0..replicates)
-        .into_par_iter()
-        .map(|index| {
-            let mut generator = Generator::from_seed(replicate_seed(runner.seed(), index as u64));
-            let perturbation = resampler.replicate(&mut generator);
-            let rises = runner.fit_one(index, &perturbation).and_then(|fit| {
-                let problem = runner.replicate_problem(&perturbation)?;
-                let seed = replicate_seed(replicate_seed(runner.seed(), index as u64), 0);
-                quantities
-                    .iter()
-                    .zip(centers)
-                    .enumerate()
-                    .map(|(q, (quantity, &center))| {
-                        let held = hold(&problem, quantity, center)?;
-                        let mut start = fit.best_parameters.clone();
-                        if let ProfiledQuantity::Parameter(j) = quantity {
-                            start[*j] = center;
-                        }
-                        let refit = optimize_subproblem(
-                            &held,
-                            runner.config(),
-                            &start,
-                            Some(replicate_seed(seed, q as u64)),
-                        )?;
-                        Ok((refit.fit.final_loss - fit.final_loss).max(0.0))
-                    })
-                    .collect()
-            });
-            (index, rises)
+    let perturbations = runner.perturbations(resampler, replicates);
+    let fits = runner.fit_all(&perturbations);
+    let outcomes: Vec<(usize, bool, Result<Vec<f64>, String>)> = fits
+        .fits
+        .par_iter()
+        .map(|(index, fit)| {
+            let index = *index;
+            let rises = runner
+                .replicate_problem(&perturbations[index])
+                .and_then(|problem| {
+                    let seed = replicate_seed(replicate_seed(runner.seed(), index as u64), 0);
+                    quantities
+                        .iter()
+                        .zip(centers)
+                        .enumerate()
+                        .map(|(q, (quantity, &center))| {
+                            let held = hold(&problem, quantity, center)?;
+                            let mut start = fit.best_parameters.clone();
+                            if let ProfiledQuantity::Parameter(j) = quantity {
+                                start[*j] = center;
+                            }
+                            let refit = optimize_subproblem(
+                                &held,
+                                runner.config(),
+                                &start,
+                                Some(replicate_seed(seed, q as u64)),
+                            )?;
+                            Ok((refit.fit.final_loss - fit.final_loss).max(0.0))
+                        })
+                        .collect()
+                });
+            (index, fit.converged, rises)
         })
         .collect();
     let mut rises = vec![Vec::new(); quantities.len()];
     let mut kept = Vec::new();
-    let mut failed = Vec::new();
-    for (index, outcome) in outcomes {
+    let mut failed = fits.failed;
+    let mut not_converged = 0;
+    for (index, converged, outcome) in outcomes {
         match outcome {
             Ok(values) => {
                 kept.push(index);
+                not_converged += usize::from(!converged);
                 for (column, value) in rises.iter_mut().zip(values) {
                     column.push(value);
                 }
@@ -175,9 +184,8 @@ where
             Err(reason) => failed.push((index, reason)),
         }
     }
-    if kept.is_empty() {
-        return Err(crate::resampling::runner::every_replicate_failed(&failed));
-    }
+    failed.sort_by_key(|(index, _)| *index);
+    FitUnit::Replicate.require(kept.len(), &failed, 1)?;
     let weights = vec![1.0; kept.len()];
     let thresholds = rises
         .iter()
@@ -191,6 +199,7 @@ where
         rises,
         replicates: kept,
         failed,
+        not_converged,
     })
 }
 

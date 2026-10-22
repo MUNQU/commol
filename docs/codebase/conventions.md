@@ -51,7 +51,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 - `ModelBuilder` methods return `Self`, so calls chain.
 - Log with the standard `logging` module. Library code never writes to the
   standard error of the process: a failure is part of the result and the
-  caller logs it (`CalibrationResult.failed_runs`). Output the user asks for,
+  caller logs it (`CalibrationResult.failed`). Output the user asks for,
   such as a verbose optimizer's table, goes to Python's `sys.stdout`.
 
 ## Rust

@@ -129,5 +129,6 @@ where
         intervals,
         scores,
         failed: Vec::new(),
+        not_converged: 0,
     })
 }

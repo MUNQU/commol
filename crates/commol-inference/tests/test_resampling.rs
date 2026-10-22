@@ -8,6 +8,10 @@ use commol_calibration::{
     OptimizationConfig, Workspace,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
+use commol_inference::conformal::{
+    ConformalSettings, NonconformityScore, Pooling, enbpi, jackknife_plus, rolling_conformal,
+};
+use commol_inference::profiles::{ProfiledQuantity, bootstrap_thresholds};
 use commol_inference::resampling::{
     BayesianBootstrap, BlockDrawing, BlockScheme, Multipliers, Perturbation, ReplicateRunner,
     Resampler, ResidualBlocks, ResidualBootstrap, ResidualNoise, ResidualScale, Residuals,
@@ -18,7 +22,8 @@ use commol_random::Generator;
 
 type Formula = fn(&HashMap<String, f64>, f64) -> f64;
 
-/// One output `x = formula(parameters, t)` at every position `t`.
+/// One output `x = formula(parameters, t)` at every position `t`; a run
+/// whose output is not a number fails.
 #[derive(Clone, Debug)]
 struct ClosedForm {
     formula: Formula,
@@ -47,11 +52,15 @@ impl SimulationEngine for ClosedForm {
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), SimulationError> {
         buffer.clear();
-        buffer.extend(
-            positions
-                .iter()
-                .map(|&t| vec![(self.formula)(&self.parameters, t)]),
-        );
+        for &t in positions {
+            let value = (self.formula)(&self.parameters, t);
+            if value.is_nan() {
+                return Err(SimulationError::Failed(
+                    "the run is not a number".to_string(),
+                ));
+            }
+            buffer.push(vec![value]);
+        }
         Ok(())
     }
 
@@ -566,8 +575,13 @@ fn a_failed_replicate_is_reported_not_sampled() {
         3,
     )
     .unwrap_err();
-    assert!(error.contains("Every replicate failed (3)"), "{error}");
-    assert!(error.contains("replicate 0"), "{error}");
+    assert!(
+        error.starts_with(
+            "Every replicate failed: 0 of 3 replicates fitted, and the method needs 1; the \
+             first reasons: replicate 0: "
+        ),
+        "{error}"
+    );
 }
 
 #[test]
@@ -752,35 +766,91 @@ fn a_runner_takes_a_start_and_one_fit_value_per_parameter() {
 }
 
 #[test]
-fn a_jackknife_reports_the_blocks_it_could_not_fit() {
-    let values = [1.0, 2.0, 3.0, 4.0];
-    let problem = line_problem(&values);
+fn a_jackknife_whose_fits_all_fail_says_every_block_failed() {
+    let problem = line_problem(&[1.0, 2.0, 3.0, 4.0]);
     let scheme = BlockScheme::new(problem.observed_data(), 2).unwrap();
     let broken = OptimizationConfig::NelderMead(NelderMeadConfig {
         initial_simplex_size: 0.0,
         ..NelderMeadConfig::default()
     });
-    // Without the observations of the first block, no weight is left when
-    // the second one is left out.
-    let half = problem.with_data(&values, &[0.0, 0.0, 1.0, 1.0]).unwrap();
-    let config = config();
+    let runner = ReplicateRunner::new(&problem, &broken, &[1.0, 1.0], 2, 0).unwrap();
 
-    let none = block_jackknife(
-        &ReplicateRunner::new(&problem, &broken, &[1.0, 1.0], 2, 0).unwrap(),
-        &scheme,
-    )
-    .unwrap_err();
-    let one = block_jackknife(
-        &ReplicateRunner::new(&half, &config, &[1.0, 1.0], 1, 0).unwrap(),
-        &scheme,
-    )
-    .unwrap_err();
+    let error = block_jackknife(&runner, &scheme).unwrap_err();
 
-    assert!(none.starts_with("Every replicate failed (2)"), "{none}");
     assert!(
-        one.starts_with("Only one block left out could be fitted; a jackknife needs two."),
-        "{one}"
+        error.starts_with(
+            "Every block failed: 0 of 2 blocks fitted, and the method needs 2; the first \
+             reasons: block 0: "
+        ),
+        "{error}"
     );
+}
+
+/// `c` up to 22; above it, a run that is not a number.
+fn capped(p: &HashMap<String, f64>, _: f64) -> f64 {
+    if p["c"] > 22.0 { f64::NAN } else { p["c"] }
+}
+
+#[test]
+fn a_jackknife_with_one_fitted_block_says_how_many_fitted() {
+    // The fit is the mean, 20. Leaving out 100 moves it down to 0; leaving
+    // out a 0 moves it up to 25, past 22, where the run fails.
+    let problem = problem(capped, &[("c", -50.0, 50.0)], &[0.0, 0.0, 0.0, 0.0, 100.0]);
+    let config = config();
+    let runner = ReplicateRunner::new(&problem, &config, &[20.0], 1, 0).unwrap();
+    let scheme = BlockScheme::new(problem.observed_data(), 1).unwrap();
+
+    let error = block_jackknife(&runner, &scheme).unwrap_err();
+
+    assert!(
+        error.starts_with(
+            "Only 1 of 5 blocks fitted, and the method needs 2; the first reasons: block 0: "
+        ),
+        "{error}"
+    );
+}
+
+#[test]
+fn every_replicate_method_counts_the_same_fits() {
+    let values = [1.0, 2.2, 2.9, 4.1, 5.0, 5.8, 7.2, 8.0];
+    let problem = line_problem(&values);
+    let scheme = BlockScheme::new(problem.observed_data(), 2).unwrap();
+    let resampler = BayesianBootstrap::new(problem.observed_data(), &scheme);
+    let settings =
+        ConformalSettings::new(NonconformityScore::Absolute, Pooling::Series, 0.5).unwrap();
+    let held = [ProfiledQuantity::Parameter(0)];
+    // The number of fits each method kept, and how many of them did not
+    // converge.
+    let counts = |config: &OptimizationConfig| -> Vec<(usize, usize)> {
+        let runner = ReplicateRunner::new(&problem, config, &[1.0, 1.0], 1, 4).unwrap();
+        let sample = bootstrap(&runner, &resampler, 3).unwrap();
+        let jackknife = block_jackknife(&runner, &scheme).unwrap();
+        let plus = jackknife_plus(&runner, &scheme, &[8.0], settings).unwrap();
+        let rolling = rolling_conformal(&runner, &[3.0, 5.0], &[8.0], settings).unwrap();
+        let ensemble = enbpi(&runner, &scheme, 12, &[8.0], settings).unwrap();
+        let thresholds = bootstrap_thresholds(&runner, &resampler, 3, &held, &[1.0], 0.5).unwrap();
+        vec![
+            (sample.sample.len(), sample.not_converged),
+            (jackknife.blocks.len(), jackknife.not_converged),
+            (plus.blocks, plus.run.not_converged),
+            (2 - rolling.failed.len(), rolling.not_converged),
+            (12 - ensemble.failed.len(), ensemble.not_converged),
+            (thresholds.replicates.len(), thresholds.not_converged),
+        ]
+    };
+    let one_iteration = OptimizationConfig::NelderMead(NelderMeadConfig {
+        max_iterations: 1,
+        ..NelderMeadConfig::default()
+    });
+
+    for (fits, not_converged) in counts(&config()) {
+        assert!(fits > 0);
+        assert_eq!(not_converged, 0);
+    }
+    for (fits, not_converged) in counts(&one_iteration) {
+        assert!(fits > 0);
+        assert_eq!(not_converged, fits);
+    }
 }
 
 #[test]

@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from commol import (
     BayesianBootstrap,
     Calibrator,
+    IdentifiabilityReport,
     LogNormalObservations,
     NelderMeadConfig,
     NormalObservations,
@@ -205,7 +206,7 @@ class TestThresholds:
             )
         )
 
-        failed = result.failed_replicates
+        failed = result.failed
         assert failed and all("needs a value above 0" in reason for reason in failed)
         rises = result.profiles["c"].replicate_rises
         assert rises is not None and len(rises) == 20 - len(failed)
@@ -359,4 +360,45 @@ def test_a_threshold_takes_a_confidence_level() -> None:
 
     z = NormalDist().inv_cdf(0.95)
     assert result.profiles["c"].threshold == pytest.approx(z**2 / 2)
-    assert [section.confidence_level for section in result.report().profile] == [0.9]
+
+
+def test_the_identifiability_of_a_profile_is_a_report() -> None:
+    calibrator = line_calibrator(
+        VALUES, observation_models={"B": NormalObservations(sd=1.0)}
+    )
+    result = calibrator.uncertainty(
+        ProfileLikelihood(
+            parameters=["c"], threshold=Threshold.chi_square(0.9), max_steps=100
+        )
+    )
+
+    report = result.identifiability()
+
+    assert isinstance(report, IdentifiabilityReport)
+    assert [section.confidence_level for section in report.profile] == [0.9]
+    data = report.report()
+    assert data["parameters"]["c"]["practical"] == {
+        "verdict": "determined",
+        "reasons": [
+            "profile likelihood: identifiable. The verdict holds with the other "
+            "parameters at their fitted values."
+        ],
+    }
+    assert data["parameters"]["B"] == {"structural": None, "practical": None}
+
+
+def test_a_prediction_profile_has_no_identifiability() -> None:
+    calibrator = line_calibrator(
+        VALUES, observation_models={"B": NormalObservations(sd=1.0)}
+    )
+    result = calibrator.uncertainty(
+        PredictionProfile(
+            specs=[PredictionSpec(at=4, output="B")],
+            threshold=Threshold.chi_square(0.9),
+            max_steps=2,
+        )
+    )
+
+    assert result.structure == {}
+    with pytest.raises(ValueError, match="predictions have no verdict on a parameter"):
+        result.identifiability()
