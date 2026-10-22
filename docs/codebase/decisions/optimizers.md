@@ -35,12 +35,10 @@ history does not depend on the order in which the threads finish. With
 several failing points, the error is that of the first in the order of the
 points. A score takes the buffers of its thread out of the thread-local
 `WORKSPACE` while it runs (`with_workspace`), so a job that the thread steals
-meanwhile takes its own; `score_in` makes no `rayon` call.
-
-The augmented Lagrangian of the argmin fork scores its inner swarm through
-`AugmentedLagrangianCost`, whose `bulk_cost` is the default of the fork: it
-scores in parallel whatever the levels, and it returns the error of any
-failing particle (#320).
+meanwhile takes its own; `score_in` makes no `rayon` call. The swarm of a held
+prediction scores `AugmentedLagrangianCost` of the fork, which runs in
+parallel when `PredictionCost::parallelize` says so, at the same levels, and
+also returns the error of the first failing point.
 
 | Alternative | Why not |
 |---|---|
@@ -51,7 +49,8 @@ failing particle (#320).
 **Guards:** `crates/commol-calibration/src/optimization.rs` `tests`
 (`a_swarm_gives_the_same_result_with_parallel_particles`,
 `the_error_of_a_swarm_is_its_first_failing_particle`,
-`a_swarm_on_a_subproblem_gives_one_fit_whatever_the_threads`);
+`a_swarm_on_a_subproblem_gives_one_fit_whatever_the_threads`,
+`a_swarm_on_a_held_prediction_follows_the_levels`);
 `objective::tests::a_score_holds_no_borrow_of_the_workspace`;
 `tests/calibration/test_parallelism.py::test_a_seed_gives_one_result_whatever_the_threads_and_the_level`.
 

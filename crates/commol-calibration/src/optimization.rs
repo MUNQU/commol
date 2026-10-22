@@ -1240,6 +1240,53 @@ mod tests {
     }
 
     #[test]
+    fn a_swarm_on_a_held_prediction_follows_the_levels() {
+        let problem = two_rates();
+        let spec = crate::ObservedDataPoint::new(8.0, "C".to_string(), 0.0);
+        let (observing, operator) = problem.observing(&[spec]).unwrap();
+        let settings = ConstraintSettings {
+            max_outer_iterations: 4,
+            ..ConstraintSettings::for_value(200.0)
+        };
+        let held = &crate::subproblem::HeldPrediction {
+            observing,
+            operator,
+            value: 200.0,
+            settings,
+        };
+        let config = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
+            num_particles: 32,
+            max_iterations: 10,
+            seed: Some(5),
+            ..ParticleSwarmConfig::default()
+        });
+        for levels in [Levels::All, Levels::Outer] {
+            let (parallelize, threads) = Parallelism::new(4, levels)
+                .unwrap()
+                .install(|| {
+                    let parallelize = CostFunction::parallelize(&PredictionCost::new(held));
+                    let run = run_constrained(
+                        &SearchSpace::of(&problem),
+                        PredictionCost::new(held),
+                        &config,
+                        &[0.5, 0.5],
+                        None,
+                        &held.settings,
+                    )
+                    .unwrap();
+                    // Each thread that scored a particle keeps its last point.
+                    let threads = run.cost.last_points().len();
+                    (parallelize, threads)
+                })
+                .unwrap();
+            assert_eq!(parallelize, levels == Levels::All);
+            if levels == Levels::Outer {
+                assert_eq!(threads, 1);
+            }
+        }
+    }
+
+    #[test]
     fn a_swarm_with_nan_costs_finds_the_minimum_where_the_cost_is_a_number() {
         let space = SearchSpace {
             bounds: vec![(0.0, 1.0)],
