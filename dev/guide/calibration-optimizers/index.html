@@ -3587,7 +3587,12 @@ losses are a sign that the data do not identify the parameters;
 <p>Set <code>CalibrationProblem(seed=...)</code>: the starts, a particle swarm and the
 replicates of a stochastic engine then make the same random choices on every
 run. Without a seed, <code>Calibrator.seed</code> draws one from the operating system and
-logs it, so the run can be repeated.</p>
+logs it. The result keeps it in <code>CalibrationResult.seed</code>, and the sample of
+each uncertainty method in <code>sample.method.settings["seed"]</code>: set it as
+<code>problem.seed</code> to repeat the run, also from a result read back from JSON.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">again</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;seed&quot;</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">seed</span><span class="p">})</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)),</span> <span class="n">again</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">starts</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span> <span class="o">==</span> <span class="n">result</span><span class="p">)</span>  <span class="c1"># True</span>
+</span></code></pre></div>
 <h2 id="history-of-evaluations">History of evaluations<a class="headerlink" href="#history-of-evaluations" title="Permanent link">&para;</a></h2>
 <p><code>Calibrator.run_with_history()</code> optimizes from the initial guess and returns a
 <code>CalibrationHistory</code>: the <code>result</code>, and every evaluation of a feasible point

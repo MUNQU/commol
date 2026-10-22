@@ -10,11 +10,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- A calibration result records the seed it used, `CalibrationResult.seed` (`Calibrator.seed`: `problem.seed`, or the seed the calibrator drew), and the sample of every uncertainty method and of `Calibrator.point_sample` names it in `method.settings["seed"]`. Set as `problem.seed`, it repeats the run, also from a result read back from JSON. See [Reproducibility](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#reproducibility).
+
 - `Ratio(numerator, denominator, replicates)` is a quantity of interest: one `ValueAt`, `Gain` or `Peak` over another, in each run, so PRCC, Morris, Sobol and a polynomial chaos read a ratio whose denominator depends on the inputs. `replicates` is required: with a stochastic engine, a point of a design holds the mean of the ratios (`"within"`), the mean of the ratios of the replicates with a positive denominator (`"within_positive"`) or the ratio of the means (`"pooled"`). A denominator of 0 makes the ratio of a run NaN, and every method follows the NaN rule. See [A ratio of two quantities](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#a-ratio-of-two-quantities).
 
 ### Changed
 
+- **Breaking:** `CalibrationResult` requires `seed`; a result saved by an earlier version, or built by hand, needs one to load.
+
 ### Fixed
+
+- A particle swarm without `problem.seed` takes the seed the calibrator draws and logs, so that seed repeats it; before, it drew one of its own that no result or log kept.
 
 ## [0.8.0] - 2026-10-22
 

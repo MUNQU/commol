@@ -4151,6 +4151,14 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Added #252 -->
 
+<ul>
+<li>A calibration result records the seed it used, <code>CalibrationResult.seed</code>
+  (<code>Calibrator.seed</code>: <code>problem.seed</code>, or the seed the calibrator drew), and
+  the sample of every uncertainty method and of <code>Calibrator.point_sample</code>
+  names it in <code>method.settings["seed"]</code>. Set as <code>problem.seed</code>, it repeats
+  the run, also from a result read back from JSON. See
+  <a href="../../guide/calibration-optimizers/#reproducibility">Reproducibility</a>.</li>
+</ul>
 <!-- Added #253 -->
 
 <!-- Added #282 -->
@@ -4175,6 +4183,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Changed #252 -->
 
+<ul>
+<li><strong>Breaking:</strong> <code>CalibrationResult</code> requires <code>seed</code>; a result saved by an
+  earlier version, or built by hand, needs one to load.</li>
+</ul>
 <!-- Changed #253 -->
 
 <!-- Changed #282 -->
@@ -4188,6 +4200,11 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Fixed #252 -->
 
+<ul>
+<li>A particle swarm without <code>problem.seed</code> takes the seed the calibrator
+  draws and logs, so that seed repeats it; before, it drew one of its own
+  that no result or log kept.</li>
+</ul>
 <!-- Fixed #253 -->
 
 <!-- Fixed #282 -->

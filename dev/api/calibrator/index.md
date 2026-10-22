@@ -156,7 +156,8 @@ class Calibrator:
         -------
         ParameterSample
             One draw at ``result.best_parameters``, with the names and bounds
-            of the parameters of the problem and ``SampleMethod(name="point")``.
+            of the parameters of the problem and
+            ``SampleMethod(name="point", settings={"seed": result.seed})``.
 
         Raises
         ------
@@ -176,7 +177,7 @@ class Calibrator:
             names,
             [(p.min_bound, p.max_bound) for p in self.problem.parameters],
             [[result.best_parameters[name] for name in names]],
-            SampleMethod(name="point"),
+            SampleMethod(name="point", settings={"seed": result.seed}),
         )
 
     def delta_band(
@@ -353,8 +354,9 @@ class Calibrator:
         CalibrationResult
             The best start: the optimized parameter values, in the order of
             the problem's parameters, its final loss and convergence, every
-            start (``starts``) and the reason of each start that failed
-            (``failed_runs``, also logged as warnings).
+            start (``starts``), the reason of each start that failed
+            (``failed_runs``, also logged as warnings) and the seed
+            (``seed``).
 
         Raises
         ------
@@ -415,6 +417,7 @@ class Calibrator:
             termination_reason=best.termination_reason,
             starts=[summary for summary, _ in summaries],
             failed_runs=failed_runs,
+            seed=self.seed,
         )
         logger.info(
             (
@@ -452,6 +455,7 @@ class Calibrator:
             iterations=rust_result.iterations,
             converged=rust_result.converged,
             termination_reason=rust_result.termination_reason,
+            seed=self.seed,
         )
         evaluations = [
             CalibrationEvaluation(
@@ -599,7 +603,7 @@ class Calibrator:
             mutation=rust_mutation,
             velocity=rust_velocity,
             initialization=opt_config.initialization,
-            seed=self.problem.seed,
+            seed=self.seed,
         )
         return rust_calibration.OptimizationConfig.particle_swarm(ps_config)
 
@@ -981,9 +985,9 @@ Parameters:
 
 Returns:
 
-| Type              | Description                                                                                                                    |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `ParameterSample` | One draw at result.best_parameters, with the names and bounds of the parameters of the problem and SampleMethod(name="point"). |
+| Type              | Description                                                                                                                                                    |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ParameterSample` | One draw at result.best_parameters, with the names and bounds of the parameters of the problem and SampleMethod(name="point", settings={"seed": result.seed}). |
 
 Raises:
 
@@ -1010,7 +1014,8 @@ def point_sample(self, result: CalibrationResult) -> ParameterSample:
     -------
     ParameterSample
         One draw at ``result.best_parameters``, with the names and bounds
-        of the parameters of the problem and ``SampleMethod(name="point")``.
+        of the parameters of the problem and
+        ``SampleMethod(name="point", settings={"seed": result.seed})``.
 
     Raises
     ------
@@ -1030,7 +1035,7 @@ def point_sample(self, result: CalibrationResult) -> ParameterSample:
         names,
         [(p.min_bound, p.max_bound) for p in self.problem.parameters],
         [[result.best_parameters[name] for name in names]],
-        SampleMethod(name="point"),
+        SampleMethod(name="point", settings={"seed": result.seed}),
     )
 ```
 
@@ -1257,9 +1262,9 @@ Parameters:
 
 Returns:
 
-| Type                | Description                                                                                                                                                                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CalibrationResult` | The best start: the optimized parameter values, in the order of the problem's parameters, its final loss and convergence, every start (starts) and the reason of each start that failed (failed_runs, also logged as warnings). |
+| Type                | Description                                                                                                                                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CalibrationResult` | The best start: the optimized parameter values, in the order of the problem's parameters, its final loss and convergence, every start (starts), the reason of each start that failed (failed_runs, also logged as warnings) and the seed (seed). |
 
 Raises:
 
@@ -1292,8 +1297,9 @@ def run(self, starts: int = 1) -> CalibrationResult:
     CalibrationResult
         The best start: the optimized parameter values, in the order of
         the problem's parameters, its final loss and convergence, every
-        start (``starts``) and the reason of each start that failed
-        (``failed_runs``, also logged as warnings).
+        start (``starts``), the reason of each start that failed
+        (``failed_runs``, also logged as warnings) and the seed
+        (``seed``).
 
     Raises
     ------
@@ -1354,6 +1360,7 @@ def run(self, starts: int = 1) -> CalibrationResult:
         termination_reason=best.termination_reason,
         starts=[summary for summary, _ in summaries],
         failed_runs=failed_runs,
+        seed=self.seed,
     )
     logger.info(
         (
@@ -1415,6 +1422,7 @@ def run_with_history(self) -> CalibrationHistory:
         iterations=rust_result.iterations,
         converged=rust_result.converged,
         termination_reason=rust_result.termination_reason,
+        seed=self.seed,
     )
     evaluations = [
         CalibrationEvaluation(
@@ -3421,15 +3429,16 @@ Result of a calibration: the best of its starts.
 
 Attributes:
 
-| Name                 | Type                 | Description                                                                       |
-| -------------------- | -------------------- | --------------------------------------------------------------------------------- |
-| `best_parameters`    | `dict[str, float]`   | The calibrated value of each parameter, in the order of the problem's parameters. |
-| `final_loss`         | `float`              | Loss at the best parameters.                                                      |
-| `iterations`         | `int`                | Iterations of the best start.                                                     |
-| `converged`          | `bool`               | Whether the best start converged.                                                 |
-| `termination_reason` | `str`                | Why the best start stopped.                                                       |
-| `starts`             | `list[StartSummary]` | Every start that finished, in order; the first is the initial guess.              |
-| `failed_runs`        | `list[str]`          | Why each start that failed did, with its number.                                  |
+| Name                 | Type                 | Description                                                                                                                                                                                 |
+| -------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `best_parameters`    | `dict[str, float]`   | The calibrated value of each parameter, in the order of the problem's parameters.                                                                                                           |
+| `final_loss`         | `float`              | Loss at the best parameters.                                                                                                                                                                |
+| `iterations`         | `int`                | Iterations of the best start.                                                                                                                                                               |
+| `converged`          | `bool`               | Whether the best start converged.                                                                                                                                                           |
+| `termination_reason` | `str`                | Why the best start stopped.                                                                                                                                                                 |
+| `starts`             | `list[StartSummary]` | Every start that finished, in order; the first is the initial guess.                                                                                                                        |
+| `failed_runs`        | `list[str]`          | Why each start that failed did, with its number.                                                                                                                                            |
+| `seed`               | `int`                | The seed of the calibration's random numbers (Calibrator.seed): problem.seed, or the seed the calibrator drew. Set as problem.seed, it repeats the calibration and its uncertainty methods. |
 
 Source code in `commol/context/calibration.py`
 
@@ -3455,6 +3464,11 @@ class CalibrationResult(BaseModel):
         Every start that finished, in order; the first is the initial guess.
     failed_runs : list[str]
         Why each start that failed did, with its number.
+    seed : int
+        The seed of the calibration's random numbers (`Calibrator.seed`):
+        ``problem.seed``, or the seed the calibrator drew. Set as
+        ``problem.seed``, it repeats the calibration and its uncertainty
+        methods.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -3476,6 +3490,9 @@ class CalibrationResult(BaseModel):
     failed_runs: list[str] = Field(
         default_factory=list, description="Why each failed start failed"
     )
+    seed: int = Field(
+        default=..., ge=0, description="Seed of the calibration's random numbers"
+    )
 
     @override
     def __str__(self) -> str:
@@ -3488,7 +3505,8 @@ class CalibrationResult(BaseModel):
             f"  best_parameters={self.best_parameters},\n"
             f"  termination_reason='{self.termination_reason}',\n"
             f"  starts={len(self.starts)},\n"
-            f"  failed_runs={len(self.failed_runs)}\n"
+            f"  failed_runs={len(self.failed_runs)},\n"
+            f"  seed={self.seed}\n"
             f")"
         )
 ```
@@ -3517,7 +3535,8 @@ def __str__(self) -> str:
         f"  best_parameters={self.best_parameters},\n"
         f"  termination_reason='{self.termination_reason}',\n"
         f"  starts={len(self.starts)},\n"
-        f"  failed_runs={len(self.failed_runs)}\n"
+        f"  failed_runs={len(self.failed_runs)},\n"
+        f"  seed={self.seed}\n"
         f")"
     )
 ```

@@ -136,14 +136,14 @@ print(scores.crps(predictive, held_out, NoNoise()).per_series)
 
 A `ParameterSample` holds draws of the parameters of one problem, each with a weight. Every method with draws returns one; the plots, the reports, the predictive and the scores read it, never the result of a method.
 
-| Field         | Meaning                                                                                      |
-| ------------- | -------------------------------------------------------------------------------------------- |
-| `names`       | One name per column, in the order of the problem's parameters                                |
-| `bounds`      | The bounds of each parameter; every value lies inside them                                   |
-| `values`      | One row per draw                                                                             |
-| `log_weights` | The log weight of each draw, normalized so the weights sum to 1; `-inf` for a weight of zero |
-| `groups`      | The chain, replicate or wave of each draw, or `None`                                         |
-| `method`      | The name and settings of the method that made it (`SampleMethod`)                            |
+| Field         | Meaning                                                                                                                                                                                                                          |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `names`       | One name per column, in the order of the problem's parameters                                                                                                                                                                    |
+| `bounds`      | The bounds of each parameter; every value lies inside them                                                                                                                                                                       |
+| `values`      | One row per draw                                                                                                                                                                                                                 |
+| `log_weights` | The log weight of each draw, normalized so the weights sum to 1; `-inf` for a weight of zero                                                                                                                                     |
+| `groups`      | The chain, replicate or wave of each draw, or `None`                                                                                                                                                                             |
+| `method`      | The name and settings of the method that made it (`SampleMethod`); the settings of a method of `Calibrator.uncertainty` name the seed of the calibrator, `settings["seed"]`, which repeats the sample when set as `problem.seed` |
 
 Every statistic is weighted and computed in Rust. With equal weights it is the unweighted statistic.
 
@@ -240,7 +240,7 @@ for summary in scenarios.compare("slower", "fitted", quantities, confidence_leve
 
 A quantity is one of the quantities of interest ([Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#quantities-of-interest)), reduced in Rust by `Predictive.quantities`; a `Trajectory` gives one summary per position. The runs read them at `positions`, so the positions hold `quantity_schedule(quantities)`. For anything else, `scenarios[name].runs()` gives the runs, in the order of `weights`.
 
-The point estimate of a fit is a sample of one draw: `Calibrator.point_sample(result)` gives it, with the names and bounds of the problem and `SampleMethod(name="point")`. With one run, a summary gives the value of that run and no interval (`lower` and `upper` are None).
+The point estimate of a fit is a sample of one draw: `Calibrator.point_sample(result)` gives it, with the names and bounds of the problem and `SampleMethod(name="point", settings={"seed": result.seed})`. With one run, a summary gives the value of that run and no interval (`lower` and `upper` are None).
 
 ```python
 fit = calibrator_k1.run()

@@ -170,7 +170,12 @@ The result is the start of least loss; if every start fails, `run` raises a `Run
 
 ## Reproducibility
 
-Set `CalibrationProblem(seed=...)`: the starts, a particle swarm and the replicates of a stochastic engine then make the same random choices on every run. Without a seed, `Calibrator.seed` draws one from the operating system and logs it, so the run can be repeated.
+Set `CalibrationProblem(seed=...)`: the starts, a particle swarm and the replicates of a stochastic engine then make the same random choices on every run. Without a seed, `Calibrator.seed` draws one from the operating system and logs it. The result keeps it in `CalibrationResult.seed`, and the sample of each uncertainty method in `sample.method.settings["seed"]`: set it as `problem.seed` to repeat the run, also from a result read back from JSON.
+
+```python
+again = problem.model_copy(update={"seed": result.seed})
+print(Calibrator(Simulation(model(None, None)), again).run(starts=4) == result)  # True
+```
 
 ## History of evaluations
 

@@ -2539,6 +2539,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-result-records-its-seed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A result records its seed
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3181,6 +3192,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-result-records-its-seed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A result records its seed
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3403,6 +3425,18 @@ so a held prediction stops at the outer limit and never reports convergence.</p>
 <code>fixing_a_prediction_at_the_fit_keeps_the_parameters</code>,
 <code>a_problem_observing_more_positions_scores_as_the_problem</code>,
 <code>a_swarm_fits_a_subproblem_and_repeats_from_its_seed</code>).</p>
+<h2 id="a-result-records-its-seed">A result records its seed<a class="headerlink" href="#a-result-records-its-seed" title="Permanent link">&para;</a></h2>
+<p>Every random number of a calibration and of its uncertainty methods comes from
+<code>Calibrator.seed</code>: <code>problem.seed</code>, or a seed the calibrator draws once and
+logs. A particle swarm takes it too, so the seed alone repeats a run. The
+result records it, so a result read from a file repeats too:
+<code>CalibrationResult.seed</code>, and <code>settings["seed"]</code> of the <code>SampleMethod</code> of every
+sample a runner makes (<code>sample_method</code> in <code>api/inference/resampling.py</code>) or
+<code>Calibrator.point_sample</code> makes.</p>
+<p><strong>Guards:</strong> <code>tests/calibration/test_problem.py</code>
+(<code>test_a_result_records_the_seed_of_its_calibration</code>);
+<code>tests/calibration/test_optimizers.py</code>
+(<code>test_the_seed_of_a_result_repeats_a_particle_swarm</code>).</p>
 
 
 
