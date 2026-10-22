@@ -9,17 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [0.7.0] - 2026-10-22
 
-<!-- Added #245 -->
+This release reads a run through the classes of commol. The axis of a model
+gives the window grid (`AxisUnits.window_end` and the other methods) and, from
+a calendar origin, the date of each position. `Simulation.sample`,
+`total_series` and `windowed_totals` read bins, accumulators and output names,
+and each report is a method of the object it describes. Before you upgrade,
+read the two **Breaking** entries: the module functions of the window grid
+and the report functions are removed, and the table under Changed gives the
+method that replaces each one. See [Reports](../guide/reports.md) and
+[Simulations](../guide/simulations.md).
+
+### Added
 
 - `commol.sample(series, positions, at)` reads a series at given positions,
   and `Simulation.sample(results, ids, at)` reads bins and accumulators by id
   at given positions, next to `Simulation.windowed_totals`: for example, the
   amount in a bin at the end of each window. An id stands for all its outputs,
   summed; an output name stands for itself.
-
-<!-- Added #254 -->
 
 - An axis of time can start at a calendar date: `ModelBuilder(origin=...)`
   takes a `date` or a `datetime` with no time zone, and `Model.axis_units()`
@@ -29,8 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   needs a step unit of time of a whole number of days or a whole fraction of a
   day: `month` and `year` raise `ValueError`.
 
-<!-- Added #255 -->
-
 - `Simulation.total_series` and `Simulation.windowed_totals` take output names
   as well as bin and accumulator ids. An output name stands for itself, so
   `simulation.windowed_totals(results, ["moved_g2", "moved_g3"], 2)` sums two
@@ -38,14 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   all its outputs. An id that is neither raises `KeyError` with the bins,
   accumulators and outputs of the model.
 
-<!-- Added #256 -->
-
 - The window grid on the axis: `AxisUnits.window_start(index, span, unit)`,
   `window_end(index, span, unit)`, `window_index(at, span, unit)` and
   `window_ends(span, unit, end)`, for a window of a span in a unit, such as
   one week. The width must be a whole number of steps.
-
-<!-- Added #257 -->
 
 - `SimulationResults.model` and `SimulationReplicates.model`: the results of
   `Simulation.run`, `run_at` and `replicates` hold a reference to their
@@ -55,22 +57,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-<!-- Changed #245 -->
-
-<!-- Changed #254 -->
-
-<!-- Changed #255 -->
-
-<!-- Changed #256 -->
-
 - **Breaking:** the module functions `window_start`, `window_end`,
   `window_index` and `window_ends` are removed from `commol`. Use the methods
   of `AxisUnits` (`Model.axis_units()`), with the width as a span and a unit:
   `window_end(2, 168)` on an axis of hours is
   `units.window_end(2, 1, "week")`, and a width of 7 steps is `(7, "day")`,
   or `(7, "step")` when the model declares no step unit.
-
-<!-- Changed #257 -->
 
 - **Breaking:** each report is a method of the object whose data it
   describes, and `commol` exports no report function. The private functions of
@@ -85,18 +77,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   | `applied_parameters_report(model, result, problem, …)` | `model.applied_parameters(result, problem, …)` |
   | `identifiability_report(report)` | `report.report()` |
   | `commol.api.reporting.observed_report`, `series_report`, `accumulators_report` | The blocks `observed`, `series` and `accumulators` of a report |
-
-### Fixed
-
-<!-- Fixed #245 -->
-
-<!-- Fixed #254 -->
-
-<!-- Fixed #255 -->
-
-<!-- Fixed #256 -->
-
-<!-- Fixed #257 -->
 
 ## [0.6.1] - 2026-10-22
 
@@ -1241,6 +1221,7 @@ the details of these versions.
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.7.0** - Reading a run through objects: the window grid and dates on the axis, series by output name and reports as methods
 - **0.6.1** - Fixes of 0.6.0: checks at build, messages of infeasible draws, PRCC with NaN, quantity labels and starts, plots
 - **0.6.0** - Uncertainty methods with a model of the data: likelihood, posteriors, local approximations, conformal intervals, profiles and sensitivity analysis
 - **0.5.0** - Uncertainty by resampling the data, identifiability of parameters and the removal of the ensemble calibration
