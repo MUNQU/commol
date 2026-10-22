@@ -8,6 +8,8 @@ Rust runner, which draws and fits every replicate in parallel.
 import logging
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel
+
 from commol.api.inference.registry import register
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.resampling import (
@@ -47,6 +49,32 @@ def fit_values(calibrator: "Calibrator", fit: CalibrationResult) -> list[float]:
         One value per parameter.
     """
     return [fit.best_parameters[name] for name in calibrator.parameter_names]
+
+
+def sample_method(
+    calibrator: "Calibrator", name: str, method: BaseModel
+) -> SampleMethod:
+    """
+    What made the sample of a method: its name, its settings and the seed.
+
+    Parameters
+    ----------
+    calibrator : Calibrator
+        The calibration problem.
+    name : str
+        The name of the method.
+    method : BaseModel
+        The settings of the method.
+
+    Returns
+    -------
+    SampleMethod
+        The settings of `method`, with ``"seed"`` set to ``calibrator.seed``,
+        which repeats the sample when set as ``problem.seed``.
+    """
+    settings = method.model_dump(mode="json")
+    settings["seed"] = calibrator.seed
+    return SampleMethod(name=name, settings=settings)
 
 
 def rust_block_length(block_length: BlockLength) -> int | None:
@@ -141,9 +169,7 @@ def run_bayesian_bootstrap(
         calibrator,
         fit,
         run,
-        SampleMethod(
-            name="bayesian_bootstrap", settings=method.model_dump(mode="json")
-        ),
+        sample_method(calibrator, "bayesian_bootstrap", method),
     )
 
 
@@ -177,9 +203,7 @@ def run_parametric_bootstrap(
         calibrator,
         fit,
         run,
-        SampleMethod(
-            name="parametric_bootstrap", settings=method.model_dump(mode="json")
-        ),
+        sample_method(calibrator, "parametric_bootstrap", method),
     )
 
 
@@ -216,9 +240,7 @@ def run_residual_bootstrap(
         calibrator,
         fit,
         run,
-        SampleMethod(
-            name="residual_bootstrap", settings=method.model_dump(mode="json")
-        ),
+        sample_method(calibrator, "residual_bootstrap", method),
     )
 
 
@@ -254,7 +276,7 @@ def run_wild_bootstrap(
         calibrator,
         fit,
         run,
-        SampleMethod(name="wild_bootstrap", settings=method.model_dump(mode="json")),
+        sample_method(calibrator, "wild_bootstrap", method),
     )
 
 

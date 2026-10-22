@@ -151,6 +151,7 @@ class TestResult:
             iterations=12,
             converged=True,
             termination_reason="tolerance",
+            seed=7,
         )
 
         assert str(result) == (
@@ -161,9 +162,32 @@ class TestResult:
             "  best_parameters={'k1': 0.1},\n"
             "  termination_reason='tolerance',\n"
             "  starts=0,\n"
-            "  failed_runs=0\n"
+            "  failed_runs=0,\n"
+            "  seed=7\n"
             ")"
         )
+
+    def test_a_result_records_the_seed_of_its_calibration(
+        self, truth: Model, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        def calibrator(seed: int | None) -> Calibrator:
+            problem = CalibrationProblem(
+                observed_data=[ObservedDataPoint(at=1, output="B", value=1.0)],
+                parameters=[bounded("k1")],
+                loss_function="sse",
+                optimization_config=NelderMeadConfig(max_iterations=20),
+                seed=seed,
+            )
+            return Calibrator(Simulation(truth), problem)
+
+        drawn = calibrator(None)
+        with caplog.at_level("INFO", logger="commol"):
+            result = drawn.run()
+
+        assert result.seed == drawn.seed
+        assert f"drew the seed {drawn.seed}" in caplog.text
+        assert calibrator(SEED).run().seed == SEED
+        assert CalibrationResult.model_validate_json(result.model_dump_json()) == result
 
 
 class TestProblemAgainstTheModel:

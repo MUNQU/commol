@@ -10,7 +10,11 @@ import logging
 from typing import TYPE_CHECKING
 
 from commol.api.inference.registry import register
-from commol.api.inference.resampling import fit_values, rust_block_length
+from commol.api.inference.resampling import (
+    fit_values,
+    rust_block_length,
+    sample_method,
+)
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.sample import ParameterSample, SampleMethod
@@ -135,9 +139,7 @@ def run_gibbs_posterior(
         sample=_sample(
             calibrator,
             run,
-            SampleMethod(
-                name="gibbs_posterior", settings=method.model_dump(mode="json")
-            ),
+            sample_method(calibrator, "gibbs_posterior", method),
         ),
         levels=run.levels,
         kept=run.kept,
@@ -180,9 +182,7 @@ def run_bayesian_posterior(
         sample=_sample(
             calibrator,
             run,
-            SampleMethod(
-                name="bayesian_posterior", settings=method.model_dump(mode="json")
-            ),
+            sample_method(calibrator, "bayesian_posterior", method),
         ),
         levels=run.levels,
         kept=run.kept,
@@ -221,7 +221,7 @@ def run_abc_smc(calibrator: "Calibrator", method: ABCSMC) -> SMCResult:
         sample=_sample(
             calibrator,
             run,
-            SampleMethod(name="abc_smc", settings=method.model_dump(mode="json")),
+            sample_method(calibrator, "abc_smc", method),
         ),
         levels=run.levels,
         kept=run.kept,
@@ -258,7 +258,7 @@ def run_abc_rejection(calibrator: "Calibrator", method: ABCRejection) -> SMCResu
         sample=_sample(
             calibrator,
             run,
-            SampleMethod(name="abc_rejection", settings=method.model_dump(mode="json")),
+            sample_method(calibrator, "abc_rejection", method),
         ),
         levels=run.levels,
         kept=run.kept,

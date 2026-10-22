@@ -353,6 +353,7 @@ class TestResults:
 
         assert type(result) is result_type
         assert result.sample.names == ["c"]
+        assert result.sample.method.settings["seed"] == calibrator.seed
         mean = float(np.mean(data))
         assert result.sample.mean()["c"] == pytest.approx(mean, abs=1.0)
 

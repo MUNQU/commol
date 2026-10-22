@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Added #252 -->
 
+- A calibration result records the seed it used, `CalibrationResult.seed`
+  (`Calibrator.seed`: `problem.seed`, or the seed the calibrator drew), and
+  the sample of every uncertainty method and of `Calibrator.point_sample`
+  names it in `method.settings["seed"]`. Set as `problem.seed`, it repeats
+  the run, also from a result read back from JSON. See
+  [Reproducibility](../guide/calibration-optimizers.md#reproducibility).
+
 <!-- Added #253 -->
 
 <!-- Added #282 -->
@@ -33,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Changed #252 -->
 
+- **Breaking:** `CalibrationResult` requires `seed`; a result saved by an
+  earlier version, or built by hand, needs one to load.
+
 <!-- Changed #253 -->
 
 <!-- Changed #282 -->
@@ -46,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!-- Fixed #239 -->
 
 <!-- Fixed #252 -->
+
+- A particle swarm without `problem.seed` takes the seed the calibrator
+  draws and logs, so that seed repeats it; before, it drew one of its own
+  that no result or log kept.
 
 <!-- Fixed #253 -->
 

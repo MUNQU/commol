@@ -161,7 +161,7 @@ predictive and the scores read it, never the result of a method.
 | `values` | One row per draw |
 | `log_weights` | The log weight of each draw, normalized so the weights sum to 1; `-inf` for a weight of zero |
 | `groups` | The chain, replicate or wave of each draw, or `None` |
-| `method` | The name and settings of the method that made it (`SampleMethod`) |
+| `method` | The name and settings of the method that made it (`SampleMethod`); the settings of a method of `Calibrator.uncertainty` name the seed of the calibrator, `settings["seed"]`, which repeats the sample when set as `problem.seed` |
 
 Every statistic is weighted and computed in Rust. With equal weights it is the
 unweighted statistic.
@@ -309,7 +309,7 @@ gives the runs, in the order of `weights`.
 
 The point estimate of a fit is a sample of one draw:
 `Calibrator.point_sample(result)` gives it, with the names and bounds of the
-problem and `SampleMethod(name="point")`. With one run, a summary gives the
+problem and `SampleMethod(name="point", settings={"seed": result.seed})`. With one run, a summary gives the
 value of that run and no interval (`lower` and `upper` are None).
 
 ```python

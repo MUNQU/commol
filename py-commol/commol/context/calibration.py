@@ -955,6 +955,11 @@ class CalibrationResult(BaseModel):
         Every start that finished, in order; the first is the initial guess.
     failed_runs : list[str]
         Why each start that failed did, with its number.
+    seed : int
+        The seed of the calibration's random numbers (`Calibrator.seed`):
+        ``problem.seed``, or the seed the calibrator drew. Set as
+        ``problem.seed``, it repeats the calibration and its uncertainty
+        methods.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -976,6 +981,9 @@ class CalibrationResult(BaseModel):
     failed_runs: list[str] = Field(
         default_factory=list, description="Why each failed start failed"
     )
+    seed: int = Field(
+        default=..., ge=0, description="Seed of the calibration's random numbers"
+    )
 
     @override
     def __str__(self) -> str:
@@ -988,7 +996,8 @@ class CalibrationResult(BaseModel):
             f"  best_parameters={self.best_parameters},\n"
             f"  termination_reason='{self.termination_reason}',\n"
             f"  starts={len(self.starts)},\n"
-            f"  failed_runs={len(self.failed_runs)}\n"
+            f"  failed_runs={len(self.failed_runs)},\n"
+            f"  seed={self.seed}\n"
             f")"
         )
 
