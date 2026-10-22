@@ -83,6 +83,7 @@ results = Simulation(model).run(num_steps=100)
 | Calibration of parameters, initial conditions and scale factors                                        | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                                                                  |
 | Parameter samples, predictive bands and scores                                                         | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                                                                        |
 | JSON-ready reports and matplotlib figures                                                              | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md), [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting) |
+| Parallel starts, replicates, particles and draws, on the threads you choose                            | [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md)                                                            |
 
 ## License and authors
 
@@ -4002,6 +4003,8 @@ Each method returns the configuration, so they chain:
 
 `Calibrator.run(starts=n)` runs the optimizer from `n` start points in parallel and returns the best result. Start 0 is the initial guess of each parameter (its `initial_guess`, or the midpoint of its bounds). Start `i > 0` is a row of a Latin hypercube over the bounds, drawn from the problem's `seed`: with `n − 1` rows, each parameter has one start in each of `n − 1` equal strata of its bounds, so the starts cover the parameter space (`start_points` in `crates/commol-calibration/src/starts.rs`). A particle swarm draws its own population; its start `i > 0` takes its own seed.
 
+A particle swarm also scores the particles of each iteration in parallel, in the order of the particles, so the result does not depend on the number of threads. `commol.threads` chooses the threads and whether the particles run in parallel: see [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
+
 ```python
 problem = CalibrationProblem(
     observed_data=observed_data,
@@ -4041,14 +4044,14 @@ print(Calibrator(Simulation(model(None, None)), again).run(starts=4) == result) 
 
 ## Troubleshooting
 
-| Symptom                            | Try                                                                        |
-| ---------------------------------- | -------------------------------------------------------------------------- |
-| A result sits at a bound           | Check the bounds, give a better `initial_guess`, or use particle swarm     |
-| `converged=False`                  | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations` |
-| Different results on each run      | Set `seed`; use more particles or iterations                               |
-| A local minimum                    | `run(starts=n)` from several points                                        |
-| A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations     |
-| Slow                               | Fewer observation steps or particles; Nelder-Mead from a good start        |
+| Symptom                            | Try                                                                                                                                                                                             |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A result sits at a bound           | Check the bounds, give a better `initial_guess`, or use particle swarm                                                                                                                          |
+| `converged=False`                  | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations`                                                                                                                      |
+| Different results on each run      | Set `seed`; use more particles or iterations                                                                                                                                                    |
+| A local minimum                    | `run(starts=n)` from several points                                                                                                                                                             |
+| A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations                                                                                                                          |
+| Slow                               | Fewer observation steps or particles; Nelder-Mead from a good start; check `commol.get_threads()` ([Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md)) |
 
 ## Next steps
 
@@ -7017,6 +7020,7 @@ Every public name of `commol`, generated from the docstrings. The guide pages ex
 | [Uncertainty](https://munqu.github.io/commol/latest/api/uncertainty/index.md)         | `InferenceMethod`, `UncertaintyMethod`, `ParameterSample`, `SampleMethod`, `ParameterSummary`, `Predictive`, `PredictiveBand`, `SeriesBand`, `ObservationDraws`, `Scenarios`, `ScenarioSummary`, `commol.scores`, `weighted_quantiles`, `member_statistics`, `ci_percentiles`                                                           |
 | [Sensitivity](https://munqu.github.io/commol/latest/api/sensitivity/index.md)         | `SensitivityAnalysis`, `InputSpace`, `SensitivityMethod`, `Propagation`, `PropagationResult`, `QuantitySummary`, `PRCC`, `PRCCResult`, `Morris`, `MorrisResult`, `Sobol`, `SobolResult`, `PolynomialChaos`, `ChaosResult`, `Level`, `Increments`, `ValueAt`, `Gain`, `Peak`, `PeakPosition`, `Trajectory`, `Ratio`, `quantity_schedule` |
 | [Identifiability](https://munqu.github.io/commol/latest/api/identifiability/index.md) | `IdentifiabilityMethod`, `StructuralRank`, `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, `IdentifiabilityReport`                                                                                                                                                                                                    |
+| [Parallelism](https://munqu.github.io/commol/latest/api/parallelism/index.md)         | `set_threads`, `threads`, `get_threads`, `get_levels`                                                                                                                                                                                                                                                                                   |
 | [Reports](https://munqu.github.io/commol/latest/api/reports/index.md)                 | `Model.applied_parameters`, `SimulationResults.report`, `SimulationReplicates.report`, `Predictive.report`, `IdentifiabilityReport.report`                                                                                                                                                                                              |
 | [Package](https://munqu.github.io/commol/latest/api/package/index.md)                 | `__version__`, `build_info`, `BuildInfo`                                                                                                                                                                                                                                                                                                |
 
@@ -9365,9 +9369,10 @@ class Calibrator:
 
         Start 0 is the initial guess of each parameter. Each further start is a
         row of a Latin hypercube over the bounds, drawn from `seed`, so the
-        starts cover the parameter space. They run in parallel; the result is
-        the best of them, and lists every start. Distinct ends with equal
-        losses are a sign that the data do not identify the parameters.
+        starts cover the parameter space. They run in parallel, on the
+        threads of `commol.threads`; the result is the best of them, and lists
+        every start. Distinct ends with equal losses are a sign that the data
+        do not identify the parameters.
 
         Parameters
         ----------
@@ -10278,7 +10283,7 @@ run(starts: int = 1) -> CalibrationResult
 
 Runs the calibration optimization from one or more starts.
 
-Start 0 is the initial guess of each parameter. Each further start is a row of a Latin hypercube over the bounds, drawn from `seed`, so the starts cover the parameter space. They run in parallel; the result is the best of them, and lists every start. Distinct ends with equal losses are a sign that the data do not identify the parameters.
+Start 0 is the initial guess of each parameter. Each further start is a row of a Latin hypercube over the bounds, drawn from `seed`, so the starts cover the parameter space. They run in parallel, on the threads of `commol.threads`; the result is the best of them, and lists every start. Distinct ends with equal losses are a sign that the data do not identify the parameters.
 
 Parameters:
 
@@ -10308,9 +10313,10 @@ def run(self, starts: int = 1) -> CalibrationResult:
 
     Start 0 is the initial guess of each parameter. Each further start is a
     row of a Latin hypercube over the bounds, drawn from `seed`, so the
-    starts cover the parameter space. They run in parallel; the result is
-    the best of them, and lists every start. Distinct ends with equal
-    losses are a sign that the data do not identify the parameters.
+    starts cover the parameter space. They run in parallel, on the
+    threads of `commol.threads`; the result is the best of them, and lists
+    every start. Distinct ends with equal losses are a sign that the data
+    do not identify the parameters.
 
     Parameters
     ----------
@@ -20550,6 +20556,185 @@ class BuildInfo(BaseModel):
 
     version: str
     commit: str | None
+```
+
+# Parallelism API
+
+[Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
+
+The threads of every parallel method and the levels that run in parallel. Guide: [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
+
+## set_threads
+
+```python
+set_threads(n: int, levels: Levels | None = None) -> None
+```
+
+Set the number of threads of every parallel method, in this context.
+
+The setting holds in the current Python thread (a `contextvars` context), not in other threads. Without it, commol uses one thread per core and every level in parallel.
+
+Parameters:
+
+| Name     | Type           | Description                                                                           | Default    |
+| -------- | -------------- | ------------------------------------------------------------------------------------- | ---------- |
+| `n`      | `int`          | The number of threads, at least 1.                                                    | *required* |
+| `levels` | `(all, outer)` | Which levels run in parallel when a method nests them; None keeps the current levels. | `"all"`    |
+
+Raises:
+
+| Type         | Description                                |
+| ------------ | ------------------------------------------ |
+| `ValueError` | If n is below 1 or levels is neither name. |
+
+Source code in `commol/api/parallelism.py`
+
+```python
+def set_threads(n: int, levels: Levels | None = None) -> None:
+    """
+    Set the number of threads of every parallel method, in this context.
+
+    The setting holds in the current Python thread (a `contextvars`
+    context), not in other threads. Without it, commol uses one thread per
+    core and every level in parallel.
+
+    Parameters
+    ----------
+    n : int
+        The number of threads, at least 1.
+    levels : {"all", "outer"} | None
+        Which levels run in parallel when a method nests them; `None` keeps
+        the current levels.
+
+    Raises
+    ------
+    ValueError
+        If `n` is below 1 or `levels` is neither name.
+    """
+    commol_rs.parallelism.setting().set(_choice(n, levels))
+```
+
+## threads
+
+```python
+threads(n: int | None = None, levels: Levels | None = None) -> Generator[None]
+```
+
+Limit the threads of every parallel method within a block.
+
+The previous setting comes back when the block ends, also on an error.
+
+Parameters:
+
+| Name     | Type           | Description                                                                           | Default                                                           |
+| -------- | -------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `n`      | \`int          | None\`                                                                                | The number of threads, at least 1; None keeps the current number. |
+| `levels` | `(all, outer)` | Which levels run in parallel when a method nests them; None keeps the current levels. | `"all"`                                                           |
+
+Yields:
+
+| Type   | Description                      |
+| ------ | -------------------------------- |
+| `None` | The block runs with the setting. |
+
+Raises:
+
+| Type         | Description                                |
+| ------------ | ------------------------------------------ |
+| `ValueError` | If n is below 1 or levels is neither name. |
+
+Source code in `commol/api/parallelism.py`
+
+```python
+@contextmanager
+def threads(n: int | None = None, levels: Levels | None = None) -> Generator[None]:
+    """
+    Limit the threads of every parallel method within a block.
+
+    The previous setting comes back when the block ends, also on an error.
+
+    Parameters
+    ----------
+    n : int | None
+        The number of threads, at least 1; `None` keeps the current number.
+    levels : {"all", "outer"} | None
+        Which levels run in parallel when a method nests them; `None` keeps
+        the current levels.
+
+    Yields
+    ------
+    None
+        The block runs with the setting.
+
+    Raises
+    ------
+    ValueError
+        If `n` is below 1 or `levels` is neither name.
+    """
+    variable = commol_rs.parallelism.setting()
+    token = variable.set(_choice(n, levels))
+    try:
+        yield
+    finally:
+        variable.reset(token)
+```
+
+## get_threads
+
+```python
+get_threads() -> int
+```
+
+The number of threads of the parallel methods in this context.
+
+Returns:
+
+| Type  | Description                                              |
+| ----- | -------------------------------------------------------- |
+| `int` | The number set, or the number of cores when none is set. |
+
+Source code in `commol/api/parallelism.py`
+
+```python
+def get_threads() -> int:
+    """
+    The number of threads of the parallel methods in this context.
+
+    Returns
+    -------
+    int
+        The number set, or the number of cores when none is set.
+    """
+    return commol_rs.parallelism.current().threads
+```
+
+## get_levels
+
+```python
+get_levels() -> Levels
+```
+
+The levels that run in parallel in this context.
+
+Returns:
+
+| Type           | Description                                |
+| -------------- | ------------------------------------------ |
+| `{all, outer}` | The levels set, or "all" when none is set. |
+
+Source code in `commol/api/parallelism.py`
+
+```python
+def get_levels() -> Levels:
+    """
+    The levels that run in parallel in this context.
+
+    Returns
+    -------
+    {"all", "outer"}
+        The levels set, or `"all"` when none is set.
+    """
+    return cast(Levels, commol_rs.parallelism.current().levels)
 ```
 
 # Plotting API
@@ -40079,6 +40264,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - `PolynomialChaos(q_norm=..., max_interaction=...)`: a truncated basis for many inputs. `max_interaction` keeps the terms of at most that many inputs, and `q_norm`, in `(0, 1]`, the terms whose degrees have `Σ α_i^q ≤ degree^q`; the defaults keep the total-degree basis. 20 inputs at degree 4 with `max_interaction=2` have 1,221 terms instead of 10,626, and the number is known before any run. `ChaosResult` records both. See [Bases for many inputs](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#bases-for-many-inputs).
 
+- `commol.set_threads(n)`, the context manager `commol.threads(n, levels)`, `commol.get_threads()` and `commol.get_levels()` choose the number of threads of every parallel method and the levels that run in parallel. The setting holds per Python thread (`contextvars`); without it, commol uses one thread per core. A particle swarm scores the particles of each iteration in parallel, in the order of the particles, with `levels="all"`, the default; `levels="outer"` keeps them in order. A seed gives the same result, history included, with any number of threads and either level. See [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
+
 - A calibration result records the seed it used, `CalibrationResult.seed` (`Calibrator.seed`: `problem.seed`, or the seed the calibrator drew), and the sample of every uncertainty method and of `Calibrator.point_sample` names it in `method.settings["seed"]`. Set as `problem.seed`, it repeats the run, also from a result read back from JSON. See [Reproducibility](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#reproducibility).
 
 - `commol.__version__` gives the installed version, and `commol.build_info()` gives a `BuildInfo` with the version and the full commit the extension was built from (`None` when the source has no git metadata, such as a source distribution). A build that is not a release, such as an install from a git commit, names its commit as a PEP 440 local version: `0.1.0+g<first 7 characters of the commit>`. See [Check the installation](https://munqu.github.io/commol/latest/getting-started/installation/#check-the-installation).
@@ -40086,6 +40273,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `Ratio(numerator, denominator, replicates)` is a quantity of interest: one `ValueAt`, `Gain` or `Peak` over another, in each run, so PRCC, Morris, Sobol and a polynomial chaos read a ratio whose denominator depends on the inputs. `replicates` is required: with a stochastic engine, a point of a design holds the mean of the ratios (`"within"`), the mean of the ratios of the replicates with a positive denominator (`"within_positive"`) or the ratio of the means (`"pooled"`). A denominator of 0 makes the ratio of a run NaN, and every method follows the NaN rule. See [A ratio of two quantities](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#a-ratio-of-two-quantities).
 
 ### Changed
+
+- The parallel methods run in a thread pool of commol, not in the global pool of `rayon`: the environment variable `RAYON_NUM_THREADS` no longer limits them; use `commol.set_threads`. A particle swarm, which scored its particles one after the other, now scores them in parallel by default.
 
 - **Breaking:** `CalibrationResult` requires `seed`; a result saved by an earlier version, or built by hand, needs one to load.
 

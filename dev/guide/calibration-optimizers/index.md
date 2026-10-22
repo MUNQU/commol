@@ -144,6 +144,8 @@ Each method returns the configuration, so they chain:
 
 `Calibrator.run(starts=n)` runs the optimizer from `n` start points in parallel and returns the best result. Start 0 is the initial guess of each parameter (its `initial_guess`, or the midpoint of its bounds). Start `i > 0` is a row of a Latin hypercube over the bounds, drawn from the problem's `seed`: with `n − 1` rows, each parameter has one start in each of `n − 1` equal strata of its bounds, so the starts cover the parameter space (`start_points` in `crates/commol-calibration/src/starts.rs`). A particle swarm draws its own population; its start `i > 0` takes its own seed.
 
+A particle swarm also scores the particles of each iteration in parallel, in the order of the particles, so the result does not depend on the number of threads. `commol.threads` chooses the threads and whether the particles run in parallel: see [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
+
 ```python
 problem = CalibrationProblem(
     observed_data=observed_data,
@@ -183,14 +185,14 @@ print(Calibrator(Simulation(model(None, None)), again).run(starts=4) == result) 
 
 ## Troubleshooting
 
-| Symptom                            | Try                                                                        |
-| ---------------------------------- | -------------------------------------------------------------------------- |
-| A result sits at a bound           | Check the bounds, give a better `initial_guess`, or use particle swarm     |
-| `converged=False`                  | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations` |
-| Different results on each run      | Set `seed`; use more particles or iterations                               |
-| A local minimum                    | `run(starts=n)` from several points                                        |
-| A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations     |
-| Slow                               | Fewer observation steps or particles; Nelder-Mead from a good start        |
+| Symptom                            | Try                                                                                                                                                                                             |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A result sits at a bound           | Check the bounds, give a better `initial_guess`, or use particle swarm                                                                                                                          |
+| `converged=False`                  | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations`                                                                                                                      |
+| Different results on each run      | Set `seed`; use more particles or iterations                                                                                                                                                    |
+| A local minimum                    | `run(starts=n)` from several points                                                                                                                                                             |
+| A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations                                                                                                                          |
+| Slow                               | Fewer observation steps or particles; Nelder-Mead from a good start; check `commol.get_threads()` ([Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md)) |
 
 ## Next steps
 

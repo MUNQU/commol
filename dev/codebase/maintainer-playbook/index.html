@@ -1469,6 +1469,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threads and Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/examples/" class="md-nav__link">
         
   
@@ -1900,6 +1928,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parallelism
   
 
     
@@ -3558,8 +3614,11 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
       <code>SmcSampler</code> (<code>crates/commol-inference/src/smc/</code>), not a sampler of its
       own, and its configuration takes required <code>priors</code> (<code>WithPriors</code>)
       (<a href="../decisions/uncertainty/#one-smc-core-many-targets">Design decisions</a>).</li>
-<li>[ ] The runner, bound in <code>py-commol/src/inference.rs</code>, and its stub in
-      <code>_commol_rs.pyi</code>.</li>
+<li>[ ] The runner, bound in <code>py-commol/src/inference.rs</code>, which runs the
+      method through <code>parallel</code> (<code>py-commol/src/parallelism.rs</code>), and its
+      stub in <code>_commol_rs.pyi</code>; a row in the table of
+      <code>docs/guide/parallelism.md</code> and a case of
+      <code>test_one_thread_keeps_every_parallel_method_on_one_core</code>.</li>
 <li>[ ] The configuration, a subclass of <code>UncertaintyMethod[YourResult]</code>, and
       the result, in <code>context/inference/</code>; a result with draws holds a
       <code>ParameterSample</code>.</li>

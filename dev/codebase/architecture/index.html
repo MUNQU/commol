@@ -1469,6 +1469,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threads and Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/examples/" class="md-nav__link">
         
   
@@ -1900,6 +1928,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parallelism
   
 
     
@@ -3221,7 +3277,7 @@ into numbers.</p>
 <tr>
 <td>Bridge</td>
 <td><code>py-commol/src/</code></td>
-<td>Exposes the Rust functions to Python (PyO3).</td>
+<td>Exposes the Rust functions to Python (PyO3), and runs their parallel work in the thread pool of <code>commol.threads</code> (<code>parallel</code>).</td>
 </tr>
 <tr>
 <td>Rust</td>
@@ -3331,8 +3387,9 @@ calibration problem.</p>
 <p><code>Calibrator</code> (<code>api/calibrator.py</code>) takes the compiled engine of a
    <code>Simulation</code> and builds the calibration problem in Rust once
    (<code>commol_rs.inference.CalibrationProblem</code>, <code>py-commol/src/inference.rs</code>).
-   <code>run(starts=n)</code> runs the optimizer loop in Rust from each start and
-   returns the best <code>CalibrationResult</code>.</p>
+   <code>run(starts=n)</code> runs the optimizer loop in Rust from each start, the
+   starts and the particles of a swarm in parallel in the pool of
+   <code>commol.threads</code>, and returns the best <code>CalibrationResult</code>.</p>
 </li>
 <li><code>apply_calibration_parameters</code> writes the result back into the <code>Model</code>.</li>
 <li><code>Calibrator.uncertainty(method)</code> runs a method on the same problem. A method

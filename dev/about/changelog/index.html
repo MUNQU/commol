@@ -1465,6 +1465,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threads and Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/examples/" class="md-nav__link">
         
   
@@ -1896,6 +1924,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parallelism
   
 
     
@@ -4186,6 +4242,17 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Added #239 -->
 
+<ul>
+<li><code>commol.set_threads(n)</code>, the context manager <code>commol.threads(n, levels)</code>,
+  <code>commol.get_threads()</code> and <code>commol.get_levels()</code> choose the number of
+  threads of every parallel method and the levels that run in parallel. The
+  setting holds per Python thread (<code>contextvars</code>); without it, commol uses
+  one thread per core. A particle swarm scores the particles of each
+  iteration in parallel, in the order of the particles, with
+  <code>levels="all"</code>, the default; <code>levels="outer"</code> keeps them in order. A seed
+  gives the same result, history included, with any number of threads and
+  either level. See <a href="../../guide/parallelism/">Threads and Parallelism</a>.</li>
+</ul>
 <!-- Added #252 -->
 
 <ul>
@@ -4227,6 +4294,12 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 
 <!-- Changed #239 -->
 
+<ul>
+<li>The parallel methods run in a thread pool of commol, not in the global pool
+  of <code>rayon</code>: the environment variable <code>RAYON_NUM_THREADS</code> no longer limits
+  them; use <code>commol.set_threads</code>. A particle swarm, which scored its particles
+  one after the other, now scores them in parallel by default.</li>
+</ul>
 <!-- Changed #252 -->
 
 <ul>

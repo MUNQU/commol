@@ -1640,6 +1640,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threads and Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../examples/" class="md-nav__link">
         
   
@@ -2071,6 +2099,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parallelism
   
 
     
@@ -3573,6 +3629,10 @@ is a row of a Latin hypercube over the bounds, drawn from the problem's
 equal strata of its bounds, so the starts cover the parameter space
 (<code>start_points</code> in <code>crates/commol-calibration/src/starts.rs</code>). A particle
 swarm draws its own population; its start <code>i &gt; 0</code> takes its own seed.</p>
+<p>A particle swarm also scores the particles of each iteration in parallel, in
+the order of the particles, so the result does not depend on the number of
+threads. <code>commol.threads</code> chooses the threads and whether the particles run
+in parallel: see <a href="../parallelism/">Threads and Parallelism</a>.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
@@ -3657,7 +3717,7 @@ order. A point the objective penalizes is not kept.</p>
 </tr>
 <tr>
 <td>Slow</td>
-<td>Fewer observation steps or particles; Nelder-Mead from a good start</td>
+<td>Fewer observation steps or particles; Nelder-Mead from a good start; check <code>commol.get_threads()</code> (<a href="../parallelism/">Threads and Parallelism</a>)</td>
 </tr>
 </tbody>
 </table>

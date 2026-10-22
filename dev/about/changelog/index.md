@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - `PolynomialChaos(q_norm=..., max_interaction=...)`: a truncated basis for many inputs. `max_interaction` keeps the terms of at most that many inputs, and `q_norm`, in `(0, 1]`, the terms whose degrees have `Σ α_i^q ≤ degree^q`; the defaults keep the total-degree basis. 20 inputs at degree 4 with `max_interaction=2` have 1,221 terms instead of 10,626, and the number is known before any run. `ChaosResult` records both. See [Bases for many inputs](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#bases-for-many-inputs).
 
+- `commol.set_threads(n)`, the context manager `commol.threads(n, levels)`, `commol.get_threads()` and `commol.get_levels()` choose the number of threads of every parallel method and the levels that run in parallel. The setting holds per Python thread (`contextvars`); without it, commol uses one thread per core. A particle swarm scores the particles of each iteration in parallel, in the order of the particles, with `levels="all"`, the default; `levels="outer"` keeps them in order. A seed gives the same result, history included, with any number of threads and either level. See [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
+
 - A calibration result records the seed it used, `CalibrationResult.seed` (`Calibrator.seed`: `problem.seed`, or the seed the calibrator drew), and the sample of every uncertainty method and of `Calibrator.point_sample` names it in `method.settings["seed"]`. Set as `problem.seed`, it repeats the run, also from a result read back from JSON. See [Reproducibility](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#reproducibility).
 
 - `commol.__version__` gives the installed version, and `commol.build_info()` gives a `BuildInfo` with the version and the full commit the extension was built from (`None` when the source has no git metadata, such as a source distribution). A build that is not a release, such as an install from a git commit, names its commit as a PEP 440 local version: `0.1.0+g<first 7 characters of the commit>`. See [Check the installation](https://munqu.github.io/commol/latest/getting-started/installation/#check-the-installation).
@@ -19,6 +21,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `Ratio(numerator, denominator, replicates)` is a quantity of interest: one `ValueAt`, `Gain` or `Peak` over another, in each run, so PRCC, Morris, Sobol and a polynomial chaos read a ratio whose denominator depends on the inputs. `replicates` is required: with a stochastic engine, a point of a design holds the mean of the ratios (`"within"`), the mean of the ratios of the replicates with a positive denominator (`"within_positive"`) or the ratio of the means (`"pooled"`). A denominator of 0 makes the ratio of a run NaN, and every method follows the NaN rule. See [A ratio of two quantities](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#a-ratio-of-two-quantities).
 
 ### Changed
+
+- The parallel methods run in a thread pool of commol, not in the global pool of `rayon`: the environment variable `RAYON_NUM_THREADS` no longer limits them; use `commol.set_threads`. A particle swarm, which scored its particles one after the other, now scores them in parallel by default.
 
 - **Breaking:** `CalibrationResult` requires `seed`; a result saved by an earlier version, or built by hand, needs one to load.
 
