@@ -9,7 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Laplace`, `Sandwich`, `InformationMatchingEta` and `BootstrapCoverageEta`
+  take `starts`, at least 1 with the default 1: their fit is the best of
+  `starts` starts, `Calibrator.run(starts)`, as in every bootstrap, jackknife,
+  conformal method and profile. Code that does not pass it runs as before.
+  See [Local Approximations](../guide/uncertainty/local.md#laplace-approximation-and-the-delta-method)
+  and [What `η` means](../guide/uncertainty/smc.md#what-means).
+
 ### Changed
+
+- **Breaking:** every uncertainty and identifiability method takes its random
+  numbers from the seed of its source, `Calibrator.seed` (`problem.seed`) or
+  `SensitivityAnalysis.seed`, and has no seed of its own. Remove `seed=` from
+  `StructuralRank` and from `scores.pit`, and set `problem.seed` (or the seed
+  of the analysis) to choose the random numbers. The PIT randomizes ties from
+  a stream of the seed of its draws, so its values at tied draws change for
+  the same seed. See [Scores](../guide/uncertainty/index.md#scores).
+- `LaplaceMixture.starts` defaults to 1.
 
 - **Breaking:** a setting that means the same thing has one name in every
   method. The level of an interval is `confidence_level`, a count is a plain

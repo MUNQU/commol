@@ -11,7 +11,7 @@
 
 use commol_calibration::{CalibrationProblem, ObservedDataPoint, weighted_crps};
 use commol_core::SimulationEngine;
-use commol_random::Generator;
+use commol_random::{Generator, stream_seed};
 
 use crate::predictive::{
     DistributionNoise, ObservationDraws, ObservationNoise, PredictiveError, check_names,
@@ -144,18 +144,26 @@ pub fn crps(draws: &ObservationDraws, observed: &[f64]) -> Result<Vec<f64>, Stri
         .collect())
 }
 
+/// The stream of the seed of the draws that randomizes the ties of the PIT
+/// ([`commol_random::stream_seed`]); the streams 1 to 4 belong to a
+/// sensitivity analysis and to the draws of a sample
+/// ([`crate::predictive::DRAWS_STREAM`]).
+const PIT_STREAM: u64 = 5;
+
 /// The probability integral transform of each observation: `F(y)` of the
 /// weighted draws, randomized between `F(y⁻)` and `F(y)` where draws tie
 /// with `y` (so a discrete predictive gives uniform values too), with the
-/// generator seeded with `seed`. Calibrated predictions give uniform values.
+/// generator seeded with the stream `PIT_STREAM` of the seed of the draws.
+/// The same draws give the same values. Calibrated predictions give uniform
+/// values.
 ///
 /// # Errors
 ///
 /// Returns a message when the shapes differ.
-pub fn pit(draws: &ObservationDraws, observed: &[f64], seed: u64) -> Result<Vec<f64>, String> {
+pub fn pit(draws: &ObservationDraws, observed: &[f64]) -> Result<Vec<f64>, String> {
     check(draws, observed)?;
     let total: f64 = draws.weights.iter().sum();
-    let mut generator = Generator::from_seed(seed);
+    let mut generator = Generator::from_seed(stream_seed(draws.seed, PIT_STREAM));
     Ok(observed
         .iter()
         .enumerate()
@@ -272,6 +280,7 @@ mod tests {
         ObservationDraws {
             values: (0..100).map(|i| vec![f64::from(i)]).collect(),
             weights: vec![0.01; 100],
+            seed: 0,
         }
     }
 
@@ -305,6 +314,7 @@ mod tests {
         let draws = ObservationDraws {
             values: vec![vec![1.0], vec![4.0], vec![2.0], vec![8.0]],
             weights: vec![0.25; 4],
+            seed: 0,
         };
         assert!((crps(&draws, &[3.0]).unwrap()[0] - 0.8125).abs() < 1e-12);
     }
@@ -315,11 +325,12 @@ mod tests {
         let draws = ObservationDraws {
             values: vec![vec![0.0], vec![1.0], vec![1.0], vec![2.0]],
             weights: vec![2.0; 4],
+            seed: 5,
         };
-        let value = pit(&draws, &[1.0], 5).unwrap()[0];
+        let value = pit(&draws, &[1.0]).unwrap()[0];
         assert!(value > 0.25 && value < 0.75, "{value}");
-        assert_eq!(pit(&draws, &[3.0], 5).unwrap(), vec![1.0]);
-        assert_eq!(pit(&draws, &[0.5], 5).unwrap(), vec![0.25]);
+        assert_eq!(pit(&draws, &[3.0]).unwrap(), vec![1.0]);
+        assert_eq!(pit(&draws, &[0.5]).unwrap(), vec![0.25]);
     }
 
     #[test]
@@ -330,6 +341,7 @@ mod tests {
         let empty = ObservationDraws {
             values: vec![],
             weights: vec![],
+            seed: 0,
         };
         assert!(crps(&empty, &[]).unwrap_err().contains("at least one draw"));
     }

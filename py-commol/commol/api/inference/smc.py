@@ -109,14 +109,14 @@ def run_gibbs_posterior(
     coverage: float | None = None
     notes: list[str] = []
     if isinstance(method.eta, InformationMatchingEta):
-        fit = calibrator.run()
+        fit = calibrator.run(starts=method.eta.starts)
         eta = rust.information_matching_eta(
             problem,
             fit_values(calibrator, fit),
             rust_block_length(method.eta.block_length),
         )
     elif isinstance(method.eta, BootstrapCoverageEta):
-        fit = calibrator.run()
+        fit = calibrator.run(starts=method.eta.starts)
         calibration = method.eta
         found = rust.bootstrap_coverage_eta(
             problem,

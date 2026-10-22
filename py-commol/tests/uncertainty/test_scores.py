@@ -141,7 +141,6 @@ class TestClosedForms:
             predictive,
             [_observation(dist.mean + offset * dist.stdev)],
             NoNoise(),
-            seed=1,
         )
 
         assert score.mean == pytest.approx(STANDARD.cdf(offset), abs=1e-3)
@@ -186,6 +185,46 @@ class TestSeries:
         )
 
         assert score.mean == pytest.approx(expected, rel=1e-12)
+
+
+class TestPit:
+    def test_the_pit_takes_the_seed_of_the_source(self) -> None:
+        def calibrator(seed: int) -> Calibrator:
+            simulation = Simulation(
+                build(abc_builder(parameters={"k1": 0.1, "k2": 0.05}))
+            )
+            problem = CalibrationProblem(
+                observed_data=[_observation(1.0)],
+                parameters=[bounded("f", 0.01, 10.0, kind="factor")],
+                loss_function="sse",
+                optimization_config=NelderMeadConfig(max_iterations=1),
+                seed=seed,
+            )
+            return Calibrator(simulation, problem)
+
+        # Two values of f, so every draw ties with the observations of one.
+        sample = ParameterSample.equally_weighted(
+            ["f"],
+            [(0.01, 10.0)],
+            [[1.0], [2.0]] * 4,
+            SampleMethod(name="two"),
+        )
+        draws = Predictive(calibrator(1), sample, [10]).at_observations(
+            [_observation(1.0)], NoNoise()
+        )
+        observations = [_observation(draws.values[0][0])] * 20
+
+        def pit(seed: int) -> list[float]:
+            predictive = Predictive(calibrator(seed), sample, [10])
+            return scores.pit(predictive, observations, NoNoise()).per_observation
+
+        first = pit(1)
+        # F(y⁻) = 0 and F(y) = 1/2: each value is uniform in between.
+        assert all(0.0 <= value <= 0.5 for value in first)
+        assert len(set(first)) == len(first)
+        assert pit(1) == first
+        other = pit(2)
+        assert all(a != b for a, b in zip(first, other, strict=True))
 
 
 class TestLogScore:

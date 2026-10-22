@@ -71,7 +71,7 @@ def run_laplace(calibrator: "Calibrator", method: Laplace) -> LaplaceResult:
     LaplaceResult
         The fit, the covariance on the unbounded scale and the draws.
     """
-    fit = calibrator.run()
+    fit = calibrator.run(starts=method.starts)
     run = rust.laplace(
         calibrator.rust_problem,
         fit_values(calibrator, fit),
@@ -108,7 +108,7 @@ def run_sandwich(calibrator: "Calibrator", method: Sandwich) -> SandwichResult:
         The fit, the sandwich covariance on the unbounded scale, the draws
         and the blocks.
     """
-    fit = calibrator.run()
+    fit = calibrator.run(starts=method.starts)
     run, blocks, block_length, estimates = rust.sandwich(
         calibrator.rust_problem,
         fit_values(calibrator, fit),

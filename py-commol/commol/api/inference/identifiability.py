@@ -92,9 +92,11 @@ def run_structural_rank(
     """Run `StructuralRank` on `calibrator`."""
     _deterministic(calibrator, "StructuralRank")
     names = calibrator.parameter_names
-    seed = calibrator.seed if method.seed is None else method.seed
     analysis = rust.structural_rank(
-        calibrator.rust_problem, method.points, method.design == "dense", seed
+        calibrator.rust_problem,
+        method.points,
+        method.design == "dense",
+        calibrator.seed,
     )
     negative = {p.id for p in calibrator.problem.parameters if p.min_bound < 0}
     combinations = []

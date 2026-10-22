@@ -486,13 +486,18 @@ impl Predictive {
     }
 }
 
-/// Every draw's value of a set of observations.
+/// Every draw's value of a set of observations, and the seed they were
+/// drawn with.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObservationDraws {
     /// `[draw][observation]`; a replicate is a draw.
     pub values: Vec<Vec<f64>>,
     /// The weight of every draw; they sum to 1.
     pub weights: Vec<f64>,
+    /// The seed of the noise and of the replicates of the draws; a score
+    /// that draws random numbers, such as [`crate::scores::pit`], takes a
+    /// stream of it.
+    pub seed: u64,
 }
 
 impl ObservationDraws {
@@ -527,7 +532,7 @@ impl ObservationDraws {
 /// Every draw's value of `observations`, run through `forward` and read
 /// through the observation operator, with `noise` drawn from the generator
 /// seeded with `seed`; the replicates of a stochastic engine are seeded from
-/// `seed` as those of [`Predictive::new`].
+/// `seed` as those of [`Predictive::new`]. The draws keep `seed`.
 ///
 /// The observations need not be the problem's: held-out data are read the
 /// same way, and a forward model with no observations reads them too.
@@ -557,6 +562,7 @@ where
     let mut draws = ObservationDraws {
         values: Vec::new(),
         weights: Vec::new(),
+        seed,
     };
     for ((replicates, &weight), values) in
         runs.into_iter().zip(sample.weights()).zip(sample.values())
@@ -620,7 +626,8 @@ where
 
 /// The stream of the seeds of the draws of a sample
 /// ([`commol_random::stream_seed`]); the streams 1 to 3 belong to the
-/// designs, the replicates and the bootstrap of a sensitivity analysis.
+/// designs, the replicates and the bootstrap of a sensitivity analysis, and
+/// stream 5 to the ties of the PIT ([`crate::scores::pit`]).
 pub const DRAWS_STREAM: u64 = 4;
 
 /// The seed of each of `count` draws of a sample run from `seed`: draw `j`

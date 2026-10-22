@@ -989,9 +989,10 @@ impl PyObservationDraws {
         scores::crps(&self.inner, &observed).map_err(value_error)
     }
 
-    /// The randomized PIT value of each observation
-    fn pit(&self, observed: Vec<f64>, seed: u64) -> PyResult<Vec<f64>> {
-        scores::pit(&self.inner, &observed, seed).map_err(value_error)
+    /// The randomized PIT value of each observation, its ties randomized
+    /// from the seed of the draws
+    fn pit(&self, observed: Vec<f64>) -> PyResult<Vec<f64>> {
+        scores::pit(&self.inner, &observed).map_err(value_error)
     }
 }
 

@@ -45,6 +45,8 @@ from tests.support import (
     build_ode,
     flow_calibrator,
     flow_observations,
+    TWO_WELLS_FIT,
+    two_wells_calibrator,
 )
 
 
@@ -377,6 +379,41 @@ class TestResults:
         assert "'c' is on its bound" in caplog.text
         # The end on the bound fits worse than the kept component: only a note.
         assert result.reliable
+
+
+class TestStarts:
+    @pytest.mark.parametrize(
+        "method",
+        [Laplace(starts=3, draws=10), Sandwich(starts=3, block_length=1, draws=10)],
+        ids=["laplace", "sandwich"],
+    )
+    def test_laplace_and_sandwich_fit_from_their_starts(
+        self, method: Laplace | Sandwich
+    ) -> None:
+        calibrator = two_wells_calibrator()
+        # One start stays at the local minimum of the initial guess.
+        assert calibrator.run().best_parameters["c"] == pytest.approx(-1.0, abs=1e-6)
+
+        result = calibrator.uncertainty(method)
+
+        assert len(result.fit.starts) == 3
+        assert result.fit == calibrator.run(starts=3)
+        assert result.fit.best_parameters["c"] == pytest.approx(TWO_WELLS_FIT, abs=1e-5)
+
+    def test_a_laplace_mixture_fits_from_one_start_by_default(self) -> None:
+        calibrator = flow_calibrator(
+            _normal_data(12, 6, sd=1.0),
+            windowed=True,
+            observation_models={"B": NormalObservations(sd=1.0)},
+        )
+        method = LaplaceMixture(
+            draws=25, target=LikelihoodTarget(priors=Priors.uniform_on_bounds())
+        )
+
+        result = calibrator.uncertainty(method)
+
+        assert len(result.fit.starts) == 1
+        assert result.fit == calibrator.run()
 
 
 def _matching(block_length: int) -> GibbsPosterior:

@@ -84,6 +84,34 @@ setting strictly between 0 and 1 is checked by one of the two functions.
 `tests/uncertainty/test_intervals.py::test_every_confidence_level_has_one_check`,
 `crates/commol-inference/tests/test_levels.rs`.
 
+## A method takes its seed from its source and fits from its starts
+
+Every uncertainty, identifiability and sensitivity method draws its random
+numbers from the seed of its source: `Calibrator.seed` (`problem.seed`) or
+`SensitivityAnalysis.seed`, split into streams (`commol_random::stream_seed`,
+`replicate_seed`). No method has a seed of its own, so one seed repeats a
+calibration and every method on it. A score reads the seed its draws keep,
+`ObservationDraws.seed` (`crates/commol-inference/src/predictive.rs`):
+`scores::pit` randomizes ties from a stream of it. Every method that fits the
+data takes `starts`, at least 1 with the default 1, and fits with
+`Calibrator.run(starts)`: the bootstraps, the jackknife, the conformal
+methods, the profiles, `Laplace`, `Sandwich`, `LaplaceMixture`,
+`InformationMatchingEta` and `BootstrapCoverageEta`.
+
+| Alternative | Why not |
+|---|---|
+| A `seed` of a method that overrides the seed of the source | Two seeds choose the random numbers of one run, and `problem.seed` no longer repeats it. |
+| A method that fits from one start, with no `starts` | A fit that ends at a local minimum gives a wrong center, and the user cannot ask for more starts. |
+
+**Rule:** a new method takes no seed and reads the seed of its source; a new
+method that fits the data takes `starts` with the default 1.
+
+**Guards:** `tests/uncertainty/test_identifiability.py::TestStructuralRank::test_structural_rank_takes_the_seed_of_the_calibrator`,
+`tests/uncertainty/test_scores.py::TestPit::test_the_pit_takes_the_seed_of_the_source`,
+`crates/commol-inference/tests/test_predictive.rs::the_pit_of_ties_follows_the_seed_of_the_draws`,
+`tests/uncertainty/test_local.py::TestStarts`,
+`tests/uncertainty/test_smc.py::test_the_eta_calibrations_fit_from_their_starts`.
+
 ## A description is data, rendered apart
 
 `Model.describe(layout)` returns a `ModelDescription`

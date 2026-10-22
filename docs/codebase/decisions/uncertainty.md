@@ -47,8 +47,8 @@ by the configuration's type and knows no method. A static type checker infers
 | `method.run(calibrator)` | The configuration, in `context/`, would import `api/`. |
 
 Every random number of a method comes from the `commol-random` generator,
-seeded from `CalibrationProblem.seed` (`replicate_seed`). Coverage studies
-(`tests/support/coverage.py`, marker `coverage_study`) check that a method's
+seeded from the seed of its source ([Results](results.md#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts)).
+Coverage studies (`tests/support/coverage.py`, marker `coverage_study`) check that a method's
 intervals cover the truth at their level; they run for a pull request that
 changes what they run and before a release
 (`.github/workflows/coverage.yaml`).

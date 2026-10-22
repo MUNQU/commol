@@ -52,6 +52,7 @@ def _calibrator(
     *,
     ab: str = "k1 * A * B / total",
     factors: tuple[str, ...] = (),
+    seed: int = 3,
 ) -> Calibrator:
     """``abc_builder`` with `parameters` left for calibration in their bounds."""
     model_parameters: dict[str, float | None] = {**TRUTH, "s": 1.0}
@@ -72,7 +73,7 @@ def _calibrator(
         ],
         loss_function="sse",
         optimization_config=NelderMeadConfig(max_iterations=200),
-        seed=3,
+        seed=seed,
     )
     return Calibrator(Simulation(model), problem)
 
@@ -176,6 +177,29 @@ class TestStructuralRank:
             RuntimeError, match="The rate of flow 'ab' at 8 is not a number"
         ):
             calibrator.identifiability(StructuralRank(points=2, design="observations"))
+
+    def test_structural_rank_takes_the_seed_of_the_calibrator(
+        self, truth: dict[str, list[float]]
+    ) -> None:
+        def points(seed: int) -> list[dict[str, float]]:
+            calibrator = _calibrator(
+                observed(truth, "B", range(5, 51, 5)),
+                {"k1": (0.1, 0.6), "k2": (0.02, 0.3)},
+                seed=seed,
+            )
+            report = calibrator.identifiability(
+                StructuralRank(points=3, design="observations")
+            )
+            return [point.values for point in report.structural[0].points]
+
+        assert points(3) == points(3)
+        assert points(3) != points(4)
+
+    def test_structural_rank_has_no_seed(self) -> None:
+        with pytest.raises(
+            ValidationError, match=r"\nseed\n  Extra inputs are not permitted"
+        ):
+            StructuralRank(points=3, design="observations", seed=1)
 
     def test_structural_rank_rejects_invalid_settings(self) -> None:
         with pytest.raises(ValidationError, match="points"):
