@@ -40,7 +40,7 @@ from commol import (
     scores,
 )
 from commol.context.inference.quantities import Quantity
-from tests.support import abc_builder, bounded, build
+from tests.support import abc_builder, bounded, build, draws_seed
 from tests.support.kinds import decay, decay_model
 from tests.support.models import a_to_b_builder, build_stochastic
 
@@ -318,6 +318,36 @@ class TestPropagation:
         # the draws: the propagation is that predictive.
         runs = Predictive(analysis, result.sample, [20.0]).runs()
         assert result.values == [[run["C"][0]] for run in runs]
+
+    def test_propagation_values_have_one_row_per_replicate_of_each_draw(
+        self,
+    ) -> None:
+        draws = [[0.3, 0.1], [0.4, 0.2]]
+        sample = ParameterSample(
+            names=["k1", "k2"],
+            bounds=[(0.1, 0.5), (0.0, 1.0)],
+            values=draws,
+            log_weights=[math.log(0.25), math.log(0.75)],
+            method=SampleMethod(name="test"),
+        )
+        inputs = InputSpace.from_sample(
+            sample, [bounded("k1", 0.1, 0.5), bounded("k2")]
+        )
+        simulation = Simulation(build_stochastic(abc_builder(), "StochasticSteps"))
+        analysis = SensitivityAnalysis(simulation, inputs, replicates=2, seed=3)
+
+        result = analysis.run(Propagation(quantities=[ValueAt(series="C", at=20)]))
+
+        assert result.weights == pytest.approx([0.125, 0.125, 0.375, 0.375])
+        # Replicate i of draw j is replicate 2j + i of the stream of the draws.
+        expected = []
+        for draw, (k1, k2) in enumerate(draws):
+            model = build_stochastic(
+                abc_builder(parameters={"k1": k1, "k2": k2}), "StochasticSteps"
+            )
+            runs = Simulation(model).replicates(4, seed=draws_seed(3)).run_at([20])
+            expected += [[run["C"][0]] for run in runs[2 * draw : 2 * draw + 2]]
+        assert result.values == expected
 
     def test_two_draws_of_one_value_draw_their_own_noise(self) -> None:
         simulation = Simulation(build_stochastic(abc_builder(), "StochasticSteps"))

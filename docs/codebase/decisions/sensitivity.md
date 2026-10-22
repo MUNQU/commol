@@ -47,6 +47,32 @@ again.
 **Guards:** `crates/commol-inference/tests/test_quantities.rs`,
 `tests/uncertainty/test_quantities.py`.
 
+## The quantities of one run take the path of a propagation
+
+`SimulationResults.quantities` and `SimulationReplicates.quantities` reduce
+the rows the run holds, with no rerun: `Quantities::evaluate_run` finds each
+position of the schedule among the positions of the run with the tolerance of
+the axis (`index_at` of `commol-calibration`), then calls the
+`Quantities::evaluate` of `Propagation`. The binding (`quantities_of_runs` in
+`py-commol/src/quantity.rs`) is a pure function of the quantities and the
+rows. A position the run lacks is an error that lists every such position
+with its quantity; `quantity_schedule` gives the positions to run at. A ratio
+of two quantities is a division of the rows of `PropagationResult.values`,
+before any reduction, not a quantity.
+
+| Alternative | Why not |
+|---|---|
+| `Simulation.quantities(results, …)` | The producer with the data as an argument; the accessors of a result live on the result. |
+| A rerun at the schedule | Numbers from a run the user does not plot: another run with a stochastic engine, and no run of the point estimate of a fit. |
+| Exact matching of positions | A position computed as `end − window` misses the row of the run. |
+| A `Ratio` quantity | NaN would become a normal value of a quantity, and the methods read a ratio row by row correctly already; a derived output cannot divide values at two positions. |
+
+**Guards:** `crates/commol-inference/tests/test_quantities.rs`
+(`a_done_run_is_read_at_the_schedule_within_the_tolerance_of_the_axis`,
+`a_done_run_lists_every_position_it_lacks_with_its_quantity`),
+`tests/simulation/test_quantities.py`,
+`tests/uncertainty/test_sensitivity.py::TestPropagation::test_propagation_values_have_one_row_per_replicate_of_each_draw`.
+
 ## NaN propagates in a run and stops a reduction across runs
 
 Inside a run, a NaN in a value a quantity reads makes the quantity NaN: a peak

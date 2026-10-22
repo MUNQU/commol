@@ -9,6 +9,34 @@ use std::collections::HashMap;
 
 use crate::types::{CalibrationParameter, CalibrationParameterType, ObservedDataPoint};
 
+/// Relative tolerance with which two positions on the axis are the same, as
+/// `index_at` of the Python results reads them.
+const POSITION_TOLERANCE: f64 = 1e-9;
+
+/// Whether two positions on the axis are the same: within
+/// [`POSITION_TOLERANCE`] of the larger of their magnitudes and 1.
+fn same_position(a: f64, b: f64) -> bool {
+    (a - b).abs() <= POSITION_TOLERANCE * a.abs().max(b.abs()).max(1.0)
+}
+
+/// The index of `at` in `positions`, ascending: the entry equal to it, or
+/// else a neighbour within the tolerance of the axis, so a position computed
+/// as `end − window` finds the entry of its start. None when no entry is the
+/// same position.
+pub fn index_at(positions: &[f64], at: f64) -> Option<usize> {
+    match positions.binary_search_by(|candidate| candidate.total_cmp(&at)) {
+        Ok(index) => Some(index),
+        Err(index) => [index.checked_sub(1), Some(index)]
+            .into_iter()
+            .flatten()
+            .find(|&candidate| {
+                positions
+                    .get(candidate)
+                    .is_some_and(|&position| same_position(position, at))
+            }),
+    }
+}
+
 /// How each observation reads a run: the outputs it sums, the row of its
 /// position, the row its window starts at, and the factor that multiplies
 /// it.
@@ -31,8 +59,8 @@ impl ObservationOperator {
     /// The operator of `observed_data` on a run at `positions`.
     ///
     /// `positions` is sorted, deduplicated, and holds every observation's
-    /// position and the start of every window. `output_names` are the
-    /// outputs of a row, in order.
+    /// position and the start of every window, each found with the tolerance
+    /// of [`index_at`]. `output_names` are the outputs of a row, in order.
     ///
     /// # Errors
     ///
@@ -88,9 +116,7 @@ impl ObservationOperator {
             .map(|(index, parameter)| (parameter.id.as_str(), index))
             .collect();
         let row_of = |position: f64| {
-            positions
-                .binary_search_by(|candidate| candidate.total_cmp(&position))
-                .expect("the schedule holds every observed position")
+            index_at(positions, position).expect("the schedule holds every observed position")
         };
 
         let mut outputs = Vec::with_capacity(observed_data.len());
@@ -223,6 +249,32 @@ mod tests {
 
         // C at 1 is 3; (A + B) grows from 3 to 10 and is doubled.
         assert_eq!(out, [3.0, 14.0]);
+    }
+
+    #[test]
+    fn a_window_finds_its_start_within_the_tolerance_of_the_axis() {
+        let mut windowed = ObservedDataPoint::new(0.3, "C".to_string(), 0.0);
+        windowed.window = Some(0.1);
+        // 0.3 − 0.1 is 0.19999999999999998, not the position 0.2 of the run.
+        let operator = ObservationOperator::new(&[windowed], &[], &names(), &[0.2, 0.3]).unwrap();
+        let rows = vec![vec![0.0, 0.0, 1.0], vec![0.0, 0.0, 4.0]];
+        let mut out = [0.0];
+
+        operator.apply(&rows, &[], &mut out);
+
+        assert_eq!(out, [3.0]);
+    }
+
+    #[test]
+    fn a_position_is_found_exactly_or_within_the_tolerance() {
+        let positions = [0.0, 0.2, 1.0, 1e12];
+        assert_eq!(index_at(&positions, 0.2), Some(1));
+        assert_eq!(index_at(&positions, 0.3 - 0.1), Some(1));
+        assert_eq!(index_at(&positions, 1.0 + 1e-10), Some(2));
+        assert_eq!(index_at(&positions, 1e12 + 1.0), Some(3));
+        assert_eq!(index_at(&positions, 0.5), None);
+        assert_eq!(index_at(&positions, 2e12), None);
+        assert_eq!(index_at(&[], 0.0), None);
     }
 
     #[test]

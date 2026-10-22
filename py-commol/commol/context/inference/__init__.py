@@ -46,6 +46,7 @@ from commol.context.inference.quantities import (
     PeakPosition,
     Trajectory,
     ValueAt,
+    quantity_schedule,
 )
 from commol.context.inference.identifiability import (
     Collinearity,
@@ -209,5 +210,6 @@ __all__ = [
     "UncertaintyMethod",
     "Uniform",
     "ValueAt",
+    "quantity_schedule",
     "WildBootstrap",
 ]

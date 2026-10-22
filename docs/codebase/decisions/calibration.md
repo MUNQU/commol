@@ -102,6 +102,10 @@ An observation is given by `at` and `window`, so its window starts at
 `at − window`. A quantity given by its start, `Gain(start, end)`, passes the
 start itself (`ObservationOperator::with_starts`): `end − (end − start)` can
 round away from `start`, as `0.4 − (0.4 − 0.1)` is `0.09999999999999998`.
+The operator finds the row of each position and of each start with the
+tolerance of the axis (`observation::index_at`: equal within `1e-9` of the
+larger of their magnitudes and 1, as `index_at` of `api/results.py`), so a start
+computed as `at − window` reads the row of the position it rounds away from.
 
 **Guards:** `observation::tests`,
 `crates/commol-inference/tests/test_predictive.rs::observation_draws_are_the_predictions_the_loss_compares`,

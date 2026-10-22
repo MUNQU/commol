@@ -41,7 +41,7 @@ from .problems import (
     observed,
 )
 from .reference import ABC_START, reference_run, abc_flows, total
-from .simulation import initial_state, run
+from .simulation import draws_seed, initial_state, run
 
 __all__ = [
     "ENGINE_REL",
@@ -63,6 +63,7 @@ __all__ = [
     "build",
     "build_ode",
     "conditional_pathway_builder",
+    "draws_seed",
     "final_size",
     "flow_calibrator",
     "flow_observations",

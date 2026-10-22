@@ -47,3 +47,5 @@ reads from each run, and the base of its methods. Guide:
 ::: commol.context.inference.quantities.PeakPosition
 
 ::: commol.context.inference.quantities.Trajectory
+
+::: commol.context.inference.quantities.quantity_schedule
