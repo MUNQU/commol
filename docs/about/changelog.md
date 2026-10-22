@@ -9,9 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [0.9.0] - 2026-10-22
 
-<!-- Added #226 -->
+This release gives control over the work of a calibration and over what a
+result records. `commol.threads(n, levels)` sets how many threads the parallel
+methods use and which levels run in parallel, a particle swarm can stop when
+it has converged, a polynomial chaos takes a truncated basis for many inputs,
+and `Ratio` gives a sensitivity analysis the ratio of two quantities. A
+calibration result records its seed, and `commol.build_info()` names the
+version and the commit of the package. Before you upgrade, read the
+**Breaking** entry: `CalibrationResult` requires `seed`. See
+[Parallelism](../guide/parallelism.md) and
+[Sensitivity Analysis](../guide/uncertainty/sensitivity.md).
+
+### Added
 
 - `PolynomialChaos(q_norm=..., max_interaction=...)`: a truncated basis for
   many inputs. `max_interaction` keeps the terms of at most that many inputs,
@@ -20,8 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   at degree 4 with `max_interaction=2` have 1,221 terms instead of 10,626,
   and the number is known before any run. `ChaosResult` records both. See
   [Bases for many inputs](../guide/uncertainty/sensitivity.md#bases-for-many-inputs).
-
-<!-- Added #230 -->
 
 - `ParticleSwarmConfig.improvement_stop(window=..., tol_abs=..., tol_rel=...)`
   and `ParticleSwarmConfig.radius_stop(tol)`: a particle swarm stops when its
@@ -33,8 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   converges. See
   [Stop rules](../guide/calibration-optimizers.md#stop-rules).
 
-<!-- Added #239 -->
-
 - `commol.set_threads(n)`, the context manager `commol.threads(n, levels)`,
   `commol.get_threads()` and `commol.get_levels()` choose the number of
   threads of every parallel method and the levels that run in parallel. The
@@ -45,16 +52,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gives the same result, history included, with any number of threads and
   either level. See [Threads and Parallelism](../guide/parallelism.md).
 
-<!-- Added #252 -->
-
 - A calibration result records the seed it used, `CalibrationResult.seed`
   (`Calibrator.seed`: `problem.seed`, or the seed the calibrator drew), and
   the sample of every uncertainty method and of `Calibrator.point_sample`
   names it in `method.settings["seed"]`. Set as `problem.seed`, it repeats
   the run, also from a result read back from JSON. See
   [Reproducibility](../guide/calibration-optimizers.md#reproducibility).
-
-<!-- Added #253 -->
 
 - `commol.__version__` gives the installed version, and `commol.build_info()`
   gives a `BuildInfo` with the version and the full commit the extension was
@@ -63,8 +66,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   git commit, names its commit as a PEP 440 local version:
   `0.1.0+g<first 7 characters of the commit>`. See
   [Check the installation](../getting-started/installation.md#check-the-installation).
-
-<!-- Added #282 -->
 
 - `Ratio(numerator, denominator, replicates)` is a quantity of interest: one
   `ValueAt`, `Gain` or `Peak` over another, in each run, so PRCC, Morris,
@@ -78,51 +79,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-<!-- Changed #226 -->
-
-<!-- Changed #230 -->
-
 - The tolerance of a profile under a particle swarm with the improvement stop
   rule is the improvement the rule allows at the fit,
   `tol_abs + tol_rel·|objective at the fit|`; without that rule it stays
   `1e-6·max(1, |objective at the fit|)`. See
   [Verdicts](../guide/uncertainty/profiles.md#verdicts-and-the-identifiability-report).
 
-<!-- Changed #239 -->
-
 - The parallel methods run in a thread pool of commol, not in the global pool
   of `rayon`: the environment variable `RAYON_NUM_THREADS` no longer limits
   them; use `commol.set_threads`. A particle swarm, which scored its particles
   one after the other, now scores them in parallel by default.
 
-<!-- Changed #252 -->
-
 - **Breaking:** `CalibrationResult` requires `seed`; a result saved by an
   earlier version, or built by hand, needs one to load.
 
-<!-- Changed #253 -->
-
-<!-- Changed #282 -->
-
 ### Fixed
-
-<!-- Fixed #226 -->
-
-<!-- Fixed #230 -->
-
-<!-- Fixed #239 -->
-
-<!-- Fixed #252 -->
 
 - A particle swarm without `problem.seed` takes the seed the calibrator
   draws and logs, so that seed repeats it; before, it drew one of its own
   that no result or log kept.
-
-<!-- Fixed #253 -->
-
-<!-- Fixed #282 -->
-
-<!-- Fixed #320 -->
 
 - A profile that holds a prediction with a particle swarm scores its
   particles in parallel only when the levels of `commol.threads` are
@@ -1491,6 +1466,7 @@ the details of these versions.
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.9.0** - Control over the work and the record: threads and levels, swarm stop rules, truncated chaos bases, ratios, seeds and build info
 - **0.8.0** - Comparing runs: scenarios, quantities of a series, figures as methods and runs on the same panels
 - **0.7.0** - Reading a run through objects: the window grid and dates on the axis, series by output name and reports as methods
 - **0.6.1** - Fixes of 0.6.0: checks at build, messages of infeasible draws, PRCC with NaN, quantity labels and starts, plots
