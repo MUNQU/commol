@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **Breaking:** `commol.add_stderr_logger` is removed: commol configures no
+  logging, and adds only a `NullHandler` to the logger `commol`. Call
+  `logging.basicConfig(level=logging.INFO)` instead, or add a handler of your
+  own to `logging.getLogger("commol")`. See
+  [Log messages](../getting-started/quickstart.md#log-messages).
+
 ## [0.9.0] - 2026-10-22
 
 This release gives control over the work of a calibration and over what a

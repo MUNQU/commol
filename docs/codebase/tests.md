@@ -34,7 +34,7 @@ kind that is not aggregate through every generic layer.
 | `docs/` | The documentation examples and the API coverage (marker `docs`) | — |
 | `reference_models/` | Published models against their stated results, one module per model family | — (across features) |
 | `model_kinds/` | The test model kind (`support/kinds.py`) through a simulation, a calibration, a report and a plot; the check that an engine runs its kind; the variants of a structure (`UnstratifiedVariant`). It needs the extension built with `--features test-kind`. | — (across features; [Design decisions](decisions/model-kinds.md#one-interface-for-every-model-kind)) |
-| `suite/` | The rules of this page that a program can check (`test_rules.py`), and the plugin that records how long each test takes (`durations.py`) | — |
+| `suite/` | The rules of this page that a program can check (`test_rules.py`), the plugin that records how long each test takes (`durations.py`), and the checks of the package as a whole: its version (`test_version.py`) and its logging, in a fresh interpreter (`test_logging.py`) | — |
 | `support/` | No tests: the code the tests share | — |
 
 Keep a test module under about 600 lines. When it grows past that, split it by
