@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+<!-- Added #246 -->
+
+<!-- Added #247 -->
+
+<!-- Added #250 -->
+
+<!-- Added #251 -->
+
+<!-- Added #276 -->
+
+<!-- Added #280 -->
+
+### Changed
+
+<!-- Changed #246 -->
+
+<!-- Changed #247 -->
+
+<!-- Changed #250 -->
+
+<!-- Changed #251 -->
+
+<!-- Changed #276 -->
+
+<!-- Changed #280 -->
+
+### Fixed
+
+<!-- Fixed #246 -->
+
+<!-- Fixed #247 -->
+
+<!-- Fixed #250 -->
+
+<!-- Fixed #251 -->
+
+<!-- Fixed #276 -->
+
+<!-- Fixed #280 -->
+
 ## [0.7.0] - 2026-10-22
 
 This release reads a run through the classes of commol. The axis of a model
