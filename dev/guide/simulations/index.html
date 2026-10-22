@@ -1117,6 +1117,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#a-panel-per-observed-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A panel per observed series
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#several-results-on-one-figure" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3422,6 +3433,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#a-panel-per-observed-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A panel per observed series
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#several-results-on-one-figure" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3647,7 +3669,7 @@ The positions the values were read at are in <code>results.positions</code>.</p>
 <td>JSON export next to the observations</td>
 </tr>
 <tr>
-<td><code>results.plot.series(…)</code>, <code>results.plot.cumulative(…)</code></td>
+<td><code>results.plot.series(…)</code>, <code>results.plot.cumulative(…)</code>, <code>results.plot.observations(…)</code></td>
 <td>A matplotlib <code>Figure</code> (<a href="#plotting">Plotting</a>)</td>
 <td>Figures of the run</td>
 </tr>
@@ -3738,8 +3760,8 @@ replicate gives the same run however many replicates run, and
 <td>The report of a run, with each number reduced replicate by replicate (<a href="../reports/#the-report-of-an-ensemble">Reports</a>)</td>
 </tr>
 <tr>
-<td><code>plot.series(…)</code>, <code>plot.cumulative(…)</code></td>
-<td>The figure of the mean and of a band of the replicates, and the figure of the running total of the mean (<a href="#plotting">Plotting</a>)</td>
+<td><code>plot.series(…)</code>, <code>plot.cumulative(…)</code>, <code>plot.observations(…)</code></td>
+<td>The figure of the mean and of a band of the replicates, the figure of the running total of the mean, and the figure of each observed series (<a href="#plotting">Plotting</a>)</td>
 </tr>
 </tbody>
 </table>
@@ -4063,15 +4085,15 @@ extra <code>commol[plot]</code>:</p>
 <tbody>
 <tr>
 <td><code>SimulationResults</code></td>
-<td><code>results.plot.series(…)</code>: each series along the axis. <code>results.plot.cumulative(…)</code>: the running total of each series.</td>
+<td><code>results.plot.series(…)</code>: each series along the axis. <code>results.plot.cumulative(…)</code>: the running total of each series. <code>results.plot.observations(…)</code>: each <a href="#a-panel-per-observed-series">observed series</a>, read through its observation operator.</td>
 </tr>
 <tr>
 <td><code>SimulationReplicates</code></td>
-<td><code>replicates.plot.series(…)</code>: the mean and a band of <code>confidence_level</code> (default 0.95), each replicate reduced to the series first. <code>replicates.plot.cumulative(…)</code>: the running total of the mean.</td>
+<td><code>replicates.plot.series(…)</code>: the mean and a band of <code>confidence_level</code> (default 0.95), each replicate reduced to the series first. <code>replicates.plot.cumulative(…)</code>: the running total of the mean. <code>replicates.plot.observations(…)</code>: the mean and the band of each observed series.</td>
 </tr>
 <tr>
 <td><a href="../uncertainty/#the-predictive"><code>Predictive</code></a></td>
-<td><code>predictive.plot.series(…)</code> and <code>predictive.plot.cumulative(…)</code>: the weighted median of the draws and their band of <code>confidence_level</code>, with no other run.</td>
+<td><code>predictive.plot.series(…)</code> and <code>predictive.plot.cumulative(…)</code>: the weighted median of the draws and their band of <code>confidence_level</code>, with no other run. <code>predictive.plot.observations(…)</code>: the median and the band of each observed series.</td>
 </tr>
 <tr>
 <td>The results of <a href="../uncertainty/sensitivity/#plots">sensitivity methods</a> and of <a href="../uncertainty/profiles/#plots">profiles</a></td>
@@ -4215,29 +4237,113 @@ matplotlib after a figure of commol keep your own style.</p>
 </span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="p">]</span>
 </span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="n">results</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">series</span><span class="p">(</span><span class="n">output_file</span><span class="o">=</span><span class="s2">&quot;with_data.png&quot;</span><span class="p">,</span> <span class="n">observed_data</span><span class="o">=</span><span class="n">observed</span><span class="p">)</span>
 </span></code></pre></div>
+<h3 id="a-panel-per-observed-series">A panel per observed series<a class="headerlink" href="#a-panel-per-observed-series" title="Permanent link">&para;</a></h3>
+<p><code>plot.observations(observed_data, …)</code> checks a model against its data: one
+panel per <code>label</code> of the observations, in the order of its first observation.
+The model is read only at the observations, through the observation operator
+of each one (the sum of its <code>outputs</code>, its <code>window</code> and its factor): the
+values the loss compares. An observed series that sums some outputs, such as
+<code>B + C</code>, has its own panel, which no series of <code>plot.series</code> gives.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">observed</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">at</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">value</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>    <span class="k">for</span> <span class="n">at</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">[(</span><span class="mi">7</span><span class="p">,</span> <span class="mf">120.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">14</span><span class="p">,</span> <span class="mf">160.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">21</span><span class="p">,</span> <span class="mf">190.0</span><span class="p">)]</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="p">]</span> <span class="o">+</span> <span class="p">[</span>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">at</span><span class="p">,</span> <span class="n">outputs</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;B_and_C&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">value</span><span class="p">)</span>
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>    <span class="k">for</span> <span class="n">at</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">[(</span><span class="mi">10</span><span class="p">,</span> <span class="mf">300.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="mf">520.0</span><span class="p">)]</span>
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="p">]</span> <span class="o">+</span> <span class="p">[</span>
+</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">at</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">value</span><span class="p">)</span>
+</span><span id="__span-20-9"><a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a>    <span class="k">for</span> <span class="n">at</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">[(</span><span class="mi">10</span><span class="p">,</span> <span class="mf">240.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="mf">380.0</span><span class="p">)]</span>
+</span><span id="__span-20-10"><a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a><span class="p">]</span>
+</span><span id="__span-20-11"><a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a>
+</span><span id="__span-20-12"><a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">observations</span><span class="p">(</span><span class="n">observed</span><span class="p">,</span> <span class="n">output_file</span><span class="o">=</span><span class="s2">&quot;observations.png&quot;</span><span class="p">)</span>
+</span><span id="__span-20-13"><a id="__codelineno-20-13" name="__codelineno-20-13" href="#__codelineno-20-13"></a><span class="nb">print</span><span class="p">([</span><span class="n">ax</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">ax</span> <span class="ow">in</span> <span class="n">figure</span><span class="o">.</span><span class="n">axes</span> <span class="k">if</span> <span class="n">ax</span><span class="o">.</span><span class="n">get_visible</span><span class="p">()])</span>  <span class="c1"># [&#39;cum_ab&#39;, &#39;B_and_C&#39;, &#39;B&#39;]</span>
+</span><span id="__span-20-14"><a id="__codelineno-20-14" name="__codelineno-20-14" href="#__codelineno-20-14"></a>
+</span><span id="__span-20-15"><a id="__codelineno-20-15" name="__codelineno-20-15" href="#__codelineno-20-15"></a><span class="n">results</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">series</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">axes</span><span class="o">=</span><span class="n">figure</span><span class="p">)</span>  <span class="c1"># the run along the whole axis</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Drawn</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A value with a window</td>
+<td>A total over <code>(at - window, at]</code>: a step over its window, with a marker at <code>at</code>. Each point has its own window.</td>
+</tr>
+<tr>
+<td>A value with no window</td>
+<td>A marker at <code>at</code>. A dotted line joins these markers only as a guide.</td>
+</tr>
+<tr>
+<td>The band of replicates or of a predictive</td>
+<td>A rectangle over the window of each value with a window, and a band filled between the values with no window. Its legend says that it is a band of the model, with no observation noise, not a prediction interval.</td>
+</tr>
+<tr>
+<td>The observed values</td>
+<td>Red points.</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Results</th>
+<th>Model</th>
+<th>Band</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SimulationResults</code></td>
+<td>The run</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>SimulationReplicates</code></td>
+<td>The mean of the replicates</td>
+<td>The interval of <code>confidence_level</code> across the replicates, each read through the operator of each observation first</td>
+</tr>
+<tr>
+<td><code>Predictive</code></td>
+<td>The weighted median of the draws</td>
+<td>The band of <code>predictive.at_observations(observed_data, NoNoise())</code>, each draw with its own values of the factors</td>
+</tr>
+</tbody>
+</table>
+<p><code>calibration_result</code>, for runs and replicates, gives the values of the
+factors. The other arguments (<code>output_file</code>, <code>config</code>, <code>show_legend</code>,
+<code>x_label</code>, <code>tick_every</code>, <code>position_label</code>, <code>confidence_level</code>, <code>axes</code>) are
+those of <code>plot.series</code>. The other keyword arguments go to <code>Axes.plot</code> for the
+steps and the guide of the model. A label that names a series, such as <code>B</code>,
+also has the panel of that series: <code>plot.series(series=["B"], axes=figure)</code>
+draws the run along the whole axis, after the data too. An empty
+<code>observed_data</code>, or results with no value at the position of an observation
+or at the start of its window, raise <code>ValueError</code>.</p>
 <h3 id="several-results-on-one-figure">Several results on one figure<a class="headerlink" href="#several-results-on-one-figure" title="Permanent link">&para;</a></h3>
 <p>Each panel holds the id of its series as the label of its <code>Axes</code>
 (<code>ax.get_label()</code>). Give the <code>Figure</code> of an earlier figure as <code>axes=</code>, and a
 figure draws each of its series on the panel of that series. A series with no
 panel raises <code>ValueError</code> that names it. <code>config</code> then sets only the style:
 the size, dpi and layout are those of the given figure.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">faster_model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">deep</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="n">faster_model</span><span class="o">.</span><span class="n">update_parameters</span><span class="p">({</span><span class="s2">&quot;k1&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">})</span>
-</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="n">faster</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">faster_model</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
-</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>
-</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">series</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">])</span>
-</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="n">faster</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">series</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">axes</span><span class="o">=</span><span class="n">figure</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span>
-</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="nb">print</span><span class="p">([</span><span class="n">ax</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">ax</span> <span class="ow">in</span> <span class="n">figure</span><span class="o">.</span><span class="n">axes</span> <span class="k">if</span> <span class="n">ax</span><span class="o">.</span><span class="n">get_visible</span><span class="p">()])</span>  <span class="c1"># [&#39;B&#39;, &#39;C&#39;]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">faster_model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">deep</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="n">faster_model</span><span class="o">.</span><span class="n">update_parameters</span><span class="p">({</span><span class="s2">&quot;k1&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">})</span>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="n">faster</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">faster_model</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">series</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">])</span>
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="n">faster</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">series</span><span class="p">(</span><span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">axes</span><span class="o">=</span><span class="n">figure</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span>
+</span><span id="__span-21-7"><a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="nb">print</span><span class="p">([</span><span class="n">ax</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">ax</span> <span class="ow">in</span> <span class="n">figure</span><span class="o">.</span><span class="n">axes</span> <span class="k">if</span> <span class="n">ax</span><span class="o">.</span><span class="n">get_visible</span><span class="p">()])</span>  <span class="c1"># [&#39;B&#39;, &#39;C&#39;]</span>
 </span></code></pre></div>
 <h3 id="compare-results-on-the-same-panels">Compare results on the same panels<a class="headerlink" href="#compare-results-on-the-same-panels" title="Permanent link">&para;</a></h3>
 <p><code>plot_compared({label: result}, …)</code> draws several results of the same model on
 the same panels and returns the <code>Figure</code>. A value is a <code>SimulationResults</code>, a
 <code>SimulationReplicates</code> or a <a href="../uncertainty/#the-predictive"><code>Predictive</code></a>.
 It is a function, not a method: a comparison describes no single result.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_compared</span>
-</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>
-</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">plot_compared</span><span class="p">({</span><span class="s2">&quot;k1 = 0.3&quot;</span><span class="p">:</span> <span class="n">results</span><span class="p">,</span> <span class="s2">&quot;k1 = 0.5&quot;</span><span class="p">:</span> <span class="n">faster</span><span class="p">},</span> <span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">])</span>
-</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="nb">print</span><span class="p">([</span><span class="n">line</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">figure</span><span class="o">.</span><span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lines</span><span class="p">])</span>  <span class="c1"># [&#39;k1 = 0.3&#39;, &#39;k1 = 0.5&#39;]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_compared</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="n">figure</span> <span class="o">=</span> <span class="n">plot_compared</span><span class="p">({</span><span class="s2">&quot;k1 = 0.3&quot;</span><span class="p">:</span> <span class="n">results</span><span class="p">,</span> <span class="s2">&quot;k1 = 0.5&quot;</span><span class="p">:</span> <span class="n">faster</span><span class="p">},</span> <span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">])</span>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="nb">print</span><span class="p">([</span><span class="n">line</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">figure</span><span class="o">.</span><span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lines</span><span class="p">])</span>  <span class="c1"># [&#39;k1 = 0.3&#39;, &#39;k1 = 0.5&#39;]</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -4276,8 +4382,8 @@ differ. <code>axes=</code> draws on the panels of an earlier figure, and <code>s
 <code>config</code>, <code>show_legend</code>, <code>x_label</code>, <code>tick_every</code>, <code>position_label</code>,
 <code>output_file</code> and other keyword arguments (for <code>Axes.plot</code>, on every line)
 work as in <code>plot.series</code>.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">weekly</span> <span class="o">=</span> <span class="n">plot_compared</span><span class="p">({</span><span class="s2">&quot;k1 = 0.3&quot;</span><span class="p">:</span> <span class="n">results</span><span class="p">,</span> <span class="s2">&quot;k1 = 0.5&quot;</span><span class="p">:</span> <span class="n">faster</span><span class="p">},</span> <span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span> <span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
-</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="nb">print</span><span class="p">([</span><span class="nb">float</span><span class="p">(</span><span class="n">at</span><span class="p">)</span> <span class="k">for</span> <span class="n">at</span> <span class="ow">in</span> <span class="n">weekly</span><span class="o">.</span><span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get_xdata</span><span class="p">()][:</span><span class="mi">3</span><span class="p">])</span>  <span class="c1"># [7.0, 14.0, 21.0]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="n">weekly</span> <span class="o">=</span> <span class="n">plot_compared</span><span class="p">({</span><span class="s2">&quot;k1 = 0.3&quot;</span><span class="p">:</span> <span class="n">results</span><span class="p">,</span> <span class="s2">&quot;k1 = 0.5&quot;</span><span class="p">:</span> <span class="n">faster</span><span class="p">},</span> <span class="n">series</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span> <span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="nb">print</span><span class="p">([</span><span class="nb">float</span><span class="p">(</span><span class="n">at</span><span class="p">)</span> <span class="k">for</span> <span class="n">at</span> <span class="ow">in</span> <span class="n">weekly</span><span class="o">.</span><span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get_xdata</span><span class="p">()][:</span><span class="mi">3</span><span class="p">])</span>  <span class="c1"># [7.0, 14.0, 21.0]</span>
 </span></code></pre></div>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>

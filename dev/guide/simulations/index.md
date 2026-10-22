@@ -77,14 +77,14 @@ model.update_parameters({"k1": 0.3})
 
 `run` and `run_at` return `SimulationResults` (`py-commol/commol/api/results.py`): a `dict` from output name to one value per position, so `results["A"]`, `json.dumps(results)` and `pandas.DataFrame(results)` work as for any mapping. The positions the values were read at are in `results.positions`.
 
-| Member                                                 | Shape                                                                                                                      | Use for                                                  |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `results[name]`                                        | `[value at positions[0], …]`                                                                                               | Reading one output, plotting                             |
-| `results.positions`                                    | `[0.0, 1.0, …, n]` for `run(n)`; the requested positions for `run_at`                                                      | Reading a value at a position, windows, reports          |
-| `results.rows()`                                       | `[[every output at positions[0]], …]`, in `simulation_outputs` order                                                       | Matrix operations, export                                |
-| `results.model`                                        | The `Model` of the run, which `run` and `run_at` set; `None` for results built by hand                                     | The outputs of each bin and accumulator, read by reports |
-| `results.report(positions, window, windows, …)`        | The report of the run, as plain data ([Reports](https://munqu.github.io/commol/latest/guide/reports/#the-report-of-a-run)) | JSON export next to the observations                     |
-| `results.plot.series(…)`, `results.plot.cumulative(…)` | A matplotlib `Figure` ([Plotting](#plotting))                                                                              | Figures of the run                                       |
+| Member                                                                                 | Shape                                                                                                                      | Use for                                                  |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `results[name]`                                                                        | `[value at positions[0], …]`                                                                                               | Reading one output, plotting                             |
+| `results.positions`                                                                    | `[0.0, 1.0, …, n]` for `run(n)`; the requested positions for `run_at`                                                      | Reading a value at a position, windows, reports          |
+| `results.rows()`                                                                       | `[[every output at positions[0]], …]`, in `simulation_outputs` order                                                       | Matrix operations, export                                |
+| `results.model`                                                                        | The `Model` of the run, which `run` and `run_at` set; `None` for results built by hand                                     | The outputs of each bin and accumulator, read by reports |
+| `results.report(positions, window, windows, …)`                                        | The report of the run, as plain data ([Reports](https://munqu.github.io/commol/latest/guide/reports/#the-report-of-a-run)) | JSON export next to the observations                     |
+| `results.plot.series(…)`, `results.plot.cumulative(…)`, `results.plot.observations(…)` | A matplotlib `Figure` ([Plotting](#plotting))                                                                              | Figures of the run                                       |
 
 `run(num_steps)` holds `num_steps + 1` positions: position 0 is the initial state.
 
@@ -118,15 +118,15 @@ except ValueError as error:
 
 Replicate `i` takes the seed derived from `seed` and `i`, the SplitMix64 of `seed + i` (`replicate_seed` in `crates/commol-random/src/generator.rs`), so a replicate gives the same run however many replicates run, and `simulation.run(…, seed=replicates[i].seed)` repeats it. `SimulationReplicates` (`py-commol/commol/api/results.py`) is a list of `SimulationResults`:
 
-| Member                                                    | Returns                                                                                                                                                                                                                                             |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `replicates[i]`, `len(replicates)`                        | One run, with its `seed`; the number of runs                                                                                                                                                                                                        |
-| `seed`, `seeds`, `positions`, `model`                     | The seed the replicate seeds derive from, the seed of each replicate, the positions, the `Model` of the replicates                                                                                                                                  |
-| `mean()`                                                  | `SimulationResults` of the mean of every output at each position                                                                                                                                                                                    |
-| `quantiles(levels)`                                       | `{level: SimulationResults}`, at each position, by [the one quantile](https://munqu.github.io/commol/latest/codebase/decisions/results/#one-confidence-interval-convention) (NumPy's `method="hazen"`)                                              |
-| `member_statistics(output, confidence_level)`             | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate with [the one quantile](https://munqu.github.io/commol/latest/codebase/decisions/results/#one-confidence-interval-convention) |
-| `report(confidence_level, positions, window, windows, …)` | The report of a run, with each number reduced replicate by replicate ([Reports](https://munqu.github.io/commol/latest/guide/reports/#the-report-of-an-ensemble))                                                                                    |
-| `plot.series(…)`, `plot.cumulative(…)`                    | The figure of the mean and of a band of the replicates, and the figure of the running total of the mean ([Plotting](#plotting))                                                                                                                     |
+| Member                                                         | Returns                                                                                                                                                                                                                                             |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `replicates[i]`, `len(replicates)`                             | One run, with its `seed`; the number of runs                                                                                                                                                                                                        |
+| `seed`, `seeds`, `positions`, `model`                          | The seed the replicate seeds derive from, the seed of each replicate, the positions, the `Model` of the replicates                                                                                                                                  |
+| `mean()`                                                       | `SimulationResults` of the mean of every output at each position                                                                                                                                                                                    |
+| `quantiles(levels)`                                            | `{level: SimulationResults}`, at each position, by [the one quantile](https://munqu.github.io/commol/latest/codebase/decisions/results/#one-confidence-interval-convention) (NumPy's `method="hazen"`)                                              |
+| `member_statistics(output, confidence_level)`                  | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate with [the one quantile](https://munqu.github.io/commol/latest/codebase/decisions/results/#one-confidence-interval-convention) |
+| `report(confidence_level, positions, window, windows, …)`      | The report of a run, with each number reduced replicate by replicate ([Reports](https://munqu.github.io/commol/latest/guide/reports/#the-report-of-an-ensemble))                                                                                    |
+| `plot.series(…)`, `plot.cumulative(…)`, `plot.observations(…)` | The figure of the mean and of a band of the replicates, the figure of the running total of the mean, and the figure of each observed series ([Plotting](#plotting))                                                                                 |
 
 ```python
 stochastic = Simulation(
@@ -374,13 +374,13 @@ pip install 'commol[plot]'
 
 `import commol` loads no plotting library. Without matplotlib, a figure raises `ImportError` with this install line.
 
-| Results                                                                                                                                                                                                     | Figures                                                                                                                                                                                            |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SimulationResults`                                                                                                                                                                                         | `results.plot.series(…)`: each series along the axis. `results.plot.cumulative(…)`: the running total of each series.                                                                              |
-| `SimulationReplicates`                                                                                                                                                                                      | `replicates.plot.series(…)`: the mean and a band of `confidence_level` (default 0.95), each replicate reduced to the series first. `replicates.plot.cumulative(…)`: the running total of the mean. |
-| [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive)                                                                                                                     | `predictive.plot.series(…)` and `predictive.plot.cumulative(…)`: the weighted median of the draws and their band of `confidence_level`, with no other run.                                         |
-| The results of [sensitivity methods](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#plots) and of [profiles](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#plots) | `result.plot(…)`                                                                                                                                                                                   |
-| Several runs, replicates or predictives                                                                                                                                                                     | `plot_compared({label: result}, …)`: each result on the same panels ([compare results](#compare-results-on-the-same-panels)).                                                                      |
+| Results                                                                                                                                                                                                     | Figures                                                                                                                                                                                                                                                                              |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SimulationResults`                                                                                                                                                                                         | `results.plot.series(…)`: each series along the axis. `results.plot.cumulative(…)`: the running total of each series. `results.plot.observations(…)`: each [observed series](#a-panel-per-observed-series), read through its observation operator.                                   |
+| `SimulationReplicates`                                                                                                                                                                                      | `replicates.plot.series(…)`: the mean and a band of `confidence_level` (default 0.95), each replicate reduced to the series first. `replicates.plot.cumulative(…)`: the running total of the mean. `replicates.plot.observations(…)`: the mean and the band of each observed series. |
+| [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive)                                                                                                                     | `predictive.plot.series(…)` and `predictive.plot.cumulative(…)`: the weighted median of the draws and their band of `confidence_level`, with no other run. `predictive.plot.observations(…)`: the median and the band of each observed series.                                       |
+| The results of [sensitivity methods](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#plots) and of [profiles](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#plots) | `result.plot(…)`                                                                                                                                                                                                                                                                     |
+| Several runs, replicates or predictives                                                                                                                                                                     | `plot_compared({label: result}, …)`: each result on the same panels ([compare results](#compare-results-on-the-same-panels)).                                                                                                                                                        |
 
 A figure draws one panel per series and returns the matplotlib `Figure`. It reads the name and the unit of each series from the model of the results (`results.model`). Results built by hand have no model: their figures draw only their outputs, and a bin or accumulator id raises `ValueError`.
 
@@ -438,6 +438,43 @@ observed = [
 ]
 results.plot.series(output_file="with_data.png", observed_data=observed)
 ```
+
+### A panel per observed series
+
+`plot.observations(observed_data, …)` checks a model against its data: one panel per `label` of the observations, in the order of its first observation. The model is read only at the observations, through the observation operator of each one (the sum of its `outputs`, its `window` and its factor): the values the loss compares. An observed series that sums some outputs, such as `B + C`, has its own panel, which no series of `plot.series` gives.
+
+```python
+observed = [
+    ObservedDataPoint(at=at, output="cum_ab", value=value, window=7)
+    for at, value in [(7, 120.0), (14, 160.0), (21, 190.0)]
+] + [
+    ObservedDataPoint(at=at, outputs=["B", "C"], label="B_and_C", value=value)
+    for at, value in [(10, 300.0), (20, 520.0)]
+] + [
+    ObservedDataPoint(at=at, output="B", value=value)
+    for at, value in [(10, 240.0), (20, 380.0)]
+]
+
+figure = results.plot.observations(observed, output_file="observations.png")
+print([ax.get_label() for ax in figure.axes if ax.get_visible()])  # ['cum_ab', 'B_and_C', 'B']
+
+results.plot.series(series=["B"], axes=figure)  # the run along the whole axis
+```
+
+| Drawn                                     | How                                                                                                                                                                                                                 |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A value with a window                     | A total over `(at - window, at]`: a step over its window, with a marker at `at`. Each point has its own window.                                                                                                     |
+| A value with no window                    | A marker at `at`. A dotted line joins these markers only as a guide.                                                                                                                                                |
+| The band of replicates or of a predictive | A rectangle over the window of each value with a window, and a band filled between the values with no window. Its legend says that it is a band of the model, with no observation noise, not a prediction interval. |
+| The observed values                       | Red points.                                                                                                                                                                                                         |
+
+| Results                | Model                            | Band                                                                                                               |
+| ---------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `SimulationResults`    | The run                          | None                                                                                                               |
+| `SimulationReplicates` | The mean of the replicates       | The interval of `confidence_level` across the replicates, each read through the operator of each observation first |
+| `Predictive`           | The weighted median of the draws | The band of `predictive.at_observations(observed_data, NoNoise())`, each draw with its own values of the factors   |
+
+`calibration_result`, for runs and replicates, gives the values of the factors. The other arguments (`output_file`, `config`, `show_legend`, `x_label`, `tick_every`, `position_label`, `confidence_level`, `axes`) are those of `plot.series`. The other keyword arguments go to `Axes.plot` for the steps and the guide of the model. A label that names a series, such as `B`, also has the panel of that series: `plot.series(series=["B"], axes=figure)` draws the run along the whole axis, after the data too. An empty `observed_data`, or results with no value at the position of an observation or at the start of its window, raise `ValueError`.
 
 ### Several results on one figure
 

@@ -140,7 +140,7 @@ print(round(scaled_result.best_parameters["share_seen"], 3))  # 0.3
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Several factors       | Each observation names its own `factor_id`, so outputs can have different shares.                                                                                                                                      |
 | Not part of the model | `apply_calibration_parameters` skips `factor` values.                                                                                                                                                                  |
-| Plots                 | Pass `calibration_result=` to `results.plot.series`; it applies the calibrated factors to the comparison.                                                                                                              |
+| Plots                 | Pass `calibration_result=` to `results.plot.series` or `results.plot.observations`; it applies the calibrated factors to the comparison.                                                                               |
 | Identifiability       | A rate and a share can explain the same data. Fit them together only when the data can tell them apart: [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) checks it. |
 
 ## Counts per period: windows

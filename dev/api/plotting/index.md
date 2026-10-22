@@ -8,7 +8,7 @@ The figures are read from the results they draw, and return a matplotlib `Figure
 
 The figures of one run, read from `results.plot`.
 
-Each figure has one panel per series, and returns the matplotlib `Figure`. Given `axes=`, the `Figure` of an earlier figure of commol, it draws each series on the panel of that series instead.
+Each figure has one panel per series, or per observed series for `observations`, and returns the matplotlib `Figure`. Given `axes=`, the `Figure` of an earlier figure of commol, it draws each series on the panel of that series instead.
 
 Source code in `commol/api/plotting/accessors.py`
 
@@ -17,9 +17,10 @@ class ResultsPlot:
     """
     The figures of one run, read from ``results.plot``.
 
-    Each figure has one panel per series, and returns the matplotlib
-    `Figure`. Given ``axes=``, the `Figure` of an earlier figure of commol, it
-    draws each series on the panel of that series instead.
+    Each figure has one panel per series, or per observed series for
+    `observations`, and returns the matplotlib `Figure`. Given ``axes=``, the
+    `Figure` of an earlier figure of commol, it draws each series on the
+    panel of that series instead.
     """
 
     def __init__(self, results: "SimulationResults"):
@@ -188,6 +189,92 @@ class ResultsPlot:
             calibration_result=calibration_result,
             config=config,
             series=series,
+            axes=axes,
+            **kwargs,
+        )
+
+    def observations(
+        self,
+        observed_data: "list[ObservedDataPoint]",
+        output_file: str | None = None,
+        calibration_result: "CalibrationResult | None" = None,
+        config: "PlotConfig | None" = None,
+        show_legend: bool = True,
+        position_label: Callable[[float], str] | None = None,
+        tick_every: float | None = None,
+        x_label: str = "Step",
+        axes: "Figure | None" = None,
+        **kwargs: str | int | float | bool | None,
+    ) -> "Figure":
+        """
+        Draw each observed series with the model read through its
+        observation operator, one panel per label.
+
+        The model is read only at the observations: the value of each
+        observation through its own operator (the sum of its outputs, its
+        window and its factor), as the loss reads it. A value with a window is
+        a total over ``(at - window, at]``, drawn as a step over its window
+        with a marker at ``at``. A value with no window is a marker, joined
+        to the next only as a guide. The run along the whole axis is
+        `series`, on the same figure with ``axes=``.
+
+        Parameters
+        ----------
+        observed_data : list[ObservedDataPoint]
+            The observations. Each label is one panel, in the order of its
+            first observation, with the `Axes` label of the label.
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        calibration_result : CalibrationResult | None
+            Its ``best_parameters`` give the values of the factors of the
+            observations, which multiply the model; observed values stay in
+            their own units.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        show_legend : bool
+            Whether each panel shows its legend.
+        position_label : Callable[[float], str] | None
+            Turns a position into a tick label, as in `series`.
+        tick_every : float | None
+            The distance between labelled observation positions, as in
+            `series`.
+        x_label : str
+            The label of the x axis.
+        axes : Figure | None
+            A figure of commol to draw on: each observed series is drawn on
+            the `Axes` whose label is its label. If None, a new figure.
+        **kwargs : str | int | float | bool | None
+            Passed to ``Axes.plot`` for the steps and the guide of the model,
+            such as ``linewidth`` or ``alpha``.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            If there are no observations; the results have no value at the
+            position of an observation or at the start of its window; or
+            ``axes`` has no panel of a label.
+        KeyError
+            If an observation names an output the results do not have.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _run_observations
+
+        return _run_observations(
+            self._results,
+            observed_data,
+            output_file=output_file,
+            calibration_result=calibration_result,
+            config=config,
+            show_legend=show_legend,
+            position_label=position_label,
+            tick_every=tick_every,
+            x_label=x_label,
             axes=axes,
             **kwargs,
         )
@@ -462,6 +549,135 @@ def cumulative(
     )
 ```
 
+#### observations
+
+```python
+observations(observed_data: list[ObservedDataPoint], output_file: str | None = None, calibration_result: CalibrationResult | None = None, config: PlotConfig | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
+```
+
+Draw each observed series with the model read through its observation operator, one panel per label.
+
+The model is read only at the observations: the value of each observation through its own operator (the sum of its outputs, its window and its factor), as the loss reads it. A value with a window is a total over `(at - window, at]`, drawn as a step over its window with a marker at `at`. A value with no window is a marker, joined to the next only as a guide. The run along the whole axis is `series`, on the same figure with `axes=`.
+
+Parameters:
+
+| Name                 | Type                       | Description                                                                                                         | Default                                                                                                                                    |
+| -------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `observed_data`      | `list[ObservedDataPoint]`  | The observations. Each label is one panel, in the order of its first observation, with the Axes label of the label. | *required*                                                                                                                                 |
+| `output_file`        | \`str                      | None\`                                                                                                              | Path to save the figure to. If None, the figure is only returned.                                                                          |
+| `calibration_result` | \`CalibrationResult        | None\`                                                                                                              | Its best_parameters give the values of the factors of the observations, which multiply the model; observed values stay in their own units. |
+| `config`             | \`PlotConfig               | None\`                                                                                                              | Layout and style. If None, the defaults.                                                                                                   |
+| `show_legend`        | `bool`                     | Whether each panel shows its legend.                                                                                | `True`                                                                                                                                     |
+| `position_label`     | \`Callable\[[float], str\] | None\`                                                                                                              | Turns a position into a tick label, as in series.                                                                                          |
+| `tick_every`         | \`float                    | None\`                                                                                                              | The distance between labelled observation positions, as in series.                                                                         |
+| `x_label`            | `str`                      | The label of the x axis.                                                                                            | `'Step'`                                                                                                                                   |
+| `axes`               | \`Figure                   | None\`                                                                                                              | A figure of commol to draw on: each observed series is drawn on the Axes whose label is its label. If None, a new figure.                  |
+| `**kwargs`           | \`str                      | int                                                                                                                 | float                                                                                                                                      |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                                                                                                               |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`  | If there are no observations; the results have no value at the position of an observation or at the start of its window; or axes has no panel of a label. |
+| `KeyError`    | If an observation names an output the results do not have.                                                                                                |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                                              |
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+def observations(
+    self,
+    observed_data: "list[ObservedDataPoint]",
+    output_file: str | None = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: "PlotConfig | None" = None,
+    show_legend: bool = True,
+    position_label: Callable[[float], str] | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """
+    Draw each observed series with the model read through its
+    observation operator, one panel per label.
+
+    The model is read only at the observations: the value of each
+    observation through its own operator (the sum of its outputs, its
+    window and its factor), as the loss reads it. A value with a window is
+    a total over ``(at - window, at]``, drawn as a step over its window
+    with a marker at ``at``. A value with no window is a marker, joined
+    to the next only as a guide. The run along the whole axis is
+    `series`, on the same figure with ``axes=``.
+
+    Parameters
+    ----------
+    observed_data : list[ObservedDataPoint]
+        The observations. Each label is one panel, in the order of its
+        first observation, with the `Axes` label of the label.
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    calibration_result : CalibrationResult | None
+        Its ``best_parameters`` give the values of the factors of the
+        observations, which multiply the model; observed values stay in
+        their own units.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+    show_legend : bool
+        Whether each panel shows its legend.
+    position_label : Callable[[float], str] | None
+        Turns a position into a tick label, as in `series`.
+    tick_every : float | None
+        The distance between labelled observation positions, as in
+        `series`.
+    x_label : str
+        The label of the x axis.
+    axes : Figure | None
+        A figure of commol to draw on: each observed series is drawn on
+        the `Axes` whose label is its label. If None, a new figure.
+    **kwargs : str | int | float | bool | None
+        Passed to ``Axes.plot`` for the steps and the guide of the model,
+        such as ``linewidth`` or ``alpha``.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        If there are no observations; the results have no value at the
+        position of an observation or at the start of its window; or
+        ``axes`` has no panel of a label.
+    KeyError
+        If an observation names an output the results do not have.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _run_observations
+
+    return _run_observations(
+        self._results,
+        observed_data,
+        output_file=output_file,
+        calibration_result=calibration_result,
+        config=config,
+        show_legend=show_legend,
+        position_label=position_label,
+        tick_every=tick_every,
+        x_label=x_label,
+        axes=axes,
+        **kwargs,
+    )
+```
+
 ## ReplicatesPlot
 
 The figures of the replicates of a stochastic engine, read from `replicates.plot`.
@@ -630,6 +846,89 @@ class ReplicatesPlot:
             calibration_result=calibration_result,
             config=config,
             series=series,
+            axes=axes,
+            **kwargs,
+        )
+
+    def observations(
+        self,
+        observed_data: "list[ObservedDataPoint]",
+        output_file: str | None = None,
+        calibration_result: "CalibrationResult | None" = None,
+        config: "PlotConfig | None" = None,
+        show_legend: bool = True,
+        position_label: Callable[[float], str] | None = None,
+        tick_every: float | None = None,
+        x_label: str = "Step",
+        confidence_level: float = 0.95,
+        axes: "Figure | None" = None,
+        **kwargs: str | int | float | bool | None,
+    ) -> "Figure":
+        """
+        Draw each observed series with the mean of the replicates and their
+        band, read through its observation operator, one panel per label.
+
+        Each replicate is read through the operator of each observation
+        first, as `ResultsPlot.observations` reads a run, then the band takes
+        the interval of `confidence_level` across them
+        (`member_statistics`). A band over a window is a rectangle over that
+        window. The band is a band of the model, with no observation noise,
+        not a prediction interval, and its legend says so.
+
+        Parameters
+        ----------
+        observed_data : list[ObservedDataPoint]
+            The observations, as in `ResultsPlot.observations`.
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        calibration_result : CalibrationResult | None
+            The values of the factors, as in `ResultsPlot.observations`.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        show_legend : bool
+            Whether each panel shows its legend.
+        position_label : Callable[[float], str] | None
+            Turns a position into a tick label, as in `ResultsPlot.series`.
+        tick_every : float | None
+            The distance between labelled positions, as in
+            `ResultsPlot.series`.
+        x_label : str
+            The label of the x axis.
+        confidence_level : float
+            The level of the band, strictly between 0 and 1.
+        axes : Figure | None
+            A figure of commol to draw on, as in `ResultsPlot.observations`.
+        **kwargs : str | int | float | bool | None
+            Passed to ``Axes.plot`` for the steps and the guide of the mean.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            As `ResultsPlot.observations`; or if there are no replicates or
+            the confidence level is out of range.
+        KeyError
+            If an observation names an output the replicates do not have.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _replicates_observations
+
+        return _replicates_observations(
+            self._replicates,
+            observed_data,
+            output_file=output_file,
+            calibration_result=calibration_result,
+            config=config,
+            show_legend=show_legend,
+            position_label=position_label,
+            tick_every=tick_every,
+            x_label=x_label,
+            confidence_level=confidence_level,
             axes=axes,
             **kwargs,
         )
@@ -891,6 +1190,133 @@ def cumulative(
     )
 ```
 
+#### observations
+
+```python
+observations(observed_data: list[ObservedDataPoint], output_file: str | None = None, calibration_result: CalibrationResult | None = None, config: PlotConfig | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', confidence_level: float = 0.95, axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
+```
+
+Draw each observed series with the mean of the replicates and their band, read through its observation operator, one panel per label.
+
+Each replicate is read through the operator of each observation first, as `ResultsPlot.observations` reads a run, then the band takes the interval of `confidence_level` across them (`member_statistics`). A band over a window is a rectangle over that window. The band is a band of the model, with no observation noise, not a prediction interval, and its legend says so.
+
+Parameters:
+
+| Name                 | Type                       | Description                                       | Default                                                            |
+| -------------------- | -------------------------- | ------------------------------------------------- | ------------------------------------------------------------------ |
+| `observed_data`      | `list[ObservedDataPoint]`  | The observations, as in ResultsPlot.observations. | *required*                                                         |
+| `output_file`        | \`str                      | None\`                                            | Path to save the figure to. If None, the figure is only returned.  |
+| `calibration_result` | \`CalibrationResult        | None\`                                            | The values of the factors, as in ResultsPlot.observations.         |
+| `config`             | \`PlotConfig               | None\`                                            | Layout and style. If None, the defaults.                           |
+| `show_legend`        | `bool`                     | Whether each panel shows its legend.              | `True`                                                             |
+| `position_label`     | \`Callable\[[float], str\] | None\`                                            | Turns a position into a tick label, as in ResultsPlot.series.      |
+| `tick_every`         | \`float                    | None\`                                            | The distance between labelled positions, as in ResultsPlot.series. |
+| `x_label`            | `str`                      | The label of the x axis.                          | `'Step'`                                                           |
+| `confidence_level`   | `float`                    | The level of the band, strictly between 0 and 1.  | `0.95`                                                             |
+| `axes`               | \`Figure                   | None\`                                            | A figure of commol to draw on, as in ResultsPlot.observations.     |
+| `**kwargs`           | \`str                      | int                                               | float                                                              |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                                                         |
+| ------------- | --------------------------------------------------------------------------------------------------- |
+| `ValueError`  | As ResultsPlot.observations; or if there are no replicates or the confidence level is out of range. |
+| `KeyError`    | If an observation names an output the replicates do not have.                                       |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                        |
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+def observations(
+    self,
+    observed_data: "list[ObservedDataPoint]",
+    output_file: str | None = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: "PlotConfig | None" = None,
+    show_legend: bool = True,
+    position_label: Callable[[float], str] | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    confidence_level: float = 0.95,
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """
+    Draw each observed series with the mean of the replicates and their
+    band, read through its observation operator, one panel per label.
+
+    Each replicate is read through the operator of each observation
+    first, as `ResultsPlot.observations` reads a run, then the band takes
+    the interval of `confidence_level` across them
+    (`member_statistics`). A band over a window is a rectangle over that
+    window. The band is a band of the model, with no observation noise,
+    not a prediction interval, and its legend says so.
+
+    Parameters
+    ----------
+    observed_data : list[ObservedDataPoint]
+        The observations, as in `ResultsPlot.observations`.
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    calibration_result : CalibrationResult | None
+        The values of the factors, as in `ResultsPlot.observations`.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+    show_legend : bool
+        Whether each panel shows its legend.
+    position_label : Callable[[float], str] | None
+        Turns a position into a tick label, as in `ResultsPlot.series`.
+    tick_every : float | None
+        The distance between labelled positions, as in
+        `ResultsPlot.series`.
+    x_label : str
+        The label of the x axis.
+    confidence_level : float
+        The level of the band, strictly between 0 and 1.
+    axes : Figure | None
+        A figure of commol to draw on, as in `ResultsPlot.observations`.
+    **kwargs : str | int | float | bool | None
+        Passed to ``Axes.plot`` for the steps and the guide of the mean.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        As `ResultsPlot.observations`; or if there are no replicates or
+        the confidence level is out of range.
+    KeyError
+        If an observation names an output the replicates do not have.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _replicates_observations
+
+    return _replicates_observations(
+        self._replicates,
+        observed_data,
+        output_file=output_file,
+        calibration_result=calibration_result,
+        config=config,
+        show_legend=show_legend,
+        position_label=position_label,
+        tick_every=tick_every,
+        x_label=x_label,
+        confidence_level=confidence_level,
+        axes=axes,
+        **kwargs,
+    )
+```
+
 ## PredictivePlot
 
 The figures of a predictive, read from `predictive.plot`.
@@ -1061,6 +1487,87 @@ class PredictivePlot:
             observed_data=observed_data,
             config=config,
             series=series,
+            confidence_level=confidence_level,
+            axes=axes,
+            **kwargs,
+        )
+
+    def observations(
+        self,
+        observed_data: "list[ObservedDataPoint]",
+        output_file: str | None = None,
+        config: "PlotConfig | None" = None,
+        show_legend: bool = True,
+        position_label: Callable[[float], str] | None = None,
+        tick_every: float | None = None,
+        x_label: str = "Step",
+        confidence_level: float = 0.95,
+        axes: "Figure | None" = None,
+        **kwargs: str | int | float | bool | None,
+    ) -> "Figure":
+        """
+        Draw each observed series with the weighted median of the draws and
+        their band, read through its observation operator, one panel per
+        label.
+
+        The values are those of ``at_observations(observed_data, NoNoise())``:
+        each draw's value of each observation through its own operator (the
+        sum of its outputs, its window and the draw's value of its factor),
+        the values the loss compares. A value with a window is drawn as a
+        step over its window with a marker at ``at``, and its band as a
+        rectangle over the same window; a value with no window is a marker,
+        joined only as a guide. The band is a band of the model, with no
+        observation noise, not a prediction interval, and its legend says so.
+
+        Parameters
+        ----------
+        observed_data : list[ObservedDataPoint]
+            The observations, as in `ResultsPlot.observations`.
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        show_legend : bool
+            Whether each panel shows its legend.
+        position_label : Callable[[float], str] | None
+            Turns a position into a tick label, as in `ResultsPlot.series`.
+        tick_every : float | None
+            The distance between labelled positions, as in
+            `ResultsPlot.series`.
+        x_label : str
+            The label of the x axis.
+        confidence_level : float
+            The level of the band, strictly between 0 and 1.
+        axes : Figure | None
+            A figure of commol to draw on, as in `ResultsPlot.observations`.
+        **kwargs : str | int | float | bool | None
+            Passed to ``Axes.plot`` for the steps and the guide of the median.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            If there are no observations, an observation names an unknown
+            output or factor, the confidence level is out of range, or
+            ``axes`` has no panel of a label.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _predictive_observations
+
+        return _predictive_observations(
+            self._predictive,
+            observed_data,
+            output_file=output_file,
+            config=config,
+            show_legend=show_legend,
+            position_label=position_label,
+            tick_every=tick_every,
+            x_label=x_label,
             confidence_level=confidence_level,
             axes=axes,
             **kwargs,
@@ -1320,6 +1827,129 @@ def cumulative(
         observed_data=observed_data,
         config=config,
         series=series,
+        confidence_level=confidence_level,
+        axes=axes,
+        **kwargs,
+    )
+```
+
+#### observations
+
+```python
+observations(observed_data: list[ObservedDataPoint], output_file: str | None = None, config: PlotConfig | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', confidence_level: float = 0.95, axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
+```
+
+Draw each observed series with the weighted median of the draws and their band, read through its observation operator, one panel per label.
+
+The values are those of `at_observations(observed_data, NoNoise())`: each draw's value of each observation through its own operator (the sum of its outputs, its window and the draw's value of its factor), the values the loss compares. A value with a window is drawn as a step over its window with a marker at `at`, and its band as a rectangle over the same window; a value with no window is a marker, joined only as a guide. The band is a band of the model, with no observation noise, not a prediction interval, and its legend says so.
+
+Parameters:
+
+| Name               | Type                       | Description                                       | Default                                                            |
+| ------------------ | -------------------------- | ------------------------------------------------- | ------------------------------------------------------------------ |
+| `observed_data`    | `list[ObservedDataPoint]`  | The observations, as in ResultsPlot.observations. | *required*                                                         |
+| `output_file`      | \`str                      | None\`                                            | Path to save the figure to. If None, the figure is only returned.  |
+| `config`           | \`PlotConfig               | None\`                                            | Layout and style. If None, the defaults.                           |
+| `show_legend`      | `bool`                     | Whether each panel shows its legend.              | `True`                                                             |
+| `position_label`   | \`Callable\[[float], str\] | None\`                                            | Turns a position into a tick label, as in ResultsPlot.series.      |
+| `tick_every`       | \`float                    | None\`                                            | The distance between labelled positions, as in ResultsPlot.series. |
+| `x_label`          | `str`                      | The label of the x axis.                          | `'Step'`                                                           |
+| `confidence_level` | `float`                    | The level of the band, strictly between 0 and 1.  | `0.95`                                                             |
+| `axes`             | \`Figure                   | None\`                                            | A figure of commol to draw on, as in ResultsPlot.observations.     |
+| `**kwargs`         | \`str                      | int                                               | float                                                              |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ValueError`  | If there are no observations, an observation names an unknown output or factor, the confidence level is out of range, or axes has no panel of a label. |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                                           |
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+def observations(
+    self,
+    observed_data: "list[ObservedDataPoint]",
+    output_file: str | None = None,
+    config: "PlotConfig | None" = None,
+    show_legend: bool = True,
+    position_label: Callable[[float], str] | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    confidence_level: float = 0.95,
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """
+    Draw each observed series with the weighted median of the draws and
+    their band, read through its observation operator, one panel per
+    label.
+
+    The values are those of ``at_observations(observed_data, NoNoise())``:
+    each draw's value of each observation through its own operator (the
+    sum of its outputs, its window and the draw's value of its factor),
+    the values the loss compares. A value with a window is drawn as a
+    step over its window with a marker at ``at``, and its band as a
+    rectangle over the same window; a value with no window is a marker,
+    joined only as a guide. The band is a band of the model, with no
+    observation noise, not a prediction interval, and its legend says so.
+
+    Parameters
+    ----------
+    observed_data : list[ObservedDataPoint]
+        The observations, as in `ResultsPlot.observations`.
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+    show_legend : bool
+        Whether each panel shows its legend.
+    position_label : Callable[[float], str] | None
+        Turns a position into a tick label, as in `ResultsPlot.series`.
+    tick_every : float | None
+        The distance between labelled positions, as in
+        `ResultsPlot.series`.
+    x_label : str
+        The label of the x axis.
+    confidence_level : float
+        The level of the band, strictly between 0 and 1.
+    axes : Figure | None
+        A figure of commol to draw on, as in `ResultsPlot.observations`.
+    **kwargs : str | int | float | bool | None
+        Passed to ``Axes.plot`` for the steps and the guide of the median.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        If there are no observations, an observation names an unknown
+        output or factor, the confidence level is out of range, or
+        ``axes`` has no panel of a label.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _predictive_observations
+
+    return _predictive_observations(
+        self._predictive,
+        observed_data,
+        output_file=output_file,
+        config=config,
+        show_legend=show_legend,
+        position_label=position_label,
+        tick_every=tick_every,
+        x_label=x_label,
         confidence_level=confidence_level,
         axes=axes,
         **kwargs,
