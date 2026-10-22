@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - A calibration result records the seed it used, `CalibrationResult.seed` (`Calibrator.seed`: `problem.seed`, or the seed the calibrator drew), and the sample of every uncertainty method and of `Calibrator.point_sample` names it in `method.settings["seed"]`. Set as `problem.seed`, it repeats the run, also from a result read back from JSON. See [Reproducibility](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#reproducibility).
 
+- `commol.__version__` gives the installed version, and `commol.build_info()` gives a `BuildInfo` with the version and the full commit the extension was built from (`None` when the source has no git metadata, such as a source distribution). A build that is not a release, such as an install from a git commit, names its commit as a PEP 440 local version: `0.1.0+g<first 7 characters of the commit>`. See [Check the installation](https://munqu.github.io/commol/latest/getting-started/installation/#check-the-installation).
+
 - `Ratio(numerator, denominator, replicates)` is a quantity of interest: one `ValueAt`, `Gain` or `Peak` over another, in each run, so PRCC, Morris, Sobol and a polynomial chaos read a ratio whose denominator depends on the inputs. `replicates` is required: with a stochastic engine, a point of a design holds the mean of the ratios (`"within"`), the mean of the ratios of the replicates with a positive denominator (`"within_positive"`) or the ratio of the means (`"pooled"`). A denominator of 0 makes the ratio of a run NaN, and every method follows the NaN rule. See [A ratio of two quantities](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#a-ratio-of-two-quantities).
 
 ### Changed

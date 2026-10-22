@@ -1888,6 +1888,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/package/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../advanced/model-structure/" class="md-nav__link">
         
   
@@ -4170,6 +4198,15 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <!-- Added #253 -->
 
+<ul>
+<li><code>commol.__version__</code> gives the installed version, and <code>commol.build_info()</code>
+  gives a <code>BuildInfo</code> with the version and the full commit the extension was
+  built from (<code>None</code> when the source has no git metadata, such as a source
+  distribution). A build that is not a release, such as an install from a
+  git commit, names its commit as a PEP 440 local version:
+  <code>0.1.0+g&lt;first 7 characters of the commit&gt;</code>. See
+  <a href="../../getting-started/installation/#check-the-installation">Check the installation</a>.</li>
+</ul>
 <!-- Added #282 -->
 
 <ul>

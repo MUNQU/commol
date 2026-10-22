@@ -1892,6 +1892,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/package/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../advanced/model-structure/" class="md-nav__link">
         
   
@@ -3542,6 +3570,17 @@ is built, the <code>set-version</code> action (<code>.github/actions/set-version
 git tag, writes it into <code>py-commol/Cargo.toml</code>, and maturin turns it into the
 Python package version.</p>
 <p>Do not commit version bumps. The tag is the version.</p>
+<p>A build that is not a release, such as an install from a git commit or
+<code>maturin develop</code>, keeps the placeholder. The build script of the extension
+(<code>py-commol/build.rs</code>, with its logic in <code>py-commol/src/build_info.rs</code>) reads
+the commit from the git metadata of the source, without the <code>git</code> program, and
+<code>commol.__version__</code> adds it to the placeholder as a PEP 440 local version:
+<code>0.1.0+g&lt;first 7 characters of the commit&gt;</code>. A build of any other version is a
+release, and <code>__version__</code> gives that version alone, in PEP 440 (<code>X.Y.Z-beta.N</code>
+gives <code>X.Y.ZbN</code>). <code>commol.build_info()</code> gives the version and the full commit,
+or <code>None</code> when the source has no git metadata (a source distribution).
+<code>tests/suite/test_version.py</code> checks the version and the commit of the build
+that the tests run on, and the Rust tests of <code>build_info.rs</code> check the rule.</p>
 <h2 id="release-workflow">Release Workflow<a class="headerlink" href="#release-workflow" title="Permanent link">&para;</a></h2>
 <p>A release is always made from <code>main</code>. Publishing a GitHub release starts the
 <strong>Release to PyPI</strong> workflow (<code>.github/workflows/release.yaml</code>), which

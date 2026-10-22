@@ -47,6 +47,7 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 - [Identifiability](https://munqu.github.io/commol/latest/api/identifiability/index.md)
 - [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md)
 - [Model](https://munqu.github.io/commol/latest/api/model/index.md)
+- [Package](https://munqu.github.io/commol/latest/api/package/index.md)
 - [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)
 - [Reports](https://munqu.github.io/commol/latest/api/reports/index.md)
 - [Sensitivity](https://munqu.github.io/commol/latest/api/sensitivity/index.md)

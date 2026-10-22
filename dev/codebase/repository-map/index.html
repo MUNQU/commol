@@ -1892,6 +1892,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/package/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../advanced/model-structure/" class="md-nav__link">
         
   
@@ -3480,6 +3508,11 @@
 </thead>
 <tbody>
 <tr>
+<td><code>py-commol/build.rs</code>, <code>py-commol/src/build_info.rs</code></td>
+<td>The version and the commit of a build: the build script reads the commit from the git metadata of the source and writes <code>COMMOL_VERSION</code> and <code>COMMOL_COMMIT</code>, which <code>py-commol/src/lib.rs</code> gives as <code>__version__</code> and <code>__commit__</code> of the extension; <code>build_info.rs</code> holds the rule (the placeholder <code>0.1.0</code> is not a release) and its tests.</td>
+<td>Anything that runs the <code>git</code> program.</td>
+</tr>
+<tr>
 <td><code>py-commol/src/core.rs</code></td>
 <td>Bindings of the model types (<code>Model</code>, <code>Process</code>, <code>Aggregate</code>, …).</td>
 <td>Logic.</td>
@@ -3585,6 +3618,11 @@
 <td><code>api/calibrator.py</code></td>
 <td><code>Calibrator</code>: the one conversion of a problem to Rust types, <code>run(starts=n)</code>, <code>run_with_history</code>, and the entry point <code>uncertainty</code>; <code>check_values</code>, the check of the values a calibration or an analysis sets.</td>
 <td>Loss or optimizer logic.</td>
+</tr>
+<tr>
+<td><code>api/build_info.py</code></td>
+<td><code>BuildInfo</code> and <code>build_info</code>, the version and the commit the extension was built from, and the source of <code>commol.__version__</code>.</td>
+<td>Reading the version or the commit in Python.</td>
 </tr>
 <tr>
 <td><code>api/sensitivity.py</code></td>

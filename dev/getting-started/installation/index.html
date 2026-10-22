@@ -1986,6 +1986,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/package/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../advanced/model-structure/" class="md-nav__link">
         
   
@@ -3156,12 +3184,43 @@
 <p>On other platforms, <code>pip</code> builds Commol from the source distribution, which
 needs a Rust toolchain.</p>
 <h2 id="check-the-installation">Check the installation<a class="headerlink" href="#check-the-installation" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">importlib.metadata</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">commol</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelBuilder</span><span class="p">,</span> <span class="n">Simulation</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">importlib</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">version</span><span class="p">(</span><span class="s2">&quot;commol&quot;</span><span class="p">))</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">commol</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">commol</span><span class="o">.</span><span class="n">build_info</span><span class="p">())</span>
 </span></code></pre></div>
+<p><code>commol.__version__</code> is the version you installed. <code>commol.build_info()</code> gives
+it with the full commit of the source; save it with a result to name the code
+that made it.</p>
+<table>
+<thead>
+<tr>
+<th>Installed from</th>
+<th><code>__version__</code></th>
+<th><code>build_info().commit</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A wheel of a release on PyPI</td>
+<td>The release, such as <code>0.9.0</code></td>
+<td>The commit of the release</td>
+</tr>
+<tr>
+<td>The source distribution of a release</td>
+<td>The release</td>
+<td><code>None</code>: the source has no git metadata</td>
+</tr>
+<tr>
+<td>A git commit, or a clone (<code>maturin develop</code>)</td>
+<td><code>0.1.0+g&lt;first 7 characters of the commit&gt;</code></td>
+<td>The full commit</td>
+</tr>
+</tbody>
+</table>
+<p>A build that is not a release has the placeholder version <code>0.1.0</code> of the
+source, so its local version (<code>+g…</code>) is what names its commit. The metadata of
+the package (<code>pip show commol</code>) gives the placeholder alone.</p>
 <h2 id="build-from-source">Build from source<a class="headerlink" href="#build-from-source" title="Permanent link">&para;</a></h2>
 <p>To work on Commol, or to use unreleased code from <code>main</code>:</p>
 <ol>
