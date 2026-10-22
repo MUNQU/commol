@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Added #250 -->
 
+- `SimulationResults.quantities(quantities)` reduces one run to its
+  quantities of interest, as `dict[str, float]`, and
+  `SimulationReplicates.quantities(quantities)` gives one such dict per
+  replicate, with the Rust code of `Propagation`. `quantity_schedule` gives
+  the positions to run at; a run that lacks one raises `ValueError` that lists
+  each missing position with its quantity. The guide shows how to take a ratio
+  of two quantities row by row. See
+  [The quantities of one run](../guide/uncertainty/sensitivity.md#the-quantities-of-one-run).
+
 <!-- Added #251 -->
 
 - `plot_compared({label: result}, …)` draws several runs, replicates or

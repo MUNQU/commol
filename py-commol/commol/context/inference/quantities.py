@@ -18,6 +18,9 @@ Every quantity follows the same rules:
 
 The quantities cross to Rust as the JSON of their classes, and Rust reduces
 each run, through the observation operator of the calibration.
+`quantity_schedule` gives the positions a run must report at, so the
+results of ``Simulation.run_at(quantity_schedule(quantities))`` give the
+quantities of that run (`SimulationResults.quantities`).
 """
 
 from abc import ABC, abstractmethod
@@ -25,6 +28,8 @@ from collections.abc import Sequence
 from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from commol.commol_rs import _commol_rs as commol_rs
 
 Position = Annotated[float, Field(ge=0.0, allow_inf_nan=False)]
 """A position on the axis of the model."""
@@ -398,3 +403,33 @@ def expand_quantities(quantities: Sequence[QuantityBase]) -> tuple[list[str], st
 def rust_quantities(quantities: Sequence[QuantityBase]) -> str:
     """The JSON list of `quantities` as Rust reads them, without labels."""
     return "[" + ",".join(quantity.rust_json() for quantity in quantities) + "]"
+
+
+def quantity_schedule(quantities: Sequence[QuantityBase]) -> list[float]:
+    """
+    The positions a run must report at for `quantities` to read it.
+
+    They are every position a quantity reads and the start of every window,
+    sorted, each once. A `SimulationResults` of
+    ``Simulation.run_at(quantity_schedule(quantities))`` holds them all, so
+    `SimulationResults.quantities` reads it; a `Propagation` runs at the same
+    positions.
+
+    Parameters
+    ----------
+    quantities : Sequence[Quantity]
+        The quantities.
+
+    Returns
+    -------
+    list[float]
+        The positions, ascending.
+
+    Raises
+    ------
+    ValueError
+        If there is no quantity.
+    """
+    if not quantities:
+        raise ValueError("Give at least one quantity of interest.")
+    return commol_rs.inference.quantity_schedule(rust_quantities(quantities))

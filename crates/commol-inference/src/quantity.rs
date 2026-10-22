@@ -22,11 +22,14 @@
 //!
 //! A quantity crosses from Python as JSON, with `kind` as the tag of each
 //! enum. The quantities of a design are evaluated in Rust, run after run, so
-//! a design of thousands of runs never returns to Python.
+//! a design of thousands of runs never returns to Python. The quantities of
+//! a run that is already done ([`Quantities::evaluate_run`]) read its rows
+//! at the positions of the schedule, found with the tolerance of the axis
+//! ([`index_at`]), and reduce them with the same code.
 
 use std::ops::Range;
 
-use commol_calibration::{ObservationOperator, ObservedDataPoint};
+use commol_calibration::{ObservationOperator, ObservedDataPoint, index_at};
 use serde::{Deserialize, Serialize};
 
 /// What a quantity reads at each position of a run.
@@ -117,6 +120,27 @@ impl Quantity {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    /// The outputs the quantity sums.
+    pub fn outputs(&self) -> &[String] {
+        match self {
+            Self::Gain { outputs, .. } => outputs,
+            Self::ValueAt { series, .. }
+            | Self::Peak { series, .. }
+            | Self::PeakPosition { series, .. }
+            | Self::Trajectory { series, .. } => series.outputs(),
+        }
+    }
+}
+
+/// The positions of the schedule that a run lacks, for one quantity that
+/// reads them.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MissingPositions {
+    /// The index of the quantity, in the order it was given.
+    pub quantity: usize,
+    /// The positions it reads that the run lacks, ascending.
+    pub positions: Vec<f64>,
 }
 
 /// How a quantity reduces its observations.
@@ -139,6 +163,9 @@ pub struct Quantities {
     operator: ObservationOperator,
     reductions: Vec<Reduction>,
     count: usize,
+    /// The positions each quantity reads, ascending: its positions and the
+    /// starts of its windows.
+    reads: Vec<Vec<f64>>,
 }
 
 /// The observations of a quantity, one per position, and the start of the
@@ -209,7 +236,9 @@ impl Quantities {
         let mut points = Vec::new();
         let mut starts = Vec::new();
         let mut reductions = Vec::with_capacity(quantities.len());
+        let mut reads = Vec::with_capacity(quantities.len());
         for (index, quantity) in quantities.iter().enumerate() {
+            let first = points.len();
             let mut read = Points {
                 index,
                 points: &mut points,
@@ -256,6 +285,14 @@ impl Quantities {
                     }
                 }
             });
+            let mut positions: Vec<f64> = points[first..]
+                .iter()
+                .map(|point| point.at)
+                .chain(starts[first..].iter().flatten().copied())
+                .collect();
+            positions.sort_by(f64::total_cmp);
+            positions.dedup();
+            reads.push(positions);
         }
         let mut schedule: Vec<f64> = points
             .iter()
@@ -271,7 +308,25 @@ impl Quantities {
             operator,
             count: quantities.iter().map(Quantity::len).sum(),
             reductions,
+            reads,
         })
+    }
+
+    /// The schedule of `quantities` alone: the sorted, deduplicated
+    /// positions a run must report at, compiled for the outputs the
+    /// quantities name.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::new`], but for an unknown output.
+    pub fn schedule_of(quantities: &[Quantity]) -> Result<Vec<f64>, String> {
+        let mut outputs: Vec<String> = quantities
+            .iter()
+            .flat_map(|quantity| quantity.outputs().iter().cloned())
+            .collect();
+        outputs.sort();
+        outputs.dedup();
+        Ok(Self::new(quantities, &outputs)?.schedule)
     }
 
     /// The sorted, deduplicated positions a run must report at.
@@ -288,6 +343,56 @@ impl Quantities {
     /// Whether there is no scalar; never, for compiled quantities.
     pub fn is_empty(&self) -> bool {
         self.count == 0
+    }
+
+    /// The value of each scalar of a run at `positions`, ascending, with one
+    /// row of `rows` per position: the rows at the positions of
+    /// [`Self::schedule`], each found within the tolerance of the axis
+    /// ([`index_at`]), reduced by [`Self::evaluate`]. The run may hold more
+    /// positions than the schedule.
+    ///
+    /// # Errors
+    ///
+    /// Every quantity that reads a position the run lacks, with those
+    /// positions, in the order of the quantities.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `rows` does not hold one row per position.
+    pub fn evaluate_run(
+        &self,
+        positions: &[f64],
+        rows: &[Vec<f64>],
+    ) -> Result<Vec<f64>, Vec<MissingPositions>> {
+        assert_eq!(rows.len(), positions.len(), "one row per position");
+        let missing: Vec<MissingPositions> = self
+            .reads
+            .iter()
+            .enumerate()
+            .filter_map(|(quantity, reads)| {
+                let positions: Vec<f64> = reads
+                    .iter()
+                    .copied()
+                    .filter(|&at| index_at(positions, at).is_none())
+                    .collect();
+                (!positions.is_empty()).then_some(MissingPositions {
+                    quantity,
+                    positions,
+                })
+            })
+            .collect();
+        if !missing.is_empty() {
+            return Err(missing);
+        }
+        let selected: Vec<Vec<f64>> = self
+            .schedule
+            .iter()
+            .map(|&at| {
+                let index = index_at(positions, at).expect("every read position was found");
+                rows[index].clone()
+            })
+            .collect();
+        Ok(self.evaluate(&selected))
     }
 
     /// The value of each scalar in the rows of a run at [`Self::schedule`].

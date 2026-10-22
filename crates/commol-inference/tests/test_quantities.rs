@@ -7,7 +7,7 @@ use commol_core::Model;
 use commol_difference::DifferenceEquations;
 use commol_inference::design::InputSpace;
 use commol_inference::global_sensitivity::{ChaosExpansion, ForwardAnalysis, morris, prcc, sobol};
-use commol_inference::quantity::{Quantities, Quantity, Series};
+use commol_inference::quantity::{MissingPositions, Quantities, Quantity, Series};
 use commol_inference::statistics::{self, NotANumber};
 use commol_inference::{NanRun, PredictiveError, Priors};
 
@@ -124,6 +124,85 @@ fn a_nan_makes_the_quantity_nan() {
     assert!(values[0].is_nan() && values[1].is_nan(), "{values:?}");
     assert!(values[2].is_nan());
     assert_eq!(values[3..], [9.0, 2.0]);
+}
+
+#[test]
+fn a_done_run_is_read_at_the_schedule_within_the_tolerance_of_the_axis() {
+    let quantities = [
+        Quantity::Gain {
+            outputs: names(&["acc"]),
+            start: 0.0,
+            end: 0.3,
+        },
+        Quantity::ValueAt {
+            series: increments(&["acc"], 0.1),
+            at: 0.3,
+        },
+    ];
+    let compiled = Quantities::new(&quantities, &names(&["other", "acc"])).unwrap();
+    // The run holds 0.2, where the window of 0.1 that ends at 0.3 starts at
+    // 0.19999999999999998, and positions the quantities do not read.
+    let positions = [0.0, 0.1, 0.2, 0.3 + 1e-12, 0.4];
+    let rows: Vec<Vec<f64>> = [0.0, 1.0, 3.0, 6.0, 10.0]
+        .iter()
+        .map(|&acc| vec![-1.0, acc])
+        .collect();
+
+    assert_eq!(compiled.evaluate_run(&positions, &rows), Ok(vec![6.0, 3.0]));
+    assert_eq!(
+        Quantities::schedule_of(&quantities).unwrap(),
+        compiled.schedule()
+    );
+}
+
+#[test]
+fn a_done_run_lists_every_position_it_lacks_with_its_quantity() {
+    let quantities = Quantities::new(
+        &[
+            Quantity::ValueAt {
+                series: level(&["acc"]),
+                at: 7.0,
+            },
+            Quantity::Peak {
+                series: increments(&["acc"], 7.0),
+                positions: vec![14.0, 21.0],
+            },
+        ],
+        &names(&["acc"]),
+    )
+    .unwrap();
+    let (_, rows) = accumulator([0.0, 1.0, 5.0, 7.0]);
+
+    let missing = quantities
+        .evaluate_run(&[0.0, 7.0, 10.0, 21.0], &rows)
+        .unwrap_err();
+
+    assert_eq!(
+        missing,
+        [MissingPositions {
+            quantity: 1,
+            positions: vec![14.0],
+        }]
+    );
+}
+
+#[test]
+fn the_schedule_alone_reads_the_outputs_the_quantities_name() {
+    let schedule = Quantities::schedule_of(&[
+        Quantity::Trajectory {
+            series: level(&["B", "A"]),
+            positions: vec![5.0, 1.0],
+        },
+        Quantity::Gain {
+            outputs: names(&["C"]),
+            start: 2.0,
+            end: 3.0,
+        },
+    ])
+    .unwrap();
+
+    assert_eq!(schedule, [1.0, 2.0, 3.0, 5.0]);
+    assert!(Quantities::schedule_of(&[]).is_err());
 }
 
 #[test]
