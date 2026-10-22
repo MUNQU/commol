@@ -31,7 +31,7 @@ Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
 
 Structural identifiability, local and numerical: the rank of the scaled sensitivities at random points inside the bounds.
 
-The sensitivities come from finite differences, with a step and an error set by the accuracy of the engine; a singular value counts when it is above the norm of that error. The engine must be deterministic.
+The sensitivities come from finite differences, with a step and an error set by the accuracy of the engine; a singular value counts when it is above the norm of that error. The engine must be deterministic. The points come from the seed of the calibrator, `Calibrator.seed`.
 
 Attributes:
 
@@ -39,7 +39,6 @@ Attributes:
 | -------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `points` | `int` | How many rows of a Latin hypercube over the bounds, at least 1.                                                                                                                                                                                       |
 | `design` | `str` | "observations": the positions and outputs of the observations, their values ignored (can this design determine the parameters?). "dense": every observed series at every unit position up to the last observation (can denser data of these series?). |
-| `seed`   | \`int | None\`                                                                                                                                                                                                                                                |
 
 Source code in `commol/context/inference/identifiability.py`
 
@@ -51,7 +50,8 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport]):
 
     The sensitivities come from finite differences, with a step and an error
     set by the accuracy of the engine; a singular value counts when it is
-    above the norm of that error. The engine must be deterministic.
+    above the norm of that error. The engine must be deterministic. The
+    points come from the seed of the calibrator, ``Calibrator.seed``.
 
     Attributes
     ----------
@@ -62,13 +62,10 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport]):
         their values ignored (can this design determine the parameters?).
         ``"dense"``: every observed series at every unit position up to the
         last observation (can denser data of these series?).
-    seed : int | None
-        The seed of the points; None takes the seed of the problem.
     """
 
     points: int = Field(ge=1)
     design: Literal["observations", "dense"]
-    seed: int | None = Field(default=None, ge=0)
 ```
 
 ## Collinearity
@@ -1017,13 +1014,13 @@ The evidence of a `ProfileLikelihood`.
 
 Attributes:
 
-| Name        | Type                                        | Description                               |
-| ----------- | ------------------------------------------- | ----------------------------------------- |
-| `threshold` | `{chi_square, beale, bootstrap_calibrated}` | The rule of the threshold.                |
-| `level`     | `float`                                     | The level of each pointwise interval.     |
-| `tolerance` | `float`                                     | The numerical tolerance of the statistic. |
-| `verdicts`  | \`dict\[str, ProfileVerdictName             | None\]\`                                  |
-| `intervals` | \`dict\[str, tuple\[float                   | None, float                               |
+| Name               | Type                                        | Description                               |
+| ------------------ | ------------------------------------------- | ----------------------------------------- |
+| `threshold`        | `{chi_square, beale, bootstrap_calibrated}` | The rule of the threshold.                |
+| `confidence_level` | `float`                                     | The level of each pointwise interval.     |
+| `tolerance`        | `float`                                     | The numerical tolerance of the statistic. |
+| `verdicts`         | \`dict\[str, ProfileVerdictName             | None\]\`                                  |
+| `intervals`        | \`dict\[str, tuple\[float                   | None, float                               |
 
 Source code in `commol/context/inference/identifiability.py`
 
@@ -1036,7 +1033,7 @@ class ProfileSection(_Frozen):
     ----------
     threshold : {"chi_square", "beale", "bootstrap_calibrated"}
         The rule of the threshold.
-    level : float
+    confidence_level : float
         The level of each pointwise interval.
     tolerance : float
         The numerical tolerance of the statistic.
@@ -1049,7 +1046,7 @@ class ProfileSection(_Frozen):
     """
 
     threshold: Literal["chi_square", "beale", "bootstrap_calibrated"]
-    level: float
+    confidence_level: float
     tolerance: float
     verdicts: dict[str, ProfileVerdictName | None]
     intervals: dict[str, tuple[float | None, float | None]]

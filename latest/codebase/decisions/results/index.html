@@ -2571,6 +2571,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../sensitivity/" class="md-nav__link">
         
   
@@ -2719,6 +2747,39 @@
     <span class="md-ellipsis">
       
         One confidence-interval convention
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-setting-has-one-name-and-one-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A setting has one name and one check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A method takes its seed from its source and fits from its starts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fits-that-fail-have-one-place" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fits that fail have one place
       
     </span>
   </a>
@@ -3217,6 +3278,39 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-setting-has-one-name-and-one-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A setting has one name and one check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A method takes its seed from its source and fits from its starts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fits-that-fail-have-one-place" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fits that fail have one place
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-description-is-data-rendered-apart" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3297,14 +3391,21 @@
 <h2 id="one-confidence-interval-convention">One confidence-interval convention<a class="headerlink" href="#one-confidence-interval-convention" title="Permanent link">&para;</a></h2>
 <p>Every interval is a weighted quantile: the inverse of the weighted empirical
 distribution, interpolated between the midpoints of the cumulative weights
-(<code>statistics::quantiles</code> in <code>crates/commol-inference/src/statistics.rs</code>). With
+(<code>statistics::quantiles</code> in <code>crates/commol-calibration/src/statistics.rs</code>). With
 equal weights it equals NumPy's <code>method="hazen"</code>; a weight of zero removes a
 value. <code>ci_percentiles</code> (<code>api/inference/intervals.py</code>) turns a confidence level
-into the two percentile points. <code>member_statistics</code> reduces each member to the
+into the two percentile points of <code>statistics::interval_levels</code>. <code>member_statistics</code> reduces each member to the
 quantity of interest <strong>first</strong>, and then takes weighted quantiles across
 members; taking quantiles first gives a band that describes no member. The
-replicates of a stochastic run (<code>SimulationReplicates.quantiles</code>), a sample
-and a predictive use the same quantile.</p>
+replicates of a stochastic run (<code>SimulationReplicates.quantiles</code>), a sample,
+a predictive and the summary of the replicates of a calibration
+(<code>"median"</code> and <code>Quantile(q)</code>, <code>ReplicateSummary::summarize</code>) use the same
+quantile. So a calibration with <code>Quantile(0.25)</code> compares the observations
+with the value that <code>SimulationReplicates.quantiles([0.25])</code> gives for the
+same runs.</p>
+<p>The module lives in <code>commol-calibration</code>, the lowest crate that takes a
+quantile, and <code>commol-inference</code> re-exports it (<code>pub use
+commol_calibration::statistics</code>), so there is one copy.</p>
 <table>
 <thead>
 <tr>
@@ -3321,12 +3422,151 @@ and a predictive use the same quantile.</p>
 <td>Harrell–Davis</td>
 <td>Smoother, but with no simple weighted form, and slower.</td>
 </tr>
+<tr>
+<td>The module in <code>commol-core</code></td>
+<td>No crate below calibration takes a quantile, and <code>commol-core</code> holds the model types and the engine contract.</td>
+</tr>
+<tr>
+<td>A copy of Hazen's rule in <code>commol-calibration</code></td>
+<td>Two quantiles again, which can drift apart.</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Rule:</strong> every new interval goes through <code>weighted_quantiles</code> or
-<code>member_statistics</code>.</p>
-<p><strong>Guards:</strong> <code>crates/commol-inference/src/statistics.rs</code> tests,
-<code>tests/uncertainty/test_intervals.py</code>.</p>
+<code>member_statistics</code>, and every quantile in Rust through
+<code>statistics::quantiles</code>.</p>
+<p><strong>Guards:</strong> <code>crates/commol-calibration/src/statistics.rs</code> tests,
+<code>crates/commol-calibration/tests/test_replicate_summary.rs</code>,
+<code>tests/uncertainty/test_intervals.py</code>,
+<code>tests/stochastic/test_calibration.py::test_a_quantile_summary_agrees_with_the_quantiles_of_the_replicates</code>,
+and <code>tests/suite/test_rules.py::test_commol_has_one_quantile</code>, which fails
+when a Rust function named for a quantile sorts values outside
+<code>statistics.rs</code>. The conformal quantile (<code>conformal/quantile.rs</code>) is the one
+exception: it is a rank that gives an interval its coverage, not an estimate
+of a quantile.</p>
+<h2 id="a-setting-has-one-name-and-one-check">A setting has one name and one check<a class="headerlink" href="#a-setting-has-one-name-and-one-check" title="Permanent link">&para;</a></h2>
+<p>A setting that means the same thing has the same name in every method, in
+Python and in Rust. The level of an interval is <code>confidence_level</code>: in the
+conformal methods, <code>Threshold</code>, <code>Sobol</code>, <code>BootstrapCoverageEta</code>, and in the
+results that report it (<code>PredictionIntervals</code>, <code>ProfileSection</code>). A count is
+a plain plural noun: <code>particles</code> (<code>ParticleSwarmConfig</code> and every SMC method),
+<code>draws</code>, <code>replicates</code> (every bootstrap, <code>Sobol</code>, <code>EnbPI</code>), and <code>count</code> for the
+argument of <code>Simulation.replicates</code>, <code>ParameterSample.resample</code> and
+<code>Distribution.sample</code>. The rule that combines the replicates of a ratio is
+<code>Ratio.replicate_rule</code>, so <code>replicates</code> is always a count. The level of a
+quantile keeps the name <code>level</code> (<code>Quantile(level)</code>): it is not the level of an
+interval.</p>
+<p>One Rust function checks each kind of setting, with one message:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Function</th>
+<th>Message</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A confidence level</td>
+<td><code>statistics::interval_levels</code></td>
+<td><code>confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95% interval</code></td>
+</tr>
+<tr>
+<td>Any other setting strictly between 0 and 1 (<code>target_cess</code>, <code>stay_probability</code>, <code>min_acceptance</code>, the <code>quantile</code> of ABC, <code>correlation_threshold</code>)</td>
+<td><code>statistics::check_open_unit(name, value)</code></td>
+<td><code>&lt;name&gt; is strictly between 0 and 1, got &lt;value&gt;</code></td>
+</tr>
+</tbody>
+</table>
+<p>Python calls the first through the binding <code>commol_rs.inference.interval_levels</code>:
+<code>ci_percentiles</code>, <code>BootstrapResult.interval_error</code>, <code>PropagationResult.summary</code>,
+the scenario summaries, and every <code>confidence_level</code> field, whose type is
+<code>ConfidenceLevel</code> (<code>context/inference/levels.py</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A check in each method, with <code>Field(gt=0.0, lt=1.0)</code></td>
+<td>The same mistake gives a different message in each method, and the rule is written many times.</td>
+</tr>
+<tr>
+<td>An alias for an old name</td>
+<td>Two names for one setting, which is what the rule removes.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rule:</strong> a new setting takes the name its meaning already has, and a new
+setting strictly between 0 and 1 is checked by one of the two functions.</p>
+<p><strong>Guards:</strong> <code>tests/suite/test_rules.py::test_a_setting_has_one_name</code>,
+<code>tests/uncertainty/test_intervals.py::test_every_confidence_level_has_one_check</code>,
+<code>crates/commol-inference/tests/test_levels.rs</code>.</p>
+<h2 id="a-method-takes-its-seed-from-its-source-and-fits-from-its-starts">A method takes its seed from its source and fits from its starts<a class="headerlink" href="#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts" title="Permanent link">&para;</a></h2>
+<p>Every uncertainty, identifiability and sensitivity method draws its random
+numbers from the seed of its source: <code>Calibrator.seed</code> (<code>problem.seed</code>) or
+<code>SensitivityAnalysis.seed</code>, split into streams (<code>commol_random::stream_seed</code>,
+<code>replicate_seed</code>). No method has a seed of its own, so one seed repeats a
+calibration and every method on it. A score reads the seed its draws keep,
+<code>ObservationDraws.seed</code> (<code>crates/commol-inference/src/predictive.rs</code>):
+<code>scores::pit</code> randomizes ties from a stream of it. Every method that fits the
+data takes <code>starts</code>, at least 1 with the default 1, and fits with
+<code>Calibrator.run(starts)</code>: the bootstraps, the jackknife, the conformal
+methods, the profiles, <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>,
+<code>InformationMatchingEta</code> and <code>BootstrapCoverageEta</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A <code>seed</code> of a method that overrides the seed of the source</td>
+<td>Two seeds choose the random numbers of one run, and <code>problem.seed</code> no longer repeats it.</td>
+</tr>
+<tr>
+<td>A method that fits from one start, with no <code>starts</code></td>
+<td>A fit that ends at a local minimum gives a wrong center, and the user cannot ask for more starts.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rule:</strong> a new method takes no seed and reads the seed of its source; a new
+method that fits the data takes <code>starts</code> with the default 1.</p>
+<p><strong>Guards:</strong> <code>tests/uncertainty/test_identifiability.py::TestStructuralRank::test_structural_rank_takes_the_seed_of_the_calibrator</code>,
+<code>tests/uncertainty/test_scores.py::TestPit::test_the_pit_takes_the_seed_of_the_source</code>,
+<code>crates/commol-inference/tests/test_predictive.rs::the_pit_of_ties_follows_the_seed_of_the_draws</code>,
+<code>tests/uncertainty/test_local.py::TestStarts</code>,
+<code>tests/uncertainty/test_smc.py::test_the_eta_calibrations_fit_from_their_starts</code>.</p>
+<h2 id="fits-that-fail-have-one-place">Fits that fail have one place<a class="headerlink" href="#fits-that-fail-have-one-place" title="Permanent link">&para;</a></h2>
+<p>Six methods fit one perturbation of the data per replicate: the bootstraps,
+the jackknife, jackknife+, rolling conformal, EnbPI and a bootstrap threshold.
+They share one loop, <code>ReplicateRunner::fit_all</code> (<code>resampling/runner.rs</code>),
+which returns <code>ReplicateFits</code>, and one check, <code>FitUnit::require</code>, whose message
+says how many of how many fits of a replicate, block or origin succeeded and
+how many the method needs. Every Python result of several fits has <code>failed</code>,
+entries <code>"&lt;Start|Replicate|Block|Origin&gt; &lt;index&gt; failed: &lt;reason&gt;"</code> logged as
+warnings, and, for fits of replicates, <code>not_converged</code>, at its top.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One loop per method, or <code>diagnostics.failed</code></td>
+<td>Counts and messages drift apart; three results have no diagnostics.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_resampling.rs::every_replicate_method_counts_the_same_fits</code>,
+<code>tests/uncertainty/test_resampling.py::test_every_method_lists_its_failed_replicates_in_failed</code>.</p>
 <h2 id="a-description-is-data-rendered-apart">A description is data, rendered apart<a class="headerlink" href="#a-description-is-data-rendered-apart" title="Permanent link">&para;</a></h2>
 <p><code>Model.describe(layout)</code> returns a <code>ModelDescription</code>
 (<code>context/description.py</code>): sections with a key, a title and blocks from a

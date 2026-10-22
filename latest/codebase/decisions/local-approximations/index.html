@@ -2571,6 +2571,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../sensitivity/" class="md-nav__link">
         
   
@@ -3464,7 +3492,7 @@ no noise scale, so its curvature is no inverse variance. The message names
 <code>NormalObservations(sd="sd")</code> with a noise parameter, whose fit estimates
 the scale by maximum likelihood (<code>SSE/n</code>, narrower than <code>SSE/(n − p)</code> by
 <code>√(n/(n − p))</code>), and the sandwich, which needs no noise model. A result
-holds only data: <code>Calibrator.delta_band(result, positions, level)</code> reads the
+holds only data: <code>Calibrator.delta_band(result, positions, confidence_level)</code> reads the
 problem from the calibrator, so a result read back from JSON gives the same
 band.</p>
 <table>

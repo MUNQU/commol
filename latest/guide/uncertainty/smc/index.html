@@ -2725,6 +2725,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/sensitivity/" class="md-nav__link">
         
   
@@ -3586,8 +3614,10 @@ distance for ABC. Each step then:</p>
 is the problem's loss with its weights and normalization. It returns a
 <code>GibbsResult</code>: the sample at temperature 1, the temperatures, the log of
 <code>∫ prior(θ) exp(−η loss(θ)) dθ</code>, the diagnostics, the <code>η</code> it ran with, the fit
-a calibration of <code>η</code> read (<code>fit</code>), and the coverage of a bootstrap calibration
-(<code>coverage</code>).</p>
+a calibration of <code>η</code> read (<code>fit</code>), the coverage of a bootstrap calibration
+(<code>coverage</code>), and each replicate of a bootstrap calibration whose sampler
+failed, <code>"Replicate &lt;index&gt; failed: &lt;reason&gt;"</code>, also logged as a warning
+(<code>failed</code>).</p>
 <h3 id="what-means">What <code>η</code> means<a class="headerlink" href="#what-means" title="Permanent link">&para;</a></h3>
 <p><code>η</code> weighs the data against the priors. The loss has no scale of its own, so
 <code>η</code> has no default: with <code>η</code> too large the posterior is too narrow, with <code>η</code>
@@ -3610,19 +3640,23 @@ variance <code>σ²</code>, <code>η = 1/(2σ²)</code> makes the Gibbs posterio
 <td>One sampler</td>
 </tr>
 <tr>
-<td><code>InformationMatchingEta(block_length)</code></td>
+<td><code>InformationMatchingEta(block_length, starts=1)</code></td>
 <td><code>η = tr(J I⁻¹ J) / tr(J)</code> at the fit: the Gauss–Newton curvature <code>J</code> of the objective against the variance <code>I</code> of the scores of its terms, summed over blocks of <code>block_length</code> positions (Holmes and Walker 2017)</td>
 <td><code>loss_function="sse"</code> or observation models, a deterministic engine, more blocks than parameters</td>
 <td>A fit, finite differences and one sampler</td>
 </tr>
 <tr>
-<td><code>BootstrapCoverageEta(replicates, block_length, confidence_level)</code></td>
+<td><code>BootstrapCoverageEta(replicates, block_length, confidence_level, starts=1)</code></td>
 <td>The posteriors of Bayesian-bootstrap data sets hold the fit at <code>confidence_level</code> (Syring and Martin 2019)</td>
 <td>Any loss and engine</td>
 <td>A fit and one sampler per replicate, then one</td>
 </tr>
 </tbody>
 </table>
+<p>Both calibrations read the fit <code>Calibrator.run(starts)</code>: the best of <code>starts</code>
+starts, the initial guess and then rows of a Latin hypercube over the bounds
+(<a href="../../calibration-optimizers/#several-starts">several starts</a>). One start (the
+default) can end at a local minimum.</p>
 <p>Information matching is cheap and local; it needs a sum of smooth terms, so
 <code>"rmse"</code> (a square root of a sum), <code>"mae"</code> (no curvature) and a stochastic
 engine raise a <code>ValueError</code> that points to the other choices. <code>J</code> and <code>I</code> are

@@ -2719,6 +2719,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/sensitivity/" class="md-nav__link">
         
   
@@ -3494,6 +3522,14 @@ is pointwise, for one quantity at a time.</p>
 <td><code>notes</code></td>
 <td>A threshold below the tolerance, or a refit below the fit</td>
 </tr>
+<tr>
+<td><code>failed</code></td>
+<td>With <code>Threshold.bootstrap_calibrated</code>, each replicate that failed, <code>"Replicate &lt;index&gt; failed: &lt;reason&gt;"</code>, also logged as a warning; empty with any other threshold</td>
+</tr>
+<tr>
+<td><code>not_converged</code></td>
+<td>With <code>Threshold.bootstrap_calibrated</code>, the replicates kept although their optimizer did not converge</td>
+</tr>
 </tbody>
 </table>
 <table>
@@ -3537,17 +3573,17 @@ noise.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>Threshold.chi_square(level)</code></td>
+<td><code>Threshold.chi_square(confidence_level)</code></td>
 <td><code>−log L</code> of observation models</td>
-<td>The models hold, and <code>2 × statistic</code> is near <code>χ²₁</code> (Wilks); it gives <code>½ χ²₁(level)</code>. It needs observation models</td>
+<td>The models hold, and <code>2 × statistic</code> is near <code>χ²₁</code> (Wilks); it gives <code>½ χ²₁(confidence_level)</code>. It needs observation models</td>
 </tr>
 <tr>
-<td><code>Threshold.beale(level)</code></td>
+<td><code>Threshold.beale(confidence_level)</code></td>
 <td>A sum of squares, the loss <code>"sse"</code></td>
-<td>Independent Gaussian errors of one variance: <code>S(θ̂) · F(1, n − p; level) / (n − p)</code>, exact for a model linear in its parameters</td>
+<td>Independent Gaussian errors of one variance: <code>S(θ̂) · F(1, n − p; confidence_level) / (n − p)</code>, exact for a model linear in its parameters</td>
 </tr>
 <tr>
-<td><code>Threshold.bootstrap_calibrated(bootstrap, level)</code></td>
+<td><code>Threshold.bootstrap_calibrated(bootstrap, confidence_level)</code></td>
 <td>Any loss</td>
 <td>That the bootstrap mimics how the data vary</td>
 </tr>
@@ -3558,7 +3594,8 @@ noise.</p>
 <code>Calibrator.uncertainty(bootstrap)</code> makes from the problem's seed. It is fitted
 (<code>θ̂_b</code>), then fitted again with the quantity held at its value at the fit of
 the original data; the rise of the replicate is <code>PL_b(θ̂ⱼ) − L_b(θ̂_b)</code>. The
-threshold of the quantity is the quantile <code>level</code> of the rises, so each
+threshold of the quantity is the quantile <code>confidence_level</code> of the rises, so
+each
 parameter gets its own. It costs one fit and one refit per quantity for each
 replicate. Any bootstrap of <a href="../resampling/">Resampling</a> works, and the
 <a href="../observation-models/#maximum-likelihood-against-the-posterior">parametric bootstrap</a>
@@ -3736,7 +3773,7 @@ tolerances <code>ν</code> is near <code>1e-4</code> and the profiles of the rid
 about <code>1e-6</code> from its minimum, and the profile reads practically
 non-identifiable. Its <code>in_combination</code> needs an <code>sd_tolerance</code> near <code>ν</code>, as
 the example below uses.</p>
-<p><code>ProfileResult.report()</code> turns the verdicts into an
+<p><code>ProfileResult.identifiability()</code> turns the verdicts into an
 <a href="../identifiability/#the-report">identifiability report</a> with a <code>profile</code>
 section, which <code>merge</code> joins with the other methods. A rate that reads
 <code>k1 * s</code> cannot tell <code>k1</code> from <code>s</code>: their profiles are flat on the ridge
@@ -3798,7 +3835,7 @@ merged verdict is then <code>conflicting</code>:</p>
 </span><span id="__span-3-42"><a id="__codelineno-3-42" name="__codelineno-3-42" href="#__codelineno-3-42"></a><span class="c1"># the bounds, not the data.</span>
 </span><span id="__span-3-43"><a id="__codelineno-3-43" name="__codelineno-3-43" href="#__codelineno-3-43"></a><span class="nb">print</span><span class="p">(</span><span class="n">profiles</span><span class="o">.</span><span class="n">structure</span><span class="p">[</span><span class="s2">&quot;k1&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">compensated_by</span><span class="p">)</span>  <span class="c1"># [&#39;s&#39;]</span>
 </span><span id="__span-3-44"><a id="__codelineno-3-44" name="__codelineno-3-44" href="#__codelineno-3-44"></a><span class="n">report</span> <span class="o">=</span> <span class="n">product</span><span class="o">.</span><span class="n">identifiability</span><span class="p">(</span><span class="n">StructuralRank</span><span class="p">(</span><span class="n">points</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">design</span><span class="o">=</span><span class="s2">&quot;observations&quot;</span><span class="p">))</span>
-</span><span id="__span-3-45"><a id="__codelineno-3-45" name="__codelineno-3-45" href="#__codelineno-3-45"></a><span class="n">merged</span> <span class="o">=</span> <span class="n">report</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">profiles</span><span class="o">.</span><span class="n">report</span><span class="p">())</span>
+</span><span id="__span-3-45"><a id="__codelineno-3-45" name="__codelineno-3-45" href="#__codelineno-3-45"></a><span class="n">merged</span> <span class="o">=</span> <span class="n">report</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">profiles</span><span class="o">.</span><span class="n">identifiability</span><span class="p">())</span>
 </span><span id="__span-3-46"><a id="__codelineno-3-46" name="__codelineno-3-46" href="#__codelineno-3-46"></a><span class="nb">print</span><span class="p">(</span><span class="n">merged</span><span class="o">.</span><span class="n">verdicts</span><span class="p">[</span><span class="s2">&quot;k1&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">structural</span><span class="o">.</span><span class="n">verdict</span><span class="p">,</span> <span class="n">merged</span><span class="o">.</span><span class="n">verdicts</span><span class="p">[</span><span class="s2">&quot;s&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">structural</span><span class="o">.</span><span class="n">verdict</span><span class="p">)</span>
 </span><span id="__span-3-47"><a id="__codelineno-3-47" name="__codelineno-3-47" href="#__codelineno-3-47"></a><span class="c1"># in_combination in_combination</span>
 </span></code></pre></div>

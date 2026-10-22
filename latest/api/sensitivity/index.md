@@ -267,7 +267,13 @@ class SensitivityAnalysis:
             entry point.
         ValueError
             If the method does not take these inputs, such as a method of
-            independent inputs on inputs from a sample.
+            independent inputs on inputs from a sample, or a setting, a
+            quantity or the model does not fit the method; the message says
+            why.
+        RuntimeError
+            If a run of the design fails.
+        InfeasibleStateError
+            If a point of the design leaves the values its model allows.
         """
         return run_method(self, method, SensitivityMethod)
 ```
@@ -654,10 +660,12 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                               |
-| ------------ | --------------------------------------------------------------------------------------------------------- |
-| `TypeError`  | If method is not a sensitivity method; the message names its entry point.                                 |
-| `ValueError` | If the method does not take these inputs, such as a method of independent inputs on inputs from a sample. |
+| Type                   | Description                                                                                                                                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`            | If method is not a sensitivity method; the message names its entry point.                                                                                                                      |
+| `ValueError`           | If the method does not take these inputs, such as a method of independent inputs on inputs from a sample, or a setting, a quantity or the model does not fit the method; the message says why. |
+| `RuntimeError`         | If a run of the design fails.                                                                                                                                                                  |
+| `InfeasibleStateError` | If a point of the design leaves the values its model allows.                                                                                                                                   |
 
 Source code in `commol/api/sensitivity.py`
 
@@ -683,7 +691,13 @@ def run(self, method: SensitivityMethod[ResultT]) -> ResultT:
         entry point.
     ValueError
         If the method does not take these inputs, such as a method of
-        independent inputs on inputs from a sample.
+        independent inputs on inputs from a sample, or a setting, a
+        quantity or the model does not fit the method; the message says
+        why.
+    RuntimeError
+        If a run of the design fails.
+    InfeasibleStateError
+        If a point of the design leaves the values its model allows.
     """
     return run_method(self, method, SensitivityMethod)
 ```
@@ -1273,16 +1287,16 @@ Its `sample` is a `ParameterSample`, so `Predictive(analysis, result.sample, pos
 
 Attributes:
 
-| Name                                                                          | Type                                                                   | Description                                                                                                                                                                                                                                                   |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sample`                                                                      | `ParameterSample`                                                      | The draws of the inputs: a Latin hypercube of their distributions, or the sample of the input space itself.                                                                                                                                                   |
-| `labels`                                                                      | `list[str]`                                                            | The label of each quantity.                                                                                                                                                                                                                                   |
-| `values`                                                                      | `list[list[float]]`                                                    | The quantities of each run, [run]\[quantity\]: one run per draw, or with a stochastic engine one per replicate of each draw.                                                                                                                                  |
-| `weights`                                                                     | `list[float]`                                                          | The weight of each run; with a stochastic engine each replicate has an equal share of its draw's weight. They sum to 1.                                                                                                                                       |
-| `draw_seeds`                                                                  | `list[int]`                                                            | The seed of each draw of sample, in its order. With a stochastic engine, replicate i of draw j runs with the seed replicate i of Simulation.replicates(n, seed=draw_seeds[j]) takes, so those replicates of the model at that draw give the runs of the draw. |
-| `` A quantity that reads a NaN is NaN in `values`, and `summary` raises on `` |                                                                        |                                                                                                                                                                                                                                                               |
-| `it`                                                                          | `` `where` keeps the runs a condition chooses, which conditions the `` |                                                                                                                                                                                                                                                               |
-| `result on that condition.`                                                   |                                                                        |                                                                                                                                                                                                                                                               |
+| Name                                                                          | Type                                                                   | Description                                                                                                                                                                                                                                                       |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sample`                                                                      | `ParameterSample`                                                      | The draws of the inputs: a Latin hypercube of their distributions, or the sample of the input space itself.                                                                                                                                                       |
+| `labels`                                                                      | `list[str]`                                                            | The label of each quantity.                                                                                                                                                                                                                                       |
+| `values`                                                                      | `list[list[float]]`                                                    | The quantities of each run, [run]\[quantity\]: one run per draw, or with a stochastic engine one per replicate of each draw.                                                                                                                                      |
+| `weights`                                                                     | `list[float]`                                                          | The weight of each run; with a stochastic engine each replicate has an equal share of its draw's weight. They sum to 1.                                                                                                                                           |
+| `draw_seeds`                                                                  | `list[int]`                                                            | The seed of each draw of sample, in its order. With a stochastic engine, replicate i of draw j runs with the seed replicate i of Simulation.replicates(count, seed=draw_seeds[j]) takes, so those replicates of the model at that draw give the runs of the draw. |
+| `` A quantity that reads a NaN is NaN in `values`, and `summary` raises on `` |                                                                        |                                                                                                                                                                                                                                                                   |
+| `it`                                                                          | `` `where` keeps the runs a condition chooses, which conditions the `` |                                                                                                                                                                                                                                                                   |
+| `result on that condition.`                                                   |                                                                        |                                                                                                                                                                                                                                                                   |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -1311,7 +1325,7 @@ class PropagationResult(BaseModel):
     draw_seeds : list[int]
         The seed of each draw of `sample`, in its order. With a stochastic
         engine, replicate ``i`` of draw ``j`` runs with the seed replicate
-        ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])`` takes, so
+        ``i`` of ``Simulation.replicates(count, seed=draw_seeds[j])`` takes, so
         those replicates of the model at that draw give the runs of the draw.
 
     A quantity that reads a NaN is NaN in `values`, and `summary` raises on
@@ -1403,12 +1417,7 @@ class PropagationResult(BaseModel):
             quantity is NaN in a run: `where` keeps the runs a condition
             chooses.
         """
-        if not 0.0 < confidence_level < 1.0:
-            raise ValueError(
-                f"The confidence level is strictly between 0 and 1, got "
-                f"{confidence_level}"
-            )
-        levels = [0.5, (1 - confidence_level) / 2, (1 + confidence_level) / 2]
+        levels = [0.5, *commol_rs.inference.interval_levels(confidence_level)]
         summaries = []
         for index, label in enumerate(self.labels):
             column = [row[index] for row in self.values]
@@ -1574,12 +1583,7 @@ def summary(self, confidence_level: float) -> list[QuantitySummary]:
         quantity is NaN in a run: `where` keeps the runs a condition
         chooses.
     """
-    if not 0.0 < confidence_level < 1.0:
-        raise ValueError(
-            f"The confidence level is strictly between 0 and 1, got "
-            f"{confidence_level}"
-        )
-    levels = [0.5, (1 - confidence_level) / 2, (1 + confidence_level) / 2]
+    levels = [0.5, *commol_rs.inference.interval_levels(confidence_level)]
     summaries = []
     for index, label in enumerate(self.labels):
         column = [row[index] for row in self.values]
@@ -2124,12 +2128,12 @@ The base matrices hold independent Monte Carlo draws, so the bootstrap intervals
 
 Attributes:
 
-| Name               | Type             | Description                                                                       |
-| ------------------ | ---------------- | --------------------------------------------------------------------------------- |
-| `base_draws`       | `int`            | The rows of each base matrix; the analysis runs base_draws · (inputs + 2) points. |
-| `bootstrap`        | `int`            | The bootstrap replicates of the intervals, at least 2.                            |
-| `confidence_level` | `float`          | The level of the intervals, strictly between 0 and 1.                             |
-| `quantities`       | `list[Quantity]` | What each run is reduced to.                                                      |
+| Name               | Type             | Description                                                                  |
+| ------------------ | ---------------- | ---------------------------------------------------------------------------- |
+| `draws`            | `int`            | The rows of each base matrix; the analysis runs draws · (inputs + 2) points. |
+| `replicates`       | `int`            | The bootstrap replicates of the intervals, at least 2.                       |
+| `confidence_level` | `float`          | The level of the intervals, strictly between 0 and 1.                        |
+| `quantities`       | `list[Quantity]` | What each run is reduced to.                                                 |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -2147,10 +2151,10 @@ class Sobol(SensitivityMethod[SobolResult]):
 
     Attributes
     ----------
-    base_draws : int
+    draws : int
         The rows of each base matrix; the analysis runs
-        ``base_draws · (inputs + 2)`` points.
-    bootstrap : int
+        ``draws · (inputs + 2)`` points.
+    replicates : int
         The bootstrap replicates of the intervals, at least 2.
     confidence_level : float
         The level of the intervals, strictly between 0 and 1.
@@ -2158,11 +2162,9 @@ class Sobol(SensitivityMethod[SobolResult]):
         What each run is reduced to.
     """
 
-    base_draws: int = Field(ge=2, description="Rows of each base matrix.")
-    bootstrap: int = Field(ge=2, description="Bootstrap replicates.")
-    confidence_level: float = Field(
-        gt=0.0, lt=1.0, description="Level of the intervals."
-    )
+    draws: int = Field(ge=2, description="Rows of each base matrix.")
+    replicates: int = Field(ge=2, description="Bootstrap replicates.")
+    confidence_level: ConfidenceLevel = Field(description="Level of the intervals.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
@@ -2178,15 +2180,15 @@ The first-order index is the share of the variance of the quantity the input exp
 
 Attributes:
 
-| Name                       | Type                | Description                                                                                                                                  |
-| -------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `inputs`                   | `list[str]`         | The inputs, in order.                                                                                                                        |
-| `labels`                   | `list[str]`         | The label of each quantity.                                                                                                                  |
-| `confidence_level`         | `float`             | The level of the intervals.                                                                                                                  |
-| `first, total`             | `list[list[float]]` | The first-order and total indices, [quantity][input]; NaN for a quantity of no variance.                                                     |
-| `first_lower, first_upper` | `list[list[float]]` | The ends of the interval of each first-order index; NaN when a bootstrap replicate of the rows has no variance, which more base_draws avoid. |
-| `total_lower, total_upper` | `list[list[float]]` | The ends of the interval of each total index.                                                                                                |
-| `runs`                     | `int`               | The number of points run: base_draws · (inputs + 2).                                                                                         |
+| Name                       | Type                | Description                                                                                                                             |
+| -------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `inputs`                   | `list[str]`         | The inputs, in order.                                                                                                                   |
+| `labels`                   | `list[str]`         | The label of each quantity.                                                                                                             |
+| `confidence_level`         | `float`             | The level of the intervals.                                                                                                             |
+| `first, total`             | `list[list[float]]` | The first-order and total indices, [quantity][input]; NaN for a quantity of no variance.                                                |
+| `first_lower, first_upper` | `list[list[float]]` | The ends of the interval of each first-order index; NaN when a bootstrap replicate of the rows has no variance, which more draws avoid. |
+| `total_lower, total_upper` | `list[list[float]]` | The ends of the interval of each total index.                                                                                           |
+| `runs`                     | `int`               | The number of points run: draws · (inputs + 2).                                                                                         |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -2216,11 +2218,11 @@ class SobolResult(BaseModel):
     first_lower, first_upper : list[list[float]]
         The ends of the interval of each first-order index; NaN when a
         bootstrap replicate of the rows has no variance, which more
-        `base_draws` avoid.
+        `draws` avoid.
     total_lower, total_upper : list[list[float]]
         The ends of the interval of each total index.
     runs : int
-        The number of points run: ``base_draws · (inputs + 2)``.
+        The number of points run: ``draws · (inputs + 2)``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -3264,15 +3266,15 @@ Bases: `_OneScalar`
 
 The ratio of two quantities of one value each, numerator N over denominator D.
 
-The ratio of a run whose denominator is 0 is NaN, also when the numerator is not 0, and follows the NaN rule of every method. A method that reduces the points of a design (`PRCC`, `Morris`, `Sobol`, `PolynomialChaos`) reads one value per point; with a stochastic engine, `replicates` says how the replicates of a point combine. A `Propagation`, the `Scenarios` and the quantities of one run keep the ratio of each run.
+The ratio of a run whose denominator is 0 is NaN, also when the numerator is not 0, and follows the NaN rule of every method. A method that reduces the points of a design (`PRCC`, `Morris`, `Sobol`, `PolynomialChaos`) reads one value per point; with a stochastic engine, `replicate_rule` says how the replicates of a point combine. A `Propagation`, the `Scenarios` and the quantities of one run keep the ratio of each run.
 
 Attributes:
 
-| Name          | Type                                | Description                                                                                                                                                                                     |
-| ------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `numerator`   | \`ValueAt                           | Gain                                                                                                                                                                                            |
-| `denominator` | \`ValueAt                           | Gain                                                                                                                                                                                            |
-| `replicates`  | `{within, within_positive, pooled}` | "within": the mean of the ratio of each replicate, E[N/D]; a replicate with D = 0 leaves the point with no value. "within_positive": the mean of the ratio of the replicates with D > 0, E\[N/D |
+| Name             | Type                                | Description                                                                                                                                                                                     |
+| ---------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `numerator`      | \`ValueAt                           | Gain                                                                                                                                                                                            |
+| `denominator`    | \`ValueAt                           | Gain                                                                                                                                                                                            |
+| `replicate_rule` | `{within, within_positive, pooled}` | "within": the mean of the ratio of each replicate, E[N/D]; a replicate with D = 0 leaves the point with no value. "within_positive": the mean of the ratio of the replicates with D > 0, E\[N/D |
 
 Source code in `commol/context/inference/quantities.py`
 
@@ -3286,7 +3288,7 @@ class Ratio(_OneScalar):
     numerator is not 0, and follows the NaN rule of every method. A method
     that reduces the points of a design (`PRCC`, `Morris`, `Sobol`,
     `PolynomialChaos`) reads one value per point; with a stochastic engine,
-    `replicates` says how the replicates of a point combine. A `Propagation`,
+    `replicate_rule` says how the replicates of a point combine. A `Propagation`,
     the `Scenarios` and the quantities of one run keep the ratio of each run.
 
     Attributes
@@ -3295,7 +3297,7 @@ class Ratio(_OneScalar):
         The quantity divided.
     denominator : ValueAt | Gain | Peak
         The quantity it is divided by.
-    replicates : {"within", "within_positive", "pooled"}
+    replicate_rule : {"within", "within_positive", "pooled"}
         ``"within"``: the mean of the ratio of each replicate, E[N/D]; a
         replicate with D = 0 leaves the point with no value.
         ``"within_positive"``: the mean of the ratio of the replicates with
@@ -3308,7 +3310,7 @@ class Ratio(_OneScalar):
     kind: Literal["ratio"] = "ratio"
     numerator: _Operand = Field(description="The quantity divided.")
     denominator: _Operand = Field(description="The quantity it is divided by.")
-    replicates: ReplicateRule = Field(
+    replicate_rule: ReplicateRule = Field(
         description="How the replicates of a stochastic run combine."
     )
 

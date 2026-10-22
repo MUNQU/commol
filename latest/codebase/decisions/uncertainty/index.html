@@ -18,7 +18,7 @@
         <link rel="prev" href="../optimizers/">
       
       
-        <link rel="next" href="../sensitivity/">
+        <link rel="next" href="../identifiability/">
       
       
         
@@ -2625,21 +2625,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#sensitivities-come-from-one-port" class="md-nav__link">
+  <a href="#methods-raise-one-error-type" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Sensitivities come from one port
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#two-verdicts-per-parameter" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Two verdicts per parameter
+        Methods raise one error type
       
     </span>
   </a>
@@ -2705,6 +2694,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3261,21 +3278,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#sensitivities-come-from-one-port" class="md-nav__link">
+  <a href="#methods-raise-one-error-type" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Sensitivities come from one port
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#two-verdicts-per-parameter" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Two verdicts per parameter
+        Methods raise one error type
       
     </span>
   </a>
@@ -3359,8 +3365,8 @@
 
 <h1 id="uncertainty">Uncertainty<a class="headerlink" href="#uncertainty" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>How the uncertainty methods share one sample, one registry, their ports and
-one sampler, what a replicate may change, and why an analysis needs no data.</p>
+<p>How the uncertainty methods share one sample, one registry, one error type,
+their ports and one sampler, and what a replicate may change.</p>
 <h2 id="a-sample-carries-its-weights">A sample carries its weights<a class="headerlink" href="#a-sample-carries-its-weights" title="Permanent link">&para;</a></h2>
 <p>A method with draws returns its own result type, which holds a
 <code>ParameterSample</code> (<code>crates/commol-inference/src/sample.rs</code>,
@@ -3427,26 +3433,52 @@ by the configuration's type and knows no method. A static type checker infers
 </tbody>
 </table>
 <p>Every random number of a method comes from the <code>commol-random</code> generator,
-seeded from <code>CalibrationProblem.seed</code> (<code>replicate_seed</code>). Coverage studies
-(<code>tests/support/coverage.py</code>, marker <code>coverage_study</code>) check that a method's
+seeded from the seed of its source (<a href="../results/#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts">Results</a>).
+Coverage studies (<code>tests/support/coverage.py</code>, marker <code>coverage_study</code>) check that a method's
 intervals cover the truth at their level; they run for a pull request that
 changes what they run and before a release
 (<code>.github/workflows/coverage.yaml</code>).</p>
 <p><strong>Guards:</strong> <code>tests/uncertainty/test_entry_point.py</code>,
 <code>tests/uncertainty/test_coverage.py</code>.</p>
-<h2 id="sensitivities-come-from-one-port">Sensitivities come from one port<a class="headerlink" href="#sensitivities-come-from-one-port" title="Permanent link">&para;</a></h2>
-<p>Every reader of derivatives of the predicted observations asks
-<code>SensitivitySource</code> (<code>crates/commol-inference/src/sensitivity/</code>); only a source
-knows how its derivatives are made. <code>FiniteDifferences</code> is the first: central
-differences, one-sided of second order at a bound, with the step
-<code>h = η^{1/3} · max(|θ|, w)</code> (at most <code>w / 8</code>), where <code>η</code> is the output
-accuracy of the engine (<code>SimulationEngine::output_accuracy</code>: machine epsilon,
-or the <code>rtol</code> of the ODE engine) and <code>w</code> the width of the bounds (1 when infinite). Each entry
-carries an estimated error, from the steps <code>h</code> and <code>2h</code> and the accuracy of
-the runs; the structural rank counts a singular value only above the norm of
-that error (Weyl's inequality). The scaled sensitivities
-<code>S_ij = J_ij · |θ_j| / s_i</code> do not depend on units. A stochastic engine is
-refused: its runs change in jumps with the parameters.</p>
+<h2 id="methods-raise-one-error-type">Methods raise one error type<a class="headerlink" href="#methods-raise-one-error-type" title="Permanent link">&para;</a></h2>
+<p>Every public function of a method in <code>commol-inference</code> returns one error,
+<code>MethodError</code> (<code>crates/commol-inference/src/error.rs</code>), and every error has
+one of two kinds (<code>MethodError::kind</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>When</th>
+<th>Python</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Invalid</code></td>
+<td>A setting, an input, the data or the model does not fit the method: a level out of range, too few replicates or blocks, a fit outside the support, a loss of 0 where a method needs a scale, a stochastic engine where a method needs derivatives.</td>
+<td><code>ValueError</code>; <code>InfeasibleStateError</code> (a <code>ValueError</code>) for a draw that leaves the values its model allows</td>
+</tr>
+<tr>
+<td><code>Failed</code></td>
+<td>A computation that could start failed: an engine run, an optimizer, every replicate or too few of them, a sampler that stops before its target.</td>
+<td><code>RuntimeError</code></td>
+</tr>
+</tbody>
+</table>
+<p>A structured error that a caller reads stays a variant of its own, with a
+fixed kind: <code>Prediction</code> (a <code>PredictiveError</code>; <code>Failed</code> when the run of a draw
+fails, <code>Invalid</code> otherwise), <code>Sensitivity</code> (a <code>SensitivityError</code>; <code>Invalid</code>
+for a stochastic engine, <code>Failed</code> otherwise) and <code>NoFeasiblePoint</code>
+(<code>Invalid</code>). The building blocks that are not methods (<code>ParameterSample</code>,
+<code>Predictive</code>, the scores, the distributions, the designs) keep their own
+errors, which convert into <code>MethodError</code>; the ports (<code>TemperedTarget</code>,
+<code>Kernel</code>, <code>Target</code>, <code>ObservationNoise</code>) return a message, and the method
+that calls them reports it as <code>Failed</code>.</p>
+<p>The bindings map a <code>MethodError</code> in one function, <code>method_error</code>
+(<code>py-commol/src/inference.rs</code>), and every binding of a method uses it; no
+binding repeats a check of the engine to choose the exception. The same
+mistake raises the same exception in every method, and the "Raises" section
+of each method lists <code>ValueError</code> and <code>RuntimeError</code> by this rule.</p>
 <table>
 <thead>
 <tr>
@@ -3456,54 +3488,23 @@ refused: its runs change in jumps with the parameters.</p>
 </thead>
 <tbody>
 <tr>
-<td>Each method differentiates on its own</td>
-<td>The step, the error and the scaling would differ between methods.</td>
+<td>One error enum per method family</td>
+<td>The same mistake raised <code>ValueError</code> in one family and <code>RuntimeError</code> in another, and each binding chose again.</td>
 </tr>
 <tr>
-<td>Exact derivatives first</td>
-<td>Symbolic differentiation of expressions and sensitivity equations in two engines; a later source behind the same port.</td>
+<td>A <code>String</code> error</td>
+<td>The binding cannot tell an input error from a failure, so it chose one exception for both.</td>
 </tr>
 <tr>
-<td>Machine epsilon as the accuracy of every engine</td>
-<td>With <code>rtol = 1e-6</code> the solver's error over the step is a fifth of the derivative, and the rank reads noise.</td>
-</tr>
-<tr>
-<td>A fixed rank threshold such as <code>1e-10</code></td>
-<td>Below the error of finite differences, so every model looks identifiable.</td>
+<td>One variant per cause</td>
+<td>Callers read the message, not the cause; two kinds set the exception, and the structured errors that callers read stay variants.</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_sensitivity.rs</code>,
-<code>crates/commol-inference/tests/test_identifiability.rs</code>,
-<code>tests/uncertainty/test_identifiability.py</code>.</p>
-<h2 id="two-verdicts-per-parameter">Two verdicts per parameter<a class="headerlink" href="#two-verdicts-per-parameter" title="Permanent link">&para;</a></h2>
-<p>An <code>IdentifiabilityReport</code> gives each parameter a structural verdict (what
-any data of the design of the observations can determine) and a practical
-verdict (what these data determine). Only <code>StructuralRank</code> on the design of
-the observations gives the structural verdict; a dense design keeps its
-verdicts in its section. Merging reports keeps a verdict the reports agree
-on, and makes one they disagree on <code>conflicting</code>, with every reason.
-Thresholds and tolerances of the methods are required arguments: they are
-modelling judgments.</p>
-<table>
-<thead>
-<tr>
-<th>Alternative</th>
-<th>Why not</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>One verdict</td>
-<td>A parameter structurally identifiable and poorly determined by the data, the usual case, would look like a conflict.</td>
-</tr>
-<tr>
-<td>Defaults for the thresholds</td>
-<td>A judgment hidden in the library.</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Guards:</strong> <code>tests/uncertainty/test_identifiability.py</code> (<code>TestReport</code>).</p>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_errors.rs</code>,
+<code>test_an_input_error_of_any_method_is_a_value_error</code> and
+<code>test_a_failed_computation_of_any_method_is_a_runtime_error</code> in
+<code>tests/uncertainty/test_entry_point.py</code>.</p>
 <h2 id="a-replicate-changes-only-the-data">A replicate changes only the data<a class="headerlink" href="#a-replicate-changes-only-the-data" title="Permanent link">&para;</a></h2>
 <p>A resampling method makes each replicate with
 <code>CalibrationProblem::with_data(values, weights)</code>
@@ -3668,12 +3669,12 @@ has residuals of.</p>
 <p>A conformal variant only chooses which predictions and which held-out values
 feed a <code>NonconformityScore</code>; the score, its scale and the quantile
 <code>⌈(n + 1)(1 − α)⌉</code> live once (<code>crates/commol-inference/src/conformal/score.rs</code>,
-<code>quantile.rs</code>). <code>score</code>, <code>by</code> and <code>level</code> are required in every variant, and
-<code>check_conformal_settings</code> rejects in Rust <code>"normalized"</code> per series. A horizon
-of <code>RollingConformal</code> is a count of observations after the origin. <code>EnbPI</code>
-draws its own block counts through <code>ReplicateRunner::fit_one</code>, and
-<code>AdaptiveConformal</code> keeps its state in Rust (<code>AdaptiveLevel</code>) and returns the
-same <code>ConformalResult</code> as every variant.</p>
+<code>quantile.rs</code>). <code>score</code>, <code>by</code> and <code>confidence_level</code> are required in every
+variant, and <code>check_conformal_settings</code> rejects in Rust <code>"normalized"</code> per
+series. A horizon of <code>RollingConformal</code> is a count of observations after the
+origin. <code>EnbPI</code> draws its own block counts and fits them with <code>fit_all</code>,
+and <code>AdaptiveConformal</code> keeps its state in Rust (<code>AdaptiveLevel</code>) and returns
+the same <code>ConformalResult</code> as every variant.</p>
 <table>
 <thead>
 <tr>

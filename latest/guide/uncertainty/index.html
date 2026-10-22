@@ -2758,6 +2758,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/sensitivity/" class="md-nav__link">
         
   
@@ -3823,8 +3851,8 @@ unweighted statistic.</p>
 <td>Weighted quantiles by <a href="#the-one-quantile">the one convention</a></td>
 </tr>
 <tr>
-<td><code>effective_size()</code></td>
-<td>Kish's effective sample size, <code>1 / Σ wᵢ²</code></td>
+<td><code>effective_size</code></td>
+<td>Kish's effective sample size, <code>1 / Σ wᵢ²</code> (a property)</td>
 </tr>
 <tr>
 <td><code>draws()</code></td>
@@ -3840,7 +3868,7 @@ unweighted statistic.</p>
 </tr>
 </tbody>
 </table>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">sample</span><span class="o">.</span><span class="n">effective_size</span><span class="p">(),</span> <span class="mi">6</span><span class="p">))</span>  <span class="c1"># 3.0</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">sample</span><span class="o">.</span><span class="n">effective_size</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>  <span class="c1"># 3.0</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">print</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">sample</span><span class="o">.</span><span class="n">draws</span><span class="p">()))</span>  <span class="c1"># {&#39;k1&#39;: 0.38, &#39;k2&#39;: 0.09}</span>
 </span></code></pre></div>
 <p>A sample has no single set of parameters, so
@@ -3864,7 +3892,7 @@ a <code>SensitivityAnalysis</code> of the inputs of the sample. With a stochasti
 every replicate of a draw is a draw of the predictive, with an equal share of
 its weight. The runs follow one tree of seeds: draw <code>j</code> takes the seed
 <code>draw_seeds[j]</code>, derived from the seed of the source, and its replicate <code>i</code>
-takes the seed that replicate <code>i</code> of <code>Simulation.replicates(n,
+takes the seed that replicate <code>i</code> of <code>Simulation.replicates(count,
 seed=draw_seeds[j])</code> takes. So every draw shows fresh noise, the predictive
 repeats from the seed of the source, and the runs of a draw change neither
 with the number of replicates nor with the number of draws.
@@ -3908,7 +3936,7 @@ calibration gives for the same values: the remainder and the excess
 </tr>
 <tr>
 <td><code>draw_seeds</code></td>
-<td>The seed of each draw of the sample: <code>Simulation.replicates(n, seed=draw_seeds[j])</code> of the model at the values of draw <code>j</code> gives its runs</td>
+<td>The seed of each draw of the sample: <code>Simulation.replicates(count, seed=draw_seeds[j])</code> of the model at the values of draw <code>j</code> gives its runs</td>
 </tr>
 <tr>
 <td><code>report(confidence_level, positions, window, windows, observed_data=(), accumulators=())</code></td>
@@ -4083,8 +4111,8 @@ held-out positions above, and say whether you score a band of the model
 <td>Lower</td>
 </tr>
 <tr>
-<td><code>pit(predictive, observations, noise, seed)</code></td>
-<td><code>F(y)</code>, randomized where draws tie with <code>y</code></td>
+<td><code>pit(predictive, observations, noise)</code></td>
+<td><code>F(y)</code>, randomized where draws tie with <code>y</code>, from the seed of the source (<code>Calibrator.seed</code> or <code>SensitivityAnalysis.seed</code>): the same draws give the same values</td>
 <td>Uniform</td>
 </tr>
 <tr>

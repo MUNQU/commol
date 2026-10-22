@@ -213,7 +213,10 @@ class Calibrator:
         ------
         ValueError
             If the result's parameters are not the problem's, the level is not
-            strictly between 0 and 1, or the engine rejects a position.
+            strictly between 0 and 1, the engine is stochastic, or the engine
+            rejects a position.
+        RuntimeError
+            If the derivatives fail at the fit.
         """
         if result.sample.names != self.parameter_names:
             raise ValueError(
@@ -355,9 +358,8 @@ class Calibrator:
         CalibrationResult
             The best start: the optimized parameter values, in the order of
             the problem's parameters, its final loss and convergence, every
-            start (``starts``), the reason of each start that failed
-            (``failed_runs``, also logged as warnings) and the seed
-            (``seed``).
+            start (``starts``), each start that failed (``failed``, also
+            logged as warnings) and the seed (``seed``).
 
         Raises
         ------
@@ -389,12 +391,12 @@ class Calibrator:
         )
         names = self.parameter_names
         summaries: list[tuple[StartSummary, "CalibrationResultProtocol"]] = []
-        failed_runs: list[str] = []
+        failed: list[str] = []
         for index, outcome in enumerate(outcomes):
             if outcome.result is None:
                 reason = f"Start {index} failed: {outcome.error}"
                 logger.warning(reason)
-                failed_runs.append(reason)
+                failed.append(reason)
                 continue
             summaries.append(
                 (
@@ -408,7 +410,7 @@ class Calibrator:
                 )
             )
         if not summaries:
-            raise RuntimeError("Every start failed: " + "; ".join(failed_runs))
+            raise RuntimeError("Every start failed: " + "; ".join(failed))
         best = min(summaries, key=lambda summary: summary[0].loss)[1]
         result = CalibrationResult(
             best_parameters=dict(best.best_parameters),
@@ -417,7 +419,7 @@ class Calibrator:
             converged=best.converged,
             termination_reason=best.termination_reason,
             starts=[summary for summary, _ in summaries],
-            failed_runs=failed_runs,
+            failed=failed,
             seed=self.seed,
         )
         logger.info(
@@ -497,8 +499,16 @@ class Calibrator:
             If `method` is an identifiability method; the message names
             ``Calibrator.identifiability``.
         ValueError
-            If no runner is registered for the configuration's type; the
-            message names the registered ones.
+            If no runner is registered for the configuration's type (the
+            message names the registered ones), or
+            a setting, an input, the data or the model does not fit the
+            method; the message says why.
+        RuntimeError
+            If a computation of the method that could start fails: an engine
+            run, an optimizer, every replicate, or a sampler that does not
+            reach its target.
+        InfeasibleStateError
+            If a draw of a prediction leaves the values its model allows.
         """
         from commol.api.inference.registry import run_method
 
@@ -530,8 +540,12 @@ class Calibrator:
             If `method` is an uncertainty method; the message names
             ``Calibrator.uncertainty``.
         ValueError
-            If no runner is registered for the configuration's type, or the
-            method fails (see the method).
+            If no runner is registered for the configuration's type, or
+            a setting, an input, the data or the model does not fit the
+            method; the message says why.
+        RuntimeError
+            If a computation of the method that could start fails: an engine
+            run or an optimizer.
         """
         from commol.api.inference.registry import run_method
 
@@ -598,7 +612,7 @@ class Calibrator:
         improvement = opt_config.improvement_stop_config
         radius = opt_config.radius_stop_config
         ps_config = rust_calibration.ParticleSwarmConfig(
-            num_particles=opt_config.num_particles,
+            particles=opt_config.particles,
             max_iterations=opt_config.max_iterations,
             verbose=opt_config.verbose,
             inertia=rust_inertia,
@@ -1074,9 +1088,10 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                    |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `ValueError` | If the result's parameters are not the problem's, the level is not strictly between 0 and 1, or the engine rejects a position. |
+| Type           | Description                                                                                                                                              |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`   | If the result's parameters are not the problem's, the level is not strictly between 0 and 1, the engine is stochastic, or the engine rejects a position. |
+| `RuntimeError` | If the derivatives fail at the fit.                                                                                                                      |
 
 Source code in `commol/api/calibrator.py`
 
@@ -1114,7 +1129,10 @@ def delta_band(
     ------
     ValueError
         If the result's parameters are not the problem's, the level is not
-        strictly between 0 and 1, or the engine rejects a position.
+        strictly between 0 and 1, the engine is stochastic, or the engine
+        rejects a position.
+    RuntimeError
+        If the derivatives fail at the fit.
     """
     if result.sample.names != self.parameter_names:
         raise ValueError(
@@ -1271,9 +1289,9 @@ Parameters:
 
 Returns:
 
-| Type                | Description                                                                                                                                                                                                                                      |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `CalibrationResult` | The best start: the optimized parameter values, in the order of the problem's parameters, its final loss and convergence, every start (starts), the reason of each start that failed (failed_runs, also logged as warnings) and the seed (seed). |
+| Type                | Description                                                                                                                                                                                                                   |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CalibrationResult` | The best start: the optimized parameter values, in the order of the problem's parameters, its final loss and convergence, every start (starts), each start that failed (failed, also logged as warnings) and the seed (seed). |
 
 Raises:
 
@@ -1307,9 +1325,8 @@ def run(self, starts: int = 1) -> CalibrationResult:
     CalibrationResult
         The best start: the optimized parameter values, in the order of
         the problem's parameters, its final loss and convergence, every
-        start (``starts``), the reason of each start that failed
-        (``failed_runs``, also logged as warnings) and the seed
-        (``seed``).
+        start (``starts``), each start that failed (``failed``, also
+        logged as warnings) and the seed (``seed``).
 
     Raises
     ------
@@ -1341,12 +1358,12 @@ def run(self, starts: int = 1) -> CalibrationResult:
     )
     names = self.parameter_names
     summaries: list[tuple[StartSummary, "CalibrationResultProtocol"]] = []
-    failed_runs: list[str] = []
+    failed: list[str] = []
     for index, outcome in enumerate(outcomes):
         if outcome.result is None:
             reason = f"Start {index} failed: {outcome.error}"
             logger.warning(reason)
-            failed_runs.append(reason)
+            failed.append(reason)
             continue
         summaries.append(
             (
@@ -1360,7 +1377,7 @@ def run(self, starts: int = 1) -> CalibrationResult:
             )
         )
     if not summaries:
-        raise RuntimeError("Every start failed: " + "; ".join(failed_runs))
+        raise RuntimeError("Every start failed: " + "; ".join(failed))
     best = min(summaries, key=lambda summary: summary[0].loss)[1]
     result = CalibrationResult(
         best_parameters=dict(best.best_parameters),
@@ -1369,7 +1386,7 @@ def run(self, starts: int = 1) -> CalibrationResult:
         converged=best.converged,
         termination_reason=best.termination_reason,
         starts=[summary for summary, _ in summaries],
-        failed_runs=failed_runs,
+        failed=failed,
         seed=self.seed,
     )
     logger.info(
@@ -1473,10 +1490,12 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                     |
-| ------------ | ----------------------------------------------------------------------------------------------- |
-| `TypeError`  | If method is an identifiability method; the message names Calibrator.identifiability.           |
-| `ValueError` | If no runner is registered for the configuration's type; the message names the registered ones. |
+| Type                   | Description                                                                                                                                                                                   |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`            | If method is an identifiability method; the message names Calibrator.identifiability.                                                                                                         |
+| `ValueError`           | If no runner is registered for the configuration's type (the message names the registered ones), or a setting, an input, the data or the model does not fit the method; the message says why. |
+| `RuntimeError`         | If a computation of the method that could start fails: an engine run, an optimizer, every replicate, or a sampler that does not reach its target.                                             |
+| `InfeasibleStateError` | If a draw of a prediction leaves the values its model allows.                                                                                                                                 |
 
 Source code in `commol/api/calibrator.py`
 
@@ -1506,8 +1525,16 @@ def uncertainty(self, method: UncertaintyMethod[ResultT]) -> ResultT:
         If `method` is an identifiability method; the message names
         ``Calibrator.identifiability``.
     ValueError
-        If no runner is registered for the configuration's type; the
-        message names the registered ones.
+        If no runner is registered for the configuration's type (the
+        message names the registered ones), or
+        a setting, an input, the data or the model does not fit the
+        method; the message says why.
+    RuntimeError
+        If a computation of the method that could start fails: an engine
+        run, an optimizer, every replicate, or a sampler that does not
+        reach its target.
+    InfeasibleStateError
+        If a draw of a prediction leaves the values its model allows.
     """
     from commol.api.inference.registry import run_method
 
@@ -1538,10 +1565,11 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                    |
-| ------------ | ---------------------------------------------------------------------------------------------- |
-| `TypeError`  | If method is an uncertainty method; the message names Calibrator.uncertainty.                  |
-| `ValueError` | If no runner is registered for the configuration's type, or the method fails (see the method). |
+| Type           | Description                                                                                                                                           |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`    | If method is an uncertainty method; the message names Calibrator.uncertainty.                                                                         |
+| `ValueError`   | If no runner is registered for the configuration's type, or a setting, an input, the data or the model does not fit the method; the message says why. |
+| `RuntimeError` | If a computation of the method that could start fails: an engine run or an optimizer.                                                                 |
 
 Source code in `commol/api/calibrator.py`
 
@@ -1572,8 +1600,12 @@ def identifiability(self, method: IdentifiabilityMethod[ResultT]) -> ResultT:
         If `method` is an uncertainty method; the message names
         ``Calibrator.uncertainty``.
     ValueError
-        If no runner is registered for the configuration's type, or the
-        method fails (see the method).
+        If no runner is registered for the configuration's type, or
+        a setting, an input, the data or the model does not fit the
+        method; the message says why.
+    RuntimeError
+        If a computation of the method that could start fails: an engine
+        run or an optimizer.
     """
     from commol.api.inference.registry import run_method
 
@@ -1827,6 +1859,8 @@ Bases: `BaseModel`
 
 A quantile of the replicates of a stochastic engine, for `CalibrationProblem.replicate_summary`.
 
+It is the one quantile of commol, the one of `weighted_quantiles` and `SimulationReplicates.quantiles`: with equal weights, NumPy's `method="hazen"`. `Quantile(0.25)` of the replicates 1, 2, 3, 4, 5 is 1.75.
+
 Attributes:
 
 | Name    | Type    | Description                                             |
@@ -1840,6 +1874,11 @@ class Quantile(BaseModel):
     """
     A quantile of the replicates of a stochastic engine, for
     ``CalibrationProblem.replicate_summary``.
+
+    It is the one quantile of commol, the one of `weighted_quantiles` and
+    `SimulationReplicates.quantiles`: with equal weights, NumPy's
+    ``method="hazen"``. ``Quantile(0.25)`` of the replicates 1, 2, 3, 4, 5 is
+    1.75.
 
     Attributes
     ----------
@@ -2784,7 +2823,7 @@ Attributes:
 
 | Name             | Type   | Description                                           |
 | ---------------- | ------ | ----------------------------------------------------- |
-| `num_particles`  | `int`  | Number of particles in the swarm (default: 20)        |
+| `particles`      | `int`  | Number of particles in the swarm (default: 20)        |
 | `max_iterations` | `int`  | Maximum number of iterations (default: 1000)          |
 | `verbose`        | `bool` | Enable verbose output (default: False)                |
 | `initialization` | `str`  | Particle initialization strategy (default: "uniform") |
@@ -2809,7 +2848,7 @@ class ParticleSwarmConfig(BaseModel):
 
     Attributes
     ----------
-    num_particles : int
+    particles : int
         Number of particles in the swarm (default: 20)
     max_iterations : int
         Maximum number of iterations (default: 1000)
@@ -2837,7 +2876,7 @@ class ParticleSwarmConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Core parameters
-    num_particles: int = Field(
+    particles: int = Field(
         default=20, gt=0, description="Number of particles in the swarm"
     )
     max_iterations: int = Field(
@@ -3643,7 +3682,7 @@ Attributes:
 | `converged`          | `bool`               | Whether the best start converged.                                                                                                                                                           |
 | `termination_reason` | `str`                | Why the best start stopped.                                                                                                                                                                 |
 | `starts`             | `list[StartSummary]` | Every start that finished, in order; the first is the initial guess.                                                                                                                        |
-| `failed_runs`        | `list[str]`          | Why each start that failed did, with its number.                                                                                                                                            |
+| `failed`             | `list[str]`          | Each start that failed: "Start <index> failed: <reason>", also logged as a warning.                                                                                                         |
 | `seed`               | `int`                | The seed of the calibration's random numbers (Calibrator.seed): problem.seed, or the seed the calibrator drew. Set as problem.seed, it repeats the calibration and its uncertainty methods. |
 
 Source code in `commol/context/calibration.py`
@@ -3668,8 +3707,9 @@ class CalibrationResult(BaseModel):
         Why the best start stopped.
     starts : list[StartSummary]
         Every start that finished, in order; the first is the initial guess.
-    failed_runs : list[str]
-        Why each start that failed did, with its number.
+    failed : list[str]
+        Each start that failed: ``"Start <index> failed: <reason>"``, also
+        logged as a warning.
     seed : int
         The seed of the calibration's random numbers (`Calibrator.seed`):
         ``problem.seed``, or the seed the calibrator drew. Set as
@@ -3693,8 +3733,8 @@ class CalibrationResult(BaseModel):
     starts: list[StartSummary] = Field(
         default_factory=list, description="Every start that finished"
     )
-    failed_runs: list[str] = Field(
-        default_factory=list, description="Why each failed start failed"
+    failed: list[str] = Field(
+        default_factory=list, description="Each start that failed"
     )
     seed: int = Field(
         default=..., ge=0, description="Seed of the calibration's random numbers"
@@ -3711,7 +3751,7 @@ class CalibrationResult(BaseModel):
             f"  best_parameters={self.best_parameters},\n"
             f"  termination_reason='{self.termination_reason}',\n"
             f"  starts={len(self.starts)},\n"
-            f"  failed_runs={len(self.failed_runs)},\n"
+            f"  failed={len(self.failed)},\n"
             f"  seed={self.seed}\n"
             f")"
         )
@@ -3741,7 +3781,7 @@ def __str__(self) -> str:
         f"  best_parameters={self.best_parameters},\n"
         f"  termination_reason='{self.termination_reason}',\n"
         f"  starts={len(self.starts)},\n"
-        f"  failed_runs={len(self.failed_runs)},\n"
+        f"  failed={len(self.failed)},\n"
         f"  seed={self.seed}\n"
         f")"
     )

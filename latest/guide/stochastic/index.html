@@ -2728,6 +2728,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/sensitivity/" class="md-nav__link">
         
   
@@ -3634,14 +3662,15 @@ two options.</p>
 <h2 id="seeds-and-replicates">Seeds and replicates<a class="headerlink" href="#seeds-and-replicates" title="Permanent link">&para;</a></h2>
 <p>A run is reproducible from its model and its seed:
 <code>simulation.run(…, seed=s)</code> gives one run, and
-<code>simulation.replicates(n, seed=s).run(…)</code> gives <code>n</code> runs with one seed each,
+<code>simulation.replicates(count, seed=s).run(…)</code> gives <code>count</code> runs with one seed
+each,
 in parallel. A run does not depend on the positions it reports at: the output
 at a position is the state after the last event before it. See
 <a href="../simulations/#randomness-seeds-and-replicates">Randomness, seeds and replicates</a>
 for the seeds, <code>SimulationReplicates</code> and its statistics, plots of the mean and
 a band, and reports. A <code>Predictive</code> or a <code>Propagation</code> of a sample gives draw
 <code>j</code> a seed of its own, <code>draw_seeds[j]</code>, and runs its replicates as
-<code>simulation.replicates(n, seed=draw_seeds[j])</code> runs them, so those replicates
+<code>simulation.replicates(count, seed=draw_seeds[j])</code> runs them, so those replicates
 of the model at the values of the draw repeat its runs.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">again</span> <span class="o">=</span> <span class="n">simulation</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">again</span> <span class="o">==</span> <span class="n">one_run</span><span class="p">)</span>  <span class="c1"># True</span>

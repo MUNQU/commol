@@ -2758,6 +2758,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/sensitivity/" class="md-nav__link">
         
   
@@ -3578,7 +3606,7 @@ modelling judgment, and the table gives the range the literature uses.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>StructuralRank(points, design, seed=None)</code></td>
+<td><code>StructuralRank(points, design)</code></td>
 <td>The problem only</td>
 <td>The rank of the sensitivities, the non-identifiable parameters and the identifiable combinations</td>
 <td>Deterministic</td>
@@ -3605,11 +3633,12 @@ modelling judgment, and the table gives the range the literature uses.</p>
 </table>
 <h3 id="structural-rank">Structural rank<a class="headerlink" href="#structural-rank" title="Permanent link">&para;</a></h3>
 <p><code>StructuralRank</code> evaluates the sensitivities of the predicted observations at
-<code>points</code> rows of a Latin hypercube over the bounds, drawn from <code>seed</code> (the
-problem's seed by default). The sensitivity of observation <code>i</code> to parameter
-<code>j</code> is scaled to a relative change of both, <code>S_ij = (∂y_i/∂θ_j) · θ_j / s_i</code>,
-where <code>s_i</code> is the root mean square of the series of observation <code>i</code>, so the
-answer does not depend on units.</p>
+<code>points</code> rows of a Latin hypercube over the bounds, drawn from the seed of
+the calibrator (<code>Calibrator.seed</code>), so <code>problem.seed</code> repeats them. The
+sensitivity of observation <code>i</code> to parameter <code>j</code> is scaled to a relative
+change of both, <code>S_ij = (∂y_i/∂θ_j) · θ_j / s_i</code>, where <code>s_i</code> is the root mean
+square of the series of observation <code>i</code>, so the answer does not depend on
+units.</p>
 <table>
 <thead>
 <tr>
@@ -3748,7 +3777,7 @@ within a relative tolerance but the best; use data with noise.</p>
 <p>An <code>IdentifiabilityReport</code> holds, for each parameter, a <strong>structural</strong> and a
 <strong>practical</strong> verdict, and the sections of the methods that ran
 (<code>structural</code>, <code>collinearity</code>, <code>sample</code>, <code>starts</code>, <code>profile</code>). The profiles of
-a <code>ProfileLikelihood</code> give their report with <code>ProfileResult.report()</code>; a flat
+a <code>ProfileLikelihood</code> give their report with <code>ProfileResult.identifiability()</code>; a flat
 profile gives the structural verdict <code>in_combination</code> when resetting the
 other parameters to their fitted values breaks it, and <code>non_identifiable</code>
 when nothing the data read depends on the parameter

@@ -317,15 +317,11 @@ class ParameterSample(BaseModel):
             for name, low, high in zip(self.names, lower, upper, strict=True)
         }
 
+    @property
     def effective_size(self) -> float:
         """
-        Kish's effective sample size: ``1 / Σ wᵢ²``.
-
-        Returns
-        -------
-        float
-            Between 1 and the number of draws; equal weights give the number
-            of draws.
+        Kish's effective sample size, ``1 / Σ wᵢ²``: between 1 and the number
+        of draws; equal weights give the number of draws.
         """
         return self._rust.effective_size()
 
@@ -410,6 +406,14 @@ weights: list[float]
 ```
 
 The weight of each draw; they sum to 1.
+
+#### effective_size
+
+```python
+effective_size: float
+```
+
+Kish's effective sample size, `1 / Σ wᵢ²`: between 1 and the number of draws; equal weights give the number of draws.
 
 ### Methods:
 
@@ -801,36 +805,6 @@ def interval(self, confidence_level: float) -> dict[str, tuple[float, float]]:
     }
 ```
 
-#### effective_size
-
-```python
-effective_size() -> float
-```
-
-Kish's effective sample size: `1 / Σ wᵢ²`.
-
-Returns:
-
-| Type    | Description                                                                |
-| ------- | -------------------------------------------------------------------------- |
-| `float` | Between 1 and the number of draws; equal weights give the number of draws. |
-
-Source code in `commol/context/inference/sample.py`
-
-```python
-def effective_size(self) -> float:
-    """
-    Kish's effective sample size: ``1 / Σ wᵢ²``.
-
-    Returns
-    -------
-    float
-        Between 1 and the number of draws; equal weights give the number
-        of draws.
-    """
-    return self._rust.effective_size()
-```
-
 #### resample
 
 ```python
@@ -1108,7 +1082,7 @@ class Predictive:
         The seed of each draw of `sample`, in its order.
 
         With a stochastic engine, replicate ``i`` of draw ``j`` runs with the
-        seed replicate ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])``
+        seed replicate ``i`` of ``Simulation.replicates(count, seed=draw_seeds[j])``
         takes, so those replicates of the model at that draw give its runs.
         """
         return self._rust.draw_seeds
@@ -1391,7 +1365,7 @@ draw_seeds: list[int]
 
 The seed of each draw of `sample`, in its order.
 
-With a stochastic engine, replicate `i` of draw `j` runs with the seed replicate `i` of `Simulation.replicates(n, seed=draw_seeds[j])` takes, so those replicates of the model at that draw give its runs.
+With a stochastic engine, replicate `i` of draw `j` runs with the seed replicate `i` of `Simulation.replicates(count, seed=draw_seeds[j])` takes, so those replicates of the model at that draw give its runs.
 
 #### plot
 
@@ -3168,11 +3142,13 @@ The result of a bootstrap.
 
 Attributes:
 
-| Name          | Type                    | Description                                                                                         |
-| ------------- | ----------------------- | --------------------------------------------------------------------------------------------------- |
-| `fit`         | `CalibrationResult`     | The fit every replicate starts from: Calibrator.run(starts).                                        |
-| `sample`      | `ParameterSample`       | One draw per replicate that did not fail, with equal weights; the group of a draw is its replicate. |
-| `diagnostics` | `ResamplingDiagnostics` | The block length, and the replicates that failed, did not converge or made values below zero.       |
+| Name            | Type                    | Description                                                                                                                          |
+| --------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `fit`           | `CalibrationResult`     | The fit every replicate starts from: Calibrator.run(starts).                                                                         |
+| `sample`        | `ParameterSample`       | One draw per replicate that did not fail, with equal weights; the group of a draw is its replicate.                                  |
+| `failed`        | `list[str]`             | Each replicate that failed: "Replicate <index> failed: <reason>", also logged as a warning. A failed replicate is not in the sample. |
+| `not_converged` | `int`                   | Replicates kept although their optimizer did not converge.                                                                           |
+| `diagnostics`   | `ResamplingDiagnostics` | The block length, and the synthetic values below zero.                                                                               |
 
 Source code in `commol/context/inference/resampling.py`
 
@@ -3188,15 +3164,21 @@ class BootstrapResult(BaseModel):
     sample : ParameterSample
         One draw per replicate that did not fail, with equal weights; the
         group of a draw is its replicate.
+    failed : list[str]
+        Each replicate that failed: ``"Replicate <index> failed: <reason>"``,
+        also logged as a warning. A failed replicate is not in the sample.
+    not_converged : int
+        Replicates kept although their optimizer did not converge.
     diagnostics : ResamplingDiagnostics
-        The block length, and the replicates that failed, did not converge or
-        made values below zero.
+        The block length, and the synthetic values below zero.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     fit: CalibrationResult
     sample: ParameterSample
+    failed: list[str] = Field(description="Each replicate that failed.")
+    not_converged: int = Field(description="Replicates that did not converge.")
     diagnostics: ResamplingDiagnostics
 
     def interval_error(self, confidence_level: float) -> dict[str, BoundError]:
@@ -3221,12 +3203,7 @@ class BootstrapResult(BaseModel):
         ValueError
             If the confidence level is not strictly between 0 and 1.
         """
-        if not 0.0 < confidence_level < 1.0:
-            raise ValueError(
-                f"A confidence level is strictly between 0 and 1, got "
-                f"{confidence_level}."
-            )
-        low, high = (1.0 - confidence_level) / 2.0, (1.0 + confidence_level) / 2.0
+        low, high = commol_rs.inference.interval_levels(confidence_level)
         errors: dict[str, BoundError] = {}
         for index, name in enumerate(self.sample.names):
             column = [row[index] for row in self.sample.values]
@@ -3292,12 +3269,7 @@ def interval_error(self, confidence_level: float) -> dict[str, BoundError]:
     ValueError
         If the confidence level is not strictly between 0 and 1.
     """
-    if not 0.0 < confidence_level < 1.0:
-        raise ValueError(
-            f"A confidence level is strictly between 0 and 1, got "
-            f"{confidence_level}."
-        )
-    low, high = (1.0 - confidence_level) / 2.0, (1.0 + confidence_level) / 2.0
+    low, high = commol_rs.inference.interval_levels(confidence_level)
     errors: dict[str, BoundError] = {}
     for index, name in enumerate(self.sample.names):
         column = [row[index] for row in self.sample.values]
@@ -3318,16 +3290,18 @@ With `B` fits `θ̂₍₋ᵦ₎` that leave one block out, around the fit `θ̂`
 
 Attributes:
 
-| Name             | Type                        | Description                                                                                                                                           |
-| ---------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fit`            | `CalibrationResult`         | The fit with every observation.                                                                                                                       |
-| `estimate`       | `dict[str, float]`          | The bias-corrected estimate of each parameter.                                                                                                        |
-| `bias`           | `dict[str, float]`          | The jackknife bias of each parameter.                                                                                                                 |
-| `standard_error` | `dict[str, float]`          | The jackknife standard error of each parameter.                                                                                                       |
-| `blocks`         | `list[tuple[float, float]]` | The first and last position of each block that was left out and fitted, in order.                                                                     |
-| `pseudo_values`  | `dict[str, list[float]]`    | The pseudo-values of each parameter, one per block.                                                                                                   |
-| `influence`      | `dict[str, list[float]]`    | How far leaving each block out moves each parameter, in standard errors: (θ̂₍₋ᵦ₎ − θ̂) / se, one per block. NaN or infinite when a standard error is 0. |
-| `diagnostics`    | `ResamplingDiagnostics`     | The block length and the fits that failed or did not converge.                                                                                        |
+| Name             | Type                        | Description                                                                                                                                                                      |
+| ---------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`            | `CalibrationResult`         | The fit with every observation.                                                                                                                                                  |
+| `estimate`       | `dict[str, float]`          | The bias-corrected estimate of each parameter.                                                                                                                                   |
+| `bias`           | `dict[str, float]`          | The jackknife bias of each parameter.                                                                                                                                            |
+| `standard_error` | `dict[str, float]`          | The jackknife standard error of each parameter.                                                                                                                                  |
+| `blocks`         | `list[tuple[float, float]]` | The first and last position of each block that was left out and fitted, in order.                                                                                                |
+| `pseudo_values`  | `dict[str, list[float]]`    | The pseudo-values of each parameter, one per block.                                                                                                                              |
+| `influence`      | `dict[str, list[float]]`    | How far leaving each block out moves each parameter, in standard errors: (θ̂₍₋ᵦ₎ − θ̂) / se, one per block. NaN or infinite when a standard error is 0.                            |
+| `failed`         | `list[str]`                 | Each block whose fit failed: "Block <index> failed: <reason>", with blocks numbered from 0 in order of position; also logged as a warning. A block that failed is not in blocks. |
+| `not_converged`  | `int`                       | Fits kept although their optimizer did not converge.                                                                                                                             |
+| `diagnostics`    | `ResamplingDiagnostics`     | The block length.                                                                                                                                                                |
 
 Source code in `commol/context/inference/resampling.py`
 
@@ -3361,8 +3335,14 @@ class JackknifeResult(BaseModel):
         How far leaving each block out moves each parameter, in standard
         errors: ``(θ̂₍₋ᵦ₎ − θ̂) / se``, one per block. NaN or infinite when a
         standard error is 0.
+    failed : list[str]
+        Each block whose fit failed: ``"Block <index> failed: <reason>"``,
+        with blocks numbered from 0 in order of position; also logged as a
+        warning. A block that failed is not in `blocks`.
+    not_converged : int
+        Fits kept although their optimizer did not converge.
     diagnostics : ResamplingDiagnostics
-        The block length and the fits that failed or did not converge.
+        The block length.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
@@ -3374,6 +3354,8 @@ class JackknifeResult(BaseModel):
     blocks: list[tuple[float, float]]
     pseudo_values: dict[str, list[float]]
     influence: dict[str, list[float]]
+    failed: list[str] = Field(description="Each block whose fit failed.")
+    not_converged: int = Field(description="Fits that did not converge.")
     diagnostics: ResamplingDiagnostics
 ```
 
@@ -3381,7 +3363,7 @@ class JackknifeResult(BaseModel):
 
 Bases: `BaseModel`
 
-What happened to the replicates of a resampling method.
+The blocks of a resampling method, and the synthetic values below zero.
 
 Attributes:
 
@@ -3389,8 +3371,6 @@ Attributes:
 | ------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
 | `block_length`           | \`int              | None\`                                                                                                                            |
 | `block_length_estimates` | \`dict[str, float] | None\`                                                                                                                            |
-| `failed`                 | `list[str]`        | Each replicate that failed, with its reason. A failed replicate is not in the sample.                                             |
-| `not_converged`          | `int`              | Replicates kept although their optimizer did not converge.                                                                        |
 | `negative_values`        | `int`              | Synthetic observed values below zero, over every replicate. They are kept; many of them point to residual_scale="multiplicative". |
 
 Source code in `commol/context/inference/resampling.py`
@@ -3398,7 +3378,7 @@ Source code in `commol/context/inference/resampling.py`
 ```python
 class ResamplingDiagnostics(BaseModel):
     """
-    What happened to the replicates of a resampling method.
+    The blocks of a resampling method, and the synthetic values below zero.
 
     Attributes
     ----------
@@ -3408,11 +3388,6 @@ class ResamplingDiagnostics(BaseModel):
     block_length_estimates : dict[str, float] | None
         With ``block_length="auto"``, the estimate of each series, by label;
         otherwise None.
-    failed : list[str]
-        Each replicate that failed, with its reason. A failed replicate is not
-        in the sample.
-    not_converged : int
-        Replicates kept although their optimizer did not converge.
     negative_values : int
         Synthetic observed values below zero, over every replicate. They are
         kept; many of them point to ``residual_scale="multiplicative"``.
@@ -3424,8 +3399,6 @@ class ResamplingDiagnostics(BaseModel):
     block_length_estimates: dict[str, float] | None = Field(
         description="The estimate of each series with the automatic length."
     )
-    failed: list[str] = Field(description="Each replicate that failed.")
-    not_converged: int = Field(description="Replicates that did not converge.")
     negative_values: int = Field(description="Synthetic values below zero.")
 ```
 
@@ -3757,17 +3730,17 @@ def as_observation(self) -> ObservedDataPoint:
 
 Bases: `_Frozen`
 
-How far the statistic of a profile may rise above the fit inside an interval of level `level`.
+How far the statistic of a profile may rise above the fit inside an interval of `confidence_level`.
 
 Build one with `chi_square`, `beale` or `bootstrap_calibrated`.
 
 Attributes:
 
-| Name        | Type                                        | Description                                                     |
-| ----------- | ------------------------------------------- | --------------------------------------------------------------- |
-| `kind`      | `{chi_square, beale, bootstrap_calibrated}` | The rule.                                                       |
-| `level`     | `float`                                     | The level of each pointwise interval, strictly between 0 and 1. |
-| `bootstrap` | \`BayesianBootstrap                         | ParametricBootstrap                                             |
+| Name               | Type                                        | Description                                                     |
+| ------------------ | ------------------------------------------- | --------------------------------------------------------------- |
+| `kind`             | `{chi_square, beale, bootstrap_calibrated}` | The rule.                                                       |
+| `confidence_level` | `float`                                     | The level of each pointwise interval, strictly between 0 and 1. |
+| `bootstrap`        | \`BayesianBootstrap                         | ParametricBootstrap                                             |
 
 Source code in `commol/context/inference/profiles.py`
 
@@ -3775,7 +3748,7 @@ Source code in `commol/context/inference/profiles.py`
 class Threshold(_Frozen):
     """
     How far the statistic of a profile may rise above the fit inside an
-    interval of level `level`.
+    interval of `confidence_level`.
 
     Build one with `chi_square`, `beale` or `bootstrap_calibrated`.
 
@@ -3783,14 +3756,14 @@ class Threshold(_Frozen):
     ----------
     kind : {"chi_square", "beale", "bootstrap_calibrated"}
         The rule.
-    level : float
+    confidence_level : float
         The level of each pointwise interval, strictly between 0 and 1.
     bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap | None
         The bootstrap of ``"bootstrap_calibrated"``; None otherwise.
     """  # noqa: E501
 
     kind: Literal["chi_square", "beale", "bootstrap_calibrated"]
-    level: float = Field(gt=0.0, lt=1.0)
+    confidence_level: ConfidenceLevel
     bootstrap: ProfileBootstrap | None = None
 
     @model_validator(mode="after")
@@ -3805,17 +3778,17 @@ class Threshold(_Frozen):
         return self
 
     @classmethod
-    def chi_square(cls, level: float) -> Self:
+    def chi_square(cls, confidence_level: float) -> Self:
         """
-        ``½ χ²₁(level)`` on ``−log L`` (Wilks): the threshold of a problem
-        with observation models.
+        ``½ χ²₁(confidence_level)`` on ``−log L`` (Wilks): the threshold of a
+        problem with observation models.
 
         It assumes that the models hold and that the statistic is near its
         large-sample distribution.
 
         Parameters
         ----------
-        level : float
+        confidence_level : float
             The level of each interval, strictly between 0 and 1.
 
         Returns
@@ -3826,23 +3799,23 @@ class Threshold(_Frozen):
         Raises
         ------
         ValueError
-            If the level is not strictly between 0 and 1.
+            If ``confidence_level`` is not strictly between 0 and 1.
         """
-        return cls(kind="chi_square", level=_level(level))
+        return cls(kind="chi_square", confidence_level=confidence_level)
 
     @classmethod
-    def beale(cls, level: float) -> Self:
+    def beale(cls, confidence_level: float) -> Self:
         """
-        Beale's threshold of a sum of squares: ``S(θ̂) · F(1, n − p; level) /
-        (n − p)``, with ``n`` observations of positive weight and ``p``
-        parameters.
+        Beale's threshold of a sum of squares:
+        ``S(θ̂) · F(1, n − p; confidence_level) / (n − p)``, with ``n``
+        observations of positive weight and ``p`` parameters.
 
         It assumes independent Gaussian errors of one variance, and is exact
         for a model linear in its parameters. It needs the loss ``"sse"``.
 
         Parameters
         ----------
-        level : float
+        confidence_level : float
             The level of each interval, strictly between 0 and 1.
 
         Returns
@@ -3853,12 +3826,14 @@ class Threshold(_Frozen):
         Raises
         ------
         ValueError
-            If the level is not strictly between 0 and 1.
+            If ``confidence_level`` is not strictly between 0 and 1.
         """
-        return cls(kind="beale", level=_level(level))
+        return cls(kind="beale", confidence_level=confidence_level)
 
     @classmethod
-    def bootstrap_calibrated(cls, bootstrap: ProfileBootstrap, level: float) -> Self:
+    def bootstrap_calibrated(
+        cls, bootstrap: ProfileBootstrap, confidence_level: float
+    ) -> Self:
         """
         The threshold of each quantity calibrated by `bootstrap`
         (prepivoting, Beran 1988), for any loss.
@@ -3867,15 +3842,15 @@ class Threshold(_Frozen):
         ``Calibrator.uncertainty(bootstrap)`` builds it, is fitted
         (``θ̂_b``) and then fitted again with the quantity held at its value
         at the fit of the original data: the rise of the replicate is
-        ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile `level` of
-        the rises. It costs one fit and one refit per quantity for each
-        replicate.
+        ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile
+        `confidence_level` of the rises. It costs one fit and one refit per
+        quantity for each replicate.
 
         Parameters
         ----------
         bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap
             The bootstrap, with its replicates and starts.
-        level : float
+        confidence_level : float
             The level of each interval, strictly between 0 and 1.
 
         Returns
@@ -3886,10 +3861,12 @@ class Threshold(_Frozen):
         Raises
         ------
         ValueError
-            If the level is not strictly between 0 and 1.
+            If ``confidence_level`` is not strictly between 0 and 1.
         """  # noqa: E501
         return cls(
-            kind="bootstrap_calibrated", level=_level(level), bootstrap=bootstrap
+            kind="bootstrap_calibrated",
+            confidence_level=confidence_level,
+            bootstrap=bootstrap,
         )
 ```
 
@@ -3921,18 +3898,18 @@ def check_bootstrap(self) -> Self:
 #### chi_square
 
 ```python
-chi_square(level: float) -> Self
+chi_square(confidence_level: float) -> Self
 ```
 
-`½ χ²₁(level)` on `−log L` (Wilks): the threshold of a problem with observation models.
+`½ χ²₁(confidence_level)` on `−log L` (Wilks): the threshold of a problem with observation models.
 
 It assumes that the models hold and that the statistic is near its large-sample distribution.
 
 Parameters:
 
-| Name    | Type    | Description                                           | Default    |
-| ------- | ------- | ----------------------------------------------------- | ---------- |
-| `level` | `float` | The level of each interval, strictly between 0 and 1. | *required* |
+| Name               | Type    | Description                                           | Default    |
+| ------------------ | ------- | ----------------------------------------------------- | ---------- |
+| `confidence_level` | `float` | The level of each interval, strictly between 0 and 1. | *required* |
 
 Returns:
 
@@ -3942,25 +3919,25 @@ Returns:
 
 Raises:
 
-| Type         | Description                                   |
-| ------------ | --------------------------------------------- |
-| `ValueError` | If the level is not strictly between 0 and 1. |
+| Type         | Description                                          |
+| ------------ | ---------------------------------------------------- |
+| `ValueError` | If confidence_level is not strictly between 0 and 1. |
 
 Source code in `commol/context/inference/profiles.py`
 
 ```python
 @classmethod
-def chi_square(cls, level: float) -> Self:
+def chi_square(cls, confidence_level: float) -> Self:
     """
-    ``½ χ²₁(level)`` on ``−log L`` (Wilks): the threshold of a problem
-    with observation models.
+    ``½ χ²₁(confidence_level)`` on ``−log L`` (Wilks): the threshold of a
+    problem with observation models.
 
     It assumes that the models hold and that the statistic is near its
     large-sample distribution.
 
     Parameters
     ----------
-    level : float
+    confidence_level : float
         The level of each interval, strictly between 0 and 1.
 
     Returns
@@ -3971,26 +3948,26 @@ def chi_square(cls, level: float) -> Self:
     Raises
     ------
     ValueError
-        If the level is not strictly between 0 and 1.
+        If ``confidence_level`` is not strictly between 0 and 1.
     """
-    return cls(kind="chi_square", level=_level(level))
+    return cls(kind="chi_square", confidence_level=confidence_level)
 ```
 
 #### beale
 
 ```python
-beale(level: float) -> Self
+beale(confidence_level: float) -> Self
 ```
 
-Beale's threshold of a sum of squares: `S(θ̂) · F(1, n − p; level) / (n − p)`, with `n` observations of positive weight and `p` parameters.
+Beale's threshold of a sum of squares: `S(θ̂) · F(1, n − p; confidence_level) / (n − p)`, with `n` observations of positive weight and `p` parameters.
 
 It assumes independent Gaussian errors of one variance, and is exact for a model linear in its parameters. It needs the loss `"sse"`.
 
 Parameters:
 
-| Name    | Type    | Description                                           | Default    |
-| ------- | ------- | ----------------------------------------------------- | ---------- |
-| `level` | `float` | The level of each interval, strictly between 0 and 1. | *required* |
+| Name               | Type    | Description                                           | Default    |
+| ------------------ | ------- | ----------------------------------------------------- | ---------- |
+| `confidence_level` | `float` | The level of each interval, strictly between 0 and 1. | *required* |
 
 Returns:
 
@@ -4000,26 +3977,26 @@ Returns:
 
 Raises:
 
-| Type         | Description                                   |
-| ------------ | --------------------------------------------- |
-| `ValueError` | If the level is not strictly between 0 and 1. |
+| Type         | Description                                          |
+| ------------ | ---------------------------------------------------- |
+| `ValueError` | If confidence_level is not strictly between 0 and 1. |
 
 Source code in `commol/context/inference/profiles.py`
 
 ```python
 @classmethod
-def beale(cls, level: float) -> Self:
+def beale(cls, confidence_level: float) -> Self:
     """
-    Beale's threshold of a sum of squares: ``S(θ̂) · F(1, n − p; level) /
-    (n − p)``, with ``n`` observations of positive weight and ``p``
-    parameters.
+    Beale's threshold of a sum of squares:
+    ``S(θ̂) · F(1, n − p; confidence_level) / (n − p)``, with ``n``
+    observations of positive weight and ``p`` parameters.
 
     It assumes independent Gaussian errors of one variance, and is exact
     for a model linear in its parameters. It needs the loss ``"sse"``.
 
     Parameters
     ----------
-    level : float
+    confidence_level : float
         The level of each interval, strictly between 0 and 1.
 
     Returns
@@ -4030,27 +4007,27 @@ def beale(cls, level: float) -> Self:
     Raises
     ------
     ValueError
-        If the level is not strictly between 0 and 1.
+        If ``confidence_level`` is not strictly between 0 and 1.
     """
-    return cls(kind="beale", level=_level(level))
+    return cls(kind="beale", confidence_level=confidence_level)
 ```
 
 #### bootstrap_calibrated
 
 ```python
-bootstrap_calibrated(bootstrap: ProfileBootstrap, level: float) -> Self
+bootstrap_calibrated(bootstrap: ProfileBootstrap, confidence_level: float) -> Self
 ```
 
 The threshold of each quantity calibrated by `bootstrap` (prepivoting, Beran 1988), for any loss.
 
-Each replicate of the bootstrap, rebuilt from the problem's seed as `Calibrator.uncertainty(bootstrap)` builds it, is fitted (`θ̂_b`) and then fitted again with the quantity held at its value at the fit of the original data: the rise of the replicate is `PL_b(θ̂ⱼ) − L_b(θ̂_b)`. The threshold is the quantile `level` of the rises. It costs one fit and one refit per quantity for each replicate.
+Each replicate of the bootstrap, rebuilt from the problem's seed as `Calibrator.uncertainty(bootstrap)` builds it, is fitted (`θ̂_b`) and then fitted again with the quantity held at its value at the fit of the original data: the rise of the replicate is `PL_b(θ̂ⱼ) − L_b(θ̂_b)`. The threshold is the quantile `confidence_level` of the rises. It costs one fit and one refit per quantity for each replicate.
 
 Parameters:
 
-| Name        | Type                | Description                                           | Default           |
-| ----------- | ------------------- | ----------------------------------------------------- | ----------------- |
-| `bootstrap` | \`BayesianBootstrap | ParametricBootstrap                                   | ResidualBootstrap |
-| `level`     | `float`             | The level of each interval, strictly between 0 and 1. | *required*        |
+| Name               | Type                | Description                                           | Default           |
+| ------------------ | ------------------- | ----------------------------------------------------- | ----------------- |
+| `bootstrap`        | \`BayesianBootstrap | ParametricBootstrap                                   | ResidualBootstrap |
+| `confidence_level` | `float`             | The level of each interval, strictly between 0 and 1. | *required*        |
 
 Returns:
 
@@ -4060,15 +4037,17 @@ Returns:
 
 Raises:
 
-| Type         | Description                                   |
-| ------------ | --------------------------------------------- |
-| `ValueError` | If the level is not strictly between 0 and 1. |
+| Type         | Description                                          |
+| ------------ | ---------------------------------------------------- |
+| `ValueError` | If confidence_level is not strictly between 0 and 1. |
 
 Source code in `commol/context/inference/profiles.py`
 
 ```python
 @classmethod
-def bootstrap_calibrated(cls, bootstrap: ProfileBootstrap, level: float) -> Self:
+def bootstrap_calibrated(
+    cls, bootstrap: ProfileBootstrap, confidence_level: float
+) -> Self:
     """
     The threshold of each quantity calibrated by `bootstrap`
     (prepivoting, Beran 1988), for any loss.
@@ -4077,15 +4056,15 @@ def bootstrap_calibrated(cls, bootstrap: ProfileBootstrap, level: float) -> Self
     ``Calibrator.uncertainty(bootstrap)`` builds it, is fitted
     (``θ̂_b``) and then fitted again with the quantity held at its value
     at the fit of the original data: the rise of the replicate is
-    ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile `level` of
-    the rises. It costs one fit and one refit per quantity for each
-    replicate.
+    ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile
+    `confidence_level` of the rises. It costs one fit and one refit per
+    quantity for each replicate.
 
     Parameters
     ----------
     bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap
         The bootstrap, with its replicates and starts.
-    level : float
+    confidence_level : float
         The level of each interval, strictly between 0 and 1.
 
     Returns
@@ -4096,10 +4075,12 @@ def bootstrap_calibrated(cls, bootstrap: ProfileBootstrap, level: float) -> Self
     Raises
     ------
     ValueError
-        If the level is not strictly between 0 and 1.
+        If ``confidence_level`` is not strictly between 0 and 1.
     """  # noqa: E501
     return cls(
-        kind="bootstrap_calibrated", level=_level(level), bootstrap=bootstrap
+        kind="bootstrap_calibrated",
+        confidence_level=confidence_level,
+        bootstrap=bootstrap,
     )
 ```
 
@@ -4111,19 +4092,20 @@ The result of a profile likelihood.
 
 Attributes:
 
-| Name                | Type                            | Description                                                                                                                          |
-| ------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `fit`               | `CalibrationResult`             | The fit every profile starts from.                                                                                                   |
-| `quantity`          | `{parameter, prediction}`       | What the profiles hold fixed: parameters (ProfileLikelihood) or predictions (PredictionProfile).                                     |
-| `threshold`         | `Threshold`                     | The threshold the profiles ran with.                                                                                                 |
-| `profiles`          | `dict[str, Profile]`            | The profile of each parameter or prediction, by name.                                                                                |
-| `intervals`         | `dict[str, ProfileInterval]`    | The interval of each.                                                                                                                |
-| `verdicts`          | \`dict\[str, ProfileVerdictName | None\]\`                                                                                                                             |
-| `structure`         | `dict[str, ProfileStructure]`   | For each profile of a parameter that does not cross on both sides, what resetting the other parameters says.                         |
-| `tolerance`         | `float`                         | The numerical tolerance of the statistic: max(τ, ν), the tolerance of the optimizer and the noise floor of the objective at the fit. |
-| `evaluation_floor`  | \`float                         | None\`                                                                                                                               |
-| `notes`             | `list[str]`                     | What a reader should know, such as a threshold below the tolerance or a refit below the fit.                                         |
-| `failed_replicates` | `list[str]`                     | With a bootstrap threshold, each replicate that failed.                                                                              |
+| Name               | Type                            | Description                                                                                                                                             |
+| ------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`              | `CalibrationResult`             | The fit every profile starts from.                                                                                                                      |
+| `quantity`         | `{parameter, prediction}`       | What the profiles hold fixed: parameters (ProfileLikelihood) or predictions (PredictionProfile).                                                        |
+| `threshold`        | `Threshold`                     | The threshold the profiles ran with.                                                                                                                    |
+| `profiles`         | `dict[str, Profile]`            | The profile of each parameter or prediction, by name.                                                                                                   |
+| `intervals`        | `dict[str, ProfileInterval]`    | The interval of each.                                                                                                                                   |
+| `verdicts`         | \`dict\[str, ProfileVerdictName | None\]\`                                                                                                                                                |
+| `structure`        | `dict[str, ProfileStructure]`   | For each profile of a parameter that does not cross on both sides, what resetting the other parameters says.                                            |
+| `tolerance`        | `float`                         | The numerical tolerance of the statistic: max(τ, ν), the tolerance of the optimizer and the noise floor of the objective at the fit.                    |
+| `evaluation_floor` | \`float                         | None\`                                                                                                                                                  |
+| `notes`            | `list[str]`                     | What a reader should know, such as a threshold below the tolerance or a refit below the fit.                                                            |
+| `failed`           | `list[str]`                     | With a bootstrap threshold, each replicate that failed: "Replicate <index> failed: <reason>", also logged as a warning. Empty with any other threshold. |
+| `not_converged`    | `int`                           | With a bootstrap threshold, the replicates kept although their optimizer did not converge; 0 with any other threshold.                                  |
 
 Source code in `commol/context/inference/profiles.py`
 
@@ -4165,8 +4147,13 @@ class ProfileResult(_Frozen):
     notes : list[str]
         What a reader should know, such as a threshold below the tolerance or
         a refit below the fit.
-    failed_replicates : list[str]
-        With a bootstrap threshold, each replicate that failed.
+    failed : list[str]
+        With a bootstrap threshold, each replicate that failed:
+        ``"Replicate <index> failed: <reason>"``, also logged as a warning.
+        Empty with any other threshold.
+    not_converged : int
+        With a bootstrap threshold, the replicates kept although their
+        optimizer did not converge; 0 with any other threshold.
     """
 
     fit: CalibrationResult
@@ -4179,7 +4166,8 @@ class ProfileResult(_Frozen):
     evaluation_floor: float | None = None
     structure: dict[str, ProfileStructure] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
-    failed_replicates: list[str] = Field(default_factory=list)
+    failed: list[str] = Field(default_factory=list)
+    not_converged: int = 0
 
     def plot(
         self,
@@ -4220,10 +4208,10 @@ class ProfileResult(_Frozen):
 
         return _profiles(self, output_file=output_file, config=config, axes=axes)
 
-    def report(self) -> IdentifiabilityReport:
+    def identifiability(self) -> IdentifiabilityReport:
         """
         The verdicts of the profiled parameters as an identifiability report,
-        with a ``profile`` section.
+        with a ``profile`` section; its ``report()`` gives them as data.
 
         ``identifiable`` gives the practical verdict ``determined`` and
         ``practically_non_identifiable`` the practical verdict
@@ -4250,8 +4238,9 @@ class ProfileResult(_Frozen):
         """
         if self.quantity != "parameter":
             raise ValueError(
-                "Only the profiles of parameters report on identifiability; this "
-                "result holds the profiles of predictions."
+                "This result holds the profiles of predictions, and predictions "
+                "have no verdict on a parameter; profile the parameters "
+                "(ProfileLikelihood) for their identifiability."
             )
         parameters = list(self.fit.best_parameters)
         verdicts: dict[str, ParameterVerdicts] = {}
@@ -4294,7 +4283,7 @@ class ProfileResult(_Frozen):
             profile=[
                 ProfileSection(
                     threshold=self.threshold.kind,
-                    level=self.threshold.level,
+                    confidence_level=self.threshold.confidence_level,
                     tolerance=self.tolerance,
                     verdicts=self.verdicts,
                     intervals={
@@ -4382,13 +4371,13 @@ def plot(
     return _profiles(self, output_file=output_file, config=config, axes=axes)
 ```
 
-#### report
+#### identifiability
 
 ```python
-report() -> IdentifiabilityReport
+identifiability() -> IdentifiabilityReport
 ```
 
-The verdicts of the profiled parameters as an identifiability report, with a `profile` section.
+The verdicts of the profiled parameters as an identifiability report, with a `profile` section; its `report()` gives them as data.
 
 `identifiable` gives the practical verdict `determined` and `practically_non_identifiable` the practical verdict `poorly_determined`. `structurally_non_identifiable` gives the structural verdict of its `structure`, `in_combination` or `non_identifiable`, with no combination: the reason names the compensating parameters. A flat profile with no structural verdict gives the practical verdict `poorly_determined`. Every reason says that the verdict holds with the other parameters at their fitted values. A parameter with no profile, or no verdict, gets neither. `IdentifiabilityReport.merge` joins it with the reports of other methods.
 
@@ -4407,10 +4396,10 @@ Raises:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-def report(self) -> IdentifiabilityReport:
+def identifiability(self) -> IdentifiabilityReport:
     """
     The verdicts of the profiled parameters as an identifiability report,
-    with a ``profile`` section.
+    with a ``profile`` section; its ``report()`` gives them as data.
 
     ``identifiable`` gives the practical verdict ``determined`` and
     ``practically_non_identifiable`` the practical verdict
@@ -4437,8 +4426,9 @@ def report(self) -> IdentifiabilityReport:
     """
     if self.quantity != "parameter":
         raise ValueError(
-            "Only the profiles of parameters report on identifiability; this "
-            "result holds the profiles of predictions."
+            "This result holds the profiles of predictions, and predictions "
+            "have no verdict on a parameter; profile the parameters "
+            "(ProfileLikelihood) for their identifiability."
         )
     parameters = list(self.fit.best_parameters)
     verdicts: dict[str, ParameterVerdicts] = {}
@@ -4481,7 +4471,7 @@ def report(self) -> IdentifiabilityReport:
         profile=[
             ProfileSection(
                 threshold=self.threshold.kind,
-                level=self.threshold.level,
+                confidence_level=self.threshold.confidence_level,
                 tolerance=self.tolerance,
                 verdicts=self.verdicts,
                 intervals={
@@ -5362,9 +5352,10 @@ It needs `loss_function="sse"` or observation models, and a deterministic engine
 
 Attributes:
 
-| Name           | Type  | Description |
-| -------------- | ----- | ----------- |
-| `block_length` | \`int | auto\`      |
+| Name           | Type  | Description                                                                                       |
+| -------------- | ----- | ------------------------------------------------------------------------------------------------- |
+| `block_length` | \`int | auto\`                                                                                            |
+| `starts`       | `int` | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 
 Source code in `commol/context/inference/smc.py`
 
@@ -5388,12 +5379,16 @@ class InformationMatchingEta(BaseModel):
     block_length : int | "auto"
         Positions per block of the scores; there must be more blocks than
         parameters.
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["information_matching"] = "information_matching"
     block_length: BlockLength = Field(description="Positions per block.")
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 ```
 
 ## BootstrapCoverageEta
@@ -5406,11 +5401,12 @@ It works with any loss and engine, and costs one sampler per replicate.
 
 Attributes:
 
-| Name               | Type    | Description                                           |
-| ------------------ | ------- | ----------------------------------------------------- |
-| `replicates`       | `int`   | Number of Bayesian-bootstrap data sets, at least 1.   |
-| `block_length`     | \`int   | auto\`                                                |
-| `confidence_level` | `float` | The level of the intervals, strictly between 0 and 1. |
+| Name               | Type    | Description                                                                                       |
+| ------------------ | ------- | ------------------------------------------------------------------------------------------------- |
+| `replicates`       | `int`   | Number of Bayesian-bootstrap data sets, at least 1.                                               |
+| `block_length`     | \`int   | auto\`                                                                                            |
+| `confidence_level` | `float` | The level of the intervals, strictly between 0 and 1.                                             |
+| `starts`           | `int`   | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 
 Source code in `commol/context/inference/smc.py`
 
@@ -5432,6 +5428,9 @@ class BootstrapCoverageEta(BaseModel):
         Positions per block of the bootstrap.
     confidence_level : float
         The level of the intervals, strictly between 0 and 1.
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -5439,9 +5438,8 @@ class BootstrapCoverageEta(BaseModel):
     kind: Literal["bootstrap_coverage"] = "bootstrap_coverage"
     replicates: int = Field(ge=1, description="Number of bootstrap data sets.")
     block_length: BlockLength = Field(description="Positions per block.")
-    confidence_level: float = Field(
-        gt=0.0, lt=1.0, description="The level of the intervals."
-    )
+    confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 ```
 
 ## ABCSMC
@@ -5670,11 +5668,12 @@ The result of a Gibbs posterior.
 
 Attributes:
 
-| Name       | Type                | Description                   |
-| ---------- | ------------------- | ----------------------------- |
-| `eta`      | `float`             | The η the posterior ran with. |
-| `fit`      | \`CalibrationResult | None\`                        |
-| `coverage` | \`float             | None\`                        |
+| Name       | Type                | Description                                                                                                                                      |
+| ---------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `eta`      | `float`             | The η the posterior ran with.                                                                                                                    |
+| `fit`      | \`CalibrationResult | None\`                                                                                                                                           |
+| `coverage` | \`float             | None\`                                                                                                                                           |
+| `failed`   | `list[str]`         | With BootstrapCoverageEta, each replicate whose sampler failed: "Replicate <index> failed: <reason>", also logged as a warning. Empty otherwise. |
 
 Source code in `commol/context/inference/smc.py`
 
@@ -5688,15 +5687,21 @@ class GibbsResult(SMCResult):
     eta : float
         The `η` the posterior ran with.
     fit : CalibrationResult | None
-        The fit a calibration of `η` read; None when `η` is a number.
+        The fit a calibration of `η` read, ``Calibrator.run(starts)``; None
+        when `η` is a number.
     coverage : float | None
         With `BootstrapCoverageEta`, the coverage of the fit by the intervals of
         the bootstrap posteriors at `η`; otherwise None.
+    failed : list[str]
+        With `BootstrapCoverageEta`, each replicate whose sampler failed:
+        ``"Replicate <index> failed: <reason>"``, also logged as a warning.
+        Empty otherwise.
     """
 
     eta: float
     fit: CalibrationResult | None
     coverage: float | None
+    failed: list[str] = Field(default_factory=list)
 ```
 
 ## SMCDiagnostics
@@ -5772,10 +5777,11 @@ It needs `observation_models`: a loss has no noise scale, so its curvature is no
 
 Attributes:
 
-| Name        | Type                      | Description                                |
-| ----------- | ------------------------- | ------------------------------------------ |
-| `draws`     | `int`                     | Number of draws of the normal, at least 1. |
-| `curvature` | `{gauss_newton, hessian}` | The curvature (default "gauss_newton").    |
+| Name        | Type                      | Description                                                                                       |
+| ----------- | ------------------------- | ------------------------------------------------------------------------------------------------- |
+| `draws`     | `int`                     | Number of draws of the normal, at least 1.                                                        |
+| `curvature` | `{gauss_newton, hessian}` | The curvature (default "gauss_newton").                                                           |
+| `starts`    | `int`                     | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 
 Source code in `commol/context/inference/local.py`
 
@@ -5797,12 +5803,16 @@ class Laplace(UncertaintyMethod[LaplaceResult]):
         Number of draws of the normal, at least 1.
     curvature : {"gauss_newton", "hessian"}
         The curvature (default ``"gauss_newton"``).
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     draws: int = Field(ge=1, description="Number of draws.")
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
     )
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 ```
 
 ## Sandwich
@@ -5820,6 +5830,7 @@ Attributes:
 | `block_length` | \`int                     | auto\`                                                                                                      |
 | `draws`        | `int`                     | Number of draws of the Student t, at least 1.                                                               |
 | `curvature`    | `{gauss_newton, hessian}` | The curvature H (default "gauss_newton"). With the Hessian, the sandwich also holds when the mean is wrong. |
+| `starts`       | `int`                     | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds.           |
 
 Source code in `commol/context/inference/local.py`
 
@@ -5850,6 +5861,9 @@ class Sandwich(UncertaintyMethod[SandwichResult]):
     curvature : {"gauss_newton", "hessian"}
         The curvature ``H`` (default ``"gauss_newton"``). With the Hessian,
         the sandwich also holds when the mean is wrong.
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     block_length: BlockLength = Field(description="Positions per block.")
@@ -5857,6 +5871,7 @@ class Sandwich(UncertaintyMethod[SandwichResult]):
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
     )
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 ```
 
 ## LaplaceMixture
@@ -5871,7 +5886,7 @@ Attributes:
 
 | Name        | Type                      | Description                                                                                       |
 | ----------- | ------------------------- | ------------------------------------------------------------------------------------------------- |
-| `starts`    | `int`                     | Starts of the fit, at least 1: the initial guess, then rows of a Latin hypercube over the bounds. |
+| `starts`    | `int`                     | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 | `draws`     | `int`                     | Number of draws of the mixture, at least 25, so that the tail of the weights has 5.               |
 | `target`    | \`LikelihoodTarget        | GibbsTarget\`                                                                                     |
 | `curvature` | `{gauss_newton, hessian}` | The curvature of each component (default "gauss_newton").                                         |
@@ -5894,8 +5909,8 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
     Attributes
     ----------
     starts : int
-        Starts of the fit, at least 1: the initial guess, then rows of a
-        Latin hypercube over the bounds.
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     draws : int
         Number of draws of the mixture, at least 25, so that the tail of the
         weights has 5.
@@ -5906,7 +5921,7 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
         The curvature of each component (default ``"gauss_newton"``).
     """
 
-    starts: int = Field(ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
     draws: int = Field(ge=25, description="Number of draws.")
     target: MixtureTarget = Field(description="The posterior to sample.")
     curvature: CurvatureName = Field(
@@ -5989,7 +6004,7 @@ Attributes:
 
 | Name         | Type                | Description                                                                                                            |
 | ------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run().                                                             |
+| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run(starts).                                                       |
 | `covariance` | `list[list[float]]` | The covariance of the distribution on the unbounded scale of the parameters, in the order of the problem's parameters. |
 | `sample`     | `ParameterSample`   | Draws of the distribution, mapped back to the parameters, with equal weights.                                          |
 | `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale; each is also logged as a warning. |
@@ -6005,7 +6020,7 @@ class LocalResult(BaseModel):
     Attributes
     ----------
     fit : CalibrationResult
-        The fit the approximation is centred on: ``Calibrator.run()``.
+        The fit the approximation is centred on: ``Calibrator.run(starts)``.
     covariance : list[list[float]]
         The covariance of the distribution on the unbounded scale of the
         parameters, in the order of the problem's parameters.
@@ -6077,7 +6092,7 @@ Attributes:
 
 | Name         | Type                | Description                                                                          |
 | ------------ | ------------------- | ------------------------------------------------------------------------------------ |
-| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run().                           |
+| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run(starts).                     |
 | `covariance` | `list[list[float]]` | Σ = H⁻¹ on the unbounded scale of the parameters.                                    |
 | `sample`     | `ParameterSample`   | Draws of the normal, mapped back to the parameters, with equal weights.              |
 | `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
@@ -6093,7 +6108,7 @@ class LaplaceResult(LocalResult):
     Attributes
     ----------
     fit : CalibrationResult
-        The fit the approximation is centred on: ``Calibrator.run()``.
+        The fit the approximation is centred on: ``Calibrator.run(starts)``.
     covariance : list[list[float]]
         ``Σ = H⁻¹`` on the unbounded scale of the parameters.
     sample : ParameterSample
@@ -6115,7 +6130,7 @@ Attributes:
 
 | Name                     | Type                | Description                                                                          |
 | ------------------------ | ------------------- | ------------------------------------------------------------------------------------ |
-| `fit`                    | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run().                                |
+| `fit`                    | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run(starts).                          |
 | `covariance`             | `list[list[float]]` | H⁻¹ B H⁻¹ on the unbounded scale of the parameters.                                  |
 | `sample`                 | `ParameterSample`   | Draws of the Student t, mapped back to the parameters, with equal weights.           |
 | `notes`                  | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
@@ -6135,7 +6150,7 @@ class SandwichResult(LocalResult):
     Attributes
     ----------
     fit : CalibrationResult
-        The fit the sandwich is centred on: ``Calibrator.run()``.
+        The fit the sandwich is centred on: ``Calibrator.run(starts)``.
     covariance : list[list[float]]
         ``H⁻¹ B H⁻¹`` on the unbounded scale of the parameters.
     sample : ParameterSample
@@ -6356,15 +6371,15 @@ Guide: [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/gu
 
 Bases: `UncertaintyMethod[ConformalResult]`
 
-What every conformal method takes: a score, the pooling of its quantiles, and a level, none of them with a default.
+What every conformal method takes: a score, the pooling of its quantiles, and a confidence level, none of them with a default.
 
 Attributes:
 
-| Name    | Type                             | Description                                                                                                                                    |
-| ------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `score` | `{absolute, normalized, spread}` | The nonconformity score. "normalized" needs by="all": per series its factor is one constant, so its intervals would equal those of "absolute". |
-| `by`    | `{series, all}`                  | Whether each series gets its own quantile, or all series share one.                                                                            |
-| `level` | `float`                          | The level of the intervals, strictly between 0 and 1.                                                                                          |
+| Name               | Type                             | Description                                                                                                                                    |
+| ------------------ | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `score`            | `{absolute, normalized, spread}` | The nonconformity score. "normalized" needs by="all": per series its factor is one constant, so its intervals would equal those of "absolute". |
+| `by`               | `{series, all}`                  | Whether each series gets its own quantile, or all series share one.                                                                            |
+| `confidence_level` | `float`                          | The level of the intervals, strictly between 0 and 1.                                                                                          |
 
 Source code in `commol/context/inference/conformal.py`
 
@@ -6372,7 +6387,7 @@ Source code in `commol/context/inference/conformal.py`
 class ConformalMethod(UncertaintyMethod[ConformalResult]):
     """
     What every conformal method takes: a score, the pooling of its
-    quantiles, and a level, none of them with a default.
+    quantiles, and a confidence level, none of them with a default.
 
     Attributes
     ----------
@@ -6382,13 +6397,13 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
         of ``"absolute"``.
     by : {"series", "all"}
         Whether each series gets its own quantile, or all series share one.
-    level : float
+    confidence_level : float
         The level of the intervals, strictly between 0 and 1.
     """
 
     score: ConformalScore = Field(description="The nonconformity score.")
     by: Pooling = Field(description="Which scores each quantile reads.")
-    level: float = Field(gt=0.0, lt=1.0, description="The level of the intervals.")
+    confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
 
     @model_validator(mode="before")
     @classmethod
@@ -6437,7 +6452,7 @@ Bases: `ConformalMethod`
 
 Split conformal prediction.
 
-It fits the problem's observations and scores `calibration_data`, observations held out of the fit. When the scores of the held-out and of new observations are exchangeable, each interval covers a new observation with probability at least `level`.
+It fits the problem's observations and scores `calibration_data`, observations held out of the fit. When the scores of the held-out and of new observations are exchangeable, each interval covers a new observation with probability at least `confidence_level`.
 
 Attributes:
 
@@ -6458,7 +6473,7 @@ class SplitConformal(ConformalMethod):
     It fits the problem's observations and scores `calibration_data`,
     observations held out of the fit. When the scores of the held-out and of
     new observations are exchangeable, each interval covers a new
-    observation with probability at least `level`.
+    observation with probability at least `confidence_level`.
 
     Attributes
     ----------
@@ -6763,11 +6778,13 @@ The result of a conformal method.
 
 Attributes:
 
-| Name        | Type                     | Description                                                             |
-| ----------- | ------------------------ | ----------------------------------------------------------------------- |
-| `intervals` | `PredictionIntervals`    | The intervals at the positions the method was given.                    |
-| `scores`    | `dict[str, list[float]]` | The scores of each series, by label, in the order the method took them. |
-| `guarantee` | `str`                    | The coverage the method guarantees, and what the guarantee assumes.     |
+| Name            | Type                     | Description                                                                                                                                                                                                                                                                 |
+| --------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `intervals`     | `PredictionIntervals`    | The intervals at the positions the method was given.                                                                                                                                                                                                                        |
+| `scores`        | `dict[str, list[float]]` | The scores of each series, by label, in the order the method took them.                                                                                                                                                                                                     |
+| `guarantee`     | `str`                    | The coverage the method guarantees, and what the guarantee assumes.                                                                                                                                                                                                         |
+| `failed`        | `list[str]`              | Each refit that failed, which gives no score: "Origin <index> failed: <reason>" for RollingConformal, "Block <index> failed: <reason>" for JackknifePlus, "Replicate <index> failed: <reason>" for EnbPI; also logged as a warning. Empty for a method that does not refit. |
+| `not_converged` | `int`                    | Refits kept although their optimizer did not converge; 0 for a method that does not refit.                                                                                                                                                                                  |
 
 Source code in `commol/context/inference/conformal.py`
 
@@ -6785,6 +6802,15 @@ class ConformalResult(BaseModel):
         them.
     guarantee : str
         The coverage the method guarantees, and what the guarantee assumes.
+    failed : list[str]
+        Each refit that failed, which gives no score: ``"Origin <index>
+        failed: <reason>"`` for `RollingConformal`, ``"Block <index> failed:
+        <reason>"`` for `JackknifePlus`, ``"Replicate <index> failed:
+        <reason>"`` for `EnbPI`; also logged as a warning. Empty for a method
+        that does not refit.
+    not_converged : int
+        Refits kept although their optimizer did not converge; 0 for a
+        method that does not refit.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
@@ -6792,21 +6818,23 @@ class ConformalResult(BaseModel):
     intervals: PredictionIntervals
     scores: dict[str, list[float]]
     guarantee: str
+    failed: list[str] = Field(description="Each refit that failed.")
+    not_converged: int = Field(description="Refits that did not converge.")
 ```
 
 ## PredictionIntervals
 
 Bases: `BaseModel`
 
-Prediction intervals for observations: where new observations of each series fall, at a level.
+Prediction intervals for observations: where new observations of each series fall, at a confidence level.
 
 Attributes:
 
-| Name        | Type                         | Description                                                                                                                                    |
-| ----------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `level`     | `float`                      | The level of the intervals, 1 − α.                                                                                                             |
-| `series`    | `dict[str, SeriesIntervals]` | The intervals of each series, by label.                                                                                                        |
-| `unbounded` | `dict[str, list[float]]`     | The positions of each series whose interval is unbounded, because its quantile had fewer than 1/α − 1 scores. A series with none is not a key. |
+| Name               | Type                         | Description                                                                                                                                    |
+| ------------------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `confidence_level` | `float`                      | The level of the intervals, 1 − α.                                                                                                             |
+| `series`           | `dict[str, SeriesIntervals]` | The intervals of each series, by label.                                                                                                        |
+| `unbounded`        | `dict[str, list[float]]`     | The positions of each series whose interval is unbounded, because its quantile had fewer than 1/α − 1 scores. A series with none is not a key. |
 
 Source code in `commol/context/inference/conformal.py`
 
@@ -6814,11 +6842,11 @@ Source code in `commol/context/inference/conformal.py`
 class PredictionIntervals(BaseModel):
     """
     Prediction intervals for observations: where new observations of each
-    series fall, at a level.
+    series fall, at a confidence level.
 
     Attributes
     ----------
-    level : float
+    confidence_level : float
         The level of the intervals, ``1 − α``.
     series : dict[str, SeriesIntervals]
         The intervals of each series, by label.
@@ -6830,7 +6858,7 @@ class PredictionIntervals(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
 
-    level: float
+    confidence_level: float
     series: dict[str, SeriesIntervals]
     unbounded: dict[str, list[float]]
 ```
@@ -7175,21 +7203,20 @@ def crps(
 #### pit
 
 ```python
-pit(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise, seed: int) -> Score
+pit(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise) -> Score
 ```
 
 The probability integral transform of each observation.
 
-`F(y)` of the weighted draws, randomized between `F(y⁻)` and `F(y)` where draws tie with `y`, so a discrete predictive gives uniform values too.
+`F(y)` of the weighted draws, randomized between `F(y⁻)` and `F(y)` where draws tie with `y`, so a discrete predictive gives uniform values too. The ties take their random numbers from the seed of the source of the predictive (`Calibrator.seed` or `SensitivityAnalysis.seed`), the seed of the draws, so the same draws give the same values.
 
 Parameters:
 
-| Name           | Type                          | Description                        | Default             |
-| -------------- | ----------------------------- | ---------------------------------- | ------------------- |
-| `predictive`   | `Predictive`                  | The predictive.                    | *required*          |
-| `observations` | `Sequence[ObservedDataPoint]` | The observations to score.         | *required*          |
-| `noise`        | \`NoNoise                     | ResidualNoise                      | DistributionNoise\` |
-| `seed`         | `int`                         | Seed of the randomization of ties. | *required*          |
+| Name           | Type                          | Description                | Default             |
+| -------------- | ----------------------------- | -------------------------- | ------------------- |
+| `predictive`   | `Predictive`                  | The predictive.            | *required*          |
+| `observations` | `Sequence[ObservedDataPoint]` | The observations to score. | *required*          |
+| `noise`        | \`NoNoise                     | ResidualNoise              | DistributionNoise\` |
 
 Returns:
 
@@ -7204,14 +7231,15 @@ def pit(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
     noise: ObservationNoise,
-    seed: int,
 ) -> Score:
     """
     The probability integral transform of each observation.
 
     ``F(y)`` of the weighted draws, randomized between ``F(y⁻)`` and ``F(y)``
     where draws tie with ``y``, so a discrete predictive gives uniform values
-    too.
+    too. The ties take their random numbers from the seed of the source of
+    the predictive (``Calibrator.seed`` or ``SensitivityAnalysis.seed``), the
+    seed of the draws, so the same draws give the same values.
 
     Parameters
     ----------
@@ -7221,8 +7249,6 @@ def pit(
         The observations to score.
     noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
-    seed : int
-        Seed of the randomization of ties.
 
     Returns
     -------
@@ -7230,7 +7256,7 @@ def pit(
         Values in ``[0, 1]``; calibrated predictions give uniform values.
     """
     draws = predictive.at_observations(observations, noise)
-    return _score(draws, draws.rust_draws.pit(draws.observed, seed))
+    return _score(draws, draws.rust_draws.pit(draws.observed))
 ```
 
 #### log_score
@@ -7558,16 +7584,8 @@ def ci_percentiles(confidence_level: float) -> tuple[float, float]:
     ValueError
         If ``confidence_level`` is not strictly between 0 and 1.
     """
-    if not 0.0 < confidence_level < 1.0:
-        raise ValueError(
-            f"confidence_level must be strictly between 0 and 1, got "
-            f"{confidence_level}. Note this is a fraction, not a percentage: "
-            f"use 0.95 for a 95% interval."
-        )
-    return (
-        (1.0 - confidence_level) / 2.0 * 100.0,
-        (1.0 + confidence_level) / 2.0 * 100.0,
-    )
+    lower, upper = commol_rs.inference.interval_levels(confidence_level)
+    return lower * 100.0, upper * 100.0
 ```
 
 ## registry

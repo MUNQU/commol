@@ -2736,6 +2736,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/sensitivity/" class="md-nav__link">
         
   
@@ -3797,7 +3825,7 @@ because what to fit is a modelling choice:</p>
 </tr>
 <tr>
 <td><code>Quantile(q)</code></td>
-<td>The quantile <code>q</code></td>
+<td>The quantile <code>q</code>, a level between 0 and 1</td>
 <td><code>loss_function</code></td>
 </tr>
 <tr>
@@ -3849,6 +3877,10 @@ because what to fit is a modelling choice:</p>
 <td><code>LossConfig::replicate_loss</code> in <code>crates/commol-calibration/src/types.rs</code></td>
 </tr>
 <tr>
+<td>The median and <code>Quantile(q)</code> are the one quantile of commol, the one of <code>weighted_quantiles</code> and <code>SimulationReplicates.quantiles</code> (NumPy's <code>method="hazen"</code>): <code>Quantile(0.25)</code> of the replicates 1, 2, 3, 4, 5 is 1.75</td>
+<td><code>ReplicateSummary::summarize</code>; <code>statistics::quantiles</code> in <code>crates/commol-calibration/src/statistics.rs</code></td>
+</tr>
+<tr>
 <td>A constraint at positions is checked on every replicate</td>
 <td><code>CalibrationProblem::evaluate</code></td>
 </tr>
@@ -3889,8 +3921,8 @@ replicate of each draw.</p>
 <td>Why it stopped</td>
 </tr>
 <tr>
-<td><code>starts</code>, <code>failed_runs</code></td>
-<td>Every start that finished, and why each failed one did. See <a href="../calibration-optimizers/#several-starts">Several starts</a>.</td>
+<td><code>starts</code>, <code>failed</code></td>
+<td>Every start that finished, and each start that failed with its reason. See <a href="../calibration-optimizers/#several-starts">Several starts</a>.</td>
 </tr>
 <tr>
 <td><code>seed</code></td>

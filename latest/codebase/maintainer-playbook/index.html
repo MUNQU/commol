@@ -2569,6 +2569,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/sensitivity/" class="md-nav__link">
         
   
@@ -3650,6 +3678,17 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
 <li>[ ] The configuration, a subclass of <code>UncertaintyMethod[YourResult]</code>, and
       the result, in <code>context/inference/</code>; a result with draws holds a
       <code>ParameterSample</code>.</li>
+<li>[ ] A method that fits several times fits its perturbations with
+      <code>ReplicateRunner::fit_all</code> and checks them with <code>ReplicateFits::require</code>;
+      its result has <code>failed</code> (the entries of <code>FitUnit::failed</code>, logged as
+      warnings) and <code>not_converged</code> at the top
+      (<a href="../decisions/results/#fits-that-fail-have-one-place">Design decisions</a>).</li>
+<li>[ ] Every public function of the method returns <code>MethodError</code>, of the
+      kind <code>Invalid</code> for a setting, an input, the data or the model that does
+      not fit the method, and <code>Failed</code> for a computation that fails; the
+      binding maps it with <code>method_error</code>, and the "Raises" section of its
+      docstring lists <code>ValueError</code> and <code>RuntimeError</code> by that rule
+      (<a href="../decisions/uncertainty/#methods-raise-one-error-type">Design decisions</a>).</li>
 <li>[ ] <code>register(YourMethod, runner)</code> in <code>api/inference/registry.py</code> (import it
       from <code>commol.api.inference</code>).</li>
 <li>[ ] A coverage study (<code>tests/support/coverage.py</code>, marker <code>coverage_study</code>)

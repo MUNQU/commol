@@ -8,6 +8,59 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-23
+
+This release makes equivalent things the same across commol, after an audit of the code, the repository and the documentation at 0.9.0. A setting that means the same thing has one name, every method takes its seed from its source and fits from its starts, equivalent results hold their failed fits in one place, equivalent methods raise one error type, a replicate summary takes the one quantile of commol, and commol adds no log handler. Before you upgrade, read each **Breaking** entry: most code changes only the names of settings and the type of an exception. See [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md) and [Log messages](https://munqu.github.io/commol/latest/getting-started/quickstart/#log-messages).
+
+### Added
+
+- `Laplace`, `Sandwich`, `InformationMatchingEta` and `BootstrapCoverageEta` take `starts`, at least 1 with the default 1: their fit is the best of `starts` starts, `Calibrator.run(starts)`, as in every bootstrap, jackknife, conformal method and profile. Code that does not pass it runs as before. See [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/#laplace-approximation-and-the-delta-method) and [What `η` means](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means).
+
+### Changed
+
+- **Breaking:** every uncertainty and identifiability method takes its random numbers from the seed of its source, `Calibrator.seed` (`problem.seed`) or `SensitivityAnalysis.seed`, and has no seed of its own. Remove `seed=` from `StructuralRank` and from `scores.pit`, and set `problem.seed` (or the seed of the analysis) to choose the random numbers. The PIT randomizes ties from a stream of the seed of its draws, so its values at tied draws change for the same seed. See [Scores](https://munqu.github.io/commol/latest/guide/uncertainty/#scores).
+- `LaplaceMixture.starts` defaults to 1.
+- **Breaking:** every uncertainty, identifiability and sensitivity method raises one exception for one kind of error: `ValueError` when a setting, an input, the data or the model does not fit the method, and `RuntimeError` when a computation that could start fails (an engine run, an optimizer, every replicate, a sampler that stops before its target). An input error of an SMC method, a bootstrap, the jackknife or a profile that raised `RuntimeError`, such as a loss of 0 at the fit or a fit outside the support for `BootstrapCoverageEta`, now raises `ValueError`. Catch `ValueError` for these errors where your code caught `RuntimeError`. See [Design decisions](https://munqu.github.io/commol/latest/codebase/decisions/uncertainty/#methods-raise-one-error-type).
+- **Breaking:** a setting that means the same thing has one name in every method. The level of an interval is `confidence_level`, a count is a plain plural noun, and the rule that combines the replicates of a ratio is `replicate_rule`. An old name raises a `ValidationError` that names it as not permitted. Rename each old name in your code:
+
+| Where                                                                                    | Before                      | Now                                       |
+| ---------------------------------------------------------------------------------------- | --------------------------- | ----------------------------------------- |
+| `SplitConformal`, `RollingConformal`, `JackknifePlus`, `EnbPI`, `AdaptiveConformal`      | `level=`                    | `confidence_level=`                       |
+| `ConformalResult.intervals` (`PredictionIntervals`), and its report block                | `.level`, `"level"`         | `.confidence_level`, `"confidence_level"` |
+| `Threshold`, `Threshold.chi_square`, `Threshold.beale`, `Threshold.bootstrap_calibrated` | `level`                     | `confidence_level`                        |
+| `ProfileSection` (`IdentifiabilityReport.profile`)                                       | `.level`                    | `.confidence_level`                       |
+| `ParticleSwarmConfig`                                                                    | `num_particles=`            | `particles=`                              |
+| `Sobol`                                                                                  | `base_draws=`, `bootstrap=` | `draws=`, `replicates=`                   |
+| `Ratio`                                                                                  | `replicates=`               | `replicate_rule=`                         |
+| `Simulation.replicates`, `ReplicateRuns`                                                 | `n`                         | `count`                                   |
+
+See [A setting has one name and one check](https://munqu.github.io/commol/latest/codebase/decisions/results/#a-setting-has-one-name-and-one-check).
+
+- One check, in Rust, rejects a confidence level that is not strictly between 0 and 1, with one message in every method: `confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95% interval`. Every other setting strictly between 0 and 1 (`target_cess`, `stay_probability`, `min_acceptance`, the `quantile` of `ABCRejection`, `correlation_threshold`) says `<name> is strictly between 0 and 1, got <value>`.
+- **Breaking:** a calibration with `replicate_summary=Quantile(q)` compares the observations with the one quantile of commol, the one of `weighted_quantiles`, `SimulationReplicates.quantiles` and every interval (NumPy's `method="hazen"` with equal weights), instead of NumPy's default `linear` quantile. `Quantile(0.25)` of the replicates 1, 2, 3, 4, 5 is now 1.75, not 2.0. So for `q` other than 0.5 the loss and the fitted values change slightly; `"median"` and `Quantile(0.5)` do not change. Your code does not change; run again a calibration with `Quantile(q)` whose result you stored. See [One confidence-interval convention](https://munqu.github.io/commol/latest/codebase/decisions/results/#one-confidence-interval-convention).
+- **Breaking:** results that hold the same thing hold it in the same place, under the same name. Every result of a method that fits several times lists each fit that failed in `failed`, `"<Start|Replicate|Block|Origin> <index> failed: <reason>"`, logged as a warning, and counts the fits kept although their optimizer did not converge in `not_converged`. Change your code:
+
+| Before                                                                                                     | Now                                                                                                                              |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `CalibrationResult.failed_runs`                                                                            | `CalibrationResult.failed`                                                                                                       |
+| `BootstrapResult.diagnostics.failed`, `.diagnostics.not_converged`                                         | `BootstrapResult.failed`, `.not_converged`                                                                                       |
+| `JackknifeResult.diagnostics.failed`, `.diagnostics.not_converged`                                         | `JackknifeResult.failed`, `.not_converged`; an entry names the block by its index from 0, `"Block 2 failed: …"`, not by its span |
+| `ProfileResult.failed_replicates`                                                                          | `ProfileResult.failed`, and the new `ProfileResult.not_converged`                                                                |
+| The failed refits of `RollingConformal`, `JackknifePlus` and `EnbPI`, only logged as `"Refit i failed: …"` | `ConformalResult.failed` and `ConformalResult.not_converged`                                                                     |
+| The failed replicates of `BootstrapCoverageEta` in `GibbsResult.diagnostics.notes`                         | `GibbsResult.failed`                                                                                                             |
+| `ProfileResult.report()`                                                                                   | `ProfileResult.identifiability()`; its `report()` gives the data                                                                 |
+| `sample.effective_size()`                                                                                  | `sample.effective_size`, a property, as on every other object                                                                    |
+
+When a method has fewer successful fits than it needs, its `RuntimeError` says how many of how many fitted, how many it needs, and the first reasons, and names the unit: `"Only 1 of 5 blocks fitted, and the method needs 2; …"`. It says `"Every origin failed: …"` (or replicate, block) only when none fitted. The jackknife and jackknife+ no longer say that every replicate failed when one fit succeeded. See [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#the-result).
+
+### Removed
+
+- **Breaking:** `commol.add_stderr_logger` is removed: commol configures no logging, and adds only a `NullHandler` to the logger `commol`. Call `logging.basicConfig(level=logging.INFO)` instead, or add a handler of your own to `logging.getLogger("commol")`. See [Log messages](https://munqu.github.io/commol/latest/getting-started/quickstart/#log-messages).
+
+### Fixed
+
+- `IdentifiabilityReport.report()` gives the `profile` section, the evidence of each profile likelihood; before, the report data had no such section.
+
 ## [0.9.0] - 2026-10-22
 
 This release gives control over the work of a calibration and over what a result records. `commol.threads(n, levels)` sets how many threads the parallel methods use and which levels run in parallel, a particle swarm can stop when it has converged, a polynomial chaos takes a truncated basis for many inputs, and `Ratio` gives a sensitivity analysis the ratio of two quantities. A calibration result records its seed, and `commol.build_info()` names the version and the commit of the package. Before you upgrade, read the **Breaking** entry: `CalibrationResult` requires `seed`. See [Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md) and [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md).
@@ -538,6 +591,7 @@ ______________________________________________________________________
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.10.0** - One way for equivalent things: setting names, seeds and starts, result shapes, error types, the quantile and logging
 - **0.9.0** - Control over the work and the record: threads and levels, swarm stop rules, truncated chaos bases, ratios, seeds and build info
 - **0.8.0** - Comparing runs: scenarios, quantities of a series, figures as methods and runs on the same panels
 - **0.7.0** - Reading a run through objects: the window grid and dates on the axis, series by output name and reports as methods

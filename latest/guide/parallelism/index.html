@@ -2695,6 +2695,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/sensitivity/" class="md-nav__link">
         
   
@@ -3405,7 +3433,7 @@ same result whatever you choose.</p>
 <td>The runs of the finite differences, the points</td>
 </tr>
 <tr>
-<td><code>Simulation.replicates(n)</code></td>
+<td><code>Simulation.replicates(count)</code></td>
 <td>The replicates of a stochastic engine</td>
 </tr>
 </tbody>
@@ -3449,7 +3477,7 @@ the machine:</p>
 </span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
 </span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>    <span class="p">],</span>
 </span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>    <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span>
-</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">ParticleSwarmConfig</span><span class="p">(</span><span class="n">num_particles</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">30</span><span class="p">),</span>
+</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">ParticleSwarmConfig</span><span class="p">(</span><span class="n">particles</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">30</span><span class="p">),</span>
 </span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
 </span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a><span class="p">)</span>
 </span><span id="__span-1-35"><a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a><span class="n">calibrator</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="kc">None</span><span class="p">)),</span> <span class="n">problem</span><span class="p">)</span>

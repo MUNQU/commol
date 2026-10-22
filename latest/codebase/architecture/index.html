@@ -2671,6 +2671,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/sensitivity/" class="md-nav__link">
         
   
@@ -3372,12 +3400,12 @@ top to bottom. The dashed box is the base that every box uses.</p>
 <tr>
 <td>Calibration</td>
 <td><code>commol-calibration</code></td>
-<td>The calibration problem in layers (forward model, observation operator, feasibility, discrepancy: a loss or the likelihood of observation models, optimization objective), and the optimizers that find the values that make an engine match observations, from one or several starts, or with one parameter or prediction held fixed (<code>Subproblem</code>).</td>
+<td>The calibration problem in layers (forward model, observation operator, feasibility, discrepancy: a loss or the likelihood of observation models, optimization objective), and the optimizers that find the values that make an engine match observations, from one or several starts, or with one parameter or prediction held fixed (<code>Subproblem</code>); the one quantile of commol (<code>statistics</code>), which the summary of the replicates and every method of inference take.</td>
 </tr>
 <tr>
 <td>Inference</td>
 <td><code>commol-inference</code></td>
-<td>What every uncertainty method returns or reads: the weighted parameter sample, the one quantile, the predictive of a sample, its observation noise and its scores; the resampling methods, which fit copies of the problem with other data (<code>CalibrationProblem::with_data</code>); the conformal prediction intervals; the port of sensitivities and the identifiability analyses; the distributions and priors, and the sequential Monte Carlo sampler with its targets (Gibbs posterior, ABC, the posterior of observation models); the noise, the parametric bootstrap and the log score of observation models; the input spaces, designs, quantities of interest and estimators of global sensitivity, which run on a forward model with no observations; the profile likelihood of parameters and predictions and its thresholds. It depends on calibration, never the reverse.</td>
+<td>What every uncertainty method returns or reads: the weighted parameter sample, the predictive of a sample, its observation noise and its scores; the resampling methods, which fit copies of the problem with other data (<code>CalibrationProblem::with_data</code>); the conformal prediction intervals; the port of sensitivities and the identifiability analyses; the distributions and priors, and the sequential Monte Carlo sampler with its targets (Gibbs posterior, ABC, the posterior of observation models); the noise, the parametric bootstrap and the log score of observation models; the input spaces, designs, quantities of interest and estimators of global sensitivity, which run on a forward model with no observations; the profile likelihood of parameters and predictions and its thresholds. It depends on calibration, never the reverse.</td>
 </tr>
 </tbody>
 </table>
