@@ -6305,7 +6305,7 @@ that one problem.</p>
 </span><span id="__span-0-641"><a id="__codelineno-0-641" name="__codelineno-0-641"></a>        <span class="n">improvement</span> <span class="o">=</span> <span class="n">opt_config</span><span class="o">.</span><span class="n">improvement_stop_config</span>
 </span><span id="__span-0-642"><a id="__codelineno-0-642" name="__codelineno-0-642"></a>        <span class="n">radius</span> <span class="o">=</span> <span class="n">opt_config</span><span class="o">.</span><span class="n">radius_stop_config</span>
 </span><span id="__span-0-643"><a id="__codelineno-0-643" name="__codelineno-0-643"></a>        <span class="n">ps_config</span> <span class="o">=</span> <span class="n">rust_calibration</span><span class="o">.</span><span class="n">ParticleSwarmConfig</span><span class="p">(</span>
-</span><span id="__span-0-644"><a id="__codelineno-0-644" name="__codelineno-0-644"></a>            <span class="n">num_particles</span><span class="o">=</span><span class="n">opt_config</span><span class="o">.</span><span class="n">num_particles</span><span class="p">,</span>
+</span><span id="__span-0-644"><a id="__codelineno-0-644" name="__codelineno-0-644"></a>            <span class="n">particles</span><span class="o">=</span><span class="n">opt_config</span><span class="o">.</span><span class="n">particles</span><span class="p">,</span>
 </span><span id="__span-0-645"><a id="__codelineno-0-645" name="__codelineno-0-645"></a>            <span class="n">max_iterations</span><span class="o">=</span><span class="n">opt_config</span><span class="o">.</span><span class="n">max_iterations</span><span class="p">,</span>
 </span><span id="__span-0-646"><a id="__codelineno-0-646" name="__codelineno-0-646"></a>            <span class="n">verbose</span><span class="o">=</span><span class="n">opt_config</span><span class="o">.</span><span class="n">verbose</span><span class="p">,</span>
 </span><span id="__span-0-647"><a id="__codelineno-0-647" name="__codelineno-0-647"></a>            <span class="n">inertia</span><span class="o">=</span><span class="n">rust_inertia</span><span class="p">,</span>
@@ -11977,7 +11977,7 @@ every point it tries is inside the bounds.</p>
       </thead>
       <tbody>
           <tr class="doc-section-item">
-            <td><code><span title="commol.context.calibration.ParticleSwarmConfig.num_particles">num_particles</span></code></td>
+            <td><code><span title="commol.context.calibration.ParticleSwarmConfig.particles">particles</span></code></td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
@@ -12452,7 +12452,7 @@ every point it tries is inside the bounds.</p>
 </span><span id="__span-0-683"><a id="__codelineno-0-683" name="__codelineno-0-683"></a>
 </span><span id="__span-0-684"><a id="__codelineno-0-684" name="__codelineno-0-684"></a><span class="sd">    Attributes</span>
 </span><span id="__span-0-685"><a id="__codelineno-0-685" name="__codelineno-0-685"></a><span class="sd">    ----------</span>
-</span><span id="__span-0-686"><a id="__codelineno-0-686" name="__codelineno-0-686"></a><span class="sd">    num_particles : int</span>
+</span><span id="__span-0-686"><a id="__codelineno-0-686" name="__codelineno-0-686"></a><span class="sd">    particles : int</span>
 </span><span id="__span-0-687"><a id="__codelineno-0-687" name="__codelineno-0-687"></a><span class="sd">        Number of particles in the swarm (default: 20)</span>
 </span><span id="__span-0-688"><a id="__codelineno-0-688" name="__codelineno-0-688"></a><span class="sd">    max_iterations : int</span>
 </span><span id="__span-0-689"><a id="__codelineno-0-689" name="__codelineno-0-689"></a><span class="sd">        Maximum number of iterations (default: 1000)</span>
@@ -12480,7 +12480,7 @@ every point it tries is inside the bounds.</p>
 </span><span id="__span-0-711"><a id="__codelineno-0-711" name="__codelineno-0-711"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">&quot;forbid&quot;</span><span class="p">)</span>
 </span><span id="__span-0-712"><a id="__codelineno-0-712" name="__codelineno-0-712"></a>
 </span><span id="__span-0-713"><a id="__codelineno-0-713" name="__codelineno-0-713"></a>    <span class="c1"># Core parameters</span>
-</span><span id="__span-0-714"><a id="__codelineno-0-714" name="__codelineno-0-714"></a>    <span class="n">num_particles</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+</span><span id="__span-0-714"><a id="__codelineno-0-714" name="__codelineno-0-714"></a>    <span class="n">particles</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
 </span><span id="__span-0-715"><a id="__codelineno-0-715" name="__codelineno-0-715"></a>        <span class="n">default</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Number of particles in the swarm&quot;</span>
 </span><span id="__span-0-716"><a id="__codelineno-0-716" name="__codelineno-0-716"></a>    <span class="p">)</span>
 </span><span id="__span-0-717"><a id="__codelineno-0-717" name="__codelineno-0-717"></a>    <span class="n">max_iterations</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>

@@ -300,7 +300,7 @@ problem = CalibrationProblem(
         ),
     ],
     loss_function="sse",
-    optimization_config=ParticleSwarmConfig(num_particles=30, max_iterations=300),
+    optimization_config=ParticleSwarmConfig(particles=30, max_iterations=300),
     seed=42,
 )
 
@@ -2489,7 +2489,7 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | `Simulation(model)`                              | —                      | Builds the engine for the model. A model with uncalibrated parameters can be built, but not run.                                                                                                                                                                                                                                                                                                                                 |
 | `run(num_steps, *, seed=None)`                   | `SimulationResults`    | Runs from the initial state, with the model as it is now, and reports at the positions `0, 1, …, num_steps`. Raises `ValueError` if a parameter is still `None`, `InfeasibleStateError` if a difference step leaves an amount below zero ([Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)), and `RuntimeError` that names the flow and the position if a rate is not a number. |
 | `run_at(at, *, seed=None)`                       | `SimulationResults`    | Runs from the initial state and reports at the given sorted positions only. The engine decides which positions its model type accepts: a `DifferentialEquations` model any non-negative position, such as `0.5`; a `DifferenceEquations` model only integer steps. Otherwise `ValueError`, with the engine's message. See [Differential equations](#differential-equations).                                                     |
-| `replicates(n, *, seed=None)`                    | `ReplicateRuns`        | For a stochastic engine: an object whose `run` and `run_at` return `SimulationReplicates`, `n` runs with one seed each. See [Randomness, seeds and replicates](#randomness-seeds-and-replicates).                                                                                                                                                                                                                                |
+| `replicates(count, *, seed=None)`                | `ReplicateRuns`        | For a stochastic engine: an object whose `run` and `run_at` return `SimulationReplicates`, `count` runs with one seed each. See [Randomness, seeds and replicates](#randomness-seeds-and-replicates).                                                                                                                                                                                                                            |
 | `is_stochastic`                                  | `bool`                 | Whether the engine draws random numbers.                                                                                                                                                                                                                                                                                                                                                                                         |
 | `simulation_outputs`                             | `list[str]`            | The output names, in engine order: compartments first, then accumulators.                                                                                                                                                                                                                                                                                                                                                        |
 | `outputs_for(id)`                                | `list[str]`            | The outputs of one bin or accumulator.                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -2552,7 +2552,7 @@ A stochastic engine draws random numbers, so its runs depend on a seed; a determ
 | -------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `run(n, seed=s)`, `run_at(at, seed=s)` | Ignores the seed; `results.seed` is `None`                                | One run from seed `s`; `results.seed` is `s`                                                      |
 | `run(n)` without a seed                | `results.seed` is `None`                                                  | Draws a seed from the operating system and keeps it in `results.seed`, so the run can be repeated |
-| `replicates(n, seed=s).run(…)`         | Raises `ValueError` that names the engine: every replicate would be equal | `n` runs, in parallel in the engine, each with its own seed                                       |
+| `replicates(count, seed=s).run(…)`     | Raises `ValueError` that names the engine: every replicate would be equal | `count` runs, in parallel in the engine, each with its own seed                                   |
 
 ```python
 print(simulation.is_stochastic)                # False: a difference engine
@@ -3134,7 +3134,7 @@ Initial conditions that calibration sets go through the same rounding. With no r
 
 ## Seeds and replicates
 
-A run is reproducible from its model and its seed: `simulation.run(…, seed=s)` gives one run, and `simulation.replicates(n, seed=s).run(…)` gives `n` runs with one seed each, in parallel. A run does not depend on the positions it reports at: the output at a position is the state after the last event before it. See [Randomness, seeds and replicates](https://munqu.github.io/commol/latest/guide/simulations/#randomness-seeds-and-replicates) for the seeds, `SimulationReplicates` and its statistics, plots of the mean and a band, and reports. A `Predictive` or a `Propagation` of a sample gives draw `j` a seed of its own, `draw_seeds[j]`, and runs its replicates as `simulation.replicates(n, seed=draw_seeds[j])` runs them, so those replicates of the model at the values of the draw repeat its runs.
+A run is reproducible from its model and its seed: `simulation.run(…, seed=s)` gives one run, and `simulation.replicates(count, seed=s).run(…)` gives `count` runs with one seed each, in parallel. A run does not depend on the positions it reports at: the output at a position is the state after the last event before it. See [Randomness, seeds and replicates](https://munqu.github.io/commol/latest/guide/simulations/#randomness-seeds-and-replicates) for the seeds, `SimulationReplicates` and its statistics, plots of the mean and a band, and reports. A `Predictive` or a `Propagation` of a sample gives draw `j` a seed of its own, `draw_seeds[j]`, and runs its replicates as `simulation.replicates(count, seed=draw_seeds[j])` runs them, so those replicates of the model at the values of the draw repeat its runs.
 
 ```python
 again = simulation.run(num_steps=100, seed=1)
@@ -3951,7 +3951,7 @@ def calibrate(optimization_config) -> dict[str, float]:
     return {name: round(value, 2) for name, value in sorted(result.best_parameters.items())}
 
 print(calibrate(NelderMeadConfig(max_iterations=2000)))                    # {'k1': 0.4, 'k2': 0.1}
-print(calibrate(ParticleSwarmConfig(num_particles=30, max_iterations=300)))  # {'k1': 0.4, 'k2': 0.1}
+print(calibrate(ParticleSwarmConfig(particles=30, max_iterations=300)))  # {'k1': 0.4, 'k2': 0.1}
 ```
 
 ## Nelder-Mead
@@ -3997,7 +3997,7 @@ The search starts at `initial_guess`, or at the midpoint of the bounds; a start 
 
 ```python
 swarm = (
-    ParticleSwarmConfig(num_particles=40, max_iterations=300, initialization="latin_hypercube")
+    ParticleSwarmConfig(particles=40, max_iterations=300, initialization="latin_hypercube")
     .inertia("chaotic", w_min=0.4, w_max=0.9)
     .acceleration("time_varying", c1_initial=2.5, c1_final=0.5, c2_initial=0.5, c2_final=2.5)
     .velocity(clamp_factor=0.2, mutation_threshold=0.005)
@@ -4008,7 +4008,7 @@ print(calibrate(swarm))  # {'k1': 0.4, 'k2': 0.1}
 
 | Field            | Default     | Meaning                                                                                                                              |
 | ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `num_particles`  | `20`        | The swarm size. More particles search more widely and cost more evaluations.                                                         |
+| `particles`      | `20`        | The swarm size. More particles search more widely and cost more evaluations.                                                         |
 | `max_iterations` | `1000`      | The iteration limit.                                                                                                                 |
 | `initialization` | `"uniform"` | Where particles start: `"uniform"`, `"latin_hypercube"` (spread evenly) or `"opposition_based"` (each random point with its mirror). |
 | `verbose`        | `False`     | Writes progress to `sys.stdout`; needs `run(starts=1)`.                                                                              |
@@ -4036,7 +4036,7 @@ A swarm stops at `max_iterations` unless a stop rule holds first. The two rules 
 | `.radius_stop(tol)`                                 | Every particle is within `tol` of the best position, as a fraction of the size of the search box (the length of its diagonal) (Zielinski and Laur, 2007) | `tol` ≥ 0 |
 
 ```python
-stopping = ParticleSwarmConfig(num_particles=30, max_iterations=2000).improvement_stop(
+stopping = ParticleSwarmConfig(particles=30, max_iterations=2000).improvement_stop(
     window=30, tol_abs=1e-12, tol_rel=1e-9
 )
 problem = CalibrationProblem(
@@ -4171,7 +4171,7 @@ def calibrate(constraints: list[CalibrationConstraint]) -> dict[str, float]:
         ],
         constraints=constraints,
         loss_function="sse",
-        optimization_config=ParticleSwarmConfig(num_particles=30, max_iterations=300),
+        optimization_config=ParticleSwarmConfig(particles=30, max_iterations=300),
         seed=3,
     )
     result = Calibrator(Simulation(model(None, None)), problem).run()
@@ -4426,7 +4426,7 @@ print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75
 
 ## The predictive
 
-`Predictive(source, sample, positions)` runs every draw at `positions`, in parallel in Rust, through the forward model of its source: a `Calibrator`, or a `SensitivityAnalysis` of the inputs of the sample. With a stochastic engine every replicate of a draw is a draw of the predictive, with an equal share of its weight. The runs follow one tree of seeds: draw `j` takes the seed `draw_seeds[j]`, derived from the seed of the source, and its replicate `i` takes the seed that replicate `i` of `Simulation.replicates(n, seed=draw_seeds[j])` takes. So every draw shows fresh noise, the predictive repeats from the seed of the source, and the runs of a draw change neither with the number of replicates nor with the number of draws. The positions are sorted and unique, and each one is a position the engine reports at; otherwise `Predictive` raises `ValueError` before any draw runs. A draw whose run leaves the values its model allows raises `InfeasibleStateError` with the index of its parameter set and the message of the run: the compartment, the step and the flows, as `Simulation.run` reports them ([Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)). A draw whose initial amounts leave the remainder below zero raises `InfeasibleStateError` with the index of its parameter set and the message a calibration gives for the same values: the remainder and the excess ([Calibrating initial conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md)).
+`Predictive(source, sample, positions)` runs every draw at `positions`, in parallel in Rust, through the forward model of its source: a `Calibrator`, or a `SensitivityAnalysis` of the inputs of the sample. With a stochastic engine every replicate of a draw is a draw of the predictive, with an equal share of its weight. The runs follow one tree of seeds: draw `j` takes the seed `draw_seeds[j]`, derived from the seed of the source, and its replicate `i` takes the seed that replicate `i` of `Simulation.replicates(count, seed=draw_seeds[j])` takes. So every draw shows fresh noise, the predictive repeats from the seed of the source, and the runs of a draw change neither with the number of replicates nor with the number of draws. The positions are sorted and unique, and each one is a position the engine reports at; otherwise `Predictive` raises `ValueError` before any draw runs. A draw whose run leaves the values its model allows raises `InfeasibleStateError` with the index of its parameter set and the message of the run: the compartment, the step and the flows, as `Simulation.run` reports them ([Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)). A draw whose initial amounts leave the remainder below zero raises `InfeasibleStateError` with the index of its parameter set and the message a calibration gives for the same values: the remainder and the excess ([Calibrating initial conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md)).
 
 | Member                                                                                    | Returns                                                                                                                                                                                                                                                                       |
 | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -4435,7 +4435,7 @@ print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75
 | `at_observations(observed_data, noise)`                                                   | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with `noise` drawn from the calibrator's seed: `NoNoise()`, `ResidualNoise(...)` or `DistributionNoise()` (`ObservationDraws`)                       |
 | `runs()`, `weights`                                                                       | The trajectory and weight of every draw                                                                                                                                                                                                                                       |
 | `quantities(quantities)`                                                                  | The quantities of interest of every draw, one dict per draw, as `SimulationResults.quantities` reads one run                                                                                                                                                                  |
-| `draw_seeds`                                                                              | The seed of each draw of the sample: `Simulation.replicates(n, seed=draw_seeds[j])` of the model at the values of draw `j` gives its runs                                                                                                                                     |
+| `draw_seeds`                                                                              | The seed of each draw of the sample: `Simulation.replicates(count, seed=draw_seeds[j])` of the model at the values of draw `j` gives its runs                                                                                                                                 |
 | `report(confidence_level, positions, window, windows, observed_data=(), accumulators=())` | The report of a run, with each number reduced across the draws with their weights ([Reports](https://munqu.github.io/commol/latest/guide/reports/#the-report-of-an-ensemble))                                                                                                 |
 | `plot.series(…)`, `plot.cumulative(…)`, `plot.observations(…)`                            | The weighted median of the draws of each series and their band, those of its running total, or those of each observed series, read through `at_observations(…, NoNoise())` ([Plotting](https://munqu.github.io/commol/latest/guide/simulations/#a-panel-per-observed-series)) |
 
@@ -5481,7 +5481,7 @@ result = calibrator.uncertainty(
         calibration_data=held_out,
         score="absolute",
         by="series",
-        level=0.9,
+        confidence_level=0.9,
         positions=[85.0, 90.0],
     )
 )
@@ -5509,7 +5509,7 @@ The quantile of `n` scores at level `1 − α` is the `⌈(n + 1)(1 − α)⌉`-
 
 ## Scores and pooling
 
-Every variant takes a `score`, a `by` and a `level`, none with a default: they change the width of the intervals, which is a modelling choice.
+Every variant takes a `score`, a `by` and a `confidence_level`, none with a default: they change the width of the intervals, which is a modelling choice.
 
 | `score`        | Score of `y` against `ŷ` | Interval | Use it when                                                                              |
 | -------------- | ------------------------ | -------- | ---------------------------------------------------------------------------------------- |
@@ -5536,7 +5536,7 @@ spread = calibrator.uncertainty(
         calibration_data=held_out,
         score="spread",
         by="series",
-        level=0.9,
+        confidence_level=0.9,
         positions=[85.0, 90.0],
         sample=sample,
     )
@@ -5569,11 +5569,11 @@ print(widths)  # [6.3, 5.2]
 
 ## Split conformal
 
-`SplitConformal(calibration_data, score, by, level, positions, sample=None, starts=1)` fits the problem's observations (`Calibrator.run(starts)`), or reads a `sample`, scores `calibration_data` and gives intervals at `positions` for each series of `calibration_data`. A series of `calibration_data` is read as its observations define it: its outputs, factor and window.
+`SplitConformal(calibration_data, score, by, confidence_level, positions, sample=None, starts=1)` fits the problem's observations (`Calibrator.run(starts)`), or reads a `sample`, scores `calibration_data` and gives intervals at `positions` for each series of `calibration_data`. A series of `calibration_data` is read as its observations define it: its outputs, factor and window.
 
 ## Rolling origins
 
-`RollingConformal(origins, score, by, level, positions, starts=1)` gives intervals ahead of the data, with one quantile per horizon. Horizon `k` is the `k`-th observation of a series after an origin: a count, not a distance on the axis, because positions can be irregular. Each origin fits the observations at or before it (one refit per origin, from the fit of every observation) and scores the later ones. The intervals are around the fit of every observation, at `positions`, which must all be after the data; the `k`-th position is horizon `k`, so give positions spaced as the observations. A horizon with fewer than `1/α − 1` origins that reach it has an unbounded interval.
+`RollingConformal(origins, score, by, confidence_level, positions, starts=1)` gives intervals ahead of the data, with one quantile per horizon. Horizon `k` is the `k`-th observation of a series after an origin: a count, not a distance on the axis, because positions can be irregular. Each origin fits the observations at or before it (one refit per origin, from the fit of every observation) and scores the later ones. The intervals are around the fit of every observation, at `positions`, which must all be after the data; the `k`-th position is horizon `k`, so give positions spaced as the observations. A horizon with fewer than `1/α − 1` origins that reach it has an unbounded interval.
 
 ```python
 from commol import RollingConformal
@@ -5591,7 +5591,7 @@ rolling = calibrator_all.uncertainty(
         origins=[float(step) for step in range(30, 71)],
         score="absolute",
         by="series",
-        level=0.8,
+        confidence_level=0.8,
         positions=[81.0, 82.0, 83.0],
     )
 )
@@ -5600,7 +5600,7 @@ print(rolling.intervals.unbounded)  # {}
 
 ## Jackknife+
 
-`JackknifePlus(block_length, score, by, level, positions, starts=1)` refits once per block left out (Barber et al. 2021). Observation `i` of block `b` has the residual `Rᵢ` of the fit `μ̂₋ᵦ` that left its block out, and the interval at a point `x` is
+`JackknifePlus(block_length, score, by, confidence_level, positions, starts=1)` refits once per block left out (Barber et al. 2021). Observation `i` of block `b` has the residual `Rᵢ` of the fit `μ̂₋ᵦ` that left its block out, and the interval at a point `x` is
 
 ```text
 [ q⁻_α { μ̂₋ᵦ₍ᵢ₎(x) − Rᵢ } ,  q⁺_{1−α} { μ̂₋ᵦ₍ᵢ₎(x) + Rᵢ } ]
@@ -5618,18 +5618,18 @@ With one observation per block, `K = n` and the bound is `1 − 2α`. With longe
 from commol import JackknifePlus
 
 jackknife = calibrator.uncertainty(
-    JackknifePlus(block_length=4, score="absolute", by="series", level=0.9, positions=[45.0])
+    JackknifePlus(block_length=4, score="absolute", by="series", confidence_level=0.9, positions=[45.0])
 )
 print(jackknife.guarantee)  # ... at least 0.7318 ... with K = 10 blocks of 4 positions ...
 ```
 
 ## EnbPI
 
-`EnbPI(replicates, block_length, score, by, level, positions, starts=1)` draws its own replicates (Xu and Xie 2021): each draws as many blocks as there are, with replacement, and fits with each observation's weight multiplied by the count of its block, so the blocks it did not draw get weight 0. The leave-one-out prediction of an observation is the mean of the replicates that left its block out; the point prediction at a position is the mean of the leave-one-out predictions there. No fit beyond the replicates is needed. A block left out by no replicate raises a `ValueError` that asks for more replicates: a block is left out by a replicate with probability about `1/e ≈ 0.37`.
+`EnbPI(replicates, block_length, score, by, confidence_level, positions, starts=1)` draws its own replicates (Xu and Xie 2021): each draws as many blocks as there are, with replacement, and fits with each observation's weight multiplied by the count of its block, so the blocks it did not draw get weight 0. The leave-one-out prediction of an observation is the mean of the replicates that left its block out; the point prediction at a position is the mean of the leave-one-out predictions there. No fit beyond the replicates is needed. A block left out by no replicate raises a `ValueError` that asks for more replicates: a block is left out by a replicate with probability about `1/e ≈ 0.37`.
 
 ## Adaptive conformal inference
 
-`AdaptiveConformal(level, step, score, by, stream, sample=None, starts=1)` walks the observations of `stream` in order of position (Gibbs and Candès 2021). The interval of each point is the quantile, at the working level `1 − α_t`, of the scores of the earlier points of the stream; then the point is scored and the working level moves:
+`AdaptiveConformal(confidence_level, step, score, by, stream, sample=None, starts=1)` walks the observations of `stream` in order of position (Gibbs and Candès 2021). The interval of each point is the quantile, at the working level `1 − α_t`, of the scores of the earlier points of the stream; then the point is scored and the working level moves:
 
 ```text
 α_{t+1} = α_t + γ (α − err_t),   err_t = 1 for a miss, 0 for a cover
@@ -5641,7 +5641,7 @@ So a miss widens the next interval and a cover narrows it. The long-run share of
 from commol import AdaptiveConformal
 
 adaptive = calibrator.uncertainty(
-    AdaptiveConformal(level=0.9, step=0.05, score="absolute", by="series", stream=held_out)
+    AdaptiveConformal(confidence_level=0.9, step=0.05, score="absolute", by="series", stream=held_out)
 )
 series = adaptive.intervals.series["B"]
 misses = [
@@ -5654,7 +5654,7 @@ print(round(sum(misses) / len(misses), 3))  # 0.125
 
 ## Results, plots and reports
 
-Every variant returns a `ConformalResult(intervals, scores, guarantee)`. `intervals` is a `PredictionIntervals`: its `level`, a `SeriesIntervals` per series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`. `plot.series(prediction_intervals=...)` of a run, of replicates or of a predictive draws the band of each series on its panel, and `SimulationResults.report(..., prediction_intervals=...)` adds it under the key `prediction_intervals`.
+Every variant returns a `ConformalResult(intervals, scores, guarantee)`. `intervals` is a `PredictionIntervals`: its `confidence_level`, a `SeriesIntervals` per series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`. `plot.series(prediction_intervals=...)` of a run, of replicates or of a predictive draws the band of each series on its panel, and `SimulationResults.report(..., prediction_intervals=...)` adds it under the key `prediction_intervals`.
 
 ```python
 run = Simulation(ab_model(0.05)).run(num_steps=90)
@@ -5768,14 +5768,14 @@ A quantity reads a series of each run and reduces it to a scalar, in Rust, throu
 | A name, a list of names, or `Level(outputs)` | The sum of the outputs, their level                                                                    |
 | `Increments(outputs, window)`                | The gain of the sum over `(end - window, end]`: the position is the end of a window, at least `window` |
 
-| Quantity                                    | Value                                                                                                                                |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `ValueAt(series, at)`                       | The value at `at`                                                                                                                    |
-| `Peak(series, positions)`                   | The largest value at the positions                                                                                                   |
-| `PeakPosition(series, positions)`           | The first of the positions where the value is largest                                                                                |
-| `Trajectory(series, positions)`             | The value at each position, one scalar per position, for an analysis over the axis                                                   |
-| `Gain(outputs, start, end)`                 | The value at `end` minus the value at `start`: what entered a cumulative output over `(start, end]`, as an observation with a window |
-| `Ratio(numerator, denominator, replicates)` | One quantity of one value over another, in each run ([A ratio of two quantities](#a-ratio-of-two-quantities))                        |
+| Quantity                                        | Value                                                                                                                                |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `ValueAt(series, at)`                           | The value at `at`                                                                                                                    |
+| `Peak(series, positions)`                       | The largest value at the positions                                                                                                   |
+| `PeakPosition(series, positions)`               | The first of the positions where the value is largest                                                                                |
+| `Trajectory(series, positions)`                 | The value at each position, one scalar per position, for an analysis over the axis                                                   |
+| `Gain(outputs, start, end)`                     | The value at `end` minus the value at `start`: what entered a cumulative output over `(start, end]`, as an observation with a window |
+| `Ratio(numerator, denominator, replicate_rule)` | One quantity of one value over another, in each run ([A ratio of two quantities](#a-ratio-of-two-quantities))                        |
 
 The series is a modelling choice. The peak of a level is the largest amount; for an output that only grows, such as `C` here or an accumulator, it is the value at the last position. The peak of `Increments` is the largest gain over one window, and `PeakPosition` gives the end of that window:
 
@@ -5799,13 +5799,13 @@ for summary in gains.summary(0.9):
 
 Every quantity follows the same rules:
 
-| Rule                                                                       | So                                                                                                                     |
-| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| A quantity reads only the positions it names, with no interpolation        | A position the engine does not report at is a `ValueError`                                                             |
-| Outputs are summed at each row before any reduction                        | The peak of `["A", "B"]` is the peak of `A + B`                                                                        |
-| `PeakPosition` gives the first of the positions where the value is largest | A tie gives the earlier position                                                                                       |
-| A NaN in a value a quantity reads makes it NaN                             | Its peak and the position of its peak are NaN too                                                                      |
-| With a stochastic engine, a quantity is computed for each replicate        | A design point holds the mean of its replicates, or for a `Ratio` what its `replicates` says; a propagation keeps each |
+| Rule                                                                       | So                                                                                                                         |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| A quantity reads only the positions it names, with no interpolation        | A position the engine does not report at is a `ValueError`                                                                 |
+| Outputs are summed at each row before any reduction                        | The peak of `["A", "B"]` is the peak of `A + B`                                                                            |
+| `PeakPosition` gives the first of the positions where the value is largest | A tie gives the earlier position                                                                                           |
+| A NaN in a value a quantity reads makes it NaN                             | Its peak and the position of its peak are NaN too                                                                          |
+| With a stochastic engine, a quantity is computed for each replicate        | A design point holds the mean of its replicates, or for a `Ratio` what its `replicate_rule` says; a propagation keeps each |
 
 Each quantity has a `label`, by default what it reads, such as `"B at 10"`. The default label writes each position in full, as Python reads it back, so two positions give two labels: `"B at 1000000"` and `"B at 1000001"`.
 
@@ -5826,7 +5826,7 @@ print(round(late.summary(0.9)[0].median))  # 216
 
 ### A ratio of two quantities
 
-`Ratio(numerator, denominator, replicates)` divides two quantities of one value each (`ValueAt`, `Gain`, `Peak`), numerator N over denominator D, in each run. It is one quantity, so every method reads it, the sensitivity methods too. A `PeakPosition` or a `Trajectory` as an operand is a `ValueError`. The share of what entered `C` by position 100 that entered by position 50 has a denominator that depends on both inputs:
+`Ratio(numerator, denominator, replicate_rule)` divides two quantities of one value each (`ValueAt`, `Gain`, `Peak`), numerator N over denominator D, in each run. It is one quantity, so every method reads it, the sensitivity methods too. A `PeakPosition` or a `Trajectory` as an operand is a `ValueError`. The share of what entered `C` by position 100 that entered by position 50 has a denominator that depends on both inputs:
 
 ```python
 from commol import Gain, Ratio
@@ -5834,7 +5834,7 @@ from commol import Gain, Ratio
 early = Ratio(
     numerator=Gain(outputs="C", start=0, end=50),
     denominator=Gain(outputs="C", start=0, end=100),
-    replicates="within",
+    replicate_rule="within",
     label="early share",
 )
 spread = analysis.run(Propagation(draws=100, quantities=[early]))
@@ -5845,9 +5845,9 @@ ranked = analysis.run(PRCC(draws=200, quantities=[early]))
 print(ranked.inputs, [round(c, 2) for c in ranked.coefficients[0]])  # ['k1', 'k2'] [0.92, 0.69]
 ```
 
-The default label is `"(N) / (D)"`, from the labels of the two quantities. `replicates` is required, with no default: with a stochastic engine, it says how the replicates of a point of PRCC, Morris, Sobol or a polynomial chaos combine (`Quantities::combine` in `crates/commol-inference/src/quantity.rs`). They are three estimands, and the choice is yours:
+The default label is `"(N) / (D)"`, from the labels of the two quantities. `replicate_rule` is required, with no default: with a stochastic engine, it says how the replicates of a point of PRCC, Morris, Sobol or a polynomial chaos combine (`Quantities::combine` in `crates/commol-inference/src/quantity.rs`). They are three estimands, and the choice is yours:
 
-| `replicates`        | Value of a point                                           | No value when         |
+| `replicate_rule`    | Value of a point                                           | No value when         |
 | ------------------- | ---------------------------------------------------------- | --------------------- |
 | `"within"`          | The mean of the ratio of each replicate, E[N/D]            | A replicate has D = 0 |
 | `"within_positive"` | The mean of the ratio of the replicates with D > 0, E\[N/D | D > 0\]               |
@@ -5884,12 +5884,12 @@ for label, value in one_run.quantities(quantities).items():
 # peak of C 946
 ```
 
-| Case                                               | Result                                                                                                                                                                                                                                                                       |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The run lacks a position a quantity reads          | `ValueError` that lists each such position with its quantity, and says to call `Simulation.run_at`                                                                                                                                                                           |
-| A quantity names an output the results do not have | `ValueError` that names the output                                                                                                                                                                                                                                           |
-| `run(n)` of the ODE engine                         | It interpolates the positions that are not breakpoints, so a value differs from that of a run that ends there by about the relative tolerance of the solver, and `PeakPosition` can change on a near-tie                                                                     |
-| The replicates of a stochastic engine              | Each replicate is reduced on its own. A `Propagation` gives draw `j` the seed `draw_seeds[j]`, so `Simulation.replicates(n, seed=result.draw_seeds[j])` of the model at the values of draw `j` gives the runs of that draw. The seed of the analysis itself gives other runs |
+| Case                                               | Result                                                                                                                                                                                                                                                                           |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The run lacks a position a quantity reads          | `ValueError` that lists each such position with its quantity, and says to call `Simulation.run_at`                                                                                                                                                                               |
+| A quantity names an output the results do not have | `ValueError` that names the output                                                                                                                                                                                                                                               |
+| `run(n)` of the ODE engine                         | It interpolates the positions that are not breakpoints, so a value differs from that of a run that ends there by about the relative tolerance of the solver, and `PeakPosition` can change on a near-tie                                                                         |
+| The replicates of a stochastic engine              | Each replicate is reduced on its own. A `Propagation` gives draw `j` the seed `draw_seeds[j]`, so `Simulation.replicates(count, seed=result.draw_seeds[j])` of the model at the values of draw `j` gives the runs of that draw. The seed of the analysis itself gives other runs |
 
 ## Which method for which budget
 
@@ -5898,7 +5898,7 @@ for label, value in one_run.quantities(quantities).items():
 | `Propagation(draws, quantities)`                                               | The distribution of each quantity, and the band of every output                            | `draws`                           | Independent or a sample |
 | `PRCC(draws, quantities)`                                                      | How steadily each quantity rises or falls with each input                                  | `draws`, more than the inputs + 1 | Independent or a sample |
 | `Morris(trajectories, levels, quantities)`                                     | Which inputs matter, in few runs                                                           | `trajectories · (inputs + 1)`     | Independent             |
-| `Sobol(base_draws, bootstrap, confidence_level, quantities)`                   | The share of the variance each input explains, alone and with interactions, with intervals | `base_draws · (inputs + 2)`       | Independent             |
+| `Sobol(draws, replicates, confidence_level, quantities)`                       | The share of the variance each input explains, alone and with interactions, with intervals | `draws · (inputs + 2)`            | Independent             |
 | `PolynomialChaos(degree, draws, quantities, q_norm=1.0, max_interaction=None)` | A polynomial surrogate and its Sobol indices, in far fewer runs for a smooth quantity      | `draws`, more than the terms      | Independent             |
 
 Start with Morris to drop the inputs that do not matter, then Sobol or a polynomial chaos on the rest. For a slow model, a polynomial chaos needs the fewest runs; read its leave-one-out error before its indices.
@@ -5964,7 +5964,7 @@ Sobol, Morris and the polynomial chaos need independent inputs. With dependent i
 from commol import Sobol
 
 indices = analysis.run(
-    Sobol(base_draws=1024, bootstrap=200, confidence_level=0.9, quantities=[peak])
+    Sobol(draws=1024, replicates=200, confidence_level=0.9, quantities=[peak])
 )
 for name, i in [("k1", 0), ("k2", 1)]:
     first = (indices.first_lower[0][i], indices.first[0][i], indices.first_upper[0][i])
@@ -6024,7 +6024,7 @@ figure = indices.plot()
 - [ ] A stochastic engine has `replicates` and a `seed`.
 - [ ] Each quantity reads the series you mean: the level of an output that only grows peaks at the last position, its `Increments` at the largest gain of a window.
 - [ ] A quantity that is NaN is filtered with `where(mask)` only on a condition you can defend, and the summary is read as conditioned on it.
-- [ ] The intervals of Sobol are narrow enough to rank the inputs, and none is NaN (a bootstrap replicate of no variance); if not, raise `base_draws`.
+- [ ] The intervals of Sobol are narrow enough to rank the inputs, and none is NaN (a bootstrap replicate of no variance); if not, raise `draws`.
 - [ ] The leave-one-out error of a polynomial chaos is small before you read its indices, and `predict` reads values inside the bounds of the inputs.
 - [ ] A truncated basis of a polynomial chaos (`max_interaction`, `q_norm`) keeps the interactions you expect to matter; its total indices hold no other.
 
@@ -6160,13 +6160,13 @@ print(profile.ends, round(profile.threshold, 4))
 
 The threshold is a required argument: it states what you assume about the noise.
 
-| Threshold                                          | Statistic                          | Assumes                                                                                                                        |
-| -------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `Threshold.chi_square(level)`                      | `−log L` of observation models     | The models hold, and `2 × statistic` is near `χ²₁` (Wilks); it gives `½ χ²₁(level)`. It needs observation models               |
-| `Threshold.beale(level)`                           | A sum of squares, the loss `"sse"` | Independent Gaussian errors of one variance: `S(θ̂) · F(1, n − p; level) / (n − p)`, exact for a model linear in its parameters |
-| `Threshold.bootstrap_calibrated(bootstrap, level)` | Any loss                           | That the bootstrap mimics how the data vary                                                                                    |
+| Threshold                                                     | Statistic                          | Assumes                                                                                                                                   |
+| ------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `Threshold.chi_square(confidence_level)`                      | `−log L` of observation models     | The models hold, and `2 × statistic` is near `χ²₁` (Wilks); it gives `½ χ²₁(confidence_level)`. It needs observation models               |
+| `Threshold.beale(confidence_level)`                           | A sum of squares, the loss `"sse"` | Independent Gaussian errors of one variance: `S(θ̂) · F(1, n − p; confidence_level) / (n − p)`, exact for a model linear in its parameters |
+| `Threshold.bootstrap_calibrated(bootstrap, confidence_level)` | Any loss                           | That the bootstrap mimics how the data vary                                                                                               |
 
-The bootstrap threshold calibrates the statistic itself (prepivoting, Beran 1988). Each replicate of `bootstrap` is the replicate `Calibrator.uncertainty(bootstrap)` makes from the problem's seed. It is fitted (`θ̂_b`), then fitted again with the quantity held at its value at the fit of the original data; the rise of the replicate is `PL_b(θ̂ⱼ) − L_b(θ̂_b)`. The threshold of the quantity is the quantile `level` of the rises, so each parameter gets its own. It costs one fit and one refit per quantity for each replicate. Any bootstrap of [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md) works, and the [parametric bootstrap](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) with observation models.
+The bootstrap threshold calibrates the statistic itself (prepivoting, Beran 1988). Each replicate of `bootstrap` is the replicate `Calibrator.uncertainty(bootstrap)` makes from the problem's seed. It is fitted (`θ̂_b`), then fitted again with the quantity held at its value at the fit of the original data; the rise of the replicate is `PL_b(θ̂ⱼ) − L_b(θ̂_b)`. The threshold of the quantity is the quantile `confidence_level` of the rises, so each parameter gets its own. It costs one fit and one refit per quantity for each replicate. Any bootstrap of [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md) works, and the [parametric bootstrap](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) with observation models.
 
 ```python
 from commol import ResidualBootstrap
@@ -6455,13 +6455,13 @@ The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `a
 | `series`       | Each compartment output sampled at `positions`                                                                                                                                                                                                                                    |
 | `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window that ends within the results, as the loss compares it) and `cumulative` (sampled at `positions`); each reading as a `total` and `by_output`                                                  |
 
-| Argument               | Meaning                                                                                                                                                                                                                                                                                                            |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `positions`            | The positions where series and cumulative readings are sampled; each must be a position of the results (`ValueError` otherwise).                                                                                                                                                                                   |
-| `window`, `windows`    | The window axis of `observed` and `windowed`: the length of one window and how many.                                                                                                                                                                                                                               |
-| `observed_data`        | The observations to report next to the run.                                                                                                                                                                                                                                                                        |
-| `accumulators`         | The accumulator ids to report. The results read the outputs of each one from their model (`results.model`, which `Simulation.run`, `run_at` and `replicates` set); results built by hand have no model, and reporting an accumulator raises `ValueError` that names it.                                            |
-| `prediction_intervals` | The `PredictionIntervals` of a [conformal method](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) (`ConformalResult.intervals`). The report gains a last block, `prediction_intervals`: its `level`, `series` (by label: `positions`, `prediction`, `lower`, `upper`) and `unbounded`. |
+| Argument               | Meaning                                                                                                                                                                                                                                                                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `positions`            | The positions where series and cumulative readings are sampled; each must be a position of the results (`ValueError` otherwise).                                                                                                                                                                                              |
+| `window`, `windows`    | The window axis of `observed` and `windowed`: the length of one window and how many.                                                                                                                                                                                                                                          |
+| `observed_data`        | The observations to report next to the run.                                                                                                                                                                                                                                                                                   |
+| `accumulators`         | The accumulator ids to report. The results read the outputs of each one from their model (`results.model`, which `Simulation.run`, `run_at` and `replicates` set); results built by hand have no model, and reporting an accumulator raises `ValueError` that names it.                                                       |
+| `prediction_intervals` | The `PredictionIntervals` of a [conformal method](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) (`ConformalResult.intervals`). The report gains a last block, `prediction_intervals`: its `confidence_level`, `series` (by label: `positions`, `prediction`, `lower`, `upper`) and `unbounded`. |
 
 The report holds only these blocks, and `prediction_intervals` when it is given. Add your own envelope around them, such as a run label or summary figures in your domain's terms:
 
@@ -6964,7 +6964,7 @@ problem = CalibrationProblem(
     parameters=parameters,
     loss_function="sse",
     optimization_config=ParticleSwarmConfig(
-        num_particles=30,
+        particles=30,
         max_iterations=500,
         verbose=True
     ),
@@ -9684,7 +9684,7 @@ class Calibrator:
         improvement = opt_config.improvement_stop_config
         radius = opt_config.radius_stop_config
         ps_config = rust_calibration.ParticleSwarmConfig(
-            num_particles=opt_config.num_particles,
+            particles=opt_config.particles,
             max_iterations=opt_config.max_iterations,
             verbose=opt_config.verbose,
             inertia=rust_inertia,
@@ -11870,7 +11870,7 @@ Attributes:
 
 | Name             | Type   | Description                                           |
 | ---------------- | ------ | ----------------------------------------------------- |
-| `num_particles`  | `int`  | Number of particles in the swarm (default: 20)        |
+| `particles`      | `int`  | Number of particles in the swarm (default: 20)        |
 | `max_iterations` | `int`  | Maximum number of iterations (default: 1000)          |
 | `verbose`        | `bool` | Enable verbose output (default: False)                |
 | `initialization` | `str`  | Particle initialization strategy (default: "uniform") |
@@ -11895,7 +11895,7 @@ class ParticleSwarmConfig(BaseModel):
 
     Attributes
     ----------
-    num_particles : int
+    particles : int
         Number of particles in the swarm (default: 20)
     max_iterations : int
         Maximum number of iterations (default: 1000)
@@ -11923,7 +11923,7 @@ class ParticleSwarmConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Core parameters
-    num_particles: int = Field(
+    particles: int = Field(
         default=20, gt=0, description="Number of particles in the swarm"
     )
     max_iterations: int = Field(
@@ -14032,13 +14032,13 @@ The evidence of a `ProfileLikelihood`.
 
 Attributes:
 
-| Name        | Type                                        | Description                               |
-| ----------- | ------------------------------------------- | ----------------------------------------- |
-| `threshold` | `{chi_square, beale, bootstrap_calibrated}` | The rule of the threshold.                |
-| `level`     | `float`                                     | The level of each pointwise interval.     |
-| `tolerance` | `float`                                     | The numerical tolerance of the statistic. |
-| `verdicts`  | \`dict\[str, ProfileVerdictName             | None\]\`                                  |
-| `intervals` | \`dict\[str, tuple\[float                   | None, float                               |
+| Name               | Type                                        | Description                               |
+| ------------------ | ------------------------------------------- | ----------------------------------------- |
+| `threshold`        | `{chi_square, beale, bootstrap_calibrated}` | The rule of the threshold.                |
+| `confidence_level` | `float`                                     | The level of each pointwise interval.     |
+| `tolerance`        | `float`                                     | The numerical tolerance of the statistic. |
+| `verdicts`         | \`dict\[str, ProfileVerdictName             | None\]\`                                  |
+| `intervals`        | \`dict\[str, tuple\[float                   | None, float                               |
 
 Source code in `commol/context/inference/identifiability.py`
 
@@ -14051,7 +14051,7 @@ class ProfileSection(_Frozen):
     ----------
     threshold : {"chi_square", "beale", "bootstrap_calibrated"}
         The rule of the threshold.
-    level : float
+    confidence_level : float
         The level of each pointwise interval.
     tolerance : float
         The numerical tolerance of the statistic.
@@ -14064,7 +14064,7 @@ class ProfileSection(_Frozen):
     """
 
     threshold: Literal["chi_square", "beale", "bootstrap_calibrated"]
-    level: float
+    confidence_level: float
     tolerance: float
     verdicts: dict[str, ProfileVerdictName | None]
     intervals: dict[str, tuple[float | None, float | None]]
@@ -25515,16 +25515,16 @@ Its `sample` is a `ParameterSample`, so `Predictive(analysis, result.sample, pos
 
 Attributes:
 
-| Name                                                                          | Type                                                                   | Description                                                                                                                                                                                                                                                   |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sample`                                                                      | `ParameterSample`                                                      | The draws of the inputs: a Latin hypercube of their distributions, or the sample of the input space itself.                                                                                                                                                   |
-| `labels`                                                                      | `list[str]`                                                            | The label of each quantity.                                                                                                                                                                                                                                   |
-| `values`                                                                      | `list[list[float]]`                                                    | The quantities of each run, [run]\[quantity\]: one run per draw, or with a stochastic engine one per replicate of each draw.                                                                                                                                  |
-| `weights`                                                                     | `list[float]`                                                          | The weight of each run; with a stochastic engine each replicate has an equal share of its draw's weight. They sum to 1.                                                                                                                                       |
-| `draw_seeds`                                                                  | `list[int]`                                                            | The seed of each draw of sample, in its order. With a stochastic engine, replicate i of draw j runs with the seed replicate i of Simulation.replicates(n, seed=draw_seeds[j]) takes, so those replicates of the model at that draw give the runs of the draw. |
-| `` A quantity that reads a NaN is NaN in `values`, and `summary` raises on `` |                                                                        |                                                                                                                                                                                                                                                               |
-| `it`                                                                          | `` `where` keeps the runs a condition chooses, which conditions the `` |                                                                                                                                                                                                                                                               |
-| `result on that condition.`                                                   |                                                                        |                                                                                                                                                                                                                                                               |
+| Name                                                                          | Type                                                                   | Description                                                                                                                                                                                                                                                       |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sample`                                                                      | `ParameterSample`                                                      | The draws of the inputs: a Latin hypercube of their distributions, or the sample of the input space itself.                                                                                                                                                       |
+| `labels`                                                                      | `list[str]`                                                            | The label of each quantity.                                                                                                                                                                                                                                       |
+| `values`                                                                      | `list[list[float]]`                                                    | The quantities of each run, [run]\[quantity\]: one run per draw, or with a stochastic engine one per replicate of each draw.                                                                                                                                      |
+| `weights`                                                                     | `list[float]`                                                          | The weight of each run; with a stochastic engine each replicate has an equal share of its draw's weight. They sum to 1.                                                                                                                                           |
+| `draw_seeds`                                                                  | `list[int]`                                                            | The seed of each draw of sample, in its order. With a stochastic engine, replicate i of draw j runs with the seed replicate i of Simulation.replicates(count, seed=draw_seeds[j]) takes, so those replicates of the model at that draw give the runs of the draw. |
+| `` A quantity that reads a NaN is NaN in `values`, and `summary` raises on `` |                                                                        |                                                                                                                                                                                                                                                                   |
+| `it`                                                                          | `` `where` keeps the runs a condition chooses, which conditions the `` |                                                                                                                                                                                                                                                                   |
+| `result on that condition.`                                                   |                                                                        |                                                                                                                                                                                                                                                                   |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -25553,7 +25553,7 @@ class PropagationResult(BaseModel):
     draw_seeds : list[int]
         The seed of each draw of `sample`, in its order. With a stochastic
         engine, replicate ``i`` of draw ``j`` runs with the seed replicate
-        ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])`` takes, so
+        ``i`` of ``Simulation.replicates(count, seed=draw_seeds[j])`` takes, so
         those replicates of the model at that draw give the runs of the draw.
 
     A quantity that reads a NaN is NaN in `values`, and `summary` raises on
@@ -25645,12 +25645,7 @@ class PropagationResult(BaseModel):
             quantity is NaN in a run: `where` keeps the runs a condition
             chooses.
         """
-        if not 0.0 < confidence_level < 1.0:
-            raise ValueError(
-                f"The confidence level is strictly between 0 and 1, got "
-                f"{confidence_level}"
-            )
-        levels = [0.5, (1 - confidence_level) / 2, (1 + confidence_level) / 2]
+        levels = [0.5, *commol_rs.inference.interval_levels(confidence_level)]
         summaries = []
         for index, label in enumerate(self.labels):
             column = [row[index] for row in self.values]
@@ -25816,12 +25811,7 @@ def summary(self, confidence_level: float) -> list[QuantitySummary]:
         quantity is NaN in a run: `where` keeps the runs a condition
         chooses.
     """
-    if not 0.0 < confidence_level < 1.0:
-        raise ValueError(
-            f"The confidence level is strictly between 0 and 1, got "
-            f"{confidence_level}"
-        )
-    levels = [0.5, (1 - confidence_level) / 2, (1 + confidence_level) / 2]
+    levels = [0.5, *commol_rs.inference.interval_levels(confidence_level)]
     summaries = []
     for index, label in enumerate(self.labels):
         column = [row[index] for row in self.values]
@@ -26366,12 +26356,12 @@ The base matrices hold independent Monte Carlo draws, so the bootstrap intervals
 
 Attributes:
 
-| Name               | Type             | Description                                                                       |
-| ------------------ | ---------------- | --------------------------------------------------------------------------------- |
-| `base_draws`       | `int`            | The rows of each base matrix; the analysis runs base_draws · (inputs + 2) points. |
-| `bootstrap`        | `int`            | The bootstrap replicates of the intervals, at least 2.                            |
-| `confidence_level` | `float`          | The level of the intervals, strictly between 0 and 1.                             |
-| `quantities`       | `list[Quantity]` | What each run is reduced to.                                                      |
+| Name               | Type             | Description                                                                  |
+| ------------------ | ---------------- | ---------------------------------------------------------------------------- |
+| `draws`            | `int`            | The rows of each base matrix; the analysis runs draws · (inputs + 2) points. |
+| `replicates`       | `int`            | The bootstrap replicates of the intervals, at least 2.                       |
+| `confidence_level` | `float`          | The level of the intervals, strictly between 0 and 1.                        |
+| `quantities`       | `list[Quantity]` | What each run is reduced to.                                                 |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -26389,10 +26379,10 @@ class Sobol(SensitivityMethod[SobolResult]):
 
     Attributes
     ----------
-    base_draws : int
+    draws : int
         The rows of each base matrix; the analysis runs
-        ``base_draws · (inputs + 2)`` points.
-    bootstrap : int
+        ``draws · (inputs + 2)`` points.
+    replicates : int
         The bootstrap replicates of the intervals, at least 2.
     confidence_level : float
         The level of the intervals, strictly between 0 and 1.
@@ -26400,11 +26390,9 @@ class Sobol(SensitivityMethod[SobolResult]):
         What each run is reduced to.
     """
 
-    base_draws: int = Field(ge=2, description="Rows of each base matrix.")
-    bootstrap: int = Field(ge=2, description="Bootstrap replicates.")
-    confidence_level: float = Field(
-        gt=0.0, lt=1.0, description="Level of the intervals."
-    )
+    draws: int = Field(ge=2, description="Rows of each base matrix.")
+    replicates: int = Field(ge=2, description="Bootstrap replicates.")
+    confidence_level: ConfidenceLevel = Field(description="Level of the intervals.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
@@ -26420,15 +26408,15 @@ The first-order index is the share of the variance of the quantity the input exp
 
 Attributes:
 
-| Name                       | Type                | Description                                                                                                                                  |
-| -------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `inputs`                   | `list[str]`         | The inputs, in order.                                                                                                                        |
-| `labels`                   | `list[str]`         | The label of each quantity.                                                                                                                  |
-| `confidence_level`         | `float`             | The level of the intervals.                                                                                                                  |
-| `first, total`             | `list[list[float]]` | The first-order and total indices, [quantity][input]; NaN for a quantity of no variance.                                                     |
-| `first_lower, first_upper` | `list[list[float]]` | The ends of the interval of each first-order index; NaN when a bootstrap replicate of the rows has no variance, which more base_draws avoid. |
-| `total_lower, total_upper` | `list[list[float]]` | The ends of the interval of each total index.                                                                                                |
-| `runs`                     | `int`               | The number of points run: base_draws · (inputs + 2).                                                                                         |
+| Name                       | Type                | Description                                                                                                                             |
+| -------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `inputs`                   | `list[str]`         | The inputs, in order.                                                                                                                   |
+| `labels`                   | `list[str]`         | The label of each quantity.                                                                                                             |
+| `confidence_level`         | `float`             | The level of the intervals.                                                                                                             |
+| `first, total`             | `list[list[float]]` | The first-order and total indices, [quantity][input]; NaN for a quantity of no variance.                                                |
+| `first_lower, first_upper` | `list[list[float]]` | The ends of the interval of each first-order index; NaN when a bootstrap replicate of the rows has no variance, which more draws avoid. |
+| `total_lower, total_upper` | `list[list[float]]` | The ends of the interval of each total index.                                                                                           |
+| `runs`                     | `int`               | The number of points run: draws · (inputs + 2).                                                                                         |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -26458,11 +26446,11 @@ class SobolResult(BaseModel):
     first_lower, first_upper : list[list[float]]
         The ends of the interval of each first-order index; NaN when a
         bootstrap replicate of the rows has no variance, which more
-        `base_draws` avoid.
+        `draws` avoid.
     total_lower, total_upper : list[list[float]]
         The ends of the interval of each total index.
     runs : int
-        The number of points run: ``base_draws · (inputs + 2)``.
+        The number of points run: ``draws · (inputs + 2)``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -27506,15 +27494,15 @@ Bases: `_OneScalar`
 
 The ratio of two quantities of one value each, numerator N over denominator D.
 
-The ratio of a run whose denominator is 0 is NaN, also when the numerator is not 0, and follows the NaN rule of every method. A method that reduces the points of a design (`PRCC`, `Morris`, `Sobol`, `PolynomialChaos`) reads one value per point; with a stochastic engine, `replicates` says how the replicates of a point combine. A `Propagation`, the `Scenarios` and the quantities of one run keep the ratio of each run.
+The ratio of a run whose denominator is 0 is NaN, also when the numerator is not 0, and follows the NaN rule of every method. A method that reduces the points of a design (`PRCC`, `Morris`, `Sobol`, `PolynomialChaos`) reads one value per point; with a stochastic engine, `replicate_rule` says how the replicates of a point combine. A `Propagation`, the `Scenarios` and the quantities of one run keep the ratio of each run.
 
 Attributes:
 
-| Name          | Type                                | Description                                                                                                                                                                                     |
-| ------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `numerator`   | \`ValueAt                           | Gain                                                                                                                                                                                            |
-| `denominator` | \`ValueAt                           | Gain                                                                                                                                                                                            |
-| `replicates`  | `{within, within_positive, pooled}` | "within": the mean of the ratio of each replicate, E[N/D]; a replicate with D = 0 leaves the point with no value. "within_positive": the mean of the ratio of the replicates with D > 0, E\[N/D |
+| Name             | Type                                | Description                                                                                                                                                                                     |
+| ---------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `numerator`      | \`ValueAt                           | Gain                                                                                                                                                                                            |
+| `denominator`    | \`ValueAt                           | Gain                                                                                                                                                                                            |
+| `replicate_rule` | `{within, within_positive, pooled}` | "within": the mean of the ratio of each replicate, E[N/D]; a replicate with D = 0 leaves the point with no value. "within_positive": the mean of the ratio of the replicates with D > 0, E\[N/D |
 
 Source code in `commol/context/inference/quantities.py`
 
@@ -27528,7 +27516,7 @@ class Ratio(_OneScalar):
     numerator is not 0, and follows the NaN rule of every method. A method
     that reduces the points of a design (`PRCC`, `Morris`, `Sobol`,
     `PolynomialChaos`) reads one value per point; with a stochastic engine,
-    `replicates` says how the replicates of a point combine. A `Propagation`,
+    `replicate_rule` says how the replicates of a point combine. A `Propagation`,
     the `Scenarios` and the quantities of one run keep the ratio of each run.
 
     Attributes
@@ -27537,7 +27525,7 @@ class Ratio(_OneScalar):
         The quantity divided.
     denominator : ValueAt | Gain | Peak
         The quantity it is divided by.
-    replicates : {"within", "within_positive", "pooled"}
+    replicate_rule : {"within", "within_positive", "pooled"}
         ``"within"``: the mean of the ratio of each replicate, E[N/D]; a
         replicate with D = 0 leaves the point with no value.
         ``"within_positive"``: the mean of the ratio of the replicates with
@@ -27550,7 +27538,7 @@ class Ratio(_OneScalar):
     kind: Literal["ratio"] = "ratio"
     numerator: _Operand = Field(description="The quantity divided.")
     denominator: _Operand = Field(description="The quantity it is divided by.")
-    replicates: ReplicateRule = Field(
+    replicate_rule: ReplicateRule = Field(
         description="How the replicates of a stochastic run combine."
     )
 
@@ -27922,19 +27910,19 @@ class Simulation:
             model=self.model_definition,
         )
 
-    def replicates(self, n: int, *, seed: int | None = None) -> "ReplicateRuns":
+    def replicates(self, count: int, *, seed: int | None = None) -> "ReplicateRuns":
         """
         Replicates of the runs of a stochastic engine.
 
         The returned object has ``run`` and ``run_at``, as `Simulation`, and
-        they return `SimulationReplicates`: ``n`` runs, each with its own seed,
+        they return `SimulationReplicates`: ``count`` runs, each with its own seed,
         run in parallel in the engine. Replicate ``i`` takes the seed derived
         from ``seed`` and ``i`` (the SplitMix64 of ``seed + i``), so it gives
         the same run however many replicates run.
 
         Parameters
         ----------
-        n : int
+        count : int
             How many replicates, at least 1.
         seed : int | None, optional
             The seed the replicate seeds derive from, a whole number from 0 to
@@ -27949,16 +27937,18 @@ class Simulation:
         ------
         ValueError
             If the engine is deterministic (every replicate would be equal),
-            ``n`` is below 1, or the seed is not valid.
+            ``count`` is below 1, or the seed is not valid.
         """
         if not self.is_stochastic:
             raise ValueError(
                 f"The {self.model_definition.engine.type} engine is deterministic: "
                 "every replicate would be equal. Replicates need a stochastic engine."
             )
-        if isinstance(n, bool) or not isinstance(n, int) or n < 1:
-            raise ValueError(f"The number of replicates is at least 1, got {n!r}.")
-        return ReplicateRuns(self, n, draw_seed() if seed is None else check_seed(seed))
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            raise ValueError(f"The number of replicates is at least 1, got {count!r}.")
+        return ReplicateRuns(
+            self, count, draw_seed() if seed is None else check_seed(seed)
+        )
 
     @property
     def engine(self) -> "EngineProtocol":
@@ -28439,19 +28429,19 @@ def run_at(
 #### replicates
 
 ```python
-replicates(n: int, *, seed: int | None = None) -> ReplicateRuns
+replicates(count: int, *, seed: int | None = None) -> ReplicateRuns
 ```
 
 Replicates of the runs of a stochastic engine.
 
-The returned object has `run` and `run_at`, as `Simulation`, and they return `SimulationReplicates`: `n` runs, each with its own seed, run in parallel in the engine. Replicate `i` takes the seed derived from `seed` and `i` (the SplitMix64 of `seed + i`), so it gives the same run however many replicates run.
+The returned object has `run` and `run_at`, as `Simulation`, and they return `SimulationReplicates`: `count` runs, each with its own seed, run in parallel in the engine. Replicate `i` takes the seed derived from `seed` and `i` (the SplitMix64 of `seed + i`), so it gives the same run however many replicates run.
 
 Parameters:
 
-| Name   | Type  | Description                      | Default                                                                                                                    |
-| ------ | ----- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `n`    | `int` | How many replicates, at least 1. | *required*                                                                                                                 |
-| `seed` | \`int | None\`                           | The seed the replicate seeds derive from, a whole number from 0 to 2\*\*64 - 1. None draws one, which the replicates keep. |
+| Name    | Type  | Description                      | Default                                                                                                                    |
+| ------- | ----- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `count` | `int` | How many replicates, at least 1. | *required*                                                                                                                 |
+| `seed`  | \`int | None\`                           | The seed the replicate seeds derive from, a whole number from 0 to 2\*\*64 - 1. None draws one, which the replicates keep. |
 
 Returns:
 
@@ -28461,26 +28451,26 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                              |
-| ------------ | -------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If the engine is deterministic (every replicate would be equal), n is below 1, or the seed is not valid. |
+| Type         | Description                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------ |
+| `ValueError` | If the engine is deterministic (every replicate would be equal), count is below 1, or the seed is not valid. |
 
 Source code in `commol/api/simulation.py`
 
 ```python
-def replicates(self, n: int, *, seed: int | None = None) -> "ReplicateRuns":
+def replicates(self, count: int, *, seed: int | None = None) -> "ReplicateRuns":
     """
     Replicates of the runs of a stochastic engine.
 
     The returned object has ``run`` and ``run_at``, as `Simulation`, and
-    they return `SimulationReplicates`: ``n`` runs, each with its own seed,
+    they return `SimulationReplicates`: ``count`` runs, each with its own seed,
     run in parallel in the engine. Replicate ``i`` takes the seed derived
     from ``seed`` and ``i`` (the SplitMix64 of ``seed + i``), so it gives
     the same run however many replicates run.
 
     Parameters
     ----------
-    n : int
+    count : int
         How many replicates, at least 1.
     seed : int | None, optional
         The seed the replicate seeds derive from, a whole number from 0 to
@@ -28495,16 +28485,18 @@ def replicates(self, n: int, *, seed: int | None = None) -> "ReplicateRuns":
     ------
     ValueError
         If the engine is deterministic (every replicate would be equal),
-        ``n`` is below 1, or the seed is not valid.
+        ``count`` is below 1, or the seed is not valid.
     """
     if not self.is_stochastic:
         raise ValueError(
             f"The {self.model_definition.engine.type} engine is deterministic: "
             "every replicate would be equal. Replicates need a stochastic engine."
         )
-    if isinstance(n, bool) or not isinstance(n, int) or n < 1:
-        raise ValueError(f"The number of replicates is at least 1, got {n!r}.")
-    return ReplicateRuns(self, n, draw_seed() if seed is None else check_seed(seed))
+    if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+        raise ValueError(f"The number of replicates is at least 1, got {count!r}.")
+    return ReplicateRuns(
+        self, count, draw_seed() if seed is None else check_seed(seed)
+    )
 ```
 
 #### outputs_for
@@ -29464,7 +29456,7 @@ Attributes:
 | Name         | Type         | Description                                    |
 | ------------ | ------------ | ---------------------------------------------- |
 | `simulation` | `Simulation` | The simulation whose model the replicates run. |
-| `n`          | `int`        | How many replicates.                           |
+| `count`      | `int`        | How many replicates.                           |
 | `seed`       | `int`        | The seed the replicate seeds derive from.      |
 
 Source code in `commol/api/simulation.py`
@@ -29478,13 +29470,13 @@ class ReplicateRuns:
     ----------
     simulation : Simulation
         The simulation whose model the replicates run.
-    n : int
+    count : int
         How many replicates.
     seed : int
         The seed the replicate seeds derive from.
     """
 
-    def __init__(self, simulation: Simulation, n: int, seed: int):
+    def __init__(self, simulation: Simulation, count: int, seed: int):
         """
         The replicates of a simulation.
 
@@ -29492,13 +29484,13 @@ class ReplicateRuns:
         ----------
         simulation : Simulation
             The simulation whose model the replicates run.
-        n : int
+        count : int
             How many replicates.
         seed : int
             The seed the replicate seeds derive from.
         """
         self.simulation = simulation
-        self.n = n
+        self.count = count
         self.seed = seed
 
     def _replicates(self, grid: int | list[float]) -> SimulationReplicates:
@@ -29506,7 +29498,7 @@ class ReplicateRuns:
         simulation = self.simulation
         simulation._validate_all_parameters_calibrated(simulation.model_definition)
         engine = simulation.engine
-        positions, seeds, runs = engine.run_replicates(self.seed, self.n, grid)
+        positions, seeds, runs = engine.run_replicates(self.seed, self.count, grid)
         outputs = simulation.simulation_outputs
         model = simulation.model_definition
         return SimulationReplicates(
@@ -29575,7 +29567,7 @@ class ReplicateRuns:
 #### __init__
 
 ```python
-__init__(simulation: Simulation, n: int, seed: int)
+__init__(simulation: Simulation, count: int, seed: int)
 ```
 
 The replicates of a simulation.
@@ -29585,13 +29577,13 @@ Parameters:
 | Name         | Type         | Description                                    | Default    |
 | ------------ | ------------ | ---------------------------------------------- | ---------- |
 | `simulation` | `Simulation` | The simulation whose model the replicates run. | *required* |
-| `n`          | `int`        | How many replicates.                           | *required* |
+| `count`      | `int`        | How many replicates.                           | *required* |
 | `seed`       | `int`        | The seed the replicate seeds derive from.      | *required* |
 
 Source code in `commol/api/simulation.py`
 
 ```python
-def __init__(self, simulation: Simulation, n: int, seed: int):
+def __init__(self, simulation: Simulation, count: int, seed: int):
     """
     The replicates of a simulation.
 
@@ -29599,13 +29591,13 @@ def __init__(self, simulation: Simulation, n: int, seed: int):
     ----------
     simulation : Simulation
         The simulation whose model the replicates run.
-    n : int
+    count : int
         How many replicates.
     seed : int
         The seed the replicate seeds derive from.
     """
     self.simulation = simulation
-    self.n = n
+    self.count = count
     self.seed = seed
 ```
 
@@ -29900,7 +29892,7 @@ class SimulationReplicates(list[SimulationResults]):
 
         A stochastic `Propagation` gives draw ``j`` the seed
         ``draw_seeds[j]`` and runs its replicate ``i`` with the seed replicate
-        ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])`` takes. So
+        ``i`` of ``Simulation.replicates(count, seed=draw_seeds[j])`` takes. So
         those replicates, of the model at the values of draw ``j``, give the
         quantities of the runs of that draw.
 
@@ -30262,7 +30254,7 @@ The quantities of interest of each replicate, as `SimulationResults.quantities` 
 
 Each replicate is reduced on its own, with no mean: a summary across the replicates is a reduction of these values, such as `member_statistics`.
 
-A stochastic `Propagation` gives draw `j` the seed `draw_seeds[j]` and runs its replicate `i` with the seed replicate `i` of `Simulation.replicates(n, seed=draw_seeds[j])` takes. So those replicates, of the model at the values of draw `j`, give the quantities of the runs of that draw.
+A stochastic `Propagation` gives draw `j` the seed `draw_seeds[j]` and runs its replicate `i` with the seed replicate `i` of `Simulation.replicates(count, seed=draw_seeds[j])` takes. So those replicates, of the model at the values of draw `j`, give the quantities of the runs of that draw.
 
 Parameters:
 
@@ -30298,7 +30290,7 @@ def quantities(
 
     A stochastic `Propagation` gives draw ``j`` the seed
     ``draw_seeds[j]`` and runs its replicate ``i`` with the seed replicate
-    ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])`` takes. So
+    ``i`` of ``Simulation.replicates(count, seed=draw_seeds[j])`` takes. So
     those replicates, of the model at the values of draw ``j``, give the
     quantities of the runs of that draw.
 
@@ -31935,7 +31927,7 @@ class Predictive:
         The seed of each draw of `sample`, in its order.
 
         With a stochastic engine, replicate ``i`` of draw ``j`` runs with the
-        seed replicate ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])``
+        seed replicate ``i`` of ``Simulation.replicates(count, seed=draw_seeds[j])``
         takes, so those replicates of the model at that draw give its runs.
         """
         return self._rust.draw_seeds
@@ -32218,7 +32210,7 @@ draw_seeds: list[int]
 
 The seed of each draw of `sample`, in its order.
 
-With a stochastic engine, replicate `i` of draw `j` runs with the seed replicate `i` of `Simulation.replicates(n, seed=draw_seeds[j])` takes, so those replicates of the model at that draw give its runs.
+With a stochastic engine, replicate `i` of draw `j` runs with the seed replicate `i` of `Simulation.replicates(count, seed=draw_seeds[j])` takes, so those replicates of the model at that draw give its runs.
 
 #### plot
 
@@ -34048,12 +34040,7 @@ class BootstrapResult(BaseModel):
         ValueError
             If the confidence level is not strictly between 0 and 1.
         """
-        if not 0.0 < confidence_level < 1.0:
-            raise ValueError(
-                f"A confidence level is strictly between 0 and 1, got "
-                f"{confidence_level}."
-            )
-        low, high = (1.0 - confidence_level) / 2.0, (1.0 + confidence_level) / 2.0
+        low, high = commol_rs.inference.interval_levels(confidence_level)
         errors: dict[str, BoundError] = {}
         for index, name in enumerate(self.sample.names):
             column = [row[index] for row in self.sample.values]
@@ -34119,12 +34106,7 @@ def interval_error(self, confidence_level: float) -> dict[str, BoundError]:
     ValueError
         If the confidence level is not strictly between 0 and 1.
     """
-    if not 0.0 < confidence_level < 1.0:
-        raise ValueError(
-            f"A confidence level is strictly between 0 and 1, got "
-            f"{confidence_level}."
-        )
-    low, high = (1.0 - confidence_level) / 2.0, (1.0 + confidence_level) / 2.0
+    low, high = commol_rs.inference.interval_levels(confidence_level)
     errors: dict[str, BoundError] = {}
     for index, name in enumerate(self.sample.names):
         column = [row[index] for row in self.sample.values]
@@ -34584,17 +34566,17 @@ def as_observation(self) -> ObservedDataPoint:
 
 Bases: `_Frozen`
 
-How far the statistic of a profile may rise above the fit inside an interval of level `level`.
+How far the statistic of a profile may rise above the fit inside an interval of `confidence_level`.
 
 Build one with `chi_square`, `beale` or `bootstrap_calibrated`.
 
 Attributes:
 
-| Name        | Type                                        | Description                                                     |
-| ----------- | ------------------------------------------- | --------------------------------------------------------------- |
-| `kind`      | `{chi_square, beale, bootstrap_calibrated}` | The rule.                                                       |
-| `level`     | `float`                                     | The level of each pointwise interval, strictly between 0 and 1. |
-| `bootstrap` | \`BayesianBootstrap                         | ParametricBootstrap                                             |
+| Name               | Type                                        | Description                                                     |
+| ------------------ | ------------------------------------------- | --------------------------------------------------------------- |
+| `kind`             | `{chi_square, beale, bootstrap_calibrated}` | The rule.                                                       |
+| `confidence_level` | `float`                                     | The level of each pointwise interval, strictly between 0 and 1. |
+| `bootstrap`        | \`BayesianBootstrap                         | ParametricBootstrap                                             |
 
 Source code in `commol/context/inference/profiles.py`
 
@@ -34602,7 +34584,7 @@ Source code in `commol/context/inference/profiles.py`
 class Threshold(_Frozen):
     """
     How far the statistic of a profile may rise above the fit inside an
-    interval of level `level`.
+    interval of `confidence_level`.
 
     Build one with `chi_square`, `beale` or `bootstrap_calibrated`.
 
@@ -34610,14 +34592,14 @@ class Threshold(_Frozen):
     ----------
     kind : {"chi_square", "beale", "bootstrap_calibrated"}
         The rule.
-    level : float
+    confidence_level : float
         The level of each pointwise interval, strictly between 0 and 1.
     bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap | None
         The bootstrap of ``"bootstrap_calibrated"``; None otherwise.
     """  # noqa: E501
 
     kind: Literal["chi_square", "beale", "bootstrap_calibrated"]
-    level: float = Field(gt=0.0, lt=1.0)
+    confidence_level: ConfidenceLevel
     bootstrap: ProfileBootstrap | None = None
 
     @model_validator(mode="after")
@@ -34632,17 +34614,17 @@ class Threshold(_Frozen):
         return self
 
     @classmethod
-    def chi_square(cls, level: float) -> Self:
+    def chi_square(cls, confidence_level: float) -> Self:
         """
-        ``½ χ²₁(level)`` on ``−log L`` (Wilks): the threshold of a problem
-        with observation models.
+        ``½ χ²₁(confidence_level)`` on ``−log L`` (Wilks): the threshold of a
+        problem with observation models.
 
         It assumes that the models hold and that the statistic is near its
         large-sample distribution.
 
         Parameters
         ----------
-        level : float
+        confidence_level : float
             The level of each interval, strictly between 0 and 1.
 
         Returns
@@ -34653,23 +34635,23 @@ class Threshold(_Frozen):
         Raises
         ------
         ValueError
-            If the level is not strictly between 0 and 1.
+            If ``confidence_level`` is not strictly between 0 and 1.
         """
-        return cls(kind="chi_square", level=_level(level))
+        return cls(kind="chi_square", confidence_level=confidence_level)
 
     @classmethod
-    def beale(cls, level: float) -> Self:
+    def beale(cls, confidence_level: float) -> Self:
         """
-        Beale's threshold of a sum of squares: ``S(θ̂) · F(1, n − p; level) /
-        (n − p)``, with ``n`` observations of positive weight and ``p``
-        parameters.
+        Beale's threshold of a sum of squares:
+        ``S(θ̂) · F(1, n − p; confidence_level) / (n − p)``, with ``n``
+        observations of positive weight and ``p`` parameters.
 
         It assumes independent Gaussian errors of one variance, and is exact
         for a model linear in its parameters. It needs the loss ``"sse"``.
 
         Parameters
         ----------
-        level : float
+        confidence_level : float
             The level of each interval, strictly between 0 and 1.
 
         Returns
@@ -34680,12 +34662,14 @@ class Threshold(_Frozen):
         Raises
         ------
         ValueError
-            If the level is not strictly between 0 and 1.
+            If ``confidence_level`` is not strictly between 0 and 1.
         """
-        return cls(kind="beale", level=_level(level))
+        return cls(kind="beale", confidence_level=confidence_level)
 
     @classmethod
-    def bootstrap_calibrated(cls, bootstrap: ProfileBootstrap, level: float) -> Self:
+    def bootstrap_calibrated(
+        cls, bootstrap: ProfileBootstrap, confidence_level: float
+    ) -> Self:
         """
         The threshold of each quantity calibrated by `bootstrap`
         (prepivoting, Beran 1988), for any loss.
@@ -34694,15 +34678,15 @@ class Threshold(_Frozen):
         ``Calibrator.uncertainty(bootstrap)`` builds it, is fitted
         (``θ̂_b``) and then fitted again with the quantity held at its value
         at the fit of the original data: the rise of the replicate is
-        ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile `level` of
-        the rises. It costs one fit and one refit per quantity for each
-        replicate.
+        ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile
+        `confidence_level` of the rises. It costs one fit and one refit per
+        quantity for each replicate.
 
         Parameters
         ----------
         bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap
             The bootstrap, with its replicates and starts.
-        level : float
+        confidence_level : float
             The level of each interval, strictly between 0 and 1.
 
         Returns
@@ -34713,10 +34697,12 @@ class Threshold(_Frozen):
         Raises
         ------
         ValueError
-            If the level is not strictly between 0 and 1.
+            If ``confidence_level`` is not strictly between 0 and 1.
         """  # noqa: E501
         return cls(
-            kind="bootstrap_calibrated", level=_level(level), bootstrap=bootstrap
+            kind="bootstrap_calibrated",
+            confidence_level=confidence_level,
+            bootstrap=bootstrap,
         )
 ```
 
@@ -34748,18 +34734,18 @@ def check_bootstrap(self) -> Self:
 #### chi_square
 
 ```python
-chi_square(level: float) -> Self
+chi_square(confidence_level: float) -> Self
 ```
 
-`½ χ²₁(level)` on `−log L` (Wilks): the threshold of a problem with observation models.
+`½ χ²₁(confidence_level)` on `−log L` (Wilks): the threshold of a problem with observation models.
 
 It assumes that the models hold and that the statistic is near its large-sample distribution.
 
 Parameters:
 
-| Name    | Type    | Description                                           | Default    |
-| ------- | ------- | ----------------------------------------------------- | ---------- |
-| `level` | `float` | The level of each interval, strictly between 0 and 1. | *required* |
+| Name               | Type    | Description                                           | Default    |
+| ------------------ | ------- | ----------------------------------------------------- | ---------- |
+| `confidence_level` | `float` | The level of each interval, strictly between 0 and 1. | *required* |
 
 Returns:
 
@@ -34769,25 +34755,25 @@ Returns:
 
 Raises:
 
-| Type         | Description                                   |
-| ------------ | --------------------------------------------- |
-| `ValueError` | If the level is not strictly between 0 and 1. |
+| Type         | Description                                          |
+| ------------ | ---------------------------------------------------- |
+| `ValueError` | If confidence_level is not strictly between 0 and 1. |
 
 Source code in `commol/context/inference/profiles.py`
 
 ```python
 @classmethod
-def chi_square(cls, level: float) -> Self:
+def chi_square(cls, confidence_level: float) -> Self:
     """
-    ``½ χ²₁(level)`` on ``−log L`` (Wilks): the threshold of a problem
-    with observation models.
+    ``½ χ²₁(confidence_level)`` on ``−log L`` (Wilks): the threshold of a
+    problem with observation models.
 
     It assumes that the models hold and that the statistic is near its
     large-sample distribution.
 
     Parameters
     ----------
-    level : float
+    confidence_level : float
         The level of each interval, strictly between 0 and 1.
 
     Returns
@@ -34798,26 +34784,26 @@ def chi_square(cls, level: float) -> Self:
     Raises
     ------
     ValueError
-        If the level is not strictly between 0 and 1.
+        If ``confidence_level`` is not strictly between 0 and 1.
     """
-    return cls(kind="chi_square", level=_level(level))
+    return cls(kind="chi_square", confidence_level=confidence_level)
 ```
 
 #### beale
 
 ```python
-beale(level: float) -> Self
+beale(confidence_level: float) -> Self
 ```
 
-Beale's threshold of a sum of squares: `S(θ̂) · F(1, n − p; level) / (n − p)`, with `n` observations of positive weight and `p` parameters.
+Beale's threshold of a sum of squares: `S(θ̂) · F(1, n − p; confidence_level) / (n − p)`, with `n` observations of positive weight and `p` parameters.
 
 It assumes independent Gaussian errors of one variance, and is exact for a model linear in its parameters. It needs the loss `"sse"`.
 
 Parameters:
 
-| Name    | Type    | Description                                           | Default    |
-| ------- | ------- | ----------------------------------------------------- | ---------- |
-| `level` | `float` | The level of each interval, strictly between 0 and 1. | *required* |
+| Name               | Type    | Description                                           | Default    |
+| ------------------ | ------- | ----------------------------------------------------- | ---------- |
+| `confidence_level` | `float` | The level of each interval, strictly between 0 and 1. | *required* |
 
 Returns:
 
@@ -34827,26 +34813,26 @@ Returns:
 
 Raises:
 
-| Type         | Description                                   |
-| ------------ | --------------------------------------------- |
-| `ValueError` | If the level is not strictly between 0 and 1. |
+| Type         | Description                                          |
+| ------------ | ---------------------------------------------------- |
+| `ValueError` | If confidence_level is not strictly between 0 and 1. |
 
 Source code in `commol/context/inference/profiles.py`
 
 ```python
 @classmethod
-def beale(cls, level: float) -> Self:
+def beale(cls, confidence_level: float) -> Self:
     """
-    Beale's threshold of a sum of squares: ``S(θ̂) · F(1, n − p; level) /
-    (n − p)``, with ``n`` observations of positive weight and ``p``
-    parameters.
+    Beale's threshold of a sum of squares:
+    ``S(θ̂) · F(1, n − p; confidence_level) / (n − p)``, with ``n``
+    observations of positive weight and ``p`` parameters.
 
     It assumes independent Gaussian errors of one variance, and is exact
     for a model linear in its parameters. It needs the loss ``"sse"``.
 
     Parameters
     ----------
-    level : float
+    confidence_level : float
         The level of each interval, strictly between 0 and 1.
 
     Returns
@@ -34857,27 +34843,27 @@ def beale(cls, level: float) -> Self:
     Raises
     ------
     ValueError
-        If the level is not strictly between 0 and 1.
+        If ``confidence_level`` is not strictly between 0 and 1.
     """
-    return cls(kind="beale", level=_level(level))
+    return cls(kind="beale", confidence_level=confidence_level)
 ```
 
 #### bootstrap_calibrated
 
 ```python
-bootstrap_calibrated(bootstrap: ProfileBootstrap, level: float) -> Self
+bootstrap_calibrated(bootstrap: ProfileBootstrap, confidence_level: float) -> Self
 ```
 
 The threshold of each quantity calibrated by `bootstrap` (prepivoting, Beran 1988), for any loss.
 
-Each replicate of the bootstrap, rebuilt from the problem's seed as `Calibrator.uncertainty(bootstrap)` builds it, is fitted (`θ̂_b`) and then fitted again with the quantity held at its value at the fit of the original data: the rise of the replicate is `PL_b(θ̂ⱼ) − L_b(θ̂_b)`. The threshold is the quantile `level` of the rises. It costs one fit and one refit per quantity for each replicate.
+Each replicate of the bootstrap, rebuilt from the problem's seed as `Calibrator.uncertainty(bootstrap)` builds it, is fitted (`θ̂_b`) and then fitted again with the quantity held at its value at the fit of the original data: the rise of the replicate is `PL_b(θ̂ⱼ) − L_b(θ̂_b)`. The threshold is the quantile `confidence_level` of the rises. It costs one fit and one refit per quantity for each replicate.
 
 Parameters:
 
-| Name        | Type                | Description                                           | Default           |
-| ----------- | ------------------- | ----------------------------------------------------- | ----------------- |
-| `bootstrap` | \`BayesianBootstrap | ParametricBootstrap                                   | ResidualBootstrap |
-| `level`     | `float`             | The level of each interval, strictly between 0 and 1. | *required*        |
+| Name               | Type                | Description                                           | Default           |
+| ------------------ | ------------------- | ----------------------------------------------------- | ----------------- |
+| `bootstrap`        | \`BayesianBootstrap | ParametricBootstrap                                   | ResidualBootstrap |
+| `confidence_level` | `float`             | The level of each interval, strictly between 0 and 1. | *required*        |
 
 Returns:
 
@@ -34887,15 +34873,17 @@ Returns:
 
 Raises:
 
-| Type         | Description                                   |
-| ------------ | --------------------------------------------- |
-| `ValueError` | If the level is not strictly between 0 and 1. |
+| Type         | Description                                          |
+| ------------ | ---------------------------------------------------- |
+| `ValueError` | If confidence_level is not strictly between 0 and 1. |
 
 Source code in `commol/context/inference/profiles.py`
 
 ```python
 @classmethod
-def bootstrap_calibrated(cls, bootstrap: ProfileBootstrap, level: float) -> Self:
+def bootstrap_calibrated(
+    cls, bootstrap: ProfileBootstrap, confidence_level: float
+) -> Self:
     """
     The threshold of each quantity calibrated by `bootstrap`
     (prepivoting, Beran 1988), for any loss.
@@ -34904,15 +34892,15 @@ def bootstrap_calibrated(cls, bootstrap: ProfileBootstrap, level: float) -> Self
     ``Calibrator.uncertainty(bootstrap)`` builds it, is fitted
     (``θ̂_b``) and then fitted again with the quantity held at its value
     at the fit of the original data: the rise of the replicate is
-    ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile `level` of
-    the rises. It costs one fit and one refit per quantity for each
-    replicate.
+    ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile
+    `confidence_level` of the rises. It costs one fit and one refit per
+    quantity for each replicate.
 
     Parameters
     ----------
     bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap
         The bootstrap, with its replicates and starts.
-    level : float
+    confidence_level : float
         The level of each interval, strictly between 0 and 1.
 
     Returns
@@ -34923,10 +34911,12 @@ def bootstrap_calibrated(cls, bootstrap: ProfileBootstrap, level: float) -> Self
     Raises
     ------
     ValueError
-        If the level is not strictly between 0 and 1.
+        If ``confidence_level`` is not strictly between 0 and 1.
     """  # noqa: E501
     return cls(
-        kind="bootstrap_calibrated", level=_level(level), bootstrap=bootstrap
+        kind="bootstrap_calibrated",
+        confidence_level=confidence_level,
+        bootstrap=bootstrap,
     )
 ```
 
@@ -35121,7 +35111,7 @@ class ProfileResult(_Frozen):
             profile=[
                 ProfileSection(
                     threshold=self.threshold.kind,
-                    level=self.threshold.level,
+                    confidence_level=self.threshold.confidence_level,
                     tolerance=self.tolerance,
                     verdicts=self.verdicts,
                     intervals={
@@ -35308,7 +35298,7 @@ def report(self) -> IdentifiabilityReport:
         profile=[
             ProfileSection(
                 threshold=self.threshold.kind,
-                level=self.threshold.level,
+                confidence_level=self.threshold.confidence_level,
                 tolerance=self.tolerance,
                 verdicts=self.verdicts,
                 intervals={
@@ -36266,9 +36256,7 @@ class BootstrapCoverageEta(BaseModel):
     kind: Literal["bootstrap_coverage"] = "bootstrap_coverage"
     replicates: int = Field(ge=1, description="Number of bootstrap data sets.")
     block_length: BlockLength = Field(description="Positions per block.")
-    confidence_level: float = Field(
-        gt=0.0, lt=1.0, description="The level of the intervals."
-    )
+    confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
 ```
 
 ## ABCSMC
@@ -37183,15 +37171,15 @@ Guide: [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/gu
 
 Bases: `UncertaintyMethod[ConformalResult]`
 
-What every conformal method takes: a score, the pooling of its quantiles, and a level, none of them with a default.
+What every conformal method takes: a score, the pooling of its quantiles, and a confidence level, none of them with a default.
 
 Attributes:
 
-| Name    | Type                             | Description                                                                                                                                    |
-| ------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `score` | `{absolute, normalized, spread}` | The nonconformity score. "normalized" needs by="all": per series its factor is one constant, so its intervals would equal those of "absolute". |
-| `by`    | `{series, all}`                  | Whether each series gets its own quantile, or all series share one.                                                                            |
-| `level` | `float`                          | The level of the intervals, strictly between 0 and 1.                                                                                          |
+| Name               | Type                             | Description                                                                                                                                    |
+| ------------------ | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `score`            | `{absolute, normalized, spread}` | The nonconformity score. "normalized" needs by="all": per series its factor is one constant, so its intervals would equal those of "absolute". |
+| `by`               | `{series, all}`                  | Whether each series gets its own quantile, or all series share one.                                                                            |
+| `confidence_level` | `float`                          | The level of the intervals, strictly between 0 and 1.                                                                                          |
 
 Source code in `commol/context/inference/conformal.py`
 
@@ -37199,7 +37187,7 @@ Source code in `commol/context/inference/conformal.py`
 class ConformalMethod(UncertaintyMethod[ConformalResult]):
     """
     What every conformal method takes: a score, the pooling of its
-    quantiles, and a level, none of them with a default.
+    quantiles, and a confidence level, none of them with a default.
 
     Attributes
     ----------
@@ -37209,13 +37197,13 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
         of ``"absolute"``.
     by : {"series", "all"}
         Whether each series gets its own quantile, or all series share one.
-    level : float
+    confidence_level : float
         The level of the intervals, strictly between 0 and 1.
     """
 
     score: ConformalScore = Field(description="The nonconformity score.")
     by: Pooling = Field(description="Which scores each quantile reads.")
-    level: float = Field(gt=0.0, lt=1.0, description="The level of the intervals.")
+    confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
 
     @model_validator(mode="before")
     @classmethod
@@ -37264,7 +37252,7 @@ Bases: `ConformalMethod`
 
 Split conformal prediction.
 
-It fits the problem's observations and scores `calibration_data`, observations held out of the fit. When the scores of the held-out and of new observations are exchangeable, each interval covers a new observation with probability at least `level`.
+It fits the problem's observations and scores `calibration_data`, observations held out of the fit. When the scores of the held-out and of new observations are exchangeable, each interval covers a new observation with probability at least `confidence_level`.
 
 Attributes:
 
@@ -37285,7 +37273,7 @@ class SplitConformal(ConformalMethod):
     It fits the problem's observations and scores `calibration_data`,
     observations held out of the fit. When the scores of the held-out and of
     new observations are exchangeable, each interval covers a new
-    observation with probability at least `level`.
+    observation with probability at least `confidence_level`.
 
     Attributes
     ----------
@@ -37625,15 +37613,15 @@ class ConformalResult(BaseModel):
 
 Bases: `BaseModel`
 
-Prediction intervals for observations: where new observations of each series fall, at a level.
+Prediction intervals for observations: where new observations of each series fall, at a confidence level.
 
 Attributes:
 
-| Name        | Type                         | Description                                                                                                                                    |
-| ----------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `level`     | `float`                      | The level of the intervals, 1 − α.                                                                                                             |
-| `series`    | `dict[str, SeriesIntervals]` | The intervals of each series, by label.                                                                                                        |
-| `unbounded` | `dict[str, list[float]]`     | The positions of each series whose interval is unbounded, because its quantile had fewer than 1/α − 1 scores. A series with none is not a key. |
+| Name               | Type                         | Description                                                                                                                                    |
+| ------------------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `confidence_level` | `float`                      | The level of the intervals, 1 − α.                                                                                                             |
+| `series`           | `dict[str, SeriesIntervals]` | The intervals of each series, by label.                                                                                                        |
+| `unbounded`        | `dict[str, list[float]]`     | The positions of each series whose interval is unbounded, because its quantile had fewer than 1/α − 1 scores. A series with none is not a key. |
 
 Source code in `commol/context/inference/conformal.py`
 
@@ -37641,11 +37629,11 @@ Source code in `commol/context/inference/conformal.py`
 class PredictionIntervals(BaseModel):
     """
     Prediction intervals for observations: where new observations of each
-    series fall, at a level.
+    series fall, at a confidence level.
 
     Attributes
     ----------
-    level : float
+    confidence_level : float
         The level of the intervals, ``1 − α``.
     series : dict[str, SeriesIntervals]
         The intervals of each series, by label.
@@ -37657,7 +37645,7 @@ class PredictionIntervals(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
 
-    level: float
+    confidence_level: float
     series: dict[str, SeriesIntervals]
     unbounded: dict[str, list[float]]
 ```
@@ -38385,16 +38373,8 @@ def ci_percentiles(confidence_level: float) -> tuple[float, float]:
     ValueError
         If ``confidence_level`` is not strictly between 0 and 1.
     """
-    if not 0.0 < confidence_level < 1.0:
-        raise ValueError(
-            f"confidence_level must be strictly between 0 and 1, got "
-            f"{confidence_level}. Note this is a fraction, not a percentage: "
-            f"use 0.95 for a 95% interval."
-        )
-    return (
-        (1.0 - confidence_level) / 2.0 * 100.0,
-        (1.0 + confidence_level) / 2.0 * 100.0,
-    )
+    lower, upper = commol_rs.inference.interval_levels(confidence_level)
+    return lower * 100.0, upper * 100.0
 ```
 
 ## registry
@@ -40521,6 +40501,25 @@ All notable changes to Commol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Changed
+
+- **Breaking:** a setting that means the same thing has one name in every method. The level of an interval is `confidence_level`, a count is a plain plural noun, and the rule that combines the replicates of a ratio is `replicate_rule`. An old name raises a `ValidationError` that names it as not permitted. Rename each old name in your code:
+
+| Where                                                                                    | Before                      | Now                                       |
+| ---------------------------------------------------------------------------------------- | --------------------------- | ----------------------------------------- |
+| `SplitConformal`, `RollingConformal`, `JackknifePlus`, `EnbPI`, `AdaptiveConformal`      | `level=`                    | `confidence_level=`                       |
+| `ConformalResult.intervals` (`PredictionIntervals`), and its report block                | `.level`, `"level"`         | `.confidence_level`, `"confidence_level"` |
+| `Threshold`, `Threshold.chi_square`, `Threshold.beale`, `Threshold.bootstrap_calibrated` | `level`                     | `confidence_level`                        |
+| `ProfileSection` (`IdentifiabilityReport.profile`)                                       | `.level`                    | `.confidence_level`                       |
+| `ParticleSwarmConfig`                                                                    | `num_particles=`            | `particles=`                              |
+| `Sobol`                                                                                  | `base_draws=`, `bootstrap=` | `draws=`, `replicates=`                   |
+| `Ratio`                                                                                  | `replicates=`               | `replicate_rule=`                         |
+| `Simulation.replicates`, `ReplicateRuns`                                                 | `n`                         | `count`                                   |
+
+See [A setting has one name and one check](https://munqu.github.io/commol/latest/codebase/decisions/results/#a-setting-has-one-name-and-one-check).
+
+- One check, in Rust, rejects a confidence level that is not strictly between 0 and 1, with one message in every method: `confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95% interval`. Every other setting strictly between 0 and 1 (`target_cess`, `stay_probability`, `min_acceptance`, the `quantile` of `ABCRejection`, `correlation_threshold`) says `<name> is strictly between 0 and 1, got <value>`.
 
 ### Removed
 

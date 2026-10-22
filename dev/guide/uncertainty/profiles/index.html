@@ -3537,17 +3537,17 @@ noise.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>Threshold.chi_square(level)</code></td>
+<td><code>Threshold.chi_square(confidence_level)</code></td>
 <td><code>−log L</code> of observation models</td>
-<td>The models hold, and <code>2 × statistic</code> is near <code>χ²₁</code> (Wilks); it gives <code>½ χ²₁(level)</code>. It needs observation models</td>
+<td>The models hold, and <code>2 × statistic</code> is near <code>χ²₁</code> (Wilks); it gives <code>½ χ²₁(confidence_level)</code>. It needs observation models</td>
 </tr>
 <tr>
-<td><code>Threshold.beale(level)</code></td>
+<td><code>Threshold.beale(confidence_level)</code></td>
 <td>A sum of squares, the loss <code>"sse"</code></td>
-<td>Independent Gaussian errors of one variance: <code>S(θ̂) · F(1, n − p; level) / (n − p)</code>, exact for a model linear in its parameters</td>
+<td>Independent Gaussian errors of one variance: <code>S(θ̂) · F(1, n − p; confidence_level) / (n − p)</code>, exact for a model linear in its parameters</td>
 </tr>
 <tr>
-<td><code>Threshold.bootstrap_calibrated(bootstrap, level)</code></td>
+<td><code>Threshold.bootstrap_calibrated(bootstrap, confidence_level)</code></td>
 <td>Any loss</td>
 <td>That the bootstrap mimics how the data vary</td>
 </tr>
@@ -3558,7 +3558,8 @@ noise.</p>
 <code>Calibrator.uncertainty(bootstrap)</code> makes from the problem's seed. It is fitted
 (<code>θ̂_b</code>), then fitted again with the quantity held at its value at the fit of
 the original data; the rise of the replicate is <code>PL_b(θ̂ⱼ) − L_b(θ̂_b)</code>. The
-threshold of the quantity is the quantile <code>level</code> of the rises, so each
+threshold of the quantity is the quantile <code>confidence_level</code> of the rises, so
+each
 parameter gets its own. It costs one fit and one refit per quantity for each
 replicate. Any bootstrap of <a href="../resampling/">Resampling</a> works, and the
 <a href="../observation-models/#maximum-likelihood-against-the-posterior">parametric bootstrap</a>

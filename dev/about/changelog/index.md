@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** a setting that means the same thing has one name in every method. The level of an interval is `confidence_level`, a count is a plain plural noun, and the rule that combines the replicates of a ratio is `replicate_rule`. An old name raises a `ValidationError` that names it as not permitted. Rename each old name in your code:
+
+| Where                                                                                    | Before                      | Now                                       |
+| ---------------------------------------------------------------------------------------- | --------------------------- | ----------------------------------------- |
+| `SplitConformal`, `RollingConformal`, `JackknifePlus`, `EnbPI`, `AdaptiveConformal`      | `level=`                    | `confidence_level=`                       |
+| `ConformalResult.intervals` (`PredictionIntervals`), and its report block                | `.level`, `"level"`         | `.confidence_level`, `"confidence_level"` |
+| `Threshold`, `Threshold.chi_square`, `Threshold.beale`, `Threshold.bootstrap_calibrated` | `level`                     | `confidence_level`                        |
+| `ProfileSection` (`IdentifiabilityReport.profile`)                                       | `.level`                    | `.confidence_level`                       |
+| `ParticleSwarmConfig`                                                                    | `num_particles=`            | `particles=`                              |
+| `Sobol`                                                                                  | `base_draws=`, `bootstrap=` | `draws=`, `replicates=`                   |
+| `Ratio`                                                                                  | `replicates=`               | `replicate_rule=`                         |
+| `Simulation.replicates`, `ReplicateRuns`                                                 | `n`                         | `count`                                   |
+
+See [A setting has one name and one check](https://munqu.github.io/commol/latest/codebase/decisions/results/#a-setting-has-one-name-and-one-check).
+
+- One check, in Rust, rejects a confidence level that is not strictly between 0 and 1, with one message in every method: `confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95% interval`. Every other setting strictly between 0 and 1 (`target_cess`, `stay_probability`, `min_acceptance`, the `quantile` of `ABCRejection`, `correlation_threshold`) says `<name> is strictly between 0 and 1, got <value>`.
+
 ### Removed
 
 - **Breaking:** `commol.add_stderr_logger` is removed: commol configures no logging, and adds only a `NullHandler` to the logger `commol`. Call `logging.basicConfig(level=logging.INFO)` instead, or add a handler of your own to `logging.getLogger("commol")`. See [Log messages](https://munqu.github.io/commol/latest/getting-started/quickstart/#log-messages).

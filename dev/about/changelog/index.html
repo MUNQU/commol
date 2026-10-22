@@ -3099,6 +3099,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#removed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3138,7 +3149,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed" class="md-nav__link">
+  <a href="#changed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3188,7 +3199,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_1" class="md-nav__link">
+  <a href="#changed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3238,7 +3249,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_2" class="md-nav__link">
+  <a href="#changed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3305,7 +3316,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_3" class="md-nav__link">
+  <a href="#changed_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3355,7 +3366,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_4" class="md-nav__link">
+  <a href="#changed_5" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3416,7 +3427,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_5" class="md-nav__link">
+  <a href="#changed_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3477,7 +3488,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_6" class="md-nav__link">
+  <a href="#changed_7" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3549,7 +3560,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_7" class="md-nav__link">
+  <a href="#changed_8" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3719,6 +3730,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#removed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3758,7 +3780,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed" class="md-nav__link">
+  <a href="#changed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3808,7 +3830,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_1" class="md-nav__link">
+  <a href="#changed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3858,7 +3880,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_2" class="md-nav__link">
+  <a href="#changed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3925,7 +3947,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_3" class="md-nav__link">
+  <a href="#changed_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -3975,7 +3997,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_4" class="md-nav__link">
+  <a href="#changed_5" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -4036,7 +4058,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_5" class="md-nav__link">
+  <a href="#changed_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -4097,7 +4119,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_6" class="md-nav__link">
+  <a href="#changed_7" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -4169,7 +4191,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_7" class="md-nav__link">
+  <a href="#changed_8" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -4310,6 +4332,75 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Breaking:</strong> a setting that means the same thing has one name in every
+  method. The level of an interval is <code>confidence_level</code>, a count is a plain
+  plural noun, and the rule that combines the replicates of a ratio is
+  <code>replicate_rule</code>. An old name raises a <code>ValidationError</code> that names it as
+  not permitted. Rename each old name in your code:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>Before</th>
+<th>Now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SplitConformal</code>, <code>RollingConformal</code>, <code>JackknifePlus</code>, <code>EnbPI</code>, <code>AdaptiveConformal</code></td>
+<td><code>level=</code></td>
+<td><code>confidence_level=</code></td>
+</tr>
+<tr>
+<td><code>ConformalResult.intervals</code> (<code>PredictionIntervals</code>), and its report block</td>
+<td><code>.level</code>, <code>"level"</code></td>
+<td><code>.confidence_level</code>, <code>"confidence_level"</code></td>
+</tr>
+<tr>
+<td><code>Threshold</code>, <code>Threshold.chi_square</code>, <code>Threshold.beale</code>, <code>Threshold.bootstrap_calibrated</code></td>
+<td><code>level</code></td>
+<td><code>confidence_level</code></td>
+</tr>
+<tr>
+<td><code>ProfileSection</code> (<code>IdentifiabilityReport.profile</code>)</td>
+<td><code>.level</code></td>
+<td><code>.confidence_level</code></td>
+</tr>
+<tr>
+<td><code>ParticleSwarmConfig</code></td>
+<td><code>num_particles=</code></td>
+<td><code>particles=</code></td>
+</tr>
+<tr>
+<td><code>Sobol</code></td>
+<td><code>base_draws=</code>, <code>bootstrap=</code></td>
+<td><code>draws=</code>, <code>replicates=</code></td>
+</tr>
+<tr>
+<td><code>Ratio</code></td>
+<td><code>replicates=</code></td>
+<td><code>replicate_rule=</code></td>
+</tr>
+<tr>
+<td><code>Simulation.replicates</code>, <code>ReplicateRuns</code></td>
+<td><code>n</code></td>
+<td><code>count</code></td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="../../codebase/decisions/results/#a-setting-has-one-name-and-one-check">A setting has one name and one check</a>.</p>
+<ul>
+<li>One check, in Rust, rejects a confidence level that is not strictly between
+  0 and 1, with one message in every method:
+  <code>confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95%
+  interval</code>. Every other setting strictly between 0 and 1 (<code>target_cess</code>,
+  <code>stay_probability</code>, <code>min_acceptance</code>, the <code>quantile</code> of <code>ABCRejection</code>,
+  <code>correlation_threshold</code>) says <code>&lt;name&gt; is strictly between 0 and 1, got
+  &lt;value&gt;</code>.</li>
+</ul>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Breaking:</strong> <code>commol.add_stderr_logger</code> is removed: commol configures no
@@ -4391,7 +4482,7 @@ version and the commit of the package. Before you upgrade, read the
   <a href="../../guide/uncertainty/sensitivity/#a-ratio-of-two-quantities">A ratio of two quantities</a>.</p>
 </li>
 </ul>
-<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p>The tolerance of a profile under a particle swarm with the improvement stop
@@ -4520,7 +4611,7 @@ See <a href="../../guide/uncertainty/sensitivity/">Sensitivity Analysis</a> and
   <a href="../../guide/simulations/#compare-results-on-the-same-panels">Plotting</a>.</p>
 </li>
 </ul>
-<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
+<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Breaking:</strong> each figure is a method of the results it draws, and
   <code>SimulationPlotter</code> is removed. Each figure returns the matplotlib <code>Figure</code>.
@@ -4661,7 +4752,7 @@ method that replaces each one. See <a href="../../guide/reports/">Reports</a> an
   their model still pickle. See <a href="../../guide/reports/">Reports</a>.</p>
 </li>
 </ul>
-<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
+<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>Breaking:</strong> the module functions <code>window_start</code>, <code>window_end</code>,
@@ -4922,7 +5013,7 @@ capitals. See <a href="../../guide/uncertainty/">Uncertainty</a>.</p>
   by the replicates of a bootstrap).</li>
 <li><code>SimulationPlotter.plot_profiles</code>.</li>
 </ul>
-<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
+<h3 id="changed_4">Changed<a class="headerlink" href="#changed_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Nelder-Mead with an infinite bound fails with the message <code>Nelder-Mead
   needs finite bounds</code>, instead of a rate that is not a number. The sine
@@ -5136,7 +5227,7 @@ place), and every interval uses one quantile, so the intervals of
 <li><code>CalibrationProblem::with_data</code> (Rust): a copy of a problem with other
   observed values and weights.</li>
 </ul>
-<h3 id="changed_4">Changed<a class="headerlink" href="#changed_4" title="Permanent link">&para;</a></h3>
+<h3 id="changed_5">Changed<a class="headerlink" href="#changed_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li>The <code>latest</code> version of the documentation site is the documentation of the
   last release, published from its tag; the <code>dev</code> version follows <code>main</code>.</li>
@@ -5297,7 +5388,7 @@ place), and every interval uses one quantile, so the intervals of
   the change of one event and its propensity or its draw; the <code>schedule</code>
   section lists the settings of the engine.</li>
 </ul>
-<h3 id="changed_5">Changed<a class="headerlink" href="#changed_5" title="Permanent link">&para;</a></h3>
+<h3 id="changed_6">Changed<a class="headerlink" href="#changed_6" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Breaking:</strong> a model is built from a process and a structure.
   <code>ModelBuilder</code> writes the process, and <code>build(structure, engine,
@@ -5439,7 +5530,7 @@ place), and every interval uses one quantile, so the intervals of
   accepts <code>initial_condition</code>. A type the kind does not accept raises an error
   that names the kind.</li>
 </ul>
-<h3 id="changed_6">Changed<a class="headerlink" href="#changed_6" title="Permanent link">&para;</a></h3>
+<h3 id="changed_7">Changed<a class="headerlink" href="#changed_7" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Breaking:</strong> a <code>DifferenceEquations</code> step that leaves a compartment below
   zero (by more than <code>10⁻¹²</code> of the total) raises <code>InfeasibleStateError</code>, a
@@ -6033,7 +6124,7 @@ place), and every interval uses one quantile, so the intervals of
   calibration objective, the calibrated predictions and the model write-back
   share one implementation of how calibration values reach the engine.</li>
 </ul>
-<h3 id="changed_7">Changed<a class="headerlink" href="#changed_7" title="Permanent link">&para;</a></h3>
+<h3 id="changed_8">Changed<a class="headerlink" href="#changed_8" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Breaking:</strong> calibrated initial conditions no longer auto-calculate the
   last population-fraction value as the remainder of the population. The new

@@ -598,7 +598,7 @@ class Calibrator:
         improvement = opt_config.improvement_stop_config
         radius = opt_config.radius_stop_config
         ps_config = rust_calibration.ParticleSwarmConfig(
-            num_particles=opt_config.num_particles,
+            particles=opt_config.particles,
             max_iterations=opt_config.max_iterations,
             verbose=opt_config.verbose,
             inertia=rust_inertia,
@@ -2784,7 +2784,7 @@ Attributes:
 
 | Name             | Type   | Description                                           |
 | ---------------- | ------ | ----------------------------------------------------- |
-| `num_particles`  | `int`  | Number of particles in the swarm (default: 20)        |
+| `particles`      | `int`  | Number of particles in the swarm (default: 20)        |
 | `max_iterations` | `int`  | Maximum number of iterations (default: 1000)          |
 | `verbose`        | `bool` | Enable verbose output (default: False)                |
 | `initialization` | `str`  | Particle initialization strategy (default: "uniform") |
@@ -2809,7 +2809,7 @@ class ParticleSwarmConfig(BaseModel):
 
     Attributes
     ----------
-    num_particles : int
+    particles : int
         Number of particles in the swarm (default: 20)
     max_iterations : int
         Maximum number of iterations (default: 1000)
@@ -2837,7 +2837,7 @@ class ParticleSwarmConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Core parameters
-    num_particles: int = Field(
+    particles: int = Field(
         default=20, gt=0, description="Number of particles in the swarm"
     )
     max_iterations: int = Field(

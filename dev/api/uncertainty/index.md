@@ -1108,7 +1108,7 @@ class Predictive:
         The seed of each draw of `sample`, in its order.
 
         With a stochastic engine, replicate ``i`` of draw ``j`` runs with the
-        seed replicate ``i`` of ``Simulation.replicates(n, seed=draw_seeds[j])``
+        seed replicate ``i`` of ``Simulation.replicates(count, seed=draw_seeds[j])``
         takes, so those replicates of the model at that draw give its runs.
         """
         return self._rust.draw_seeds
@@ -1391,7 +1391,7 @@ draw_seeds: list[int]
 
 The seed of each draw of `sample`, in its order.
 
-With a stochastic engine, replicate `i` of draw `j` runs with the seed replicate `i` of `Simulation.replicates(n, seed=draw_seeds[j])` takes, so those replicates of the model at that draw give its runs.
+With a stochastic engine, replicate `i` of draw `j` runs with the seed replicate `i` of `Simulation.replicates(count, seed=draw_seeds[j])` takes, so those replicates of the model at that draw give its runs.
 
 #### plot
 
@@ -3221,12 +3221,7 @@ class BootstrapResult(BaseModel):
         ValueError
             If the confidence level is not strictly between 0 and 1.
         """
-        if not 0.0 < confidence_level < 1.0:
-            raise ValueError(
-                f"A confidence level is strictly between 0 and 1, got "
-                f"{confidence_level}."
-            )
-        low, high = (1.0 - confidence_level) / 2.0, (1.0 + confidence_level) / 2.0
+        low, high = commol_rs.inference.interval_levels(confidence_level)
         errors: dict[str, BoundError] = {}
         for index, name in enumerate(self.sample.names):
             column = [row[index] for row in self.sample.values]
@@ -3292,12 +3287,7 @@ def interval_error(self, confidence_level: float) -> dict[str, BoundError]:
     ValueError
         If the confidence level is not strictly between 0 and 1.
     """
-    if not 0.0 < confidence_level < 1.0:
-        raise ValueError(
-            f"A confidence level is strictly between 0 and 1, got "
-            f"{confidence_level}."
-        )
-    low, high = (1.0 - confidence_level) / 2.0, (1.0 + confidence_level) / 2.0
+    low, high = commol_rs.inference.interval_levels(confidence_level)
     errors: dict[str, BoundError] = {}
     for index, name in enumerate(self.sample.names):
         column = [row[index] for row in self.sample.values]
@@ -3757,17 +3747,17 @@ def as_observation(self) -> ObservedDataPoint:
 
 Bases: `_Frozen`
 
-How far the statistic of a profile may rise above the fit inside an interval of level `level`.
+How far the statistic of a profile may rise above the fit inside an interval of `confidence_level`.
 
 Build one with `chi_square`, `beale` or `bootstrap_calibrated`.
 
 Attributes:
 
-| Name        | Type                                        | Description                                                     |
-| ----------- | ------------------------------------------- | --------------------------------------------------------------- |
-| `kind`      | `{chi_square, beale, bootstrap_calibrated}` | The rule.                                                       |
-| `level`     | `float`                                     | The level of each pointwise interval, strictly between 0 and 1. |
-| `bootstrap` | \`BayesianBootstrap                         | ParametricBootstrap                                             |
+| Name               | Type                                        | Description                                                     |
+| ------------------ | ------------------------------------------- | --------------------------------------------------------------- |
+| `kind`             | `{chi_square, beale, bootstrap_calibrated}` | The rule.                                                       |
+| `confidence_level` | `float`                                     | The level of each pointwise interval, strictly between 0 and 1. |
+| `bootstrap`        | \`BayesianBootstrap                         | ParametricBootstrap                                             |
 
 Source code in `commol/context/inference/profiles.py`
 
@@ -3775,7 +3765,7 @@ Source code in `commol/context/inference/profiles.py`
 class Threshold(_Frozen):
     """
     How far the statistic of a profile may rise above the fit inside an
-    interval of level `level`.
+    interval of `confidence_level`.
 
     Build one with `chi_square`, `beale` or `bootstrap_calibrated`.
 
@@ -3783,14 +3773,14 @@ class Threshold(_Frozen):
     ----------
     kind : {"chi_square", "beale", "bootstrap_calibrated"}
         The rule.
-    level : float
+    confidence_level : float
         The level of each pointwise interval, strictly between 0 and 1.
     bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap | None
         The bootstrap of ``"bootstrap_calibrated"``; None otherwise.
     """  # noqa: E501
 
     kind: Literal["chi_square", "beale", "bootstrap_calibrated"]
-    level: float = Field(gt=0.0, lt=1.0)
+    confidence_level: ConfidenceLevel
     bootstrap: ProfileBootstrap | None = None
 
     @model_validator(mode="after")
@@ -3805,17 +3795,17 @@ class Threshold(_Frozen):
         return self
 
     @classmethod
-    def chi_square(cls, level: float) -> Self:
+    def chi_square(cls, confidence_level: float) -> Self:
         """
-        ``½ χ²₁(level)`` on ``−log L`` (Wilks): the threshold of a problem
-        with observation models.
+        ``½ χ²₁(confidence_level)`` on ``−log L`` (Wilks): the threshold of a
+        problem with observation models.
 
         It assumes that the models hold and that the statistic is near its
         large-sample distribution.
 
         Parameters
         ----------
-        level : float
+        confidence_level : float
             The level of each interval, strictly between 0 and 1.
 
         Returns
@@ -3826,23 +3816,23 @@ class Threshold(_Frozen):
         Raises
         ------
         ValueError
-            If the level is not strictly between 0 and 1.
+            If ``confidence_level`` is not strictly between 0 and 1.
         """
-        return cls(kind="chi_square", level=_level(level))
+        return cls(kind="chi_square", confidence_level=confidence_level)
 
     @classmethod
-    def beale(cls, level: float) -> Self:
+    def beale(cls, confidence_level: float) -> Self:
         """
-        Beale's threshold of a sum of squares: ``S(θ̂) · F(1, n − p; level) /
-        (n − p)``, with ``n`` observations of positive weight and ``p``
-        parameters.
+        Beale's threshold of a sum of squares:
+        ``S(θ̂) · F(1, n − p; confidence_level) / (n − p)``, with ``n``
+        observations of positive weight and ``p`` parameters.
 
         It assumes independent Gaussian errors of one variance, and is exact
         for a model linear in its parameters. It needs the loss ``"sse"``.
 
         Parameters
         ----------
-        level : float
+        confidence_level : float
             The level of each interval, strictly between 0 and 1.
 
         Returns
@@ -3853,12 +3843,14 @@ class Threshold(_Frozen):
         Raises
         ------
         ValueError
-            If the level is not strictly between 0 and 1.
+            If ``confidence_level`` is not strictly between 0 and 1.
         """
-        return cls(kind="beale", level=_level(level))
+        return cls(kind="beale", confidence_level=confidence_level)
 
     @classmethod
-    def bootstrap_calibrated(cls, bootstrap: ProfileBootstrap, level: float) -> Self:
+    def bootstrap_calibrated(
+        cls, bootstrap: ProfileBootstrap, confidence_level: float
+    ) -> Self:
         """
         The threshold of each quantity calibrated by `bootstrap`
         (prepivoting, Beran 1988), for any loss.
@@ -3867,15 +3859,15 @@ class Threshold(_Frozen):
         ``Calibrator.uncertainty(bootstrap)`` builds it, is fitted
         (``θ̂_b``) and then fitted again with the quantity held at its value
         at the fit of the original data: the rise of the replicate is
-        ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile `level` of
-        the rises. It costs one fit and one refit per quantity for each
-        replicate.
+        ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile
+        `confidence_level` of the rises. It costs one fit and one refit per
+        quantity for each replicate.
 
         Parameters
         ----------
         bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap
             The bootstrap, with its replicates and starts.
-        level : float
+        confidence_level : float
             The level of each interval, strictly between 0 and 1.
 
         Returns
@@ -3886,10 +3878,12 @@ class Threshold(_Frozen):
         Raises
         ------
         ValueError
-            If the level is not strictly between 0 and 1.
+            If ``confidence_level`` is not strictly between 0 and 1.
         """  # noqa: E501
         return cls(
-            kind="bootstrap_calibrated", level=_level(level), bootstrap=bootstrap
+            kind="bootstrap_calibrated",
+            confidence_level=confidence_level,
+            bootstrap=bootstrap,
         )
 ```
 
@@ -3921,18 +3915,18 @@ def check_bootstrap(self) -> Self:
 #### chi_square
 
 ```python
-chi_square(level: float) -> Self
+chi_square(confidence_level: float) -> Self
 ```
 
-`½ χ²₁(level)` on `−log L` (Wilks): the threshold of a problem with observation models.
+`½ χ²₁(confidence_level)` on `−log L` (Wilks): the threshold of a problem with observation models.
 
 It assumes that the models hold and that the statistic is near its large-sample distribution.
 
 Parameters:
 
-| Name    | Type    | Description                                           | Default    |
-| ------- | ------- | ----------------------------------------------------- | ---------- |
-| `level` | `float` | The level of each interval, strictly between 0 and 1. | *required* |
+| Name               | Type    | Description                                           | Default    |
+| ------------------ | ------- | ----------------------------------------------------- | ---------- |
+| `confidence_level` | `float` | The level of each interval, strictly between 0 and 1. | *required* |
 
 Returns:
 
@@ -3942,25 +3936,25 @@ Returns:
 
 Raises:
 
-| Type         | Description                                   |
-| ------------ | --------------------------------------------- |
-| `ValueError` | If the level is not strictly between 0 and 1. |
+| Type         | Description                                          |
+| ------------ | ---------------------------------------------------- |
+| `ValueError` | If confidence_level is not strictly between 0 and 1. |
 
 Source code in `commol/context/inference/profiles.py`
 
 ```python
 @classmethod
-def chi_square(cls, level: float) -> Self:
+def chi_square(cls, confidence_level: float) -> Self:
     """
-    ``½ χ²₁(level)`` on ``−log L`` (Wilks): the threshold of a problem
-    with observation models.
+    ``½ χ²₁(confidence_level)`` on ``−log L`` (Wilks): the threshold of a
+    problem with observation models.
 
     It assumes that the models hold and that the statistic is near its
     large-sample distribution.
 
     Parameters
     ----------
-    level : float
+    confidence_level : float
         The level of each interval, strictly between 0 and 1.
 
     Returns
@@ -3971,26 +3965,26 @@ def chi_square(cls, level: float) -> Self:
     Raises
     ------
     ValueError
-        If the level is not strictly between 0 and 1.
+        If ``confidence_level`` is not strictly between 0 and 1.
     """
-    return cls(kind="chi_square", level=_level(level))
+    return cls(kind="chi_square", confidence_level=confidence_level)
 ```
 
 #### beale
 
 ```python
-beale(level: float) -> Self
+beale(confidence_level: float) -> Self
 ```
 
-Beale's threshold of a sum of squares: `S(θ̂) · F(1, n − p; level) / (n − p)`, with `n` observations of positive weight and `p` parameters.
+Beale's threshold of a sum of squares: `S(θ̂) · F(1, n − p; confidence_level) / (n − p)`, with `n` observations of positive weight and `p` parameters.
 
 It assumes independent Gaussian errors of one variance, and is exact for a model linear in its parameters. It needs the loss `"sse"`.
 
 Parameters:
 
-| Name    | Type    | Description                                           | Default    |
-| ------- | ------- | ----------------------------------------------------- | ---------- |
-| `level` | `float` | The level of each interval, strictly between 0 and 1. | *required* |
+| Name               | Type    | Description                                           | Default    |
+| ------------------ | ------- | ----------------------------------------------------- | ---------- |
+| `confidence_level` | `float` | The level of each interval, strictly between 0 and 1. | *required* |
 
 Returns:
 
@@ -4000,26 +3994,26 @@ Returns:
 
 Raises:
 
-| Type         | Description                                   |
-| ------------ | --------------------------------------------- |
-| `ValueError` | If the level is not strictly between 0 and 1. |
+| Type         | Description                                          |
+| ------------ | ---------------------------------------------------- |
+| `ValueError` | If confidence_level is not strictly between 0 and 1. |
 
 Source code in `commol/context/inference/profiles.py`
 
 ```python
 @classmethod
-def beale(cls, level: float) -> Self:
+def beale(cls, confidence_level: float) -> Self:
     """
-    Beale's threshold of a sum of squares: ``S(θ̂) · F(1, n − p; level) /
-    (n − p)``, with ``n`` observations of positive weight and ``p``
-    parameters.
+    Beale's threshold of a sum of squares:
+    ``S(θ̂) · F(1, n − p; confidence_level) / (n − p)``, with ``n``
+    observations of positive weight and ``p`` parameters.
 
     It assumes independent Gaussian errors of one variance, and is exact
     for a model linear in its parameters. It needs the loss ``"sse"``.
 
     Parameters
     ----------
-    level : float
+    confidence_level : float
         The level of each interval, strictly between 0 and 1.
 
     Returns
@@ -4030,27 +4024,27 @@ def beale(cls, level: float) -> Self:
     Raises
     ------
     ValueError
-        If the level is not strictly between 0 and 1.
+        If ``confidence_level`` is not strictly between 0 and 1.
     """
-    return cls(kind="beale", level=_level(level))
+    return cls(kind="beale", confidence_level=confidence_level)
 ```
 
 #### bootstrap_calibrated
 
 ```python
-bootstrap_calibrated(bootstrap: ProfileBootstrap, level: float) -> Self
+bootstrap_calibrated(bootstrap: ProfileBootstrap, confidence_level: float) -> Self
 ```
 
 The threshold of each quantity calibrated by `bootstrap` (prepivoting, Beran 1988), for any loss.
 
-Each replicate of the bootstrap, rebuilt from the problem's seed as `Calibrator.uncertainty(bootstrap)` builds it, is fitted (`θ̂_b`) and then fitted again with the quantity held at its value at the fit of the original data: the rise of the replicate is `PL_b(θ̂ⱼ) − L_b(θ̂_b)`. The threshold is the quantile `level` of the rises. It costs one fit and one refit per quantity for each replicate.
+Each replicate of the bootstrap, rebuilt from the problem's seed as `Calibrator.uncertainty(bootstrap)` builds it, is fitted (`θ̂_b`) and then fitted again with the quantity held at its value at the fit of the original data: the rise of the replicate is `PL_b(θ̂ⱼ) − L_b(θ̂_b)`. The threshold is the quantile `confidence_level` of the rises. It costs one fit and one refit per quantity for each replicate.
 
 Parameters:
 
-| Name        | Type                | Description                                           | Default           |
-| ----------- | ------------------- | ----------------------------------------------------- | ----------------- |
-| `bootstrap` | \`BayesianBootstrap | ParametricBootstrap                                   | ResidualBootstrap |
-| `level`     | `float`             | The level of each interval, strictly between 0 and 1. | *required*        |
+| Name               | Type                | Description                                           | Default           |
+| ------------------ | ------------------- | ----------------------------------------------------- | ----------------- |
+| `bootstrap`        | \`BayesianBootstrap | ParametricBootstrap                                   | ResidualBootstrap |
+| `confidence_level` | `float`             | The level of each interval, strictly between 0 and 1. | *required*        |
 
 Returns:
 
@@ -4060,15 +4054,17 @@ Returns:
 
 Raises:
 
-| Type         | Description                                   |
-| ------------ | --------------------------------------------- |
-| `ValueError` | If the level is not strictly between 0 and 1. |
+| Type         | Description                                          |
+| ------------ | ---------------------------------------------------- |
+| `ValueError` | If confidence_level is not strictly between 0 and 1. |
 
 Source code in `commol/context/inference/profiles.py`
 
 ```python
 @classmethod
-def bootstrap_calibrated(cls, bootstrap: ProfileBootstrap, level: float) -> Self:
+def bootstrap_calibrated(
+    cls, bootstrap: ProfileBootstrap, confidence_level: float
+) -> Self:
     """
     The threshold of each quantity calibrated by `bootstrap`
     (prepivoting, Beran 1988), for any loss.
@@ -4077,15 +4073,15 @@ def bootstrap_calibrated(cls, bootstrap: ProfileBootstrap, level: float) -> Self
     ``Calibrator.uncertainty(bootstrap)`` builds it, is fitted
     (``θ̂_b``) and then fitted again with the quantity held at its value
     at the fit of the original data: the rise of the replicate is
-    ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile `level` of
-    the rises. It costs one fit and one refit per quantity for each
-    replicate.
+    ``PL_b(θ̂ⱼ) − L_b(θ̂_b)``. The threshold is the quantile
+    `confidence_level` of the rises. It costs one fit and one refit per
+    quantity for each replicate.
 
     Parameters
     ----------
     bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap
         The bootstrap, with its replicates and starts.
-    level : float
+    confidence_level : float
         The level of each interval, strictly between 0 and 1.
 
     Returns
@@ -4096,10 +4092,12 @@ def bootstrap_calibrated(cls, bootstrap: ProfileBootstrap, level: float) -> Self
     Raises
     ------
     ValueError
-        If the level is not strictly between 0 and 1.
+        If ``confidence_level`` is not strictly between 0 and 1.
     """  # noqa: E501
     return cls(
-        kind="bootstrap_calibrated", level=_level(level), bootstrap=bootstrap
+        kind="bootstrap_calibrated",
+        confidence_level=confidence_level,
+        bootstrap=bootstrap,
     )
 ```
 
@@ -4294,7 +4292,7 @@ class ProfileResult(_Frozen):
             profile=[
                 ProfileSection(
                     threshold=self.threshold.kind,
-                    level=self.threshold.level,
+                    confidence_level=self.threshold.confidence_level,
                     tolerance=self.tolerance,
                     verdicts=self.verdicts,
                     intervals={
@@ -4481,7 +4479,7 @@ def report(self) -> IdentifiabilityReport:
         profile=[
             ProfileSection(
                 threshold=self.threshold.kind,
-                level=self.threshold.level,
+                confidence_level=self.threshold.confidence_level,
                 tolerance=self.tolerance,
                 verdicts=self.verdicts,
                 intervals={
@@ -5439,9 +5437,7 @@ class BootstrapCoverageEta(BaseModel):
     kind: Literal["bootstrap_coverage"] = "bootstrap_coverage"
     replicates: int = Field(ge=1, description="Number of bootstrap data sets.")
     block_length: BlockLength = Field(description="Positions per block.")
-    confidence_level: float = Field(
-        gt=0.0, lt=1.0, description="The level of the intervals."
-    )
+    confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
 ```
 
 ## ABCSMC
@@ -6356,15 +6352,15 @@ Guide: [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/gu
 
 Bases: `UncertaintyMethod[ConformalResult]`
 
-What every conformal method takes: a score, the pooling of its quantiles, and a level, none of them with a default.
+What every conformal method takes: a score, the pooling of its quantiles, and a confidence level, none of them with a default.
 
 Attributes:
 
-| Name    | Type                             | Description                                                                                                                                    |
-| ------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `score` | `{absolute, normalized, spread}` | The nonconformity score. "normalized" needs by="all": per series its factor is one constant, so its intervals would equal those of "absolute". |
-| `by`    | `{series, all}`                  | Whether each series gets its own quantile, or all series share one.                                                                            |
-| `level` | `float`                          | The level of the intervals, strictly between 0 and 1.                                                                                          |
+| Name               | Type                             | Description                                                                                                                                    |
+| ------------------ | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `score`            | `{absolute, normalized, spread}` | The nonconformity score. "normalized" needs by="all": per series its factor is one constant, so its intervals would equal those of "absolute". |
+| `by`               | `{series, all}`                  | Whether each series gets its own quantile, or all series share one.                                                                            |
+| `confidence_level` | `float`                          | The level of the intervals, strictly between 0 and 1.                                                                                          |
 
 Source code in `commol/context/inference/conformal.py`
 
@@ -6372,7 +6368,7 @@ Source code in `commol/context/inference/conformal.py`
 class ConformalMethod(UncertaintyMethod[ConformalResult]):
     """
     What every conformal method takes: a score, the pooling of its
-    quantiles, and a level, none of them with a default.
+    quantiles, and a confidence level, none of them with a default.
 
     Attributes
     ----------
@@ -6382,13 +6378,13 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
         of ``"absolute"``.
     by : {"series", "all"}
         Whether each series gets its own quantile, or all series share one.
-    level : float
+    confidence_level : float
         The level of the intervals, strictly between 0 and 1.
     """
 
     score: ConformalScore = Field(description="The nonconformity score.")
     by: Pooling = Field(description="Which scores each quantile reads.")
-    level: float = Field(gt=0.0, lt=1.0, description="The level of the intervals.")
+    confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
 
     @model_validator(mode="before")
     @classmethod
@@ -6437,7 +6433,7 @@ Bases: `ConformalMethod`
 
 Split conformal prediction.
 
-It fits the problem's observations and scores `calibration_data`, observations held out of the fit. When the scores of the held-out and of new observations are exchangeable, each interval covers a new observation with probability at least `level`.
+It fits the problem's observations and scores `calibration_data`, observations held out of the fit. When the scores of the held-out and of new observations are exchangeable, each interval covers a new observation with probability at least `confidence_level`.
 
 Attributes:
 
@@ -6458,7 +6454,7 @@ class SplitConformal(ConformalMethod):
     It fits the problem's observations and scores `calibration_data`,
     observations held out of the fit. When the scores of the held-out and of
     new observations are exchangeable, each interval covers a new
-    observation with probability at least `level`.
+    observation with probability at least `confidence_level`.
 
     Attributes
     ----------
@@ -6798,15 +6794,15 @@ class ConformalResult(BaseModel):
 
 Bases: `BaseModel`
 
-Prediction intervals for observations: where new observations of each series fall, at a level.
+Prediction intervals for observations: where new observations of each series fall, at a confidence level.
 
 Attributes:
 
-| Name        | Type                         | Description                                                                                                                                    |
-| ----------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `level`     | `float`                      | The level of the intervals, 1 − α.                                                                                                             |
-| `series`    | `dict[str, SeriesIntervals]` | The intervals of each series, by label.                                                                                                        |
-| `unbounded` | `dict[str, list[float]]`     | The positions of each series whose interval is unbounded, because its quantile had fewer than 1/α − 1 scores. A series with none is not a key. |
+| Name               | Type                         | Description                                                                                                                                    |
+| ------------------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `confidence_level` | `float`                      | The level of the intervals, 1 − α.                                                                                                             |
+| `series`           | `dict[str, SeriesIntervals]` | The intervals of each series, by label.                                                                                                        |
+| `unbounded`        | `dict[str, list[float]]`     | The positions of each series whose interval is unbounded, because its quantile had fewer than 1/α − 1 scores. A series with none is not a key. |
 
 Source code in `commol/context/inference/conformal.py`
 
@@ -6814,11 +6810,11 @@ Source code in `commol/context/inference/conformal.py`
 class PredictionIntervals(BaseModel):
     """
     Prediction intervals for observations: where new observations of each
-    series fall, at a level.
+    series fall, at a confidence level.
 
     Attributes
     ----------
-    level : float
+    confidence_level : float
         The level of the intervals, ``1 − α``.
     series : dict[str, SeriesIntervals]
         The intervals of each series, by label.
@@ -6830,7 +6826,7 @@ class PredictionIntervals(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
 
-    level: float
+    confidence_level: float
     series: dict[str, SeriesIntervals]
     unbounded: dict[str, list[float]]
 ```
@@ -7558,16 +7554,8 @@ def ci_percentiles(confidence_level: float) -> tuple[float, float]:
     ValueError
         If ``confidence_level`` is not strictly between 0 and 1.
     """
-    if not 0.0 < confidence_level < 1.0:
-        raise ValueError(
-            f"confidence_level must be strictly between 0 and 1, got "
-            f"{confidence_level}. Note this is a fraction, not a percentage: "
-            f"use 0.95 for a 95% interval."
-        )
-    return (
-        (1.0 - confidence_level) / 2.0 * 100.0,
-        (1.0 + confidence_level) / 2.0 * 100.0,
-    )
+    lower, upper = commol_rs.inference.interval_levels(confidence_level)
+    return lower * 100.0, upper * 100.0
 ```
 
 ## registry

@@ -3299,13 +3299,14 @@ points of the side, or of the line through the last two.</p>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_profiles.rs::profile_of_a_linear_model_is_a_parabola</code>,
 <code>tests/uncertainty/test_profiles.py::test_linear_normal_profiles_are_exact</code>.</p>
 <h2 id="a-threshold-states-the-noise">A threshold states the noise<a class="headerlink" href="#a-threshold-states-the-noise" title="Permanent link">&para;</a></h2>
-<p><code>Threshold</code> has no default. <code>chi_square</code> gives <code>½ χ²₁(level)</code> on <code>−log L</code> and
-refuses a loss; <code>beale</code> gives <code>S(θ̂) · F(1, n − p; level) / (n − p)</code> and needs
+<p><code>Threshold</code> has no default. <code>chi_square</code> gives <code>½ χ²₁(confidence_level)</code> on
+<code>−log L</code> and refuses a loss; <code>beale</code> gives
+<code>S(θ̂) · F(1, n − p; confidence_level) / (n − p)</code> and needs
 the loss <code>"sse"</code>; <code>bootstrap_calibrated</code> calibrates the statistic itself
 (prepivoting, Beran 1988): replicate <code>b</code> of the bootstrap, rebuilt from
 <code>replicate_seed(seed, b)</code> as <code>ReplicateRunner::run</code> builds it, is fitted and
 then fitted again with the quantity held at its value at the original fit, and
-the threshold is the quantile <code>level</code> of the rises
+the threshold is the quantile <code>confidence_level</code> of the rises
 (<code>bootstrap_thresholds</code>, <code>threshold.rs</code>).</p>
 <table>
 <thead>

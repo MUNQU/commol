@@ -3864,7 +3864,7 @@ a <code>SensitivityAnalysis</code> of the inputs of the sample. With a stochasti
 every replicate of a draw is a draw of the predictive, with an equal share of
 its weight. The runs follow one tree of seeds: draw <code>j</code> takes the seed
 <code>draw_seeds[j]</code>, derived from the seed of the source, and its replicate <code>i</code>
-takes the seed that replicate <code>i</code> of <code>Simulation.replicates(n,
+takes the seed that replicate <code>i</code> of <code>Simulation.replicates(count,
 seed=draw_seeds[j])</code> takes. So every draw shows fresh noise, the predictive
 repeats from the seed of the source, and the runs of a draw change neither
 with the number of replicates nor with the number of draws.
@@ -3908,7 +3908,7 @@ calibration gives for the same values: the remainder and the excess
 </tr>
 <tr>
 <td><code>draw_seeds</code></td>
-<td>The seed of each draw of the sample: <code>Simulation.replicates(n, seed=draw_seeds[j])</code> of the model at the values of draw <code>j</code> gives its runs</td>
+<td>The seed of each draw of the sample: <code>Simulation.replicates(count, seed=draw_seeds[j])</code> of the model at the values of draw <code>j</code> gives its runs</td>
 </tr>
 <tr>
 <td><code>report(confidence_level, positions, window, windows, observed_data=(), accumulators=())</code></td>

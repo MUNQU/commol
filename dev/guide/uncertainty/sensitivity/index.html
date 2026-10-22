@@ -3748,7 +3748,7 @@ never returns to Python. The quantities live in
 <td>The value at <code>end</code> minus the value at <code>start</code>: what entered a cumulative output over <code>(start, end]</code>, as an observation with a window</td>
 </tr>
 <tr>
-<td><code>Ratio(numerator, denominator, replicates)</code></td>
+<td><code>Ratio(numerator, denominator, replicate_rule)</code></td>
 <td>One quantity of one value over another, in each run (<a href="#a-ratio-of-two-quantities">A ratio of two quantities</a>)</td>
 </tr>
 </tbody>
@@ -3800,7 +3800,7 @@ one window, and <code>PeakPosition</code> gives the end of that window:</p>
 </tr>
 <tr>
 <td>With a stochastic engine, a quantity is computed for each replicate</td>
-<td>A design point holds the mean of its replicates, or for a <code>Ratio</code> what its <code>replicates</code> says; a propagation keeps each</td>
+<td>A design point holds the mean of its replicates, or for a <code>Ratio</code> what its <code>replicate_rule</code> says; a propagation keeps each</td>
 </tr>
 </tbody>
 </table>
@@ -3828,8 +3828,8 @@ condition, such as <code>np.isfinite(values[:, i])</code> or a value above a thr
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">late</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="mf">0.9</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">median</span><span class="p">))</span>  <span class="c1"># 216</span>
 </span></code></pre></div>
 <h3 id="a-ratio-of-two-quantities">A ratio of two quantities<a class="headerlink" href="#a-ratio-of-two-quantities" title="Permanent link">&para;</a></h3>
-<p><code>Ratio(numerator, denominator, replicates)</code> divides two quantities of one
-value each (<code>ValueAt</code>, <code>Gain</code>, <code>Peak</code>), numerator N over denominator D, in
+<p><code>Ratio(numerator, denominator, replicate_rule)</code> divides two quantities of
+one value each (<code>ValueAt</code>, <code>Gain</code>, <code>Peak</code>), numerator N over denominator D, in
 each run. It is one quantity, so every method reads it, the sensitivity
 methods too. A <code>PeakPosition</code> or a <code>Trajectory</code> as an operand is a
 <code>ValueError</code>. The share of what entered <code>C</code> by position 100 that entered by
@@ -3839,7 +3839,7 @@ position 50 has a denominator that depends on both inputs:</p>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">early</span> <span class="o">=</span> <span class="n">Ratio</span><span class="p">(</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">numerator</span><span class="o">=</span><span class="n">Gain</span><span class="p">(</span><span class="n">outputs</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">50</span><span class="p">),</span>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">denominator</span><span class="o">=</span><span class="n">Gain</span><span class="p">(</span><span class="n">outputs</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">replicates</span><span class="o">=</span><span class="s2">&quot;within&quot;</span><span class="p">,</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">replicate_rule</span><span class="o">=</span><span class="s2">&quot;within&quot;</span><span class="p">,</span>
 </span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;early share&quot;</span><span class="p">,</span>
 </span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="p">)</span>
 </span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="n">spread</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">Propagation</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">early</span><span class="p">]))</span>
@@ -3850,14 +3850,15 @@ position 50 has a denominator that depends on both inputs:</p>
 </span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="nb">print</span><span class="p">(</span><span class="n">ranked</span><span class="o">.</span><span class="n">inputs</span><span class="p">,</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">ranked</span><span class="o">.</span><span class="n">coefficients</span><span class="p">[</span><span class="mi">0</span><span class="p">]])</span>  <span class="c1"># [&#39;k1&#39;, &#39;k2&#39;] [0.92, 0.69]</span>
 </span></code></pre></div>
 <p>The default label is <code>"(N) / (D)"</code>, from the labels of the two quantities.
-<code>replicates</code> is required, with no default: with a stochastic engine, it says
+<code>replicate_rule</code> is required, with no default: with a stochastic engine, it
+says
 how the replicates of a point of PRCC, Morris, Sobol or a polynomial chaos
 combine (<code>Quantities::combine</code> in <code>crates/commol-inference/src/quantity.rs</code>).
 They are three estimands, and the choice is yours:</p>
 <table>
 <thead>
 <tr>
-<th><code>replicates</code></th>
+<th><code>replicate_rule</code></th>
 <th>Value of a point</th>
 <th>No value when</th>
 </tr>
@@ -3967,7 +3968,7 @@ at <code>0.3 - 0.1</code> reads the row of <code>0.2</code>.</p>
 </tr>
 <tr>
 <td>The replicates of a stochastic engine</td>
-<td>Each replicate is reduced on its own. A <code>Propagation</code> gives draw <code>j</code> the seed <code>draw_seeds[j]</code>, so <code>Simulation.replicates(n, seed=result.draw_seeds[j])</code> of the model at the values of draw <code>j</code> gives the runs of that draw. The seed of the analysis itself gives other runs</td>
+<td>Each replicate is reduced on its own. A <code>Propagation</code> gives draw <code>j</code> the seed <code>draw_seeds[j]</code>, so <code>Simulation.replicates(count, seed=result.draw_seeds[j])</code> of the model at the values of draw <code>j</code> gives the runs of that draw. The seed of the analysis itself gives other runs</td>
 </tr>
 </tbody>
 </table>
@@ -4001,9 +4002,9 @@ at <code>0.3 - 0.1</code> reads the row of <code>0.2</code>.</p>
 <td>Independent</td>
 </tr>
 <tr>
-<td><code>Sobol(base_draws, bootstrap, confidence_level, quantities)</code></td>
+<td><code>Sobol(draws, replicates, confidence_level, quantities)</code></td>
 <td>The share of the variance each input explains, alone and with interactions, with intervals</td>
-<td><code>base_draws · (inputs + 2)</code></td>
+<td><code>draws · (inputs + 2)</code></td>
 <td>Independent</td>
 </tr>
 <tr>
@@ -4094,7 +4095,7 @@ propagation, which take it.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Sobol</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">indices</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">Sobol</span><span class="p">(</span><span class="n">base_draws</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span> <span class="n">bootstrap</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">peak</span><span class="p">])</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">Sobol</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span> <span class="n">replicates</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">quantities</span><span class="o">=</span><span class="p">[</span><span class="n">peak</span><span class="p">])</span>
 </span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="p">)</span>
 </span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[(</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)]:</span>
 </span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    <span class="n">first</span> <span class="o">=</span> <span class="p">(</span><span class="n">indices</span><span class="o">.</span><span class="n">first_lower</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="n">indices</span><span class="o">.</span><span class="n">first</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="n">indices</span><span class="o">.</span><span class="n">first_upper</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">])</span>
@@ -4187,7 +4188,7 @@ and the <code>plot</code> of a <code>ChaosResult</code> draws those of the expan
 <li>[ ] A quantity that is NaN is filtered with <code>where(mask)</code> only on a
       condition you can defend, and the summary is read as conditioned on it.</li>
 <li>[ ] The intervals of Sobol are narrow enough to rank the inputs, and none is
-      NaN (a bootstrap replicate of no variance); if not, raise <code>base_draws</code>.</li>
+      NaN (a bootstrap replicate of no variance); if not, raise <code>draws</code>.</li>
 <li>[ ] The leave-one-out error of a polynomial chaos is small before you read
       its indices, and <code>predict</code> reads values inside the bounds of the inputs.</li>
 <li>[ ] A truncated basis of a polynomial chaos (<code>max_interaction</code>, <code>q_norm</code>)

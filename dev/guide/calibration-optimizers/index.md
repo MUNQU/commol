@@ -67,7 +67,7 @@ def calibrate(optimization_config) -> dict[str, float]:
     return {name: round(value, 2) for name, value in sorted(result.best_parameters.items())}
 
 print(calibrate(NelderMeadConfig(max_iterations=2000)))                    # {'k1': 0.4, 'k2': 0.1}
-print(calibrate(ParticleSwarmConfig(num_particles=30, max_iterations=300)))  # {'k1': 0.4, 'k2': 0.1}
+print(calibrate(ParticleSwarmConfig(particles=30, max_iterations=300)))  # {'k1': 0.4, 'k2': 0.1}
 ```
 
 ## Nelder-Mead
@@ -113,7 +113,7 @@ The search starts at `initial_guess`, or at the midpoint of the bounds; a start 
 
 ```python
 swarm = (
-    ParticleSwarmConfig(num_particles=40, max_iterations=300, initialization="latin_hypercube")
+    ParticleSwarmConfig(particles=40, max_iterations=300, initialization="latin_hypercube")
     .inertia("chaotic", w_min=0.4, w_max=0.9)
     .acceleration("time_varying", c1_initial=2.5, c1_final=0.5, c2_initial=0.5, c2_final=2.5)
     .velocity(clamp_factor=0.2, mutation_threshold=0.005)
@@ -124,7 +124,7 @@ print(calibrate(swarm))  # {'k1': 0.4, 'k2': 0.1}
 
 | Field            | Default     | Meaning                                                                                                                              |
 | ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `num_particles`  | `20`        | The swarm size. More particles search more widely and cost more evaluations.                                                         |
+| `particles`      | `20`        | The swarm size. More particles search more widely and cost more evaluations.                                                         |
 | `max_iterations` | `1000`      | The iteration limit.                                                                                                                 |
 | `initialization` | `"uniform"` | Where particles start: `"uniform"`, `"latin_hypercube"` (spread evenly) or `"opposition_based"` (each random point with its mirror). |
 | `verbose`        | `False`     | Writes progress to `sys.stdout`; needs `run(starts=1)`.                                                                              |
@@ -152,7 +152,7 @@ A swarm stops at `max_iterations` unless a stop rule holds first. The two rules 
 | `.radius_stop(tol)`                                 | Every particle is within `tol` of the best position, as a fraction of the size of the search box (the length of its diagonal) (Zielinski and Laur, 2007) | `tol` ≥ 0 |
 
 ```python
-stopping = ParticleSwarmConfig(num_particles=30, max_iterations=2000).improvement_stop(
+stopping = ParticleSwarmConfig(particles=30, max_iterations=2000).improvement_stop(
     window=30, tol_abs=1e-12, tol_rel=1e-9
 )
 problem = CalibrationProblem(

@@ -3514,7 +3514,7 @@ variant runs through <code>Calibrator.uncertainty</code>, in Rust
 </span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a>        <span class="n">calibration_data</span><span class="o">=</span><span class="n">held_out</span><span class="p">,</span>
 </span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a>        <span class="n">score</span><span class="o">=</span><span class="s2">&quot;absolute&quot;</span><span class="p">,</span>
 </span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a>        <span class="n">by</span><span class="o">=</span><span class="s2">&quot;series&quot;</span><span class="p">,</span>
-</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a>        <span class="n">level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a>        <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
 </span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a>        <span class="n">positions</span><span class="o">=</span><span class="p">[</span><span class="mf">85.0</span><span class="p">,</span> <span class="mf">90.0</span><span class="p">],</span>
 </span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a>    <span class="p">)</span>
 </span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a><span class="p">)</span>
@@ -3562,7 +3562,8 @@ With fewer than <code>1/α − 1</code> scores that rank is above <code>n</code>
 unbounded: <code>-inf</code> to <code>inf</code>. <code>result.intervals.unbounded</code> names the positions of
 each series where that happens. At level 0.9 a quantile needs 9 scores.</p>
 <h2 id="scores-and-pooling">Scores and pooling<a class="headerlink" href="#scores-and-pooling" title="Permanent link">&para;</a></h2>
-<p>Every variant takes a <code>score</code>, a <code>by</code> and a <code>level</code>, none with a default: they
+<p>Every variant takes a <code>score</code>, a <code>by</code> and a <code>confidence_level</code>, none with a
+default: they
 change the width of the intervals, which is a modelling choice.</p>
 <table>
 <thead>
@@ -3621,7 +3622,7 @@ choice: a small series does not borrow the errors of a large one, but it needs
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="n">calibration_data</span><span class="o">=</span><span class="n">held_out</span><span class="p">,</span>
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        <span class="n">score</span><span class="o">=</span><span class="s2">&quot;spread&quot;</span><span class="p">,</span>
 </span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        <span class="n">by</span><span class="o">=</span><span class="s2">&quot;series&quot;</span><span class="p">,</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>        <span class="n">level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>        <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
 </span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>        <span class="n">positions</span><span class="o">=</span><span class="p">[</span><span class="mf">85.0</span><span class="p">,</span> <span class="mf">90.0</span><span class="p">],</span>
 </span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>        <span class="n">sample</span><span class="o">=</span><span class="n">sample</span><span class="p">,</span>
 </span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="p">)</span>
@@ -3709,13 +3710,13 @@ choice: a small series does not borrow the errors of a large one, but it needs
 </tbody>
 </table>
 <h2 id="split-conformal">Split conformal<a class="headerlink" href="#split-conformal" title="Permanent link">&para;</a></h2>
-<p><code>SplitConformal(calibration_data, score, by, level, positions, sample=None,
+<p><code>SplitConformal(calibration_data, score, by, confidence_level, positions, sample=None,
 starts=1)</code> fits the problem's observations (<code>Calibrator.run(starts)</code>), or
 reads a <code>sample</code>, scores <code>calibration_data</code> and gives intervals at <code>positions</code>
 for each series of <code>calibration_data</code>. A series of <code>calibration_data</code> is read
 as its observations define it: its outputs, factor and window.</p>
 <h2 id="rolling-origins">Rolling origins<a class="headerlink" href="#rolling-origins" title="Permanent link">&para;</a></h2>
-<p><code>RollingConformal(origins, score, by, level, positions, starts=1)</code> gives
+<p><code>RollingConformal(origins, score, by, confidence_level, positions, starts=1)</code> gives
 intervals ahead of the data, with one quantile per horizon. Horizon <code>k</code> is the
 <code>k</code>-th observation of a series after an origin: a count, not a distance on the
 axis, because positions can be irregular. Each origin fits the observations at
@@ -3739,14 +3740,14 @@ than <code>1/α − 1</code> origins that reach it has an unbounded interval.</p
 </span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="n">origins</span><span class="o">=</span><span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">step</span><span class="p">)</span> <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">30</span><span class="p">,</span> <span class="mi">71</span><span class="p">)],</span>
 </span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        <span class="n">score</span><span class="o">=</span><span class="s2">&quot;absolute&quot;</span><span class="p">,</span>
 </span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>        <span class="n">by</span><span class="o">=</span><span class="s2">&quot;series&quot;</span><span class="p">,</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="n">level</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
 </span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>        <span class="n">positions</span><span class="o">=</span><span class="p">[</span><span class="mf">81.0</span><span class="p">,</span> <span class="mf">82.0</span><span class="p">,</span> <span class="mf">83.0</span><span class="p">],</span>
 </span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    <span class="p">)</span>
 </span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="p">)</span>
 </span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="nb">print</span><span class="p">(</span><span class="n">rolling</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">unbounded</span><span class="p">)</span>  <span class="c1"># {}</span>
 </span></code></pre></div>
 <h2 id="jackknife">Jackknife+<a class="headerlink" href="#jackknife" title="Permanent link">&para;</a></h2>
-<p><code>JackknifePlus(block_length, score, by, level, positions, starts=1)</code> refits
+<p><code>JackknifePlus(block_length, score, by, confidence_level, positions, starts=1)</code> refits
 once per block left out (Barber et al. 2021). Observation <code>i</code> of block <code>b</code> has
 the residual <code>Rᵢ</code> of the fit <code>μ̂₋ᵦ</code> that left its block out, and the interval at
 a point <code>x</code> is</p>
@@ -3766,12 +3767,12 @@ computes it, and <code>result.guarantee</code> states it.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">JackknifePlus</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">jackknife</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">JackknifePlus</span><span class="p">(</span><span class="n">block_length</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">score</span><span class="o">=</span><span class="s2">&quot;absolute&quot;</span><span class="p">,</span> <span class="n">by</span><span class="o">=</span><span class="s2">&quot;series&quot;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="p">[</span><span class="mf">45.0</span><span class="p">])</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">JackknifePlus</span><span class="p">(</span><span class="n">block_length</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">score</span><span class="o">=</span><span class="s2">&quot;absolute&quot;</span><span class="p">,</span> <span class="n">by</span><span class="o">=</span><span class="s2">&quot;series&quot;</span><span class="p">,</span> <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="p">[</span><span class="mf">45.0</span><span class="p">])</span>
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="p">)</span>
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">jackknife</span><span class="o">.</span><span class="n">guarantee</span><span class="p">)</span>  <span class="c1"># ... at least 0.7318 ... with K = 10 blocks of 4 positions ...</span>
 </span></code></pre></div>
 <h2 id="enbpi">EnbPI<a class="headerlink" href="#enbpi" title="Permanent link">&para;</a></h2>
-<p><code>EnbPI(replicates, block_length, score, by, level, positions, starts=1)</code> draws
+<p><code>EnbPI(replicates, block_length, score, by, confidence_level, positions, starts=1)</code> draws
 its own replicates (Xu and Xie 2021): each draws as many blocks as there are,
 with replacement, and fits with each observation's weight multiplied by the
 count of its block, so the blocks it did not draw get weight 0. The
@@ -3782,7 +3783,7 @@ block left out by no replicate raises a <code>ValueError</code> that asks for mo
 replicates: a block is left out by a replicate with probability about
 <code>1/e ≈ 0.37</code>.</p>
 <h2 id="adaptive-conformal-inference">Adaptive conformal inference<a class="headerlink" href="#adaptive-conformal-inference" title="Permanent link">&para;</a></h2>
-<p><code>AdaptiveConformal(level, step, score, by, stream, sample=None, starts=1)</code>
+<p><code>AdaptiveConformal(confidence_level, step, score, by, stream, sample=None, starts=1)</code>
 walks the observations of <code>stream</code> in order of position (Gibbs and Candès
 2021). The interval of each point is the quantile, at the working level
 <code>1 − α_t</code>, of the scores of the earlier points of the stream; then the point
@@ -3797,7 +3798,7 @@ at each point before it was seen.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">AdaptiveConformal</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">adaptive</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">AdaptiveConformal</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">score</span><span class="o">=</span><span class="s2">&quot;absolute&quot;</span><span class="p">,</span> <span class="n">by</span><span class="o">=</span><span class="s2">&quot;series&quot;</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="n">held_out</span><span class="p">)</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">AdaptiveConformal</span><span class="p">(</span><span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">score</span><span class="o">=</span><span class="s2">&quot;absolute&quot;</span><span class="p">,</span> <span class="n">by</span><span class="o">=</span><span class="s2">&quot;series&quot;</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="n">held_out</span><span class="p">)</span>
 </span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="p">)</span>
 </span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">series</span> <span class="o">=</span> <span class="n">adaptive</span><span class="o">.</span><span class="n">intervals</span><span class="o">.</span><span class="n">series</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">]</span>
 </span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="n">misses</span> <span class="o">=</span> <span class="p">[</span>
@@ -3809,7 +3810,8 @@ at each point before it was seen.</p>
 </span></code></pre></div>
 <h2 id="results-plots-and-reports">Results, plots and reports<a class="headerlink" href="#results-plots-and-reports" title="Permanent link">&para;</a></h2>
 <p>Every variant returns a <code>ConformalResult(intervals, scores, guarantee)</code>.
-<code>intervals</code> is a <code>PredictionIntervals</code>: its <code>level</code>, a <code>SeriesIntervals</code> per
+<code>intervals</code> is a <code>PredictionIntervals</code>: its <code>confidence_level</code>, a
+<code>SeriesIntervals</code> per
 series (<code>positions</code>, <code>prediction</code>, <code>lower</code>, <code>upper</code>), and <code>unbounded</code>.
 <code>plot.series(prediction_intervals=...)</code> of a run, of replicates or of a
 predictive draws the band of each series on its panel, and
