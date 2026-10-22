@@ -240,7 +240,9 @@ inputs.
 `dict[str, float]` with one value per label, and
 `replicates.quantities(quantities)` gives one such dict per replicate, in seed
 order, with no mean. Use them on the point estimate of a fit, or on any run you
-plot. Rust reads the rows of the run at the positions of the quantities and
+plot; `predictive.quantities(quantities)` gives one dict per draw of a
+predictive, and `Scenarios` compares them between scenarios
+([Scenarios](index.md#scenarios)). Rust reads the rows of the run at the positions of the quantities and
 reduces them with the code of `Propagation` (`Quantities::evaluate_run` in
 `crates/commol-inference/src/quantity.rs`), so the values equal those of a
 `Propagation` of a sample of one draw with the parameters of the run.

@@ -1,7 +1,7 @@
 """Uncertainty and identifiability methods and what reads their samples:
-intervals, the predictive and the scores. Importing it registers the runners
-of the identifiability, resampling, sequential Monte Carlo, conformal, local,
-sensitivity and profile methods."""
+intervals, the predictive, the scenarios and the scores. Importing it
+registers the runners of the identifiability, resampling, sequential Monte
+Carlo, conformal, local, sensitivity and profile methods."""
 
 from commol.api.inference import (
     conformal,
@@ -24,11 +24,14 @@ from commol.api.inference.predictive import (
     PredictiveBand,
     SeriesBand,
 )
+from commol.api.inference.scenarios import Scenarios, ScenarioSummary
 
 __all__ = [
     "ObservationDraws",
     "Predictive",
     "PredictiveBand",
+    "ScenarioSummary",
+    "Scenarios",
     "SeriesBand",
     "ci_percentiles",
     "conformal",
