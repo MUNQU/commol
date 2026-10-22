@@ -1274,6 +1274,43 @@ class SimulationResults(dict[str, list[float]]):
         """
         return [list(row) for row in zip(*self.values())] if self else []
 
+    def quantities(self, quantities: "Sequence[QuantityBase]") -> dict[str, float]:
+        """
+        The quantities of interest of this run, as a `Propagation` reduces
+        each of its runs.
+
+        The run must hold every position the quantities read: the results of
+        ``Simulation.run_at(quantity_schedule(quantities))`` hold them all.
+        Each position is found within ``1e-9``, as `index_at` finds it, and
+        Rust reduces the rows with the code of `Propagation`, so the values
+        equal those of a `Propagation` of a sample of one draw with the
+        parameters of this run.
+
+        On the ODE engine, `Simulation.run` reports a position that is not a
+        breakpoint by interpolation, so a value read from it can differ from
+        that of a run that ends there by about the relative tolerance of the
+        solver, and `PeakPosition` can change on a near-tie.
+
+        Parameters
+        ----------
+        quantities : Sequence[Quantity]
+            The quantities; a `Trajectory` gives one scalar per position.
+
+        Returns
+        -------
+        dict[str, float]
+            One value per label of the quantities, in their order.
+
+        Raises
+        ------
+        ValueError
+            If there is no quantity, two scalars have one label, a quantity
+            names an output the results do not have, or the run lacks a
+            position a quantity reads; the message lists every such position
+            with its quantity and says to call `Simulation.run_at`.
+        """
+        return quantities_of_runs([self], self.positions, quantities)[0]
+
     @property
     def plot(self) -> ResultsPlot:
         """
@@ -1525,6 +1562,77 @@ def rows(self) -> list[list[float]]:
         ``positions[i]``.
     """
     return [list(row) for row in zip(*self.values())] if self else []
+```
+
+#### quantities
+
+```python
+quantities(quantities: Sequence[QuantityBase]) -> dict[str, float]
+```
+
+The quantities of interest of this run, as a `Propagation` reduces each of its runs.
+
+The run must hold every position the quantities read: the results of `Simulation.run_at(quantity_schedule(quantities))` hold them all. Each position is found within `1e-9`, as `index_at` finds it, and Rust reduces the rows with the code of `Propagation`, so the values equal those of a `Propagation` of a sample of one draw with the parameters of this run.
+
+On the ODE engine, `Simulation.run` reports a position that is not a breakpoint by interpolation, so a value read from it can differ from that of a run that ends there by about the relative tolerance of the solver, and `PeakPosition` can change on a near-tie.
+
+Parameters:
+
+| Name         | Type                 | Description                                                 | Default    |
+| ------------ | -------------------- | ----------------------------------------------------------- | ---------- |
+| `quantities` | `Sequence[Quantity]` | The quantities; a Trajectory gives one scalar per position. | *required* |
+
+Returns:
+
+| Type               | Description                                            |
+| ------------------ | ------------------------------------------------------ |
+| `dict[str, float]` | One value per label of the quantities, in their order. |
+
+Raises:
+
+| Type         | Description                                                                                                                                                                                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If there is no quantity, two scalars have one label, a quantity names an output the results do not have, or the run lacks a position a quantity reads; the message lists every such position with its quantity and says to call Simulation.run_at. |
+
+Source code in `commol/api/results.py`
+
+```python
+def quantities(self, quantities: "Sequence[QuantityBase]") -> dict[str, float]:
+    """
+    The quantities of interest of this run, as a `Propagation` reduces
+    each of its runs.
+
+    The run must hold every position the quantities read: the results of
+    ``Simulation.run_at(quantity_schedule(quantities))`` hold them all.
+    Each position is found within ``1e-9``, as `index_at` finds it, and
+    Rust reduces the rows with the code of `Propagation`, so the values
+    equal those of a `Propagation` of a sample of one draw with the
+    parameters of this run.
+
+    On the ODE engine, `Simulation.run` reports a position that is not a
+    breakpoint by interpolation, so a value read from it can differ from
+    that of a run that ends there by about the relative tolerance of the
+    solver, and `PeakPosition` can change on a near-tie.
+
+    Parameters
+    ----------
+    quantities : Sequence[Quantity]
+        The quantities; a `Trajectory` gives one scalar per position.
+
+    Returns
+    -------
+    dict[str, float]
+        One value per label of the quantities, in their order.
+
+    Raises
+    ------
+    ValueError
+        If there is no quantity, two scalars have one label, a quantity
+        names an output the results do not have, or the run lacks a
+        position a quantity reads; the message lists every such position
+        with its quantity and says to call `Simulation.run_at`.
+    """
+    return quantities_of_runs([self], self.positions, quantities)[0]
 ```
 
 #### report
@@ -2077,6 +2185,46 @@ class SimulationReplicates(list[SimulationResults]):
             for index, level in enumerate(levels)
         }
 
+    def quantities(
+        self, quantities: "Sequence[QuantityBase]"
+    ) -> list[dict[str, float]]:
+        """
+        The quantities of interest of each replicate, as
+        `SimulationResults.quantities` reads one run.
+
+        Each replicate is reduced on its own, with no mean: a summary across
+        the replicates is a reduction of these values, such as
+        `member_statistics`.
+
+        A stochastic `Propagation` seeds replicate ``i`` of draw ``j`` with
+        ``replicate_seed(stream_seed(seed, 4), j * replicates + i)``, a stream
+        of the seed of the analysis (`crates/commol-inference/src/predictive.rs`,
+        `run_sets`). So the replicates of ``Simulation.replicates(n,
+        seed=s)`` repeat the runs of the first draw only when ``s`` is that
+        stream seed, and ``Simulation.run(seed=s)`` repeats none of them.
+
+        Parameters
+        ----------
+        quantities : Sequence[Quantity]
+            The quantities; a `Trajectory` gives one scalar per position.
+
+        Returns
+        -------
+        list[dict[str, float]]
+            One dict per replicate, in seed order, with one value per label of
+            the quantities.
+
+        Raises
+        ------
+        ValueError
+            If there are no replicates, there is no quantity, two scalars have
+            one label, a quantity names an output the replicates do not have,
+            or they lack a position a quantity reads.
+        """
+        if not self:
+            raise ValueError("There are no replicates.")
+        return quantities_of_runs(self, self.positions, quantities)
+
     def member_statistics(
         self, output: str, confidence_level: float
     ) -> dict[str, list[float]]:
@@ -2401,6 +2549,80 @@ def quantiles(self, levels: Sequence[float]) -> dict[float, SimulationResults]:
         )
         for index, level in enumerate(levels)
     }
+```
+
+#### quantities
+
+```python
+quantities(quantities: Sequence[QuantityBase]) -> list[dict[str, float]]
+```
+
+The quantities of interest of each replicate, as `SimulationResults.quantities` reads one run.
+
+Each replicate is reduced on its own, with no mean: a summary across the replicates is a reduction of these values, such as `member_statistics`.
+
+A stochastic `Propagation` seeds replicate `i` of draw `j` with `replicate_seed(stream_seed(seed, 4), j * replicates + i)`, a stream of the seed of the analysis (`crates/commol-inference/src/predictive.rs`, `run_sets`). So the replicates of `Simulation.replicates(n, seed=s)` repeat the runs of the first draw only when `s` is that stream seed, and `Simulation.run(seed=s)` repeats none of them.
+
+Parameters:
+
+| Name         | Type                 | Description                                                 | Default    |
+| ------------ | -------------------- | ----------------------------------------------------------- | ---------- |
+| `quantities` | `Sequence[Quantity]` | The quantities; a Trajectory gives one scalar per position. | *required* |
+
+Returns:
+
+| Type                     | Description                                                                        |
+| ------------------------ | ---------------------------------------------------------------------------------- |
+| `list[dict[str, float]]` | One dict per replicate, in seed order, with one value per label of the quantities. |
+
+Raises:
+
+| Type         | Description                                                                                                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ValueError` | If there are no replicates, there is no quantity, two scalars have one label, a quantity names an output the replicates do not have, or they lack a position a quantity reads. |
+
+Source code in `commol/api/results.py`
+
+```python
+def quantities(
+    self, quantities: "Sequence[QuantityBase]"
+) -> list[dict[str, float]]:
+    """
+    The quantities of interest of each replicate, as
+    `SimulationResults.quantities` reads one run.
+
+    Each replicate is reduced on its own, with no mean: a summary across
+    the replicates is a reduction of these values, such as
+    `member_statistics`.
+
+    A stochastic `Propagation` seeds replicate ``i`` of draw ``j`` with
+    ``replicate_seed(stream_seed(seed, 4), j * replicates + i)``, a stream
+    of the seed of the analysis (`crates/commol-inference/src/predictive.rs`,
+    `run_sets`). So the replicates of ``Simulation.replicates(n,
+    seed=s)`` repeat the runs of the first draw only when ``s`` is that
+    stream seed, and ``Simulation.run(seed=s)`` repeats none of them.
+
+    Parameters
+    ----------
+    quantities : Sequence[Quantity]
+        The quantities; a `Trajectory` gives one scalar per position.
+
+    Returns
+    -------
+    list[dict[str, float]]
+        One dict per replicate, in seed order, with one value per label of
+        the quantities.
+
+    Raises
+    ------
+    ValueError
+        If there are no replicates, there is no quantity, two scalars have
+        one label, a quantity names an output the replicates do not have,
+        or they lack a position a quantity reads.
+    """
+    if not self:
+        raise ValueError("There are no replicates.")
+    return quantities_of_runs(self, self.positions, quantities)
 ```
 
 #### member_statistics

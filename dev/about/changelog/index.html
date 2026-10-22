@@ -4060,6 +4060,16 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <!-- Added #250 -->
 
+<ul>
+<li><code>SimulationResults.quantities(quantities)</code> reduces one run to its
+  quantities of interest, as <code>dict[str, float]</code>, and
+  <code>SimulationReplicates.quantities(quantities)</code> gives one such dict per
+  replicate, with the Rust code of <code>Propagation</code>. <code>quantity_schedule</code> gives
+  the positions to run at; a run that lacks one raises <code>ValueError</code> that lists
+  each missing position with its quantity. The guide shows how to take a ratio
+  of two quantities row by row. See
+  <a href="../../guide/uncertainty/sensitivity/#the-quantities-of-one-run">The quantities of one run</a>.</li>
+</ul>
 <!-- Added #251 -->
 
 <ul>

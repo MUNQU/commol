@@ -2541,6 +2541,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-quantities-of-one-run-take-the-path-of-a-propagation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The quantities of one run take the path of a propagation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#nan-propagates-in-a-run-and-stops-a-reduction-across-runs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3083,6 +3094,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-quantities-of-one-run-take-the-path-of-a-propagation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The quantities of one run take the path of a propagation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#nan-propagates-in-a-run-and-stops-a-reduction-across-runs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3191,6 +3213,48 @@ again.</p>
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_quantities.rs</code>,
 <code>tests/uncertainty/test_quantities.py</code>.</p>
+<h2 id="the-quantities-of-one-run-take-the-path-of-a-propagation">The quantities of one run take the path of a propagation<a class="headerlink" href="#the-quantities-of-one-run-take-the-path-of-a-propagation" title="Permanent link">&para;</a></h2>
+<p><code>SimulationResults.quantities</code> and <code>SimulationReplicates.quantities</code> reduce
+the rows the run holds, with no rerun: <code>Quantities::evaluate_run</code> finds each
+position of the schedule among the positions of the run with the tolerance of
+the axis (<code>index_at</code> of <code>commol-calibration</code>), then calls the
+<code>Quantities::evaluate</code> of <code>Propagation</code>. The binding (<code>quantities_of_runs</code> in
+<code>py-commol/src/quantity.rs</code>) is a pure function of the quantities and the
+rows. A position the run lacks is an error that lists every such position
+with its quantity; <code>quantity_schedule</code> gives the positions to run at. A ratio
+of two quantities is a division of the rows of <code>PropagationResult.values</code>,
+before any reduction, not a quantity.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Simulation.quantities(results, …)</code></td>
+<td>The producer with the data as an argument; the accessors of a result live on the result.</td>
+</tr>
+<tr>
+<td>A rerun at the schedule</td>
+<td>Numbers from a run the user does not plot: another run with a stochastic engine, and no run of the point estimate of a fit.</td>
+</tr>
+<tr>
+<td>Exact matching of positions</td>
+<td>A position computed as <code>end − window</code> misses the row of the run.</td>
+</tr>
+<tr>
+<td>A <code>Ratio</code> quantity</td>
+<td>NaN would become a normal value of a quantity, and the methods read a ratio row by row correctly already; a derived output cannot divide values at two positions.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_quantities.rs</code>
+(<code>a_done_run_is_read_at_the_schedule_within_the_tolerance_of_the_axis</code>,
+<code>a_done_run_lists_every_position_it_lacks_with_its_quantity</code>),
+<code>tests/simulation/test_quantities.py</code>,
+<code>tests/uncertainty/test_sensitivity.py::TestPropagation::test_propagation_values_have_one_row_per_replicate_of_each_draw</code>.</p>
 <h2 id="nan-propagates-in-a-run-and-stops-a-reduction-across-runs">NaN propagates in a run and stops a reduction across runs<a class="headerlink" href="#nan-propagates-in-a-run-and-stops-a-reduction-across-runs" title="Permanent link">&para;</a></h2>
 <p>Inside a run, a NaN in a value a quantity reads makes the quantity NaN: a peak
 and the position of a peak are NaN, not the largest of the other values.

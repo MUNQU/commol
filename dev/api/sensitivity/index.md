@@ -3129,3 +3129,64 @@ def axes(self) -> list[tuple[str, float | None]]:
     """Its name and each position."""
     return [(self._name(), at) for at in self.positions]
 ```
+
+## quantity_schedule
+
+```python
+quantity_schedule(quantities: Sequence[QuantityBase]) -> list[float]
+```
+
+The positions a run must report at for `quantities` to read it.
+
+They are every position a quantity reads and the start of every window, sorted, each once. A `SimulationResults` of `Simulation.run_at(quantity_schedule(quantities))` holds them all, so `SimulationResults.quantities` reads it; a `Propagation` runs at the same positions.
+
+Parameters:
+
+| Name         | Type                 | Description     | Default    |
+| ------------ | -------------------- | --------------- | ---------- |
+| `quantities` | `Sequence[Quantity]` | The quantities. | *required* |
+
+Returns:
+
+| Type          | Description               |
+| ------------- | ------------------------- |
+| `list[float]` | The positions, ascending. |
+
+Raises:
+
+| Type         | Description              |
+| ------------ | ------------------------ |
+| `ValueError` | If there is no quantity. |
+
+Source code in `commol/context/inference/quantities.py`
+
+```python
+def quantity_schedule(quantities: Sequence[QuantityBase]) -> list[float]:
+    """
+    The positions a run must report at for `quantities` to read it.
+
+    They are every position a quantity reads and the start of every window,
+    sorted, each once. A `SimulationResults` of
+    ``Simulation.run_at(quantity_schedule(quantities))`` holds them all, so
+    `SimulationResults.quantities` reads it; a `Propagation` runs at the same
+    positions.
+
+    Parameters
+    ----------
+    quantities : Sequence[Quantity]
+        The quantities.
+
+    Returns
+    -------
+    list[float]
+        The positions, ascending.
+
+    Raises
+    ------
+    ValueError
+        If there is no quantity.
+    """
+    if not quantities:
+        raise ValueError("Give at least one quantity of interest.")
+    return commol_rs.inference.quantity_schedule(rust_quantities(quantities))
+```

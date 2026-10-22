@@ -3669,6 +3669,11 @@ The positions the values were read at are in <code>results.positions</code>.</p>
 <td>JSON export next to the observations</td>
 </tr>
 <tr>
+<td><code>results.quantities(quantities)</code></td>
+<td><code>{label: value}</code>, the quantities of interest of the run, as a propagation reduces each run (<a href="../uncertainty/sensitivity/#the-quantities-of-one-run">The quantities of one run</a>)</td>
+<td>The numbers a run is judged on, such as the point estimate of a fit</td>
+</tr>
+<tr>
 <td><code>results.plot.series(…)</code>, <code>results.plot.cumulative(…)</code>, <code>results.plot.observations(…)</code></td>
 <td>A matplotlib <code>Figure</code> (<a href="#plotting">Plotting</a>)</td>
 <td>Figures of the run</td>
@@ -3758,6 +3763,10 @@ replicate gives the same run however many replicates run, and
 <tr>
 <td><code>report(confidence_level, positions, window, windows, …)</code></td>
 <td>The report of a run, with each number reduced replicate by replicate (<a href="../reports/#the-report-of-an-ensemble">Reports</a>)</td>
+</tr>
+<tr>
+<td><code>quantities(quantities)</code></td>
+<td>One <code>{label: value}</code> per replicate, in seed order, with no mean (<a href="../uncertainty/sensitivity/#the-quantities-of-one-run">The quantities of one run</a>)</td>
 </tr>
 <tr>
 <td><code>plot.series(…)</code>, <code>plot.cumulative(…)</code>, <code>plot.observations(…)</code></td>

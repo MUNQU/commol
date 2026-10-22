@@ -143,6 +143,63 @@ print(len(late.values), round(late.effective_size), round(gains.effective_size))
 print(round(late.summary(0.9)[0].median))  # 216
 ```
 
+### A ratio of two quantities
+
+A ratio is taken within each run, before the runs are reduced: divide the two columns of `PropagationResult.values` row by row, leave out the rows that are not finite, and summarise the ratios with `member_statistics` and the weights of the rows. The share of the initial amount that entered `C` by position 100 is the gain of `C` over `(0, 100]` divided by the sum of the bins at 0:
+
+```python
+from commol import Gain, ValueAt, member_statistics
+
+parts = analysis.run(
+    Propagation(
+        draws=100,
+        quantities=[
+            Gain(outputs="C", start=0, end=100),
+            ValueAt(series=["A", "B", "C"], at=0),
+        ],
+    )
+)
+values = np.asarray(parts.values)
+finite = parts.where(np.isfinite(values[:, 0] / values[:, 1]))
+kept = np.asarray(finite.values)
+shares = (kept[:, 0] / kept[:, 1]).tolist()
+share = member_statistics(per_member=shares, confidence_level=0.9, weights=finite.weights)
+print(round(share["ci_lower"], 2), round(share["median"], 2), round(share["ci_upper"], 2))
+# 0.81 0.98 1.0
+```
+
+| Rule                                                | Why                                                                                                                                                                                            |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Divide each row, then reduce                        | The mean of the ratios, E[N/D], is not the ratio of the means, E[N]/E\[D\]: the ratio of two summaries is another quantity                                                                     |
+| Leave out the rows that are not finite with `where` | A denominator of 0 gives an infinite ratio or NaN, and `member_statistics` raises on a NaN; `where` renormalises the weights of the kept rows, so the summary is conditioned on a finite ratio |
+| Pass the weights of the rows                        | A row is one run: with a sample of weights, or a stochastic engine, whose replicates share the weight of their draw, equal weights give another distribution                                   |
+
+`PropagationResult.values` has one row per run, so the same division holds for the replicates of a stochastic engine (one row per replicate of each draw, draw by draw) and for the quantities of one run (below). The indices of a sensitivity method on a ratio equal those of its numerator only when the denominator is fixed and is not an input, as the sum of the bins at 0 is here: run the method on the numerator. commol has no quantity for a ratio, so a sensitivity method cannot read the ratio of a denominator that depends on the inputs.
+
+### The quantities of one run
+
+`results.quantities(quantities)` reduces one run to its quantities, as `dict[str, float]` with one value per label, and `replicates.quantities(quantities)` gives one such dict per replicate, in seed order, with no mean. Use them on the point estimate of a fit, or on any run you plot. Rust reads the rows of the run at the positions of the quantities and reduces them with the code of `Propagation` (`Quantities::evaluate_run` in `crates/commol-inference/src/quantity.rs`), so the values equal those of a `Propagation` of a sample of one draw with the parameters of the run.
+
+`quantity_schedule(quantities)` gives the positions the quantities read: the results of `run_at` at them hold every position. Each position is found within a relative tolerance of `1e-9`, as `index_at` finds it, so a window that starts at `0.3 - 0.1` reads the row of `0.2`.
+
+```python
+from commol import quantity_schedule
+
+one_run = simulation.run_at(quantity_schedule(quantities))
+for label, value in one_run.quantities(quantities).items():
+    print(label, round(value))
+# peak of C gain over windows of 10 283
+# position of the peak of C gain over windows of 10 30
+# peak of C 946
+```
+
+| Case                                               | Result                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The run lacks a position a quantity reads          | `ValueError` that lists each such position with its quantity, and says to call `Simulation.run_at`                                                                                                                                                                                                        |
+| A quantity names an output the results do not have | `ValueError` that names the output                                                                                                                                                                                                                                                                        |
+| `run(n)` of the ODE engine                         | It interpolates the positions that are not breakpoints, so a value differs from that of a run that ends there by about the relative tolerance of the solver, and `PeakPosition` can change on a near-tie                                                                                                  |
+| The replicates of a stochastic engine              | Each replicate is reduced on its own. A `Propagation` seeds replicate `i` of draw `j` with `replicate_seed(stream_seed(seed, 4), j · replicates + i)` (`run_sets` in `crates/commol-inference/src/predictive.rs`), so its runs are not those of `Simulation.replicates(n, seed=seed)` or `run(seed=seed)` |
+
 ## Which method for which budget
 
 | Method                                                       | Answers                                                                                    | Runs                              | Inputs                  |

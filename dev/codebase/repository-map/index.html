@@ -3329,7 +3329,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/observation.rs</code></td>
-<td><code>ObservationOperator</code>: one prediction per observation from the rows of a run (rows, sums of outputs, windows, factors).</td>
+<td><code>ObservationOperator</code>: one prediction per observation from the rows of a run (rows, sums of outputs, windows, factors); <code>index_at</code>, the row of a position within the tolerance of the axis.</td>
 <td>Comparison with data.</td>
 </tr>
 <tr>
@@ -3414,7 +3414,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/design.rs</code>, <code>crates/commol-inference/src/quantity.rs</code>, <code>batch.rs</code></td>
-<td>What a design-based method shares: <code>InputSpace</code> (independent distributions or a sample) and its designs (Latin hypercube, Morris trajectories, the Saltelli matrices, the scale <code>F(x)</code>); <code>Series</code>, <code>Quantity</code> (a series and its reduction, read from JSON) and <code>Quantities</code>, read through the observation operator; <code>BatchRunner</code>, every point through a forward model in parallel, replicate by replicate or as their mean, which rejects a quantity that is NaN.</td>
+<td>What a design-based method shares: <code>InputSpace</code> (independent distributions or a sample) and its designs (Latin hypercube, Morris trajectories, the Saltelli matrices, the scale <code>F(x)</code>); <code>Series</code>, <code>Quantity</code> (a series and its reduction, read from JSON) and <code>Quantities</code>, read through the observation operator, with the schedule of a list of quantities and the quantities of a run that is done (<code>evaluate_run</code>); <code>BatchRunner</code>, every point through a forward model in parallel, replicate by replicate or as their mean, which rejects a quantity that is NaN.</td>
 <td>Estimators.</td>
 </tr>
 <tr>
@@ -3531,7 +3531,7 @@
 </tr>
 <tr>
 <td><code>py-commol/src/quantity.rs</code></td>
-<td><code>commol_rs.inference</code>: the quantities of interest read from the JSON of their classes, and <code>quantities_as_read</code>, which writes them back.</td>
+<td><code>commol_rs.inference</code>: the quantities of interest read from the JSON of their classes, <code>quantities_as_read</code>, which writes them back, <code>quantity_schedule</code>, and <code>quantities_of_runs</code>, the quantities of runs that are done.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
@@ -3578,7 +3578,7 @@
 </tr>
 <tr>
 <td><code>api/results.py</code></td>
-<td><code>SimulationResults</code> (values with their positions, seed and model, its <code>report</code> and its <code>plot</code>), <code>SimulationReplicates</code> (runs with one seed each, their statistics, their <code>report</code> and their <code>plot</code>), <code>index_at</code>, <code>sample</code>.</td>
+<td><code>SimulationResults</code> (values with their positions, seed and model, its <code>report</code>, its <code>plot</code> and its <code>quantities</code>), <code>SimulationReplicates</code> (runs with one seed each, their statistics, their <code>report</code>, their <code>plot</code> and their <code>quantities</code>), <code>index_at</code>, <code>sample</code>.</td>
 <td>Engine rules.</td>
 </tr>
 <tr>
@@ -3901,7 +3901,7 @@
 <tr>
 <td>Change a sensitivity method, a design or a quantity of interest</td>
 <td><code>crates/commol-inference/src/global_sensitivity/</code>; <code>design.rs</code>, <code>crates/commol-inference/src/quantity.rs</code>, <code>batch.rs</code></td>
-<td><code>crates/commol-calibration/src/forward.rs</code> (<code>unobserved</code>), <code>py-commol/src/sensitivity.rs</code>, <code>py-commol/src/quantity.rs</code>, <code>py-commol/commol/context/inference/quantities.py</code>, <code>context/inference/global_sensitivity.py</code>, <code>api/sensitivity.py</code>, <code>api/inference/global_sensitivity.py</code>, <code>docs/guide/uncertainty/sensitivity.md</code></td>
+<td><code>crates/commol-calibration/src/forward.rs</code> (<code>unobserved</code>), <code>py-commol/src/sensitivity.rs</code>, <code>py-commol/src/quantity.rs</code>, <code>py-commol/commol/context/inference/quantities.py</code>, <code>context/inference/global_sensitivity.py</code>, <code>api/sensitivity.py</code>, <code>api/inference/global_sensitivity.py</code>, <code>api/results.py</code> (<code>quantities</code>), <code>docs/guide/uncertainty/sensitivity.md</code></td>
 </tr>
 <tr>
 <td>Change a local approximation (the curvature, Laplace, the sandwich, the Laplace mixture) or PSIS</td>
