@@ -3578,7 +3578,7 @@ modelling judgment, and the table gives the range the literature uses.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>StructuralRank(points, design, seed=None)</code></td>
+<td><code>StructuralRank(points, design)</code></td>
 <td>The problem only</td>
 <td>The rank of the sensitivities, the non-identifiable parameters and the identifiable combinations</td>
 <td>Deterministic</td>
@@ -3605,11 +3605,12 @@ modelling judgment, and the table gives the range the literature uses.</p>
 </table>
 <h3 id="structural-rank">Structural rank<a class="headerlink" href="#structural-rank" title="Permanent link">&para;</a></h3>
 <p><code>StructuralRank</code> evaluates the sensitivities of the predicted observations at
-<code>points</code> rows of a Latin hypercube over the bounds, drawn from <code>seed</code> (the
-problem's seed by default). The sensitivity of observation <code>i</code> to parameter
-<code>j</code> is scaled to a relative change of both, <code>S_ij = (∂y_i/∂θ_j) · θ_j / s_i</code>,
-where <code>s_i</code> is the root mean square of the series of observation <code>i</code>, so the
-answer does not depend on units.</p>
+<code>points</code> rows of a Latin hypercube over the bounds, drawn from the seed of
+the calibrator (<code>Calibrator.seed</code>), so <code>problem.seed</code> repeats them. The
+sensitivity of observation <code>i</code> to parameter <code>j</code> is scaled to a relative
+change of both, <code>S_ij = (∂y_i/∂θ_j) · θ_j / s_i</code>, where <code>s_i</code> is the root mean
+square of the series of observation <code>i</code>, so the answer does not depend on
+units.</p>
 <table>
 <thead>
 <tr>

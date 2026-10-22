@@ -5360,9 +5360,10 @@ It needs `loss_function="sse"` or observation models, and a deterministic engine
 
 Attributes:
 
-| Name           | Type  | Description |
-| -------------- | ----- | ----------- |
-| `block_length` | \`int | auto\`      |
+| Name           | Type  | Description                                                                                       |
+| -------------- | ----- | ------------------------------------------------------------------------------------------------- |
+| `block_length` | \`int | auto\`                                                                                            |
+| `starts`       | `int` | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 
 Source code in `commol/context/inference/smc.py`
 
@@ -5386,12 +5387,16 @@ class InformationMatchingEta(BaseModel):
     block_length : int | "auto"
         Positions per block of the scores; there must be more blocks than
         parameters.
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["information_matching"] = "information_matching"
     block_length: BlockLength = Field(description="Positions per block.")
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 ```
 
 ## BootstrapCoverageEta
@@ -5404,11 +5409,12 @@ It works with any loss and engine, and costs one sampler per replicate.
 
 Attributes:
 
-| Name               | Type    | Description                                           |
-| ------------------ | ------- | ----------------------------------------------------- |
-| `replicates`       | `int`   | Number of Bayesian-bootstrap data sets, at least 1.   |
-| `block_length`     | \`int   | auto\`                                                |
-| `confidence_level` | `float` | The level of the intervals, strictly between 0 and 1. |
+| Name               | Type    | Description                                                                                       |
+| ------------------ | ------- | ------------------------------------------------------------------------------------------------- |
+| `replicates`       | `int`   | Number of Bayesian-bootstrap data sets, at least 1.                                               |
+| `block_length`     | \`int   | auto\`                                                                                            |
+| `confidence_level` | `float` | The level of the intervals, strictly between 0 and 1.                                             |
+| `starts`           | `int`   | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 
 Source code in `commol/context/inference/smc.py`
 
@@ -5430,6 +5436,9 @@ class BootstrapCoverageEta(BaseModel):
         Positions per block of the bootstrap.
     confidence_level : float
         The level of the intervals, strictly between 0 and 1.
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -5438,6 +5447,7 @@ class BootstrapCoverageEta(BaseModel):
     replicates: int = Field(ge=1, description="Number of bootstrap data sets.")
     block_length: BlockLength = Field(description="Positions per block.")
     confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 ```
 
 ## ABCSMC
@@ -5684,7 +5694,8 @@ class GibbsResult(SMCResult):
     eta : float
         The `η` the posterior ran with.
     fit : CalibrationResult | None
-        The fit a calibration of `η` read; None when `η` is a number.
+        The fit a calibration of `η` read, ``Calibrator.run(starts)``; None
+        when `η` is a number.
     coverage : float | None
         With `BootstrapCoverageEta`, the coverage of the fit by the intervals of
         the bootstrap posteriors at `η`; otherwise None.
@@ -5768,10 +5779,11 @@ It needs `observation_models`: a loss has no noise scale, so its curvature is no
 
 Attributes:
 
-| Name        | Type                      | Description                                |
-| ----------- | ------------------------- | ------------------------------------------ |
-| `draws`     | `int`                     | Number of draws of the normal, at least 1. |
-| `curvature` | `{gauss_newton, hessian}` | The curvature (default "gauss_newton").    |
+| Name        | Type                      | Description                                                                                       |
+| ----------- | ------------------------- | ------------------------------------------------------------------------------------------------- |
+| `draws`     | `int`                     | Number of draws of the normal, at least 1.                                                        |
+| `curvature` | `{gauss_newton, hessian}` | The curvature (default "gauss_newton").                                                           |
+| `starts`    | `int`                     | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 
 Source code in `commol/context/inference/local.py`
 
@@ -5793,12 +5805,16 @@ class Laplace(UncertaintyMethod[LaplaceResult]):
         Number of draws of the normal, at least 1.
     curvature : {"gauss_newton", "hessian"}
         The curvature (default ``"gauss_newton"``).
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     draws: int = Field(ge=1, description="Number of draws.")
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
     )
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 ```
 
 ## Sandwich
@@ -5816,6 +5832,7 @@ Attributes:
 | `block_length` | \`int                     | auto\`                                                                                                      |
 | `draws`        | `int`                     | Number of draws of the Student t, at least 1.                                                               |
 | `curvature`    | `{gauss_newton, hessian}` | The curvature H (default "gauss_newton"). With the Hessian, the sandwich also holds when the mean is wrong. |
+| `starts`       | `int`                     | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds.           |
 
 Source code in `commol/context/inference/local.py`
 
@@ -5846,6 +5863,9 @@ class Sandwich(UncertaintyMethod[SandwichResult]):
     curvature : {"gauss_newton", "hessian"}
         The curvature ``H`` (default ``"gauss_newton"``). With the Hessian,
         the sandwich also holds when the mean is wrong.
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     block_length: BlockLength = Field(description="Positions per block.")
@@ -5853,6 +5873,7 @@ class Sandwich(UncertaintyMethod[SandwichResult]):
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
     )
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 ```
 
 ## LaplaceMixture
@@ -5867,7 +5888,7 @@ Attributes:
 
 | Name        | Type                      | Description                                                                                       |
 | ----------- | ------------------------- | ------------------------------------------------------------------------------------------------- |
-| `starts`    | `int`                     | Starts of the fit, at least 1: the initial guess, then rows of a Latin hypercube over the bounds. |
+| `starts`    | `int`                     | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 | `draws`     | `int`                     | Number of draws of the mixture, at least 25, so that the tail of the weights has 5.               |
 | `target`    | \`LikelihoodTarget        | GibbsTarget\`                                                                                     |
 | `curvature` | `{gauss_newton, hessian}` | The curvature of each component (default "gauss_newton").                                         |
@@ -5890,8 +5911,8 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
     Attributes
     ----------
     starts : int
-        Starts of the fit, at least 1: the initial guess, then rows of a
-        Latin hypercube over the bounds.
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     draws : int
         Number of draws of the mixture, at least 25, so that the tail of the
         weights has 5.
@@ -5902,7 +5923,7 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
         The curvature of each component (default ``"gauss_newton"``).
     """
 
-    starts: int = Field(ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
     draws: int = Field(ge=25, description="Number of draws.")
     target: MixtureTarget = Field(description="The posterior to sample.")
     curvature: CurvatureName = Field(
@@ -5985,7 +6006,7 @@ Attributes:
 
 | Name         | Type                | Description                                                                                                            |
 | ------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run().                                                             |
+| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run(starts).                                                       |
 | `covariance` | `list[list[float]]` | The covariance of the distribution on the unbounded scale of the parameters, in the order of the problem's parameters. |
 | `sample`     | `ParameterSample`   | Draws of the distribution, mapped back to the parameters, with equal weights.                                          |
 | `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale; each is also logged as a warning. |
@@ -6001,7 +6022,7 @@ class LocalResult(BaseModel):
     Attributes
     ----------
     fit : CalibrationResult
-        The fit the approximation is centred on: ``Calibrator.run()``.
+        The fit the approximation is centred on: ``Calibrator.run(starts)``.
     covariance : list[list[float]]
         The covariance of the distribution on the unbounded scale of the
         parameters, in the order of the problem's parameters.
@@ -6073,7 +6094,7 @@ Attributes:
 
 | Name         | Type                | Description                                                                          |
 | ------------ | ------------------- | ------------------------------------------------------------------------------------ |
-| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run().                           |
+| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run(starts).                     |
 | `covariance` | `list[list[float]]` | Σ = H⁻¹ on the unbounded scale of the parameters.                                    |
 | `sample`     | `ParameterSample`   | Draws of the normal, mapped back to the parameters, with equal weights.              |
 | `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
@@ -6089,7 +6110,7 @@ class LaplaceResult(LocalResult):
     Attributes
     ----------
     fit : CalibrationResult
-        The fit the approximation is centred on: ``Calibrator.run()``.
+        The fit the approximation is centred on: ``Calibrator.run(starts)``.
     covariance : list[list[float]]
         ``Σ = H⁻¹`` on the unbounded scale of the parameters.
     sample : ParameterSample
@@ -6111,7 +6132,7 @@ Attributes:
 
 | Name                     | Type                | Description                                                                          |
 | ------------------------ | ------------------- | ------------------------------------------------------------------------------------ |
-| `fit`                    | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run().                                |
+| `fit`                    | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run(starts).                          |
 | `covariance`             | `list[list[float]]` | H⁻¹ B H⁻¹ on the unbounded scale of the parameters.                                  |
 | `sample`                 | `ParameterSample`   | Draws of the Student t, mapped back to the parameters, with equal weights.           |
 | `notes`                  | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
@@ -6131,7 +6152,7 @@ class SandwichResult(LocalResult):
     Attributes
     ----------
     fit : CalibrationResult
-        The fit the sandwich is centred on: ``Calibrator.run()``.
+        The fit the sandwich is centred on: ``Calibrator.run(starts)``.
     covariance : list[list[float]]
         ``H⁻¹ B H⁻¹`` on the unbounded scale of the parameters.
     sample : ParameterSample
@@ -7171,21 +7192,20 @@ def crps(
 #### pit
 
 ```python
-pit(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise, seed: int) -> Score
+pit(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise) -> Score
 ```
 
 The probability integral transform of each observation.
 
-`F(y)` of the weighted draws, randomized between `F(y⁻)` and `F(y)` where draws tie with `y`, so a discrete predictive gives uniform values too.
+`F(y)` of the weighted draws, randomized between `F(y⁻)` and `F(y)` where draws tie with `y`, so a discrete predictive gives uniform values too. The ties take their random numbers from the seed of the source of the predictive (`Calibrator.seed` or `SensitivityAnalysis.seed`), the seed of the draws, so the same draws give the same values.
 
 Parameters:
 
-| Name           | Type                          | Description                        | Default             |
-| -------------- | ----------------------------- | ---------------------------------- | ------------------- |
-| `predictive`   | `Predictive`                  | The predictive.                    | *required*          |
-| `observations` | `Sequence[ObservedDataPoint]` | The observations to score.         | *required*          |
-| `noise`        | \`NoNoise                     | ResidualNoise                      | DistributionNoise\` |
-| `seed`         | `int`                         | Seed of the randomization of ties. | *required*          |
+| Name           | Type                          | Description                | Default             |
+| -------------- | ----------------------------- | -------------------------- | ------------------- |
+| `predictive`   | `Predictive`                  | The predictive.            | *required*          |
+| `observations` | `Sequence[ObservedDataPoint]` | The observations to score. | *required*          |
+| `noise`        | \`NoNoise                     | ResidualNoise              | DistributionNoise\` |
 
 Returns:
 
@@ -7200,14 +7220,15 @@ def pit(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
     noise: ObservationNoise,
-    seed: int,
 ) -> Score:
     """
     The probability integral transform of each observation.
 
     ``F(y)`` of the weighted draws, randomized between ``F(y⁻)`` and ``F(y)``
     where draws tie with ``y``, so a discrete predictive gives uniform values
-    too.
+    too. The ties take their random numbers from the seed of the source of
+    the predictive (``Calibrator.seed`` or ``SensitivityAnalysis.seed``), the
+    seed of the draws, so the same draws give the same values.
 
     Parameters
     ----------
@@ -7217,8 +7238,6 @@ def pit(
         The observations to score.
     noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
-    seed : int
-        Seed of the randomization of ties.
 
     Returns
     -------
@@ -7226,7 +7245,7 @@ def pit(
         Values in ``[0, 1]``; calibrated predictions give uniform values.
     """
     draws = predictive.at_observations(observations, noise)
-    return _score(draws, draws.rust_draws.pit(draws.observed, seed))
+    return _score(draws, draws.rust_draws.pit(draws.observed))
 ```
 
 #### log_score

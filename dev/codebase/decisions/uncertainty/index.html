@@ -3427,8 +3427,8 @@ by the configuration's type and knows no method. A static type checker infers
 </tbody>
 </table>
 <p>Every random number of a method comes from the <code>commol-random</code> generator,
-seeded from <code>CalibrationProblem.seed</code> (<code>replicate_seed</code>). Coverage studies
-(<code>tests/support/coverage.py</code>, marker <code>coverage_study</code>) check that a method's
+seeded from the seed of its source (<a href="../results/#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts">Results</a>).
+Coverage studies (<code>tests/support/coverage.py</code>, marker <code>coverage_study</code>) check that a method's
 intervals cover the truth at their level; they run for a pull request that
 changes what they run and before a release
 (<code>.github/workflows/coverage.yaml</code>).</p>

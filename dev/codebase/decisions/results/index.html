@@ -2737,6 +2737,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A method takes its seed from its source and fits from its starts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-description-is-data-rendered-apart" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3239,6 +3250,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A method takes its seed from its source and fits from its starts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-description-is-data-rendered-apart" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3433,6 +3455,43 @@ setting strictly between 0 and 1 is checked by one of the two functions.</p>
 <p><strong>Guards:</strong> <code>tests/suite/test_rules.py::test_a_setting_has_one_name</code>,
 <code>tests/uncertainty/test_intervals.py::test_every_confidence_level_has_one_check</code>,
 <code>crates/commol-inference/tests/test_levels.rs</code>.</p>
+<h2 id="a-method-takes-its-seed-from-its-source-and-fits-from-its-starts">A method takes its seed from its source and fits from its starts<a class="headerlink" href="#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts" title="Permanent link">&para;</a></h2>
+<p>Every uncertainty, identifiability and sensitivity method draws its random
+numbers from the seed of its source: <code>Calibrator.seed</code> (<code>problem.seed</code>) or
+<code>SensitivityAnalysis.seed</code>, split into streams (<code>commol_random::stream_seed</code>,
+<code>replicate_seed</code>). No method has a seed of its own, so one seed repeats a
+calibration and every method on it. A score reads the seed its draws keep,
+<code>ObservationDraws.seed</code> (<code>crates/commol-inference/src/predictive.rs</code>):
+<code>scores::pit</code> randomizes ties from a stream of it. Every method that fits the
+data takes <code>starts</code>, at least 1 with the default 1, and fits with
+<code>Calibrator.run(starts)</code>: the bootstraps, the jackknife, the conformal
+methods, the profiles, <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>,
+<code>InformationMatchingEta</code> and <code>BootstrapCoverageEta</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A <code>seed</code> of a method that overrides the seed of the source</td>
+<td>Two seeds choose the random numbers of one run, and <code>problem.seed</code> no longer repeats it.</td>
+</tr>
+<tr>
+<td>A method that fits from one start, with no <code>starts</code></td>
+<td>A fit that ends at a local minimum gives a wrong center, and the user cannot ask for more starts.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rule:</strong> a new method takes no seed and reads the seed of its source; a new
+method that fits the data takes <code>starts</code> with the default 1.</p>
+<p><strong>Guards:</strong> <code>tests/uncertainty/test_identifiability.py::TestStructuralRank::test_structural_rank_takes_the_seed_of_the_calibrator</code>,
+<code>tests/uncertainty/test_scores.py::TestPit::test_the_pit_takes_the_seed_of_the_source</code>,
+<code>crates/commol-inference/tests/test_predictive.rs::the_pit_of_ties_follows_the_seed_of_the_draws</code>,
+<code>tests/uncertainty/test_local.py::TestStarts</code>,
+<code>tests/uncertainty/test_smc.py::test_the_eta_calibrations_fit_from_their_starts</code>.</p>
 <h2 id="a-description-is-data-rendered-apart">A description is data, rendered apart<a class="headerlink" href="#a-description-is-data-rendered-apart" title="Permanent link">&para;</a></h2>
 <p><code>Model.describe(layout)</code> returns a <code>ModelDescription</code>
 (<code>context/description.py</code>): sections with a key, a title and blocks from a

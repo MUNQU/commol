@@ -4516,14 +4516,14 @@ print(round(at_fit.median), at_fit.lower)  # -72 None
 
 The functions of `commol.scores` compare a predictive with observations, and return a `Score`: the value of each observation, the mean of each series and the overall mean. Which observations to score and the observation noise are arguments with no default: score data the method did not see, such as the held-out positions above, and say whether you score a band of the model (`NoNoise()`) or a prediction interval (`ResidualNoise(...)`, `DistributionNoise()`).
 
-| Function                                                                      | Score                                                                        | Better                                                                                                                      |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `coverage(predictive, observations, noise, confidence_level)`                 | 1 inside the central interval, 0 outside; the mean is the empirical coverage | Close to the level                                                                                                          |
-| `interval_score(predictive, observations, noise, confidence_level)`           | `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`, `α = 1 − c`                       | Lower                                                                                                                       |
-| `weighted_interval_score(predictive, observations, noise, confidence_levels)` | The weighted interval score of Bracher et al. (2021)                         | Lower                                                                                                                       |
-| `crps(predictive, observations, noise)`                                       | \`Σ wᵢ                                                                       | xᵢ − y                                                                                                                      |
-| `pit(predictive, observations, noise, seed)`                                  | `F(y)`, randomized where draws tie with `y`                                  | Uniform                                                                                                                     |
-| `log_score(predictive, observations, DistributionNoise())`                    | \`log Σ_d w_d · p(y                                                          | μ_d)`, the log density of `y`under the mixture of the observation models over the draws; another noise raises a`TypeError\` |
+| Function                                                                      | Score                                                                                                                                                           | Better                                                                                                                      |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `coverage(predictive, observations, noise, confidence_level)`                 | 1 inside the central interval, 0 outside; the mean is the empirical coverage                                                                                    | Close to the level                                                                                                          |
+| `interval_score(predictive, observations, noise, confidence_level)`           | `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`, `α = 1 − c`                                                                                                          | Lower                                                                                                                       |
+| `weighted_interval_score(predictive, observations, noise, confidence_levels)` | The weighted interval score of Bracher et al. (2021)                                                                                                            | Lower                                                                                                                       |
+| `crps(predictive, observations, noise)`                                       | \`Σ wᵢ                                                                                                                                                          | xᵢ − y                                                                                                                      |
+| `pit(predictive, observations, noise)`                                        | `F(y)`, randomized where draws tie with `y`, from the seed of the source (`Calibrator.seed` or `SensitivityAnalysis.seed`): the same draws give the same values | Uniform                                                                                                                     |
+| `log_score(predictive, observations, DistributionNoise())`                    | \`log Σ_d w_d · p(y                                                                                                                                             | μ_d)`, the log density of `y`under the mixture of the observation models over the draws; another noise raises a`TypeError\` |
 
 ## The entry point
 
@@ -4672,14 +4672,14 @@ Every method runs through `Calibrator.identifiability(method)` and returns an `I
 
 | Method                                                                    | Needs                                                                    | Answers                                                                                                                                                                               | Engine        |
 | ------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| `StructuralRank(points, design, seed=None)`                               | The problem only                                                         | The rank of the sensitivities, the non-identifiable parameters and the identifiable combinations                                                                                      | Deterministic |
+| `StructuralRank(points, design)`                                          | The problem only                                                         | The rank of the sensitivities, the non-identifiable parameters and the identifiable combinations                                                                                      | Deterministic |
 | `Collinearity(at, max_subset_size, threshold)`                            | A fit (`CalibrationResult`) or a sample                                  | Which subsets of parameters can be fitted together; `threshold` from 5 to 20                                                                                                          | Deterministic |
 | `SampleIdentifiability(sample, reference, correlation_threshold, priors)` | Any `ParameterSample`                                                    | How much the sample contracts each parameter against its bounds or its prior, which pairs move together, which marginals have several modes; `correlation_threshold` from 0.8 to 0.95 | Any           |
 | `StartsIdentifiability(result, parameter_tolerance, loss_tolerance)`      | A result of `Calibrator.run(starts=n)` with two or more converged starts | Which parameters differ between starts of equal loss                                                                                                                                  | Any           |
 
 ### Structural rank
 
-`StructuralRank` evaluates the sensitivities of the predicted observations at `points` rows of a Latin hypercube over the bounds, drawn from `seed` (the problem's seed by default). The sensitivity of observation `i` to parameter `j` is scaled to a relative change of both, `S_ij = (∂y_i/∂θ_j) · θ_j / s_i`, where `s_i` is the root mean square of the series of observation `i`, so the answer does not depend on units.
+`StructuralRank` evaluates the sensitivities of the predicted observations at `points` rows of a Latin hypercube over the bounds, drawn from the seed of the calibrator (`Calibrator.seed`), so `problem.seed` repeats them. The sensitivity of observation `i` to parameter `j` is scaled to a relative change of both, `S_ij = (∂y_i/∂θ_j) · θ_j / s_i`, where `s_i` is the root mean square of the series of observation `i`, so the answer does not depend on units.
 
 | `design`         | Positions and outputs                                                                                             | Question                                           |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
@@ -5164,11 +5164,13 @@ None of them has a default: each sets the cost and the accuracy of the run.
 
 `η` weighs the data against the priors. The loss has no scale of its own, so `η` has no default: with `η` too large the posterior is too narrow, with `η` too small too wide. For the sum of squares of a model with Gaussian noise of variance `σ²`, `η = 1/(2σ²)` makes the Gibbs posterior the Bayesian posterior.
 
-| `eta`                                                              | How it is chosen                                                                                                                                                                                                   | Needs                                                                                            | Cost                                          |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | --------------------------------------------- |
-| A number above 0                                                   | By you                                                                                                                                                                                                             | Nothing                                                                                          | One sampler                                   |
-| `InformationMatchingEta(block_length)`                             | `η = tr(J I⁻¹ J) / tr(J)` at the fit: the Gauss–Newton curvature `J` of the objective against the variance `I` of the scores of its terms, summed over blocks of `block_length` positions (Holmes and Walker 2017) | `loss_function="sse"` or observation models, a deterministic engine, more blocks than parameters | A fit, finite differences and one sampler     |
-| `BootstrapCoverageEta(replicates, block_length, confidence_level)` | The posteriors of Bayesian-bootstrap data sets hold the fit at `confidence_level` (Syring and Martin 2019)                                                                                                         | Any loss and engine                                                                              | A fit and one sampler per replicate, then one |
+| `eta`                                                                        | How it is chosen                                                                                                                                                                                                   | Needs                                                                                            | Cost                                          |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| A number above 0                                                             | By you                                                                                                                                                                                                             | Nothing                                                                                          | One sampler                                   |
+| `InformationMatchingEta(block_length, starts=1)`                             | `η = tr(J I⁻¹ J) / tr(J)` at the fit: the Gauss–Newton curvature `J` of the objective against the variance `I` of the scores of its terms, summed over blocks of `block_length` positions (Holmes and Walker 2017) | `loss_function="sse"` or observation models, a deterministic engine, more blocks than parameters | A fit, finite differences and one sampler     |
+| `BootstrapCoverageEta(replicates, block_length, confidence_level, starts=1)` | The posteriors of Bayesian-bootstrap data sets hold the fit at `confidence_level` (Syring and Martin 2019)                                                                                                         | Any loss and engine                                                                              | A fit and one sampler per replicate, then one |
+
+Both calibrations read the fit `Calibrator.run(starts)`: the best of `starts` starts, the initial guess and then rows of a Latin hypercube over the bounds ([several starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)). One start (the default) can end at a local minimum.
 
 Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. `J` and `I` are the curvature and the meat of the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich): `I` sums the scores over blocks, so it holds when the noise depends on its neighbours inside a block, and `block_length` has no default: `block_length=1` gives the independent version, every observation its own block. Bootstrap coverage runs one tempered sampler per replicate to a large `η`, reads the posterior of every smaller `η` by reweighting, so its search runs no model, and finds for each replicate and parameter the `η` where the interval stops holding the fit. `η` interpolates those thresholds at the level, so the expected coverage is the level; it needs at least `1/(1 − c) − 1` replicates times parameters.
 
@@ -13054,7 +13056,7 @@ Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
 
 Structural identifiability, local and numerical: the rank of the scaled sensitivities at random points inside the bounds.
 
-The sensitivities come from finite differences, with a step and an error set by the accuracy of the engine; a singular value counts when it is above the norm of that error. The engine must be deterministic.
+The sensitivities come from finite differences, with a step and an error set by the accuracy of the engine; a singular value counts when it is above the norm of that error. The engine must be deterministic. The points come from the seed of the calibrator, `Calibrator.seed`.
 
 Attributes:
 
@@ -13062,7 +13064,6 @@ Attributes:
 | -------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `points` | `int` | How many rows of a Latin hypercube over the bounds, at least 1.                                                                                                                                                                                       |
 | `design` | `str` | "observations": the positions and outputs of the observations, their values ignored (can this design determine the parameters?). "dense": every observed series at every unit position up to the last observation (can denser data of these series?). |
-| `seed`   | \`int | None\`                                                                                                                                                                                                                                                |
 
 Source code in `commol/context/inference/identifiability.py`
 
@@ -13074,7 +13075,8 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport]):
 
     The sensitivities come from finite differences, with a step and an error
     set by the accuracy of the engine; a singular value counts when it is
-    above the norm of that error. The engine must be deterministic.
+    above the norm of that error. The engine must be deterministic. The
+    points come from the seed of the calibrator, ``Calibrator.seed``.
 
     Attributes
     ----------
@@ -13085,13 +13087,10 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport]):
         their values ignored (can this design determine the parameters?).
         ``"dense"``: every observed series at every unit position up to the
         last observation (can denser data of these series?).
-    seed : int | None
-        The seed of the points; None takes the seed of the problem.
     """
 
     points: int = Field(ge=1)
     design: Literal["observations", "dense"]
-    seed: int | None = Field(default=None, ge=0)
 ```
 
 ## Collinearity
@@ -36187,9 +36186,10 @@ It needs `loss_function="sse"` or observation models, and a deterministic engine
 
 Attributes:
 
-| Name           | Type  | Description |
-| -------------- | ----- | ----------- |
-| `block_length` | \`int | auto\`      |
+| Name           | Type  | Description                                                                                       |
+| -------------- | ----- | ------------------------------------------------------------------------------------------------- |
+| `block_length` | \`int | auto\`                                                                                            |
+| `starts`       | `int` | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 
 Source code in `commol/context/inference/smc.py`
 
@@ -36213,12 +36213,16 @@ class InformationMatchingEta(BaseModel):
     block_length : int | "auto"
         Positions per block of the scores; there must be more blocks than
         parameters.
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["information_matching"] = "information_matching"
     block_length: BlockLength = Field(description="Positions per block.")
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 ```
 
 ## BootstrapCoverageEta
@@ -36231,11 +36235,12 @@ It works with any loss and engine, and costs one sampler per replicate.
 
 Attributes:
 
-| Name               | Type    | Description                                           |
-| ------------------ | ------- | ----------------------------------------------------- |
-| `replicates`       | `int`   | Number of Bayesian-bootstrap data sets, at least 1.   |
-| `block_length`     | \`int   | auto\`                                                |
-| `confidence_level` | `float` | The level of the intervals, strictly between 0 and 1. |
+| Name               | Type    | Description                                                                                       |
+| ------------------ | ------- | ------------------------------------------------------------------------------------------------- |
+| `replicates`       | `int`   | Number of Bayesian-bootstrap data sets, at least 1.                                               |
+| `block_length`     | \`int   | auto\`                                                                                            |
+| `confidence_level` | `float` | The level of the intervals, strictly between 0 and 1.                                             |
+| `starts`           | `int`   | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 
 Source code in `commol/context/inference/smc.py`
 
@@ -36257,6 +36262,9 @@ class BootstrapCoverageEta(BaseModel):
         Positions per block of the bootstrap.
     confidence_level : float
         The level of the intervals, strictly between 0 and 1.
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -36265,6 +36273,7 @@ class BootstrapCoverageEta(BaseModel):
     replicates: int = Field(ge=1, description="Number of bootstrap data sets.")
     block_length: BlockLength = Field(description="Positions per block.")
     confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 ```
 
 ## ABCSMC
@@ -36511,7 +36520,8 @@ class GibbsResult(SMCResult):
     eta : float
         The `η` the posterior ran with.
     fit : CalibrationResult | None
-        The fit a calibration of `η` read; None when `η` is a number.
+        The fit a calibration of `η` read, ``Calibrator.run(starts)``; None
+        when `η` is a number.
     coverage : float | None
         With `BootstrapCoverageEta`, the coverage of the fit by the intervals of
         the bootstrap posteriors at `η`; otherwise None.
@@ -36595,10 +36605,11 @@ It needs `observation_models`: a loss has no noise scale, so its curvature is no
 
 Attributes:
 
-| Name        | Type                      | Description                                |
-| ----------- | ------------------------- | ------------------------------------------ |
-| `draws`     | `int`                     | Number of draws of the normal, at least 1. |
-| `curvature` | `{gauss_newton, hessian}` | The curvature (default "gauss_newton").    |
+| Name        | Type                      | Description                                                                                       |
+| ----------- | ------------------------- | ------------------------------------------------------------------------------------------------- |
+| `draws`     | `int`                     | Number of draws of the normal, at least 1.                                                        |
+| `curvature` | `{gauss_newton, hessian}` | The curvature (default "gauss_newton").                                                           |
+| `starts`    | `int`                     | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 
 Source code in `commol/context/inference/local.py`
 
@@ -36620,12 +36631,16 @@ class Laplace(UncertaintyMethod[LaplaceResult]):
         Number of draws of the normal, at least 1.
     curvature : {"gauss_newton", "hessian"}
         The curvature (default ``"gauss_newton"``).
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     draws: int = Field(ge=1, description="Number of draws.")
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
     )
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 ```
 
 ## Sandwich
@@ -36643,6 +36658,7 @@ Attributes:
 | `block_length` | \`int                     | auto\`                                                                                                      |
 | `draws`        | `int`                     | Number of draws of the Student t, at least 1.                                                               |
 | `curvature`    | `{gauss_newton, hessian}` | The curvature H (default "gauss_newton"). With the Hessian, the sandwich also holds when the mean is wrong. |
+| `starts`       | `int`                     | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds.           |
 
 Source code in `commol/context/inference/local.py`
 
@@ -36673,6 +36689,9 @@ class Sandwich(UncertaintyMethod[SandwichResult]):
     curvature : {"gauss_newton", "hessian"}
         The curvature ``H`` (default ``"gauss_newton"``). With the Hessian,
         the sandwich also holds when the mean is wrong.
+    starts : int
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     """
 
     block_length: BlockLength = Field(description="Positions per block.")
@@ -36680,6 +36699,7 @@ class Sandwich(UncertaintyMethod[SandwichResult]):
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
     )
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
 ```
 
 ## LaplaceMixture
@@ -36694,7 +36714,7 @@ Attributes:
 
 | Name        | Type                      | Description                                                                                       |
 | ----------- | ------------------------- | ------------------------------------------------------------------------------------------------- |
-| `starts`    | `int`                     | Starts of the fit, at least 1: the initial guess, then rows of a Latin hypercube over the bounds. |
+| `starts`    | `int`                     | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 | `draws`     | `int`                     | Number of draws of the mixture, at least 25, so that the tail of the weights has 5.               |
 | `target`    | \`LikelihoodTarget        | GibbsTarget\`                                                                                     |
 | `curvature` | `{gauss_newton, hessian}` | The curvature of each component (default "gauss_newton").                                         |
@@ -36717,8 +36737,8 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
     Attributes
     ----------
     starts : int
-        Starts of the fit, at least 1: the initial guess, then rows of a
-        Latin hypercube over the bounds.
+        Starts of the fit (default 1): the initial guess, then rows of a Latin
+        hypercube over the bounds.
     draws : int
         Number of draws of the mixture, at least 25, so that the tail of the
         weights has 5.
@@ -36729,7 +36749,7 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
         The curvature of each component (default ``"gauss_newton"``).
     """
 
-    starts: int = Field(ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
     draws: int = Field(ge=25, description="Number of draws.")
     target: MixtureTarget = Field(description="The posterior to sample.")
     curvature: CurvatureName = Field(
@@ -36812,7 +36832,7 @@ Attributes:
 
 | Name         | Type                | Description                                                                                                            |
 | ------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run().                                                             |
+| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run(starts).                                                       |
 | `covariance` | `list[list[float]]` | The covariance of the distribution on the unbounded scale of the parameters, in the order of the problem's parameters. |
 | `sample`     | `ParameterSample`   | Draws of the distribution, mapped back to the parameters, with equal weights.                                          |
 | `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale; each is also logged as a warning. |
@@ -36828,7 +36848,7 @@ class LocalResult(BaseModel):
     Attributes
     ----------
     fit : CalibrationResult
-        The fit the approximation is centred on: ``Calibrator.run()``.
+        The fit the approximation is centred on: ``Calibrator.run(starts)``.
     covariance : list[list[float]]
         The covariance of the distribution on the unbounded scale of the
         parameters, in the order of the problem's parameters.
@@ -36900,7 +36920,7 @@ Attributes:
 
 | Name         | Type                | Description                                                                          |
 | ------------ | ------------------- | ------------------------------------------------------------------------------------ |
-| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run().                           |
+| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run(starts).                     |
 | `covariance` | `list[list[float]]` | Σ = H⁻¹ on the unbounded scale of the parameters.                                    |
 | `sample`     | `ParameterSample`   | Draws of the normal, mapped back to the parameters, with equal weights.              |
 | `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
@@ -36916,7 +36936,7 @@ class LaplaceResult(LocalResult):
     Attributes
     ----------
     fit : CalibrationResult
-        The fit the approximation is centred on: ``Calibrator.run()``.
+        The fit the approximation is centred on: ``Calibrator.run(starts)``.
     covariance : list[list[float]]
         ``Σ = H⁻¹`` on the unbounded scale of the parameters.
     sample : ParameterSample
@@ -36938,7 +36958,7 @@ Attributes:
 
 | Name                     | Type                | Description                                                                          |
 | ------------------------ | ------------------- | ------------------------------------------------------------------------------------ |
-| `fit`                    | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run().                                |
+| `fit`                    | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run(starts).                          |
 | `covariance`             | `list[list[float]]` | H⁻¹ B H⁻¹ on the unbounded scale of the parameters.                                  |
 | `sample`                 | `ParameterSample`   | Draws of the Student t, mapped back to the parameters, with equal weights.           |
 | `notes`                  | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
@@ -36958,7 +36978,7 @@ class SandwichResult(LocalResult):
     Attributes
     ----------
     fit : CalibrationResult
-        The fit the sandwich is centred on: ``Calibrator.run()``.
+        The fit the sandwich is centred on: ``Calibrator.run(starts)``.
     covariance : list[list[float]]
         ``H⁻¹ B H⁻¹`` on the unbounded scale of the parameters.
     sample : ParameterSample
@@ -37998,21 +38018,20 @@ def crps(
 #### pit
 
 ```python
-pit(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise, seed: int) -> Score
+pit(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise) -> Score
 ```
 
 The probability integral transform of each observation.
 
-`F(y)` of the weighted draws, randomized between `F(y⁻)` and `F(y)` where draws tie with `y`, so a discrete predictive gives uniform values too.
+`F(y)` of the weighted draws, randomized between `F(y⁻)` and `F(y)` where draws tie with `y`, so a discrete predictive gives uniform values too. The ties take their random numbers from the seed of the source of the predictive (`Calibrator.seed` or `SensitivityAnalysis.seed`), the seed of the draws, so the same draws give the same values.
 
 Parameters:
 
-| Name           | Type                          | Description                        | Default             |
-| -------------- | ----------------------------- | ---------------------------------- | ------------------- |
-| `predictive`   | `Predictive`                  | The predictive.                    | *required*          |
-| `observations` | `Sequence[ObservedDataPoint]` | The observations to score.         | *required*          |
-| `noise`        | \`NoNoise                     | ResidualNoise                      | DistributionNoise\` |
-| `seed`         | `int`                         | Seed of the randomization of ties. | *required*          |
+| Name           | Type                          | Description                | Default             |
+| -------------- | ----------------------------- | -------------------------- | ------------------- |
+| `predictive`   | `Predictive`                  | The predictive.            | *required*          |
+| `observations` | `Sequence[ObservedDataPoint]` | The observations to score. | *required*          |
+| `noise`        | \`NoNoise                     | ResidualNoise              | DistributionNoise\` |
 
 Returns:
 
@@ -38027,14 +38046,15 @@ def pit(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
     noise: ObservationNoise,
-    seed: int,
 ) -> Score:
     """
     The probability integral transform of each observation.
 
     ``F(y)`` of the weighted draws, randomized between ``F(y⁻)`` and ``F(y)``
     where draws tie with ``y``, so a discrete predictive gives uniform values
-    too.
+    too. The ties take their random numbers from the seed of the source of
+    the predictive (``Calibrator.seed`` or ``SensitivityAnalysis.seed``), the
+    seed of the draws, so the same draws give the same values.
 
     Parameters
     ----------
@@ -38044,8 +38064,6 @@ def pit(
         The observations to score.
     noise : NoNoise | ResidualNoise | DistributionNoise
         The observation noise of the draws (`Predictive.at_observations`).
-    seed : int
-        Seed of the randomization of ties.
 
     Returns
     -------
@@ -38053,7 +38071,7 @@ def pit(
         Values in ``[0, 1]``; calibrated predictions give uniform values.
     """
     draws = predictive.at_observations(observations, noise)
-    return _score(draws, draws.rust_draws.pit(draws.observed, seed))
+    return _score(draws, draws.rust_draws.pit(draws.observed))
 ```
 
 #### log_score
@@ -40510,8 +40528,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `Laplace`, `Sandwich`, `InformationMatchingEta` and `BootstrapCoverageEta` take `starts`, at least 1 with the default 1: their fit is the best of `starts` starts, `Calibrator.run(starts)`, as in every bootstrap, jackknife, conformal method and profile. Code that does not pass it runs as before. See [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/#laplace-approximation-and-the-delta-method) and [What `η` means](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means).
+
 ### Changed
 
+- **Breaking:** every uncertainty and identifiability method takes its random numbers from the seed of its source, `Calibrator.seed` (`problem.seed`) or `SensitivityAnalysis.seed`, and has no seed of its own. Remove `seed=` from `StructuralRank` and from `scores.pit`, and set `problem.seed` (or the seed of the analysis) to choose the random numbers. The PIT randomizes ties from a stream of the seed of its draws, so its values at tied draws change for the same seed. See [Scores](https://munqu.github.io/commol/latest/guide/uncertainty/#scores).
+- `LaplaceMixture.starts` defaults to 1.
 - **Breaking:** a setting that means the same thing has one name in every method. The level of an interval is `confidence_level`, a count is a plain plural noun, and the rule that combines the replicates of a ratio is `replicate_rule`. An old name raises a `ValidationError` that names it as not permitted. Rename each old name in your code:
 
 | Where                                                                                    | Before                      | Now                                       |

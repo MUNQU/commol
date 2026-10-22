@@ -4083,8 +4083,8 @@ held-out positions above, and say whether you score a band of the model
 <td>Lower</td>
 </tr>
 <tr>
-<td><code>pit(predictive, observations, noise, seed)</code></td>
-<td><code>F(y)</code>, randomized where draws tie with <code>y</code></td>
+<td><code>pit(predictive, observations, noise)</code></td>
+<td><code>F(y)</code>, randomized where draws tie with <code>y</code>, from the seed of the source (<code>Calibrator.seed</code> or <code>SensitivityAnalysis.seed</code>): the same draws give the same values</td>
 <td>Uniform</td>
 </tr>
 <tr>
