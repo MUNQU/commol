@@ -299,7 +299,7 @@ type LastPoints = HashMap<ThreadId, (Vec<f64>, Option<f64>)>;
 /// from one run: the constraint of the point that a thread scored last is
 /// kept, so the augmented Lagrangian, which asks for both at each point on
 /// one thread, runs the model once. A swarm scores its particles on several
-/// threads at once.
+/// threads at once when the inner levels run in parallel.
 pub(crate) struct PredictionCost<'a, E: SimulationEngine> {
     objective: OptimizationObjective<'a, E>,
     operator: &'a ObservationOperator,
@@ -336,7 +336,7 @@ impl<'a, E: SimulationEngine> PredictionCost<'a, E> {
     }
 
     /// The last point of each thread and its prediction.
-    fn last_points(&self) -> MutexGuard<'_, LastPoints> {
+    pub(crate) fn last_points(&self) -> MutexGuard<'_, LastPoints> {
         self.last.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
@@ -347,6 +347,10 @@ impl<E: SimulationEngine + Sync> CostFunction for PredictionCost<'_, E> {
 
     fn cost(&self, values: &Self::Param) -> Result<Self::Output, Error> {
         self.evaluate(values).map(|(cost, _)| cost)
+    }
+
+    fn parallelize(&self) -> bool {
+        inner_levels_in_parallel()
     }
 }
 

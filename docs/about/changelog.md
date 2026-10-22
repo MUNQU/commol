@@ -122,6 +122,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Fixed #282 -->
 
+<!-- Fixed #320 -->
+
+- A profile that holds a prediction with a particle swarm scores its
+  particles in parallel only when the levels of `commol.threads` are
+  `"all"`, and stops with the error of the first failing particle, as every
+  other swarm does; before, it scored them in parallel at any level and
+  reported the error of any failing particle.
+
 ## [0.8.0] - 2026-10-22
 
 This release compares runs. `Scenarios` runs every draw of a sample under
