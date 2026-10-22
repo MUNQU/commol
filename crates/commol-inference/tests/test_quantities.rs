@@ -1,15 +1,19 @@
 //! Quantities of interest: a series and its reduction, the rules for ties
-//! and NaN, the form a quantity crosses in, and the NaN rule of every
-//! reduction across runs.
+//! and NaN, the form a quantity crosses in, the NaN rule of every reduction
+//! across runs, and the ratio of two quantities.
 
-use commol_calibration::CalibrationParameter;
-use commol_core::Model;
+use commol_calibration::{CalibrationParameter, ForwardModel};
+use commol_core::{Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
+use commol_inference::batch::BatchRunner;
 use commol_inference::design::InputSpace;
 use commol_inference::global_sensitivity::{ChaosExpansion, ForwardAnalysis, morris, prcc, sobol};
-use commol_inference::quantity::{MissingPositions, Quantities, Quantity, Series};
+use commol_inference::quantity::{
+    MissingPositions, Quantities, Quantity, Replicates, Series, Undefined,
+};
 use commol_inference::statistics::{self, NotANumber};
 use commol_inference::{NanRun, PredictiveError, Priors};
+use commol_stochastic::StochasticSteps;
 
 fn names(outputs: &[&str]) -> Vec<String> {
     outputs.iter().map(|name| name.to_string()).collect()
@@ -258,6 +262,15 @@ fn each_quantity_crosses_as_json_tagged_by_kind() {
             series: increments(&["A"], 1.0),
             positions: vec![1.0, 2.0],
         },
+        ratio_of(
+            value_at(&["A"], 1.0),
+            Quantity::Gain {
+                outputs: names(&["B"]),
+                start: 0.0,
+                end: 1.0,
+            },
+            Replicates::WithinPositive,
+        ),
     ];
 
     let json = serde_json::to_string(&quantities).unwrap();
@@ -268,6 +281,7 @@ fn each_quantity_crosses_as_json_tagged_by_kind() {
         r#"[{"kind":"value_at","series":{"kind":"level","outputs":["A","B"]},"at":1.5}"#
     ));
     assert!(json.contains(r#"{"kind":"increments","outputs":["A"],"window":7.0}"#));
+    assert!(json.contains(r#""replicates":"within_positive""#), "{json}");
     assert!(serde_json::from_str::<Quantity>(r#"{"kind":"mean","at":1.0}"#).is_err());
     assert!(quantities.iter().all(|quantity| !quantity.is_empty()));
 }
@@ -375,7 +389,7 @@ fn a_nan_run_is_named_by_its_point_and_inputs() {
         **run,
         NanRun {
             draw: 0,
-            replicate: 0,
+            replicate: Some(0),
             seed: None,
             inputs: propagation.sample.values()[0].clone(),
         }
@@ -394,7 +408,7 @@ fn the_seed_of_a_nan_replicate_is_named() {
         points: vec![4],
         run: Some(Box::new(NanRun {
             draw: 4,
-            replicate: 1,
+            replicate: Some(1),
             seed: Some(17),
             inputs: vec![0.5],
         })),
@@ -406,4 +420,307 @@ fn the_seed_of_a_nan_replicate_is_named() {
         message.contains("point 4 of the inputs [0.5], replicate 1 of seed 17"),
         "{message}"
     );
+}
+
+fn value_at(outputs: &[&str], at: f64) -> Quantity {
+    Quantity::ValueAt {
+        series: level(outputs),
+        at,
+    }
+}
+
+fn ratio_of(numerator: Quantity, denominator: Quantity, replicates: Replicates) -> Quantity {
+    Quantity::Ratio {
+        numerator: Box::new(numerator),
+        denominator: Box::new(denominator),
+        replicates,
+    }
+}
+
+/// The ratio of the level of `N` to the level of `D` at 0, combined by
+/// `replicates`.
+fn n_over_d(replicates: Replicates) -> Quantity {
+    ratio_of(value_at(&["N"], 0.0), value_at(&["D"], 0.0), replicates)
+}
+
+const RULES: [Replicates; 3] = [
+    Replicates::Within,
+    Replicates::WithinPositive,
+    Replicates::Pooled,
+];
+
+/// The value of a ratio of `N` to `D` under each rule, for replicates of the
+/// values `(N, D)` given.
+fn combined(replicates: &[(f64, f64)]) -> Vec<Result<f64, Undefined>> {
+    let quantities = Quantities::new(&RULES.map(n_over_d), &names(&["N", "D"])).unwrap();
+    let terms: Vec<_> = replicates
+        .iter()
+        .map(|&(n, d)| quantities.terms(&[vec![n, d]]))
+        .collect();
+    quantities.combine(&terms)
+}
+
+#[test]
+fn a_ratio_combines_replicates_as_the_user_chooses() {
+    assert_eq!(
+        combined(&[(1.0, 2.0), (3.0, 6.0)]),
+        [Ok(0.5), Ok(0.5), Ok(0.5)]
+    );
+    assert_eq!(
+        combined(&[(1.0, 1.0), (0.0, 4.0)]),
+        [Ok(0.5), Ok(0.5), Ok(0.2)]
+    );
+    // A NaN term leaves every rule with no value, and names its replicate.
+    assert_eq!(
+        combined(&[(1.0, 1.0), (f64::NAN, 4.0)]),
+        [Err(Undefined::Replicate(1)); 3]
+    );
+}
+
+#[test]
+fn a_ratio_divides_two_values_of_one_run() {
+    let quantities = [
+        ratio_of(
+            Quantity::Peak {
+                series: level(&["acc"]),
+                positions: vec![7.0, 14.0],
+            },
+            Quantity::Gain {
+                outputs: names(&["acc"]),
+                start: 7.0,
+                end: 21.0,
+            },
+            Replicates::Pooled,
+        ),
+        value_at(&["acc"], 21.0),
+    ];
+    let compiled = Quantities::new(&quantities, &names(&["acc"])).unwrap();
+    let (positions, rows) = accumulator([0.0, 1.0, 5.0, 7.0]);
+    let (_, empty) = accumulator([0.0, 1.0, 1.0, 1.0]);
+
+    assert_eq!(compiled.len(), 2);
+    assert_eq!(compiled.schedule(), [7.0, 14.0, 21.0]);
+    assert_eq!(
+        Quantities::schedule_of(&quantities).unwrap(),
+        compiled.schedule()
+    );
+    // The peak 5 over the gain 6; a zero denominator is undefined, even
+    // over a numerator of 1.
+    assert_eq!(compiled.evaluate(&rows[1..]), [5.0 / 6.0, 7.0]);
+    assert!(compiled.evaluate(&empty[1..])[0].is_nan());
+    assert!(compiled.evaluate_run(&positions, &empty).unwrap()[0].is_nan());
+}
+
+#[test]
+fn a_ratio_takes_values_only() {
+    let outputs = names(&["acc"]);
+    let of = |operand: Quantity| {
+        Quantities::new(
+            &[ratio_of(
+                operand,
+                value_at(&["acc"], 1.0),
+                Replicates::Within,
+            )],
+            &outputs,
+        )
+        .unwrap_err()
+    };
+
+    let position = of(Quantity::PeakPosition {
+        series: level(&["acc"]),
+        positions: vec![1.0],
+    });
+    let trajectory = of(Quantity::Trajectory {
+        series: level(&["acc"]),
+        positions: vec![1.0],
+    });
+    let nested = of(n_over_d(Replicates::Within));
+
+    assert!(position.contains("got peak_position"), "{position}");
+    assert!(trajectory.contains("got trajectory"), "{trajectory}");
+    assert!(nested.contains("got ratio"), "{nested}");
+}
+
+/// A → B at the proportional rate `k`, from one unit of A, and two units
+/// of C that never move, run by the engine of chain binomial steps.
+fn one_unit() -> StochasticSteps {
+    let json = r#"{"name":"m","parameters":[{"id":"k","value":0.5}],
+        "engine":{"type":"StochasticSteps","settings":null},
+        "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"},{"id":"C","name":"C"}],
+        "accumulators":[],"stratifications":[],
+        "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"k"}]},
+        "structure":{"kind":"aggregate","bin_amounts":{"A":1.0,"B":0.0,"C":2.0}}}"#;
+    let model: Model = serde_json::from_str(json).expect("valid model JSON");
+    StochasticSteps::try_from_model(&model).unwrap()
+}
+
+/// The three units over B at `at`, combined by `replicates`.
+fn all_over_b(at: f64, replicates: Replicates) -> Quantity {
+    ratio_of(
+        value_at(&["A", "B", "C"], 1.0),
+        value_at(&["B"], at),
+        replicates,
+    )
+}
+
+/// The forward model of [`one_unit`], 8 replicates of `k`.
+fn one_unit_forward() -> ForwardModel<StochasticSteps> {
+    let k = vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)];
+    ForwardModel::unobserved(one_unit(), k, None, Some(8), 3).unwrap()
+}
+
+/// The replicates of `quantity` at two points of `k = 0.5`, combined.
+fn means_of(quantity: Quantity) -> Result<Vec<Vec<f64>>, PredictiveError> {
+    let forward = one_unit_forward();
+    let quantities = Quantities::new(&[quantity], &forward.base_engine().output_names()).unwrap();
+    BatchRunner::new(&forward, &quantities)
+        .unwrap()
+        .means(&[vec![0.5], vec![0.5]])
+}
+
+#[test]
+fn a_zero_denominator_is_undefined_unless_the_user_conditions() {
+    let forward = one_unit_forward();
+    let within = Quantities::new(
+        &[all_over_b(1.0, Replicates::Within)],
+        &forward.base_engine().output_names(),
+    )
+    .unwrap();
+    let runner = BatchRunner::new(&forward, &within).unwrap();
+    let ratios: Vec<f64> = runner.replicates(&[vec![0.5]]).unwrap()[0]
+        .iter()
+        .map(|values| values[0])
+        .collect();
+    // B is 1 in some replicates, where the ratio is 3, and 0 in the others.
+    let first_zero = ratios.iter().position(|ratio| ratio.is_nan()).unwrap();
+    assert!(ratios.iter().all(|&ratio| ratio.is_nan() || ratio == 3.0));
+    assert!(ratios.contains(&3.0), "{ratios:?}");
+
+    let error = means_of(all_over_b(1.0, Replicates::Within)).unwrap_err();
+    let positive = means_of(all_over_b(1.0, Replicates::WithinPositive)).unwrap();
+
+    assert_eq!(
+        error,
+        PredictiveError::NotANumber {
+            quantity: 0,
+            points: vec![0, 1],
+            run: Some(Box::new(NanRun {
+                draw: 0,
+                replicate: Some(first_zero),
+                seed: Some(forward.replicates().unwrap().seeds[first_zero]),
+                inputs: vec![0.5],
+            })),
+        }
+    );
+    assert_eq!(positive, [[3.0], [3.0]]);
+}
+
+#[test]
+fn a_draw_with_no_positive_denominator_raises() {
+    // B is 0 at 0 in every replicate.
+    for replicates in [Replicates::WithinPositive, Replicates::Pooled] {
+        let error = means_of(all_over_b(0.0, replicates)).unwrap_err();
+
+        assert_eq!(
+            error,
+            PredictiveError::NotANumber {
+                quantity: 0,
+                points: vec![0, 1],
+                run: Some(Box::new(NanRun {
+                    draw: 0,
+                    replicate: None,
+                    seed: None,
+                    inputs: vec![0.5],
+                })),
+            }
+        );
+        let message = error.to_string();
+        assert!(
+            message.contains("point 0 of the inputs [0.5] (no replicate is NaN"),
+            "{message}"
+        );
+    }
+}
+
+/// A → B at the rate `max(0, k − 0.5)` from A = 1000: B gains nothing over
+/// the first step when `k` is at most 0.5.
+fn gated() -> ForwardAnalysis<DifferenceEquations> {
+    let json = r#"{"name":"m","parameters":[{"id":"k","value":0.7}],
+        "engine":{"type":"DifferenceEquations","settings":null},
+        "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
+        "accumulators":[],"stratifications":[],
+        "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"max(0, k - 0.5)"}]},
+        "structure":{"kind":"aggregate","bin_amounts":{"A":1000.0,"B":0.0}}}"#;
+    let model: Model = serde_json::from_str(json).expect("valid model JSON");
+    ForwardAnalysis::new(
+        DifferenceEquations::try_from_model(&model).unwrap(),
+        vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+        None,
+        None,
+        InputSpace::Independent(Priors::uniform_on_bounds(&names(&["k"]), &[(0.0, 1.0)]).unwrap()),
+        5,
+    )
+    .unwrap()
+}
+
+/// A at 1 over the gain of B over (0, 1], combined by `replicates`.
+fn a_over_gain(replicates: Replicates) -> Vec<Quantity> {
+    vec![ratio_of(
+        value_at(&["A"], 1.0),
+        Quantity::Gain {
+            outputs: names(&["B"]),
+            start: 0.0,
+            end: 1.0,
+        },
+        replicates,
+    )]
+}
+
+/// The point and the replicate of the first run a NaN error names.
+fn named_run(error: PredictiveError) -> (Vec<usize>, NanRun) {
+    let PredictiveError::NotANumber {
+        quantity: 0,
+        points,
+        run: Some(run),
+    } = error
+    else {
+        panic!("{error:?}");
+    };
+    (points, *run)
+}
+
+#[test]
+fn a_zero_denominator_follows_the_nan_rule_in_every_method() {
+    let analysis = gated();
+
+    for (replicates, replicate) in [(Replicates::Within, Some(0)), (Replicates::Pooled, None)] {
+        let quantities = a_over_gain(replicates);
+        let errors = [
+            analysis.prcc(Some(8), &quantities).map(|_| ()).unwrap_err(),
+            analysis.morris(3, 4, &quantities).map(|_| ()).unwrap_err(),
+            analysis
+                .sobol(4, 2, 0.9, &quantities)
+                .map(|_| ())
+                .unwrap_err(),
+            analysis.chaos(1, 8, &quantities).map(|_| ()).unwrap_err(),
+        ];
+
+        for error in errors {
+            let (points, run) = named_run(error);
+            assert_eq!(points[0], run.draw);
+            assert!(run.inputs[0] <= 0.5, "{run:?}");
+            assert_eq!(run.replicate, replicate);
+        }
+    }
+    // A propagation keeps the NaN of each run, which its quantiles reject.
+    let propagation = analysis
+        .propagate(Some(8), &a_over_gain(Replicates::Within))
+        .unwrap();
+    let ratios: Vec<f64> = propagation.values.iter().map(|row| row[0]).collect();
+    let undefined: Vec<usize> = (0..ratios.len())
+        .filter(|&run| propagation.sample.values()[run][0] <= 0.5)
+        .collect();
+    assert!(!undefined.is_empty());
+    let error = statistics::quantiles(&ratios, &propagation.weights, &[0.5]).unwrap_err();
+    assert_eq!(error, NotANumber { points: undefined });
 }

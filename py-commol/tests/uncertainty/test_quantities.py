@@ -1,6 +1,6 @@
 """Quantities of interest: a series and its reduction, the rules every
-quantity follows, the form they cross to Rust in, and a propagation filtered
-by a condition."""
+quantity follows, the ratio of two quantities, the form they cross to Rust in,
+and a propagation filtered by a condition."""
 
 import math
 
@@ -24,6 +24,7 @@ from commol import (
     PolynomialChaos,
     Propagation,
     PropagationResult,
+    Ratio,
     SampleMethod,
     SensitivityAnalysis,
     Simulation,
@@ -171,6 +172,78 @@ class TestRules:
             weighted_quantiles([math.nan], [0.5])
 
 
+def _two_inflows() -> SensitivityAnalysis:
+    """
+    An analysis of a sample of two draws, `k` = 1 and 3, of a model whose
+    accumulator `n` gains ``2 k`` and `d` gains ``4.5 - 0.5 k`` over (0, 7].
+    """
+    model = (
+        ModelBuilder(name="Two inflows", version="1.0")
+        .add_bin(id="A", name="A")
+        .add_bin(id="B", name="B")
+        .add_accumulator(id="n", name="n")
+        .add_accumulator(id="d", name="d")
+        .add_parameter(id="k", value=1.0)
+        .add_transition(
+            id="to_a",
+            source=[],
+            target=["A"],
+            rate=AxisPattern.pulses([3], ["2 * k"]),
+            accumulators=["n"],
+        )
+        .add_transition(
+            id="to_b",
+            source=[],
+            target=["B"],
+            rate=AxisPattern.pulses([3], ["4.5 - 0.5 * k"]),
+            accumulators=["d"],
+        )
+        .build(Aggregate(bin_amounts={"A": 0, "B": 0}), engine="DifferenceEquations")
+    )
+    sample = ParameterSample(
+        names=["k"],
+        bounds=[(0.5, 4.0)],
+        values=[[1.0], [3.0]],
+        log_weights=[0.0, 0.0],
+        method=SampleMethod(name="two runs"),
+    )
+    inputs = InputSpace.from_sample(sample, [bounded("k", 0.5, 4.0)])
+    return SensitivityAnalysis(Simulation(model), inputs, seed=1)
+
+
+class TestRatio:
+    def test_a_ratio_is_taken_within_each_run(self) -> None:
+        analysis = _two_inflows()
+        ratio = Ratio(
+            numerator=Gain(outputs="n", start=0, end=7),
+            denominator=Gain(outputs="d", start=0, end=7),
+            replicates="within",
+        )
+
+        result = analysis.run(Propagation(quantities=[ratio]))
+
+        assert result.values == [[0.5], [2.0]]
+        assert result.labels == ["(n gain over (0, 7]) / (d gain over (0, 7])"]
+
+    def test_a_ratio_takes_values_only(self) -> None:
+        value = ValueAt(series="B", at=1)
+
+        with pytest.raises(ValueError, match=r"got the PeakPosition 'when'"):
+            Ratio(
+                numerator=PeakPosition(series="B", positions=[1], label="when"),
+                denominator=value,
+                replicates="pooled",
+            )
+        with pytest.raises(ValueError, match=r"got the Trajectory 'B at 1'"):
+            Ratio(
+                numerator=value,
+                denominator=Trajectory(series="B", positions=[1]),
+                replicates="within",
+            )
+        with pytest.raises(ValueError, match=r"replicates"):
+            Ratio(numerator=value, denominator=value)  # ty: ignore[missing-argument]
+
+
 class TestLabels:
     def test_each_quantity_has_a_label(self) -> None:
         labels, _ = expand_quantities(
@@ -236,12 +309,25 @@ class TestBoundary:
             Peak(series=Increments("A", 7), positions=ENDS),
             PeakPosition(series="A", positions=[1, 2]),
             Trajectory(series=Increments(["A", "B"], 1), positions=[1, 2]),
+            Ratio(
+                numerator=Peak(series="A", positions=[1, 2]),
+                denominator=Gain(outputs="B", start=0, end=1),
+                replicates="within_positive",
+            ),
         ]
         _, rust = expand_quantities(quantities)
 
         read = commol_rs.inference.quantities_as_read(rust)
+        labelled = Ratio(
+            numerator=ValueAt(series="A", at=1, label="a"),
+            denominator=ValueAt(series="B", at=1, label="b"),
+            replicates="pooled",
+            label="a over b",
+        )
 
         assert TypeAdapter(list[Quantity]).validate_json(read) == quantities
+        assert '"label"' not in labelled.rust_json()
+        assert labelled.labels() == ["a over b"]
         with pytest.raises(ValueError, match=r"Not a list of quantities"):
             commol_rs.inference.quantities_as_read('[{"kind": "mean"}]')
 

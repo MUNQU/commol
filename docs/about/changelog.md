@@ -23,6 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Added #282 -->
 
+- `Ratio(numerator, denominator, replicates)` is a quantity of interest: one
+  `ValueAt`, `Gain` or `Peak` over another, in each run, so PRCC, Morris,
+  Sobol and a polynomial chaos read a ratio whose denominator depends on the
+  inputs. `replicates` is required: with a stochastic engine, a point of a
+  design holds the mean of the ratios (`"within"`), the mean of the ratios
+  of the replicates with a positive denominator (`"within_positive"`) or the
+  ratio of the means (`"pooled"`). A denominator of 0 makes the ratio of a
+  run NaN, and every method follows the NaN rule. See
+  [A ratio of two quantities](../guide/uncertainty/sensitivity.md#a-ratio-of-two-quantities).
+
 ### Changed
 
 <!-- Changed #226 -->

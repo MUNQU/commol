@@ -3,14 +3,15 @@
 //!
 //! The points run in parallel. With a stochastic engine each point runs the
 //! replicates of the forward model, the same seeds at every point (common
-//! random numbers), so two points differ only by their values.
+//! random numbers), so two points differ only by their values, and
+//! [`Quantities::combine`] combines the replicates of each point.
 
 use commol_calibration::ForwardModel;
 use commol_core::SimulationEngine;
 use rayon::prelude::*;
 
 use crate::predictive::{NanRun, PredictiveError};
-use crate::quantity::Quantities;
+use crate::quantity::{Quantities, Term, Undefined};
 
 /// A forward model and the quantities each of its runs is reduced to.
 #[derive(Debug, Clone, Copy)]
@@ -54,6 +55,20 @@ impl<'a, E: SimulationEngine + Send + Sync> BatchRunner<'a, E> {
     /// [`PredictiveError::Draw`] with the index of the first point that has
     /// no run.
     pub fn replicates(&self, points: &[Vec<f64>]) -> Result<Vec<Vec<Vec<f64>>>, PredictiveError> {
+        Ok(self
+            .terms(points)?
+            .into_iter()
+            .map(|runs| {
+                runs.into_iter()
+                    .map(|terms| terms.into_iter().map(Term::value).collect())
+                    .collect()
+            })
+            .collect())
+    }
+
+    /// The [`Quantities::terms`] of every replicate of every point,
+    /// `[point][replicate][quantity]`.
+    fn terms(&self, points: &[Vec<f64>]) -> Result<Vec<Vec<Vec<Term>>>, PredictiveError> {
         points
             .par_iter()
             .enumerate()
@@ -64,56 +79,59 @@ impl<'a, E: SimulationEngine + Send + Sync> BatchRunner<'a, E> {
                     .map_err(|error| PredictiveError::Draw { draw, error })?;
                 Ok(runs
                     .iter()
-                    .map(|rows| self.quantities.evaluate(rows))
+                    .map(|rows| self.quantities.terms(rows))
                     .collect())
             })
             .collect()
     }
 
-    /// The quantities of every point, each the mean of its replicates',
-    /// `[point][quantity]`. Every method that reduces quantities across the
-    /// points of a design reads them here.
+    /// The quantities of every point, each its replicates combined by
+    /// [`Quantities::combine`] (the mean of each quantity, and the rule of
+    /// each ratio), `[point][quantity]`. Every method that reduces
+    /// quantities across the points of a design reads them here.
     ///
     /// # Errors
     ///
     /// As [`Self::replicates`]; [`PredictiveError::NotANumber`] with the
-    /// first quantity that is NaN in a replicate of a point, every point
-    /// where it is, and the first such run.
+    /// first quantity that has no value at a point, every point where it
+    /// has none, and the first such point, with the replicate that is NaN
+    /// when one is.
     pub fn means(&self, points: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, PredictiveError> {
-        let replicates = self.replicates(points)?;
-        let nan = |runs: &Vec<Vec<f64>>, quantity: usize| {
-            runs.iter().position(|values| values[quantity].is_nan())
-        };
-        let first = (0..self.quantities.len())
-            .find(|&q| replicates.iter().any(|runs| nan(runs, q).is_some()));
+        let combined: Vec<Vec<Result<f64, Undefined>>> = self
+            .terms(points)?
+            .iter()
+            .map(|runs| self.quantities.combine(runs))
+            .collect();
+        let first =
+            (0..self.quantities.len()).find(|&q| combined.iter().any(|values| values[q].is_err()));
         if let Some(quantity) = first {
-            let points_nan: Vec<usize> = (0..replicates.len())
-                .filter(|&point| nan(&replicates[point], quantity).is_some())
+            let points_nan: Vec<usize> = (0..combined.len())
+                .filter(|&point| combined[point][quantity].is_err())
                 .collect();
             let draw = points_nan[0];
-            let replicate = nan(&replicates[draw], quantity).expect("a point where it is NaN");
+            let replicate = match combined[draw][quantity] {
+                Err(Undefined::Replicate(replicate)) => Some(replicate),
+                _ => None,
+            };
             return Err(PredictiveError::NotANumber {
                 quantity,
                 points: points_nan,
                 run: Some(Box::new(NanRun {
                     draw,
                     replicate,
-                    seed: self.forward.replicates().map(|r| r.seeds[replicate]),
+                    seed: replicate
+                        .and_then(|replicate| Some(self.forward.replicates()?.seeds[replicate])),
                     inputs: points[draw].clone(),
                 })),
             });
         }
-        Ok(replicates
+        Ok(combined
             .into_iter()
-            .map(|replicates| {
-                let count = replicates.len() as f64;
-                let mut mean = vec![0.0; self.quantities.len()];
-                for values in &replicates {
-                    for (sum, value) in mean.iter_mut().zip(values) {
-                        *sum += value / count;
-                    }
-                }
-                mean
+            .map(|values| {
+                values
+                    .into_iter()
+                    .map(|value| value.expect("checked"))
+                    .collect()
             })
             .collect())
     }

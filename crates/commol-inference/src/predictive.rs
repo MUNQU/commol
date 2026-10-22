@@ -219,8 +219,11 @@ pub enum PredictiveError {
 pub struct NanRun {
     /// Index of the point, in the order of the design.
     pub draw: usize,
-    /// Index of the replicate at the point; 0 for a deterministic engine.
-    pub replicate: usize,
+    /// Index of the replicate at the point, 0 for a deterministic engine;
+    /// None when no replicate is NaN but the replicates of the point
+    /// combine to no value, as a ratio can
+    /// ([`crate::quantity::Undefined::Point`]).
+    pub replicate: Option<usize>,
     /// The seed of the replicate, for a stochastic engine.
     pub seed: Option<u64>,
     /// The values of the inputs at the point.
@@ -241,9 +244,16 @@ impl std::fmt::Display for PredictiveError {
                     let seed = run
                         .seed
                         .map_or(String::new(), |seed| format!(" of seed {seed}"));
+                    let replicate = run.replicate.map_or(
+                        " (no replicate is NaN, but a ratio has no value there: no replicate has \
+                         a denominator above 0 under within_positive, or the mean denominator \
+                         is 0 under pooled)"
+                            .to_string(),
+                        |replicate| format!(", replicate {replicate}{seed}"),
+                    );
                     format!(
-                        ", first at the point {} of the inputs {:?}, replicate {}{seed}",
-                        run.draw, run.inputs, run.replicate
+                        ", first at the point {} of the inputs {:?}{replicate}",
+                        run.draw, run.inputs
                     )
                 });
                 write!(

@@ -3,7 +3,8 @@
 [Back to Design decisions](../design-decisions.md)
 
 How a sensitivity analysis runs a model with no data, what a quantity of
-interest reads from a run, and what a NaN does to a quantity and to a method.
+interest reads from a run, what a NaN does to a quantity and to a method, and
+how the replicates of a ratio combine.
 
 ## An analysis needs no data
 
@@ -62,16 +63,13 @@ the axis (`index_at` of `commol-calibration`), then calls the
 `Quantities::evaluate` of `Propagation`. The binding (`quantities_of_runs` in
 `py-commol/src/quantity.rs`) is a pure function of the quantities and the
 rows. A position the run lacks is an error that lists every such position
-with its quantity; `quantity_schedule` gives the positions to run at. A ratio
-of two quantities is a division of the rows of `PropagationResult.values`,
-before any reduction, not a quantity.
+with its quantity; `quantity_schedule` gives the positions to run at.
 
 | Alternative | Why not |
 |---|---|
 | `Simulation.quantities(results, …)` | The producer with the data as an argument; the accessors of a result live on the result. |
 | A rerun at the schedule | Numbers from a run the user does not plot: another run with a stochastic engine, and no run of the point estimate of a fit. |
 | Exact matching of positions | A position computed as `end − window` misses the row of the run. |
-| A `Ratio` quantity | NaN would become a normal value of a quantity, and the methods read a ratio row by row correctly already; a derived output cannot divide values at two positions. |
 
 **Guards:** `crates/commol-inference/tests/test_quantities.rs`
 (`a_done_run_is_read_at_the_schedule_within_the_tolerance_of_the_axis`,
@@ -104,3 +102,35 @@ renormalises their weights; the user writes the condition.
 (`a_nan_makes_the_quantity_nan`, `every_estimator_rejects_a_nan`,
 `a_nan_run_is_named_by_its_point_and_inputs`),
 `tests/uncertainty/test_quantities.py` (`TestRules`, `TestFilter`).
+
+## A ratio combines its replicates as the user chooses
+
+`Quantity::Ratio` divides two quantities of one value each
+(`crates/commol-inference/src/quantity.rs`). `Quantities::terms` gives each
+scalar of a run as a numerator and a denominator (1 for a scalar that is not
+a ratio), and `Quantities::combine` reduces the terms of the replicates of a
+point by the `Replicates` rule of the scalar: `Within` (E[N/D], the mean that
+every other scalar takes), `WithinPositive` (E[N/D | D > 0]) or `Pooled`
+(E[N]/E[D]). `BatchRunner::means` reads `combine`, so PRCC, Morris, Sobol and
+the polynomial chaos see one value per point; `Quantities::evaluate` gives
+`Term::value`, N/D, to a propagation and to the quantities of one run. A
+denominator of 0 makes the ratio of a run NaN, whatever the numerator. A point
+with no value is `Undefined::Replicate` (the first replicate that is NaN) or
+`Undefined::Point` (no replicate with D > 0, or a pooled denominator of 0),
+and `NanRun::replicate` is `None` for the second. The rule has no default:
+the Python class requires `replicates`.
+
+| Alternative | Why not |
+|---|---|
+| One estimand, or a default | E[N/D] and E[N]/E[D] differ when D is small or 0 in some replicates; the choice is the modeller's. |
+| `"within"` alone, with no conditional rule | A design of 10^5 replicates almost surely holds a replicate with D = 0 when D can reach 0, and the only way out would be another estimand. |
+| Skip a replicate with D = 0 under `"within"` | It conditions on D > 0 with no choice made; `"within_positive"` names that estimand. |
+| 0/0 = 0, or N/0 = ±inf | 0 changes the estimand unseen; an infinity passes a check for NaN and breaks the indices. |
+| A ratio of a ratio, a `PeakPosition` or a `Trajectory` | A ratio of positions has no use, and a trajectory gives several values; a third operation would go to an expression on the Rust expression engine, not to more classes. |
+
+**Guards:** `crates/commol-inference/tests/test_quantities.rs`
+(`a_ratio_combines_replicates_as_the_user_chooses`,
+`a_zero_denominator_is_undefined_unless_the_user_conditions`,
+`a_draw_with_no_positive_denominator_raises`,
+`a_zero_denominator_follows_the_nan_rule_in_every_method`),
+`tests/uncertainty/test_quantities.py` (`TestRatio`).

@@ -6,7 +6,8 @@
 //! ([`Quantity::ValueAt`]), the largest value or its first position over
 //! given positions ([`Quantity::Peak`], [`Quantity::PeakPosition`]), or the
 //! value at each position ([`Quantity::Trajectory`]). [`Quantity::Gain`] is
-//! one window given by its start and its end.
+//! one window given by its start and its end. [`Quantity::Ratio`] divides
+//! two quantities of one value each.
 //!
 //! Every value is read through the [`ObservationOperator`], the one code
 //! that turns a run into observed values: a level is an observation, an
@@ -18,7 +19,13 @@
 //!   largest;
 //! - a NaN in the values a quantity reads makes it NaN, its peak and the
 //!   position of its peak too;
-//! - with a stochastic engine, a quantity is computed for each replicate.
+//! - with a stochastic engine, a quantity is computed for each replicate;
+//! - a ratio of a replicate whose denominator is 0 is NaN, also when its
+//!   numerator is not 0.
+//!
+//! A method that reduces the points of a design reads one value per point:
+//! [`Quantities::combine`] combines the replicates of the point, the mean of
+//! each quantity, and for a ratio the rule its [`Replicates`] names.
 //!
 //! A quantity crosses from Python as JSON, with `kind` as the tag of each
 //! enum. The quantities of a design are evaluated in Rust, run after run, so
@@ -104,6 +111,75 @@ pub enum Quantity {
         /// The positions.
         positions: Vec<f64>,
     },
+    /// `numerator` divided by `denominator`, two quantities of one value
+    /// each ([`Quantity::ValueAt`], [`Quantity::Gain`], [`Quantity::Peak`]).
+    /// The ratio of a run whose denominator is 0 is NaN.
+    Ratio {
+        /// The quantity divided.
+        numerator: Box<Quantity>,
+        /// The quantity it is divided by.
+        denominator: Box<Quantity>,
+        /// How the replicates of a stochastic run combine.
+        replicates: Replicates,
+    },
+}
+
+/// How the replicates of a point combine into the value of a ratio of
+/// numerator N and denominator D.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Replicates {
+    /// The mean of the ratio of each replicate, `E[N/D]`: a replicate with
+    /// D = 0 leaves the point with no value.
+    Within,
+    /// The mean of the ratio of the replicates with D > 0, `E[N/D | D > 0]`: a
+    /// point with no such replicate has no value.
+    WithinPositive,
+    /// The ratio of the means, `E[N]/E[D]`: a point with `E[D] = 0` has no
+    /// value.
+    Pooled,
+}
+
+/// The numerator and the denominator of a scalar of one run: the two
+/// quantities of a ratio, or the value of any other scalar over 1.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Term {
+    /// The numerator, or the value of a scalar that is not a ratio.
+    pub numerator: f64,
+    /// The denominator; 1 for a scalar that is not a ratio.
+    pub denominator: f64,
+}
+
+impl Term {
+    /// The term of a scalar that is not a ratio: `value` over 1.
+    fn of(value: f64) -> Self {
+        Self {
+            numerator: value,
+            denominator: 1.0,
+        }
+    }
+
+    /// The value of the scalar in its run: the numerator over the
+    /// denominator, NaN when the denominator is 0.
+    pub fn value(self) -> f64 {
+        if self.denominator == 0.0 {
+            f64::NAN
+        } else {
+            self.numerator / self.denominator
+        }
+    }
+}
+
+/// Why the replicates of a point give a scalar no value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Undefined {
+    /// The value of this replicate is NaN, or one of the terms of its ratio
+    /// is.
+    Replicate(usize),
+    /// No replicate is NaN, but a ratio has no value at the point: no
+    /// replicate has D > 0 under [`Replicates::WithinPositive`], or `E[D] = 0`
+    /// under [`Replicates::Pooled`].
+    Point,
 }
 
 impl Quantity {
@@ -121,14 +197,26 @@ impl Quantity {
         self.len() == 0
     }
 
-    /// The outputs the quantity sums.
-    pub fn outputs(&self) -> &[String] {
+    /// The outputs the quantity sums; for a ratio, those of its numerator,
+    /// then those of its denominator.
+    pub fn outputs(&self) -> Vec<&str> {
         match self {
-            Self::Gain { outputs, .. } => outputs,
+            Self::Gain { outputs, .. } => outputs.iter().map(String::as_str).collect(),
             Self::ValueAt { series, .. }
             | Self::Peak { series, .. }
             | Self::PeakPosition { series, .. }
-            | Self::Trajectory { series, .. } => series.outputs(),
+            | Self::Trajectory { series, .. } => {
+                series.outputs().iter().map(String::as_str).collect()
+            }
+            Self::Ratio {
+                numerator,
+                denominator,
+                ..
+            } => {
+                let mut outputs = numerator.outputs();
+                outputs.extend(denominator.outputs());
+                outputs
+            }
         }
     }
 }
@@ -143,17 +231,41 @@ pub struct MissingPositions {
     pub positions: Vec<f64>,
 }
 
-/// How a quantity reduces its observations.
+/// How a quantity of one value reduces its observations.
 #[derive(Debug, Clone)]
-enum Reduction {
+enum Scalar {
     /// The value of one observation.
     One(usize),
     /// The largest value of a range of observations.
     Max(Range<usize>),
     /// The position of the first largest value of a range of observations.
     ArgMax(Range<usize>, Vec<f64>),
+}
+
+impl Scalar {
+    /// The value in the observations of a run.
+    fn value(&self, observed: &[f64]) -> f64 {
+        match self {
+            Self::One(index) => observed[*index],
+            Self::Max(range) => {
+                first_largest(&observed[range.clone()]).map_or(f64::NAN, |(_, v)| v)
+            }
+            Self::ArgMax(range, positions) => {
+                first_largest(&observed[range.clone()]).map_or(f64::NAN, |(i, _)| positions[i])
+            }
+        }
+    }
+}
+
+/// How a quantity reduces its observations.
+#[derive(Debug, Clone)]
+enum Reduction {
+    /// One value.
+    Scalar(Scalar),
     /// The value of each observation of a range.
     Each(Range<usize>),
+    /// The value of one quantity over the value of another.
+    Ratio(Scalar, Scalar),
 }
 
 /// The quantities of a design, compiled for runs at their schedule.
@@ -162,6 +274,9 @@ pub struct Quantities {
     schedule: Vec<f64>,
     operator: ObservationOperator,
     reductions: Vec<Reduction>,
+    /// How the replicates of each scalar combine: [`Replicates::Within`]
+    /// for a scalar that is not a ratio, whose denominator is 1.
+    rules: Vec<Replicates>,
     count: usize,
     /// The positions each quantity reads, ascending: its positions and the
     /// starts of its windows.
@@ -217,6 +332,79 @@ impl Points<'_> {
         }
         Ok(first..self.points.len())
     }
+
+    /// The reduction of `quantity`, its observations read.
+    fn reduction(&mut self, quantity: &Quantity) -> Result<Reduction, String> {
+        let index = self.index;
+        Ok(match quantity {
+            Quantity::ValueAt { series, at } => {
+                Reduction::Scalar(Scalar::One(self.read(series, &[*at])?.start))
+            }
+            Quantity::Gain {
+                outputs,
+                start,
+                end,
+            } => {
+                check_position(index, *start)?;
+                if end <= start {
+                    return Err(format!(
+                        "Quantity {index}: a gain ends after it starts, got start {start} and \
+                         end {end}"
+                    ));
+                }
+                let series = Series::Level {
+                    outputs: outputs.clone(),
+                };
+                let row = self.read(&series, &[*end])?.start;
+                self.starts[row] = Some(*start);
+                Reduction::Scalar(Scalar::One(row))
+            }
+            Quantity::Peak { series, positions }
+            | Quantity::PeakPosition { series, positions }
+            | Quantity::Trajectory { series, positions } => {
+                if positions.is_empty() {
+                    return Err(format!(
+                        "Quantity {index}: a peak or a trajectory needs positions"
+                    ));
+                }
+                let range = self.read(series, positions)?;
+                match quantity {
+                    Quantity::Peak { .. } => Reduction::Scalar(Scalar::Max(range)),
+                    Quantity::PeakPosition { .. } => {
+                        Reduction::Scalar(Scalar::ArgMax(range, positions.clone()))
+                    }
+                    _ => Reduction::Each(range),
+                }
+            }
+            Quantity::Ratio {
+                numerator,
+                denominator,
+                ..
+            } => Reduction::Ratio(self.operand(numerator)?, self.operand(denominator)?),
+        })
+    }
+
+    /// The reduction of an operand of a ratio: a value, a gain or a peak.
+    fn operand(&mut self, quantity: &Quantity) -> Result<Scalar, String> {
+        match (quantity, self.reduction(quantity)?) {
+            (
+                Quantity::ValueAt { .. } | Quantity::Gain { .. } | Quantity::Peak { .. },
+                Reduction::Scalar(scalar),
+            ) => Ok(scalar),
+            _ => {
+                let kind = match quantity {
+                    Quantity::PeakPosition { .. } => "peak_position",
+                    Quantity::Trajectory { .. } => "trajectory",
+                    _ => "ratio",
+                };
+                Err(format!(
+                    "Quantity {}: a ratio divides quantities of one value each (value_at, gain, \
+                     peak), got {kind}",
+                    self.index
+                ))
+            }
+        }
+    }
 }
 
 impl Quantities {
@@ -237,6 +425,7 @@ impl Quantities {
         let mut starts = Vec::new();
         let mut reductions = Vec::with_capacity(quantities.len());
         let mut reads = Vec::with_capacity(quantities.len());
+        let mut rules = Vec::with_capacity(quantities.len());
         for (index, quantity) in quantities.iter().enumerate() {
             let first = points.len();
             let mut read = Points {
@@ -244,47 +433,12 @@ impl Quantities {
                 points: &mut points,
                 starts: &mut starts,
             };
-            reductions.push(match quantity {
-                Quantity::ValueAt { series, at } => {
-                    Reduction::One(read.read(series, &[*at])?.start)
-                }
-                Quantity::Gain {
-                    outputs,
-                    start,
-                    end,
-                } => {
-                    check_position(index, *start)?;
-                    if end <= start {
-                        return Err(format!(
-                            "Quantity {index}: a gain ends after it starts, got start {start} \
-                             and end {end}"
-                        ));
-                    }
-                    let series = Series::Level {
-                        outputs: outputs.clone(),
-                    };
-                    let row = read.read(&series, &[*end])?.start;
-                    starts[row] = Some(*start);
-                    Reduction::One(row)
-                }
-                Quantity::Peak { series, positions }
-                | Quantity::PeakPosition { series, positions }
-                | Quantity::Trajectory { series, positions } => {
-                    if positions.is_empty() {
-                        return Err(format!(
-                            "Quantity {index}: a peak or a trajectory needs positions"
-                        ));
-                    }
-                    let range = read.read(series, positions)?;
-                    match quantity {
-                        Quantity::Peak { .. } => Reduction::Max(range),
-                        Quantity::PeakPosition { .. } => {
-                            Reduction::ArgMax(range, positions.clone())
-                        }
-                        _ => Reduction::Each(range),
-                    }
-                }
-            });
+            reductions.push(read.reduction(quantity)?);
+            let rule = match quantity {
+                Quantity::Ratio { replicates, .. } => *replicates,
+                _ => Replicates::Within,
+            };
+            rules.extend(std::iter::repeat_n(rule, quantity.len()));
             let mut positions: Vec<f64> = points[first..]
                 .iter()
                 .map(|point| point.at)
@@ -308,6 +462,7 @@ impl Quantities {
             operator,
             count: quantities.iter().map(Quantity::len).sum(),
             reductions,
+            rules,
             reads,
         })
     }
@@ -322,7 +477,8 @@ impl Quantities {
     pub fn schedule_of(quantities: &[Quantity]) -> Result<Vec<f64>, String> {
         let mut outputs: Vec<String> = quantities
             .iter()
-            .flat_map(|quantity| quantity.outputs().iter().cloned())
+            .flat_map(Quantity::outputs)
+            .map(str::to_string)
             .collect();
         outputs.sort();
         outputs.dedup();
@@ -395,25 +551,98 @@ impl Quantities {
         Ok(self.evaluate(&selected))
     }
 
-    /// The value of each scalar in the rows of a run at [`Self::schedule`].
+    /// The value of each scalar in the rows of a run at [`Self::schedule`]:
+    /// the [`Term::value`] of each of its [`Self::terms`].
     pub fn evaluate(&self, rows: &[Vec<f64>]) -> Vec<f64> {
+        self.terms(rows).into_iter().map(Term::value).collect()
+    }
+
+    /// The numerator and the denominator of each scalar in the rows of a
+    /// run at [`Self::schedule`].
+    pub fn terms(&self, rows: &[Vec<f64>]) -> Vec<Term> {
         let mut observed = vec![0.0; self.operator.count()];
         self.operator.apply(rows, &[], &mut observed);
-        let mut values = Vec::with_capacity(self.count);
+        let mut terms = Vec::with_capacity(self.count);
         for reduction in &self.reductions {
             match reduction {
-                Reduction::One(index) => values.push(observed[*index]),
-                Reduction::Max(range) => {
-                    values
-                        .push(first_largest(&observed[range.clone()]).map_or(f64::NAN, |(_, v)| v));
+                Reduction::Scalar(scalar) => terms.push(Term::of(scalar.value(&observed))),
+                Reduction::Each(range) => {
+                    terms.extend(observed[range.clone()].iter().copied().map(Term::of));
                 }
-                Reduction::ArgMax(range, positions) => values.push(
-                    first_largest(&observed[range.clone()]).map_or(f64::NAN, |(i, _)| positions[i]),
-                ),
-                Reduction::Each(range) => values.extend_from_slice(&observed[range.clone()]),
+                Reduction::Ratio(numerator, denominator) => terms.push(Term {
+                    numerator: numerator.value(&observed),
+                    denominator: denominator.value(&observed),
+                }),
             }
         }
-        values
+        terms
+    }
+
+    /// The value of each scalar at a point, from the [`Self::terms`] of
+    /// each of its replicates, `[replicate][scalar]`: the mean over the
+    /// replicates, and for a ratio the rule of its [`Replicates`].
+    ///
+    /// # Errors
+    ///
+    /// Each scalar with no value at the point holds why: the first
+    /// replicate that is NaN, or a ratio whose rule gives no value.
+    pub fn combine(&self, replicates: &[Vec<Term>]) -> Vec<Result<f64, Undefined>> {
+        self.rules
+            .iter()
+            .enumerate()
+            .map(|(scalar, rule)| {
+                let terms = replicates.iter().map(move |terms| terms[scalar]);
+                combine(terms, *rule)
+            })
+            .collect()
+    }
+}
+
+/// The value of a scalar from its term in each replicate, combined by
+/// `rule`.
+fn combine(terms: impl Iterator<Item = Term> + Clone, rule: Replicates) -> Result<f64, Undefined> {
+    let nan = |(replicate, term): (usize, Term)| {
+        match rule {
+            Replicates::Within => term.value().is_nan(),
+            Replicates::WithinPositive | Replicates::Pooled => {
+                term.numerator.is_nan() || term.denominator.is_nan()
+            }
+        }
+        .then_some(Undefined::Replicate(replicate))
+    };
+    if let Some(undefined) = terms.clone().enumerate().find_map(nan) {
+        return Err(undefined);
+    }
+    let mean = |values: &[f64]| {
+        let count = values.len() as f64;
+        values.iter().map(|value| value / count).sum::<f64>()
+    };
+    let value = match rule {
+        Replicates::Within => mean(&terms.map(Term::value).collect::<Vec<_>>()),
+        Replicates::WithinPositive => {
+            let ratios: Vec<f64> = terms
+                .filter(|term| term.denominator > 0.0)
+                .map(Term::value)
+                .collect();
+            if ratios.is_empty() {
+                return Err(Undefined::Point);
+            }
+            mean(&ratios)
+        }
+        Replicates::Pooled => {
+            let (numerators, denominators): (Vec<f64>, Vec<f64>) =
+                terms.map(|term| (term.numerator, term.denominator)).unzip();
+            Term {
+                numerator: mean(&numerators),
+                denominator: mean(&denominators),
+            }
+            .value()
+        }
+    };
+    if value.is_nan() {
+        Err(Undefined::Point)
+    } else {
+        Ok(value)
     }
 }
 
