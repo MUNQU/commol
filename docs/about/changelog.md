@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+<!-- Added #226 -->
+
+<!-- Added #230 -->
+
+<!-- Added #239 -->
+
+<!-- Added #252 -->
+
+<!-- Added #253 -->
+
+<!-- Added #282 -->
+
+### Changed
+
+<!-- Changed #226 -->
+
+<!-- Changed #230 -->
+
+<!-- Changed #239 -->
+
+<!-- Changed #252 -->
+
+<!-- Changed #253 -->
+
+<!-- Changed #282 -->
+
+### Fixed
+
+<!-- Fixed #226 -->
+
+<!-- Fixed #230 -->
+
+<!-- Fixed #239 -->
+
+<!-- Fixed #252 -->
+
+<!-- Fixed #253 -->
+
+<!-- Fixed #282 -->
+
 ## [0.8.0] - 2026-10-22
 
 This release compares runs. `Scenarios` runs every draw of a sample under
