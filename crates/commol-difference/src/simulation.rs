@@ -770,7 +770,7 @@ mod tests {
     #[test]
     fn an_impulse_that_moves_more_than_its_source_holds_stops_its_step() {
         let mut engine = DifferenceEquations::from_model(&three_bins_with(vec![transition(
-            "dose",
+            "b_to_c",
             "B",
             "C",
             "1.5",
@@ -783,7 +783,7 @@ mod tests {
         assert_eq!(
             message,
             "The impulses at step 3 leave compartment 'B' at -5, below zero: it held 10, \
-             and the flows out of it move 'dose' 15. A difference step cannot move more \
+             and the flows out of it move 'b_to_c' 15. A difference step cannot move more \
              than a compartment holds"
         );
     }
