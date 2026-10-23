@@ -1600,7 +1600,7 @@ A calibration gives a run that stops this way a penalty and goes on; see [Calibr
 
 [Back to Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)
 
-Rates and formula parameters are written as expressions, such as `"k1 * A * B / total"`. This page lists everything an expression can contain: operators, variables, functions, and the security limits. The engine compiles each expression to machine code (Cranelift) once, and reuses it at every step.
+Rates and formula parameters are written as expressions, such as `"k1 * A * B / total"`. This page lists everything an expression can contain: operators, variables, functions, and the security limits. The engine checks each expression against this language, compiles it to machine code (Cranelift) once, and reuses it at every step.
 
 ## Quick path
 
@@ -1732,9 +1732,11 @@ print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 | Hyperbolic                | `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`                                              |
 | Exponential and logarithm | `exp`, `log` (natural), `ln` (natural), `log10`, `log2`                                        |
 | Power and root            | `sqrt`, `cbrt`, `pow(x, y)`, `hypot(x, y)`                                                     |
-| Comparison                | `min(a, b)`, `max(a, b)`, `abs`                                                                |
+| Comparison                | `min(a, b, ...)`, `max(a, b, ...)` (two arguments or more), `abs`                              |
 | Rounding                  | `floor`, `ceil`, `round` (halves round away from zero: `round(2.5)` is 3, `round(-2.5)` is -3) |
 | Conditional               | `if(condition, value_if_true, value_if_false)`                                                 |
+
+No other function is in the language: `erf(x)` or `trunc(x)` is rejected.
 
 For rates that change along the axis, [`AxisPattern`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) builds tested expressions for pulses, windows, ramps and sinusoids.
 
@@ -1757,9 +1759,22 @@ patterns = {
 
 To keep a rate readable, move part of it into a formula parameter: `add_parameter(id="k1_periodic", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")` and then `rate="k1_periodic * A * B / total"`.
 
+## Rejected expressions
+
+The engine checks each expression when it is added: a transition rate, a stratified rate, a formula parameter, a calibration constraint or an axis pattern. An expression outside the language of this page fails with a `ValueError` that names the expression and its first part outside the language: an unknown function, a call with the wrong number of arguments, `&&` or `||`, or a comparison or `!` outside the condition of an `if`.
+
+```python
+try:
+    ModelBuilder(name="Rejected").add_parameter(id="k2", value="k1 * (step > 30)")
+except ValueError as error:
+    print(error)  # ... Parameter 'k2': Formula 'k1 * (step > 30)': the comparison '>' ...
+```
+
+When the model is built, the engine checks the variables each rate and each formula parameter reads. A variable that no parameter, bin, compartment, subgroup total or engine variable defines fails the build, with a message that names the transition or the parameter, the expression, the undefined variables, and the parameters and bins of the model: `Undefined variables in transition 'bc' rate 'k9 * B': k9. Available parameters: k1, k2. Available bins: A, B, C.` A category id, such as `g1`, is not a variable: write `total_g1` for its compartments.
+
 ## Security
 
-Every rate and constraint expression is checked before it reaches the engine (`commol.utils.security.validate_expression_security`). An expression that is not plain mathematics is rejected when the transition is added:
+Every expression is also checked before it reaches the engine (`commol.utils.security.validate_expression_security`). An expression that is not plain mathematics is rejected when the transition is added:
 
 ```python
 try:
@@ -1770,14 +1785,14 @@ except ValueError as error:
     print("rejected")
 ```
 
-| Limit (`SecurityConfig`) | Value            |
-| ------------------------ | ---------------- |
-| Expression length        | 10000 characters |
-| Nesting depth            | 10 levels        |
-| Function calls           | 500              |
-| Variable name length     | 50 characters    |
-| Numeric literal          | 1e12             |
-| Complexity score         | 1000             |
+| Limit (`SecurityConfig`)                                                                            | Value            |
+| --------------------------------------------------------------------------------------------------- | ---------------- |
+| Expression length                                                                                   | 10000 characters |
+| Nesting depth                                                                                       | 10 levels        |
+| Function calls                                                                                      | 500              |
+| Variable name length                                                                                | 50 characters    |
+| Numeric literal                                                                                     | 1e12             |
+| Complexity score: the nodes of the tree of the expression (numbers, variables, operators and calls) | 1000             |
 
 ## Next steps
 
@@ -2103,7 +2118,7 @@ model.check_unit_consistency(verbose=True)  # Unit consistency check passed succ
 
 ## Unit checking
 
-`Model.check_unit_consistency(verbose=False)` checks that every flow has the unit `<bin unit>/<step unit>`, every [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses) the unit `<bin unit>`, and that every function receives a plain number. It checks the models of every engine alike: in each, a rate is per unit of the axis, and only what its value means differs (see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means)). It reads the flows the engine plans (`transition_flows`), so a proportional rate is checked as its flow, the rate times its source: `k2` in `1/day` from a bin in `item` gives `item/day`. The bin unit of a flow is the unit of the bin it leaves, or of the bin it enters when it has no source; so a category transition in a model of bins in `item` and `kg` moves `item/day` in one bin and `kg/day` in the other. In such a model `total`, a subgroup total `total_<categories>`, a category and `neighbors` add amounts of different units, so they have none, and a rate that reads one fails the check; read the bins or the compartments instead. A rate that reads the [neighbors of a unit](https://munqu.github.io/commol/latest/guide/building-models/#neighbors) is checked as the sums they are. It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every transition that fails.
+`Model.check_unit_consistency(verbose=False)` checks that every flow has the unit `<bin unit>/<step unit>`, every [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses) the unit `<bin unit>`, and that every function receives a plain number. It checks the models of every engine alike: in each, a rate is per unit of the axis, and only what its value means differs (see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means)). It reads the flows the engine plans (`transition_flows`), so a proportional rate is checked as its flow, the rate times its source: `k2` in `1/day` from a bin in `item` gives `item/day`. The bin unit of a flow is the unit of the bin it leaves, or of the bin it enters when it has no source; so a category transition in a model of bins in `item` and `kg` moves `item/day` in one bin and `kg/day` in the other. In such a model `total`, a subgroup total `total_<categories>` and `neighbors` add amounts of different units, so they have none, and a rate that reads one fails the check; read the bins or the compartments instead. A rate that reads the [neighbors of a unit](https://munqu.github.io/commol/latest/guide/building-models/#neighbors) is checked as the sums they are. It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every transition that fails.
 
 ### What needs a unit
 
@@ -14704,8 +14719,10 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If ``value`` is a list but ``mode`` is not provided, or if
-            ``mode`` is provided without a list ``value``.
+            If ``value`` is a list but ``mode`` is not provided, if
+            ``mode`` is provided without a list ``value``, or if a formula
+            ``value`` fails the security check or is not in the language of
+            formulas.
         """
         if isinstance(value, list):
             if mode is None:
@@ -15598,9 +15615,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                               |
-| ------------ | ----------------------------------------------------------------------------------------- |
-| `ValueError` | If value is a list but mode is not provided, or if mode is provided without a list value. |
+| Type         | Description                                                                                                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If value is a list but mode is not provided, if mode is provided without a list value, or if a formula value fails the security check or is not in the language of formulas. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -15651,8 +15668,10 @@ def add_parameter(
     Raises
     ------
     ValueError
-        If ``value`` is a list but ``mode`` is not provided, or if
-        ``mode`` is provided without a list ``value``.
+        If ``value`` is a list but ``mode`` is not provided, if
+        ``mode`` is provided without a list ``value``, or if a formula
+        ``value`` fails the security check or is not in the language of
+        formulas.
     """
     if isinstance(value, list):
         if mode is None:
@@ -18690,9 +18709,9 @@ class Aggregate(ModelStructure, InitialConditions):
 
         The process needs a bin and a transition, the amounts must name every
         bin and the fractions every category of the process, parameter ids
-        must not be engine variables or bin ids, every variable of a rate must
-        be defined, and the engine must plan every transition, resolve the
-        neighbors and build the initial state.
+        must not be engine variables or bin ids, and the engine must plan
+        every transition, resolve the neighbors, find every variable a rate or
+        a formula parameter reads, and build the initial state.
 
         Parameters
         ----------
@@ -18716,7 +18735,6 @@ class Aggregate(ModelStructure, InitialConditions):
         engine_state.check_model(model)
         if self.compartment_amounts:
             engine_state.initial_state(process, self)
-        self._check_formula_variables(model)
 
     def outputs_by_source(self, model: "Model[Self]") -> dict[str, list[str]]:
         """
@@ -19168,77 +19186,6 @@ class Aggregate(ModelStructure, InitialConditions):
                 f"Bin IDs ({sorted(bin_ids)}) are reserved variables. "
                 f"Please rename the conflicting parameters."
             )
-
-    def _check_formula_variables(self, model: "Model[Self]") -> None:
-        """Check that every variable of a rate expression is defined."""
-        parameter_ids = {param.id for param in model.parameters}
-        valid_identifiers = parameter_ids | self._process_identifiers(model.process)
-
-        for transition in model.process.transitions:
-            rates = [("rate", transition.rate)] if transition.rate else []
-            rates += [
-                ("stratified_rate", stratified.rate)
-                for stratified in transition.stratified_rates or []
-            ]
-            for context, rate in rates:
-                self._check_rate_variables(
-                    model.process,
-                    rate,
-                    transition.id,
-                    context,
-                    valid_identifiers,
-                    parameter_ids,
-                )
-
-    def _process_identifiers(self, process: Process) -> set[str]:
-        """Identifiers the process, the structure and the engine define."""
-        bin_ids = {bin_item.id for bin_item in process.bins}
-        category_ids = {
-            cat for strat in process.stratifications for cat in strat.categories
-        }
-        neighbor_terms = {NEIGHBORS_VARIABLE} | {
-            f"{NEIGHBORS_PREFIX}{bin_id}" for bin_id in bin_ids
-        }
-        return (
-            bin_ids
-            | category_ids
-            | set(RESERVED_VARIABLE_NAMES)
-            | neighbor_terms
-            | set(engine_state.subgroup_total_names(process))
-            | self._full_compartment_names(process)
-        )
-
-    def _full_compartment_names(self, process: Process) -> set[str]:
-        """Returns all full stratified compartment names."""
-        if not process.stratifications:
-            return set()
-        compartments, _ = engine_state.expanded_outputs(process)
-        return {output.name for output in compartments}
-
-    def _check_rate_variables(
-        self,
-        process: Process,
-        rate: str,
-        transition_id: str,
-        context: str,
-        valid_identifiers: set[str],
-        parameter_ids: set[str],
-    ) -> None:
-        """Check the variables of one rate expression."""
-        variables = get_expression_variables(rate)
-        undefined_vars = [var for var in variables if var not in valid_identifiers]
-        if not undefined_vars:
-            return
-        bin_ids = {bin_item.id for bin_item in process.bins}
-        message = (
-            f"Undefined variables in transition '{transition_id}' "
-            f"{context} '{rate}': {', '.join(undefined_vars)}. "
-            f"Available parameters: "
-            f"{', '.join(sorted(parameter_ids)) if parameter_ids else 'none'}. "
-            f"Available bins: "
-            f"{', '.join(sorted(bin_ids)) if bin_ids else 'none'}."
-        )
-        raise ValueError(message)
 ```
 
 ### Methods:
@@ -19251,7 +19198,7 @@ check_model(model: Model[Self]) -> None
 
 Check the structure against the process and the parameters.
 
-The process needs a bin and a transition, the amounts must name every bin and the fractions every category of the process, parameter ids must not be engine variables or bin ids, every variable of a rate must be defined, and the engine must plan every transition, resolve the neighbors and build the initial state.
+The process needs a bin and a transition, the amounts must name every bin and the fractions every category of the process, parameter ids must not be engine variables or bin ids, and the engine must plan every transition, resolve the neighbors, find every variable a rate or a formula parameter reads, and build the initial state.
 
 Parameters:
 
@@ -19274,9 +19221,9 @@ def check_model(self, model: "Model[Self]") -> None:
 
     The process needs a bin and a transition, the amounts must name every
     bin and the fractions every category of the process, parameter ids
-    must not be engine variables or bin ids, every variable of a rate must
-    be defined, and the engine must plan every transition, resolve the
-    neighbors and build the initial state.
+    must not be engine variables or bin ids, and the engine must plan
+    every transition, resolve the neighbors, find every variable a rate or
+    a formula parameter reads, and build the initial state.
 
     Parameters
     ----------
@@ -19300,7 +19247,6 @@ def check_model(self, model: "Model[Self]") -> None:
     engine_state.check_model(model)
     if self.compartment_amounts:
         engine_state.initial_state(process, self)
-    self._check_formula_variables(model)
 ```
 
 #### outputs_by_source
@@ -39375,6 +39321,17 @@ class Parameter(BaseModel):
             raise ValueError("Formula cannot be empty")
         return value.strip()
 
+    @model_validator(mode="after")
+    def validate_formula(self) -> Self:
+        """Check a formula value as a rate is checked: the security check and
+        the check of the language of formulas."""
+        if isinstance(self.value, str):
+            try:
+                validate_expression_security(self.value)
+            except ValueError as error:
+                raise ValueError(f"Parameter '{self.id}': {error}")
+        return self
+
     def is_calibrated(self) -> bool:
         """
         Check if the parameter has a value (is calibrated).
@@ -39452,6 +39409,29 @@ def validate_value(
     if not value.strip():
         raise ValueError("Formula cannot be empty")
     return value.strip()
+```
+
+#### validate_formula
+
+```python
+validate_formula() -> Self
+```
+
+Check a formula value as a rate is checked: the security check and the check of the language of formulas.
+
+Source code in `commol/context/parameter.py`
+
+```python
+@model_validator(mode="after")
+def validate_formula(self) -> Self:
+    """Check a formula value as a rate is checked: the security check and
+    the check of the language of formulas."""
+    if isinstance(self.value, str):
+        try:
+            validate_expression_security(self.value)
+        except ValueError as error:
+            raise ValueError(f"Parameter '{self.id}': {error}")
+    return self
 ```
 
 #### is_calibrated
@@ -40872,6 +40852,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - A calibration, a sensitivity analysis or any other method that sets a model parameter raises `ValueError` when it is built if the parameter is a formula or a series parameter. The engine computes such a parameter at each step, so a value set on it was lost and the method fitted nothing. The message is the engine's, for this case and for a parameter the model does not have: `Parameter 'k9' is not in the model; the parameters that can be set are k1, k2`. Python keeps no copy of this check.
 - The four engines of the aggregate kind name themselves in their messages by the name of the engine: a position an engine does not report at gives `The DifferenceEquations engine reports only at integer steps; 2.5 is not one`, and an impulse or a series point between two steps names `the DifferenceEquations engine` or `the StochasticSteps engine`.
+
+### Fixed
+
+- One check of the engine defines the language of formulas, the one [Mathematical expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) documents, for rates, formula parameters, calibration constraints and the unit check. A formula outside it fails when it is added, with a message that names the formula and its first part outside the language. Before, `k1 * (step > 30)` was accepted as a formula parameter, and `step > 1` as a rate became a parameter named `step > 1` that failed only when the model ran. A formula that calls a function the guide does not list, such as `erf`, `fma` or `trunc`, fails as a rate always did; a formula parameter accepted it before.
+- A rate or a formula parameter that reads a variable the model does not define fails when the model is built. Before, only a transition rate was checked, and a formula parameter failed when the model ran. A category id is not a variable: before, a rate that read one passed the build and failed when the model ran.
+- An error of a rate when the model runs names its transition, not the indices of its compartments.
+- `SecurityConfig.max_complexity_score` limits the number of nodes of the tree of a formula (numbers, variables, operators and calls), as the guide documents. Before, it limited nothing.
+- The unit check reads `^` as a power, as the engine does, and `cbrt` takes the cube root of a unit.
 
 ## [0.10.1] - 2026-10-23
 

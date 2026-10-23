@@ -2485,9 +2485,9 @@ class Aggregate(ModelStructure, InitialConditions):
 
         The process needs a bin and a transition, the amounts must name every
         bin and the fractions every category of the process, parameter ids
-        must not be engine variables or bin ids, every variable of a rate must
-        be defined, and the engine must plan every transition, resolve the
-        neighbors and build the initial state.
+        must not be engine variables or bin ids, and the engine must plan
+        every transition, resolve the neighbors, find every variable a rate or
+        a formula parameter reads, and build the initial state.
 
         Parameters
         ----------
@@ -2511,7 +2511,6 @@ class Aggregate(ModelStructure, InitialConditions):
         engine_state.check_model(model)
         if self.compartment_amounts:
             engine_state.initial_state(process, self)
-        self._check_formula_variables(model)
 
     def outputs_by_source(self, model: "Model[Self]") -> dict[str, list[str]]:
         """
@@ -2963,77 +2962,6 @@ class Aggregate(ModelStructure, InitialConditions):
                 f"Bin IDs ({sorted(bin_ids)}) are reserved variables. "
                 f"Please rename the conflicting parameters."
             )
-
-    def _check_formula_variables(self, model: "Model[Self]") -> None:
-        """Check that every variable of a rate expression is defined."""
-        parameter_ids = {param.id for param in model.parameters}
-        valid_identifiers = parameter_ids | self._process_identifiers(model.process)
-
-        for transition in model.process.transitions:
-            rates = [("rate", transition.rate)] if transition.rate else []
-            rates += [
-                ("stratified_rate", stratified.rate)
-                for stratified in transition.stratified_rates or []
-            ]
-            for context, rate in rates:
-                self._check_rate_variables(
-                    model.process,
-                    rate,
-                    transition.id,
-                    context,
-                    valid_identifiers,
-                    parameter_ids,
-                )
-
-    def _process_identifiers(self, process: Process) -> set[str]:
-        """Identifiers the process, the structure and the engine define."""
-        bin_ids = {bin_item.id for bin_item in process.bins}
-        category_ids = {
-            cat for strat in process.stratifications for cat in strat.categories
-        }
-        neighbor_terms = {NEIGHBORS_VARIABLE} | {
-            f"{NEIGHBORS_PREFIX}{bin_id}" for bin_id in bin_ids
-        }
-        return (
-            bin_ids
-            | category_ids
-            | set(RESERVED_VARIABLE_NAMES)
-            | neighbor_terms
-            | set(engine_state.subgroup_total_names(process))
-            | self._full_compartment_names(process)
-        )
-
-    def _full_compartment_names(self, process: Process) -> set[str]:
-        """Returns all full stratified compartment names."""
-        if not process.stratifications:
-            return set()
-        compartments, _ = engine_state.expanded_outputs(process)
-        return {output.name for output in compartments}
-
-    def _check_rate_variables(
-        self,
-        process: Process,
-        rate: str,
-        transition_id: str,
-        context: str,
-        valid_identifiers: set[str],
-        parameter_ids: set[str],
-    ) -> None:
-        """Check the variables of one rate expression."""
-        variables = get_expression_variables(rate)
-        undefined_vars = [var for var in variables if var not in valid_identifiers]
-        if not undefined_vars:
-            return
-        bin_ids = {bin_item.id for bin_item in process.bins}
-        message = (
-            f"Undefined variables in transition '{transition_id}' "
-            f"{context} '{rate}': {', '.join(undefined_vars)}. "
-            f"Available parameters: "
-            f"{', '.join(sorted(parameter_ids)) if parameter_ids else 'none'}. "
-            f"Available bins: "
-            f"{', '.join(sorted(bin_ids)) if bin_ids else 'none'}."
-        )
-        raise ValueError(message)
 ```
 
 ### Methods:
@@ -3046,7 +2974,7 @@ check_model(model: Model[Self]) -> None
 
 Check the structure against the process and the parameters.
 
-The process needs a bin and a transition, the amounts must name every bin and the fractions every category of the process, parameter ids must not be engine variables or bin ids, every variable of a rate must be defined, and the engine must plan every transition, resolve the neighbors and build the initial state.
+The process needs a bin and a transition, the amounts must name every bin and the fractions every category of the process, parameter ids must not be engine variables or bin ids, and the engine must plan every transition, resolve the neighbors, find every variable a rate or a formula parameter reads, and build the initial state.
 
 Parameters:
 
@@ -3069,9 +2997,9 @@ def check_model(self, model: "Model[Self]") -> None:
 
     The process needs a bin and a transition, the amounts must name every
     bin and the fractions every category of the process, parameter ids
-    must not be engine variables or bin ids, every variable of a rate must
-    be defined, and the engine must plan every transition, resolve the
-    neighbors and build the initial state.
+    must not be engine variables or bin ids, and the engine must plan
+    every transition, resolve the neighbors, find every variable a rate or
+    a formula parameter reads, and build the initial state.
 
     Parameters
     ----------
@@ -3095,7 +3023,6 @@ def check_model(self, model: "Model[Self]") -> None:
     engine_state.check_model(model)
     if self.compartment_amounts:
         engine_state.initial_state(process, self)
-    self._check_formula_variables(model)
 ```
 
 #### outputs_by_source

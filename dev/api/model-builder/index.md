@@ -244,8 +244,10 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If ``value`` is a list but ``mode`` is not provided, or if
-            ``mode`` is provided without a list ``value``.
+            If ``value`` is a list but ``mode`` is not provided, if
+            ``mode`` is provided without a list ``value``, or if a formula
+            ``value`` fails the security check or is not in the language of
+            formulas.
         """
         if isinstance(value, list):
             if mode is None:
@@ -1138,9 +1140,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                               |
-| ------------ | ----------------------------------------------------------------------------------------- |
-| `ValueError` | If value is a list but mode is not provided, or if mode is provided without a list value. |
+| Type         | Description                                                                                                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If value is a list but mode is not provided, if mode is provided without a list value, or if a formula value fails the security check or is not in the language of formulas. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -1191,8 +1193,10 @@ def add_parameter(
     Raises
     ------
     ValueError
-        If ``value`` is a list but ``mode`` is not provided, or if
-        ``mode`` is provided without a list ``value``.
+        If ``value`` is a list but ``mode`` is not provided, if
+        ``mode`` is provided without a list ``value``, or if a formula
+        ``value`` fails the security check or is not in the language of
+        formulas.
     """
     if isinstance(value, list):
         if mode is None:

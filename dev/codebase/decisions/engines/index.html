@@ -3545,7 +3545,7 @@ version may change a run, and the changelog says so.</p>
 </tr>
 <tr>
 <td>A pure-Rust <code>libm</code> for every function of the JIT</td>
-<td><code>pow</code> takes 4 times as long (21 ns against 5 ns) and <code>exp</code>, <code>log</code> and <code>sin</code> about 40 % more, in every engine, for a difference in the last bit; the levels above are documented instead. The <code>libm</code> crate gives only the functions the standard library does not have (<code>erf</code>, <code>erfc</code>, <code>tgamma</code>, <code>lgamma</code>, the Bessel functions, <code>fdim</code>, <code>remainder</code>).</td>
+<td><code>pow</code> takes 4 times as long (21 ns against 5 ns) and <code>exp</code>, <code>log</code> and <code>sin</code> about 40 % more, in every engine, for a difference in the last bit; the levels above are documented instead. Every function of the language has a method in the standard library.</td>
 </tr>
 <tr>
 <td>The JIT looks each function up in the process (<code>dlsym</code>)</td>

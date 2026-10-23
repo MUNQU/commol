@@ -3374,7 +3374,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-core/src/math_expression/</code></td>
-<td>Parsing, preprocessing and evaluation of rate expressions; the Cranelift JIT and its global cache (<code>jit/</code>).</td>
+<td>The language of formulas (<code>language.rs</code>: <code>FUNCTIONS</code> and the check of a formula, <code>MathExpression::check</code>), the parsing and evaluation of rate expressions; the Cranelift JIT and its global cache (<code>jit/</code>).</td>
 <td>Model-specific variables.</td>
 </tr>
 <tr>
@@ -3424,7 +3424,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/rates.rs</code></td>
-<td>Evaluation of a compiled rate: fast path, JIT with resolved slots, evalexpr fallback.</td>
+<td>Evaluation of a compiled rate: fast path or JIT with resolved slots; an error names the transition.</td>
 <td>Flow logic.</td>
 </tr>
 <tr>
@@ -3908,17 +3908,17 @@
 </tr>
 <tr>
 <td><code>utils/security.py</code></td>
-<td>Validation of every user expression (<code>SecurityConfig</code> limits).</td>
-<td>Expression evaluation.</td>
+<td>Validation of every user expression: the text guards and the limits of <code>SecurityConfig</code>, then the check of the engine (<code>commol_rs.core.MathExpression</code>).</td>
+<td>Expression evaluation; a list of functions.</td>
 </tr>
 <tr>
 <td><code>utils/equations.py</code></td>
-<td>Dimensional analysis with <code>pint</code>.</td>
+<td>Dimensional analysis with <code>pint</code>: one unit rule per function of the engine (<code>_FUNCTION_UNITS</code>).</td>
 <td>—</td>
 </tr>
 <tr>
 <td><code>commol/constants.py</code></td>
-<td>The names of the variables every expression has (<code>TOTAL_VARIABLE</code>, <code>RESERVED_VARIABLE_NAMES</code>) and the prefix of the subgroup totals (<code>SUBGROUP_TOTAL_PREFIX</code>).</td>
+<td>The names of the variables every expression has (<code>TOTAL_VARIABLE</code>, <code>RESERVED_VARIABLE_NAMES</code>) and the prefix of the subgroup totals (<code>SUBGROUP_TOTAL_PREFIX</code>), read from the engine (<code>commol_rs.model</code>).</td>
 <td>Names that depend on a model (ask the engine).</td>
 </tr>
 <tr>
@@ -4053,8 +4053,8 @@
 </tr>
 <tr>
 <td>Add a function or variable to rate expressions</td>
-<td><code>crates/commol-core/src/math_expression/</code></td>
-<td><code>py-commol/commol/utils/security.py</code>, <code>docs/guide/mathematical-expressions.md</code></td>
+<td><code>crates/commol-core/src/math_expression/</code> (<code>language.rs</code>: <code>FUNCTIONS</code>, <code>check</code>)</td>
+<td><code>py-commol/commol/utils/equations.py</code> (<code>_FUNCTION_UNITS</code>), <code>docs/guide/mathematical-expressions.md</code></td>
 </tr>
 <tr>
 <td>Change initial conditions</td>

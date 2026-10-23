@@ -490,6 +490,17 @@ class Parameter(BaseModel):
             raise ValueError("Formula cannot be empty")
         return value.strip()
 
+    @model_validator(mode="after")
+    def validate_formula(self) -> Self:
+        """Check a formula value as a rate is checked: the security check and
+        the check of the language of formulas."""
+        if isinstance(self.value, str):
+            try:
+                validate_expression_security(self.value)
+            except ValueError as error:
+                raise ValueError(f"Parameter '{self.id}': {error}")
+        return self
+
     def is_calibrated(self) -> bool:
         """
         Check if the parameter has a value (is calibrated).
@@ -567,6 +578,29 @@ def validate_value(
     if not value.strip():
         raise ValueError("Formula cannot be empty")
     return value.strip()
+```
+
+#### validate_formula
+
+```python
+validate_formula() -> Self
+```
+
+Check a formula value as a rate is checked: the security check and the check of the language of formulas.
+
+Source code in `commol/context/parameter.py`
+
+```python
+@model_validator(mode="after")
+def validate_formula(self) -> Self:
+    """Check a formula value as a rate is checked: the security check and
+    the check of the language of formulas."""
+    if isinstance(self.value, str):
+        try:
+            validate_expression_security(self.value)
+        except ValueError as error:
+            raise ValueError(f"Parameter '{self.id}': {error}")
+    return self
 ```
 
 #### is_calibrated
