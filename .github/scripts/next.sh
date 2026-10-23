@@ -3,13 +3,14 @@
 # blocked by no open issue and assigned to nobody, that can run at the same
 # time as every issue in progress and as each other. They come by effective
 # priority (the field Priority, Now, Next or Later, raised by the open issues
-# each one blocks in any repository; no value is Next), then milestone, then
-# number. It prints the priority and where an inherited one comes from, and
-# names each issue it skips and the issue it would touch
-# (.github/scripts/parallel.py). First it links each open issue to the release
-# before its milestone, and each open release to the issues of its milestone
-# (--releases), then it writes the precedence level of each open issue into
-# the field Level of the project (--levels).
+# each one blocks in any repository; no value is Next), then the version of the
+# milestone (its title, not its number), then number. Every open blocker
+# counts, as for start.sh. It prints the priority and where an inherited one
+# comes from, and names each issue it skips and the issue it would touch
+# (.github/scripts/parallel.py). First it links each open issue to the
+# release before its milestone, and each open release to the issues of its
+# milestone (--releases), then it writes the precedence level of each open
+# issue into the field Level of the project (--levels).
 #
 # Usage, from anywhere in the repository: .github/scripts/next.sh [count]   (default 1)
 set -euo pipefail

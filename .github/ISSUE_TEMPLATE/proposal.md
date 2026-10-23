@@ -81,7 +81,6 @@ approved with a link to the comment that approves it. -->
 - Branch: `<type>/<name>` from `main`
 - Breaking: yes | no
 - Release: the milestone of the issue
-- Parallel with: <!-- written by `python .github/scripts/parallel.py --write` -->
 
 <!-- Log: each decision or implementation finding is a comment,
 "L<n> (decision|implementation): …". Evidence: the body of the pull request,
