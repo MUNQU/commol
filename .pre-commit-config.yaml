@@ -9,7 +9,7 @@ repos:
         types: [rust]
       - id: cargo-clippy
         name: cargo clippy
-        entry: cargo clippy --all-targets --all-features -- -D warnings
+        entry: cargo clippy --workspace --all-targets --all-features -- -D warnings
         language: system
         pass_filenames: false
         types: [rust]
@@ -43,9 +43,11 @@ repos:
         pass_filenames: false
         files: ^(py-commol/|\.github/scripts/|README\.md$)
         types_or: [python, pyi, jupyter, markdown]
-  - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.33
-    hooks:
+      # The uv of the machine, which refuses to run unless it is the version
+      # of `required-version` in py-commol/pyproject.toml, the one CI installs.
       - id: uv-lock
+        name: uv lock
+        entry: uv lock --check --project py-commol
+        language: system
+        pass_filenames: false
         files: ^py-commol/(pyproject\.toml|uv\.lock)$
-        args: ["--project", "py-commol"]

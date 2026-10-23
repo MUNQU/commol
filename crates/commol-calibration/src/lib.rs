@@ -56,7 +56,7 @@ pub mod subproblem;
 pub mod types;
 pub mod values;
 
-pub use calibration_problem::{check_positions, CalibrationProblem};
+pub use calibration_problem::{CalibrationProblem, check_positions};
 pub use discrepancy::{Discrepancy, DiscrepancyConfig, TermError};
 pub use feasibility::{EvaluationError, Feasibility, Violation};
 pub use forward::{ForwardModel, Workspace};
@@ -64,18 +64,18 @@ pub use likelihood::{
     Argument, Center, Likelihood, Noise, ObservationModel, Term, TermDerivatives,
 };
 pub use objective::{OptimizationObjective, Score};
-pub use observation::{index_at, ObservationOperator};
+pub use observation::{ObservationOperator, index_at};
 pub use optimization::{
-    converged, optimize, optimize_from, optimize_subproblem, optimize_with_history,
-    optimize_with_observer, AccelerationStrategy, ImprovementStop, InertiaWeightStrategy,
-    InitializationStrategy, MutationApplication, MutationStrategy, NelderMeadConfig,
-    NelderMeadState, NoObserver, OptimizationConfig, ParticleSwarmConfig, ParticleSwarmState,
+    AccelerationStrategy, ImprovementStop, InertiaWeightStrategy, InitializationStrategy,
+    MutationApplication, MutationStrategy, NelderMeadConfig, NelderMeadState, NoObserver,
+    OptimizationConfig, ParticleSwarmConfig, ParticleSwarmState, converged, optimize,
+    optimize_from, optimize_subproblem, optimize_with_history, optimize_with_observer,
 };
-pub use starts::{optimize_starts, start_points, StartOutcome};
-pub use subproblem::{predict, ConstraintSettings, Subproblem, SubproblemResult};
+pub use starts::{StartOutcome, optimize_starts, start_points};
+pub use subproblem::{ConstraintSettings, Subproblem, SubproblemResult, predict};
 pub use types::{
-    crps, weighted_crps, CalibrationConstraint, CalibrationEvaluation, CalibrationParameter,
-    CalibrationParameterType, CalibrationResult, CalibrationResultWithHistory, LossConfig,
-    ObservedDataPoint, ReplicateSummary, Replicates,
+    CalibrationConstraint, CalibrationEvaluation, CalibrationParameter, CalibrationParameterType,
+    CalibrationResult, CalibrationResultWithHistory, LossConfig, ObservedDataPoint,
+    ReplicateSummary, Replicates, crps, weighted_crps,
 };
 pub use values::{check_model_values, configured_engine};

@@ -3,8 +3,9 @@
 
 use argmin::core::CostFunction;
 use commol_calibration::{
-    optimize, CalibrationParameter, CalibrationParameterType, CalibrationProblem, LossConfig,
+    CalibrationParameter, CalibrationParameterType, CalibrationProblem, LossConfig,
     NelderMeadConfig, ObservedDataPoint, OptimizationConfig, OptimizationObjective, Violation,
+    optimize,
 };
 use commol_core::Model;
 use commol_difference::DifferenceEquations;

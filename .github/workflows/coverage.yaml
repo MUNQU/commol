@@ -72,6 +72,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v10.3.0
         with:
+          version-file: py-commol/pyproject.toml
           enable-cache: true
           cache-dependency-glob: py-commol/uv.lock
 

@@ -643,7 +643,7 @@ mod loss_tests {
 
 #[cfg(test)]
 mod replicate_tests {
-    use super::{crps, weighted_crps, LossConfig, ReplicateSummary, Replicates};
+    use super::{LossConfig, ReplicateSummary, Replicates, crps, weighted_crps};
 
     #[test]
     fn the_crps_of_one_replicate_is_the_absolute_error() {

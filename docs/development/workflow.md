@@ -292,7 +292,7 @@ ty check commol                        # Type checking
 
 cd ..
 cargo fmt --all                       # Format Rust code
-cargo clippy --all-targets --fix      # Fix Rust linting issues
+cargo clippy --workspace --all-targets --all-features --fix   # Fix Rust linting issues
 ```
 
 ### 3. Testing Your Changes
@@ -388,12 +388,21 @@ Process](release.md)).
 | Workflow | Runs on | Checks | Required check |
 |---|---|---|---|
 | Code Quality (`code-quality.yaml`) | Pull requests, the merge queue and on demand | Python Code Quality: Ruff (lint, format, docstrings `D1`/`D417`) of `py-commol/` and `.github/scripts/`, Ty and Vulture, on the source and the stubs, so it builds nothing. Python Coverage: every test, the documentation checks (`pytest -m docs`) too, under coverage, for every change, the documentation included; it fails under 100 % of the statements. Rust: rustfmt, Clippy (`-D warnings`, so `missing_docs` too), rustdoc without broken links, then the Rust tests and `pytest` on an extension built with the instrumentation of `cargo llvm-cov` (`.github/scripts/rust_coverage.sh`), so the bindings are measured where they run; it fails on a line that no test runs and that has no marker `// coverage: <reason>` (`.github/scripts/rust_uncovered.py`). Both upload their coverage to Codecov (flags `python` and `rust`) with the OIDC token of the run, so no secret is needed; `.github/codecov.yml` makes its checks informational: the thresholds live in the repository ([Test coverage](../codebase/coverage.md#test-coverage)). | `Python Code Quality`, `Python Coverage`, `Rust Code Quality` |
-| Build (`build.yaml`) | Pull requests, the merge queue, every Monday on `main` and on demand | Tests, the documentation checks included, without coverage: the job on Ubuntu installs LaTeX and times every test against its budget ([Time budget](../codebase/tests.md#time-budget)). A pull request that changes what the coverage studies run also runs them (`coverage.yaml`): the crates `commol-core`, `commol-model`, `commol-difference`, `commol-calibration`, `commol-random` and `commol-inference`, the bindings (`py-commol/src/`), the Python package, `tests/support/`, the studies, the locks, the manifests and the toolchain. The merge queue does not run them again. A pull request runs one job, Ubuntu with Python 3.12, for a fast answer; the merge queue, the weekly and the manual runs test Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14. A failure that only one operating system shows appears in the queue, which then removes the pull request. A change of only documentation or planning files (`docs/`, Markdown at the root, `mkdocs.yaml`, `.github/ISSUE_TEMPLATE/`, `.github/scripts/`) skips the tests. The wheels of every architecture are built by the release (`release.yaml`). | `Build Passed` |
+| Build (`build.yaml`) | Pull requests, the merge queue, every Monday on `main` and on demand | Tests, the documentation checks included, without coverage: the job on Ubuntu installs LaTeX and times every test against its budget ([Time budget](../codebase/tests.md#time-budget)). A pull request that changes what the coverage studies run also runs them (`coverage.yaml`): the crates `commol-core`, `commol-model`, `commol-difference`, `commol-stochastic`, `commol-calibration`, `commol-random` and `commol-inference`, the bindings (`py-commol/src/`), the Python package, `tests/support/`, the studies, the locks, the manifests and the toolchain. The merge queue does not run them again. A pull request runs one job, Ubuntu with Python 3.12, for a fast answer; the merge queue, the weekly and the manual runs test Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14. A failure that only one operating system shows appears in the queue, which then removes the pull request. A change of only documentation or planning files (`docs/`, Markdown at the root, `mkdocs.yaml`, `.github/ISSUE_TEMPLATE/`, `.github/scripts/`) skips the tests. The wheels of every architecture are built by the release (`release.yaml`). | `Build Passed` |
 | Documentation (`docs.yaml`) | Pull requests, the merge queue, pushes to `main` and release tags | `mkdocs build --strict`: no broken internal link or anchor. Deploys the site with mike: a release tag as `latest`, a push to `main` as `dev`. | `Build Documentation` |
 | Coverage Studies (`coverage.yaml`) | Called by Build for a pull request that changes what the studies run and by the release before it publishes; on demand | `pytest -m coverage_study`: the intervals of each uncertainty method cover the truth at their level ([Design decisions](../codebase/decisions/uncertainty.md#methods-plug-into-one-entry-point)). One job per group of studies, so the slowest study, about 10 min, sets the wait. | `Build Passed`, through Build |
 | Links (`links.yaml`) | Pull requests that change `docs/`, `README.md` or `AGENTS.md`; every Monday; on demand | External links, with lychee. | None: a site that is down for a while must not block a pull request |
 | Merge queue (`merge_group` in Code Quality, Build and Documentation) | A pull request queued for `main` | The same required checks, on the pull request merged on top of the ones queued before it, at most 2 groups at a time and up to 5 pull requests per group. The tree that reaches `main` is the tree the queue tested, so a push to `main` runs no tests again. | The same |
-| Release (`release.yaml`) | A published GitHub release | Builds wheels and the sdist, runs the coverage studies, and publishes to PyPI only when all of them pass. See [Release Process](release.md). | — |
+| Release (`release.yaml`) | A published GitHub release | Builds wheels and the sdist with the maturin of `py-commol/uv.lock`, runs the coverage studies, and publishes to PyPI only when all of them pass. See [Release Process](release.md). | — |
+
+Every workflow sets `permissions: contents: read` at its top level, so its
+token can read the repository and cannot change it. A job that writes asks
+for the right in its own `permissions`: only `deploy-docs` of `docs.yaml`,
+which pushes the site, sets `contents: write`. Every workflow installs the uv
+of `required-version` in `py-commol/pyproject.toml` (`version-file` of
+`setup-uv`). `py-commol/tests/suite/test_workflows.py` checks both, the
+maturin of the release and the commands that `AGENTS.md` and the pull request
+template show.
 
 ## Local Development Tips
 
@@ -420,11 +429,23 @@ On every commit, the hooks in `.pre-commit-config.yaml` run:
 | `vulture` | Dead Python code |
 | `ruff-check` | Python lints, including docstrings (`D1`, `D417`) |
 | `ruff-format` | Python formatting |
-| `uv-lock` | `uv.lock` matches `pyproject.toml` |
+| `uv-lock` | `uv.lock` matches `pyproject.toml` (`uv lock --check`) |
 
 The Python hooks run their tool with `uv run` from `py-commol/`, so they use
 the versions of `uv.lock`, the same as CI. Dependabot updates `uv.lock`, not the
 `rev` of a pre-commit repository, so a hook pinned there would drift from CI.
+Every hook is local: `uv-lock` runs the uv of your machine, which is the uv of
+CI (see [The uv version](#the-uv-version)).
+
+### The uv version
+
+`required-version` in `[tool.uv]` of `py-commol/pyproject.toml` pins one
+exact uv version. CI installs it (`setup-uv` reads it with `version-file`), and
+a uv of another version refuses to run in the project, so your `uv sync`,
+`uv lock` and the hook `uv-lock` give the results of CI. Install that version
+with `uv self update <version>` (a standalone uv) or your package manager. To
+move to a newer uv, change `required-version` in one pull request; its CI runs
+the new uv.
 
 ### The Rust toolchain
 
@@ -452,10 +473,10 @@ by hand, or to fix the lints of that pull request:
 ```bash
 # Build with debug symbols (with virtual environment activated)
 cd py-commol
-maturin develop
+maturin develop --features test-kind
 
 # Run Python
-python -m your_test_script.py
+python your_test_script.py
 ```
 
 ## Building Documentation
@@ -463,15 +484,15 @@ python -m your_test_script.py
 The project uses MkDocs Material for documentation with multi-version support via Mike:
 
 ```bash
-# Install documentation dependencies (with virtual environment activated)
+# Install the documentation dependencies (with virtual environment activated)
 cd py-commol
-pip install -e ".[docs]"
+uv sync --extra dev --extra docs
 
-# Serve documentation locally
-mkdocs serve
+# Serve documentation locally (mkdocs.yaml is at the root)
+mkdocs serve -f ../mkdocs.yaml
 
-# Build documentation
-mkdocs build
+# Build documentation, as CI does
+mkdocs build --strict -f ../mkdocs.yaml
 ```
 
 Visit http://127.0.0.1:8000 to view the documentation locally.
@@ -500,18 +521,18 @@ If you need to manually deploy documentation:
 ```bash
 # Deploy latest version (from a checkout of the release tag) - with venv activated
 cd py-commol
-mike deploy --push --update-aliases latest
-mike set-default --push latest
+mike deploy --push --update-aliases latest --config-file ../mkdocs.yaml
+mike set-default --push latest --config-file ../mkdocs.yaml
 
 # Deploy dev version (from main)
 cd py-commol
-mike deploy --push dev
+mike deploy --push --update-aliases dev --config-file ../mkdocs.yaml
 
 # List all deployed versions
-mike list
+mike list --config-file ../mkdocs.yaml
 
 # Delete a version
-mike delete <version-name> --push
+mike delete <version-name> --push --config-file ../mkdocs.yaml
 ```
 
 #### Version Management Tips

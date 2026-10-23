@@ -17,8 +17,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Only the job that deploys the site writes: it pushes the branch gh-pages.
 permissions:
-  contents: write
+  contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -42,6 +43,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v10.3.0
         with:
+          version-file: py-commol/pyproject.toml
           enable-cache: true
           cache-dependency-glob: py-commol/uv.lock
 
@@ -63,6 +65,8 @@ jobs:
     needs: build-docs
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v7
@@ -77,6 +81,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v10.3.0
         with:
+          version-file: py-commol/pyproject.toml
           enable-cache: true
           cache-dependency-glob: py-commol/uv.lock
 

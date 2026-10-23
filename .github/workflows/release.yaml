@@ -11,8 +11,24 @@ env:
     FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+    # The version of maturin that py-commol/uv.lock pins, so every wheel builds
+    # with the maturin of the tests and of the sdist, not the latest one.
+    maturin:
+        name: Read the maturin of the lock
+        runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.lock.outputs.version }}
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Read the version of maturin in uv.lock
+              id: lock
+              run: |
+                  python3 -c 'import tomllib; lock = tomllib.load(open("py-commol/uv.lock", "rb")); print("version=" + next(p["version"] for p in lock["package"] if p["name"] == "maturin"))' >> "$GITHUB_OUTPUT"
+
     build-wheels-linux:
         name: Build wheels on Linux (${{ matrix.target }}) with Python ${{ matrix.python-version }}
+        needs: maturin
         runs-on: ubuntu-latest
         strategy:
             fail-fast: false
@@ -29,6 +45,7 @@ jobs:
             - name: Build wheels
               uses: PyO3/maturin-action@v1
               with:
+                  maturin-version: ${{ needs.maturin.outputs.version }}
                   target: ${{ matrix.target }}
                   args: --release --out dist --manifest-path py-commol/Cargo.toml --interpreter ${{ matrix.python-version }}
                   sccache: "true"
@@ -42,6 +59,7 @@ jobs:
 
     build-wheels-windows:
         name: Build wheels on Windows with Python ${{ matrix.python-version }}
+        needs: maturin
         runs-on: windows-latest
         strategy:
             fail-fast: false
@@ -57,6 +75,7 @@ jobs:
             - name: Build wheels
               uses: PyO3/maturin-action@v1
               with:
+                  maturin-version: ${{ needs.maturin.outputs.version }}
                   target: x86_64
                   args: --release --out dist --manifest-path py-commol/Cargo.toml --interpreter ${{ matrix.python-version }}
                   sccache: "true"
@@ -69,6 +88,7 @@ jobs:
 
     build-wheels-macos:
         name: Build wheels on macOS (${{ matrix.target }}) with Python ${{ matrix.python-version }}
+        needs: maturin
         runs-on: macos-latest
         strategy:
             fail-fast: false
@@ -85,6 +105,7 @@ jobs:
             - name: Build wheels
               uses: PyO3/maturin-action@v1
               with:
+                  maturin-version: ${{ needs.maturin.outputs.version }}
                   target: ${{ matrix.target }}
                   args: --release --out dist --manifest-path py-commol/Cargo.toml --interpreter ${{ matrix.python-version }}
                   sccache: "true"
@@ -109,11 +130,14 @@ jobs:
               with:
                   python-version: "3.12"
 
-            - name: Install build dependencies
-              run: pip install maturin
+            - name: Install uv
+              uses: astral-sh/setup-uv@v10.3.0
+              with:
+                  version-file: py-commol/pyproject.toml
 
+            # The maturin of uv.lock, as the tests and the wheels use.
             - name: Build sdist
-              run: maturin sdist --out dist --manifest-path py-commol/Cargo.toml
+              run: uv run --locked --project py-commol --extra dev maturin sdist --out dist --manifest-path py-commol/Cargo.toml
 
             - name: Upload sdist
               uses: actions/upload-artifact@v7

@@ -6,11 +6,11 @@ use std::collections::HashMap;
 
 use argmin::core::CostFunction;
 use commol_calibration::{
-    check_model_values, configured_engine, optimize_from, optimize_with_history,
-    optimize_with_observer, CalibrationConstraint, CalibrationParameter, CalibrationParameterType,
-    CalibrationProblem, EvaluationError, ImprovementStop, LossConfig, MutationApplication,
-    MutationStrategy, NelderMeadConfig, NoObserver, ObservedDataPoint, OptimizationConfig,
-    OptimizationObjective, ParticleSwarmConfig, Violation, Workspace,
+    CalibrationConstraint, CalibrationParameter, CalibrationParameterType, CalibrationProblem,
+    EvaluationError, ImprovementStop, LossConfig, MutationApplication, MutationStrategy,
+    NelderMeadConfig, NoObserver, ObservedDataPoint, OptimizationConfig, OptimizationObjective,
+    ParticleSwarmConfig, Violation, Workspace, check_model_values, configured_engine,
+    optimize_from, optimize_with_history, optimize_with_observer,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 
@@ -226,11 +226,10 @@ fn an_infeasible_state_is_penalized_and_its_reason_comes_from_the_engine() {
 fn a_constraint_reads_the_sums_and_the_state_total_the_engine_names() {
     // At k = 1 and start = 0.5: x = 0.5, y = 2, xy = 2.5 and total = x = 0.5.
     let penalty = |expression: &str| {
-        let problem = problem(vec![CalibrationConstraint::new(
-            "c".to_string(),
-            expression.to_string(),
-        )
-        .with_positions(vec![1.0])])
+        let problem = problem(vec![
+            CalibrationConstraint::new("c".to_string(), expression.to_string())
+                .with_positions(vec![1.0]),
+        ])
         .unwrap();
         OptimizationObjective::new(&problem)
             .cost(&vec![1.0, 0.5, 1.0])
@@ -242,11 +241,9 @@ fn a_constraint_reads_the_sums_and_the_state_total_the_engine_names() {
     assert!(penalty("xy - 3") > 0.0);
     assert!(penalty("total - 1") > 0.0);
 
-    let error = problem(vec![CalibrationConstraint::new(
-        "c".to_string(),
-        "zz - 1".to_string(),
-    )
-    .with_positions(vec![1.0])])
+    let error = problem(vec![
+        CalibrationConstraint::new("c".to_string(), "zz - 1".to_string()).with_positions(vec![1.0]),
+    ])
     .err()
     .unwrap();
     assert!(error.contains("unknown variable 'zz'"), "{error}");

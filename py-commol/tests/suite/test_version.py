@@ -1,7 +1,8 @@
 """Check that the package reports its version and the commit it was built from.
 
 The tests run on a build from the git source, which is never a release: its
-version is the placeholder of ``py-commol/Cargo.toml``.
+version is the placeholder of ``[workspace.package]`` in the root
+``Cargo.toml``.
 """
 
 import importlib.metadata

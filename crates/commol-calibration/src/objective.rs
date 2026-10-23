@@ -10,7 +10,7 @@ use std::cell::RefCell;
 use std::sync::{Mutex, PoisonError};
 
 use argmin::core::{CostFunction, Error, SendAlias, SyncAlias};
-use commol_core::{inner_levels_in_parallel, SimulationEngine};
+use commol_core::{SimulationEngine, inner_levels_in_parallel};
 use rayon::prelude::*;
 
 use crate::calibration_problem::CalibrationProblem;

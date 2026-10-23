@@ -12,12 +12,12 @@
 use commol_core::SimulationEngine;
 
 use crate::discrepancy::{Discrepancy, DiscrepancyConfig, TermError};
-use crate::feasibility::{constraint_positions, EvaluationError, Feasibility, Violation};
+use crate::feasibility::{EvaluationError, Feasibility, Violation, constraint_positions};
 use crate::forward::{ForwardModel, Workspace};
 use crate::likelihood::TermDerivatives;
 use crate::observation::ObservationOperator;
 use crate::types::{CalibrationConstraint, CalibrationParameter, ObservedDataPoint, Replicates};
-use crate::values::{clamp_to_bounds, ValueWriter};
+use crate::values::{ValueWriter, clamp_to_bounds};
 
 /// A calibration problem for any [`SimulationEngine`].
 ///

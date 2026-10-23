@@ -1,5 +1,5 @@
 name: "Set Version from Tag"
-description: "Extracts version from git tag and updates Cargo.toml (maturin converts to PEP 440 automatically)"
+description: "Extracts version from git tag and writes it in [workspace.package] of the root Cargo.toml, the version of every crate (maturin converts it to PEP 440)"
 outputs:
   version:
     description: "The extracted version"
@@ -17,11 +17,11 @@ runs:
         CARGO_VERSION=$(echo "$VERSION" | sed -E 's/([0-9]+\.[0-9]+\.[0-9]+)b([0-9]+)/\1-beta.\2/')
         echo "CARGO_VERSION=$CARGO_VERSION" >> $GITHUB_OUTPUT
 
-    - name: Update version in Cargo.toml
+    - name: Update the version of the workspace in Cargo.toml
       shell: bash
       run: |
         if [[ "$RUNNER_OS" == "macOS" ]]; then
-          sed -i '' 's/^version = ".*"/version = "${{ steps.extract.outputs.CARGO_VERSION }}"/' py-commol/Cargo.toml
+          sed -i '' 's/^version = ".*"/version = "${{ steps.extract.outputs.CARGO_VERSION }}"/' Cargo.toml
         else
-          sed -i 's/^version = ".*"/version = "${{ steps.extract.outputs.CARGO_VERSION }}"/' py-commol/Cargo.toml
+          sed -i 's/^version = ".*"/version = "${{ steps.extract.outputs.CARGO_VERSION }}"/' Cargo.toml
         fi

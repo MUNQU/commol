@@ -284,20 +284,12 @@ pub fn log_location(mean: f64, sigma: f64, center: Center) -> f64 {
 
 /// `x · ln y`, with `0 · ln 0 = 0`.
 fn x_log(x: f64, y: f64) -> f64 {
-    if x == 0.0 {
-        0.0
-    } else {
-        x * libm::log(y)
-    }
+    if x == 0.0 { 0.0 } else { x * libm::log(y) }
 }
 
 /// `x · ln(1 + y)`, with `0 · ln 0 = 0`.
 fn x_log1p(x: f64, y: f64) -> f64 {
-    if x == 0.0 {
-        0.0
-    } else {
-        x * libm::log1p(y)
-    }
+    if x == 0.0 { 0.0 } else { x * libm::log1p(y) }
 }
 
 /// The log probability of the count `y` under a negative binomial of mean

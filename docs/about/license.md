@@ -37,7 +37,6 @@ Commol uses the following open-source libraries:
 ### Python Dependencies
 
 - **Pydantic** - MIT License
-- **cffi** - MIT License
 
 ### Rust Dependencies
 

@@ -44,11 +44,12 @@ Incremented for backwards-compatible bug fixes:
 
 ## Where the Version Comes From
 
-The version is not stored in the repository. `Cargo.toml` keeps a placeholder
-(`0.1.0`), and `pyproject.toml` declares the version as dynamic. When a release
-is built, the `set-version` action (`.github/actions/set-version`) reads the
-git tag, writes it into `py-commol/Cargo.toml`, and maturin turns it into the
-Python package version.
+The version is not stored in the repository. `[workspace.package]` of the root
+`Cargo.toml` keeps a placeholder (`0.1.0`), which every crate takes, and
+`pyproject.toml` declares the version as dynamic. When a release is built, the
+`set-version` action (`.github/actions/set-version`) reads the git tag, writes
+it into `[workspace.package]`, and maturin turns it into the Python package
+version.
 
 Do not commit version bumps. The tag is the version.
 
@@ -150,7 +151,8 @@ The **Release to PyPI** workflow:
 
 1. Builds the wheels for Linux and macOS (x86_64 and aarch64) and Windows
    (x86_64), for Python 3.12, 3.13 and 3.14
-2. Builds the source distribution (sdist)
+2. Builds the source distribution (sdist); the wheels and the sdist build
+   with the maturin of `py-commol/uv.lock`, never the latest one
 3. Runs the coverage studies (`coverage.yaml`), about 10 min
 4. Publishes all of them to PyPI with trusted publishing, only when every
    step before passed

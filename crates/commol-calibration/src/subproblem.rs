@@ -15,11 +15,11 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::thread::ThreadId;
 
 use argmin::core::{CostFunction, Error, Operator, SendAlias, SyncAlias};
-use commol_core::{inner_levels_in_parallel, SimulationEngine};
+use commol_core::{SimulationEngine, inner_levels_in_parallel};
 
 use crate::calibration_problem::CalibrationProblem;
 use crate::forward::Workspace;
-use crate::objective::{with_workspace, OptimizationObjective};
+use crate::objective::{OptimizationObjective, with_workspace};
 use crate::observation::ObservationOperator;
 use crate::types::{CalibrationResult, ObservedDataPoint};
 
