@@ -384,7 +384,8 @@ impl PyEngine {
     /// initial state with a seed of its own
     ///
     /// Replicate `i` takes the seed `replicate_seed(seed, i)`, the SplitMix64
-    /// of `seed + i`, so it gives the same run however many replicates run.
+    /// of the SplitMix64 of `seed` plus `i`, so two seeds share no replicate,
+    /// and a replicate gives the same run however many replicates run.
     ///
     /// Args:
     ///     seed: The seed of the replicates, from 0 to 2**64 - 1

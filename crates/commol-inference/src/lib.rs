@@ -20,6 +20,7 @@
 //! | [`distribution`] | [`Distribution`]: a family of distributions truncated to the bounds of a parameter |
 //! | [`priors`] | [`Priors`]: one distribution per parameter |
 //! | [`smc`] | Sequential Monte Carlo: the sampler, its kernels, the Gibbs posterior and ABC |
+//! | [`streams`] | [`streams::Stream`]: the seed stream of each method and purpose, each with its own number |
 //! | [`transform`] | The unbounded scale of the moves: logit, log or identity by the bounds |
 //! | [`conformal`] | Conformal prediction intervals: split, rolling, jackknife+, EnbPI and adaptive |
 //! | [`design`] | [`design::InputSpace`]: independent distributions or a sample, and the designs on it |
@@ -32,9 +33,9 @@
 //! method touches an engine only through a
 //! [`commol_calibration::ForwardModel`] (a problem's, or one with no
 //! observations), reads observations and quantities only through a
-//! [`commol_calibration::ObservationOperator`], and draws every random number
-//! from a [`commol_random::Generator`]; every public function of a method
-//! returns a [`MethodError`].
+//! [`commol_calibration::ObservationOperator`], draws every random number
+//! with the generator and the samplers of [`commol_random`], from a stream of
+//! [`streams`]; every public function of a method returns a [`MethodError`].
 
 #![warn(missing_docs)]
 
@@ -58,6 +59,7 @@ pub mod scores;
 pub mod sensitivity;
 pub mod smc;
 mod special;
+pub mod streams;
 pub mod target;
 pub mod transform;
 

@@ -148,6 +148,13 @@ class TestReplicates:
         with pytest.raises(KeyError, match=r"'D' is not an output.*\['A', 'B'\]"):
             self._replicates().member_statistics("D", confidence_level=0.9)
 
+    def test_neighbouring_seeds_share_no_replicate(self) -> None:
+        simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
+        first = simulation.replicates(3, seed=42).run_at(POSITIONS)
+        second = simulation.replicates(3, seed=43).run_at(POSITIONS)
+
+        assert not {run.seed for run in first} & {run.seed for run in second}
+
     def test_replicates_print_their_count_their_seed_and_their_positions(
         self,
     ) -> None:

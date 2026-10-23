@@ -20,14 +20,13 @@ use commol_calibration::{
     CalibrationProblem, EvaluationError, ForwardModel, Likelihood, Noise, ObservedDataPoint,
 };
 use commol_core::SimulationEngine;
-use commol_random::sample::{binomial, poisson};
-use commol_random::{Generator, replicate_seed, stream_seed};
+use commol_random::sample::{binomial, gamma, normal, poisson};
+use commol_random::{Generator, replicate_seed};
 use rayon::prelude::*;
 
-use crate::distribution::{Distribution, Family, open_uniform};
 use crate::sample::ParameterSample;
-use crate::special::normal_quantile;
 use crate::statistics;
+use crate::streams::Stream;
 
 /// Below this share of extra variance, `φμ`, a negative binomial draw is a
 /// Poisson draw.
@@ -143,21 +142,20 @@ impl ObservationNoise for DistributionNoise {
 /// One observed value drawn from `noise` around `mean`, at the nearest mean
 /// the model allows.
 ///
-/// Continuous models invert their distribution function at a uniform number
-/// strictly between 0 and 1; a Student-t divides a normal draw by the root
-/// of a chi-square draw over its degrees of freedom; a negative binomial is
-/// a Poisson draw of a gamma mean, and a Poisson draw when `φμ` is below
-/// `1e-6`.
+/// A normal and a log-normal scale a standard normal draw; a Student-t
+/// divides a normal draw by the root of a chi-square draw over its degrees
+/// of freedom; a negative binomial is a Poisson draw of a gamma mean, and a
+/// Poisson draw when `φμ` is below `1e-6`.
 pub(crate) fn draw_observation(noise: Noise, mean: f64, generator: &mut Generator) -> f64 {
     let mean = noise.nearest_mean(mean);
     match noise {
-        Noise::Normal { sd } => mean + sd * normal_quantile(open_uniform(generator)),
-        Noise::LogNormal { sigma, center } => libm::exp(
-            log_location(mean, sigma, center) + sigma * normal_quantile(open_uniform(generator)),
-        ),
+        Noise::Normal { sd } => mean + sd * normal(generator),
+        Noise::LogNormal { sigma, center } => {
+            libm::exp(log_location(mean, sigma, center) + sigma * normal(generator))
+        }
         Noise::StudentT { df, scale } => {
-            let z = normal_quantile(open_uniform(generator));
-            let chi_square = gamma(0.5 * df, 0.5, generator);
+            let z = normal(generator);
+            let chi_square = gamma(generator, 0.5 * df, 0.5);
             mean + scale * z / (chi_square / df).sqrt()
         }
         Noise::Poisson => poisson(generator, mean) as f64,
@@ -167,7 +165,7 @@ pub(crate) fn draw_observation(noise: Noise, mean: f64, generator: &mut Generato
             } else {
                 let shape = 1.0 / overdispersion;
                 let rate = shape / mean;
-                let rate_of_counts = gamma(shape, rate, generator);
+                let rate_of_counts = gamma(generator, shape, rate);
                 poisson(generator, rate_of_counts) as f64
             }
         }
@@ -179,13 +177,6 @@ pub(crate) fn draw_observation(noise: Noise, mean: f64, generator: &mut Generato
             }
         }
     }
-}
-
-/// A gamma draw of `shape` and `rate`, by inversion.
-fn gamma(shape: f64, rate: f64, generator: &mut Generator) -> f64 {
-    Distribution::new(Family::Gamma { shape, rate }, 0.0, f64::INFINITY)
-        .expect("a gamma of positive shape and rate has mass above 0")
-        .sample(generator)
 }
 
 /// Why a predictive could not be built.
@@ -576,8 +567,8 @@ impl ObservationDraws {
 }
 
 /// Every draw's value of `observations`, run through `forward` and read
-/// through the observation operator, with `noise` drawn from the generator
-/// seeded with `seed`; the replicates of a stochastic engine are seeded from
+/// through the observation operator, with `noise` drawn from the stream
+/// [`Stream::ObservationNoise`] of `seed`; the replicates of a stochastic engine are seeded from
 /// `seed` as those of [`Predictive::new`]. The draws keep `seed`.
 ///
 /// The observations need not be the problem's: held-out data are read the
@@ -604,7 +595,7 @@ where
         .check(observations)
         .map_err(PredictiveError::Mismatch)?;
     let runs = observe_sets(forward, sample.values(), observations, Some(seed))?;
-    let mut generator = Generator::from_seed(seed);
+    let mut generator = Generator::from_seed(Stream::ObservationNoise.seed(seed));
     let shown: Vec<Vec<Vec<f64>>> = runs
         .into_iter()
         .zip(sample.values())
@@ -667,19 +658,12 @@ where
         .collect())
 }
 
-/// The stream of the seeds of the draws of a sample
-/// ([`commol_random::stream_seed`]); the streams 1 to 3 belong to the
-/// designs, the replicates and the bootstrap of a sensitivity analysis, and
-/// stream 5 to the ties of the PIT ([`crate::scores::pit`]).
-pub const DRAWS_STREAM: u64 = 4;
-
 /// The seed of each of `count` draws of a sample run from `seed`: draw `j`
-/// takes `replicate_seed(stream_seed(seed, DRAWS_STREAM), j)`, which depends
-/// on neither `count` nor the number of replicates.
+/// takes `Stream::PredictiveDraws.replicate(seed, j)`, which depends on
+/// neither `count` nor the number of replicates.
 pub fn draw_seeds(seed: u64, count: usize) -> Vec<u64> {
-    let base = stream_seed(seed, DRAWS_STREAM);
     (0..count as u64)
-        .map(|draw| replicate_seed(base, draw))
+        .map(|draw| Stream::PredictiveDraws.replicate(seed, draw))
         .collect()
 }
 

@@ -2,9 +2,9 @@
 //! Metropolis on the unbounded scale.
 
 use commol_random::Generator;
+use commol_random::sample::normal;
 use nalgebra::{DMatrix, DVector};
 
-use crate::distribution::open_uniform;
 use crate::statistics::covariance;
 use crate::transform::Transform;
 
@@ -102,7 +102,7 @@ impl Kernel for RandomWalk {
     fn propose(&self, current: &[f64], stream: &mut Generator) -> Proposal {
         let transform = self.transform.as_ref().expect("adapt sets the proposal");
         let cholesky = self.cholesky.as_ref().expect("adapt sets the proposal");
-        let step = cholesky * DVector::from_vec(standard_normals(stream, current.len()));
+        let step = cholesky * DVector::from_fn(current.len(), |_, _| normal(stream));
         let unbounded: Vec<f64> = transform
             .to_unbounded(current)
             .iter()
@@ -124,26 +124,6 @@ fn cholesky_or_diagonal(matrix: DMatrix<f64>) -> DMatrix<f64> {
         Some(cholesky) => cholesky.l(),
         None => DMatrix::from_diagonal(&matrix.diagonal().map(f64::sqrt)),
     }
-}
-
-/// `count` independent standard normal draws, drawn in pairs: the second
-/// of an odd count's last pair is dropped.
-pub(crate) fn standard_normals(stream: &mut Generator, count: usize) -> Vec<f64> {
-    let mut normals = Vec::with_capacity(count + 1);
-    while normals.len() < count {
-        let (a, b) = normal_pair(stream);
-        normals.push(a);
-        normals.push(b);
-    }
-    normals.truncate(count);
-    normals
-}
-
-/// Two independent standard normal draws (Box–Muller).
-fn normal_pair(stream: &mut Generator) -> (f64, f64) {
-    let radius = libm::sqrt(-2.0 * libm::log(open_uniform(stream)));
-    let angle = 2.0 * std::f64::consts::PI * open_uniform(stream);
-    (radius * libm::cos(angle), radius * libm::sin(angle))
 }
 
 #[cfg(test)]

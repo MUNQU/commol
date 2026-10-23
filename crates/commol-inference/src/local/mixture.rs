@@ -20,7 +20,6 @@ use commol_random::Generator;
 use super::approximation::{CurvatureKind, curvature_at};
 use super::curvature::on_bound;
 use super::gaussian::{Gaussian, inverse};
-use crate::distribution::open_uniform;
 use crate::error::MethodError;
 use crate::importance::{ImportanceRun, Proposal, importance_sample};
 use crate::psis::{RELIABLE_K_HAT, log_sum_exp};
@@ -52,7 +51,7 @@ struct Mixture<'a> {
 
 impl Proposal for Mixture<'_> {
     fn draw(&self, generator: &mut Generator) -> Vec<f64> {
-        let point = open_uniform(generator);
+        let point = generator.open_uniform();
         let mut cumulative = 0.0;
         let index = self
             .components

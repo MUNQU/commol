@@ -495,7 +495,7 @@ impl Distribution {
 
     /// One draw: the quantile of a uniform number in `(0, 1)`.
     pub fn sample(&self, generator: &mut Generator) -> f64 {
-        self.quantile(open_uniform(generator))
+        self.quantile(generator.open_uniform())
     }
 }
 
@@ -527,12 +527,6 @@ impl Gradient for Level<'_> {
     fn gradient(&self, x: &f64) -> Result<f64, Error> {
         Ok(self.distribution.log_density(*x).exp())
     }
-}
-
-/// A uniform number strictly between 0 and 1: the 53 high bits of the
-/// generator, at the middle of their interval.
-pub(crate) fn open_uniform(generator: &mut Generator) -> f64 {
-    ((generator.next_u64() >> 11) as f64 + 0.5) * (1.0 / (1u64 << 53) as f64)
 }
 
 #[cfg(test)]

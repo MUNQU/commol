@@ -5,6 +5,7 @@
 //! design of independent inputs is built on the unit cube and mapped to each
 //! input by the quantile of its distribution; a sample is its own design.
 
+use commol_random::sample::index;
 use commol_random::{Generator, latin_hypercube};
 
 use crate::priors::Priors;
@@ -141,8 +142,7 @@ impl InputSpace {
         let inputs = priors.distributions().len();
         let half = levels / 2;
         let mut generator = Generator::from_seed(seed);
-        let mut draw =
-            |count: usize| ((generator.uniform() * count as f64) as usize).min(count - 1);
+        let mut draw = |count: usize| index(&mut generator, count);
         let mut unit = Vec::with_capacity(trajectories * (inputs + 1));
         let mut steps = Vec::with_capacity(trajectories);
         for _ in 0..trajectories {

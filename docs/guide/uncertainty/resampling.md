@@ -246,8 +246,8 @@ Each replicate starts from the fit. With `starts > 1` it also starts from the
 and keeps the end of lowest loss, so a
 second basin of the loss shows up instead of adding optimizer noise to the
 data's uncertainty. Replicate `b` draws its data and its starts from
-`replicate_seed(seed, b)` of the problem's seed: two runs with one seed give one
-result. A replicate changes only the observed values or the weights
+streams of the problem's seed, one for the data and one for the fits, at
+index `b`: two runs with one seed give one result. A replicate changes only the observed values or the weights
 (`CalibrationProblem::with_data`); with `normalize_observations` its
 normalization comes from its own values, as the fit's does.
 

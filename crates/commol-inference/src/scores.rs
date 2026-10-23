@@ -11,7 +11,7 @@
 
 use commol_calibration::{CalibrationProblem, ObservedDataPoint, SeriesIndex, weighted_crps};
 use commol_core::SimulationEngine;
-use commol_random::{Generator, stream_seed};
+use commol_random::Generator;
 
 use crate::predictive::{
     DistributionNoise, ObservationDraws, ObservationNoise, PredictiveError, check_names,
@@ -19,6 +19,7 @@ use crate::predictive::{
 };
 use crate::sample::ParameterSample;
 use crate::statistics;
+use crate::streams::Stream;
 
 fn column(draws: &ObservationDraws, observation: usize) -> Vec<f64> {
     draws.values.iter().map(|row| row[observation]).collect()
@@ -144,18 +145,12 @@ pub fn crps(draws: &ObservationDraws, observed: &[f64]) -> Result<Vec<f64>, Stri
         .collect())
 }
 
-/// The stream of the seed of the draws that randomizes the ties of the PIT
-/// ([`commol_random::stream_seed`]); the streams 1 to 4 belong to a
-/// sensitivity analysis and to the draws of a sample
-/// ([`crate::predictive::DRAWS_STREAM`]).
-const PIT_STREAM: u64 = 5;
-
 /// The probability integral transform of each observation: `F(y)` of the
 /// weighted draws, randomized between `F(y⁻)` and `F(y)` where draws tie
 /// with `y` (so a discrete predictive gives uniform values too), with the
-/// generator seeded with the stream `PIT_STREAM` of the seed of the draws.
-/// The same draws give the same values. Calibrated predictions give uniform
-/// values.
+/// generator seeded with the stream [`Stream::PitTies`] of the seed of the
+/// draws. The same draws give the same values. Calibrated predictions give
+/// uniform values.
 ///
 /// # Errors
 ///
@@ -163,7 +158,7 @@ const PIT_STREAM: u64 = 5;
 pub fn pit(draws: &ObservationDraws, observed: &[f64]) -> Result<Vec<f64>, String> {
     check(draws, observed)?;
     let total: f64 = draws.weights.iter().sum();
-    let mut generator = Generator::from_seed(stream_seed(draws.seed, PIT_STREAM));
+    let mut generator = Generator::from_seed(Stream::PitTies.seed(draws.seed));
     Ok(observed
         .iter()
         .enumerate()

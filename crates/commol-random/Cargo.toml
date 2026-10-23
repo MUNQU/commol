@@ -6,12 +6,13 @@ edition = { workspace = true }
 homepage = { workspace = true }
 license = { workspace = true }
 repository = { workspace = true }
-description = "Reproducible random numbers for the stochastic engines of commol"
+description = "Reproducible random numbers for the stochastic engines and the inference methods of commol"
 
 [lib]
 name = "commol_random"
 crate-type = ["rlib"]
 
 [dependencies]
+libm = { workspace = true }
 rand_core = "0.10"
 rand_xoshiro = "0.8"

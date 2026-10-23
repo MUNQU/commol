@@ -15,7 +15,8 @@ use commol_inference::profiles::{
     ProfileEnd, ProfileTracer, ProfiledQuantity, beale, bootstrap_thresholds, chi_square,
 };
 use commol_inference::resampling::{Perturbation, ReplicateRunner, Resampler};
-use commol_random::{Generator, replicate_seed};
+use commol_inference::streams::Stream;
+use commol_random::Generator;
 
 type Formula = fn(&HashMap<String, f64>, f64) -> f64;
 
@@ -764,7 +765,8 @@ fn a_bootstrap_threshold_of_a_prediction_reads_the_rise_of_each_replicate() {
     // `c` rises by (c − ĉ_b)² / h above its fit.
     let h = 0.1 + 10.5_f64.powi(2) / 82.5;
     for (b_index, rise) in run.replicates.iter().zip(&run.rises[0]) {
-        let mut generator = Generator::from_seed(replicate_seed(9, *b_index as u64));
+        let mut generator =
+            Generator::from_seed(Stream::ReplicateData.replicate(9, *b_index as u64));
         let Perturbation::Values(values) = Noisy.replicate(&mut generator) else {
             unreachable!("Noisy draws values")
         };

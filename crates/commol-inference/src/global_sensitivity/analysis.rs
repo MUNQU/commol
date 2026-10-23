@@ -4,14 +4,12 @@
 //! Each method builds its design from the [`InputSpace`], runs it with the
 //! [`BatchRunner`], and hands the quantities to its estimator, all here, so a
 //! caller of Rust or Python runs a method in one call. The seed of the
-//! analysis splits into one stream per purpose
-//! ([`commol_random::stream_seed`]): the designs, the replicates of a
-//! stochastic engine, the bootstrap of Sobol and the runs of a propagation
-//! never draw from one sequence.
+//! analysis splits into one stream per purpose ([`Stream`]): the designs,
+//! the replicates of a stochastic engine, the bootstrap of Sobol and the runs
+//! of a propagation never draw from one sequence.
 
 use commol_calibration::{CalibrationParameter, ForwardModel};
 use commol_core::SimulationEngine;
-use commol_random::stream_seed;
 
 use crate::batch::BatchRunner;
 use crate::design::InputSpace;
@@ -22,17 +20,7 @@ use crate::global_sensitivity::{
 use crate::predictive::{draw_seeds, run_sets, share_among_replicates};
 use crate::quantity::{Quantities, Quantity};
 use crate::sample::ParameterSample;
-
-/// The stream of the designs.
-const DESIGN_STREAM: u64 = 1;
-/// The stream of the replicates of a stochastic engine at each point of a
-/// design (common random numbers).
-const REPLICATES_STREAM: u64 = 2;
-/// The stream of the bootstrap of Sobol.
-const BOOTSTRAP_STREAM: u64 = 3;
-// Stream 4 is the one of the runs of the draws of a predictive and of a
-// propagation (`crate::predictive::DRAWS_STREAM`), and stream 5 the one of
-// the ties of the PIT (`crate::scores::pit`).
+use crate::streams::Stream;
 
 /// The draws of a propagation and what each run gives.
 #[derive(Debug, Clone, PartialEq)]
@@ -95,7 +83,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
             parameters,
             remainder,
             replicates,
-            stream_seed(seed, REPLICATES_STREAM),
+            Stream::SensitivityReplicates.seed(seed),
         )
         .map_err(MethodError::Invalid)?;
         Ok(Self {
@@ -267,7 +255,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
             &outputs,
             replicates,
             confidence_level,
-            stream_seed(self.seed, BOOTSTRAP_STREAM),
+            Stream::SobolBootstrap.seed(self.seed),
         )
         .map(|result| (result, design.points.len()))
     }
@@ -334,6 +322,6 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
     }
 
     fn design_seed(&self) -> u64 {
-        stream_seed(self.seed, DESIGN_STREAM)
+        Stream::SensitivityDesign.seed(self.seed)
     }
 }

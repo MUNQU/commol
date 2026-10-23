@@ -28,14 +28,14 @@
 //! the step before, the last one whose moves completed.
 
 use commol_calibration::Workspace;
-use commol_random::{Generator, replicate_seed};
+use commol_random::Generator;
 use rayon::prelude::*;
 
 use super::TemperedTarget;
 use super::kernel::Kernel;
-use crate::distribution::open_uniform;
 use crate::error::MethodError;
 use crate::statistics::{check_open_unit, effective_size, normalized_weights};
+use crate::streams::Stream;
 
 /// One step of a run.
 #[derive(Debug, Clone, PartialEq)]
@@ -227,7 +227,7 @@ impl<K: Kernel> SmcSampler<K> {
     /// As [`Self::run`].
     pub fn start<T: TemperedTarget>(&self, target: &T, seed: u64) -> Result<SmcState, MethodError> {
         let mut streams: Vec<Generator> = (0..self.particles)
-            .map(|i| Generator::from_seed(replicate_seed(seed, 1 + i as u64)))
+            .map(|i| Generator::from_seed(Stream::SmcParticles.replicate(seed, i as u64)))
             .collect();
         let draws: Vec<(Vec<f64>, Option<f64>)> = streams
             .par_iter_mut()
@@ -258,7 +258,7 @@ impl<K: Kernel> SmcSampler<K> {
             kept,
             log_weights,
             streams,
-            main: Generator::from_seed(replicate_seed(seed, 0)),
+            main: Generator::from_seed(Stream::SmcResampling.seed(seed)),
             log_evidence: (alive as f64 / self.particles as f64).ln(),
             evaluations: self.particles,
             steps: Vec::new(),
@@ -443,7 +443,7 @@ fn metropolis_move<T: TemperedTarget, K: Kernel>(
         return Ok((false, false));
     }
     let proposed = target.evaluate(&proposal.values, stream, workspace)?;
-    let u = open_uniform(stream);
+    let u = stream.open_uniform();
     let Some(value) = proposed else {
         return Ok((false, true));
     };

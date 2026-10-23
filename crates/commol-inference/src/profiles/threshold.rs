@@ -17,6 +17,7 @@ use crate::profiles::tracer::ProfiledQuantity;
 use crate::resampling::{FitUnit, ReplicateRunner, Resampler};
 use crate::special::{f_one_quantile, normal_quantile};
 use crate::statistics;
+use crate::streams::Stream;
 
 /// `½ χ²₁(confidence_level)`: the threshold of `−log L` for a pointwise
 /// interval of `confidence_level` (Wilks).
@@ -103,9 +104,10 @@ pub struct BootstrapThresholds {
 /// The thresholds of `quantities`, held at their values `centers` at the
 /// fit, calibrated by the bootstrap (prepivoting, Beran 1988).
 ///
-/// Replicate `b` draws its data with `resampler` from the generator of
-/// `replicate_seed(runner.seed(), b)` ([`ReplicateRunner::perturbations`]),
-/// so it is the replicate of that bootstrap. It is fitted
+/// Replicate `b` draws its data with `resampler` as a bootstrap of `runner`
+/// does ([`ReplicateRunner::perturbations`]), so it is the replicate of that
+/// bootstrap; the refits of its held quantities take their seeds from
+/// `Stream::ThresholdRefits.replicate(runner.seed(), b)` ([`Stream`]). It is fitted
 /// ([`ReplicateRunner::fit_all`], giving `θ̂_b` and its loss `L_b(θ̂_b)`),
 /// and each quantity is held at its center on the replicate's data from
 /// `θ̂_b`: the rise is `PL_b(center) − L_b(θ̂_b)`, at least 0. The threshold
@@ -147,7 +149,7 @@ where
                 .replicate_problem(&perturbations[index])
                 .map_err(|error| error.to_string())
                 .and_then(|problem| {
-                    let seed = replicate_seed(replicate_seed(runner.seed(), index as u64), 0);
+                    let seed = Stream::ThresholdRefits.replicate(runner.seed(), index as u64);
                     quantities
                         .iter()
                         .zip(centers)

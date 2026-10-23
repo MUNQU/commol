@@ -276,7 +276,7 @@ fn laplace_mixture(
             parallel(py, || {
                 local::laplace_mixture(
                     inner,
-                    &TemperedPosterior::new(&target),
+                    &TemperedPosterior::new(&target, seed),
                     1.0,
                     &ends,
                     draws,
@@ -290,7 +290,7 @@ fn laplace_mixture(
             parallel(py, || {
                 local::laplace_mixture(
                     inner,
-                    &TemperedPosterior::new(&target),
+                    &TemperedPosterior::new(&target, seed),
                     eta,
                     &ends,
                     draws,

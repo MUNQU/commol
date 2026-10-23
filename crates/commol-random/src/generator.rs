@@ -16,13 +16,22 @@ pub fn splitmix64(state: &mut u64) -> u64 {
     z ^ (z >> 31)
 }
 
+/// The SplitMix64 of `seed`: a seed with its bits mixed, so that
+/// neighbouring seeds give unrelated numbers.
+fn mixed(seed: u64) -> u64 {
+    let mut state = seed;
+    splitmix64(&mut state)
+}
+
 /// The seed of replicate `index` of a run seeded with `seed`: the SplitMix64
-/// of `seed + index`.
+/// of the mixed seed plus `index`.
 ///
-/// Neighbouring replicates get unrelated seeds, and replicate `index` gets the
-/// same seed however many replicates run.
+/// Replicate `index` gets the same seed however many replicates run, and
+/// two seeds give unrelated seeds for every pair of indices: the mix of the
+/// seed comes before the index, so replicate `i + 1` of `s` is not replicate
+/// `i` of `s + 1`.
 pub fn replicate_seed(seed: u64, index: u64) -> u64 {
-    let mut state = seed.wrapping_add(index);
+    let mut state = mixed(seed).wrapping_add(index);
     splitmix64(&mut state)
 }
 
@@ -30,11 +39,11 @@ pub fn replicate_seed(seed: u64, index: u64) -> u64 {
 /// purpose of a method (its design, its replicates, its bootstrap), so that
 /// no two purposes draw from one sequence.
 ///
-/// It mixes `stream` into `seed` with a multiplier other than the increment
-/// of [`replicate_seed`], then takes the SplitMix64 of the result; the
-/// replicates of one stream come from [`replicate_seed`] of its seed.
+/// It mixes `stream` into the mixed seed with a multiplier, then takes the
+/// SplitMix64 of the result; the replicates of one stream come from
+/// [`replicate_seed`] of its seed.
 pub fn stream_seed(seed: u64, stream: u64) -> u64 {
-    let mut state = seed ^ stream.wrapping_mul(0xD1B5_4A32_D192_ED03);
+    let mut state = mixed(seed) ^ stream.wrapping_mul(0xD1B5_4A32_D192_ED03);
     splitmix64(&mut state)
 }
 
@@ -86,6 +95,13 @@ impl Generator {
     /// A number in `(0, 1]`, so that its logarithm is finite.
     pub fn uniform_positive(&mut self) -> f64 {
         ((self.next_u64() >> 11) + 1) as f64 * (1.0 / (1u64 << 53) as f64)
+    }
+
+    /// A number strictly between 0 and 1: the 53 high bits of
+    /// [`Self::next_u64`] at the middle of their interval, so that a
+    /// quantile and a logarithm of it are finite.
+    pub fn open_uniform(&mut self) -> f64 {
+        ((self.next_u64() >> 11) as f64 + 0.5) * (1.0 / (1u64 << 53) as f64)
     }
 }
 
@@ -148,7 +164,8 @@ mod tests {
         unique.dedup();
         assert_eq!(unique.len(), seeds.len());
         assert_eq!(replicate_seed(5, 3), seeds[3]);
-        let mut state = 8;
+        let mut state = 5;
+        let mut state = splitmix64(&mut state).wrapping_add(3);
         assert_eq!(replicate_seed(5, 3), splitmix64(&mut state));
     }
 }

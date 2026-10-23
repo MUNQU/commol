@@ -6,6 +6,7 @@ use commol_calibration::{
 };
 use commol_core::SimulationEngine;
 use commol_random::Generator;
+use commol_random::sample::index;
 
 use crate::error::MethodError;
 use crate::resampling::blocks::{distinct_positions, position_indices};
@@ -241,21 +242,18 @@ pub(crate) fn source_positions(
         ResidualBlocks::Moving => {
             let starts = positions - length + 1;
             while source.len() < count {
-                let start = ((generator.uniform() * starts as f64) as usize).min(starts - 1);
+                let start = index(generator, starts);
                 source.extend(start..start + length);
             }
             source.truncate(count);
         }
         ResidualBlocks::Stationary => {
-            let draw = |generator: &mut Generator| {
-                ((generator.uniform() * positions as f64) as usize).min(positions - 1)
-            };
             let renewal = 1.0 / length as f64;
-            let mut position = draw(generator);
+            let mut position = index(generator, positions);
             source.push(position);
             while source.len() < count {
                 position = if generator.uniform() < renewal {
-                    draw(generator)
+                    index(generator, positions)
                 } else {
                     (position + 1) % positions
                 };

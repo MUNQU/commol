@@ -8,7 +8,7 @@
 
 use commol_calibration::{CalibrationProblem, LossConfig, Workspace};
 use commol_core::SimulationEngine;
-use commol_random::{Generator, replicate_seed};
+use commol_random::Generator;
 use nalgebra::DMatrix;
 
 use super::TemperedTarget;
@@ -19,6 +19,7 @@ use crate::local::{CurvatureKind, block_meat, blocks_at, curvature_at};
 use crate::priors::Priors;
 use crate::resampling::{BayesianBootstrap, BlockScheme};
 use crate::statistics::{interval_levels, normalized_weights, quantiles};
+use crate::streams::Stream;
 use crate::target::discrepancy_in_support;
 
 /// Growth of the largest `η` of a calibration by coverage, while its
@@ -352,7 +353,8 @@ fn interpolated_eta(thresholds: &mut [f64], confidence_level: f64) -> Result<f64
 /// over the replicates and the parameters.
 ///
 /// Replicate `b` reweights the observations by blocks of `blocks`, from the
-/// seed `replicate_seed(seed, b)`, and runs one tempered sampler to a large
+/// seed `Stream::EtaWeights.replicate(seed, b)`, and runs one tempered
+/// sampler, seeded with `Stream::EtaSamplers.replicate(seed, b)`, to a large
 /// `η`; the posterior at any smaller `η` reweights the particles of the step
 /// below it, so no search below runs a model. The largest `η` starts at
 /// `1 / loss(θ̂)`, where the kernel of the fit is `e⁻¹`, and grows four times,
@@ -408,7 +410,7 @@ where
 
     let problems = (0..replicates)
         .map(|b| {
-            let mut generator = Generator::from_seed(replicate_seed(seed, b as u64));
+            let mut generator = Generator::from_seed(Stream::EtaWeights.replicate(seed, b as u64));
             let weights = resampler.draw_weights(&mut generator);
             problem
                 .with_data(&values, &weights)
@@ -422,7 +424,7 @@ where
     let mut runs: Vec<(usize, SmcState, Vec<Snapshot>)> = Vec::new();
     for (b, replicate) in &problems {
         let target = GibbsTarget::new(replicate, priors, eta_max)?;
-        let start = sampler.start(&target, replicate_seed(seed, (replicates + *b) as u64));
+        let start = sampler.start(&target, Stream::EtaSamplers.replicate(seed, *b as u64));
         let outcome = start.and_then(|mut state| {
             let mut snapshots = vec![Snapshot::of(&state, eta_max)];
             sampler.advance(&mut state, &target, |s| {

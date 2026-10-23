@@ -7,17 +7,15 @@
 //! Jacobian of [`Transform`], as the moves of the SMC kernel do.
 
 use commol_calibration::Workspace;
-use commol_random::{Generator, replicate_seed, stream_seed};
+use commol_random::Generator;
 use rayon::prelude::*;
 
 use crate::psis::smooth;
 use crate::smc::TemperedTarget;
 use crate::statistics::effective_size;
+use crate::streams::Stream;
 use crate::target::Target;
 use crate::transform::Transform;
-
-/// The stream of the draws of an importance sampler ([`stream_seed`]).
-const DRAWS_STREAM: u64 = 2;
 
 /// The port of a proposal: a distribution on the unbounded scale that draws
 /// and gives its log density.
@@ -31,15 +29,22 @@ pub trait Proposal: Sync {
 
 /// The last level of a [`TemperedTarget`] as a [`Target`]: the log prior plus
 /// the log kernel of the value one run keeps, `−∞` outside the support. A
-/// stochastic model draws its replicate from a stream of seed 0.
+/// stochastic model runs one replicate, from [`Stream::PosteriorReplicate`]
+/// of the seed, at every point: the density is a function of the point, with
+/// common random numbers for all points.
 pub struct TemperedPosterior<'a, T: TemperedTarget> {
     target: &'a T,
+    replicate: u64,
 }
 
 impl<'a, T: TemperedTarget> TemperedPosterior<'a, T> {
-    /// The target at the last level of `target`.
-    pub fn new(target: &'a T) -> Self {
-        Self { target }
+    /// The target at the last level of `target`, with the replicate of
+    /// `seed`.
+    pub fn new(target: &'a T, seed: u64) -> Self {
+        Self {
+            target,
+            replicate: Stream::PosteriorReplicate.seed(seed),
+        }
     }
 }
 
@@ -50,9 +55,9 @@ impl<T: TemperedTarget> Target for TemperedPosterior<'_, T> {
 
     fn log_density(&self, values: &[f64], workspace: &mut Workspace) -> Result<f64, String> {
         let log_prior = self.target.log_prior(values);
-        let kept = self
-            .target
-            .evaluate(values, &mut Generator::from_seed(0), workspace)?;
+        let kept =
+            self.target
+                .evaluate(values, &mut Generator::from_seed(self.replicate), workspace)?;
         Ok(match kept {
             Some(value) => log_prior + self.target.log_kernel(value, self.target.last_level()),
             None => f64::NEG_INFINITY,
@@ -96,11 +101,11 @@ where
     T: Target + Sync,
     P: Proposal,
 {
-    let base = stream_seed(seed, DRAWS_STREAM);
     let points: Vec<(Vec<f64>, f64)> = (0..draws)
         .into_par_iter()
         .map_init(Workspace::default, |workspace, i| {
-            let mut generator = Generator::from_seed(replicate_seed(base, i as u64));
+            let mut generator =
+                Generator::from_seed(Stream::ImportanceDraws.replicate(seed, i as u64));
             let unbounded = proposal.draw(&mut generator);
             let values = transform.from_unbounded(&unbounded);
             // A target of `−∞` gives a weight of 0 whatever the rest.

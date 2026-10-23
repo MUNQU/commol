@@ -48,8 +48,9 @@ by the configuration's type and knows no method. A static type checker infers
 | Free functions | Each repeats the simulation and problem arguments. |
 | `method.run(calibrator)` | The configuration, in `context/`, would import `api/`. |
 
-Every random number of a method comes from the `commol-random` generator,
-seeded from the seed of its source ([Results](results.md#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts)).
+Every random number of a method comes from the generator and the samplers
+of `commol-random`, seeded from the seed of its source ([Results](results.md#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts))
+by one scheme: seed, then a `Stream` of `crates/commol-inference/src/streams.rs`, then the index of a draw.
 Coverage studies (`tests/support/coverage.py`, marker `coverage_study`) check that a method's
 intervals cover the truth at their level; they run for a pull request that
 changes what they run and before a release

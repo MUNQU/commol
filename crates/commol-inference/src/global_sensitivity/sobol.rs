@@ -16,6 +16,7 @@
 //! it, since dropping such replicates would bias the interval.
 
 use commol_random::Generator;
+use commol_random::sample::index;
 use rayon::prelude::*;
 
 use super::check_numbers;
@@ -47,7 +48,7 @@ pub struct Sobol {
 /// The Sobol indices of `design` from the quantities of its points,
 /// `[point][quantity]`, with `replicates` bootstrap replicates for intervals at
 /// `confidence_level`; `seed` seeds the bootstrap alone, so a caller gives
-/// it a stream of its own ([`commol_random::stream_seed`]). The quantities
+/// it a stream of its own ([`crate::streams::Stream::SobolBootstrap`]). The quantities
 /// run in parallel.
 ///
 /// # Errors
@@ -92,11 +93,7 @@ fn estimate(
     let all_rows: Vec<usize> = (0..base).collect();
     let mut generator = Generator::from_seed(seed);
     let resamples: Vec<Vec<usize>> = (0..replicates)
-        .map(|_| {
-            (0..base)
-                .map(|_| ((generator.uniform() * base as f64) as usize).min(base - 1))
-                .collect()
-        })
+        .map(|_| (0..base).map(|_| index(&mut generator, base)).collect())
         .collect();
     let equal = vec![1.0; replicates];
     let per_quantity: Vec<QuantityIndices> = (0..quantities)

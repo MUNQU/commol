@@ -20,6 +20,7 @@ use commol_inference::resampling::{
 };
 use commol_inference::{NoNoise, ObservationNoise, ParameterSample, observation_draws};
 use commol_random::Generator;
+use commol_random::sample::normal;
 
 type Formula = fn(&HashMap<String, f64>, f64) -> f64;
 
@@ -146,21 +147,12 @@ fn config() -> OptimizationConfig {
     })
 }
 
-/// `count` standard normal draws (Box–Muller).
-fn normals(generator: &mut Generator, count: usize) -> Vec<f64> {
-    (0..count)
-        .map(|_| {
-            let (u, v) = (generator.uniform_positive(), generator.uniform());
-            (-2.0 * u.ln()).sqrt() * (2.0 * std::f64::consts::PI * v).cos()
-        })
-        .collect()
-}
-
 /// An AR(1) series with coefficient `phi` and unit innovations.
 fn ar1(phi: f64, count: usize, seed: u64) -> Vec<f64> {
     let mut previous = 0.0;
-    normals(&mut Generator::from_seed(seed), count)
-        .into_iter()
+    let mut generator = Generator::from_seed(seed);
+    (0..count)
+        .map(|_| normal(&mut generator))
         .map(|e| {
             previous = phi * previous + e;
             previous
