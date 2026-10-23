@@ -6,14 +6,13 @@ member statistics. Both know the `Model` they ran, report themselves
 (`report`) and draw their figures (`plot`).
 """
 
-import bisect
-import math
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 from commol.api.plotting.accessors import ReplicatesPlot, ResultsPlot
+from commol.commol_rs import _commol_rs as commol_rs
 
 if TYPE_CHECKING:
     from commol.api.reporting import SimulationReport
@@ -21,10 +20,6 @@ if TYPE_CHECKING:
     from commol.context.inference.conformal import PredictionIntervals
     from commol.context.inference.quantities import QuantityBase
     from commol.context.model import Model
-
-# Relative tolerance with which two positions on the axis are the same, as in
-# the ODE engine (`crates/commol-differential/src/solve.rs`).
-POSITION_TOLERANCE = 1e-9
 
 
 class SimulationResults(dict[str, list[float]]):
@@ -149,7 +144,8 @@ class SimulationResults(dict[str, list[float]]):
 
         The run must hold every position the quantities read: the results of
         ``Simulation.run_at(quantity_schedule(quantities))`` hold them all.
-        Each position is found within ``1e-9``, as `index_at` finds it, and
+        Each position is found within ``1e-9``, as an observation finds its
+        row (`index_at` of `crates/commol-calibration/src/observation.rs`), and
         Rust reduces the rows with the code of `Propagation`, so the values
         equal those of a `Propagation` of a sample of one draw with the
         parameters of this run.
@@ -258,43 +254,69 @@ class SimulationResults(dict[str, list[float]]):
         )
 
 
-def index_at(positions: Sequence[float], at: float) -> int:
+def outputs_for(model: "Model", id: str) -> list[str]:
     """
-    Index of a position in an ascending list of positions.
+    Names of the outputs a source id expands into.
 
-    Two positions are the same within a relative tolerance of ``1e-9``, so a
-    position computed as ``end - window`` finds its entry.
+    The structure of the model groups its outputs by source
+    (`ModelStructure.outputs_by_source`): for an aggregate model, by bin and
+    accumulator.
 
     Parameters
     ----------
-    positions : Sequence[float]
-        Positions on the axis, ascending.
-    at : float
-        The position to find.
+    model : Model
+        The model whose outputs the results hold.
+    id : str
+        A source id, such as a bin id or an accumulator id.
 
     Returns
     -------
-    int
-        Index of `at` in `positions`.
+    list[str]
+        Output names for that id, in the order the engine reports them.
 
     Raises
     ------
-    ValueError
-        If `at` is not one of `positions`.
+    KeyError
+        If `id` is not a source of the model.
     """
-    index = bisect.bisect_left(positions, at)
-    for candidate in (index - 1, index):
-        if 0 <= candidate < len(positions) and same_position(positions[candidate], at):
-            return candidate
-    raise ValueError(
-        f"The results have no value at {at}; run the simulation at that position "
-        f"with Simulation.run_at."
-    )
+    outputs = model.structure.outputs_by_source(model)
+    if id not in outputs:
+        raise KeyError(
+            f"'{id}' is not a bin or accumulator of model '{model.name}'. "
+            f"Available: {sorted(outputs)}"
+        )
+    return outputs[id]
 
 
-def same_position(a: float, b: float) -> bool:
-    """Whether two positions on the axis are the same, within ``1e-9``."""
-    return math.isclose(a, b, rel_tol=POSITION_TOLERANCE, abs_tol=POSITION_TOLERANCE)
+def total_series(
+    results: Mapping[str, Sequence[float]], outputs: Sequence[str]
+) -> list[float]:
+    """
+    The sum of some outputs at each position.
+
+    Parameters
+    ----------
+    results : Mapping[str, Sequence[float]]
+        Simulation results, such as those of `Simulation.run`.
+    outputs : Sequence[str]
+        Output names.
+
+    Returns
+    -------
+    list[float]
+        One value per position, or no value without outputs.
+
+    Raises
+    ------
+    KeyError
+        If an output is missing from `results`.
+    """
+    missing = [name for name in outputs if name not in results]
+    if missing:
+        raise KeyError(f"Missing output series in results: {sorted(missing)}")
+    return [
+        sum(values) for values in zip(*(results[name] for name in outputs), strict=True)
+    ]
 
 
 def quantities_of_runs(
@@ -327,7 +349,6 @@ def quantities_of_runs(
         an output the runs do not have, or the runs lack a position a
         quantity reads.
     """
-    from commol.commol_rs import _commol_rs as commol_rs
     from commol.context.inference.quantities import expand_quantities
 
     labels, rust = expand_quantities(quantities)
@@ -349,7 +370,10 @@ def sample(
     Read a series at the given positions.
 
     Compartment counts are instantaneous, so they are read at the position
-    rather than averaged over the interval leading to it.
+    rather than averaged over the interval leading to it. Each position is
+    found with the tolerance of the axis, as an observation finds its row
+    (`index_at` of `crates/commol-calibration/src/observation.rs`), so ``0.1
+    + 0.2`` reads the value at ``0.3``.
 
     Parameters
     ----------
@@ -370,7 +394,11 @@ def sample(
     ValueError
         If a position in `at` is not one of `positions`.
     """
-    return [series[index_at(positions, position)] for position in at]
+    rows = commol_rs.calibration.index_at(
+        [float(position) for position in positions],
+        [float(position) for position in at],
+    )
+    return [series[row] for row in rows]
 
 
 class SimulationReplicates(list[SimulationResults]):

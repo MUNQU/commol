@@ -508,7 +508,7 @@ pub fn check_positions<E: SimulationEngine>(
                     obs.label, obs.at
                 ));
             }
-            let start = obs.at - window;
+            let start = crate::observation::window_start(obs.at, window);
             engine.check_position(start).map_err(|reason| {
                 format!(
                     "Observation '{}' at {} with the window {window} starts its \

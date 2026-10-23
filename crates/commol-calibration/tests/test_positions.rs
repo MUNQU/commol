@@ -118,6 +118,13 @@ fn a_window_longer_than_its_position_is_rejected() {
 }
 
 #[test]
+fn a_window_that_starts_at_zero_within_the_rounding_of_its_end_is_accepted() {
+    let observation = ObservedDataPoint::with_window(1000.0, "A".to_string(), 500.0, 1000.0 + 1e-7);
+    assert!(problem(difference(), vec![observation.clone()], vec![]).is_ok());
+    assert!(problem(differential(), vec![observation], vec![]).is_ok());
+}
+
+#[test]
 fn a_window_is_finite_and_positive() {
     for window in [0.0, f64::INFINITY] {
         let observation = ObservedDataPoint::with_window(4.0, "A".to_string(), 500.0, window);

@@ -36,7 +36,7 @@
 
 use std::ops::Range;
 
-use commol_calibration::{ObservationOperator, ObservedDataPoint, index_at};
+use commol_calibration::{ObservationOperator, ObservedDataPoint, index_at, window_start};
 use serde::{Deserialize, Serialize};
 
 /// What a quantity reads at each position of a run.
@@ -315,7 +315,7 @@ impl Points<'_> {
         for &at in positions {
             check_position(index, at)?;
             if let Some(window) = window
-                && at < window
+                && window_start(at, window) < 0.0
             {
                 return Err(format!(
                     "Quantity {index}: increments over windows of {window} start at 0 at the \
@@ -328,7 +328,8 @@ impl Points<'_> {
                 series.outputs().to_vec(),
                 0.0,
             ));
-            self.starts.push(window.map(|window| at - window));
+            self.starts
+                .push(window.map(|window| window_start(at, window)));
         }
         Ok(first..self.points.len())
     }

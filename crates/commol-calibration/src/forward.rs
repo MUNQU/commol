@@ -387,7 +387,7 @@ pub fn schedule_of(
 ) -> Vec<f64> {
     let mut schedule: Vec<f64> = observations
         .iter()
-        .flat_map(|obs| std::iter::once(obs.at).chain(obs.window.map(|window| obs.at - window)))
+        .flat_map(|obs| std::iter::once(obs.at).chain(obs.window_start()))
         .chain(extra)
         .collect();
     schedule.sort_by(f64::total_cmp);

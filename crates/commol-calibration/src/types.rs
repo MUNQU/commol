@@ -97,6 +97,14 @@ impl ObservedDataPoint {
             ..Self::new(at, output, value)
         }
     }
+
+    /// The start of the window of the observation
+    /// ([`window_start`](crate::observation::window_start)), or `None`
+    /// without a window.
+    pub fn window_start(&self) -> Option<f64> {
+        self.window
+            .map(|window| crate::observation::window_start(self.at, window))
+    }
 }
 
 /// Parameter to be calibrated with its bounds

@@ -296,7 +296,7 @@ class TestObservationOperator:
     ) -> None:
         observed = [ObservedDataPoint(at=10, outputs=["B", "Z"], label="B", value=1.0)]
 
-        with pytest.raises(KeyError, match=r"aggregate components: \['Z'\]"):
+        with pytest.raises(KeyError, match=r"in results: \['Z'\]"):
             run.plot.series(observed_data=observed, series=["B"])
 
     def test_a_factor_it_cannot_read_leaves_the_line_unscaled(
@@ -370,7 +370,7 @@ class TestSeriesSelection:
     def test_an_unknown_id_is_a_clear_error(
         self, stratified: SimulationResults, method: str
     ) -> None:
-        with pytest.raises(ValueError, match="'X' is neither an output"):
+        with pytest.raises(KeyError, match="'X' is not a bin or accumulator"):
             getattr(stratified.plot, method)(series=["X"])
 
 

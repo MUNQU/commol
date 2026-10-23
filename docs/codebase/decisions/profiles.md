@@ -136,9 +136,12 @@ named, noise parameters included, are then reset together on each side, and
 a rise above the floor (two evaluations) makes the list "may be incomplete".
 `combinations` keeps the algebraic combinations of the structural rank. Every
 verdict holds with the other parameters at their fitted values. The error of
-a refit at the fit, `|δ|` (`ProfileTracer::refit_error`), is a diagnostic
-only, with a note when it is above `ε`: the flatness keeps `ε`, and a too
-small `ε` falls back to the practical verdict.
+a refit at the fit, `|δ|` (`ProfileTracer::refit_error`, kept in
+`Profile::refit_error`), is a diagnostic only, with a note when it is above
+`ε`: the flatness keeps `ε`, and a too small `ε` falls back to the practical
+verdict. The profile flags both notes (`Profile::inaccurate_refit`, and
+`Profile::below_fit` for a refit below the fit by more than `ε`); Python
+writes their text.
 
 Conflicts with `StructuralRank` remain, and the merge shows them as
 `conflicting`: the rank reads the generic rank over a Latin hypercube across
@@ -157,4 +160,6 @@ with no effect at the fit of the others but an effect elsewhere reads
 | `|δ|` as the tolerance | Two samples of the error of the optimizer are no bound on it. |
 
 **Guards:** `crates/commol-inference/tests/test_profile_structure.rs`,
+`crates/commol-inference/tests/test_profiles.rs::a_profile_flags_a_refit_less_accurate_than_the_tolerance`,
+`crates/commol-inference/tests/test_profiles.rs::a_profile_flags_a_refit_below_the_fit`,
 `tests/uncertainty/test_profile_verdicts.py` (`TestStructure`, `TestReport`).

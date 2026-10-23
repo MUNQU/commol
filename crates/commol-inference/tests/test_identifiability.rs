@@ -4,8 +4,8 @@ use commol_calibration::{CalibrationParameter, CalibrationProblem, LossConfig, O
 use commol_core::Model;
 use commol_difference::DifferenceEquations;
 use commol_inference::identifiability::{
-    Reference, StructuralVerdict, collinearity, collinearity_index, sample_identifiability,
-    structural_rank,
+    PracticalVerdict, Reference, StructuralVerdict, collinearity, collinearity_index,
+    sample_identifiability, structural_rank,
 };
 use commol_inference::sensitivity::{
     Design, FiniteDifferences, Matrix, Sensitivities, SensitivityError, SensitivitySource,
@@ -186,6 +186,27 @@ fn a_ridge_gives_a_correlated_pair() {
 }
 
 #[test]
+fn a_sample_gives_the_verdict_of_each_parameter() {
+    let a: Vec<f64> = normals(500, 2).iter().map(|z| 0.5 + 0.1 * z).collect();
+    let b: Vec<f64> = a.iter().map(|x| 1.0 - x).collect();
+    let c: Vec<f64> = normals(500, 3).iter().map(|z| 0.5 + 0.1 * z).collect();
+    let result = sample_identifiability(&sample(&[a, b, c]), Reference::Bounds, 0.9).unwrap();
+
+    let r = result.correlation[0][1];
+    let verdicts = &result.verdicts;
+    assert_eq!(verdicts[0].verdict, PracticalVerdict::PoorlyDetermined);
+    assert_eq!(verdicts[0].correlated_with, [(1, r)]);
+    assert_eq!(verdicts[1].verdict, PracticalVerdict::PoorlyDetermined);
+    assert_eq!(verdicts[1].correlated_with, [(0, r)]);
+    assert_eq!(verdicts[2].verdict, PracticalVerdict::Determined);
+    assert!(verdicts[2].correlated_with.is_empty());
+    assert!(
+        verdicts.iter().all(|verdict| verdict.modes == 1),
+        "{verdicts:?}"
+    );
+}
+
+#[test]
 fn a_correlation_equal_to_the_threshold_is_not_above_it() {
     // Centered columns with Σxy = 1 and Σx² = Σy² = 2: r = 1/2.
     let x = vec![0.75, 0.25, 0.5, 0.5];
@@ -208,7 +229,13 @@ fn a_bimodal_marginal_is_flagged() {
     let result =
         sample_identifiability(&sample(&[bimodal, unimodal]), Reference::Bounds, 0.9).unwrap();
 
-    assert_eq!(result.multimodal, [true, false]);
+    assert_eq!(result.verdicts[0].modes, 2);
+    assert_eq!(result.verdicts[1].modes, 1);
+    assert_eq!(
+        result.verdicts[0].verdict,
+        PracticalVerdict::PoorlyDetermined
+    );
+    assert_eq!(result.verdicts[1].verdict, PracticalVerdict::Determined);
 }
 
 /// A source of fixed scaled sensitivities: point `[i, …]` reads
@@ -324,6 +351,37 @@ fn collinearity_reads_the_indices_and_sensitivities_of_known_columns() {
     // Only sizes up to max_subset_size.
     assert_eq!(result.best_by_size.len(), 1);
     assert_eq!(result.best_by_size[0].parameters, [0, 2]);
+}
+
+#[test]
+fn collinearity_gives_the_verdict_of_each_parameter() {
+    let sixty = Fixed::new(vec![sixty_degrees()]);
+    // No observation is sensitive to k1: its column is zero.
+    let insensitive = Fixed::new(vec![Matrix::from_row_slice(2, 2, &[1.0, 0.0, 0.0, 0.0])]);
+
+    let collinear = collinearity(&sixty, &[vec![0.0; 3]], &[1.0], 2, 1.2).unwrap();
+    let apart = collinearity(&sixty, &[vec![0.0; 3]], &[1.0], 2, 1.5).unwrap();
+    let unread = collinearity(&insensitive, &[vec![0.0; 2]], &[1.0], 2, 1.5).unwrap();
+
+    // The pair (k0, k1) has the index √2: at or above 1.2, below 1.5.
+    let verdicts = &collinear.verdicts;
+    assert_eq!(verdicts[0].verdict, PracticalVerdict::PoorlyDetermined);
+    assert_eq!(verdicts[0].collinear_with, [1]);
+    assert_eq!(verdicts[1].collinear_with, [0]);
+    assert_eq!(verdicts[2].verdict, PracticalVerdict::Determined);
+    assert!(verdicts[2].collinear_with.is_empty());
+    assert!(
+        apart
+            .verdicts
+            .iter()
+            .all(|v| v.verdict == PracticalVerdict::Determined && !v.insensitive),
+        "{:?}",
+        apart.verdicts
+    );
+    let k1 = &unread.verdicts[1];
+    assert_eq!(k1.verdict, PracticalVerdict::PoorlyDetermined);
+    assert!(k1.insensitive);
+    assert!(!unread.verdicts[0].insensitive);
 }
 
 #[test]

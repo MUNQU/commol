@@ -100,14 +100,16 @@ def plot_compared(
     ------
     ValueError
         If there are no results; a result does not have the outputs of the
-        first (the message names its key and the outputs that differ); an
-        entry of ``series`` is neither an output nor a bin or accumulator
-        id; `window` is not positive; the confidence level is out of range;
+        first (the message names its key and the outputs that differ);
+        `window` is not positive; the confidence level is out of range;
         ``axes`` has no panel of a series; `panels` is neither ``"series"``
         nor ``"observations"``; or, with ``panels="observations"``, `series`
         or `window` is given, there are no observations, or a result has no
         value at the position of an observation or at the start of its
         window.
+    KeyError
+        If an entry of ``series`` is neither an output nor a bin or
+        accumulator id of the model.
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
 

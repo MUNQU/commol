@@ -111,6 +111,19 @@ impl Profile {
             .map(|point| point.statistic)
             .fold(f64::INFINITY, f64::min)
     }
+
+    /// Whether a refit is below the fit by more than `tolerance`
+    /// ([`Self::lowest`] below `−tolerance`): the fit is not the optimum.
+    pub fn below_fit(&self, tolerance: f64) -> bool {
+        self.lowest() < -tolerance
+    }
+
+    /// Whether a refit at the fit lands farther from it than `tolerance`
+    /// ([`Profile::refit_error`] above it): the refits are less accurate
+    /// than the tolerance.
+    pub fn inaccurate_refit(&self, tolerance: f64) -> bool {
+        self.refit_error.is_some_and(|error| error > tolerance)
+    }
 }
 
 #[cfg(test)]
@@ -138,6 +151,7 @@ mod tests {
             interval: [None, None],
             evaluations: 0,
             box_crossings: [None, None],
+            refit_error: None,
         }
     }
 

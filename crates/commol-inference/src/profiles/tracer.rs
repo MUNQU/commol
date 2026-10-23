@@ -115,6 +115,10 @@ pub struct Profile {
     /// and the side counts as open. A parameter that stays on its bound
     /// from the fit to the crossing is not seen.
     pub box_crossings: [Option<usize>; 2],
+    /// The error of a refit at the fit ([`ProfileTracer::refit_error`]),
+    /// for a profile of a parameter; `None` for a prediction, or when the
+    /// profile has no neighbour of the fit or a refit fails.
+    pub refit_error: Option<f64>,
 }
 
 impl Profile {
@@ -331,7 +335,8 @@ where
     }
 
     /// The profile of `quantity` up to `threshold` on the statistic, with at
-    /// most `max_steps` points on each side.
+    /// most `max_steps` points on each side; a profile of a parameter holds
+    /// the error of a refit at the fit ([`Profile::refit_error`]).
     ///
     /// # Errors
     ///
@@ -383,19 +388,30 @@ where
             })
             .collect();
         let mut sides = sides.into_iter();
-        centers
+        let joined: Vec<(Option<usize>, Result<Profile, MethodError>)> = centers
             .into_iter()
             .zip(thresholds)
             .enumerate()
             .map(|(index, (center, &threshold))| {
                 let below = sides.next().expect("two sides per quantity");
                 let above = sides.next().expect("two sides per quantity");
-                let (center, below, above) = (center?, below?, above?);
                 let held = match &quantities[index] {
                     ProfiledQuantity::Parameter(j) => Some(*j),
                     ProfiledQuantity::Prediction(_) => None,
                 };
-                Ok(self.join(held, center, threshold, below, above))
+                let profile = center
+                    .and_then(|center| Ok(self.join(held, center, threshold, below?, above?)));
+                (held, profile)
+            })
+            .collect();
+        joined
+            .into_par_iter()
+            .map(|(held, profile)| {
+                let mut profile = profile?;
+                if let Some(index) = held {
+                    profile.refit_error = self.refit_error(index, &profile);
+                }
+                Ok(profile)
             })
             .collect()
     }
@@ -438,6 +454,7 @@ where
             interval,
             evaluations,
             box_crossings,
+            refit_error: None,
         }
     }
 

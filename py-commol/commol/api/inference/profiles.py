@@ -191,13 +191,13 @@ def _result(
                     f"at {end:.4g} where '{by}' reaches a bound, so that side counts "
                     "as open."
                 )
-        if profile.refit_error is not None and profile.refit_error > run.tolerance:
+        if profile.inaccurate_refit:
             notes.append(
                 f"'{name}': a refit at the fit lands {profile.refit_error:.3g} from "
                 f"it, above the tolerance {run.tolerance:.3g}: the refits are less "
                 "accurate than the tolerance."
             )
-        if profile.lowest < -run.tolerance:
+        if profile.below_fit:
             notes.append(
                 f"'{name}': a refit is {-profile.lowest:.3g} below the fit; the fit "
                 "is not the optimum, so fit again with more starts."

@@ -967,6 +967,69 @@ fn check_positions(
         .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
 }
 
+/// The message of a position that results do not hold.
+fn no_value(at: f64) -> PyErr {
+    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+        "The results have no value at {at}; run the simulation at that position with \
+         Simulation.run_at."
+    ))
+}
+
+/// The index of each position of `at` in `positions`, found with the
+/// tolerance of the axis, as an observation finds its row
+///
+/// Args:
+///     positions: Positions on the axis, ascending
+///     at: The positions to find
+///
+/// Raises:
+///     ValueError: If a position of `at` is not one of `positions`; the
+///         message names it
+#[pyfunction]
+fn index_at(positions: Vec<f64>, at: Vec<f64>) -> PyResult<Vec<usize>> {
+    at.into_iter()
+        .map(|at| commol_calibration::index_at(&positions, at).ok_or_else(|| no_value(at)))
+        .collect()
+}
+
+/// The start of the window of length `window` that ends at `at`: `at -
+/// window`, or 0 within the rounding of the window
+///
+/// Args:
+///     at: The end of the window
+///     window: The length of the window
+#[pyfunction]
+fn window_start(at: f64, window: f64) -> f64 {
+    commol_calibration::window_start(at, window)
+}
+
+/// The increment of `series` over the window of length `window` that ends at
+/// each of `ends`, as an observation with that window reads it
+///
+/// Args:
+///     series: One value per position
+///     positions: Positions on the axis, ascending
+///     window: The length of a window
+///     ends: The end of each window
+///
+/// Raises:
+///     ValueError: If a window starts before 0 at no position, or an end or
+///         a start is not one of `positions`
+#[pyfunction]
+fn window_increments(
+    series: Vec<f64>,
+    positions: Vec<f64>,
+    window: f64,
+    ends: Vec<f64>,
+) -> PyResult<Vec<f64>> {
+    commol_calibration::window_increments(&series, &positions, window, &ends).map_err(|error| {
+        match error {
+            commol_calibration::WindowError::Missing(at) => no_value(at),
+            incomplete => PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("{incomplete}.")),
+        }
+    })
+}
+
 /// Register calibration module with the Python module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCalibrationParameterType>()?;
@@ -992,5 +1055,8 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(check_model_values, m)?)?;
     m.add_function(wrap_pyfunction!(initial_condition_coverage, m)?)?;
     m.add_function(wrap_pyfunction!(check_positions, m)?)?;
+    m.add_function(wrap_pyfunction!(index_at, m)?)?;
+    m.add_function(wrap_pyfunction!(window_start, m)?)?;
+    m.add_function(wrap_pyfunction!(window_increments, m)?)?;
     Ok(())
 }

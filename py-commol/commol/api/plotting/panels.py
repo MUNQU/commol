@@ -15,7 +15,13 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from commol.api.inference.intervals import member_statistics
-from commol.api.results import SimulationReplicates, SimulationResults, index_at
+from commol.api.results import (
+    SimulationReplicates,
+    SimulationResults,
+    outputs_for,
+    sample,
+    total_series,
+)
 from commol.api.windows import windowed_totals
 from commol.context._windows import check_window, window_ends
 from commol.context.calibration import CalibrationResult, ObservedDataPoint
@@ -241,13 +247,7 @@ class _Outputs:
                 "have no model to read the outputs of a bin or accumulator from. "
                 f"Outputs: {self.outputs}"
             )
-        by_source = self.model.structure.outputs_by_source(self.model)
-        if series_id not in by_source:
-            raise ValueError(
-                f"'{series_id}' is neither an output nor a bin or accumulator id. "
-                f"Outputs: {self.outputs}. Bins and accumulators: {sorted(by_source)}"
-            )
-        return by_source[series_id]
+        return outputs_for(self.model, series_id)
 
     def label(self, series_id: str) -> tuple[str, str]:
         """The name and unit of a series, as the kind of the model names it."""
@@ -413,7 +413,9 @@ def cumulative_panels(
             Trace(
                 results.positions,
                 list(
-                    itertools.accumulate(_sum(results, outputs.components(series_id)))
+                    itertools.accumulate(
+                        total_series(results, outputs.components(series_id))
+                    )
                 ),
                 "Simulation (Cumulative)",
             ),
@@ -843,7 +845,7 @@ def _windowed(
     ends = window_ends(window, result.positions[-1])
     if isinstance(result, SimulationReplicates):
         gains = [
-            windowed_totals(_sum(run, components), run.positions, window, ends)
+            windowed_totals(total_series(run, components), run.positions, window, ends)
             for run in result
         ]
         statistics = member_statistics(gains, confidence_level)
@@ -855,7 +857,7 @@ def _windowed(
         )
     if isinstance(result, SimulationResults):
         gains = windowed_totals(
-            _sum(result, components), result.positions, window, ends
+            total_series(result, components), result.positions, window, ends
         )
         return Trace(ends, gains, "Simulation"), None
     points = [
@@ -1019,14 +1021,6 @@ def _reads_each_observation(observed: list[ObservedDataPoint]) -> bool:
     return any(point.window for point in observed) or len(operators) > 1
 
 
-def _sum(results: Mapping[str, list[float]], outputs: list[str]) -> list[float]:
-    """The sum of some outputs at each position."""
-    missing = [name for name in outputs if name not in results]
-    if missing:
-        raise KeyError(f"Missing result series for aggregate components: {missing}")
-    return [sum(values) for values in zip(*(results[name] for name in outputs))]
-
-
 def _read(
     results: SimulationResults, outputs: list[str], point: ObservedDataPoint
 ) -> float:
@@ -1034,10 +1028,10 @@ def _read(
     The sum of `outputs` of one run as `point` reads it: at its position, or
     its increment over its window (`windowed_totals`).
     """
-    series = _sum(results, outputs)
+    series = total_series(results, outputs)
     if point.window:
         return windowed_totals(series, results.positions, point.window, [point.at])[0]
-    return series[index_at(results.positions, point.at)]
+    return sample(series, results.positions, [point.at])[0]
 
 
 def _model_line(
@@ -1076,7 +1070,7 @@ def _model_line(
     )
     factor = _factor(observed[0].factor_id if observed else None, factors)
     return list(results.positions), [
-        value * factor for value in _sum(results, components)
+        value * factor for value in total_series(results, components)
     ]
 
 

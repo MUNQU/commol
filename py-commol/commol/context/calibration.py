@@ -13,6 +13,7 @@ from pydantic import (
     model_validator,
 )
 
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.constants import (
     CalibrationParameterType,
     LossFunction,
@@ -133,9 +134,18 @@ class ObservedDataPoint(BaseModel):
 
     @model_validator(mode="after")
     def validate_window(self) -> Self:
-        """A window must not start before position 0."""
-        if self.window is not None and self.window > self.at:
-            raise ValueError(f"window ({self.window}) must be <= at ({self.at})")
+        """
+        A window must not start before position 0, with the start of the
+        engine (`window_start` of `crates/commol-calibration/src/observation.rs`).
+        """
+        if (
+            self.window is not None
+            and commol_rs.calibration.window_start(self.at, self.window) < 0
+        ):
+            raise ValueError(
+                f"The window {self.window} that ends at {self.at} starts before "
+                "position 0."
+            )
         return self
 
     @property

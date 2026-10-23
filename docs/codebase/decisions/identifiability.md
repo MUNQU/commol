@@ -40,11 +40,19 @@ the observations gives the structural verdict; a dense design keeps its
 verdicts in its section. Merging reports keeps a verdict the reports agree
 on, and makes one they disagree on `conflicting`, with every reason.
 Thresholds and tolerances of the methods are required arguments: they are
-modelling judgments.
+modelling judgments. Rust decides each verdict and gives its causes
+(`StructuralAnalysis::verdicts`; `Collinearity::verdicts`: insensitive, the
+parameters it is collinear with; `SampleIdentifiability::verdicts`: the
+parameters it is correlated with, its number of modes;
+`StartsIdentifiability::flagged`). The runners of
+`api/inference/identifiability.py` write the reasons from the causes and
+decide nothing.
 
 | Alternative | Why not |
 |---|---|
 | One verdict | A parameter structurally identifiable and poorly determined by the data, the usual case, would look like a conflict. |
 | Defaults for the thresholds | A judgment hidden in the library. |
 
-**Guards:** `tests/uncertainty/test_identifiability_report.py` (`TestReport`).
+**Guards:** `tests/uncertainty/test_identifiability_report.py` (`TestReport`),
+`crates/commol-inference/tests/test_identifiability.rs::collinearity_gives_the_verdict_of_each_parameter`,
+`crates/commol-inference/tests/test_identifiability.rs::a_sample_gives_the_verdict_of_each_parameter`.

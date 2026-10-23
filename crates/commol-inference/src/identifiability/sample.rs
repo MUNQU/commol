@@ -1,7 +1,12 @@
 //! Practical identifiability from a parameter sample: how much the sample
 //! contracts each parameter against a reference, which parameters move
 //! together, and which marginals have several modes.
+//!
+//! A parameter is poorly determined when it is correlated with another above
+//! the threshold, or when its marginal has several modes; otherwise it is
+//! determined.
 
+use super::PracticalVerdict;
 use crate::error::MethodError;
 use crate::priors::Priors;
 use crate::sample::ParameterSample;
@@ -12,6 +17,19 @@ const GRID: usize = 512;
 /// A local maximum of a density counts as a mode above this share of the
 /// highest.
 const MODE_HEIGHT: f64 = 0.1;
+
+/// The verdict of one parameter and its causes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SampleVerdict {
+    /// Poorly determined when it is correlated with another parameter or its
+    /// marginal has several modes.
+    pub verdict: PracticalVerdict,
+    /// The other parameters, ascending, whose absolute correlation with it is
+    /// above the threshold, with that correlation: `(k, r)`.
+    pub correlated_with: Vec<(usize, f64)>,
+    /// The number of modes of its marginal.
+    pub modes: usize,
+}
 
 /// The result of [`sample_identifiability`].
 #[derive(Debug, Clone, PartialEq)]
@@ -25,10 +43,10 @@ pub struct SampleIdentifiability {
     /// The pairs `(j, k, r)`, `j < k`, whose absolute correlation `r` is
     /// above the threshold.
     pub correlated_pairs: Vec<(usize, usize, f64)>,
-    /// Whether the marginal of each parameter has two or more modes.
-    pub multimodal: Vec<bool>,
     /// The positions of the modes of each marginal.
     pub modes: Vec<Vec<f64>>,
+    /// The verdict of each parameter.
+    pub verdicts: Vec<SampleVerdict>,
 }
 
 /// The distribution the contraction of each parameter compares with.
@@ -105,12 +123,35 @@ pub fn sample_identifiability(
             density_modes(&values, weights, covariance[j][j].sqrt())
         })
         .collect();
+    let verdicts = modes
+        .iter()
+        .enumerate()
+        .map(|(j, marginal)| {
+            let correlated_with: Vec<(usize, f64)> = correlated_pairs
+                .iter()
+                .filter_map(|&(a, b, r)| {
+                    if a == j {
+                        Some((b, r))
+                    } else if b == j {
+                        Some((a, r))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            SampleVerdict {
+                verdict: PracticalVerdict::of(!correlated_with.is_empty() || marginal.len() >= 2),
+                correlated_with,
+                modes: marginal.len(),
+            }
+        })
+        .collect();
     Ok(SampleIdentifiability {
         contraction,
         correlation,
         correlated_pairs,
-        multimodal: modes.iter().map(|m| m.len() >= 2).collect(),
         modes,
+        verdicts,
     })
 }
 

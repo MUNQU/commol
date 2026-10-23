@@ -38,7 +38,7 @@ from commol.api.plotting.panels import (
     ObservationPanel,
     Panel,
 )
-from commol.api.results import same_position
+from commol.context._windows import is_whole
 from commol.context.inference.global_sensitivity import SobolResult
 from commol.context.visualization import PlotConfig
 
@@ -966,10 +966,7 @@ def _apply_x_labels(
         ticks = [
             position
             for position in positions
-            if same_position(
-                (position - anchor) / tick_every,
-                round((position - anchor) / tick_every),
-            )
+            if is_whole((position - anchor) / tick_every)
         ]
     else:
         ticks = list(positions)

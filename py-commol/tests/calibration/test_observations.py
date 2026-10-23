@@ -177,8 +177,27 @@ class TestPositionsAndEngines:
             ObservedDataPoint(at=3, outputs=[], label="x", value=1.0)
 
     def test_a_window_does_not_start_before_zero(self) -> None:
-        with pytest.raises(ValidationError, match=r"window \(4.0\) must be <= at"):
+        with pytest.raises(ValidationError, match="window 4.0 that ends at 3.0 starts"):
             ObservedDataPoint(at=3, output="B", window=4, value=1.0)
+
+    def test_a_window_that_starts_at_zero_within_its_rounding_is_calibrated(
+        self,
+    ) -> None:
+        observation = ObservedDataPoint(
+            at=1000, output="A", value=1.0, window=1000 + 1e-7
+        )
+        problem = CalibrationProblem(
+            observed_data=[observation],
+            parameters=[bounded("k")],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=1),
+        )
+        model = build(a_to_b_builder(parameters={"k": None}))
+
+        calibrator = Calibrator(Simulation(model), problem)
+
+        [[[prediction]]] = calibrator.rust_problem.predict_observations([[0.0]])
+        assert prediction == 0.0
 
     def test_a_difference_model_rejects_a_non_integer_observation(self) -> None:
         problem = CalibrationProblem(

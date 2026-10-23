@@ -436,6 +436,46 @@ fn profile_of_a_linear_model_is_a_parabola() {
     );
 }
 
+#[test]
+fn a_profile_flags_a_refit_less_accurate_than_the_tolerance() {
+    let problem = line_problem(&VALUES);
+    let fit = optimize(&problem, &config()).unwrap();
+    // Five iterations leave a refit far from the optimum it starts near.
+    let short = OptimizationConfig::NelderMead(NelderMeadConfig {
+        sd_tolerance: 1e-14,
+        max_iterations: 5,
+        ..NelderMeadConfig::default()
+    });
+    let tracer = ProfileTracer::new(&problem, &short, &fit.best_parameters, 7).unwrap();
+    let profile = tracer
+        .trace(&ProfiledQuantity::Parameter(1), 1.0, 3)
+        .unwrap();
+
+    let error = profile
+        .refit_error
+        .expect("a profile of a parameter has one");
+    assert!(error > tracer.tolerance(), "{error}");
+    assert!(profile.inaccurate_refit(tracer.tolerance()));
+    assert!(!profile.inaccurate_refit(error));
+}
+
+#[test]
+fn a_profile_flags_a_refit_below_the_fit() {
+    let problem = line_problem(&VALUES);
+    let config = config();
+    let (a, b) = least_squares(&VALUES);
+    // The intercept off its optimum: a refit of it lowers the objective.
+    let tracer = ProfileTracer::new(&problem, &config, &[a + 0.5, b], 7).unwrap();
+    let profile = tracer
+        .trace(&ProfiledQuantity::Parameter(1), 1.0, 3)
+        .unwrap();
+
+    let below = -profile.lowest();
+    assert!(below > tracer.tolerance(), "{below}");
+    assert!(profile.below_fit(tracer.tolerance()));
+    assert!(!profile.below_fit(below));
+}
+
 /// The model of `abc_builder` (`tests/support/models.py`): A → B at
 /// `k1 * A * B / total`, B → C at `k2 * B`, from 990 in A and 10 in B.
 fn abc_engine() -> commol_difference::DifferenceEquations {
