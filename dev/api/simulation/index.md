@@ -301,14 +301,7 @@ class Simulation:
         KeyError
             If `id` is not a source of the model.
         """
-        model = self.model_definition
-        outputs = model.structure.outputs_by_source(model)
-        if id not in outputs:
-            raise KeyError(
-                f"'{id}' is not a bin or accumulator of model "
-                f"'{self.model_definition.name}'. Available: {sorted(outputs)}"
-            )
-        return outputs[id]
+        return outputs_for(self.model_definition, id)
 
     def group_outputs(self, ids: Iterable[str]) -> dict[str, list[str]]:
         """
@@ -388,16 +381,7 @@ class Simulation:
             If an id is not a bin, accumulator or output of the model, or an
             expected output is missing from `results`.
         """
-        names = self._series_names(ids)
-        missing = [name for name in names if name not in results]
-        if missing:
-            raise KeyError(f"Missing output series in results: {sorted(missing)}")
-        if not names:
-            return []
-        return [
-            sum(values)
-            for values in zip(*(results[name] for name in names), strict=True)
-        ]
+        return total_series(results, self._series_names(ids))
 
     def windowed_totals(
         self,
@@ -863,14 +847,7 @@ def outputs_for(self, id: str) -> list[str]:
     KeyError
         If `id` is not a source of the model.
     """
-    model = self.model_definition
-    outputs = model.structure.outputs_by_source(model)
-    if id not in outputs:
-        raise KeyError(
-            f"'{id}' is not a bin or accumulator of model "
-            f"'{self.model_definition.name}'. Available: {sorted(outputs)}"
-        )
-    return outputs[id]
+    return outputs_for(self.model_definition, id)
 ```
 
 #### group_outputs
@@ -982,16 +959,7 @@ def total_series(
         If an id is not a bin, accumulator or output of the model, or an
         expected output is missing from `results`.
     """
-    names = self._series_names(ids)
-    missing = [name for name in names if name not in results]
-    if missing:
-        raise KeyError(f"Missing output series in results: {sorted(missing)}")
-    if not names:
-        return []
-    return [
-        sum(values)
-        for values in zip(*(results[name] for name in names), strict=True)
-    ]
+    return total_series(results, self._series_names(ids))
 ```
 
 #### windowed_totals
@@ -1285,7 +1253,8 @@ class SimulationResults(dict[str, list[float]]):
 
         The run must hold every position the quantities read: the results of
         ``Simulation.run_at(quantity_schedule(quantities))`` hold them all.
-        Each position is found within ``1e-9``, as `index_at` finds it, and
+        Each position is found within ``1e-9``, as an observation finds its
+        row (`index_at` of `crates/commol-calibration/src/observation.rs`), and
         Rust reduces the rows with the code of `Propagation`, so the values
         equal those of a `Propagation` of a sample of one draw with the
         parameters of this run.
@@ -1576,7 +1545,7 @@ quantities(quantities: Sequence[QuantityBase]) -> dict[str, float]
 
 The quantities of interest of this run, as a `Propagation` reduces each of its runs.
 
-The run must hold every position the quantities read: the results of `Simulation.run_at(quantity_schedule(quantities))` hold them all. Each position is found within `1e-9`, as `index_at` finds it, and Rust reduces the rows with the code of `Propagation`, so the values equal those of a `Propagation` of a sample of one draw with the parameters of this run.
+The run must hold every position the quantities read: the results of `Simulation.run_at(quantity_schedule(quantities))` hold them all. Each position is found within `1e-9`, as an observation finds its row (`index_at` of `crates/commol-calibration/src/observation.rs`), and Rust reduces the rows with the code of `Propagation`, so the values equal those of a `Propagation` of a sample of one draw with the parameters of this run.
 
 On the ODE engine, `Simulation.run` reports a position that is not a breakpoint by interpolation, so a value read from it can differ from that of a run that ends there by about the relative tolerance of the solver, and `PeakPosition` can change on a near-tie.
 
@@ -1608,7 +1577,8 @@ def quantities(self, quantities: "Sequence[QuantityBase]") -> dict[str, float]:
 
     The run must hold every position the quantities read: the results of
     ``Simulation.run_at(quantity_schedule(quantities))`` hold them all.
-    Each position is found within ``1e-9``, as `index_at` finds it, and
+    Each position is found within ``1e-9``, as an observation finds its
+    row (`index_at` of `crates/commol-calibration/src/observation.rs`), and
     Rust reduces the rows with the code of `Propagation`, so the values
     equal those of a `Propagation` of a sample of one draw with the
     parameters of this run.
@@ -2978,7 +2948,7 @@ windowed_totals(series: Sequence[float], positions: Sequence[float], window: flo
 
 Amount a cumulative series gained over each window.
 
-Each value is the series at the end of the window minus the series at its start, `at - window`: the same quantity a calibration compares an observation against when that observation sets `window`.
+Each value is the series at the end of the window minus the series at its start, `at - window`, each found with the tolerance of the axis: the rule of a windowed observation (`window_increments` of `crates/commol-calibration/src/observation.rs`), so the value is the prediction a calibration compares an observation against when that observation sets `window`.
 
 Parameters:
 
@@ -2997,9 +2967,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                             |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If window is not positive, a window starts before position 0, or the series has no value at the end or the start of a requested window. |
+| Type         | Description                                                                                                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ValueError` | If window is not positive, series and positions differ in length, a window starts before position 0, or the series has no value at the end or the start of a requested window. |
 
 Source code in `commol/api/windows.py`
 
@@ -3014,8 +2984,11 @@ def windowed_totals(
     Amount a cumulative series gained over each window.
 
     Each value is the series at the end of the window minus the series at its
-    start, ``at - window``: the same quantity a calibration compares an
-    observation against when that observation sets ``window``.
+    start, ``at - window``, each found with the tolerance of the axis: the
+    rule of a windowed observation (`window_increments` of
+    `crates/commol-calibration/src/observation.rs`), so the value is the
+    prediction a calibration compares an observation against when that
+    observation sets ``window``.
 
     Parameters
     ----------
@@ -3039,28 +3012,26 @@ def windowed_totals(
     Raises
     ------
     ValueError
-        If `window` is not positive, a window starts before position 0, or the
-        series has no value at the end or the start of a requested window.
+        If `window` is not positive, `series` and `positions` differ in
+        length, a window starts before position 0, or the series has no value
+        at the end or the start of a requested window.
     """
     check_window(window)
+    if len(series) != len(positions):
+        raise ValueError(
+            f"The series has {len(series)} values for {len(positions)} positions."
+        )
     ends = (
         window_ends(window, positions[-1] if positions else 0.0)
         if at is None
         else list(at)
     )
-
-    totals = []
-    for end in ends:
-        start = end - window
-        if start < -POSITION_TOLERANCE * max(abs(end), 1.0):
-            raise ValueError(
-                f"Position {end} has no complete window of {window} before it."
-            )
-        totals.append(
-            series[index_at(positions, end)]
-            - series[index_at(positions, max(start, 0.0))]
-        )
-    return totals
+    return commol_rs.calibration.window_increments(
+        [float(value) for value in series],
+        [float(position) for position in positions],
+        float(window),
+        [float(end) for end in ends],
+    )
 ```
 
 ## sample
@@ -3071,7 +3042,9 @@ sample(series: Sequence[float], positions: Sequence[float], at: Iterable[float])
 
 Read a series at the given positions.
 
-Compartment counts are instantaneous, so they are read at the position rather than averaged over the interval leading to it.
+Compartment counts are instantaneous, so they are read at the position rather than averaged over the interval leading to it. Each position is found with the tolerance of the axis, as an observation finds its row (`index_at` of `crates/commol-calibration/src/observation.rs`), so \`0.1
+
+- 0.2`reads the value at`0.3\`.
 
 Parameters:
 
@@ -3103,7 +3076,10 @@ def sample(
     Read a series at the given positions.
 
     Compartment counts are instantaneous, so they are read at the position
-    rather than averaged over the interval leading to it.
+    rather than averaged over the interval leading to it. Each position is
+    found with the tolerance of the axis, as an observation finds its row
+    (`index_at` of `crates/commol-calibration/src/observation.rs`), so ``0.1
+    + 0.2`` reads the value at ``0.3``.
 
     Parameters
     ----------
@@ -3124,5 +3100,9 @@ def sample(
     ValueError
         If a position in `at` is not one of `positions`.
     """
-    return [series[index_at(positions, position)] for position in at]
+    rows = commol_rs.calibration.index_at(
+        [float(position) for position in positions],
+        [float(position) for position in at],
+    )
+    return [series[row] for row in rows]
 ```

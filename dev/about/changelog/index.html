@@ -4601,9 +4601,23 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   with the message of the engine, as a calibration does. The bands, the
   automatic block lengths and their estimates keep their values: one Rust
   function of each computes them for every method.</li>
+<li>The engine decides the practical verdicts of <code>Collinearity</code> and
+  <code>SampleIdentifiability</code> and the two notes of a profile on its refits, and
+  results read a position with the rule of an observation: the verdicts,
+  reasons, notes and values stay. <code>windowed_totals</code> reads each window as a
+  calibration reads a windowed observation, and it gives floats. A figure asked for a series that is neither an
+  output nor a bin or accumulator raises <code>KeyError</code> with the message of
+  <code>Simulation.outputs_for</code>, and a sum of outputs that the results do not hold
+  gives one message, <code>Missing output series in results</code>, in a simulation, a
+  report and a figure.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>A window whose start rounds to just below 0, such as a window of
+  <code>1000 + 1e-7</code> that ends at 1000, starts at 0 in an observation, a
+  calibration and a quantity, as <code>windowed_totals</code> reads it. Before, a
+  calibration rejected it while the same window that ends at 2000 was
+  accepted. One rule of the engine gives the start of a window.</li>
 <li>One check of the engine defines the language of formulas, the one
   <a href="../../guide/mathematical-expressions/">Mathematical expressions</a>
   documents, for rates, formula parameters, calibration constraints and the

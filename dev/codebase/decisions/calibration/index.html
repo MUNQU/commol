@@ -3481,17 +3481,29 @@ come from Rust. <code>Calibrator</code> builds the Rust problem once
 (<code>commol_rs.inference.CalibrationProblem</code>) and every call reads it. The
 helpers that present results already computed, such as <code>windowed_totals</code>
 (<code>api/windows.py</code>) for a run or its replicates, are not predictions; they
-must agree with the operator, which
-<code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> checks.</p>
+read the rules of the operator through bindings (<code>index_at</code> and
+<code>window_increments</code> of <code>observation.rs</code>), which
+<code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> and
+<code>tests/simulation/test_windows.py::test_windowed_totals_equal_the_prediction_of_a_windowed_observation</code>
+check.</p>
 <p>An observation is given by <code>at</code> and <code>window</code>, so its window starts at
-<code>at − window</code>. A quantity given by its start, <code>Gain(start, end)</code>, passes the
+<code>at − window</code> (<code>observation::window_start</code>), read as 0 when
+<code>|at − window|</code> is at most <code>1e-9</code> times the larger of <code>|at|</code>, <code>window</code> and 1:
+the rounding of the subtraction grows with its operands, and <code>same_position</code>
+near 0 loses that scale, so a window of <code>1000 + 1e-7</code> has one verdict whether
+it ends at 1000 or at 2000. <code>check_positions</code>, <code>schedule_of</code>, the windows of a
+quantity, <code>window_increments</code> and the checks of Python (<code>ObservedDataPoint</code>,
+<code>Increments</code>, through the binding) read this one rule. A quantity given by its start, <code>Gain(start, end)</code>, passes the
 start itself (<code>ObservationOperator::with_starts</code>): <code>end − (end − start)</code> can
 round away from <code>start</code>, as <code>0.4 − (0.4 − 0.1)</code> is <code>0.09999999999999998</code>.
 The operator finds the row of each position and of each start with the
 tolerance of the axis (<code>observation::index_at</code>: equal within <code>1e-9</code> of the
-larger of their magnitudes and 1, as <code>index_at</code> of <code>api/results.py</code>), so a start
-computed as <code>at − window</code> reads the row of the position it rounds away from.</p>
+larger of their magnitudes and 1), so a start computed as <code>at − window</code>
+(<code>window_start</code>) reads the row of the position it rounds away from. Results
+read a position with the same <code>index_at</code>.</p>
 <p><strong>Guards:</strong> <code>observation::tests</code>,
+<code>crates/commol-calibration/tests/test_positions.rs::a_window_that_starts_at_zero_within_the_rounding_of_its_end_is_accepted</code>,
+<code>tests/calibration/test_observations.py::TestPositionsAndEngines::test_a_window_that_starts_at_zero_within_its_rounding_is_calibrated</code>,
 <code>crates/commol-inference/tests/test_predictive.rs::observation_draws_are_the_predictions_the_loss_compares</code>,
 <code>tests/uncertainty/test_predictive.py::TestObservations</code>,
 <code>crates/commol-inference/tests/test_global_sensitivity.rs::a_gain_reads_its_start_exactly</code>,

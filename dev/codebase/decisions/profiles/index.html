@@ -3462,9 +3462,12 @@ named, noise parameters included, are then reset together on each side, and
 a rise above the floor (two evaluations) makes the list "may be incomplete".
 <code>combinations</code> keeps the algebraic combinations of the structural rank. Every
 verdict holds with the other parameters at their fitted values. The error of
-a refit at the fit, <code>|δ|</code> (<code>ProfileTracer::refit_error</code>), is a diagnostic
-only, with a note when it is above <code>ε</code>: the flatness keeps <code>ε</code>, and a too
-small <code>ε</code> falls back to the practical verdict.</p>
+a refit at the fit, <code>|δ|</code> (<code>ProfileTracer::refit_error</code>, kept in
+<code>Profile::refit_error</code>), is a diagnostic only, with a note when it is above
+<code>ε</code>: the flatness keeps <code>ε</code>, and a too small <code>ε</code> falls back to the practical
+verdict. The profile flags both notes (<code>Profile::inaccurate_refit</code>, and
+<code>Profile::below_fit</code> for a refit below the fit by more than <code>ε</code>); Python
+writes their text.</p>
 <p>Conflicts with <code>StructuralRank</code> remain, and the merge shows them as
 <code>conflicting</code>: the rank reads the generic rank over a Latin hypercube across
 the box, a profile one ridge through the fit; the rank cuts the projection on
@@ -3503,6 +3506,8 @@ with no effect at the fit of the others but an effect elsewhere reads
 </tbody>
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_profile_structure.rs</code>,
+<code>crates/commol-inference/tests/test_profiles.rs::a_profile_flags_a_refit_less_accurate_than_the_tolerance</code>,
+<code>crates/commol-inference/tests/test_profiles.rs::a_profile_flags_a_refit_below_the_fit</code>,
 <code>tests/uncertainty/test_profile_verdicts.py</code> (<code>TestStructure</code>, <code>TestReport</code>).</p>
 
 

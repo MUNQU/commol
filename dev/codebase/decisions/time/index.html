@@ -3510,8 +3510,8 @@ impulse step and restarts from the new state, so <code>diffsol</code> needs no e
 <h2 id="windowed-observations">Windowed observations<a class="headerlink" href="#windowed-observations" title="Permanent link">&para;</a></h2>
 <p>An observation at <code>at</code> with <code>window = W</code> is compared with
 <code>output(at) - output(at - W)</code>, anchored at its own position. The Rust loss and
-<code>windowed_totals</code> (<code>api/windows.py</code>) must give the same number, and the
-predictive reads windows through the observation operator
+<code>windowed_totals</code> (<code>api/windows.py</code>) give the same number from one rule
+(<code>window_increments</code>), and the predictive reads windows through the observation operator
 (<a href="../calibration/#one-observation-operator">One observation operator</a>). Window <code>w</code>
 covers <code>(w · W, (w + 1) · W]</code>; <code>window_index</code> places a position with
 <code>max(ceil(at / W) − 1, 0)</code>, and the <code>observed</code> block of a report (<code>_observed_report</code> in <code>api/reporting.py</code>) calls it.
@@ -3563,11 +3563,11 @@ checks whether a model type accepts a position.</p>
 <code>positions</code> and the rows in <code>rows()</code>. A <code>dict</code> keeps <code>results["A"]</code>,
 <code>json.dumps</code> and <code>pandas.DataFrame(results)</code> working; a reserved key could clash
 with an output name. Windows, reports and plots read a value at a position
-(<code>index_at</code>, which matches within a relative <code>1e-9</code>), never at a list index, so
+with the Rust <code>index_at</code> of an observation (<code>observation.rs</code>, a relative <code>1e-9</code>), never at a list index, so
 a model type that reports between integers fits them. The engines take the
 same tolerance (<code>same_position</code> in <code>crates/commol-core/src/position.rs</code>). A
 predictive holds the positions it was asked for (<code>Predictive.positions</code>).</p>
-<p><strong>Guards:</strong> <code>tests/simulation/test_runs.py::TestResults</code>,
+<p><strong>Guards:</strong> <code>tests/simulation/test_runs.py::TestResults</code>, <code>tests/simulation/test_runs.py::test_a_result_reads_a_position_with_the_tolerance_of_the_engine</code>,
 <code>crates/commol-core/tests/positions.rs::same_position_is_relative_to_the_larger_magnitude</code>,
 <code>tests/reporting/test_simulation_report.py::TestNonIntegerPositions</code>,
 <code>tests/plotting/test_figures.py::TestDifferentialModel</code>.</p>

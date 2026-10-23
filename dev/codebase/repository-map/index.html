@@ -3484,7 +3484,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/observation.rs</code></td>
-<td><code>ObservationOperator</code>: one prediction per observation from the rows of a run (rows, sums of outputs, windows, factors); <code>index_at</code>, the row of a position within the tolerance of the axis.</td>
+<td><code>ObservationOperator</code>: one prediction per observation from the rows of a run (rows, sums of outputs, windows, factors); <code>index_at</code>, the row of a position within the tolerance of the axis; <code>window_start</code> and <code>window_increments</code>, the window of an observation, which <code>windowed_totals</code> also reads.</td>
 <td>Comparison with data.</td>
 </tr>
 <tr>
@@ -3748,7 +3748,7 @@
 </tr>
 <tr>
 <td><code>api/results.py</code></td>
-<td><code>SimulationResults</code> (values with their positions, seed and model, its <code>report</code>, its <code>plot</code> and its <code>quantities</code>), <code>SimulationReplicates</code> (runs with one seed each, their statistics, their <code>report</code>, their <code>plot</code> and their <code>quantities</code>), <code>index_at</code>, <code>sample</code>.</td>
+<td><code>SimulationResults</code> (values with their positions, seed and model, its <code>report</code>, its <code>plot</code> and its <code>quantities</code>), <code>SimulationReplicates</code> (runs with one seed each, their statistics, their <code>report</code>, their <code>plot</code> and their <code>quantities</code>); <code>outputs_for</code> and <code>total_series</code>, the outputs of a source and their sum, which a simulation, a report and a figure share; <code>sample</code>, which reads positions with <code>index_at</code> of Rust.</td>
 <td>Engine rules.</td>
 </tr>
 <tr>
@@ -4044,7 +4044,7 @@
 <tr>
 <td>Change which positions a model type accepts, or how results, windows and reports read them</td>
 <td><code>crates/commol-core/src/types/engine.rs</code> (<code>EngineType::check_position</code>); <code>py-commol/commol/api/results.py</code></td>
-<td><code>crates/commol-core/src/position.rs</code> (<code>same_position</code>), each engine's <code>check_position</code>, <code>crates/commol-calibration/src/calibration_problem.rs</code> (<code>check_positions</code>), <code>api/windows.py</code>, <code>api/reporting.py</code>, <code>api/plotting/</code>, <code>api/inference/predictive.py</code></td>
+<td><code>crates/commol-core/src/position.rs</code> (<code>same_position</code>), <code>crates/commol-calibration/src/observation.rs</code> (<code>index_at</code>, <code>window_increments</code>), each engine's <code>check_position</code>, <code>crates/commol-calibration/src/calibration_problem.rs</code> (<code>check_positions</code>), <code>api/windows.py</code>, <code>api/reporting.py</code>, <code>api/plotting/</code>, <code>api/inference/predictive.py</code></td>
 </tr>
 <tr>
 <td>Change axis units, the calendar of an axis or axis patterns</td>
