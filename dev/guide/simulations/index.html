@@ -3868,7 +3868,8 @@ deterministic engine, such as <code>DifferenceEquations</code> and
 </span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">error</span><span class="p">)</span>  <span class="c1"># The DifferenceEquations engine is deterministic: ...</span>
 </span></code></pre></div>
 <p>Replicate <code>i</code> takes the seed derived from <code>seed</code> and <code>i</code>, the SplitMix64 of
-<code>seed + i</code> (<code>replicate_seed</code> in <code>crates/commol-random/src/generator.rs</code>), so a
+the SplitMix64 of <code>seed</code> plus <code>i</code> (<code>replicate_seed</code> in
+<code>crates/commol-random/src/generator.rs</code>), so two seeds share no replicate, a
 replicate gives the same run however many replicates run, and
 <code>simulation.run(…, seed=replicates[i].seed)</code> repeats it. <code>SimulationReplicates</code>
 (<code>py-commol/commol/api/results.py</code>) is a list of <code>SimulationResults</code>:</p>

@@ -3434,8 +3434,9 @@ by the configuration's type and knows no method. A static type checker infers
 </tr>
 </tbody>
 </table>
-<p>Every random number of a method comes from the <code>commol-random</code> generator,
-seeded from the seed of its source (<a href="../results/#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts">Results</a>).
+<p>Every random number of a method comes from the generator and the samplers
+of <code>commol-random</code>, seeded from the seed of its source (<a href="../results/#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts">Results</a>)
+by one scheme: seed, then a <code>Stream</code> of <code>crates/commol-inference/src/streams.rs</code>, then the index of a draw.
 Coverage studies (<code>tests/support/coverage.py</code>, marker <code>coverage_study</code>) check that a method's
 intervals cover the truth at their level; they run for a pull request that
 changes what they run and before a release

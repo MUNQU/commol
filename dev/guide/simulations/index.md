@@ -117,7 +117,7 @@ except ValueError as error:
     print(error)  # The DifferenceEquations engine is deterministic: ...
 ```
 
-Replicate `i` takes the seed derived from `seed` and `i`, the SplitMix64 of `seed + i` (`replicate_seed` in `crates/commol-random/src/generator.rs`), so a replicate gives the same run however many replicates run, and `simulation.run(…, seed=replicates[i].seed)` repeats it. `SimulationReplicates` (`py-commol/commol/api/results.py`) is a list of `SimulationResults`:
+Replicate `i` takes the seed derived from `seed` and `i`, the SplitMix64 of the SplitMix64 of `seed` plus `i` (`replicate_seed` in `crates/commol-random/src/generator.rs`), so two seeds share no replicate, a replicate gives the same run however many replicates run, and `simulation.run(…, seed=replicates[i].seed)` repeats it. `SimulationReplicates` (`py-commol/commol/api/results.py`) is a list of `SimulationResults`:
 
 | Member                                                         | Returns                                                                                                                                                                                                                                             |
 | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

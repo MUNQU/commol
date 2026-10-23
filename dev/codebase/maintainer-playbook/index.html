@@ -3673,8 +3673,11 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
 <li>[ ] The algorithm in <code>crates/commol-inference/</code>. It runs the engine only
       through <code>ForwardModel</code>, reads observations only through
       <code>ObservationOperator</code>, sees a <code>Violation</code> as outside the support
-      (<code>discrepancy_in_support</code>), and draws every random number from a
-      <code>commol_random::Generator</code> seeded from the problem's seed.</li>
+      (<code>discrepancy_in_support</code>), and draws every random number with the
+      samplers of <code>commol-random</code>, from a <code>commol_random::Generator</code> seeded
+      from a stream of the problem's seed: a new <code>Stream</code> of
+      <code>crates/commol-inference/src/streams.rs</code>, with a number of its own, and
+      <code>Stream::replicate</code> for each draw or replicate; never the seed itself.</li>
 <li>[ ] A method that samples a posterior is a <code>TemperedTarget</code> on
       <code>SmcSampler</code> (<code>crates/commol-inference/src/smc/</code>), not a sampler of its
       own, and its configuration takes required <code>priors</code> (<code>WithPriors</code>)
@@ -3717,7 +3720,7 @@ builds the design from <code>InputSpace</code> (<code>design.rs</code>), runs it
 <code>BatchRunner</code> and calls the estimator; the binding and the Python runner only
 convert. A method of independent inputs refuses a sample through
 <code>InputSpace::independent</code>, and a random number comes from a stream of the
-seed of the analysis (<code>stream_seed</code>).</p>
+seed of the analysis (<code>Stream</code>, <code>streams.rs</code>).</p>
 <h3 id="model-type-engine">Model type (engine)<a class="headerlink" href="#model-type-engine" title="Permanent link">&para;</a></h3>
 <p>To add an engine to the list:</p>
 <ul>

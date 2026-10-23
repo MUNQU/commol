@@ -3487,9 +3487,11 @@ setting strictly between 0 and 1 is checked by one of the two functions.</p>
 <h2 id="a-method-takes-its-seed-from-its-source-and-fits-from-its-starts">A method takes its seed from its source and fits from its starts<a class="headerlink" href="#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts" title="Permanent link">&para;</a></h2>
 <p>Every uncertainty, identifiability and sensitivity method draws its random
 numbers from the seed of its source: <code>Calibrator.seed</code> (<code>problem.seed</code>) or
-<code>SensitivityAnalysis.seed</code>, split into streams (<code>commol_random::stream_seed</code>,
-<code>replicate_seed</code>). No method has a seed of its own, so one seed repeats a
-calibration and every method on it. A score reads the seed its draws keep,
+<code>SensitivityAnalysis.seed</code>, split into streams (<code>Stream</code> in
+<code>crates/commol-inference/src/streams.rs</code>, each with its own number) and the
+replicates of a stream (<code>Stream::replicate</code>); no method draws from the seed
+itself. No method has a seed of its own, so one seed repeats a calibration
+and every method on it. A score reads the seed its draws keep,
 <code>ObservationDraws.seed</code> (<code>crates/commol-inference/src/predictive.rs</code>):
 <code>scores::pit</code> randomizes ties from a stream of it. Every method that fits the
 data takes <code>starts</code>, at least 1 with the default 1, and fits with

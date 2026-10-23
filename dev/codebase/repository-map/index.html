@@ -3384,8 +3384,8 @@
 </tr>
 <tr>
 <td><code>crates/commol-random/</code></td>
-<td>What every stochastic engine shares and no model: the generator (<code>Generator</code>, <code>Xoshiro256PlusPlus</code> seeded by SplitMix64), <code>replicate_seed</code>, the samplers (<code>sample</code>: exponential, Poisson, binomial, multinomial), <code>SumTree</code>, the rates of a set of events, which the stochastic engine of the test kind uses (<code>StochasticEvents</code> scans its propensities), and <code>latin_hypercube</code> on the unit cube.</td>
-<td>Anything of a model or an engine.</td>
+<td>What every stochastic engine and inference method shares and no model: the generator (<code>Generator</code>, <code>Xoshiro256PlusPlus</code> seeded by SplitMix64, with its uniforms), <code>replicate_seed</code>, <code>stream_seed</code>, the samplers (<code>sample</code>: exponential, Poisson, binomial, multinomial, normal, gamma, an index below <code>n</code>), <code>SumTree</code>, the rates of a set of events, which the stochastic engine of the test kind uses (<code>StochasticEvents</code> scans its propensities), and <code>latin_hypercube</code> on the unit cube.</td>
+<td>Anything of a model or an engine; a sampler in another crate.</td>
 </tr>
 <tr>
 <td><code>crates/commol-model/src/builder.rs</code></td>
@@ -3568,6 +3568,11 @@
 <td>—</td>
 </tr>
 <tr>
+<td><code>crates/commol-inference/src/streams.rs</code></td>
+<td><code>Stream</code>, the one registry of the seed streams of the inference methods: each stream with its own number, its method and its purpose (<code>Stream::ALL</code>); the one scheme of a draw, seed, then <code>Stream::seed</code>, then <code>Stream::replicate</code> for each draw or replicate.</td>
+<td>A stream number written in a method; samplers (<code>commol-random</code>).</td>
+</tr>
+<tr>
 <td><code>crates/commol-inference/src/sensitivity/</code></td>
 <td><code>SensitivitySource</code>, the port of derivatives of the predicted observations; <code>FiniteDifferences</code> on the design of the observations or a dense one; the scaled sensitivities and <code>observation_scales</code>.</td>
 <td>Ranks, verdicts.</td>
@@ -3619,7 +3624,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/psis.rs</code>, <code>importance.rs</code></td>
-<td>Pareto-smoothed importance sampling (<code>smooth</code>, <code>k̂</code>); <code>importance_sample</code> of a <code>Target</code> from a <code>Proposal</code> on the unbounded scale, and <code>TemperedPosterior</code>, the last level of a <code>TemperedTarget</code> as a <code>Target</code>.</td>
+<td>Pareto-smoothed importance sampling (<code>smooth</code>, <code>k̂</code>); <code>importance_sample</code> of a <code>Target</code> from a <code>Proposal</code> on the unbounded scale, and <code>TemperedPosterior</code>, the last level of a <code>TemperedTarget</code> as a <code>Target</code>, which runs a stochastic model with one replicate of its seed (<code>Stream::PosteriorReplicate</code>) at every point.</td>
 <td>Proposals of one method.</td>
 </tr>
 <tr>
@@ -4068,7 +4073,7 @@
 </tr>
 <tr>
 <td>Change a stochastic engine (events, chain binomial, whole units), seeds or samplers</td>
-<td><code>crates/commol-stochastic/src/</code> (<code>events.rs</code>, <code>steps.rs</code>, <code>units.rs</code>); <code>crates/commol-random/</code></td>
+<td><code>crates/commol-stochastic/src/</code> (<code>events.rs</code>, <code>steps.rs</code>, <code>units.rs</code>); <code>crates/commol-random/</code>; <code>crates/commol-inference/src/streams.rs</code> (the seed streams of the inference methods)</td>
 <td><code>crates/commol-core/src/types/engine.rs</code> (<code>StochasticEventsSettings</code>, <code>Rounding</code>, <code>is_stochastic</code>), <code>crates/commol-model/src/system.rs</code> (<code>flow_changes</code>, <code>breakpoints</code>), <code>crates/commol-core/src/simulation_engine.rs</code> (<code>set_seed</code>, <code>run_replicates</code>), <code>py-commol/commol/context/engine.py</code>, <code>py-commol/commol/api/simulation.py</code> (<code>replicates</code>), <code>docs/guide/stochastic.md</code></td>
 </tr>
 <tr>

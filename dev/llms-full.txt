@@ -2555,7 +2555,7 @@ except ValueError as error:
     print(error)  # The DifferenceEquations engine is deterministic: ...
 ```
 
-Replicate `i` takes the seed derived from `seed` and `i`, the SplitMix64 of `seed + i` (`replicate_seed` in `crates/commol-random/src/generator.rs`), so a replicate gives the same run however many replicates run, and `simulation.run(…, seed=replicates[i].seed)` repeats it. `SimulationReplicates` (`py-commol/commol/api/results.py`) is a list of `SimulationResults`:
+Replicate `i` takes the seed derived from `seed` and `i`, the SplitMix64 of the SplitMix64 of `seed` plus `i` (`replicate_seed` in `crates/commol-random/src/generator.rs`), so two seeds share no replicate, a replicate gives the same run however many replicates run, and `simulation.run(…, seed=replicates[i].seed)` repeats it. `SimulationReplicates` (`py-commol/commol/api/results.py`) is a list of `SimulationResults`:
 
 | Member                                                         | Returns                                                                                                                                                                                                                                             |
 | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -5153,7 +5153,7 @@ print(error.lower[0] <= lower <= error.lower[1])  # True
 
 ## How replicates run
 
-Each replicate starts from the fit. With `starts > 1` it also starts from the [other starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts) of the optimizer, and keeps the end of lowest loss, so a second basin of the loss shows up instead of adding optimizer noise to the data's uncertainty. Replicate `b` draws its data and its starts from `replicate_seed(seed, b)` of the problem's seed: two runs with one seed give one result. A replicate changes only the observed values or the weights (`CalibrationProblem::with_data`); with `normalize_observations` its normalization comes from its own values, as the fit's does.
+Each replicate starts from the fit. With `starts > 1` it also starts from the [other starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts) of the optimizer, and keeps the end of lowest loss, so a second basin of the loss shows up instead of adding optimizer noise to the data's uncertainty. Replicate `b` draws its data and its starts from streams of the problem's seed, one for the data and one for the fits, at index `b`: two runs with one seed give one result. A replicate changes only the observed values or the weights (`CalibrationProblem::with_data`); with `normalize_observations` its normalization comes from its own values, as the fit's does.
 
 ## Prediction intervals
 
@@ -28384,8 +28384,9 @@ class Simulation:
         The returned object has ``run`` and ``run_at``, as `Simulation`, and
         they return `SimulationReplicates`: ``count`` runs, each with its own seed,
         run in parallel in the engine. Replicate ``i`` takes the seed derived
-        from ``seed`` and ``i`` (the SplitMix64 of ``seed + i``), so it gives
-        the same run however many replicates run.
+        from ``seed`` and ``i`` (the SplitMix64 of the SplitMix64 of ``seed``
+        plus ``i``), so two seeds share no replicate, and a replicate gives the
+        same run however many replicates run.
 
         Parameters
         ----------
@@ -28885,7 +28886,7 @@ replicates(count: int, *, seed: int | None = None) -> ReplicateRuns
 
 Replicates of the runs of a stochastic engine.
 
-The returned object has `run` and `run_at`, as `Simulation`, and they return `SimulationReplicates`: `count` runs, each with its own seed, run in parallel in the engine. Replicate `i` takes the seed derived from `seed` and `i` (the SplitMix64 of `seed + i`), so it gives the same run however many replicates run.
+The returned object has `run` and `run_at`, as `Simulation`, and they return `SimulationReplicates`: `count` runs, each with its own seed, run in parallel in the engine. Replicate `i` takes the seed derived from `seed` and `i` (the SplitMix64 of the SplitMix64 of `seed` plus `i`), so two seeds share no replicate, and a replicate gives the same run however many replicates run.
 
 Parameters:
 
@@ -28916,8 +28917,9 @@ def replicates(self, count: int, *, seed: int | None = None) -> "ReplicateRuns":
     The returned object has ``run`` and ``run_at``, as `Simulation`, and
     they return `SimulationReplicates`: ``count`` runs, each with its own seed,
     run in parallel in the engine. Replicate ``i`` takes the seed derived
-    from ``seed`` and ``i`` (the SplitMix64 of ``seed + i``), so it gives
-    the same run however many replicates run.
+    from ``seed`` and ``i`` (the SplitMix64 of the SplitMix64 of ``seed``
+    plus ``i``), so two seeds share no replicate, and a replicate gives the
+    same run however many replicates run.
 
     Parameters
     ----------
@@ -40891,6 +40893,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 - A window whose start rounds to just below 0, such as a window of `1000 + 1e-7` that ends at 1000, starts at 0 in an observation, a calibration and a quantity, as `windowed_totals` reads it. Before, a calibration rejected it while the same window that ends at 2000 was accepted. One rule of the engine gives the start of a window.
+- Two neighbouring seeds share no replicate: before, replicate `i + 1` of `simulation.replicates(n, seed=42)` was replicate `i` of `seed=43`, and so were the starts and the swarms of a calibration with neighbouring seeds. Two methods that take one seed no longer draw from one sequence either: every random method draws from a stream of its own of the seed, and with one seed, replicate `i + 1` of a bootstrap no longer has the generator of particle `i` of an SMC sampler, nor the draws of `Laplace` the design of a sensitivity analysis. Every method draws with the samplers of the one generator of commol. So with one seed, the draws of the random methods and the replicates of a stochastic engine differ from 0.10.1; a run stays reproducible from its seed on one version.
 - One check of the engine defines the language of formulas, the one [Mathematical expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) documents, for rates, formula parameters, calibration constraints and the unit check. A formula outside it fails when it is added, with a message that names the formula and its first part outside the language. Before, `k1 * (step > 30)` was accepted as a formula parameter, and `step > 1` as a rate became a parameter named `step > 1` that failed only when the model ran. A formula that calls a function the guide does not list, such as `erf`, `fma` or `trunc`, fails as a rate always did; a formula parameter accepted it before.
 - A rate or a formula parameter that reads a variable the model does not define fails when the model is built. Before, only a transition rate was checked, and a formula parameter failed when the model ran. A category id is not a variable: before, a rate that read one passed the build and failed when the model ran.
 - An error of a rate when the model runs names its transition, not the indices of its compartments.
