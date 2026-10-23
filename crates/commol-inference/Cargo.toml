@@ -17,15 +17,15 @@ commol-calibration = { path = "../commol-calibration" }
 commol-core = { path = "../commol-core" }
 commol-random = { path = "../commol-random" }
 anyhow = "1.0"
-argmin = { git = "https://github.com/MUNQU/argmin", branch = "development" }
-finitediff = { git = "https://github.com/MUNQU/argmin", branch = "development" }
-libm = "0.2.15"
+argmin = { workspace = true }
+finitediff = { workspace = true }
+libm = { workspace = true }
 nalgebra = { version = "0.35.0", default-features = false, features = ["std"] }
-rayon = "1.11"
-serde = { version = "1.0", features = ["derive"] }
+rayon = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
 commol-difference = { path = "../commol-difference" }
 commol-differential = { path = "../commol-differential" }
 commol-stochastic = { path = "../commol-stochastic" }
-serde_json = "1.0"
+serde_json = { workspace = true }

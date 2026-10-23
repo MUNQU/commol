@@ -32,15 +32,15 @@ Run them from `py-commol/` with the virtual environment `py-commol/.venv`.
 
 | Task | Command |
 |---|---|
-| Install dependencies | `uv sync --extra dev --extra docs` |
+| Install dependencies | `uv sync --extra dev --extra docs` (the uv of `required-version` in `pyproject.toml`; another uv refuses to run) |
 | Build the extension | `source .venv/bin/activate && maturin develop --release --features test-kind` (the tests need the test model kind; a release never has it) |
 | Python tests | `pytest` |
 | Documentation checks (examples, API coverage) | `pytest -m docs` |
 | Coverage studies of the uncertainty methods (slow; CI runs them when what they run changes, and before a release) | `pytest -m coverage_study` |
 | Python lint, types and dead code | `ruff check . ../.github/scripts && ruff format --check . ../.github/scripts && ty check commol && vulture commol .vulture_allowlist.py --min-confidence 80` |
 | Rust tests (from the root) | `cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-stochastic -p commol && cargo test -p commol --features test-kind` |
-| Test coverage, as CI measures it | `pytest --cov=commol --cov-fail-under=100`; from the root, `.github/scripts/rust_coverage.sh --summary-only` (the Rust tests and `pytest` on an instrumented extension, failing on a line that no test runs and that has no `// coverage: <reason>`; needs `cargo-llvm-cov` and the `llvm-tools-preview` component). Policy: `docs/codebase/coverage.md` |
-| Rust lint (from the root) | `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings` |
+| Test coverage, as CI measures it | `pytest --cov=commol --cov-fail-under=100`; from the root, with `py-commol/.venv` active (the script runs `maturin` and `pytest`), `.github/scripts/rust_coverage.sh --summary-only` (the Rust tests and `pytest` on an instrumented extension, failing on a line that no test runs and that has no `// coverage: <reason>`; needs `cargo-llvm-cov` and the `llvm-tools-preview` component). Policy: `docs/codebase/coverage.md` |
+| Rust lint (from the root) | `cargo fmt --all -- --check && cargo clippy --workspace --all-targets --all-features -- -D warnings` |
 | Documentation (from the root) | `mkdocs build --strict` |
 | Rust docs (from the root) | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-stochastic` |
 

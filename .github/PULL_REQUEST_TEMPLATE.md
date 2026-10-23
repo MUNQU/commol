@@ -11,8 +11,8 @@ Closes #<!-- the issue this delivers; delete the line if there is none -->
 <!-- Each requirement of the issue (R1, R2, …) and the tests that check it,
 then the commands you ran and their results. -->
 
-- [ ] Rust: `cargo clippy --workspace --all-targets -- -D warnings` and the Rust tests pass
-- [ ] Python: `maturin develop --release`, then `pytest`, `ruff` and `ty` pass
+- [ ] Rust: `cargo clippy --workspace --all-targets --all-features -- -D warnings` and the Rust tests pass
+- [ ] Python: `maturin develop --release --features test-kind`, then `pytest`, `ruff` and `ty` pass
 
 ## Documentation (mandatory)
 

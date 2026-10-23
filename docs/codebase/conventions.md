@@ -57,7 +57,10 @@ check some of these rules. The rest depend on the author and the reviewer.
 
 ## Rust
 
-- Edition 2024.
+- Edition 2024. Every crate takes its version, edition and metadata from
+  `[workspace.package]` of the root manifest, and a dependency that more
+  than one crate uses from `[workspace.dependencies]`
+  (`py-commol/tests/suite/test_workflows.py`).
 - Public items have rustdoc comments, and a new module starts with a `//!`
   summary.
 - Hot paths avoid allocation: reuse buffers, access by index, keep evaluation

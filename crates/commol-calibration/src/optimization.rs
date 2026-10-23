@@ -19,8 +19,8 @@ use argmin::solver::particleswarm::{
 };
 use commol_core::SimulationEngine;
 use commol_random::replicate_seed;
-use rand::rngs::SmallRng;
 use rand::SeedableRng;
+use rand::rngs::SmallRng;
 
 use crate::calibration_problem::CalibrationProblem;
 use crate::objective::{OptimizationObjective, Recorded};

@@ -4,8 +4,8 @@
 use std::collections::HashMap;
 
 use commol_calibration::{
-    optimize, optimize_starts, CalibrationParameter, CalibrationProblem, LossConfig,
-    NelderMeadConfig, ObservedDataPoint, OptimizationConfig, ParticleSwarmConfig,
+    CalibrationParameter, CalibrationProblem, LossConfig, NelderMeadConfig, ObservedDataPoint,
+    OptimizationConfig, ParticleSwarmConfig, optimize, optimize_starts,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 

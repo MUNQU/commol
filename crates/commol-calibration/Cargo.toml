@@ -1,10 +1,12 @@
 [package]
 name = "commol-calibration"
-version = "0.1.0"
-edition = "2021"
-authors = ["Commol Contributors"]
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
 description = "Model calibration and parameter estimation for Commol"
-license = "MIT"
 
 [lib]
 name = "commol_calibration"
@@ -12,25 +14,25 @@ crate-type = ["rlib"]
 
 [dependencies]
 # Optimization library
-argmin = { git = "https://github.com/MUNQU/argmin", branch = "development", features = ["rand", "rayon"] }
-argmin-math = { git = "https://github.com/MUNQU/argmin", branch = "development" }
+argmin = { workspace = true, features = ["rand", "rayon"] }
+argmin-math = { workspace = true }
 
 # Commol dependencies
 commol-core = { path = "../commol-core" }
 commol-random = { path = "../commol-random" }
 
-libm = "0.2.15"
+libm = { workspace = true }
 
 # Random number generation
 rand = "0.10"
 
 # Parallel processing
-rayon = "1.11"
+rayon = { workspace = true }
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
+serde = { workspace = true }
 
 [dev-dependencies]
-serde_json = "1.0"
+serde_json = { workspace = true }
 commol-difference = { path = "../commol-difference" }
 commol-differential = { path = "../commol-differential" }

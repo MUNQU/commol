@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- `cffi` is no longer a dependency of commol: no code of commol uses it, so
+  `pip install commol` no longer installs it. Code that imports `cffi`
+  installs it itself.
+
 ### Fixed
 
 - In the `StochasticEvents` engine, a parameter or a seed changed between

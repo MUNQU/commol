@@ -52,7 +52,10 @@ the package (`pip show commol`) gives the placeholder alone.
 To work on Commol, or to use unreleased code from `main`:
 
 1. Install Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`.
-2. Install [uv](https://docs.astral.sh/uv/).
+2. Install [uv](https://docs.astral.sh/uv/), at the version of
+   `required-version` in `py-commol/pyproject.toml`; another version of uv
+   refuses to run in the project. A standalone uv moves to it with
+   `uv self update <version>`.
 3. Clone, install the dependencies, and build the extension:
 
 ```bash
@@ -60,7 +63,7 @@ git clone https://github.com/MUNQU/commol.git
 cd commol/py-commol
 uv sync --extra dev --extra docs
 source .venv/bin/activate    # On Windows: .venv\Scripts\activate
-maturin develop --release
+maturin develop --release --features test-kind
 pytest
 ```
 
@@ -68,7 +71,7 @@ pytest
 |---|---|
 | `uv sync --extra dev --extra docs` | Creates `.venv` with the test, lint and documentation tools. It does not build Commol (`package = false` in `pyproject.toml`), and a later `uv sync` removes the install of Commol. |
 | `source .venv/bin/activate` | `maturin develop` installs into the active environment. |
-| `maturin develop --release` | Compiles the Rust extension and installs Commol in editable mode. Run it again after every Rust change and every `uv sync`. |
+| `maturin develop --release --features test-kind` | Compiles the Rust extension and installs Commol in editable mode. The `test-kind` feature adds the model kind that the tests need; a release never has it. Run it again after every Rust change and every `uv sync`. |
 
 !!! warning "Paths with spaces"
     Maturin may fail when the project path contains spaces. Clone into a

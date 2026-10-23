@@ -16,4 +16,4 @@ crate-type = ["rlib"]
 commol-core = { path = "../commol-core" }
 
 [dev-dependencies]
-serde_json = "1.0"
+serde_json = { workspace = true }

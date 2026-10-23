@@ -7,11 +7,11 @@
 //! moves around the guess put every start in the same basin.
 
 use commol_core::SimulationEngine;
-use commol_random::{latin_hypercube, replicate_seed, Generator};
+use commol_random::{Generator, latin_hypercube, replicate_seed};
 use rayon::prelude::*;
 
 use crate::calibration_problem::CalibrationProblem;
-use crate::optimization::{optimize_from, OptimizationConfig};
+use crate::optimization::{OptimizationConfig, optimize_from};
 use crate::types::{CalibrationParameter, CalibrationResult};
 
 /// The `count` start points of a multi-start optimization seeded with

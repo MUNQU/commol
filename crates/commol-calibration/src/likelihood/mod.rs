@@ -14,7 +14,7 @@ pub mod density;
 
 use std::collections::HashMap;
 
-pub use density::{log_location, Center, Noise};
+pub use density::{Center, Noise, log_location};
 
 use crate::feasibility::Violation;
 use crate::types::{CalibrationParameter, CalibrationParameterType, ObservedDataPoint};
@@ -253,7 +253,7 @@ impl Likelihood {
         if let Some(parameter) = parameters
             .iter()
             .zip(&named)
-            .find(|(parameter, &named)| {
+            .find(|&(parameter, &named)| {
                 parameter.parameter_type == CalibrationParameterType::Noise && !named
             })
             .map(|(parameter, _)| parameter)
@@ -321,14 +321,14 @@ impl Likelihood {
                             "Observation '{}' at {} has trials, and the Binomial model of its \
                              series has trials={n}; give the trials in one place",
                             obs.label, obs.at
-                        ))
+                        ));
                     }
                     (Resolved::Binomial { trials: None }, None) => {
                         return Err(format!(
                             "Observation '{}' at {} needs trials: the Binomial model of its \
                              series has none, so it reads them from each observation",
                             obs.label, obs.at
-                        ))
+                        ));
                     }
                     (Resolved::Binomial { trials: Some(n) }, None) => Some(n),
                     (Resolved::Binomial { trials: None }, Some(n)) => Some(n),
@@ -339,7 +339,7 @@ impl Likelihood {
                             obs.label,
                             obs.at,
                             resolved.name()
-                        ))
+                        ));
                     }
                     (_, None) => None,
                 };

@@ -20,4 +20,4 @@ diffsol = "~0.17.1"
 
 [dev-dependencies]
 commol-difference = { path = "../commol-difference" }
-serde_json = "1.0"
+serde_json = { workspace = true }

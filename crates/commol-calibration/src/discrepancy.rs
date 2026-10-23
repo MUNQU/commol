@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 
 use crate::feasibility::Violation;
-use crate::likelihood::{unnamed_noise, Likelihood, ObservationModel, TermDerivatives};
+use crate::likelihood::{Likelihood, ObservationModel, TermDerivatives, unnamed_noise};
 use crate::types::{
     CalibrationParameter, CalibrationParameterType, LossConfig, ObservedDataPoint, ReplicateSummary,
 };
@@ -378,11 +378,7 @@ pub fn series_rms(labels: &[String], values: &[f64]) -> Vec<f64> {
         .map(|label| {
             let (sum_squares, count) = sums[label.as_str()];
             let rms = (sum_squares / count as f64).sqrt();
-            if rms > f64::EPSILON {
-                rms
-            } else {
-                1.0
-            }
+            if rms > f64::EPSILON { rms } else { 1.0 }
         })
         .collect()
 }
