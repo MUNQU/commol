@@ -231,6 +231,7 @@ a test, or one case of a parametrized test with its parameter in brackets.
 |---|---|
 | `tests/description/test_rendering.py::TestLatex::test_the_latex_document_compiles` | It compiles the LaTeX description with `latexmk`; the first TeX run of the job loads its formats. No other test checks that the document compiles. |
 | `tests/docs/test_examples.py::test_page_examples_run[docs/guide/simulations.md]` | It runs every example of the page, which draws and saves four figures with matplotlib, one label per plotted position; the figures are what the page documents. |
+| `tests/docs/test_examples.py::test_page_examples_run[docs/guide/examples.md]` | It runs the ten examples of the page, from a first run to a fit with a bootstrap, its predictive and two scenarios, and draws and saves their figures with matplotlib; the page shows the whole workflow, and its replicates and bootstrap are already small. |
 
 ## Navigation
 

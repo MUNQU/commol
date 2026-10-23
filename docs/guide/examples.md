@@ -2,59 +2,35 @@
 
 [Back to Home](../index.md)
 
-Complete models, each runnable on its own, with abstract names. Each example
-shows one technique:
+Complete models with abstract names. Each example runs on its own, shows one
+technique, and reads or draws its results. They follow the order of the
+guide: rates and stratifications first, then other engines, then a fit, its
+uncertainty and a comparison of scenarios.
 
-| Example | Technique |
-|---|---|
-| 1. Basic three-state model | Absolute and proportional rates |
-| 2. Four-state model | A chain of states |
-| 3. Periodic rates | `sin` of `step` in a rate |
-| 4. Group-specific rates | Stratified rates |
-| 5. Waning effect | A cyclic transition back to the first state |
-| 6. Capacity-constrained rate | `max` in a rate |
-| 7. Intersection rates | Stratified rates with several conditions |
-| 8. Subgroup-normalized rate | `total_<category>` variables |
-| 9. Conditional stratification | A stratification that splits one group only |
-| 10. Parameter calibration | `Calibrator` |
-| Axis-pattern transition | `AxisPattern` as a rate |
-| Schedules per subgroup | `AxisPattern.add_group` |
+| Example | Technique | Guide |
+|---|---|---|
+| [1. A chain of states](#example-1-a-chain-of-states) | Absolute and proportional rates; read and plot the results | [Core Concepts](core-concepts.md) |
+| [2. A periodic rate](#example-2-a-periodic-rate) | `sin` of `step` in a rate | [Mathematical Expressions](mathematical-expressions.md) |
+| [3. A rate per group](#example-3-a-rate-per-group) | Stratified rates; a figure of the sum of a bin | [Transitions](transitions.md) |
+| [4. Rates of an intersection](#example-4-rates-of-an-intersection) | Two stratifications, `total_<category>`, `per_compartment` | [Transitions](transitions.md) |
+| [5. A conditional stratification](#example-5-a-conditional-stratification) | A stratification that splits one group only | [Core Concepts](core-concepts.md#conditional-stratifications) |
+| [6. A capacity limit](#example-6-a-capacity-limit) | `max` in a rate | [Mathematical Expressions](mathematical-expressions.md) |
+| [7. A cycle in continuous time](#example-7-a-cycle-in-continuous-time) | A transition back to the first state, run as differential equations | [Running Simulations](simulations.md#differential-equations) |
+| [8. Rates that follow a pattern](#example-8-rates-that-follow-a-pattern) | `AxisPattern` as a rate, and a schedule per group | [Axis Patterns](axis-patterns.md) |
+| [9. Runs at random](#example-9-runs-at-random) | Replicates of a stochastic engine, their mean and band | [Stochastic Simulation](stochastic.md) |
+| [10. A fit, its uncertainty and two scenarios](#example-10-a-fit-its-uncertainty-and-two-scenarios) | `Calibrator`, a bootstrap, `Predictive`, `Scenarios`, `plot_compared`, threads | [Model Calibration](calibration.md), [Uncertainty](uncertainty/index.md) |
 
-## Example 1: Basic Three-State Model
+## Example 1: A chain of states
 
-A simple model with three states and two transitions:
+`A` moves to `B` at an absolute rate, which names compartments, and `B` moves
+to `C` at a proportional rate, which names none. A fourth state `M` sits
+between `A` and `B`:
 
 ```python
 from commol import Aggregate, ModelBuilder, Simulation
 
 model = (
-    ModelBuilder(name="Three-State Model", version="1.0")
-    .add_bin(id="A", name="State A")
-    .add_bin(id="B", name="State B")
-    .add_bin(id="C", name="State C")
-    .add_parameter(id="k1", value=0.3)
-    .add_parameter(id="k2", value=0.1)
-    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / total")
-    .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
-    .build(
-        Aggregate(
-            bin_amounts={"A": 990, "B": 10, "C": 0},
-        ),
-        engine="DifferenceEquations",
-    )
-)
-
-simulation = Simulation(model)
-results = simulation.run(num_steps=100)
-```
-
-## Example 2: Four-State Model with Intermediate States
-
-Adding an intermediate state between A and B:
-
-```python
-model = (
-    ModelBuilder(name="Four-State Model", version="1.0")
+    ModelBuilder(name="Chain Model", version="1.0")
     .add_bin(id="A", name="State A")
     .add_bin(id="M", name="Intermediate")
     .add_bin(id="B", name="State B")
@@ -66,22 +42,27 @@ model = (
     .add_transition(id="flow_MB", source=["M"], target=["B"], rate="k2")
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k3")
     .build(
-        Aggregate(
-            bin_amounts={"A": 999, "M": 0, "B": 1, "C": 0},
-        ),
+        Aggregate(bin_amounts={"A": 999, "M": 0, "B": 1, "C": 0}),
         engine="DifferenceEquations",
     )
 )
 
-simulation = Simulation(model)
-results = simulation.run(num_steps=100)
+results = Simulation(model).run(num_steps=100)
+
+peak = max(results["B"])
+print(f"B peaks at {peak:.0f} at step {results['B'].index(peak)}")
+results.plot.series(output_file="chain.png")
 ```
 
-## Example 3: Periodic Rates
+## Example 2: A periodic rate
 
-Modelling periodic variation in a transition rate:
+The rate of `A` to `B` varies with a period of 365 steps; `step` is the
+position on the axis and `pi` a constant of the
+[expressions](mathematical-expressions.md):
 
 ```python
+from commol import Aggregate, ModelBuilder, Simulation
+
 model = (
     ModelBuilder(name="Periodic Model", version="1.0")
     .add_bin(id="A", name="State A")
@@ -94,26 +75,28 @@ model = (
         id="periodic_flow",
         source=["A"],
         target=["B"],
-        rate="k_mean * (1 + k_amp * sin(2 * pi * step / 365)) * A * B / total"
+        rate="k_mean * (1 + k_amp * sin(2 * pi * step / 365)) * A * B / total",
     )
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .build(
-        Aggregate(
-            bin_amounts={"A": 990, "B": 10, "C": 0},
-        ),
+        Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0}),
         engine="DifferenceEquations",
     )
 )
 
-simulation = Simulation(model)
-results = simulation.run(num_steps=365 * 3)
+results = Simulation(model).run(num_steps=365 * 3)
+results.plot.series(series=["B"], tick_every=365, output_file="periodic.png")
 ```
 
-## Example 4: Stratified Model with Group-Specific Rates
+## Example 3: A rate per group
 
-Different rates per category group:
+A stratification splits every bin into three groups, and the transition from
+`B` to `C` has one rate per group. In a figure, a bin id such as `B` draws the
+sum of its compartments:
 
 ```python
+from commol import Aggregate, ModelBuilder, Simulation
+
 model = (
     ModelBuilder(name="Stratified Model", version="1.0")
     .add_bin(id="A", name="State A")
@@ -124,30 +107,16 @@ model = (
     .add_parameter(id="k2_g1", value=0.15)
     .add_parameter(id="k2_g2", value=0.12)
     .add_parameter(id="k2_g3", value=0.08)
-    .add_transition(
-        id="flow_AB",
-        source=["A"],
-        target=["B"],
-        rate="k1"
-    )
+    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1")
     .add_transition(
         id="flow_BC",
         source=["B"],
         target=["C"],
         stratified_rates=[
-            {
-                "conditions": [{"stratification": "group", "category": "g1"}],
-                "rate": "k2_g1"
-            },
-            {
-                "conditions": [{"stratification": "group", "category": "g2"}],
-                "rate": "k2_g2"
-            },
-            {
-                "conditions": [{"stratification": "group", "category": "g3"}],
-                "rate": "k2_g3"
-            },
-        ]
+            {"conditions": [{"stratification": "group", "category": "g1"}], "rate": "k2_g1"},
+            {"conditions": [{"stratification": "group", "category": "g2"}], "rate": "k2_g2"},
+            {"conditions": [{"stratification": "group", "category": "g3"}], "rate": "k2_g3"},
+        ],
     )
     .build(
         Aggregate(
@@ -158,86 +127,26 @@ model = (
     )
 )
 
-simulation = Simulation(model)
-results = simulation.run(num_steps=100)
+results = Simulation(model).run(num_steps=100)
 
-print(f"B_g1: {results['B_g1'][-1]:.2f}")
-print(f"B_g2: {results['B_g2'][-1]:.2f}")
-print(f"B_g3: {results['B_g3'][-1]:.2f}")
+for name in ["B_g1", "B_g2", "B_g3"]:
+    print(f"{name}: {results[name][-1]:.2f}")
+results.plot.series(series=["B", "B_g1", "B_g3"], output_file="groups.png")
 ```
 
-## Example 5: Waning Effect (Cyclic Transition)
+## Example 4: Rates of an intersection
 
-Entities in the final state gradually return to the initial state:
-
-```python
-model = (
-    ModelBuilder(name="Cyclic Model", version="1.0")
-    .add_bin(id="A", name="State A")
-    .add_bin(id="B", name="State B")
-    .add_bin(id="C", name="State C")
-    .add_parameter(id="k1", value=0.3)
-    .add_parameter(id="k2", value=0.1)
-    .add_parameter(id="k3", value=0.01)  # Return rate
-    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / total")
-    .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
-    .add_transition(id="return_CA", source=["C"], target=["A"], rate="k3")
-    .build(
-        Aggregate(
-            bin_amounts={"A": 990, "B": 10, "C": 0},
-        ),
-        engine="DifferenceEquations",
-    )
-)
-
-simulation = Simulation(model)
-results = simulation.run(num_steps=1000)
-```
-
-## Example 6: Capacity-Constrained Rate
-
-The flow from `B` slows as the downstream compartment `C` fills, and stops
-when `C` reaches `capacity`. The rate names `B`, so it is the flow itself; the
-factor `max(0, 1 - C / capacity)` never turns it negative:
+Two stratifications, and a rate for the compartments of type `t2` only. In
+group `g1`, the rate divides by the total of the subgroup, `total_g1`, instead
+of the total of the model. `per_compartment=True` makes `A` and `B` in the
+rate the compartments of each flow, so each compartment of `A` loses an amount
+computed from its own amount:
 
 ```python
+from commol import Aggregate, ModelBuilder, Simulation
+
 model = (
-    ModelBuilder(name="Capacity Model", version="1.0")
-    .add_bin(id="A", name="State A")
-    .add_bin(id="B", name="State B")
-    .add_bin(id="C", name="State C")
-    .add_parameter(id="k1", value=0.5)
-    .add_parameter(id="k2_max", value=0.15)
-    .add_parameter(id="capacity", value=100.0)
-    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / total")
-    .add_transition(
-        id="flow_BC",
-        source=["B"],
-        target=["C"],
-        rate="k2_max * B * max(0, 1 - C / capacity)"
-    )
-    .build(
-        Aggregate(
-            bin_amounts={"A": 950, "B": 50, "C": 0},
-        ),
-        engine="DifferenceEquations",
-    )
-)
-
-simulation = Simulation(model)
-results = simulation.run(num_steps=100)
-```
-
-## Example 7: Multi-Stratified Model with Intersection Rates
-
-A model with two stratifications and a rate specific to a particular intersection of categories.
-`per_compartment=True` makes `A` and `B` in the rate the compartments of each
-flow, so each compartment of `A` loses an amount computed from its own amount,
-not from the total of the bin:
-
-```python
-model = (
-    ModelBuilder(name="Multi-Stratified Model", version="1.0")
+    ModelBuilder(name="Intersection Model", version="1.0")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_bin(id="C", name="State C")
@@ -253,9 +162,13 @@ model = (
         rate="k1_low * A * B / total",
         stratified_rates=[
             {
+                "conditions": [{"stratification": "group", "category": "g1"}],
+                "rate": "k1_low * A * B / total_g1",
+            },
+            {
                 "conditions": [{"stratification": "type", "category": "t2"}],
-                "rate": "k1_high * A * B / total"
-            }
+                "rate": "k1_high * A * B / total",
+            },
         ],
         per_compartment=True,
     )
@@ -272,72 +185,29 @@ model = (
     )
 )
 
-simulation = Simulation(model)
-results = simulation.run(num_steps=100)
+results = Simulation(model).run(num_steps=100)
+print(sorted(name for name in results if name.startswith("B_")))
+# ['B_g1_t1', 'B_g1_t2', 'B_g2_t1', 'B_g2_t2']
 ```
 
-## Example 8: Subgroup-Normalized Rate
+## Example 5: A conditional stratification
 
-The engine computes the subgroup total `total_<category>`. This example
-divides a rate by the total of its subgroup instead of the total of the model.
-`per_compartment=True` makes each compartment of `A` lose an amount computed
-from its own amount, not from the total of the bin:
+The stratification `subtype` splits only the compartments of group `g2`; the
+compartments of `g1` are not split further:
 
 ```python
-model = (
-    ModelBuilder(name="Subgroup-Normalized Model", version="1.0")
-    .add_bin(id="A", name="State A")
-    .add_bin(id="B", name="State B")
-    .add_bin(id="C", name="State C")
-    .add_stratification(id="group", categories=["g1", "g2"])
-    .add_parameter(id="k1", value=0.4)
-    .add_parameter(id="k2", value=0.1)
-    .add_transition(
-        id="flow_AB",
-        source=["A"],
-        target=["B"],
-        rate="k1 * A * B / total",
-        stratified_rates=[
-            {
-                "conditions": [{"stratification": "group", "category": "g1"}],
-                "rate": "k1 * A * B / total_g1"  # Divided by the subgroup total
-            }
-        ],
-        per_compartment=True,
-    )
-    .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
-    .build(
-        Aggregate(
-            bin_amounts={"A": 990, "B": 10, "C": 0},
-            stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
-        ),
-        engine="DifferenceEquations",
-    )
-)
+from commol import Aggregate, ModelBuilder, Simulation
 
-simulation = Simulation(model)
-results = simulation.run(num_steps=100)
-```
-
-## Example 9: Conditional Stratification
-
-A second stratification that only applies to a subset of the first. Here, the `subtype` stratification only expands `g2` compartments — `g1` compartments are not split further.
-`per_compartment=True` on `flow_AB` makes each compartment of `A` lose an
-amount computed from its own amount, not from the total of the bin.
-
-```python
 model = (
     ModelBuilder(name="Conditional Stratification Model", version="1.0")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_bin(id="C", name="State C")
-    # group applies to all compartments
     .add_stratification(id="group", categories=["g1", "g2"])
-    # subtype only applies to g2 compartments
     .add_stratification(
         id="subtype",
         categories=["s1", "s2"],
-        conditions=[{"stratification": "group", "category": "g2"}]
+        conditions=[{"stratification": "group", "category": "g2"}],
     )
     .add_parameter(id="k1", value=0.3)
     .add_parameter(id="k2_default", value=0.1)
@@ -356,15 +226,9 @@ model = (
         target=["C"],
         rate="k2_default",
         stratified_rates=[
-            {
-                "conditions": [{"stratification": "subtype", "category": "s1"}],
-                "rate": "k2_s1"
-            },
-            {
-                "conditions": [{"stratification": "subtype", "category": "s2"}],
-                "rate": "k2_s2"
-            },
-        ]
+            {"conditions": [{"stratification": "subtype", "category": "s1"}], "rate": "k2_s1"},
+            {"conditions": [{"stratification": "subtype", "category": "s2"}], "rate": "k2_s2"},
+        ],
     )
     .build(
         Aggregate(
@@ -378,187 +242,244 @@ model = (
     )
 )
 
-# Generated compartments:
-# A_g1, B_g1, C_g1          (group=g1, no subtype)
-# A_g2_s1, B_g2_s1, C_g2_s1 (group=g2, subtype=s1)
-# A_g2_s2, B_g2_s2, C_g2_s2 (group=g2, subtype=s2)
-
-simulation = Simulation(model)
-results = simulation.run(num_steps=100)
-
-print(f"B_g1:    {results['B_g1'][-1]:.2f}")
-print(f"B_g2_s1: {results['B_g2_s1'][-1]:.2f}")
-print(f"B_g2_s2: {results['B_g2_s2'][-1]:.2f}")
+results = Simulation(model).run(num_steps=100)
+print(sorted(name for name in results if name.startswith("B")))
+# ['B_g1', 'B_g2_s1', 'B_g2_s2']
 ```
 
-## Example 10: Parameter Calibration
+## Example 6: A capacity limit
 
-Calibrate model parameters to match observed data:
+The flow from `B` slows as `C` fills, and stops when `C` reaches `capacity`.
+The rate names `B`, so it is the flow itself; the factor
+`max(0, 1 - C / capacity)` never turns it negative. A difference model moves
+the flow of a whole step at once, so the last step can pass `capacity` by a
+little:
 
 ```python
-from commol import (
-    ModelBuilder,
-    Simulation,
-    Calibrator,
-    CalibrationProblem,
-    CalibrationParameter,
-    ObservedDataPoint,
-    ParticleSwarmConfig,
-)
+from commol import Aggregate, ModelBuilder, Simulation
 
 model = (
-    ModelBuilder(name="Model for Calibration", version="1.0")
+    ModelBuilder(name="Capacity Model", version="1.0")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_bin(id="C", name="State C")
-    .add_parameter(id="k1", value=None)   # To be calibrated
-    .add_parameter(id="k2", value=None)   # To be calibrated
-    .add_transition(
-        id="flow_AB",
-        source=["A"],
-        target=["B"],
-        rate="k1 * A * B / total"
-    )
+    .add_parameter(id="k1", value=0.5)
+    .add_parameter(id="k2_max", value=0.15)
+    .add_parameter(id="capacity", value=100.0)
+    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(
         id="flow_BC",
         source=["B"],
         target=["C"],
-        rate="k2 * B"
+        rate="k2_max * B * max(0, 1 - C / capacity)",
     )
     .build(
-        Aggregate(
-            bin_amounts={"A": 990, "B": 10, "C": 0},
-        ),
+        Aggregate(bin_amounts={"A": 950, "B": 50, "C": 0}),
         engine="DifferenceEquations",
     )
 )
 
-observed_data = [
-    ObservedDataPoint(at=0,  output="B", value=10.0),
-    ObservedDataPoint(at=10, output="B", value=45.2),
-    ObservedDataPoint(at=20, output="B", value=78.5),
-    ObservedDataPoint(at=30, output="B", value=62.3),
-    ObservedDataPoint(at=40, output="B", value=38.1),
-    ObservedDataPoint(at=50, output="B", value=18.7),
-    ObservedDataPoint(at=60, output="B", value=8.2),
-]
-
-simulation = Simulation(model)
-
-parameters = [
-    CalibrationParameter(
-        id="k1",
-        parameter_type="parameter",
-        min_bound=0.0,
-        max_bound=1.0,
-        initial_guess=0.3
-    ),
-    CalibrationParameter(
-        id="k2",
-        parameter_type="parameter",
-        min_bound=0.0,
-        max_bound=1.0,
-        initial_guess=0.1
-    ),
-]
-
-problem = CalibrationProblem(
-    observed_data=observed_data,
-    parameters=parameters,
-    loss_function="sse",
-    optimization_config=ParticleSwarmConfig(
-        particles=30,
-        max_iterations=500,
-        verbose=True
-    ),
-)
-
-calibrator = Calibrator(simulation, problem)
-result = calibrator.run()
-
-print(f"Converged: {result.converged}")
-print(f"Iterations: {result.iterations}")
-print(f"Final loss: {result.final_loss:.6f}")
-print(f"k1: {result.best_parameters['k1']:.6f}")
-print(f"k2: {result.best_parameters['k2']:.6f}")
-
-model.update_parameters(result.best_parameters)
-calibrated_sim = Simulation(model)
-results = calibrated_sim.run(num_steps=100)
+results = Simulation(model).run(num_steps=100)
+print(round(results["C"][-1], 1))  # 100.0
 ```
 
-## Example: Axis-Pattern Driven Transition
+## Example 7: A cycle in continuous time
 
-A composed transition that changes along the axis: an opening pulse, a
-periodic event every 30 steps, and a continuous sinusoid baseline.
+Amounts in `C` return to `A`, so the process never ends. The same process
+runs as differential equations: only the engine changes, and the results can
+be read at any position, here every half step:
 
 ```python
-from commol import ModelBuilder, Simulation, AxisPattern
+from commol import Aggregate, ModelBuilder, Simulation
 
-rate = AxisPattern.combine(
+model = (
+    ModelBuilder(name="Cyclic Model", version="1.0")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=0.3)
+    .add_parameter(id="k2", value=0.1)
+    .add_parameter(id="k3", value=0.01, description="C to A rate")
+    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / total")
+    .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
+    .add_transition(id="return_CA", source=["C"], target=["A"], rate="k3")
+    .build(
+        Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0}),
+        engine="DifferentialEquations",
+    )
+)
+
+simulation = Simulation(model)
+results = simulation.run_at([step / 2 for step in range(2001)])
+print(results.positions[:3])  # [0.0, 0.5, 1.0]
+print(round(sum(results[name][-1] for name in ["A", "B", "C"])))  # 1000
+```
+
+## Example 8: Rates that follow a pattern
+
+An `AxisPattern` is a rate that changes along the axis. The first model
+combines an opening pulse, an event every 30 steps and a sinusoid. The second
+gives each group its own schedule: the first `add_group` call is on the
+class, the next ones on the pattern it returns:
+
+```python
+from commol import Aggregate, AxisPattern, ModelBuilder, Simulation
+
+combined = AxisPattern.combine(
     AxisPattern.pulse(at=0, value=0.3),
     AxisPattern.periodic(period=30, value=0.05),
     AxisPattern.sinusoid(amplitude=0.005, period=365, baseline=0.01),
 )
-
 model = (
-    ModelBuilder("AB-axis-pattern")
-    .add_bin("A", "Source")
-    .add_bin("B", "Sink")
-    .add_transition("flow", ["A"], ["B"], rate=rate)
-    .build(
-        Aggregate(
-            bin_amounts={"A": 10000, "B": 0},
-        ),
-        "DifferenceEquations",
-    )
+    ModelBuilder(name="Pattern Model")
+    .add_bin(id="A", name="Source")
+    .add_bin(id="B", name="Sink")
+    .add_transition(id="flow", source=["A"], target=["B"], rate=combined)
+    .build(Aggregate(bin_amounts={"A": 10000, "B": 0}), engine="DifferenceEquations")
 )
-
 results = Simulation(model).run(num_steps=365)
-```
 
-## Example: Sub-Group Specific Schedules
-
-Different stratification sub-groups receive different patterns. The schedule
-is built by chaining `AxisPattern.add_group(...)` calls — the first call
-on the class itself, subsequent calls on the returned instance:
-
-```python
-from commol import ModelBuilder, Simulation, AxisPattern
-
-rate = (
-    AxisPattern.add_group(
-        conditions=[{"stratification": "group", "category": "cat1"}],
-        schedule=AxisPattern.periodic(period=7, value=0.05),
-    )
-    .add_group(
-        conditions=[{"stratification": "group", "category": "cat2"}],
-        schedule=AxisPattern.periodic(period=30, value=0.05),
-    )
+per_group = AxisPattern.add_group(
+    conditions=[{"stratification": "group", "category": "cat1"}],
+    schedule=AxisPattern.periodic(period=7, value=0.05),
+).add_group(
+    conditions=[{"stratification": "group", "category": "cat2"}],
+    schedule=AxisPattern.periodic(period=30, value=0.05),
 )
-
-model = (
-    ModelBuilder("AB-stratified-schedule")
-    .add_bin("A", "Source")
-    .add_bin("B", "Sink")
-    .add_stratification("group", ["cat1", "cat2"])
-    .add_transition("flow", ["A"], ["B"], rate=rate)
+grouped = (
+    ModelBuilder(name="Schedule Model")
+    .add_bin(id="A", name="Source")
+    .add_bin(id="B", name="Sink")
+    .add_stratification(id="group", categories=["cat1", "cat2"])
+    .add_transition(id="flow", source=["A"], target=["B"], rate=per_group)
     .build(
         Aggregate(
             bin_amounts={"A": 1000, "B": 0},
             stratification_fractions={"group": {"cat1": 0.5, "cat2": 0.5}},
         ),
-        "DifferenceEquations",
+        engine="DifferenceEquations",
     )
 )
-
-results = Simulation(model).run(num_steps=60)
+grouped_results = Simulation(grouped).run(num_steps=60)
+print(grouped_results["B_cat1"][-1] > grouped_results["B_cat2"][-1])  # True
 ```
 
-## Next Steps
+## Example 9: Runs at random
 
-- [API Reference](../api/model-builder.md) - Complete API documentation
-- [Calibration Guide](calibration.md) - Comprehensive calibration documentation
-- [Mathematical Expressions](mathematical-expressions.md) - Advanced formulas
-- [Axis Patterns](axis-patterns.md) - Rates that change along the axis
-- [Contributing](../development/contributing.md) - Build your own examples
+The `StochasticSteps` engine moves whole units at random, one step at a time.
+`replicates` runs the model once per seed; the mean, the band and the figure
+reduce the runs position by position:
+
+```python
+from commol import Aggregate, ModelBuilder, Simulation
+
+model = (
+    ModelBuilder(name="Stochastic Model")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=0.3)
+    .add_parameter(id="k2", value=0.1)
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
+    .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
+    .build(Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0}), engine="StochasticSteps")
+)
+
+replicates = Simulation(model).replicates(40, seed=7).run(num_steps=100)
+mean = replicates.mean()
+spread = replicates.member_statistics("C", confidence_level=0.9)
+print(round(mean["C"][-1]), round(spread["ci_lower"][-1]), round(spread["ci_upper"][-1]))
+replicates.plot.series(series=["B", "C"], confidence_level=0.9, output_file="replicates.png")
+```
+
+## Example 10: A fit, its uncertainty and two scenarios
+
+A fit of `k1` to noisy observations of `B`, a sample of `k1` from a Bayesian
+bootstrap, its predictive band, and a comparison of two scenarios of `k2`. The
+work of the bootstrap and of the draws runs on two threads:
+
+```python
+import numpy as np
+
+import commol
+from commol import (
+    Aggregate,
+    BayesianBootstrap,
+    CalibrationParameter,
+    CalibrationProblem,
+    Calibrator,
+    ModelBuilder,
+    NelderMeadConfig,
+    ObservedDataPoint,
+    Predictive,
+    Scenarios,
+    Simulation,
+    ValueAt,
+    plot_compared,
+)
+
+
+def basic_model(k1: float | None):
+    return (
+        ModelBuilder(name="Basic Model")
+        .add_bin(id="A", name="State A")
+        .add_bin(id="B", name="State B")
+        .add_bin(id="C", name="State C")
+        .add_parameter(id="k1", value=k1)
+        .add_parameter(id="k2", value=0.1)
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
+        .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
+        .build(
+            Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0}),
+            engine="DifferenceEquations",
+        )
+    )
+
+
+truth = Simulation(basic_model(0.4)).run(num_steps=40)
+rng = np.random.default_rng(1)
+observed_data = [
+    ObservedDataPoint(at=step, output="B", value=truth["B"][step] * float(np.exp(rng.normal(0.0, 0.05))))
+    for step in range(2, 41, 2)
+]
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=[
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+    ],
+    loss_function="sse",
+    optimization_config=NelderMeadConfig(max_iterations=500),
+    seed=42,
+)
+calibrator = Calibrator(Simulation(basic_model(None)), problem)
+
+with commol.threads(2):
+    fit = calibrator.run()
+    bootstrap = calibrator.uncertainty(BayesianBootstrap(replicates=20, block_length=1))
+    predictive = Predictive(calibrator, bootstrap.sample, positions=list(range(61)))
+    scenarios = Scenarios(
+        calibrator,
+        bootstrap.sample,
+        {"fitted": {}, "slower": {"k2": 0.05}},
+        positions=list(range(61)),
+    )
+
+print(round(fit.best_parameters["k1"], 2))  # close to 0.4
+lower, upper = bootstrap.sample.interval(0.9)["k1"]
+print(round(lower, 3), round(upper, 3))  # the 90 % interval of k1
+predictive.plot.series(series=["B"], observed_data=observed_data, output_file="band.png")
+
+[difference] = scenarios.compare("slower", "fitted", [ValueAt(series="C", at=60)], 0.9)
+print(difference.label, round(difference.median))  # how much less C reaches by step 60
+plot_compared(scenarios, series=["B", "C"], output_file="scenarios.png")
+```
+
+## Next steps
+
+| To learn | Read |
+|---|---|
+| Every builder option | [Building Models](building-models.md) |
+| Reading, aggregating and plotting results | [Running Simulations](simulations.md) |
+| Calibration in depth | [Model Calibration](calibration.md) |
+| The uncertainty methods, the predictive and scenarios | [Uncertainty](uncertainty/index.md) |
+| Every class and argument | [API Reference](../api/index.md) |

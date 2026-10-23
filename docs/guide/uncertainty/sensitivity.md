@@ -96,7 +96,7 @@ in `[0, 1]`, with `initial_condition_remainder` as in a calibration problem.
 A factor or a noise parameter is not an input: both belong to observations,
 and an analysis has none.
 
-`SensitivityAnalysis(simulation, inputs, replicates=None, seed=None)` holds
+`SensitivityAnalysis(simulation, inputs, *, replicates=None, seed=None)` holds
 the inputs for every method you run on it. With a stochastic engine
 `replicates` (at least 1) and `seed` are required. A point of the design of
 PRCC, Morris, Sobol or a polynomial chaos runs `replicates` replicates, on the
@@ -286,14 +286,14 @@ for label, value in one_run.quantities(quantities).items():
 | The run lacks a position a quantity reads | `ValueError` that lists each such position with its quantity, and says to call `Simulation.run_at` |
 | A quantity names an output the results do not have | `ValueError` that names the output |
 | `run(n)` of the ODE engine | It interpolates the positions that are not breakpoints, so a value differs from that of a run that ends there by about the relative tolerance of the solver, and `PeakPosition` can change on a near-tie |
-| The replicates of a stochastic engine | Each replicate is reduced on its own. A `Propagation` gives draw `j` the seed `draw_seeds[j]`, so `Simulation.replicates(count, seed=result.draw_seeds[j])` of the model at the values of draw `j` gives the runs of that draw. The seed of the analysis itself gives other runs |
+| The replicates of a stochastic engine | Each replicate is reduced on its own. The runs of a draw follow the tree of seeds of a [predictive](index.md#the-predictive), from `result.draw_seeds`. The seed of the analysis itself gives other runs |
 
 ## Which method for which budget
 
 | Method | Answers | Runs | Inputs |
 |---|---|---|---|
-| `Propagation(draws, quantities)` | The distribution of each quantity, and the band of every output | `draws` | Independent or a sample |
-| `PRCC(draws, quantities)` | How steadily each quantity rises or falls with each input | `draws`, more than the inputs + 1 | Independent or a sample |
+| `Propagation(draws, quantities)` | The distribution of each quantity, and the band of every output | `draws`; with inputs from a sample, `draws` is left unset and every draw of the sample runs | Independent or a sample |
+| `PRCC(draws, quantities)` | How steadily each quantity rises or falls with each input | `draws`, more than the inputs + 1; with inputs from a sample, as `Propagation` | Independent or a sample |
 | `Morris(trajectories, levels, quantities)` | Which inputs matter, in few runs | `trajectories · (inputs + 1)` | Independent |
 | `Sobol(draws, replicates, confidence_level, quantities)` | The share of the variance each input explains, alone and with interactions, with intervals | `draws · (inputs + 2)` | Independent |
 | `PolynomialChaos(degree, draws, quantities, q_norm=1.0, max_interaction=None)` | A polynomial surrogate and its Sobol indices, in far fewer runs for a smooth quantity | `draws`, more than the terms | Independent |
@@ -504,3 +504,4 @@ figure = indices.plot()
 | The parameter sample, the predictive and its scores | [Uncertainty](index.md) |
 | A posterior to propagate | [Sequential Monte Carlo](smc.md), [Observation Models](observation-models.md) |
 | Which parameters the data determine | [Identifiability](identifiability.md) |
+| Reports of runs, predictives and analyses | [Reports](../reports.md) |

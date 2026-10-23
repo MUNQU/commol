@@ -161,7 +161,7 @@ distance for ABC. Each step then:
 |---|---|---|
 | `particles` | The size of the sample | Less Monte Carlo error, more runs |
 | `target_cess` | The share of the particles each step keeps | More, smaller steps |
-| `resample_threshold` | Resample below this share of effective size (Gibbs only) | More resampling |
+| `resample_threshold` | Resample below this share of effective size (`GibbsPosterior` and `BayesianPosterior`) | More resampling |
 | `stay_probability` | The chance that a particle does not move in a step | Fewer moves per step |
 
 None of them has a default: each sets the cost and the accuracy of the run.
@@ -190,10 +190,8 @@ variance `σ²`, `η = 1/(2σ²)` makes the Gibbs posterior the Bayesian posteri
 | `InformationMatchingEta(block_length, starts=1)` | `η = tr(J I⁻¹ J) / tr(J)` at the fit: the Gauss–Newton curvature `J` of the objective against the variance `I` of the scores of its terms, summed over blocks of `block_length` positions (Holmes and Walker 2017) | `loss_function="sse"` or observation models, a deterministic engine, more blocks than parameters | A fit, finite differences and one sampler |
 | `BootstrapCoverageEta(replicates, block_length, confidence_level, starts=1)` | The posteriors of Bayesian-bootstrap data sets hold the fit at `confidence_level` (Syring and Martin 2019) | Any loss and engine | A fit and one sampler per replicate, then one |
 
-Both calibrations read the fit `Calibrator.run(starts)`: the best of `starts`
-starts, the initial guess and then rows of a Latin hypercube over the bounds
-([several starts](../calibration-optimizers.md#several-starts)). One start (the
-default) can end at a local minimum.
+Both calibrations read the fit `Calibrator.run(starts)`, the best of
+[several starts](../calibration-optimizers.md#several-starts).
 
 Information matching is cheap and local; it needs a sum of smooth terms, so
 `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic

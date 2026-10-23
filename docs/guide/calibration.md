@@ -99,21 +99,16 @@ also when it was created while a parameter was `None`. See
 | `constraints` | `list[CalibrationConstraint]` | `[]` | Relations the result must respect. See [Constraints](calibration-constraints.md). |
 | `normalize_observations` | `bool` | `False` | Divides each residual by the RMS of its observation series, so series of very different size weigh the same. Needs a loss. |
 | `initial_condition_remainder` | `str \| None` | `None` | The compartment or bin that absorbs the difference when initial conditions are calibrated. See [Calibrating Initial Conditions](calibration-initial-conditions.md). |
-| `seed` | `int \| None` | `None` | Makes every random choice reproducible. |
+| `replicates` | `int \| None` | `None` | How many replicates of a stochastic engine each evaluation runs. Required with a stochastic engine. See [Stochastic engines](#stochastic-engines) and [Stochastic Simulation](stochastic.md). |
+| `replicate_summary` | `"mean"`, `"median"`, `"crps"`, `Quantile(q)` or `None` | `None` | What each observation is compared with when an evaluation runs replicates. Required with a stochastic engine. See [Stochastic engines](#stochastic-engines). |
+| `seed` | `int \| None` | `None` | The seed of every random number of a calibration: the replicates of a stochastic engine, the starts, a particle swarm and the uncertainty methods. Without it, `Calibrator.seed` draws one. See [Reproducibility](calibration-optimizers.md#reproducibility). |
 
 ### Observations
 
-| `ObservedDataPoint` field | Type | Default | Meaning |
-|---|---|---|---|
-| `at` | `float` | required | The position of the observation on the axis. A difference model accepts integer steps only. |
-| `output` | `str \| None` | `None` | The output it observes: a compartment or accumulator name, such as `B` or `B_g1`. Give `output` or `outputs`. |
-| `outputs` | `list[str] \| None` | `None` | Outputs to sum before the comparison; needs a `label`. |
-| `label` | `str` | `output` | The name of the observed series in reports, plots and the normalization. |
-| `value` | `float` | required | The observed value. |
-| `weight` | `float` | `1.0` | How much the observation counts in every loss, and the power of its term of a likelihood; see [Losses](#losses). |
-| `factor_id` | `str \| None` | `None` | A `factor` parameter that multiplies the prediction. |
-| `window` | `float \| None` | `None` | Compares with the gain over `(at − window, at]` instead of the value. |
-| `trials` | `int \| None` | `None` | The trials of the observation, for a `BinomialObservations()` model that reads them from each observation. |
+An `ObservedDataPoint(at=..., output=..., value=...)` is one observed value of
+an output at a position on the axis. Its other fields observe a sum of
+outputs, weigh it, scale the prediction by a factor or compare a gain over a
+window: [Observations](calibration-observations.md) lists them all.
 
 ### Unknowns
 
@@ -235,7 +230,7 @@ replicate of each draw.
 | `best_parameters` | `dict[str, float]`: the best value of every unknown, in the order of `problem.parameters` |
 | `final_loss` | The loss at `best_parameters`; with observation models, the negative log-likelihood |
 | `iterations` | The optimizer iterations performed |
-| `converged` | `True` only when the optimizer met its convergence test or `target_cost`; a run that used all `max_iterations` is `False`. See [Optimizers](calibration-optimizers.md#converged-and-termination_reason). |
+| `converged` | `True` only when the optimizer met its convergence test (a stop rule for a particle swarm); a run that used all `max_iterations` is `False`. See [Optimizers](calibration-optimizers.md#converged-and-termination_reason). |
 | `termination_reason` | Why it stopped |
 | `starts`, `failed` | Every start that finished, and each start that failed with its reason. See [Several starts](calibration-optimizers.md#several-starts). |
 | `seed` | The seed of the calibration's random numbers (`Calibrator.seed`). See [Reproducibility](calibration-optimizers.md#reproducibility). |
@@ -250,6 +245,8 @@ print(f"loss = {result.final_loss:.3g} after {result.iterations} iterations")
 | `run(starts=1)` | Runs the optimizer from `starts` start points and returns the best `CalibrationResult`. See [Several starts](calibration-optimizers.md#several-starts). |
 | `run_with_history()` | Returns a `CalibrationHistory`: the result and every evaluation of a feasible point. |
 | `uncertainty(method)` | Runs an uncertainty method. See [Uncertainty](uncertainty/index.md#the-entry-point). |
+| `identifiability(method)` | Runs an identifiability method. See [Identifiability](uncertainty/identifiability.md). |
+| `seed` | The seed of the calibration's random numbers: `problem.seed`, or a seed drawn once and logged. |
 | `num_observations`, `num_parameters`, `parameter_names` | Facts about the problem. |
 
 ## Writing the result back
@@ -275,7 +272,7 @@ unchanged. To set values by hand, use `Model.update_parameters({...})`.
 - [ ] Every observation names an output of the model (`Simulation.simulation_outputs`).
 - [ ] The bounds are realistic, and the result is not stuck at a bound.
 - [ ] `result.converged` is `True`, or you know why not.
-- [ ] You simulate the calibrated model with a **new** `Simulation`.
+- [ ] You simulate the calibrated model (`apply_calibration_parameters`, then `run`).
 
 ## Next steps
 

@@ -45,8 +45,8 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | Member | Returns | What it does |
 |---|---|---|
 | `Simulation(model)` | — | Builds the engine for the model. A model with uncalibrated parameters can be built, but not run. |
-| `run(num_steps, *, seed=None)` | `SimulationResults` | Runs from the initial state, with the model as it is now, and reports at the positions `0, 1, …, num_steps`. Raises `ValueError` if a parameter is still `None`, `InfeasibleStateError` if a difference step leaves an amount below zero ([Amounts below zero](transitions.md#amounts-below-zero)), and `RuntimeError` that names the flow and the position if a rate is not a number. |
-| `run_at(at, *, seed=None)` | `SimulationResults` | Runs from the initial state and reports at the given sorted positions only. The engine decides which positions its model type accepts: a `DifferentialEquations` model any non-negative position, such as `0.5`; a `DifferenceEquations` model only integer steps. Otherwise `ValueError`, with the engine's message. See [Differential equations](#differential-equations). |
+| `run(num_steps, *, seed=None)` | `SimulationResults` | Runs from the initial state, with the model as it is now, and reports at the positions `0, 1, …, num_steps`. Raises `ValueError` if a parameter or a bin amount is still `None`, `InfeasibleStateError` if a difference step leaves an amount below zero ([Amounts below zero](transitions.md#amounts-below-zero)), and `RuntimeError` that names the flow and the position if a rate is not a number. |
+| `run_at(at, *, seed=None)` | `SimulationResults` | Runs from the initial state and reports at the given sorted positions only. The engine decides which positions its model type accepts: a `DifferentialEquations` or `StochasticEvents` model any non-negative position, such as `0.5`; a `DifferenceEquations` or `StochasticSteps` model only integer steps. Otherwise `ValueError`, with the engine's message. See [Differential equations](#differential-equations). |
 | `replicates(count, *, seed=None)` | `ReplicateRuns` | For a stochastic engine: an object whose `run` and `run_at` return `SimulationReplicates`, `count` runs with one seed each. See [Randomness, seeds and replicates](#randomness-seeds-and-replicates). |
 | `is_stochastic` | `bool` | Whether the engine draws random numbers. |
 | `simulation_outputs` | `list[str]` | The output names, in engine order: compartments first, then accumulators. |
@@ -170,13 +170,13 @@ print(replicates.seeds[:2] == [run.seed for run in replicates[:2]])  # True
 The stochastic engines and what they draw are in
 [Stochastic Simulation](stochastic.md).
 
-A run is reproducible from its model and its seed, on one platform and one
+The model and the seed of a run repeat it on the same platform with the same
 commol version:
 
 | Where | The same seed gives |
 |---|---|
 | The same machine and commol version | The same run |
-| Another platform, the same commol version | The same random numbers (`Xoshiro256PlusPlus` and samplers written in commol, `crates/commol-random/`), but the rate functions (`exp`, `sin`, `log`, …) come from the system's math library, which can differ in the last bit between operating systems; a run there is equal in distribution and rarely differs draw by draw |
+| Another platform, the same commol version | The same random numbers (`Xoshiro256PlusPlus` and samplers written in commol, `crates/commol-random/`), but the rate functions (`exp`, `sin`, `log`, …) come from the system's math library, which can differ in the last bit between operating systems. The runs have the same distribution, and a draw seldom differs |
 | Another commol version | A run that may change; the changelog says so |
 
 ## Accumulators
@@ -265,9 +265,10 @@ print(round(total_g1[-1]))  # 500: g1 started with half of every bin
 ## Windowed totals
 
 `windowed_totals` turns a cumulative output into the amount it gained in each
-window of length `window` on the axis. Window `w` covers `(w · window,
-(w + 1) · window]`, and each value is the output at the end of the window minus
-the output at its start. Both must be positions of the results.
+window of length `window` on the axis, the windows of the
+[window grid](core-concepts.md#units-of-the-axis). Each value is the output at
+the end of the window minus the output at its start. Both must be positions of
+the results.
 
 ```python
 per_week = stratified_simulation.windowed_totals(
@@ -439,7 +440,7 @@ print(round(ode_pulse["A"][2] - ode_pulse["A"][3], 1))  # 181.3 = 1000 (1 − e^
 ### Reporting at any position
 
 `run_at(at)` reports at sorted positions on the axis, from the dense output of
-the solver. Observations (`ObservedDataPoint.at`), windows
+the solver. [Observations](calibration-observations.md) (`ObservedDataPoint.at`), windows
 (`ObservedDataPoint.window`) and constraint positions
 (`CalibrationConstraint.at`) may lie between integers for a differential
 model: the calibration reads the engine at those positions
@@ -504,8 +505,8 @@ results.plot.series(
 |---|---|---|
 | `output_file` | `None` | Where to save the figure. `None` only returns it. |
 | `series` | `None` (every output) | What to draw, one panel each: an output name (`B_g1`) or a bin or accumulator id (`B`), which draws the sum of its outputs (`ModelStructure.outputs_by_source`). An exact output name wins. An unknown entry raises `ValueError`. |
-| `observed_data` | `None` | `ObservedDataPoint`s to draw on the panel of their `label`, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs and one factor and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, `window` and factor as the loss reads it (`ValueError` when the results have no value at a position or a window start). A predictive reads each draw through the same operator. |
-| `calibration_result` | `None` | Runs and replicates only. A `CalibrationResult` gives the factor values that scale the model. A predictive reads the factors of each draw. |
+| `observed_data` | `None` | [`ObservedDataPoint`](calibration-observations.md)s to draw on the panel of their `label`, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs and one factor and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, `window` and factor as the loss reads it (`ValueError` when the results have no value at a position or a window start). A predictive reads each draw through the same operator. |
+| `calibration_result` | `None` | Runs and replicates only. A [`CalibrationResult`](calibration.md#results) gives the values of the [factors](calibration-observations.md#partial-observations-factors) that scale the model. A predictive reads the factors of each draw. |
 | `confidence_level` | `0.95` | Replicates and predictives only. The level of the band. |
 | `prediction_intervals` | `None` | `plot.series` only. The `PredictionIntervals` of a [conformal method](uncertainty/conformal.md): the panel of each of their series, by label, shows the band from `lower` to `upper` and the point prediction, dashed. An unbounded interval is left out of the band. |
 | `axes` | `None` | A `Figure` of commol to draw on ([several results on one figure](#several-results-on-one-figure)). |
@@ -670,6 +671,7 @@ unscaled, and log a warning. A predictive reads the factors of each draw.
 
 | To learn | Read |
 |---|---|
+| Runs at random, with whole units | [Stochastic Simulation](stochastic.md) |
 | Fitting a model to data | [Model Calibration](calibration.md) |
 | Complete models | [Examples](examples.md) |
 | Signatures | [API reference: Simulation](../api/simulation.md) |

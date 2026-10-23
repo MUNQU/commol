@@ -36,8 +36,8 @@ model.check_unit_consistency(verbose=True)  # Unit consistency check passed succ
 `Model.check_unit_consistency(verbose=False)` checks that every flow has the
 unit `<bin unit>/<step unit>`, every [impulse](transitions.md#impulses) the
 unit `<bin unit>`, and that every function receives a plain number. It checks
-`DifferenceEquations` and `DifferentialEquations` models alike: in both, a rate
-is per unit of the axis, and only what its value means differs (see
+the models of every engine alike: in each, a rate is per unit of the axis, and
+only what its value means differs (see
 [What a rate means](core-concepts.md#what-a-rate-means)).
 It reads the flows the engine plans (`transition_flows`), so a proportional
 rate is checked as its flow, the rate times its source: `k2` in `1/day` from a
@@ -128,8 +128,8 @@ and gives the rates the engine reads; see
 `k * t * A` passes when `k` is in `1/day**2`. `step` counts increments and is
 dimensionless.
 
-A number written in a rate and added to, subtracted from or compared with a
-quantity is read in the unit of that quantity, as the engine reads it:
+When a rate adds a number to a quantity, subtracts it or compares it, the
+number has the unit of that quantity, as the engine reads it:
 `if(t >= 10, k, 0)` compares `t` with 10 days, and `t - 3` is 3 days before
 `t`. The two branches of `if` and the arguments of `min` and `max` must share
 a unit, and a written `0` takes the unit of the other branch. A number that a
@@ -232,7 +232,7 @@ Rules of the origin, each a `ValueError`:
 |---|---|
 | A conversion needs an origin. | An axis without one has no dates. |
 | The moment has no time zone. | A step has no time zone, so `(moment - origin) / step` stays exact through a change of summer time. Convert an aware moment with `moment.astimezone(zone).replace(tzinfo=None)`. |
-| The step unit is a unit of time whose length is a whole number of days or a whole fraction of a day, such as `hour`, `day` or `week`. | `month` and `year` are units of a fixed length (a month is 1/12 of a year, about 30.44 days), not the length of a calendar month or year, so their positions would not fall on calendar dates. |
+| The step unit is a unit of time of a whole number of days, or a day divided by a whole number, such as `hour`, `day` or `week`. | `month` and `year` are units of a fixed length (a month is 1/12 of a year, about 30.44 days), not the length of a calendar month or year, so their positions would not fall on calendar dates. |
 
 With an origin, [`results.plot.series()`](simulations.md#plotting)
 labels its ticks with dates when it has no `position_label`.

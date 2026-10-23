@@ -32,6 +32,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bins of different units are "a count and a concentration". A test checks
   the words of the user pages and of the source of `commol`.
 
+### Documentation
+
+- The documentation reads as one account of the library: the home page, the
+  quickstart and the examples show one process run by several engines, then
+  calibration, uncertainty, the comparison of runs and parallel work, and the
+  guide follows that order. Each rule lives in one page and the others link
+  to it; a test checks that every page is in the navigation and that no text
+  repeats across pages. The API reference names every name of
+  `commol.__all__` and the module of each name that the root does not export.
+  The maintainer pages name the paths, symbols and tests of the code, and the
+  design note of per-compartment initial conditions is part of
+  [Initial conditions](../codebase/decisions/initial-conditions.md).
+
 ## [0.10.0] - 2026-10-23
 
 This release makes equivalent things the same across commol, after an audit

@@ -1,6 +1,6 @@
 # Reports
 
-[Back to Model Calibration](calibration.md)
+[Back to Home](../index.md)
 
 A report turns the data of an object into plain dictionaries, ready for JSON.
 Each report is a method of the object whose data it describes:
@@ -117,7 +117,7 @@ kind of model; the structure of the model adds the sections of its kind
 |---|---|
 | The model | Call the method on the model **after** `apply_calibration_parameters`. |
 | `values` | A `CalibrationResult`, or an `{id: value}` mapping such as one of `sample.draws()`. |
-| `problem` | Optional. Adds the `factor` parameters, which the model does not hold. |
+| `problem` | Optional. Adds the calibrated `factor` and `noise` parameters, which the model does not hold. |
 | `sample`, `confidence_level` | Optional. A `ParameterSample`: each entry gains its weighted statistics (`ParameterSample.summary`). A sample needs a confidence level. |
 
 | Entry | Rule |
@@ -127,6 +127,8 @@ kind of model; the structure of the model adds the sections of its kind
 | `category_splits` | One row per category: its `fraction` of the group it splits. A category has no amount, because it can split bins of different units. |
 | `group` | The conditioning categories of a conditional stratification, or `[]` when it splits every bin. |
 | An uncalibrated bin (`None` amount) | `amount` is `null`. |
+| A bin with no unit | `unit` is `null`. |
+| A category name that two stratifications declare | Its row is under the qualified id, such as `group:g1`. |
 | A `sample` | Each entry gains an `interval` block (`mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max`, `std`, all weighted), and the report starts with `confidence_level`. |
 
 The key order of each entry is fixed (`value`, `calibrated`, then `interval`;
@@ -146,8 +148,8 @@ reports at non-integer positions once the results hold them
 
 | Block | Content |
 |---|---|
-| `observed` | For each observation label: `values`, padded to `windows`, so it lines up with `windowed` index for index. An observation goes to the window that holds its position (the rule of `AxisUnits.window_index`). `weights`, `outputs` and `factor_id` appear when a series uses them. |
-| `series` | Each compartment output sampled at `positions` |
+| `observed` | For each observation label: `values`, padded to `windows`, so it lines up with `windowed` index for index. An observation goes to the window that holds its position (the rule of `AxisUnits.window_index`). `outputs` and `factor_id` appear when a series uses them, and `weights` when a weight is not 1.0. |
+| `series` | Each output sampled at `positions`, sorted by name, except the outputs of the accumulators in `accumulators` |
 | `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window that ends within the results, as the loss compares it) and `cumulative` (sampled at `positions`); each reading as a `total` and `by_output` |
 
 | Argument | Meaning |
@@ -208,7 +210,7 @@ print(list(band_report["series"]["A"]))  # ['mean', 'median', 'ci_lower', 'ci_up
 ## Checklist
 
 - [ ] The model reports `applied_parameters` after `apply_calibration_parameters`.
-- [ ] `problem` is passed when there are `factor` parameters.
+- [ ] `problem` is passed when there are `factor` or `noise` parameters.
 - [ ] `positions`, `window` and `windows` match the observations, and the results hold every position the report reads.
 
 ## Next steps
@@ -216,4 +218,5 @@ print(list(band_report["series"]["A"]))  # ['mean', 'median', 'ci_lower', 'ci_up
 | To learn | Read |
 |---|---|
 | Samples, predictives and intervals | [Uncertainty](uncertainty/index.md) |
+| The threads of the parallel work | [Threads and Parallelism](parallelism.md) |
 | Signatures | [API reference: Reports](../api/reports.md) |

@@ -5,10 +5,10 @@
 `ModelBuilder` writes the **process** of a model: its bins, parameters,
 stratifications, accumulators and transitions. `build` joins the process with a
 **structure**, which lays it out, and an **engine**, which runs it, and returns
-a validated `Model`. The process is written once; the structure is what changes
-between kinds of model. Today the structure is `Aggregate`: amounts per
-compartment. This page documents every builder method except transitions,
-which have their own page:
+a validated `Model` ([Build and run](core-concepts.md#build-and-run)). The
+structure of an aggregate model is `Aggregate`: amounts per compartment. This
+page documents every builder method except transitions, which have their own
+page:
 
 | Topic | Page |
 |---|---|
@@ -67,6 +67,7 @@ builder = ModelBuilder(
 | `description` | `str \| None` | `None` | A free-text description. |
 | `version` | `str \| None` | `None` | A version label for your own tracking. |
 | `bin_unit` | `str \| None` | `None` | The default unit of every bin. It enables [unit checking](units-and-equations.md#unit-checking). |
+| `step_unit` | `str \| None` | `None` | The unit of one step of the axis, such as `"day"` or `"meter"`. The unit check reads each flow as `<bin unit>/<step_unit>`. `None` means `step`. See [Units](units-and-equations.md). |
 | `origin` | `date \| datetime \| None` | `None` | The calendar moment of position 0, with no time zone, for an axis of time. See [Dates on the axis](units-and-equations.md#dates-on-the-axis). |
 
 Every `add_*` method returns the builder, so calls chain. The other methods:
@@ -76,8 +77,8 @@ Every `add_*` method returns the builder, so calls chain. The other methods:
 | `build(structure, engine, settings=None)` | `Model` of the class of `structure` | Joins the process with a [structure](#the-structure-aggregate) and an engine, validates the model and returns it. The engine must run the kind of the structure: `"DifferenceEquations"` (discrete time), `"DifferentialEquations"` (continuous time), `"StochasticEvents"` and `"StochasticSteps"` ([at random](stochastic.md)) run `Aggregate`. `settings` are the settings of that engine (`ODESolver` for `"DifferentialEquations"`, `StochasticEventsSettings` and `StochasticStepsSettings` for the stochastic engines); None uses its defaults. One builder builds the model for each engine and each structure. See [Differential equations](simulations.md#differential-equations). |
 | `process()` | `Process` | The bins, accumulators, stratifications and transitions written so far. |
 | `clone()` | `ModelBuilder` | A deep copy of everything, accumulators included, to build variants of one model. |
-| `reset()` | `ModelBuilder` | Removes bins, accumulators, stratifications, transitions and parameters; keeps the name, description, version and `bin_unit`. |
-| `get_summary()` | `dict` | The name, description, version and the ids added so far. |
+| `reset()` | `ModelBuilder` | Removes bins, accumulators, stratifications, transitions and parameters; keeps the name, description, version, `bin_unit`, `step_unit` and `origin`. |
+| `get_summary()` | `dict` | The name, description, version, and the count and ids of the bins, stratifications, transitions and parameters added so far. |
 
 ```python
 variant = builder.clone()
@@ -273,8 +274,8 @@ category.
 
 ## Accumulators
 
-An accumulator counts what one or more transitions move. It is an output, not
-part of the state or of the total.
+An [accumulator](core-concepts.md#accumulators) counts what one or more
+transitions move.
 
 ```python
 counted = (
@@ -398,7 +399,7 @@ process carries over to structures where units have their own neighbors. Under
 | `neighbors=` | `neighbors_<bin>` in a compartment of category `g` | `neighbors` |
 |---|---|---|
 | `Complete()` | The bin total: every unit is a neighbor of every other | `total` |
-| `Groups(stratification, weights=None)` | `Σ_g' w[g][g'] × (amount of the bin in g')` | `Σ_g' w[g][g'] × (amount of every bin in g')` |
+| `Groups(stratification, weights=None)` | The sum over the categories `g'` of `w[g][g']` times the amount of the bin in `g'` | The same sum, of the amount of every bin in `g'` |
 
 `weights[g][g']` is the weight of category `g'` for a unit in `g`: one number of
 at least 0 for every pair of categories. No weights is the identity: a unit

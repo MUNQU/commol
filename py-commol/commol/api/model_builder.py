@@ -369,8 +369,8 @@ class ModelBuilder:
         flow of each compartment is proportional to its own amount.
 
         **$compartment Usage Rules**:
-        - Only valid when len(source) > 1
-        - Target must be empty [] or have exactly one element
+        - Only valid with several sources (and one or no target) or several
+          targets (and one or no source)
         - Can be used with stratified_rates - the placeholder will be expanded in
           both the base rate and all stratified rate expressions
         - The placeholder $compartment will be replaced with each source compartment
@@ -392,9 +392,9 @@ class ModelBuilder:
             List of source state/category identifiers. When using $compartment in
             the rate, each source will generate a separate transition.
         target : list[str]
-            List of target state/category identifiers. When using $compartment,
-            target must be empty [] or have exactly one element.
-        rate : str | float | None, default=None
+            List of target state/category identifiers. When using $compartment
+            with several targets, each target generates a separate transition.
+        rate : str | float | AxisPattern | None, default=None
             Default mathematical formula, parameter reference, or constant value for
             the transition rate. Used when no stratified rate matches.
             Can be:
@@ -436,7 +436,8 @@ class ModelBuilder:
             Make the transition an impulse at these positions on the axis. At
             each one, ``rate`` is the fraction of the source (proportional) or the
             amount (absolute) moved at once, before the flows of that step. A
-            DifferenceEquations model needs integer positions.
+            DifferenceEquations or StochasticSteps model needs integer
+            positions.
 
         impulse_every : tuple[float, float] | None, default=None
             ``(period, offset)``: make the transition an impulse at ``offset``,
@@ -797,11 +798,13 @@ class ModelBuilder:
             compartment). The model is a ``Model`` of its class.
         engine : EngineName
             The engine that runs the model, which must run the kind of the
-            structure: ``"DifferenceEquations"`` (discrete time) or
-            ``"DifferentialEquations"`` (continuous time).
+            structure: ``"DifferenceEquations"`` (discrete time),
+            ``"DifferentialEquations"`` (continuous time), ``"StochasticEvents"``
+            or ``"StochasticSteps"`` (at random).
         settings : EngineSettings | None, default=None
-            Settings of that engine; None uses its defaults. Only
-            ``"DifferentialEquations"`` takes settings (`ODESolver`).
+            Settings of that engine; None uses its defaults: `ODESolver` for
+            ``"DifferentialEquations"``, `StochasticEventsSettings` and
+            `StochasticStepsSettings` for the stochastic engines.
 
         Returns
         -------
@@ -819,8 +822,8 @@ class ModelBuilder:
             one the engine cannot run (a position between two steps for an
             engine that steps only at integers, or a ``"pulse"`` point between
             two steps), a per-compartment override names an unknown
-            compartment or makes the initial amounts exceed the total, or the
-            origin has a time zone or a step unit that is not of fixed
+            compartment, a stochastic engine gets an amount that is not whole,
+            or the origin has a time zone or a step unit that is not of fixed
             calendar length.
         """
         model: Model[StructureT] = Model(

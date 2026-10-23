@@ -8,18 +8,6 @@ which parameters the model and the data determine, which they do not, and
 which combination of parameters the data determine in their place. It is for
 anyone who fits more than one parameter.
 
-## Structural against practical
-
-| Kind | Question | Depends on | Methods |
-|---|---|---|---|
-| **Structural** | Can any data from this design determine the parameter? | The model and the positions and outputs observed, not the observed values | `StructuralRank` |
-| **Practical** | Do these data determine it? | The observed values, their noise and the fit | `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, the profiles of a `ProfileLikelihood` |
-
-A parameter that is not structurally identifiable is never practically
-identifiable: no amount of data of the same design fixes it. A parameter that
-is structurally identifiable can still be poorly determined by the data at
-hand.
-
 ## Quick path
 
 `k1` and `alpha` enter the model only as their product `k1 * alpha`, so the
@@ -114,6 +102,18 @@ for name, verdicts in report.verdicts.items():
 Fix `alpha` (or `k1`) at a value, or calibrate their product as one
 parameter: the data determine `k1 · alpha`, and the fit says nothing about
 how it splits.
+
+## Structural against practical
+
+| Kind | Question | Depends on | Methods |
+|---|---|---|---|
+| **Structural** | Can any data from this design determine the parameter? | The model and the positions and outputs observed, not the observed values | `StructuralRank` |
+| **Practical** | Do these data determine it? | The observed values, their noise and the fit | `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, the profiles of a `ProfileLikelihood` |
+
+A parameter that is not structurally identifiable is never practically
+identifiable: no amount of data of the same design fixes it. A parameter that
+is structurally identifiable can still be poorly determined by the data at
+hand.
 
 ## The methods
 

@@ -124,8 +124,8 @@ change the width of the intervals, which is a modelling choice.
 choice: a small series does not borrow the errors of a large one, but it needs
 `1/α − 1` scores of its own.
 
-- `score="normalized"` with `by="series"` raises a `ValueError`: its factor is
-  one constant per series, so its intervals equal those of `"absolute"`.
+- `score="normalized"` with `by="series"` raises a `ValueError`: with one
+  constant factor per series, its intervals are those of `"absolute"`.
 - `score="spread"` needs predictions with a spread. `SplitConformal` and
   `AdaptiveConformal` take it from a `sample`, whose predictive gives the
   prediction (its weighted median) and the spread (its weighted standard
@@ -316,9 +316,10 @@ their `failed` is empty and their `not_converged` is 0.
 `SeriesIntervals` per
 series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`.
 `plot.series(prediction_intervals=...)` of a run, of replicates or of a
-predictive draws the band of each series on its panel, and
-`SimulationResults.report(..., prediction_intervals=...)` adds it under the key
-`prediction_intervals`.
+predictive draws the band of each series on its panel.
+`SimulationResults.report`, `SimulationReplicates.report` and
+`Predictive.report` take `prediction_intervals=...` too, and add the intervals
+under the key `prediction_intervals`.
 
 ```python
 run = Simulation(ab_model(0.05)).run(num_steps=90)
