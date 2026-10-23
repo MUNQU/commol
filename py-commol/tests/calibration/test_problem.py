@@ -180,12 +180,13 @@ class TestResult:
             )
             return Calibrator(Simulation(truth), problem)
 
-        drawn = calibrator(None)
         with caplog.at_level("INFO", logger="commol"):
-            result = drawn.run()
+            drawn = calibrator(None)
+        result = drawn.run()
 
         assert result.seed == drawn.seed
         assert f"drew the seed {drawn.seed}" in caplog.text
+        assert calibrator(result.seed).run() == result
         assert calibrator(SEED).run().seed == SEED
         assert CalibrationResult.model_validate_json(result.model_dump_json()) == result
 
@@ -241,10 +242,16 @@ class TestProblemAgainstTheModel:
         with pytest.raises(ValueError, match="'f' must have positive bounds"):
             self._calibrator(truth, [bounded("f", 0.0, 1.0, kind="factor")])
 
-    def test_an_observation_is_of_an_output_of_the_model(self, truth: Model) -> None:
-        with pytest.raises(ValueError, match=r"\['D'\] for observation 'D' not found"):
+    def test_an_unknown_observed_output_gets_the_message_of_the_engine(
+        self, truth: Model
+    ) -> None:
+        with pytest.raises(
+            ValueError,
+            match="^Invalid observed output name 'X' for observation 'series1' "
+            r"\(available: A, B, C\)$",
+        ):
             self._calibrator(
                 truth,
                 [bounded("k1")],
-                [ObservedDataPoint(at=0, output="D", value=1.0)],
+                [ObservedDataPoint(at=0, output="X", label="series1", value=1.0)],
             )

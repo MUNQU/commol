@@ -2,9 +2,15 @@
 
 import math
 from collections.abc import Mapping
-from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    field_validator,
+    model_validator,
+)
 
 # Separator of a qualified category id, as in ``group:g1``.
 CATEGORY_SEPARATOR = ":"
@@ -65,7 +71,7 @@ class InitialConditions(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_fractions_of_a_total(cls, data: Any) -> Any:
+    def reject_fractions_of_a_total(cls, data: JsonValue) -> JsonValue:
         """Name the field of amounts that replaces a field of fractions.
 
         A total over bins of different units has no meaning, so the initial

@@ -11,6 +11,8 @@
 //! above the last one the largest. With equal weights `pᵢ = (i − ½)/n`,
 //! which is NumPy's `method="hazen"`.
 
+use commol_core::check_open_unit;
+
 /// Weights that sum to 1 from log weights of any scale.
 ///
 /// # Panics
@@ -121,20 +123,6 @@ pub fn quantiles(values: &[f64], weights: &[f64], levels: &[f64]) -> Result<Vec<
             }
         })
         .collect())
-}
-
-/// Check that the setting `name` is strictly between 0 and 1.
-///
-/// # Errors
-///
-/// Returns "`name` is strictly between 0 and 1, got `value`" when it is
-/// not, NaN included.
-pub fn check_open_unit(name: &str, value: f64) -> Result<(), String> {
-    if value > 0.0 && value < 1.0 {
-        Ok(())
-    } else {
-        Err(format!("{name} is strictly between 0 and 1, got {value}"))
-    }
 }
 
 /// The two quantiles of a central interval of `confidence_level`:

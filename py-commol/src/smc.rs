@@ -97,7 +97,11 @@ impl PyDistribution {
     }
 
     /// `count` draws from the stream of draws of a distribution of `seed`
-    fn sample(&self, count: usize, seed: u64) -> Vec<f64> {
+    fn sample(
+        &self,
+        #[pyo3(from_py_with = crate::counts::required::count)] count: usize,
+        seed: u64,
+    ) -> Vec<f64> {
         let mut generator = Generator::from_seed(Stream::DistributionDraws.seed(seed));
         (0..count)
             .map(|_| self.inner.sample(&mut generator))
@@ -226,7 +230,7 @@ fn gibbs_posterior(
     problem: &PyCalibrationProblem,
     priors: Option<Vec<PriorArgs>>,
     eta: f64,
-    particles: usize,
+    #[pyo3(from_py_with = crate::counts::required::particles)] particles: usize,
     resample_threshold: f64,
     target_cess: f64,
     stay_probability: f64,
@@ -263,7 +267,7 @@ fn bayesian_posterior(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     priors: Option<Vec<PriorArgs>>,
-    particles: usize,
+    #[pyo3(from_py_with = crate::counts::required::particles)] particles: usize,
     resample_threshold: f64,
     target_cess: f64,
     stay_probability: f64,
@@ -296,7 +300,7 @@ fn bayesian_posterior(
 fn information_matching_eta(
     problem: &PyCalibrationProblem,
     fit: Vec<f64>,
-    block_length: Option<usize>,
+    #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
 ) -> PyResult<f64> {
     smc::information_matching_eta(&problem.inner, &fit, block_length).map_err(method_error)
 }
@@ -330,10 +334,10 @@ fn bootstrap_coverage_eta(
     problem: &PyCalibrationProblem,
     priors: Option<Vec<PriorArgs>>,
     fit: Vec<f64>,
-    replicates: usize,
-    block_length: Option<usize>,
+    #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
+    #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
     confidence_level: f64,
-    particles: usize,
+    #[pyo3(from_py_with = crate::counts::required::particles)] particles: usize,
     resample_threshold: f64,
     target_cess: f64,
     stay_probability: f64,
@@ -397,7 +401,7 @@ fn abc_smc(
     problem: &PyCalibrationProblem,
     priors: Option<Vec<PriorArgs>>,
     metric: Option<&str>,
-    particles: usize,
+    #[pyo3(from_py_with = crate::counts::required::particles)] particles: usize,
     target_cess: f64,
     min_acceptance: f64,
     stay_probability: f64,
@@ -440,7 +444,7 @@ fn abc_rejection(
     problem: &PyCalibrationProblem,
     priors: Option<Vec<PriorArgs>>,
     metric: Option<&str>,
-    draws: usize,
+    #[pyo3(from_py_with = crate::counts::required::draws)] draws: usize,
     quantile: f64,
     seed: u64,
 ) -> PyResult<(PySmcRun, bool)> {

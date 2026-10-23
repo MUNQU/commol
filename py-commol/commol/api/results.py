@@ -56,7 +56,7 @@ class SimulationResults(dict[str, list[float]]):
         values: Mapping[str, Sequence[float]] | None = None,
         seed: int | None = None,
         model: "Model | None" = None,
-    ):
+    ) -> None:
         """
         Results at the given positions.
 
@@ -431,7 +431,7 @@ class SimulationReplicates(list[SimulationResults]):
         seed: int,
         positions: Sequence[float],
         model: "Model | None" = None,
-    ):
+    ) -> None:
         """
         Replicates of one run.
 

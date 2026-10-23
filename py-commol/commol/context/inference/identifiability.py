@@ -22,10 +22,11 @@ verdict per parameter, and the evidence of its section.
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.distributions import Priors, coerce_priors
+from commol.context.inference.levels import Share
 from commol.context.inference.method import IdentifiabilityMethod
 from commol.context.inference.sample import ParameterSample
 
@@ -44,6 +45,15 @@ ProfileVerdictName = Literal[
     "identifiable", "practically_non_identifiable", "structurally_non_identifiable"
 ]
 """What the shape of a profile says about its quantity."""
+
+StructuralDesign = Literal["observations", "dense"]
+"""The positions where a structural rank reads the sensitivities."""
+
+SampleReference = Literal["bounds", "prior"]
+"""What the contraction of a sample is measured against."""
+
+ProfileThresholdName = Literal["chi_square", "beale", "bootstrap_calibrated"]
+"""The threshold of a profile."""
 
 
 class _Frozen(BaseModel):
@@ -174,7 +184,7 @@ class StructuralSection(_Frozen):
         The identifiable combinations.
     """
 
-    design: Literal["observations", "dense"]
+    design: StructuralDesign
     points: list[PointRank]
     skipped: list[str]
     generic_rank: int
@@ -275,7 +285,7 @@ class SampleSection(_Frozen):
         The modes of the marginal of each parameter.
     """
 
-    reference: Literal["bounds", "prior"]
+    reference: SampleReference
     correlation_threshold: float
     contraction: dict[str, float]
     correlation: dict[str, dict[str, float]]
@@ -329,7 +339,7 @@ class ProfileSection(_Frozen):
         cross the threshold.
     """
 
-    threshold: Literal["chi_square", "beale", "bootstrap_calibrated"]
+    threshold: ProfileThresholdName
     confidence_level: float
     tolerance: float
     verdicts: dict[str, ProfileVerdictName | None]
@@ -499,7 +509,7 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport]):
     """
 
     points: int = Field(ge=1)
-    design: Literal["observations", "dense"]
+    design: StructuralDesign
 
 
 class Collinearity(IdentifiabilityMethod[IdentifiabilityReport]):
@@ -526,7 +536,7 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport]):
     """
 
     at: CalibrationResult | ParameterSample
-    max_subset_size: int = Field(ge=2)
+    max_subset_size: int
     threshold: float = Field(gt=1.0)
 
 
@@ -553,13 +563,13 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
     """
 
     sample: ParameterSample
-    reference: Literal["bounds", "prior"]
-    correlation_threshold: float = Field(gt=0.0, lt=1.0)
+    reference: SampleReference
+    correlation_threshold: Share
     priors: Priors | None = None
 
     @model_validator(mode="before")
     @classmethod
-    def read_priors(cls, data: object) -> object:
+    def read_priors(cls, data: JsonValue) -> JsonValue:
         """Read a mapping of parameter to distribution as `Priors`."""
         if isinstance(data, Mapping) and data.get("priors") is not None:
             return {**data, "priors": coerce_priors(data["priors"])}

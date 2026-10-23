@@ -251,6 +251,10 @@ impl SimulationEngine for Engine {
         dispatch!(self, engine => engine.set_seed(seed))
     }
 
+    fn engine_type(&self) -> Option<EngineType> {
+        Some(Engine::engine_type(self))
+    }
+
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
         dispatch!(self, engine => engine.set_parameter(parameter_id, value))
     }
@@ -374,7 +378,10 @@ impl PyEngine {
     ///     InfeasibleStateError: If the state leaves the values the model
     ///         allows, such as an amount below zero
     ///     RuntimeError: If the simulation fails for another reason
-    fn run(&mut self, num_steps: u32) -> PyResult<(Vec<f64>, Vec<Vec<f64>>)> {
+    fn run(
+        &mut self,
+        #[pyo3(from_py_with = crate::counts::required::num_steps)] num_steps: u32,
+    ) -> PyResult<(Vec<f64>, Vec<Vec<f64>>)> {
         let trajectory =
             SimulationEngine::run(&mut self.inner, num_steps).map_err(simulation_error)?;
         Ok((trajectory.positions, trajectory.rows))
@@ -388,14 +395,15 @@ impl PyEngine {
     /// and a replicate gives the same run however many replicates run.
     ///
     /// Args:
-    ///     seed: The seed of the replicates, from 0 to 2**64 - 1
+    ///     seed: The seed of the replicates, from 0 to 2**64 - 1; None draws
+    ///         one
     ///     count: How many replicates to run
     ///     grid: A number of steps, to run on the default grid of that many
     ///         steps, or the sorted, unique positions to report at
     ///
     /// Returns:
-    ///     The positions, the seed of each replicate, and one list of output
-    ///     rows per replicate
+    ///     The seed of the replicates, the positions, the seed of each
+    ///     replicate, and one list of output rows per replicate
     ///
     /// Raises:
     ///     ValueError: If a position is not valid for the engine
@@ -406,10 +414,11 @@ impl PyEngine {
     fn run_replicates(
         &self,
         py: Python<'_>,
-        seed: u64,
-        count: u64,
+        seed: Option<u64>,
+        #[pyo3(from_py_with = crate::counts::required::count)] count: u64,
         grid: ReplicateGrid,
-    ) -> PyResult<(Vec<f64>, Vec<u64>, Vec<Vec<Vec<f64>>>)> {
+    ) -> PyResult<(u64, Vec<f64>, Vec<u64>, Vec<Vec<Vec<f64>>>)> {
+        let seed = commol_random::seed_or_drawn(seed);
         let mut start = self.inner.clone();
         start.reset();
         let positions = match grid {
@@ -425,7 +434,7 @@ impl PyEngine {
             commol_core::run_replicates(&start, &positions, &seeds)
         })?
         .map_err(simulation_error)?;
-        Ok((positions, seeds, runs))
+        Ok((seed, positions, seeds, runs))
     }
 
     /// Run through the last of the given positions on the axis
@@ -503,9 +512,15 @@ impl PyEngine {
     /// ignores the seed.
     ///
     /// Args:
-    ///     seed: The seed, from 0 to 2**64 - 1
-    fn set_seed(&mut self, seed: u64) {
+    ///     seed: The seed, from 0 to 2**64 - 1; None draws one
+    ///
+    /// Returns:
+    ///     The seed the engine runs with
+    #[pyo3(signature = (seed=None))]
+    fn set_seed(&mut self, seed: Option<u64>) -> u64 {
+        let seed = commol_random::seed_or_drawn(seed);
         self.inner.set_seed(seed);
+        seed
     }
 
     /// Current position on the axis
@@ -715,6 +730,14 @@ impl PyModelKind {
 
 /// Register the engine classes with the Python module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("ODE_DEFAULT_RTOL", commol_core::OdeSolver::DEFAULT_RTOL)?;
+    m.add("ODE_DEFAULT_ATOL", commol_core::OdeSolver::DEFAULT_ATOL)?;
+    use commol_core::StochasticEventsSettings as Events;
+    m.add("STOCHASTIC_EVENTS_DEFAULT_EPSILON", Events::DEFAULT_EPSILON)?;
+    m.add(
+        "STOCHASTIC_EVENTS_DEFAULT_TOLERANCE",
+        Events::DEFAULT_TOLERANCE,
+    )?; // coverage: an error that only PyO3 returns, when the module cannot take it
     m.add_class::<PyEngine>()?;
     m.add_class::<PyEngineType>()?;
     m.add_class::<PyModelKind>()?;

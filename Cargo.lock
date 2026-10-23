@@ -187,6 +187,7 @@ dependencies = [
  "commol-difference",
  "commol-differential",
  "commol-random",
+ "commol-stochastic",
  "libm",
  "rand 0.10.3",
  "rayon",
@@ -261,6 +262,7 @@ dependencies = [
 name = "commol-random"
 version = "0.1.0"
 dependencies = [
+ "getrandom 0.4.3",
  "libm",
  "rand_core 0.10.1",
  "rand_xoshiro",

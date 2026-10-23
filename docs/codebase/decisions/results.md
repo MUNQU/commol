@@ -66,12 +66,18 @@ One Rust function checks each kind of setting, with one message:
 | Check | Function | Message |
 |---|---|---|
 | A confidence level | `statistics::interval_levels` | `confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95% interval` |
-| Any other setting strictly between 0 and 1 (`target_cess`, `stay_probability`, `min_acceptance`, the `quantile` of ABC, `correlation_threshold`) | `statistics::check_open_unit(name, value)` | `<name> is strictly between 0 and 1, got <value>` |
+| Any other setting strictly between 0 and 1 (`target_cess`, `stay_probability`, `min_acceptance`, the `quantile` of ABC, `correlation_threshold`, the `epsilon` of an adaptive leap) | `check_open_unit(name, value)` (`crates/commol-core/src/share.rs`) | `<name> is strictly between 0 and 1, got <value>` |
+| A quantile level, `Quantile(level)` included | `statistics::check_levels` | `A quantile level is between 0 and 1, got 1.5` |
 
 Python calls the first through the binding `commol_rs.inference.interval_levels`:
 `ci_percentiles`, `BootstrapResult.interval_error`, `PropagationResult.summary`,
 the scenario summaries, and every `confidence_level` field, whose type is
-`ConfidenceLevel` (`context/inference/levels.py`).
+`ConfidenceLevel` (`context/inference/levels.py`). A field of a share has the
+type `Share` of the same module, which calls `commol_rs.inference.check_open_unit`
+with the name of the field, and `Quantile.level` calls
+`commol_rs.inference.check_levels`, so the error comes when the setting is
+built, with the message of Rust. The `epsilon` of `StochasticEventsSettings`
+reaches the check through the engine (`check_settings`).
 
 | Alternative | Why not |
 |---|---|
@@ -101,8 +107,21 @@ data takes `starts`, at least 1 with the default 1, and fits with
 methods, the profiles, `Laplace`, `Sandwich`, `LaplaceMixture`,
 `InformationMatchingEta` and `BootstrapCoverageEta`.
 
+A seed that its user does not set is drawn in one place,
+`commol_random::seed_or_drawn` (`crates/commol-random/src/drawn.rs`, from the
+entropy of the operating system). The bindings of a run, its replicates, a
+calibration problem and a sensitivity analysis take `seed: Option<u64>`, and
+each result gives the seed it ran with (`results.seed`,
+`SimulationReplicates.seed`, `Calibrator.seed`, `SensitivityAnalysis.seed`),
+so a run can be repeated. A method that needs the seed of its user, such as a
+sensitivity analysis on a stochastic engine, refuses `None` with the message
+of the engine (`ForwardModel::unobserved`); no type tells the engine where a
+seed comes from.
+
 | Alternative | Why not |
 |---|---|
+| Python draws the seed and passes it to the engine | Two places draw, and the engine cannot tell a seed its user set from one drawn for them, so it needs a second argument or type to refuse a drawn seed. |
+| A seed type that says where it comes from (`Set` or `Drawn`) | The engine reads only whether a seed is set; `Option<u64>` says that. |
 | A `seed` of a method that overrides the seed of the source | Two seeds choose the random numbers of one run, and `problem.seed` no longer repeats it. |
 | A method that fits from one start, with no `starts` | A fit that ends at a local minimum gives a wrong center, and the user cannot ask for more starts. |
 
@@ -110,6 +129,9 @@ methods, the profiles, `Laplace`, `Sandwich`, `LaplaceMixture`,
 method that fits the data takes `starts` with the default 1.
 
 **Guards:** `tests/uncertainty/test_identifiability.py::TestStructuralRank::test_structural_rank_takes_the_seed_of_the_calibrator`,
+`crates/commol-random/tests/test_seeds.rs::a_seed_that_is_set_is_kept_and_one_that_is_not_is_drawn`,
+`tests/model_kinds/test_stochastic.py` (`test_a_run_without_a_seed_keeps_the_seed_it_drew`, `test_replicates_without_a_seed_keep_the_seed_they_drew`),
+`tests/uncertainty/test_sensitivity.py::TestAnalysis::test_with_no_seed_one_is_drawn_and_logged`,
 `tests/uncertainty/test_scores.py::TestPit::test_the_pit_takes_the_seed_of_the_source`,
 `crates/commol-inference/tests/test_predictive.rs::the_pit_of_ties_follows_the_seed_of_the_draws`,
 `tests/uncertainty/test_local.py::TestStarts`,

@@ -345,36 +345,6 @@ def rust_constraints(
     ]
 
 
-def check_positions(
-    engine: "EngineProtocol",
-    observed_data: Sequence["ObservedDataPoint"],
-    constraints: Sequence["CalibrationConstraint"] = (),
-) -> None:
-    """
-    Check every position of a calibration problem with the engine.
-
-    The engine decides which positions its model type accepts, and its
-    message names the observation or constraint that holds a rejected one.
-
-    Parameters
-    ----------
-    engine : EngineProtocol
-        The engine the calibration runs on.
-    observed_data : Sequence[ObservedDataPoint]
-        Observations, at their positions and windows.
-    constraints : Sequence[CalibrationConstraint]
-        Constraints, at their positions.
-
-    Raises
-    ------
-    ValueError
-        If the engine does not report at a position.
-    """
-    commol_rs.calibration.check_positions(
-        engine, rust_observed_data(observed_data), rust_constraints(constraints)
-    )
-
-
 def check_model_values(
     model: "Model",
     engine: "EngineProtocol",
@@ -608,15 +578,17 @@ def formula_inputs(formula: str) -> list[str]:
     return commol_rs.core.MathExpression(formula).inputs
 
 
-REPLICATE_SUMMARIES = ('"mean"', '"median"', "Quantile(level)", '"crps"')
-"""The options of ``CalibrationProblem.replicate_summary``, as a message lists them."""
-
-
 def rust_loss_config(
-    problem: "CalibrationProblem", loss_function: str, engine_type: str
+    problem: "CalibrationProblem", loss_function: str
 ) -> "LossConfigProtocol":
     """
-    The Rust loss of a problem, with the replicates of a stochastic engine.
+    The Rust loss of a problem, with the settings of its replicates.
+
+    The calibration problem of the engine reads the replicates: a
+    stochastic engine runs ``problem.replicates`` replicates at each
+    evaluation, seeded from ``problem.seed`` (which the calibration problem
+    of the engine takes) and compared through ``problem.replicate_summary``,
+    and a deterministic engine reads none of them.
 
     Parameters
     ----------
@@ -624,21 +596,11 @@ def rust_loss_config(
         The calibration problem.
     loss_function : str
         The problem's loss.
-    engine_type : str
-        The engine of the model. A stochastic engine runs
-        ``problem.replicates`` replicates at each evaluation; a deterministic
-        one does not use them.
 
     Returns
     -------
     LossConfigProtocol
-        The loss, its normalization and its replicates.
-
-    Raises
-    ------
-    ValueError
-        If the engine is stochastic and the problem has no ``replicates``, no
-        ``replicate_summary`` (the message lists the options) or no ``seed``.
+        The loss, its normalization and the settings of its replicates.
     """
     from commol.context.calibration import Quantile
     from commol.context.constants import LossFunction
@@ -651,28 +613,9 @@ def rust_loss_config(
     builder = builders[LossFunction(loss_function)]
     # Per-series normalization is orthogonal to the chosen metric.
     loss_config = builder().normalized(problem.normalize_observations)
-    if not commol_rs.engine.EngineType(engine_type).is_stochastic:
-        return loss_config
-    if problem.replicate_summary is None:
-        raise ValueError(
-            f"The {engine_type} engine is stochastic, so the calibration compares "
-            "the observations with its replicates: set replicate_summary to one of "
-            f"{', '.join(REPLICATE_SUMMARIES)}. There is no default: what to fit "
-            "is a modelling choice."
-        )
-    if problem.replicates is None:
-        raise ValueError(
-            f"The {engine_type} engine is stochastic: set replicates, how many "
-            "replicates each evaluation runs."
-        )
-    if problem.seed is None:
-        raise ValueError(
-            f"The {engine_type} engine is stochastic: set seed, so the replicates "
-            "and the calibration are reproducible."
-        )
     summary = problem.replicate_summary
     if isinstance(summary, Quantile):
         return loss_config.with_replicates(
-            problem.replicates, problem.seed, "quantile", summary.level
+            problem.replicates, "quantile", summary.level
         )
-    return loss_config.with_replicates(problem.replicates, problem.seed, summary)
+    return loss_config.with_replicates(problem.replicates, summary)

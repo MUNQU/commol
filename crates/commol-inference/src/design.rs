@@ -195,7 +195,7 @@ impl InputSpace {
     pub fn saltelli(&self, method: &str, base: usize, seed: u64) -> Result<SaltelliDesign, String> {
         let priors = self.independent(method)?;
         if base < 2 {
-            return Err(format!("{method} needs at least 2 base draws, got {base}"));
+            return Err(format!("{method} needs at least 2 draws, got {base}"));
         }
         let inputs = priors.distributions().len();
         let mut generator = Generator::from_seed(seed);

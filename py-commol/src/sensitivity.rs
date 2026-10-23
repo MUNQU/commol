@@ -65,6 +65,8 @@ pub struct PyForwardAnalysis {
     inner: ForwardAnalysis<Engine>,
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyForwardAnalysis {
     /// Build a forward analysis
@@ -79,21 +81,25 @@ impl PyForwardAnalysis {
     ///         takes the place of `distributions`
     ///     initial_condition_remainder: Compartment or bin that takes what
     ///         the initial conditions leave, if any
-    ///     replicates: Replicates at each point, for a stochastic engine
-    ///     seed: Seed of every random number of the analysis
+    ///     replicates: Replicates at each point, for a stochastic engine; a
+    ///         deterministic engine reads none
+    ///     seed: Seed of every random number of the analysis; None draws one,
+    ///         which `seed` reports, and a stochastic engine needs it set
     ///
     /// Raises:
-    ///     ValueError: If the inputs are not valid for the engine
+    ///     ValueError: If the inputs are not valid for the engine, replicates
+    ///         is negative, or a stochastic engine has no replicates or no
+    ///         seed
     #[new]
-    #[pyo3(signature = (engine, parameters, distributions=None, sample=None, initial_condition_remainder=None, replicates=None, seed=0))]
+    #[pyo3(signature = (engine, parameters, distributions=None, sample=None, initial_condition_remainder=None, replicates=None, seed=None))]
     fn new(
         engine: PyRef<'_, PyEngine>,
         parameters: Vec<PyCalibrationParameter>,
         distributions: Option<Vec<PriorArgs>>,
         sample: Option<PyRef<'_, PyParameterSample>>,
         initial_condition_remainder: Option<String>,
-        replicates: Option<usize>,
-        seed: u64,
+        #[pyo3(from_py_with = crate::counts::optional::replicates)] replicates: Option<usize>,
+        seed: Option<u64>,
     ) -> PyResult<Self> {
         let inputs = input_space(&parameters, distributions, sample.as_deref())?;
         let inner = ForwardAnalysis::new(
@@ -108,6 +114,12 @@ impl PyForwardAnalysis {
         Ok(Self { inner })
     }
 
+    /// The seed of every random number of the analysis
+    #[getter]
+    fn seed(&self) -> u64 {
+        self.inner.seed()
+    }
+
     /// Monte Carlo propagation: the draws, the quantities and weight of each
     /// run, and the seed of each draw
     ///
@@ -118,7 +130,7 @@ impl PyForwardAnalysis {
     fn propagate(
         &self,
         py: Python<'_>,
-        draws: Option<usize>,
+        #[pyo3(from_py_with = crate::counts::optional::draws)] draws: Option<usize>,
         quantities: &str,
     ) -> PyResult<PropagationValues> {
         let quantities = read_quantities(quantities)?;
@@ -136,7 +148,12 @@ impl PyForwardAnalysis {
     ///         fit the model or is NaN at a draw, or the ranks of the inputs
     ///         are collinear
     ///     InfeasibleStateError: If a point leaves the values its model allows
-    fn prcc(&self, py: Python<'_>, draws: Option<usize>, quantities: &str) -> PyResult<PrccValues> {
+    fn prcc(
+        &self,
+        py: Python<'_>,
+        #[pyo3(from_py_with = crate::counts::optional::draws)] draws: Option<usize>,
+        quantities: &str,
+    ) -> PyResult<PrccValues> {
         let quantities = read_quantities(quantities)?;
         let (sample, result) =
             parallel(py, || self.inner.prcc(draws, &quantities))?.map_err(method_error)?;
@@ -159,8 +176,8 @@ impl PyForwardAnalysis {
     fn morris(
         &self,
         py: Python<'_>,
-        trajectories: usize,
-        levels: usize,
+        #[pyo3(from_py_with = crate::counts::required::trajectories)] trajectories: usize,
+        #[pyo3(from_py_with = crate::counts::required::levels)] levels: usize,
         quantities: &str,
     ) -> PyResult<MorrisValues> {
         let quantities = read_quantities(quantities)?;
@@ -179,8 +196,8 @@ impl PyForwardAnalysis {
     fn sobol(
         &self,
         py: Python<'_>,
-        draws: usize,
-        replicates: usize,
+        #[pyo3(from_py_with = crate::counts::required::draws)] draws: usize,
+        #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
         confidence_level: f64,
         quantities: &str,
     ) -> PyResult<SobolValues> {
@@ -216,10 +233,12 @@ impl PyForwardAnalysis {
     fn chaos(
         &self,
         py: Python<'_>,
-        degree: usize,
+        #[pyo3(from_py_with = crate::counts::required::degree)] degree: usize,
         q_norm: f64,
-        max_interaction: Option<usize>,
-        draws: usize,
+        #[pyo3(from_py_with = crate::counts::optional::max_interaction)] max_interaction: Option<
+            usize,
+        >,
+        #[pyo3(from_py_with = crate::counts::required::draws)] draws: usize,
         quantities: &str,
     ) -> PyResult<PyChaosRun> {
         let truncation = Truncation::new(q_norm, max_interaction).map_err(method_error)?;
@@ -363,9 +382,9 @@ pub struct PyChaosRun {
 fn chaos_evaluate(
     parameters: Vec<PyCalibrationParameter>,
     distributions: Vec<PriorArgs>,
-    degree: usize,
+    #[pyo3(from_py_with = crate::counts::required::degree)] degree: usize,
     q_norm: f64,
-    max_interaction: Option<usize>,
+    #[pyo3(from_py_with = crate::counts::optional::max_interaction)] max_interaction: Option<usize>,
     coefficients: Vec<Vec<f64>>,
     points: Vec<Vec<f64>>,
 ) -> PyResult<Vec<Vec<f64>>> {

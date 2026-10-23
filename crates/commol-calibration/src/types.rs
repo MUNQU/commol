@@ -422,13 +422,11 @@ impl Replicates {
     ///
     /// # Errors
     ///
-    /// Returns a message when `count` is 0, or the message of
-    /// [`statistics::check_levels`] when a quantile level is outside
-    /// `[0, 1]`.
+    /// Returns the message of [`Self::check_count`] when `count` is 0, or
+    /// the message of [`statistics::check_levels`] when a quantile level is
+    /// outside `[0, 1]`.
     pub fn new(count: usize, seed: u64, summary: ReplicateSummary) -> Result<Self, String> {
-        if count == 0 {
-            return Err("A stochastic engine needs at least one replicate".to_string());
-        }
+        Self::check_count(count)?;
         if let ReplicateSummary::Quantile(level) = summary {
             statistics::check_levels(&[level])?;
         }
@@ -438,6 +436,19 @@ impl Replicates {
                 .collect(),
             summary,
         })
+    }
+
+    /// Check that a count of replicates is at least 1. It is the one check
+    /// of the setting `replicates`.
+    ///
+    /// # Errors
+    ///
+    /// Returns "replicates is at least 1, got 0" when it is 0.
+    pub fn check_count(count: usize) -> Result<(), String> {
+        if count == 0 {
+            return Err(format!("replicates is at least 1, got {count}"));
+        }
+        Ok(())
     }
 }
 

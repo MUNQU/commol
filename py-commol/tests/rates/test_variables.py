@@ -7,11 +7,7 @@ import pytest
 
 from commol import Simulation
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.constants import (
-    RESERVED_VARIABLE_NAMES,
-    SUBGROUP_TOTAL_PREFIX,
-    TOTAL_VARIABLE,
-)
+from commol.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
 from tests.support import (
     ENGINE_REL,
     assert_close,
@@ -116,6 +112,5 @@ def test_the_variables_of_a_formula_come_from_the_engine() -> None:
 
 
 def test_the_engine_variables_come_from_the_engine() -> None:
-    assert RESERVED_VARIABLE_NAMES == ("total", "step", "t", "pi", "e")
-    assert RESERVED_VARIABLE_NAMES == tuple(commol_rs.model.ENGINE_VARIABLES)
+    assert commol_rs.model.ENGINE_VARIABLES == ["total", "step", "t", "pi", "e"]
     assert (TOTAL_VARIABLE, SUBGROUP_TOTAL_PREFIX) == ("total", "total_")

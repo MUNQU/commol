@@ -51,19 +51,24 @@ pub struct ForwardAnalysis<E: SimulationEngine> {
 impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
     /// The analysis of `inputs`, the values `parameters` of `engine`, with
     /// `remainder` for the initial conditions and, for a stochastic engine,
-    /// `replicates` replicates at each point of a design.
+    /// `replicates` replicates at each point of a design, seeded from
+    /// `seed`. With no seed, the analysis draws one
+    /// ([`commol_random::seed_or_drawn`]) and reports it ([`Self::seed`]); a
+    /// stochastic engine needs the seed of its caller, so its replicates and
+    /// the analysis repeat.
     ///
     /// # Errors
     ///
     /// [`MethodError::Invalid`] when the inputs are not the parameters, in
-    /// order and with their bounds, or as [`ForwardModel::unobserved`].
+    /// order and with their bounds, or as [`ForwardModel::unobserved`], which
+    /// refuses a stochastic engine with no replicates or no seed.
     pub fn new(
         engine: E,
         parameters: Vec<CalibrationParameter>,
         remainder: Option<&str>,
         replicates: Option<usize>,
         inputs: InputSpace,
-        seed: u64,
+        seed: Option<u64>,
     ) -> Result<Self, MethodError> {
         let names: Vec<String> = parameters.iter().map(|p| p.id.clone()).collect();
         let bounds: Vec<(f64, f64)> = parameters
@@ -83,13 +88,13 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
             parameters,
             remainder,
             replicates,
-            Stream::SensitivityReplicates.seed(seed),
+            seed.map(|seed| Stream::SensitivityReplicates.seed(seed)),
         )
         .map_err(MethodError::Invalid)?;
         Ok(Self {
             forward,
             inputs,
-            seed,
+            seed: commol_random::seed_or_drawn(seed),
         })
     }
 

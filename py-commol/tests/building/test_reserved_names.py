@@ -1,5 +1,7 @@
 """Parameter, bin and accumulator ids cannot be names the engine provides."""
 
+import re
+
 import pytest
 
 from commol import Aggregate, ModelBuilder, Simulation
@@ -17,10 +19,20 @@ def _builder(parameter_id: str, stratifications: int = 1) -> ModelBuilder:
     )
 
 
-@pytest.mark.parametrize("name", ["total", "step", "t", "pi", "e"])
-def test_an_engine_variable_is_not_a_parameter_id(name: str) -> None:
-    with pytest.raises(ValueError, match=f"engine variables: \\['{name}'\\]"):
-        build(_builder(name))
+@pytest.mark.parametrize(
+    ("parameter_id", "conflict"),
+    [
+        *((name, f"parameter '{name}'") for name in ("total", "step", "t", "pi", "e")),
+        ("A", "'A' (a subgroup total)"),
+    ],
+)
+def test_a_reserved_parameter_id_gets_the_message_of_the_engine(
+    parameter_id: str, conflict: str
+) -> None:
+    with pytest.raises(ValueError, match=re.escape(conflict)) as error:
+        build(_builder(parameter_id))
+
+    assert "Rename" in str(error.value)
 
 
 @pytest.mark.parametrize("name", ["total", "step", "t", "pi", "e"])
@@ -61,15 +73,12 @@ def test_a_bin_name_that_reads_as_a_subgroup_total_is_rejected() -> None:
         build(builder)
 
 
-def test_a_bin_id_is_not_a_parameter_id() -> None:
-    with pytest.raises(ValueError, match="reserved compartment names: \\['A'\\]"):
-        build(_builder("A"))
-
-
 def test_every_conflicting_parameter_id_is_reported() -> None:
     builder = abc_builder(parameters={"A": 0.5, "B": 0.3, "k2": 0.1}, ab=None)
 
-    with pytest.raises(ValueError, match="reserved compartment names: \\['A', 'B'\\]"):
+    with pytest.raises(
+        ValueError, match=re.escape("'A' (a compartment), 'B' (a compartment)")
+    ):
         build(builder)
 
 

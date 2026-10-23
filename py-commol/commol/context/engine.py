@@ -7,12 +7,14 @@ names of the engines as the ``Literal`` `EngineName`, for static typing of
 `ModelBuilder.build`, and a test checks that it equals the list.
 """
 
-from typing import Any, Literal, Self, TypeAlias
+from collections.abc import Mapping
+from typing import Literal, Self, TypeAlias
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    JsonValue,
     ValidationInfo,
     field_validator,
     model_validator,
@@ -51,8 +53,17 @@ class ODESolver(BaseModel):
     method: Literal["tsit45", "bdf"] = Field(
         default="tsit45", description="Integration method."
     )
-    rtol: float = Field(default=1e-6, gt=0.0, description="Relative tolerance.")
-    atol: float = Field(default=1e-6, gt=0.0, description="Absolute tolerance.")
+    rtol: float = Field(
+        default=commol_rs.engine.ODE_DEFAULT_RTOL, description="Relative tolerance."
+    )
+    atol: float = Field(
+        default=commol_rs.engine.ODE_DEFAULT_ATOL, description="Absolute tolerance."
+    )
+
+    @model_validator(mode="after")
+    def check_with_the_engine(self) -> Self:
+        """Ask the engine's list whether it takes the settings."""
+        return _checked(self)
 
 
 Rounding: TypeAlias = Literal["largest_remainder", "random"]
@@ -92,17 +103,24 @@ class StochasticEventsSettings(BaseModel):
         default="direct", description="Simulation method."
     )
     tau: float | None = Field(
-        default=None, gt=0.0, description="Length of a leap of tau-leaping."
+        default=None, description="Length of a leap of tau-leaping."
     )
     epsilon: float = Field(
-        default=0.03, gt=0.0, lt=1.0, description="Bound of an adaptive leap."
+        default=commol_rs.engine.STOCHASTIC_EVENTS_DEFAULT_EPSILON,
+        description="Bound of an adaptive leap.",
     )
     tolerance: float = Field(
-        default=1e-8, gt=0.0, description="Relative tolerance of an event time."
+        default=commol_rs.engine.STOCHASTIC_EVENTS_DEFAULT_TOLERANCE,
+        description="Relative tolerance of an event time.",
     )
     rounding: Rounding | None = Field(
         default=None, description="How to make the initial amounts whole."
     )
+
+    @model_validator(mode="after")
+    def check_with_the_engine(self) -> Self:
+        """Ask the engine's list whether it takes the settings."""
+        return _checked(self)
 
 
 class StochasticStepsSettings(BaseModel):
@@ -122,6 +140,11 @@ class StochasticStepsSettings(BaseModel):
         default=None, description="How to make the initial amounts whole."
     )
 
+    @model_validator(mode="after")
+    def check_with_the_engine(self) -> Self:
+        """Ask the engine's list whether it takes the settings."""
+        return _checked(self)
+
 
 EngineSettings: TypeAlias = (
     ODESolver | StochasticEventsSettings | StochasticStepsSettings
@@ -134,6 +157,20 @@ _SETTINGS: dict[str, type[EngineSettings]] = {
     "StochasticSteps": StochasticStepsSettings,
 }
 """The class of the settings of each engine that takes settings."""
+
+
+def _checked[SettingsT: EngineSettings](settings: SettingsT) -> SettingsT:
+    """
+    Check settings with the engine they belong to, as a model checks them.
+
+    Raises
+    ------
+    ValueError
+        If the engine does not take them; the message is the engine's.
+    """
+    engine = next(name for name, cls in _SETTINGS.items() if cls is type(settings))
+    commol_rs.engine.EngineType(engine).check_settings(settings.model_dump_json())
+    return settings
 
 
 class ModelEngine(BaseModel):
@@ -163,10 +200,14 @@ class ModelEngine(BaseModel):
 
     @field_validator("settings", mode="before")
     @classmethod
-    def settings_of_the_engine(cls, value: Any, info: ValidationInfo) -> Any:
+    def settings_of_the_engine(
+        cls,
+        value: EngineSettings | Mapping[str, JsonValue] | None,
+        info: ValidationInfo,
+    ) -> EngineSettings | Mapping[str, JsonValue] | None:
         """Read settings given as a mapping with the class of their engine."""
         settings_class = _SETTINGS.get(info.data.get("type", ""))
-        if isinstance(value, dict) and settings_class is not None:
+        if isinstance(value, Mapping) and settings_class is not None:
             return settings_class.model_validate(value)
         return value
 

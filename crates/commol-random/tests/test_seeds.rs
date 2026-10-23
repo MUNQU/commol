@@ -1,7 +1,7 @@
 //! The seeds of replicates and streams: two seeds give unrelated seeds for
 //! every pair of indices.
 
-use commol_random::{replicate_seed, stream_seed};
+use commol_random::{replicate_seed, seed_or_drawn, stream_seed};
 
 fn all_differ(mut seeds: Vec<u64>) -> bool {
     let count = seeds.len();
@@ -45,4 +45,12 @@ fn the_first_seeds_are_fixed() {
             3_791_248_478_382_738_589
         ]
     );
+}
+
+#[test]
+fn a_seed_that_is_set_is_kept_and_one_that_is_not_is_drawn() {
+    let drawn: Vec<u64> = (0..8).map(|_| seed_or_drawn(None)).collect();
+
+    assert_eq!(seed_or_drawn(Some(42)), 42);
+    assert!(all_differ(drawn));
 }

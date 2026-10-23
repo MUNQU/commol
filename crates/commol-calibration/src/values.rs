@@ -32,8 +32,8 @@ pub(crate) struct ValueWriter<E: SimulationEngine> {
 }
 
 impl<E: SimulationEngine> ValueWriter<E> {
-    /// Check that the engine sets every parameter, and ask it to resolve the
-    /// values of its model kind.
+    /// Check that every factor has positive bounds and the engine sets every
+    /// parameter, and ask it to resolve the values of its model kind.
     ///
     /// Each parameter is set on a copy of the engine at its lower bound, so
     /// the rule of the engine ([`SimulationEngine::set_parameter`]) rejects
@@ -41,8 +41,9 @@ impl<E: SimulationEngine> ValueWriter<E> {
     ///
     /// # Errors
     ///
-    /// Returns the engine's message when it does not set a parameter or does
-    /// not accept a value, or an id or the remainder does not resolve.
+    /// Returns a message that names a factor with a bound at or below 0, or
+    /// the engine's message when it does not set a parameter or does not
+    /// accept a value, or an id or the remainder does not resolve.
     pub(crate) fn new(
         engine: &E,
         parameters: &[CalibrationParameter],
@@ -50,8 +51,21 @@ impl<E: SimulationEngine> ValueWriter<E> {
     ) -> Result<Self, String> {
         let mut probe = engine.clone();
         for parameter in parameters {
-            if parameter.parameter_type == CalibrationParameterType::Parameter {
-                probe.set_parameter(&parameter.id, parameter.min_bound)?;
+            match parameter.parameter_type {
+                CalibrationParameterType::Parameter => {
+                    probe.set_parameter(&parameter.id, parameter.min_bound)?;
+                }
+                CalibrationParameterType::Factor
+                    if !(parameter.min_bound > 0.0 && parameter.max_bound > 0.0) =>
+                {
+                    return Err(format!(
+                        "Factor parameter '{}' must have positive bounds (got min={}, max={})",
+                        parameter.id, parameter.min_bound, parameter.max_bound
+                    ));
+                }
+                CalibrationParameterType::Factor
+                | CalibrationParameterType::InitialCondition
+                | CalibrationParameterType::Noise => {}
             }
         }
         let mut kind_indices = Vec::new();
@@ -145,8 +159,9 @@ pub(crate) fn configure_engine<E: SimulationEngine>(
     Ok((engine, clamped))
 }
 
-/// Check that the engine sets every parameter and resolves every value of
-/// its model kind and the remainder, and return the plan it resolves them to.
+/// Check that every factor has positive bounds and the engine sets every
+/// parameter and resolves every value of its model kind and the remainder,
+/// and return the plan it resolves them to.
 ///
 /// The engine sets and resolves them as the calibration objective does, so
 /// the first check that sees an id gives the engine's message, for example
@@ -155,9 +170,9 @@ pub(crate) fn configure_engine<E: SimulationEngine>(
 ///
 /// # Errors
 ///
-/// Returns the engine's message when it does not set a parameter, a value
-/// or the remainder does not resolve, or the kind does not accept a type of
-/// value.
+/// Returns a message that names a factor with a bound at or below 0, or the
+/// engine's message when it does not set a parameter, a value or the
+/// remainder does not resolve, or the kind does not accept a type of value.
 pub fn check_model_values<E: SimulationEngine>(
     engine: &E,
     parameters: &[CalibrationParameter],

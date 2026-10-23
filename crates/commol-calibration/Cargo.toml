@@ -36,3 +36,4 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 commol-difference = { path = "../commol-difference" }
 commol-differential = { path = "../commol-differential" }
+commol-stochastic = { path = "../commol-stochastic" }

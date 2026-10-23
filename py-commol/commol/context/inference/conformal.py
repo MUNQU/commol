@@ -11,7 +11,7 @@ sets the width of every interval.
 from collections.abc import Mapping
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import ObservedDataPoint
@@ -136,7 +136,7 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
 
     @model_validator(mode="before")
     @classmethod
-    def check_score_and_by(cls, data: object) -> object:
+    def check_score_and_by(cls, data: JsonValue) -> JsonValue:
         """Check, in Rust, that `score` and `by` are given and fit together."""
         if isinstance(data, Mapping):
 

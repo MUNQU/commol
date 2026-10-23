@@ -48,7 +48,7 @@ class ModelBuilder:
         bin_unit: str | None = None,
         step_unit: str | None = None,
         origin: date | None = None,
-    ):
+    ) -> None:
         """
         Initialize the ModelBuilder.
 

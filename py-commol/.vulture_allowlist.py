@@ -28,6 +28,10 @@ MixtureRunProtocol
 LossConfigProtocol
 ObservationModelProtocol
 OptimizationConfigProtocol
+PSOInertiaConstantProtocol
+PSOInertiaChaoticProtocol
+PSOAccelerationConstantProtocol
+PSOAccelerationTimeVaryingProtocol
 EngineTypeProtocol
 BootstrapSettingsProtocol
 ProfileRunProtocol

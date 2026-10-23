@@ -217,6 +217,10 @@ impl commol_core::SimulationEngine for DifferenceEquations {
         EngineType::DifferenceEquations.check_position(position)
     }
 
+    fn engine_type(&self) -> Option<EngineType> {
+        Some(EngineType::DifferenceEquations)
+    }
+
     fn run_at_positions_into_buffer(
         &mut self,
         positions: &[f64],

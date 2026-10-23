@@ -171,7 +171,7 @@ fn rolling_conformal(
     score: &str,
     by: &str,
     confidence_level: f64,
-    starts: usize,
+    #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
     seed: u64,
 ) -> PyResult<PyConformalRun> {
     let settings = settings(score, by, confidence_level)?;
@@ -219,12 +219,12 @@ fn jackknife_plus(
     problem: &PyCalibrationProblem,
     config: &PyOptimizationConfig,
     fit: Vec<f64>,
-    block_length: Option<usize>,
+    #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
     positions: Vec<f64>,
     score: &str,
     by: &str,
     confidence_level: f64,
-    starts: usize,
+    #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
     seed: u64,
 ) -> PyResult<PyConformalRun> {
     let settings = settings(score, by, confidence_level)?;
@@ -270,13 +270,13 @@ fn enbpi(
     problem: &PyCalibrationProblem,
     config: &PyOptimizationConfig,
     fit: Vec<f64>,
-    replicates: usize,
-    block_length: Option<usize>,
+    #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
+    #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
     positions: Vec<f64>,
     score: &str,
     by: &str,
     confidence_level: f64,
-    starts: usize,
+    #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
     seed: u64,
 ) -> PyResult<PyConformalRun> {
     let settings = settings(score, by, confidence_level)?;

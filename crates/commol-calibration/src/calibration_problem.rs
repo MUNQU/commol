@@ -13,10 +13,12 @@ use commol_core::SimulationEngine;
 
 use crate::discrepancy::{Discrepancy, DiscrepancyConfig, TermError};
 use crate::feasibility::{EvaluationError, Feasibility, Violation, constraint_positions};
-use crate::forward::{ForwardModel, Workspace, schedule_of};
+use crate::forward::{ForwardModel, Workspace, schedule_of, the_engine};
 use crate::likelihood::TermDerivatives;
 use crate::observation::ObservationOperator;
-use crate::types::{CalibrationConstraint, CalibrationParameter, ObservedDataPoint, Replicates};
+use crate::types::{
+    CalibrationConstraint, CalibrationParameter, ObservedDataPoint, ReplicateSummary, Replicates,
+};
 use crate::values::{ValueWriter, clamp_to_bounds};
 
 /// A calibration problem for any [`SimulationEngine`].
@@ -85,11 +87,13 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     ///
     /// # Errors
     ///
-    /// Returns a message when there is no observation or parameter, a
-    /// position is one the engine rejects, an observation names an unknown
-    /// output or factor, the engine does not resolve a value of its model
-    /// kind, a constraint is invalid, or the observation models do not fit
-    /// the observations and parameters ([`crate::Likelihood::new`]).
+    /// Returns a message when a stochastic engine
+    /// ([`SimulationEngine::is_stochastic`]) comes with observation models,
+    /// there is no observation or parameter, a position is one the engine
+    /// rejects, an observation names an unknown output or factor, a factor
+    /// has a bound at or below 0, the engine does not resolve a value of its
+    /// model kind, a constraint is invalid, or the observation models do not
+    /// fit the observations and parameters ([`crate::Likelihood::new`]).
     pub fn new(
         base_engine: E,
         observed_data: Vec<ObservedDataPoint>,
@@ -97,6 +101,15 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         constraints: Vec<CalibrationConstraint>,
         discrepancy: impl Into<DiscrepancyConfig>,
     ) -> Result<Self, String> {
+        let discrepancy = discrepancy.into();
+        if base_engine.is_stochastic() && matches!(discrepancy, DiscrepancyConfig::Likelihood(_)) {
+            return Err(
+                "A stochastic engine needs a loss: the likelihood of a stochastic model \
+                 integrates its hidden path, which observation models of one run do not do; \
+                 set loss_function instead of observation_models"
+                    .to_string(),
+            );
+        }
         if observed_data.is_empty() {
             return Err("No observed data provided".to_string());
         }
@@ -119,7 +132,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             base_engine.output_sums(),
             &schedule,
         )?;
-        let discrepancy = Discrepancy::new(discrepancy.into(), &observed_data, &parameters)?;
+        let discrepancy = Discrepancy::new(discrepancy, &observed_data, &parameters)?;
 
         Ok(Self {
             forward: ForwardModel::new(base_engine, parameters, values, schedule, observation),
@@ -161,6 +174,49 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             .set_summary(replicates.as_ref().map(|r| r.summary))?;
         self.forward.set_replicates(replicates);
         Ok(self)
+    }
+
+    /// Run the replicates a stochastic engine needs at each evaluation, from
+    /// settings a caller may leave unset: `count` replicates seeded from
+    /// `seed`, compared through `summary` ([`Self::with_replicates`]). A
+    /// deterministic engine ([`SimulationEngine::is_stochastic`]) runs once,
+    /// and reads none of them.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the setting a stochastic engine needs
+    /// when `summary`, `count` or `seed` is not set, or the message of
+    /// [`Replicates::new`] or [`Self::with_replicates`].
+    pub fn with_replicate_settings(
+        self,
+        count: Option<usize>,
+        seed: Option<u64>,
+        summary: Option<ReplicateSummary>,
+    ) -> Result<Self, String> {
+        if !self.forward.base_engine().is_stochastic() {
+            return Ok(self);
+        }
+        let engine = the_engine(self.forward.base_engine());
+        let summary = summary.ok_or_else(|| {
+            format!(
+                "{engine} is stochastic, so the calibration compares the observations with its \
+                 replicates: set replicate_summary to one of \"mean\", \"median\", \
+                 Quantile(level), \"crps\". There is no default: what to fit is a modelling \
+                 choice."
+            )
+        })?;
+        let count = count.ok_or_else(|| {
+            format!(
+                "{engine} is stochastic: set replicates, how many replicates each evaluation runs."
+            )
+        })?;
+        let seed = seed.ok_or_else(|| {
+            format!(
+                "{engine} is stochastic: set seed, so the replicates and the calibration are \
+                 reproducible."
+            )
+        })?;
+        self.with_replicates(Some(Replicates::new(count, seed, summary)?))
     }
 
     /// Name the id that takes what the calibrated initial conditions leave of
@@ -385,7 +441,8 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     ) -> Result<Vec<f64>, EvaluationError> {
         let likelihood = self.discrepancy.likelihood().ok_or_else(|| {
             EvaluationError::Failed(
-                "The pointwise log-likelihood needs observation models; the problem has a                  loss"
+                "The pointwise log-likelihood needs observation models; the problem has a \
+                 loss"
                     .to_string(),
             )
         })?;
@@ -491,7 +548,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
 /// Returns a message that names the observation or constraint and gives the
 /// engine's reason, or that names an observation whose window is not a
 /// finite, positive length.
-pub fn check_positions<E: SimulationEngine>(
+pub(crate) fn check_positions<E: SimulationEngine>(
     engine: &E,
     observed_data: &[ObservedDataPoint],
     constraints: &[CalibrationConstraint],

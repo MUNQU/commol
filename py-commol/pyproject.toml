@@ -134,7 +134,11 @@ indent-width = 4
 [tool.ruff.lint]
 # D1 and D417: every public module, class, function and argument is documented.
 # N: names follow PEP 8 (pep8-naming).
-select = ["E", "F", "C90", "ARG", "ERA", "B007", "D1", "D417", "N"]
+# ANN and TID251: every signature of the package has annotations, and none is
+# `Any`.
+select = [
+    "E", "F", "C90", "ARG", "ERA", "B007", "D1", "D417", "N", "ANN", "TID251",
+]
 fixable = ["ALL"]
 unfixable = []
 ignore = [
@@ -144,8 +148,11 @@ ignore = [
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.Any".msg = "Use a precise type, a TypeVar, a Protocol or a union."
+
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D1"]
+"tests/**" = ["D1", "ANN", "TID251"]
 
 [tool.ruff.format]
 indent-style = "space"

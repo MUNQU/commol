@@ -4,9 +4,9 @@ import ast
 import math
 import re
 from collections.abc import Callable, Iterable
-from typing import Any
 
 import pint
+from pint.facets.plain import PlainQuantity
 
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.parameter import Parameter
@@ -126,7 +126,13 @@ class _Literal(float):
     """A number written in an equation, whose unit the check may read."""
 
 
-def _match_units(*operands: Any) -> list[Any]:
+type Operand = PlainQuantity | float
+"""What the check reads in place of a value: a quantity with its unit (a
+`pint.Quantity`, or the `PlainQuantity` that pint's arithmetic gives), or a
+number, written (`_Literal`) or computed."""
+
+
+def _match_units(*operands: Operand) -> list[Operand]:
     """
     Give each written number the unit of the first quantity among `operands`.
 
@@ -144,7 +150,7 @@ def _match_units(*operands: Any) -> list[Any]:
     if not quantities:
         return list(operands)
     units = quantities[0].units
-    matched: list[Any] = []
+    matched: list[Operand] = []
     for operand in operands:
         if isinstance(operand, _Literal):
             operand = ureg.Quantity(float(operand), units)
@@ -156,39 +162,39 @@ def _match_units(*operands: Any) -> list[Any]:
     return matched
 
 
-def _add(left: Any, right: Any) -> Any:
+def _add(left: Operand, right: Operand) -> Operand:
     a, b = _match_units(left, right)
     return a + b
 
 
-def _subtract(left: Any, right: Any) -> Any:
+def _subtract(left: Operand, right: Operand) -> Operand:
     a, b = _match_units(left, right)
     return a - b
 
 
-def _compare(*operands: Any) -> float:
+def _compare(*operands: Operand) -> float:
     """A comparison: its operands share a unit, and its value is a number."""
     _match_units(*operands)
     return 1.0
 
 
-def _if(_condition: Any, then: Any, otherwise: Any) -> Any:
+def _if(_condition: Operand, then: Operand, otherwise: Operand) -> Operand:
     """``if(condition, then, otherwise)``: both branches share a unit."""
     return _match_units(then, otherwise)[0]
 
 
-def _min(*operands: Any) -> Any:
+def _min(*operands: Operand) -> Operand:
     return _match_units(*operands)[0]
 
 
-def _cbrt(operand: Any) -> Any:
+def _cbrt(operand: Operand) -> Operand:
     """``cbrt(x)``: the cube root of a quantity is the cube root of its unit."""
     if isinstance(operand, pint.Quantity):
         return operand ** (1 / 3)
     return math.cbrt(operand)
 
 
-_FUNCTION_UNITS: dict[str, Callable[..., Any]] = {
+_FUNCTION_UNITS: dict[str, Callable[..., Operand]] = {
     "sin": math.sin,
     "cos": math.cos,
     "tan": math.tan,
@@ -222,7 +228,7 @@ _FUNCTION_UNITS: dict[str, Callable[..., Any]] = {
 without a unit; ``abs`` and ``round`` keep the unit of their argument,
 ``cbrt`` takes its cube root, and ``min`` and ``max`` need one unit."""
 
-_FUNCTIONS: dict[str, Callable[..., Any]] = {
+_FUNCTIONS: dict[str, Callable[..., Operand]] = {
     name: _FUNCTION_UNITS[name] for name in commol_rs.core.FUNCTIONS
 }
 """The rule of each function of the engine (``commol_rs.core.FUNCTIONS``)."""
@@ -287,7 +293,7 @@ def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Q
     pint.Quantity
         A pint Quantity representing the unit of the equation.
     """
-    namespace: dict[str, object] = {}
+    namespace: dict[str, Operand | Callable[..., Operand]] = {}
 
     for var, unit_str in variable_units.items():
         namespace[var] = ureg(unit_str)
@@ -309,7 +315,7 @@ def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Q
         python = _IF_CALL.sub("_if(", equation).replace("^", "**")
         tree = ast.parse(python, mode="eval")
         tree = ast.fix_missing_locations(_ReadWrittenNumbers().visit(tree))
-        eval_result: object = eval(
+        eval_result: Operand = eval(
             compile(tree, "<equation>", "eval"), {"__builtins__": {}}, namespace
         )
     except Exception as e:

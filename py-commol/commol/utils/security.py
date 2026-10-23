@@ -43,7 +43,7 @@ class SecurityConfig:
 class SecurityError(ValueError):
     """Raised when a security violation is detected in an expression."""
 
-    def __init__(self, message: str):
+    def __init__(self, message: str) -> None:
         super().__init__(message)
 
 
@@ -409,7 +409,7 @@ class ExpressionSecurityValidator:
         "ω": "w",
     }
 
-    def __init__(self, config: SecurityConfig | None = None):
+    def __init__(self, config: SecurityConfig | None = None) -> None:
         """Initialize the validator with the given configuration."""
         self.config: SecurityConfig = config or SecurityConfig()
 

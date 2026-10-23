@@ -124,13 +124,42 @@ class TestAnalysis:
     ) -> None:
         with caplog.at_level(logging.INFO, logger="commol.api.sensitivity"):
             analysis = SensitivityAnalysis(simulation, abc_rates())
+        method = PRCC(draws=10, quantities=[ValueAt(series="B", at=5)])
+
+        again = SensitivityAnalysis(simulation, abc_rates(), seed=analysis.seed)
+
         assert f"drew the seed {analysis.seed}" in caplog.text
-        assert analysis.seed == analysis.seed
+        # The JSON holds every value, and a NaN coefficient equals itself.
+        assert again.run(method).model_dump_json() == (
+            analysis.run(method).model_dump_json()
+        )
+
+    def test_a_seed_whose_draws_give_a_nan_coefficient_repeats(
+        self, simulation: Simulation
+    ) -> None:
+        # With these 10 draws k2 orders B at 5 alone, so the PRCC of k1 is NaN.
+        seed = 2496558405389616264
+        method = PRCC(draws=10, quantities=[ValueAt(series="B", at=5)])
+
+        first = SensitivityAnalysis(simulation, abc_rates(), seed=seed).run(method)
+        again = SensitivityAnalysis(simulation, abc_rates(), seed=seed).run(method)
+
+        assert math.isnan(first.coefficients[0][0])
+        assert first.coefficients[0][1] == -1.0
+        assert again.model_dump_json() == first.model_dump_json()
 
     def test_a_stochastic_engine_runs_at_least_one_replicate(self) -> None:
         simulation = Simulation(build_stochastic(abc_builder(), "StochasticSteps"))
         with pytest.raises(ValueError, match=r"replicates is at least 1, got 0"):
             SensitivityAnalysis(simulation, abc_rates(), replicates=0, seed=1)
+
+    def test_a_negative_count_names_the_setting(self, simulation: Simulation) -> None:
+        with pytest.raises(ValueError) as error:
+            SensitivityAnalysis(simulation, abc_rates(), replicates=-1, seed=1)
+        with pytest.raises(TypeError):
+            SensitivityAnalysis(simulation, abc_rates(), replicates=1.5, seed=1)  # ty: ignore[invalid-argument-type]
+
+        assert str(error.value) == "replicates is a whole number from 0, got -1"
 
     def test_a_seed_is_a_whole_number_of_64_bits(self, simulation: Simulation) -> None:
         with pytest.raises(ValueError):

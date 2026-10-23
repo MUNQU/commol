@@ -71,7 +71,8 @@ class Groups(BaseModel):
         self,
         stratification: str,
         weights: Mapping[str, Mapping[str, float]] | None = None,
-        **data: object,
+        *,
+        type: Literal["groups"] = "groups",
     ) -> None:
         """
         Group the neighbors of a unit by the categories of a stratification.
@@ -83,15 +84,15 @@ class Groups(BaseModel):
         weights : Mapping[str, Mapping[str, float]] | None, default=None
             ``weights[g][g']``, the weight of category ``g'`` for a unit in
             ``g``. None is the identity.
-        **data : object
-            The other fields, as JSON holds them.
+        type : {"groups"}, default="groups"
+            The kind of neighbors, as JSON holds it.
         """
         super().__init__(
             stratification=stratification,
             weights=None
             if weights is None
             else {own: dict(row) for own, row in weights.items()},
-            **data,
+            type=type,
         )
 
 

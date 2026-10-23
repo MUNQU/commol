@@ -137,6 +137,47 @@ class TestBuild:
 
         assert model.engine.settings == settings
 
+    def test_the_engine_settings_take_the_defaults_of_the_engine(self) -> None:
+        engine = commol_rs.engine
+
+        assert (ODESolver().rtol, ODESolver().atol) == (
+            engine.ODE_DEFAULT_RTOL,
+            engine.ODE_DEFAULT_ATOL,
+        )
+        events = StochasticEventsSettings()
+        assert (events.epsilon, events.tolerance) == (
+            engine.STOCHASTIC_EVENTS_DEFAULT_EPSILON,
+            engine.STOCHASTIC_EVENTS_DEFAULT_TOLERANCE,
+        )
+        builder = a_to_b_builder()
+        unset, default = (
+            Simulation(
+                builder.build(
+                    builder.structure, engine="DifferentialEquations", settings=settings
+                )
+            ).run(5)
+            for settings in (None, ODESolver())
+        )
+        assert unset == default
+
+    @pytest.mark.parametrize(
+        ("settings", "message"),
+        [
+            (
+                lambda: StochasticEventsSettings(epsilon=1.5),
+                "epsilon is strictly between 0 and 1, got 1.5",
+            ),
+            (
+                lambda: ODESolver(rtol=0.0),
+                "The solver tolerance rtol must be a positive number, got 0",
+            ),
+        ],
+        ids=["epsilon", "rtol"],
+    )
+    def test_the_engine_checks_the_settings(self, settings, message: str) -> None:
+        with pytest.raises(ValidationError, match=message):
+            settings()
+
     def test_settings_of_another_engine_name_both_engines(self) -> None:
         builder = a_to_b_builder()
         with pytest.raises(ValidationError) as error:

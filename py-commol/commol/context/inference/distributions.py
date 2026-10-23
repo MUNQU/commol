@@ -11,7 +11,7 @@ the same draws on every platform.
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Annotated, ClassVar, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from commol.commol_rs import _commol_rs as commol_rs
 
@@ -307,18 +307,18 @@ class Priors(BaseModel):
         ]
 
 
-def coerce_priors(data: object) -> object:
+def coerce_priors(data: JsonValue) -> JsonValue:
     """
     Read a mapping of parameter to distribution as `Priors`.
 
     Parameters
     ----------
-    data : object
+    data : JsonValue
         A `Priors`, or a mapping of parameter to distribution.
 
     Returns
     -------
-    object
+    JsonValue
         The value for the ``priors`` field.
     """
     if isinstance(data, Mapping) and set(data) != {"distributions"}:
@@ -335,7 +335,7 @@ class WithPriors(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def require_priors(cls, data: object) -> object:
+    def require_priors(cls, data: JsonValue) -> JsonValue:
         """Name `Priors.uniform_on_bounds()` when the priors are missing."""
         if isinstance(data, Mapping):
             if data.get("priors") is None:

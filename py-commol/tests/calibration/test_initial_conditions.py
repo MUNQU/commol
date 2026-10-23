@@ -174,6 +174,19 @@ class TestRemainderUnits:
             "the unit of 'C'."
         )
 
+    def test_an_error_of_the_values_has_no_prefix(self) -> None:
+        problem = _remainder_problem("B").model_copy(
+            update={"initial_condition_remainder": "X"}
+        )
+
+        with pytest.raises(ValueError) as error:
+            Calibrator(Simulation(build(abc_builder())), problem)
+
+        assert str(error.value) == (
+            "Initial-condition remainder 'X' is not a compartment or a bin "
+            "(available: A, B, C)"
+        )
+
     def test_a_remainder_of_the_same_unit_is_accepted(self) -> None:
         assert_accepted(
             Calibrator,

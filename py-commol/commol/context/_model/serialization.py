@@ -3,18 +3,20 @@
 import json
 import re
 
+from pydantic import JsonValue
+
 INLINE_ARRAY_MIN_LENGTH = 8
 _INLINE_TOKEN = re.compile(r'"@@inline:(\d+)@@"')
 
 
-def _is_number(value: object) -> bool:
+def _is_number(value: JsonValue) -> bool:
     """True for a JSON number or null, excluding booleans."""
     return value is None or (
         isinstance(value, (int, float)) and not isinstance(value, bool)
     )
 
 
-def _is_numeric_array(payload: list[object]) -> bool:
+def _is_numeric_array(payload: list[JsonValue]) -> bool:
     """True for a flat array of numbers, or an array of such arrays."""
     if all(_is_number(item) for item in payload):
         return True
@@ -25,8 +27,8 @@ def _is_numeric_array(payload: list[object]) -> bool:
 
 
 def _inline_numeric_arrays(
-    payload: object, inlined: list[str], min_length: int
-) -> object:
+    payload: JsonValue, inlined: list[str], min_length: int
+) -> JsonValue:
     """Replace long numeric arrays with placeholders holding their compact form."""
     if isinstance(payload, list):
         if len(payload) >= min_length and _is_numeric_array(payload):
@@ -42,7 +44,7 @@ def _inline_numeric_arrays(
 
 
 def render_json(
-    payload: object,
+    payload: JsonValue,
     indent: int = 2,
     inline_min_length: int = INLINE_ARRAY_MIN_LENGTH,
 ) -> str:
@@ -55,7 +57,7 @@ def render_json(
 
     Parameters
     ----------
-    payload : object
+    payload : JsonValue
         A JSON-serializable structure.
     indent : int, optional
         Indentation width for nested structures.

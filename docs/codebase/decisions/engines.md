@@ -140,10 +140,10 @@ A stochastic engine draws every random number from one generator seeded by
 `reset` restores it, so a run is reproducible from its seed. The default
 `set_seed` does nothing, so a deterministic engine ignores a seed.
 `EngineType::is_stochastic` says which engines draw: `StochasticEvents` and
-`StochasticSteps` (`crates/commol-stochastic/`). A run does not depend on the
-positions it reports at: `StochasticEvents` measures each wait from the last
-change of the state, never from a reported position, and draws the flow of an
-event only when the event happens.
+`StochasticSteps` (`crates/commol-stochastic/`); each engine reads its entry
+(`SimulationEngine::is_stochastic`). A run does not depend on its positions:
+`StochasticEvents` measures each wait from the last change of the state, never
+from a reported position, and draws the flow of an event when it happens.
 
 | Part | Rule |
 |---|---|

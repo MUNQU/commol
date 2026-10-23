@@ -1,7 +1,6 @@
 """Simulation of a model with the Rust engine, and access to its outputs."""
 
 import logging
-import secrets
 import time
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING
@@ -27,18 +26,6 @@ logger = logging.getLogger(__name__)
 
 SEED_LIMIT = 2**64
 """Seeds are whole numbers from 0 to ``2**64 - 1``."""
-
-
-def draw_seed() -> int:
-    """
-    A seed drawn from the randomness of the operating system.
-
-    Returns
-    -------
-    int
-        A whole number from 0 to ``2**64 - 1``.
-    """
-    return secrets.randbits(64)
 
 
 def check_seed(seed: int) -> int:
@@ -78,7 +65,7 @@ class Simulation:
     from, for example after ``Model.update_parameters``.
     """
 
-    def __init__(self, model: Model):
+    def __init__(self, model: Model) -> None:
         """
         Initializes the simulation engine from a Pydantic Model definition.
 
@@ -164,12 +151,13 @@ class Simulation:
         ).is_stochastic
 
     def _seed_run(self, seed: int | None) -> int | None:
-        """Seed the engine of a stochastic model; None for a deterministic one."""
+        """
+        Seed the engine of a stochastic model, which draws a seed for None;
+        the seed it runs with, or None for a deterministic engine.
+        """
         if not self.is_stochastic:
             return None
-        seed = draw_seed() if seed is None else check_seed(seed)
-        self._engine.set_seed(seed)
-        return seed
+        return self._engine.set_seed(None if seed is None else check_seed(seed))
 
     def run(self, num_steps: int, *, seed: int | None = None) -> SimulationResults:
         """
@@ -313,9 +301,7 @@ class Simulation:
             )
         if isinstance(count, bool) or not isinstance(count, int) or count < 1:
             raise ValueError(f"The number of replicates is at least 1, got {count!r}.")
-        return ReplicateRuns(
-            self, count, draw_seed() if seed is None else check_seed(seed)
-        )
+        return ReplicateRuns(self, count, None if seed is None else check_seed(seed))
 
     @property
     def engine(self) -> "EngineProtocol":
@@ -532,11 +518,12 @@ class ReplicateRuns:
         The simulation whose model the replicates run.
     count : int
         How many replicates.
-    seed : int
-        The seed the replicate seeds derive from.
+    seed : int | None
+        The seed the replicate seeds derive from; None draws one at each run,
+        which the replicates keep (`SimulationReplicates.seed`).
     """
 
-    def __init__(self, simulation: Simulation, count: int, seed: int):
+    def __init__(self, simulation: Simulation, count: int, seed: int | None) -> None:
         """
         The replicates of a simulation.
 
@@ -546,8 +533,9 @@ class ReplicateRuns:
             The simulation whose model the replicates run.
         count : int
             How many replicates.
-        seed : int
-            The seed the replicate seeds derive from.
+        seed : int | None
+            The seed the replicate seeds derive from; None draws one at each
+            run.
         """
         self.simulation = simulation
         self.count = count
@@ -558,7 +546,9 @@ class ReplicateRuns:
         simulation = self.simulation
         simulation._validate_all_parameters_calibrated(simulation.model_definition)
         engine = simulation.engine
-        positions, seeds, runs = engine.run_replicates(self.seed, self.count, grid)
+        seed, positions, seeds, runs = engine.run_replicates(
+            self.seed, self.count, grid
+        )
         outputs = simulation.simulation_outputs
         model = simulation.model_definition
         return SimulationReplicates(
@@ -568,7 +558,7 @@ class ReplicateRuns:
                 )
                 for replicate_seed, rows in zip(seeds, runs, strict=True)
             ),
-            seed=self.seed,
+            seed=seed,
             positions=positions,
             model=model,
         )

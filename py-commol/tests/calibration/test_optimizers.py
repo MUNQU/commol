@@ -296,28 +296,29 @@ class TestNelderMeadInsideBounds:
 
 class TestParticleSwarmConfig:
     @pytest.mark.parametrize(
-        ("setting", "canonical", "other"),
+        ("setting", "other"),
         [
-            ("inertia", {"factor": 0.721}, {"factor": 0.5}),
-            (
-                "acceleration",
-                {"cognitive": 1.193, "social": 1.193},
-                {"cognitive": 2.0, "social": 0.5},
-            ),
+            ("inertia", {"factor": 0.5}),
+            ("acceleration", {"cognitive": 2.0, "social": 0.5}),
         ],
     )
-    def test_the_settings_reach_the_swarm(
-        self, setting: str, canonical: dict[str, float], other: dict[str, float]
+    def test_a_constant_setting_has_the_default_of_the_engine(
+        self, setting: str, other: dict[str, float]
     ) -> None:
         def fit(**values: float) -> CalibrationResult:
             swarm = ParticleSwarmConfig(particles=4, max_iterations=3, verbose=False)
             config = getattr(swarm, setting)("constant", **values)
             return _calibrate(_k_problem(config, seed=SEED))
 
-        default = fit()
+        unset = _calibrate(
+            _k_problem(
+                ParticleSwarmConfig(particles=4, max_iterations=3, verbose=False),
+                seed=SEED,
+            )
+        )
 
-        assert fit(**canonical) == default
-        assert fit(**other).best_parameters != default.best_parameters
+        assert fit() == unset
+        assert fit(**other).best_parameters != unset.best_parameters
 
     def test_a_chaotic_inertia_needs_a_range(self) -> None:
         with pytest.raises(ValueError, match=r"w_max \(0.4\) must be greater"):

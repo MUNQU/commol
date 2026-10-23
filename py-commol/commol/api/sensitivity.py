@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from commol.api.calibrator import check_values
 from commol.api.inference.registry import run_method
-from commol.api.simulation import Simulation, check_seed, draw_seed
+from commol.api.simulation import Simulation, check_seed
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context._model import engine_state
 from commol.context.inference.global_sensitivity import InputSpace
@@ -49,7 +49,7 @@ class SensitivityAnalysis:
         *,
         replicates: int | None = None,
         seed: int | None = None,
-    ):
+    ) -> None:
         """
         Build the analysis of `inputs` on `simulation`.
 
@@ -68,36 +68,20 @@ class SensitivityAnalysis:
             the same analysis runs on every engine.
         seed : int | None, optional
             The seed of the designs and the replicates. Required with a
-            stochastic engine; otherwise None draws one from the operating
-            system, which the analysis logs.
+            stochastic engine; otherwise None has the engine draw one, which
+            `seed` reports and the analysis logs.
 
         Raises
         ------
         ValueError
             If an input is not a value of the model, the replicates or the
-            seed do not fit the engine, `replicates` is below 1, or the seed
-            is not a whole number from 0 to ``2**64 - 1``.
+            seed do not fit the engine, `replicates` is below 1 (a negative
+            number included), or the seed is not a whole number from 0 to
+            ``2**64 - 1``.
         """
-        engine_type = simulation.model_definition.engine.type
-        stochastic = commol_rs.engine.EngineType(engine_type).is_stochastic
-        if replicates is not None and replicates < 1:
-            raise ValueError(f"replicates is at least 1, got {replicates}")
-        if stochastic and replicates is None:
-            raise ValueError(
-                f"The {engine_type} engine is stochastic: set replicates, how many "
-                "replicates each point of a design runs."
-            )
-        if stochastic and seed is None:
-            raise ValueError(
-                f"The {engine_type} engine is stochastic: set seed, so the "
-                "replicates and the analysis are reproducible."
-            )
         self.simulation: Simulation = simulation
         self.inputs: InputSpace = inputs
         self.replicates: int | None = replicates
-        if seed is not None:
-            check_seed(seed)
-        self._seed: int | None = seed
         check_values(
             simulation.model_definition,
             simulation.engine,
@@ -110,9 +94,14 @@ class SensitivityAnalysis:
             distributions=inputs.rust_distributions(),
             sample=None if inputs.sample is None else inputs.sample.rust_sample,
             initial_condition_remainder=inputs.initial_condition_remainder,
-            replicates=replicates if stochastic else None,
-            seed=self.seed,
+            replicates=replicates,
+            seed=None if seed is None else check_seed(seed),
         )
+        if seed is None:
+            logger.info(
+                "No seed set; drew the seed %d, which repeats this analysis.",
+                self._rust.seed,
+            )
 
     @property
     def rust_analysis(self) -> "ForwardAnalysisProtocol":
@@ -249,18 +238,10 @@ class SensitivityAnalysis:
         Returns
         -------
         int
-            The seed given, or a seed drawn from the operating system once
-            per analysis and logged.
+            The seed given, or the seed the engine drew when the analysis
+            was built, which it logs.
         """
-        if self._seed is not None:
-            return self._seed
-        if not hasattr(self, "_drawn_seed"):
-            self._drawn_seed = draw_seed()
-            logger.info(
-                "No seed set; drew the seed %d, which repeats this analysis.",
-                self._drawn_seed,
-            )
-        return self._drawn_seed
+        return self._rust.seed
 
     def run(self, method: SensitivityMethod[ResultT]) -> ResultT:
         """

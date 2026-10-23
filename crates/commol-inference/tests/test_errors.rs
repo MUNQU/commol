@@ -202,7 +202,7 @@ fn a_setting_out_of_range_is_invalid_in_every_method() {
         None,
         None,
         InputSpace::Independent(priors.clone()),
-        3,
+        Some(3),
     )
     .unwrap();
     let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();

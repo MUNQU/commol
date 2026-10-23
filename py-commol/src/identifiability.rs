@@ -71,7 +71,7 @@ pub struct PyStructuralAnalysis {
 fn structural_rank(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    points: usize,
+    #[pyo3(from_py_with = crate::counts::required::points)] points: usize,
     dense: bool,
     seed: u64,
 ) -> PyResult<PyStructuralAnalysis> {
@@ -175,15 +175,16 @@ fn subsets(subsets: Vec<Subset>) -> Vec<(Vec<usize>, f64, f64)> {
 ///     threshold: The index below which a subset can be fitted together
 ///
 /// Raises:
-///     ValueError: If the engine is stochastic, a setting is not valid, or
-///         every point is infeasible
+///     ValueError: If the engine is stochastic, a setting is not valid
+///         (a negative max_subset_size included), or every point is
+///         infeasible
 #[pyfunction]
 fn collinearity(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     points: Vec<Vec<f64>>,
     weights: Vec<f64>,
-    max_subset_size: usize,
+    #[pyo3(from_py_with = crate::counts::required::max_subset_size)] max_subset_size: usize,
     threshold: f64,
 ) -> PyResult<PyCollinearityAnalysis> {
     let source = source(problem, false)?;

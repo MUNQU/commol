@@ -13,6 +13,7 @@ name = "commol_random"
 crate-type = ["rlib"]
 
 [dependencies]
+getrandom = "0.4"
 libm = { workspace = true }
 rand_core = "0.10"
 rand_xoshiro = "0.8"

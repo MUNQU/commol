@@ -48,7 +48,7 @@ fn level(outputs: &[&str]) -> Series {
 #[test]
 fn quantities_equal_hand_computations() {
     let engine = DifferenceEquations::try_from_model(&decay("DifferenceEquations")).unwrap();
-    let forward = ForwardModel::unobserved(engine.clone(), k(), None, None, 0).unwrap();
+    let forward = ForwardModel::unobserved(engine.clone(), k(), None, None, None).unwrap();
     let quantities = Quantities::new(
         &[
             Quantity::ValueAt {
@@ -148,7 +148,7 @@ fn a_gain_reads_its_start_exactly() {
 #[test]
 fn stochastic_points_average_replicates_with_common_seeds() {
     let engine = StochasticSteps::try_from_model(&decay("StochasticSteps")).unwrap();
-    let forward = ForwardModel::unobserved(engine.clone(), k(), None, Some(4), 9).unwrap();
+    let forward = ForwardModel::unobserved(engine.clone(), k(), None, Some(4), Some(9)).unwrap();
     let quantities = Quantities::new(
         &[Quantity::ValueAt {
             series: level(&["A"]),
@@ -176,7 +176,7 @@ fn stochastic_points_average_replicates_with_common_seeds() {
 #[test]
 fn a_quantity_reads_only_what_the_model_has() {
     let engine = DifferenceEquations::try_from_model(&decay("DifferenceEquations")).unwrap();
-    let forward = ForwardModel::unobserved(engine.clone(), k(), None, None, 0).unwrap();
+    let forward = ForwardModel::unobserved(engine.clone(), k(), None, None, None).unwrap();
     let outputs = engine.output_names();
     let quantity = |quantity: Quantity| Quantities::new(&[quantity], &outputs);
 
@@ -398,7 +398,7 @@ const ISHIGAMI_TOTAL: [f64; 3] = [0.5576, 0.4424, 0.2437];
 fn a_saltelli_design_needs_two_base_draws() {
     let error = ishigami_inputs().saltelli("Sobol", 1, 21).unwrap_err();
 
-    assert_eq!(error, "Sobol needs at least 2 base draws, got 1");
+    assert_eq!(error, "Sobol needs at least 2 draws, got 1");
 }
 
 #[test]
@@ -529,7 +529,7 @@ fn analysis<E: SimulationEngine + Send + Sync>(
     engine: E,
     replicates: Option<usize>,
 ) -> ForwardAnalysis<E> {
-    ForwardAnalysis::new(engine, k(), None, replicates, decay_inputs(), 5).unwrap()
+    ForwardAnalysis::new(engine, k(), None, replicates, decay_inputs(), Some(5)).unwrap()
 }
 
 fn a_at(at: f64) -> Vec<Quantity> {
@@ -588,7 +588,7 @@ fn an_analysis_takes_draws_by_its_inputs() {
         None,
         None,
         InputSpace::Sample(sample.clone()),
-        5,
+        Some(5),
     )
     .unwrap();
 
@@ -613,7 +613,7 @@ fn an_analysis_takes_draws_by_its_inputs() {
         None,
         None,
         decay_inputs(),
-        5,
+        Some(5),
     )
     .err()
     .unwrap()
@@ -625,12 +625,59 @@ fn an_analysis_takes_draws_by_its_inputs() {
 fn an_analysis_of_no_replicates_is_refused() {
     let engine = StochasticSteps::try_from_model(&decay("StochasticSteps")).unwrap();
 
-    let error = ForwardAnalysis::new(engine, k(), None, Some(0), decay_inputs(), 5)
+    let error = ForwardAnalysis::new(engine, k(), None, Some(0), decay_inputs(), Some(5))
         .err()
         .unwrap()
         .to_string();
 
-    assert_eq!(error, "A stochastic engine needs at least one replicate");
+    assert_eq!(error, "replicates is at least 1, got 0");
+}
+
+#[test]
+fn a_stochastic_analysis_needs_replicates_and_a_seed_the_user_sets() {
+    let stochastic = || StochasticSteps::try_from_model(&decay("StochasticSteps")).unwrap();
+    let refused = |engine, replicates, seed| {
+        ForwardAnalysis::new(engine, k(), None, replicates, decay_inputs(), seed)
+            .err()
+            .unwrap()
+            .to_string()
+    };
+
+    let no_replicates = refused(stochastic(), None, Some(5));
+    let no_seed = refused(stochastic(), Some(2), None);
+
+    assert_eq!(
+        no_replicates,
+        "The StochasticSteps engine is stochastic: set replicates, how many replicates each point \
+         of a design runs."
+    );
+    assert_eq!(
+        no_seed,
+        "The StochasticSteps engine is stochastic: set seed, so the replicates and the analysis \
+         are reproducible."
+    );
+}
+
+#[test]
+fn an_analysis_with_no_seed_reports_the_seed_that_repeats_it() {
+    let deterministic =
+        || DifferenceEquations::try_from_model(&decay("DifferenceEquations")).unwrap();
+    let drawn =
+        ForwardAnalysis::new(deterministic(), k(), None, None, decay_inputs(), None).unwrap();
+    let again = ForwardAnalysis::new(
+        deterministic(),
+        k(),
+        None,
+        None,
+        decay_inputs(),
+        Some(drawn.seed()),
+    )
+    .unwrap();
+
+    assert_eq!(
+        drawn.draws("PRCC", Some(6)).unwrap(),
+        again.draws("PRCC", Some(6)).unwrap()
+    );
 }
 
 #[test]
@@ -652,7 +699,7 @@ fn a_propagation_names_the_draw_that_has_no_run() {
         None,
         None,
         InputSpace::Sample(sample),
-        5,
+        Some(5),
     )
     .unwrap();
 

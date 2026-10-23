@@ -145,9 +145,9 @@ Each method returns the configuration, so they chain:
 
 | Method | Arguments | Effect |
 |---|---|---|
-| `.inertia("constant", factor=0.721)` | `factor` | A fixed inertia weight. |
+| `.inertia("constant", factor=0.72135)` | `factor` | A fixed inertia weight. The default is the weight of canonical PSO, 1/(2 ln 2), which a swarm with no `.inertia` also uses. |
 | `.inertia("chaotic", w_min=…, w_max=…)` | `w_min < w_max` | An inertia weight that varies chaotically between the two. |
-| `.acceleration("constant", cognitive=1.193, social=1.193)` | `cognitive`, `social` | Fixed pulls towards each particle's best and the swarm's best. |
+| `.acceleration("constant", cognitive=1.19315, social=1.19315)` | `cognitive`, `social` | Fixed pulls towards each particle's best and the swarm's best. The default of each is the coefficient of canonical PSO, 0.5 + ln 2, which a swarm with no `.acceleration` also uses. |
 | `.acceleration("time_varying", c1_initial=…, c1_final=…, c2_initial=…, c2_final=…)` | four factors | Pulls that change from explore (high `c1`) to exploit (high `c2`). |
 | `.velocity(clamp_factor=None, mutation_threshold=None)` | fractions | `clamp_factor` limits speed to a share of the search box (0.1–0.2 is typical); `mutation_threshold` restarts particles slower than it (0.001–0.01). |
 | `.mutation(strategy, *, scale, probability, application)` | see right | Random jumps to escape local minima: `strategy` `"gaussian"` or `"cauchy"` (larger jumps), `probability` per iteration, `application` `"global_best"`, `"all_particles"` or `"below_average"`. |
@@ -240,8 +240,8 @@ losses are a sign that the data do not identify the parameters;
 
 Set `CalibrationProblem(seed=...)`: the starts, a particle swarm and the
 replicates of a stochastic engine then make the same random choices on every
-run. Without a seed, `Calibrator.seed` draws one from the operating system and
-logs it. The result keeps it in `CalibrationResult.seed`, and the sample of
+run. Without a seed, the engine draws one when the calibrator is built;
+`Calibrator.seed` gives it and the calibrator logs it. The result keeps it in `CalibrationResult.seed`, and the sample of
 each uncertainty method in `sample.method.settings["seed"]`: set it as
 `problem.seed` to repeat the run, also from a result read back from JSON.
 

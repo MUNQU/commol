@@ -225,7 +225,7 @@ class ComparedObservationPanel:
 class _Outputs:
     """The outputs of results, and the bins and accumulators of their model."""
 
-    def __init__(self, outputs: Iterable[str], model: "Model | None"):
+    def __init__(self, outputs: Iterable[str], model: "Model | None") -> None:
         self.outputs = list(outputs)
         self.model = model
 

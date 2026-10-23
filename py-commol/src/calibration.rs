@@ -67,7 +67,7 @@ impl PyObservedDataPoint {
         weight: Option<f64>,
         factor_id: Option<String>,
         window: Option<f64>,
-        trials: Option<u64>,
+        #[pyo3(from_py_with = crate::counts::optional::trials)] trials: Option<u64>,
     ) -> Self {
         let mut inner = commol_calibration::ObservedDataPoint::of_sum(at, label, outputs, value);
         inner.weight = weight.unwrap_or(1.0);
@@ -161,7 +161,9 @@ impl PyObservationModel {
     /// read the trials of each observation
     #[staticmethod]
     #[pyo3(signature = (trials=None))]
-    fn binomial(trials: Option<u64>) -> Self {
+    fn binomial(
+        #[pyo3(from_py_with = crate::counts::optional::trials)] trials: Option<u64>,
+    ) -> Self {
         Self {
             inner: commol_calibration::ObservationModel::Binomial { trials },
         }
@@ -253,8 +255,11 @@ pub struct PyLossConfig {
     pub inner: commol_calibration::LossConfig,
     /// Whether to apply per-series observation normalization to the metric.
     pub normalize_observations: bool,
-    /// The replicates of each evaluation of a stochastic engine, or `None`.
-    pub replicates: Option<commol_calibration::Replicates>,
+    /// How many replicates each evaluation of a stochastic engine runs, if
+    /// set.
+    pub replicates: Option<usize>,
+    /// What the observations are compared with, if set.
+    pub summary: Option<commol_calibration::ReplicateSummary>,
 }
 
 // coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
@@ -268,6 +273,7 @@ impl PyLossConfig {
             inner: commol_calibration::LossConfig::SumSquaredError,
             normalize_observations: false,
             replicates: None,
+            summary: None,
         }
     }
 
@@ -278,6 +284,7 @@ impl PyLossConfig {
             inner: commol_calibration::LossConfig::RootMeanSquaredError,
             normalize_observations: false,
             replicates: None,
+            summary: None,
         }
     }
 
@@ -288,6 +295,7 @@ impl PyLossConfig {
             inner: commol_calibration::LossConfig::MeanAbsoluteError,
             normalize_observations: false,
             replicates: None,
+            summary: None,
         }
     }
 
@@ -304,36 +312,36 @@ impl PyLossConfig {
         }
     }
 
-    /// Return a copy that runs replicates of a stochastic engine at each
+    /// Return a copy with the replicates a stochastic engine runs at each
     /// evaluation, with common random numbers
     ///
     /// Each evaluation runs `count` replicates, the same seeds at every
     /// evaluation (derived from `seed`), and compares the observations with
-    /// their summary.
+    /// their summary. The calibration problem checks them against its
+    /// engine: a stochastic engine needs each one, and a deterministic
+    /// engine reads none.
     ///
     /// Args:
-    ///     count: How many replicates, at least 1
-    ///     seed: The seed the replicate seeds derive from
-    ///     summary: "mean", "median", "quantile" or "crps"
-    ///     quantile: The level of a "quantile" summary, in [0, 1]
+    ///     count: How many replicates, if set
+    ///     summary: "mean", "median", "quantile" or "crps", if set
+    ///     quantile: The level of a "quantile" summary
     ///
     /// Raises:
-    ///     ValueError: If count is 0, the summary is unknown, or the quantile
-    ///         level is missing or outside [0, 1]
-    #[pyo3(signature = (count, seed, summary, quantile=None))]
+    ///     ValueError: If the summary is unknown, or a quantile has no level
+    #[pyo3(signature = (count=None, summary=None, quantile=None))]
     fn with_replicates(
         &self,
-        count: usize,
-        seed: u64,
-        summary: &str,
+        #[pyo3(from_py_with = crate::counts::optional::count)] count: Option<usize>,
+        summary: Option<&str>,
         quantile: Option<f64>,
     ) -> PyResult<Self> {
-        let summary = commol_calibration::ReplicateSummary::from_name(summary, quantile)
-            .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
-        let replicates = commol_calibration::Replicates::new(count, seed, summary)
+        let summary = summary
+            .map(|name| commol_calibration::ReplicateSummary::from_name(name, quantile))
+            .transpose()
             .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
         Ok(Self {
-            replicates: Some(replicates),
+            replicates: count,
+            summary,
             ..self.clone()
         })
     }
@@ -372,7 +380,7 @@ impl PyNelderMeadConfig {
     #[pyo3(signature = (max_iterations=1000, sd_tolerance=1e-6, initial_simplex_size=0.1, alpha=None, gamma=None, rho=None, sigma=None, verbose=false, header_interval=100))]
     #[allow(clippy::too_many_arguments)]
     fn new(
-        max_iterations: u64,
+        #[pyo3(from_py_with = crate::counts::required::max_iterations)] max_iterations: u64,
         sd_tolerance: f64,
         initial_simplex_size: f64,
         alpha: Option<f64>,
@@ -380,7 +388,7 @@ impl PyNelderMeadConfig {
         rho: Option<f64>,
         sigma: Option<f64>,
         verbose: bool,
-        header_interval: u64,
+        #[pyo3(from_py_with = crate::counts::required::header_interval)] header_interval: u64,
     ) -> Self {
         Self {
             inner: commol_calibration::NelderMeadConfig {
@@ -573,8 +581,8 @@ impl PyParticleSwarmConfig {
     #[pyo3(signature = (particles=20, max_iterations=1000, verbose=false, inertia=None, acceleration=None, mutation=None, velocity=None, initialization="uniform", seed=None, improvement_stop=None, radius_stop=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
-        particles: usize,
-        max_iterations: u64,
+        #[pyo3(from_py_with = crate::counts::required::particles)] particles: usize,
+        #[pyo3(from_py_with = crate::counts::required::max_iterations)] max_iterations: u64,
         verbose: bool,
         inertia: Option<PyInertia>,
         acceleration: Option<PyAcceleration>,
@@ -582,7 +590,11 @@ impl PyParticleSwarmConfig {
         velocity: Option<PyRef<PyPSOVelocity>>,
         initialization: &str,
         seed: Option<u64>,
-        improvement_stop: Option<(u64, f64, f64)>,
+        #[pyo3(from_py_with = crate::counts::improvement_stop)] improvement_stop: Option<(
+            u64,
+            f64,
+            f64,
+        )>,
         radius_stop: Option<f64>,
     ) -> PyResult<Self> {
         let value_error = PyErr::new::<pyo3::exceptions::PyValueError, _>;
@@ -945,28 +957,6 @@ fn initial_condition_coverage(
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
 }
 
-/// Check every position of a calibration problem with the engine
-///
-/// Args:
-///     engine: Engine built from the model definition
-///     observed_data: Observations, at their positions and windows
-///     constraints: Constraints, at their positions
-///
-/// Raises:
-///     ValueError: If the engine does not report at a position; the message
-///         names the observation or constraint that holds it
-#[pyfunction]
-fn check_positions(
-    engine: PyRef<'_, PyEngine>,
-    observed_data: Vec<PyObservedDataPoint>,
-    constraints: Vec<PyCalibrationConstraint>,
-) -> PyResult<()> {
-    let observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
-    let constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
-    commol_calibration::check_positions(&engine.engine(), &observed_data, &constraints)
-        .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
-}
-
 /// The message of a position that results do not hold.
 fn no_value(at: f64) -> PyErr {
     PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
@@ -1032,6 +1022,15 @@ fn window_increments(
 
 /// Register calibration module with the Python module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    use commol_calibration::{AccelerationStrategy, InertiaWeightStrategy};
+    m.add(
+        "PSO_DEFAULT_INERTIA_FACTOR",
+        InertiaWeightStrategy::DEFAULT_FACTOR,
+    )?; // coverage: an error that only PyO3 returns, when the module cannot take it
+    m.add(
+        "PSO_DEFAULT_ACCELERATION",
+        AccelerationStrategy::DEFAULT_COEFFICIENT,
+    )?; // coverage: an error that only PyO3 returns, when the module cannot take it
     m.add_class::<PyCalibrationParameterType>()?;
     m.add_class::<PyObservedDataPoint>()?;
     m.add_class::<PyCalibrationParameter>()?;
@@ -1054,7 +1053,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calibrated_initial_state, m)?)?;
     m.add_function(wrap_pyfunction!(check_model_values, m)?)?;
     m.add_function(wrap_pyfunction!(initial_condition_coverage, m)?)?;
-    m.add_function(wrap_pyfunction!(check_positions, m)?)?;
     m.add_function(wrap_pyfunction!(index_at, m)?)?;
     m.add_function(wrap_pyfunction!(window_start, m)?)?;
     m.add_function(wrap_pyfunction!(window_increments, m)?)?;

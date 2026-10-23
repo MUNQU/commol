@@ -10,7 +10,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 | Area | Rule | Checked by |
 |---|---|---|
 | Python style | Ruff, line length 88; PEP 8 names | `ruff check` (rules `N`), `ruff format` (pre-commit, CI) |
-| Python types | Annotations on every signature; never `Any` | `ty check` (pre-commit, CI) checks the types; review checks the annotations and `Any` |
+| Python types | Annotations on every signature; never `Any` | `ruff check` (`ANN`, and `TID251`, which bans `typing.Any`, on `commol/`) checks the annotations; `ty check` (pre-commit, CI) checks the types |
 | Python dead code | No unused code; a name used only in a string annotation goes in `py-commol/.vulture_allowlist.py` | `vulture` (pre-commit, CI) |
 | Rust style | `cargo fmt`; no Clippy warnings | pre-commit, CI (`-D warnings`) |
 | Rust docs | Every public item documented (`missing_docs`); no broken doc links | clippy and `cargo doc` (CI) |

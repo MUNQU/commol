@@ -30,7 +30,7 @@ class ResultsPlot:
     panel of that series instead.
     """
 
-    def __init__(self, results: "SimulationResults"):
+    def __init__(self, results: "SimulationResults") -> None:
         """
         The figures of `results`.
 
@@ -300,7 +300,7 @@ class ReplicatesPlot:
     `series` adds the band of the replicates.
     """
 
-    def __init__(self, replicates: "SimulationReplicates"):
+    def __init__(self, replicates: "SimulationReplicates") -> None:
         """
         The figures of `replicates`.
 
@@ -550,7 +550,7 @@ class PredictivePlot:
     other run; the model of the source names the series.
     """
 
-    def __init__(self, predictive: "Predictive"):
+    def __init__(self, predictive: "Predictive") -> None:
         """
         The figures of `predictive`.
 
