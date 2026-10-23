@@ -4596,6 +4596,11 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>The DifferenceEquations engine reports only at integer steps; 2.5 is not
   one</code>, and an impulse or a series point between two steps names <code>the
   DifferenceEquations engine</code> or <code>the StochasticSteps engine</code>.</li>
+<li><code>Predictive.at_observations</code> and every method that reads a predictive at
+  other observations raise <code>ValueError</code> for a position the engine rejects,
+  with the message of the engine, as a calibration does. The bands, the
+  automatic block lengths and their estimates keep their values: one Rust
+  function of each computes them for every method.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>

@@ -9714,9 +9714,9 @@ class Calibrator:
         return DeltaBand(
             confidence_level=confidence_level,
             positions=points,
-            center=dict(zip(outputs, center, strict=True)),
-            lower=dict(zip(outputs, lower, strict=True)),
-            upper=dict(zip(outputs, upper, strict=True)),
+            center=by_output(outputs, center),
+            lower=by_output(outputs, lower),
+            upper=by_output(outputs, upper),
         )
 
     def rust_observation_draws(
@@ -10630,9 +10630,9 @@ def delta_band(
     return DeltaBand(
         confidence_level=confidence_level,
         positions=points,
-        center=dict(zip(outputs, center, strict=True)),
-        lower=dict(zip(outputs, lower, strict=True)),
-        upper=dict(zip(outputs, upper, strict=True)),
+        center=by_output(outputs, center),
+        lower=by_output(outputs, lower),
+        upper=by_output(outputs, upper),
     )
 ```
 
@@ -32455,20 +32455,14 @@ class Predictive:
             If the confidence level is not strictly between 0 and 1.
         """
         mean, median, lower, upper = self._rust.band(confidence_level)
-
-        def by_output(table: list[list[float]]) -> dict[str, list[float]]:
-            return {
-                name: [row[index] for row in table]
-                for index, name in enumerate(self.output_names)
-            }
-
+        names = self.output_names
         return PredictiveBand(
             confidence_level=confidence_level,
             positions=self.positions,
-            mean=by_output(mean),
-            median=by_output(median),
-            lower=by_output(lower),
-            upper=by_output(upper),
+            mean=by_output(names, mean),
+            median=by_output(names, median),
+            lower=by_output(names, lower),
+            upper=by_output(names, upper),
         )
 
     def series_band(
@@ -32919,20 +32913,14 @@ def band(self, confidence_level: float) -> PredictiveBand:
         If the confidence level is not strictly between 0 and 1.
     """
     mean, median, lower, upper = self._rust.band(confidence_level)
-
-    def by_output(table: list[list[float]]) -> dict[str, list[float]]:
-        return {
-            name: [row[index] for row in table]
-            for index, name in enumerate(self.output_names)
-        }
-
+    names = self.output_names
     return PredictiveBand(
         confidence_level=confidence_level,
         positions=self.positions,
-        mean=by_output(mean),
-        median=by_output(median),
-        lower=by_output(lower),
-        upper=by_output(upper),
+        mean=by_output(names, mean),
+        median=by_output(names, median),
+        lower=by_output(names, lower),
+        upper=by_output(names, upper),
     )
 ```
 
@@ -40852,6 +40840,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - A calibration, a sensitivity analysis or any other method that sets a model parameter raises `ValueError` when it is built if the parameter is a formula or a series parameter. The engine computes such a parameter at each step, so a value set on it was lost and the method fitted nothing. The message is the engine's, for this case and for a parameter the model does not have: `Parameter 'k9' is not in the model; the parameters that can be set are k1, k2`. Python keeps no copy of this check.
 - The four engines of the aggregate kind name themselves in their messages by the name of the engine: a position an engine does not report at gives `The DifferenceEquations engine reports only at integer steps; 2.5 is not one`, and an impulse or a series point between two steps names `the DifferenceEquations engine` or `the StochasticSteps engine`.
+- `Predictive.at_observations` and every method that reads a predictive at other observations raise `ValueError` for a position the engine rejects, with the message of the engine, as a calibration does. The bands, the automatic block lengths and their estimates keep their values: one Rust function of each computes them for every method.
 
 ### Fixed
 

@@ -1234,20 +1234,14 @@ class Predictive:
             If the confidence level is not strictly between 0 and 1.
         """
         mean, median, lower, upper = self._rust.band(confidence_level)
-
-        def by_output(table: list[list[float]]) -> dict[str, list[float]]:
-            return {
-                name: [row[index] for row in table]
-                for index, name in enumerate(self.output_names)
-            }
-
+        names = self.output_names
         return PredictiveBand(
             confidence_level=confidence_level,
             positions=self.positions,
-            mean=by_output(mean),
-            median=by_output(median),
-            lower=by_output(lower),
-            upper=by_output(upper),
+            mean=by_output(names, mean),
+            median=by_output(names, median),
+            lower=by_output(names, lower),
+            upper=by_output(names, upper),
         )
 
     def series_band(
@@ -1698,20 +1692,14 @@ def band(self, confidence_level: float) -> PredictiveBand:
         If the confidence level is not strictly between 0 and 1.
     """
     mean, median, lower, upper = self._rust.band(confidence_level)
-
-    def by_output(table: list[list[float]]) -> dict[str, list[float]]:
-        return {
-            name: [row[index] for row in table]
-            for index, name in enumerate(self.output_names)
-        }
-
+    names = self.output_names
     return PredictiveBand(
         confidence_level=confidence_level,
         positions=self.positions,
-        mean=by_output(mean),
-        median=by_output(median),
-        lower=by_output(lower),
-        upper=by_output(upper),
+        mean=by_output(names, mean),
+        median=by_output(names, median),
+        lower=by_output(names, lower),
+        upper=by_output(names, upper),
     )
 ```
 

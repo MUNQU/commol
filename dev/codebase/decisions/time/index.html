@@ -3475,8 +3475,7 @@ that do not change during a run (<code>time_thresholds</code> in
 <code>crates/commol-model/src/builder.rs</code>), and the engine evaluates them with the
 current parameters and ends a piece there. Without that, an adaptive solver
 whose rate is 0 before a short window grows its step and steps over the window.
-A comparison with the state is a state event, which the engine does not
-detect.</p>
+A comparison with the state is a state event, which the engine does not detect.</p>
 <p>On a piece <code>[start, end)</code> the right-hand side sees <code>t</code> no larger than the
 float just below <code>end</code> (<code>RightHandSide::last_t</code>). A Runge–Kutta step evaluates
 the right-hand side at the end of its interval; without the limit, a value that
@@ -3544,8 +3543,8 @@ rejected one: the observation or constraint (<code>check_positions</code> in
 <code>crates/commol-calibration/src/calibration_problem.rs</code>), the impulse transition
 or series parameter when the model is built or its parameters change
 (<code>check_model</code> in <code>crates/commol-model/src/builder.rs</code>, for an engine that
-steps only at integers), or the positions of a predictive before any draw
-runs (<code>Predictive::new</code> in <code>crates/commol-inference/src/predictive.rs</code>).</p>
+steps only at integers), or the positions and observations of a predictive before any
+draw runs (<code>Predictive::new</code>; <code>observation_draws</code> through <code>ForwardModel::with_observations</code>).</p>
 <p><strong>Rule:</strong> Python passes positions on and shows the engine's message. It never
 checks whether a model type accepts a position.</p>
 <p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_positions.rs</code>,
@@ -3556,7 +3555,8 @@ checks whether a model type accepts a position.</p>
 <code>crates/commol-model/tests/schedules.rs::an_engine_that_steps_at_integers_rejects_a_position_between_steps_at_the_check</code>,
 <code>tests/building/test_parameters.py::test_a_point_the_engine_cannot_run_is_rejected_at_build_and_update</code>,
 <code>tests/calibration/test_observations.py::TestPositionsAndEngines</code>,
-<code>crates/commol-inference/tests/test_predictive.rs::positions_the_engine_cannot_run_are_rejected_before_any_draw</code>.</p>
+<code>crates/commol-inference/tests/test_predictive.rs::positions_the_engine_cannot_run_are_rejected_before_any_draw</code>,
+<code>crates/commol-inference/tests/test_predictive.rs::observation_draws_reject_a_position_the_engine_rejects</code>.</p>
 <h2 id="results-carry-their-positions">Results carry their positions<a class="headerlink" href="#results-carry-their-positions" title="Permanent link">&para;</a></h2>
 <p><code>Simulation.run</code> and <code>run_at</code> return <code>SimulationResults</code>
 (<code>api/results.py</code>): a <code>dict</code> from output name to values, with the positions in

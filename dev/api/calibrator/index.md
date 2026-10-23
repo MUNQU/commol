@@ -235,9 +235,9 @@ class Calibrator:
         return DeltaBand(
             confidence_level=confidence_level,
             positions=points,
-            center=dict(zip(outputs, center, strict=True)),
-            lower=dict(zip(outputs, lower, strict=True)),
-            upper=dict(zip(outputs, upper, strict=True)),
+            center=by_output(outputs, center),
+            lower=by_output(outputs, lower),
+            upper=by_output(outputs, upper),
         )
 
     def rust_observation_draws(
@@ -1151,9 +1151,9 @@ def delta_band(
     return DeltaBand(
         confidence_level=confidence_level,
         positions=points,
-        center=dict(zip(outputs, center, strict=True)),
-        lower=dict(zip(outputs, lower, strict=True)),
-        upper=dict(zip(outputs, upper, strict=True)),
+        center=by_output(outputs, center),
+        lower=by_output(outputs, lower),
+        upper=by_output(outputs, upper),
     )
 ```
 

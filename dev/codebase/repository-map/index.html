@@ -3474,8 +3474,13 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/forward.rs</code></td>
-<td><code>ForwardModel</code>: every clone, reset, write of values and run of the engine (<code>run_schedule</code>, <code>run_observed</code>, <code>run_at</code>), one run per replicate of a stochastic engine, or one run seeded by its caller (<code>run_once</code>); the same model on other observations (<code>with_observations</code>), or with none (<code>unobserved</code>); <code>Workspace</code>.</td>
-<td>Loss, penalties, history.</td>
+<td><code>ForwardModel</code>: every clone, reset, write of values and run of the engine (<code>run_schedule</code>, <code>run_observed</code>, <code>run_at</code>), one run per replicate of a stochastic engine, or one run seeded by its caller (<code>run_once</code>); the same model on other observations (<code>with_observations</code>, which checks their positions), or with none (<code>unobserved</code>); <code>Workspace</code>; the one schedule of a set of observations (<code>schedule_of</code>: each position and window start, sorted, once) and the one mean over replicates (<code>replicate_mean</code>).</td>
+<td>Loss, penalties, history; a second schedule or mean over replicates.</td>
+</tr>
+<tr>
+<td><code>crates/commol-calibration/src/series.rs</code></td>
+<td><code>SeriesIndex</code>: the one index of the series of a set of observations (or of labels): the labels in order of first appearance, and the entries of each in position order. Every method that reads the observations series by series uses it.</td>
+<td>A second grouping of observations by label.</td>
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/observation.rs</code></td>
@@ -3544,12 +3549,12 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/predictive.rs</code></td>
-<td><code>Predictive</code> (the run of every draw, its bands), <code>observation_draws</code> through the observation operator, the <code>ObservationNoise</code> port (one draw's whole vector), <code>NoNoise</code>, and <code>DistributionNoise</code> with the draw of each observation model.</td>
-<td>Noise models of one method.</td>
+<td><code>Predictive</code> (the run of every draw, its bands), <code>observation_draws</code> through <code>ForwardModel::with_observations</code>, the <code>ObservationNoise</code> port (one draw's whole vector), <code>NoNoise</code>, and <code>DistributionNoise</code> with the draw of each observation model; <code>Band</code>, the one layout of a band (<code>[position][output]</code>, also of the delta method) and its one reducer (<code>Band::of</code>); <code>share_among_replicates</code>, the one share of the weight of a draw among its replicates.</td>
+<td>Noise models of one method; a second band reducer or layout.</td>
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/resampling/</code></td>
-<td>Fits to reweighted or resampled data: <code>blocks.rs</code> (<code>BlockScheme</code>, the automatic block length), <code>residuals.rs</code> (<code>Residuals</code> on a scale, residuals by series and position), <code>resamplers.rs</code> (the <code>Resampler</code> port, <code>Perturbation</code>, the Bayesian, residual and wild bootstraps, <code>ParametricResampler</code>), <code>runner.rs</code> (<code>ReplicateRunner</code> and its one loop <code>fit_all</code>, <code>ReplicateFits</code>, <code>FitUnit</code>, <code>bootstrap</code>), <code>jackknife.rs</code> (<code>block_jackknife</code>), <code>noise.rs</code> (<code>ResidualNoise</code>).</td>
+<td>Fits to reweighted or resampled data: <code>blocks.rs</code> (<code>BlockScheme</code>, the automatic block length, and the one resolution of a block length, given or automatic, with its estimates: <code>BlockScheme::resolve</code>, <code>BlockScheme::at_fit</code>, which the sandwich, the bootstraps, the jackknife, the calibration of <code>η</code> and the conformal methods call), <code>residuals.rs</code> (<code>Residuals</code> on a scale, residuals by series and position), <code>resamplers.rs</code> (the <code>Resampler</code> port, <code>Perturbation</code>, the Bayesian, residual and wild bootstraps, <code>ParametricResampler</code>), <code>runner.rs</code> (<code>ReplicateRunner</code> and its one loop <code>fit_all</code>, <code>ReplicateFits</code>, <code>FitUnit</code>, <code>bootstrap</code>), <code>jackknife.rs</code> (<code>block_jackknife</code>), <code>noise.rs</code> (<code>ResidualNoise</code>).</td>
 <td>Changes to the problem other than through <code>with_data</code>.</td>
 </tr>
 <tr>
