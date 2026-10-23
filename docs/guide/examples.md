@@ -385,7 +385,7 @@ model = (
     .build(Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0}), engine="StochasticSteps")
 )
 
-replicates = Simulation(model).replicates(100, seed=7).run(num_steps=100)
+replicates = Simulation(model).replicates(40, seed=7).run(num_steps=100)
 mean = replicates.mean()
 spread = replicates.member_statistics("C", confidence_level=0.9)
 print(round(mean["C"][-1]), round(spread["ci_lower"][-1]), round(spread["ci_upper"][-1]))
@@ -455,7 +455,7 @@ calibrator = Calibrator(Simulation(basic_model(None)), problem)
 
 with commol.threads(2):
     fit = calibrator.run()
-    bootstrap = calibrator.uncertainty(BayesianBootstrap(replicates=50, block_length=1))
+    bootstrap = calibrator.uncertainty(BayesianBootstrap(replicates=20, block_length=1))
     predictive = Predictive(calibrator, bootstrap.sample, positions=list(range(61)))
     scenarios = Scenarios(
         calibrator,
