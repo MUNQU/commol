@@ -1288,34 +1288,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1394,6 +1366,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
   
 
     
@@ -1498,14 +1498,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../uncertainty/observation-models/" class="md-nav__link">
+      <a href="../uncertainty/local/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Observation Models
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
   
 
     
@@ -1575,65 +1603,37 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/local/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Local Approximations
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/profiles/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Profile Likelihood
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3594,80 +3594,30 @@ also when it was created while a parameter was <code>None</code>. See
 <td>The compartment or bin that absorbs the difference when initial conditions are calibrated. See <a href="../calibration-initial-conditions/">Calibrating Initial Conditions</a>.</td>
 </tr>
 <tr>
+<td><code>replicates</code></td>
+<td><code>int \| None</code></td>
+<td><code>None</code></td>
+<td>How many replicates of a stochastic engine each evaluation runs. Required with a stochastic engine. See <a href="#stochastic-engines">Stochastic engines</a> and <a href="../stochastic/">Stochastic Simulation</a>.</td>
+</tr>
+<tr>
+<td><code>replicate_summary</code></td>
+<td><code>"mean"</code>, <code>"median"</code>, <code>"crps"</code>, <code>Quantile(q)</code> or <code>None</code></td>
+<td><code>None</code></td>
+<td>What each observation is compared with when an evaluation runs replicates. Required with a stochastic engine. See <a href="#stochastic-engines">Stochastic engines</a>.</td>
+</tr>
+<tr>
 <td><code>seed</code></td>
 <td><code>int \| None</code></td>
 <td><code>None</code></td>
-<td>Makes every random choice reproducible.</td>
+<td>The seed of every random number of a calibration: the replicates of a stochastic engine, the starts, a particle swarm and the uncertainty methods. Without it, <code>Calibrator.seed</code> draws one. See <a href="../calibration-optimizers/#reproducibility">Reproducibility</a>.</td>
 </tr>
 </tbody>
 </table>
 <h3 id="observations">Observations<a class="headerlink" href="#observations" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th><code>ObservedDataPoint</code> field</th>
-<th>Type</th>
-<th>Default</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>at</code></td>
-<td><code>float</code></td>
-<td>required</td>
-<td>The position of the observation on the axis. A difference model accepts integer steps only.</td>
-</tr>
-<tr>
-<td><code>output</code></td>
-<td><code>str \| None</code></td>
-<td><code>None</code></td>
-<td>The output it observes: a compartment or accumulator name, such as <code>B</code> or <code>B_g1</code>. Give <code>output</code> or <code>outputs</code>.</td>
-</tr>
-<tr>
-<td><code>outputs</code></td>
-<td><code>list[str] \| None</code></td>
-<td><code>None</code></td>
-<td>Outputs to sum before the comparison; needs a <code>label</code>.</td>
-</tr>
-<tr>
-<td><code>label</code></td>
-<td><code>str</code></td>
-<td><code>output</code></td>
-<td>The name of the observed series in reports, plots and the normalization.</td>
-</tr>
-<tr>
-<td><code>value</code></td>
-<td><code>float</code></td>
-<td>required</td>
-<td>The observed value.</td>
-</tr>
-<tr>
-<td><code>weight</code></td>
-<td><code>float</code></td>
-<td><code>1.0</code></td>
-<td>How much the observation counts in every loss, and the power of its term of a likelihood; see <a href="#losses">Losses</a>.</td>
-</tr>
-<tr>
-<td><code>factor_id</code></td>
-<td><code>str \| None</code></td>
-<td><code>None</code></td>
-<td>A <code>factor</code> parameter that multiplies the prediction.</td>
-</tr>
-<tr>
-<td><code>window</code></td>
-<td><code>float \| None</code></td>
-<td><code>None</code></td>
-<td>Compares with the gain over <code>(at − window, at]</code> instead of the value.</td>
-</tr>
-<tr>
-<td><code>trials</code></td>
-<td><code>int \| None</code></td>
-<td><code>None</code></td>
-<td>The trials of the observation, for a <code>BinomialObservations()</code> model that reads them from each observation.</td>
-</tr>
-</tbody>
-</table>
+<p>An <code>ObservedDataPoint(at=..., output=..., value=...)</code> is one observed value of
+an output at a position on the axis. Its other fields observe a sum of
+outputs, weigh it, scale the prediction by a factor or compare a gain over a
+window: <a href="../calibration-observations/">Observations</a> lists them all.</p>
 <h3 id="unknowns">Unknowns<a class="headerlink" href="#unknowns" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -3914,7 +3864,7 @@ replicate of each draw.</p>
 </tr>
 <tr>
 <td><code>converged</code></td>
-<td><code>True</code> only when the optimizer met its convergence test or <code>target_cost</code>; a run that used all <code>max_iterations</code> is <code>False</code>. See <a href="../calibration-optimizers/#converged-and-termination_reason">Optimizers</a>.</td>
+<td><code>True</code> only when the optimizer met its convergence test (a stop rule for a particle swarm); a run that used all <code>max_iterations</code> is <code>False</code>. See <a href="../calibration-optimizers/#converged-and-termination_reason">Optimizers</a>.</td>
 </tr>
 <tr>
 <td><code>termination_reason</code></td>
@@ -3952,6 +3902,14 @@ replicate of each draw.</p>
 <tr>
 <td><code>uncertainty(method)</code></td>
 <td>Runs an uncertainty method. See <a href="../uncertainty/#the-entry-point">Uncertainty</a>.</td>
+</tr>
+<tr>
+<td><code>identifiability(method)</code></td>
+<td>Runs an identifiability method. See <a href="../uncertainty/identifiability/">Identifiability</a>.</td>
+</tr>
+<tr>
+<td><code>seed</code></td>
+<td>The seed of the calibration's random numbers: <code>problem.seed</code>, or a seed drawn once and logged.</td>
 </tr>
 <tr>
 <td><code>num_observations</code>, <code>num_parameters</code>, <code>parameter_names</code></td>
@@ -3995,7 +3953,7 @@ unchanged. To set values by hand, use <code>Model.update_parameters({...})</code
 <li>[ ] Every observation names an output of the model (<code>Simulation.simulation_outputs</code>).</li>
 <li>[ ] The bounds are realistic, and the result is not stuck at a bound.</li>
 <li>[ ] <code>result.converged</code> is <code>True</code>, or you know why not.</li>
-<li>[ ] You simulate the calibrated model with a <strong>new</strong> <code>Simulation</code>.</li>
+<li>[ ] You simulate the calibrated model (<code>apply_calibration_parameters</code>, then <code>run</code>).</li>
 </ul>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>

@@ -353,8 +353,8 @@ class ModelBuilder:
         flow of each compartment is proportional to its own amount.
 
         **$compartment Usage Rules**:
-        - Only valid when len(source) > 1
-        - Target must be empty [] or have exactly one element
+        - Only valid with several sources (and one or no target) or several
+          targets (and one or no source)
         - Can be used with stratified_rates - the placeholder will be expanded in
           both the base rate and all stratified rate expressions
         - The placeholder $compartment will be replaced with each source compartment
@@ -376,9 +376,9 @@ class ModelBuilder:
             List of source state/category identifiers. When using $compartment in
             the rate, each source will generate a separate transition.
         target : list[str]
-            List of target state/category identifiers. When using $compartment,
-            target must be empty [] or have exactly one element.
-        rate : str | float | None, default=None
+            List of target state/category identifiers. When using $compartment
+            with several targets, each target generates a separate transition.
+        rate : str | float | AxisPattern | None, default=None
             Default mathematical formula, parameter reference, or constant value for
             the transition rate. Used when no stratified rate matches.
             Can be:
@@ -420,7 +420,8 @@ class ModelBuilder:
             Make the transition an impulse at these positions on the axis. At
             each one, ``rate`` is the fraction of the source (proportional) or the
             amount (absolute) moved at once, before the flows of that step. A
-            DifferenceEquations model needs integer positions.
+            DifferenceEquations or StochasticSteps model needs integer
+            positions.
 
         impulse_every : tuple[float, float] | None, default=None
             ``(period, offset)``: make the transition an impulse at ``offset``,
@@ -781,11 +782,13 @@ class ModelBuilder:
             compartment). The model is a ``Model`` of its class.
         engine : EngineName
             The engine that runs the model, which must run the kind of the
-            structure: ``"DifferenceEquations"`` (discrete time) or
-            ``"DifferentialEquations"`` (continuous time).
+            structure: ``"DifferenceEquations"`` (discrete time),
+            ``"DifferentialEquations"`` (continuous time), ``"StochasticEvents"``
+            or ``"StochasticSteps"`` (at random).
         settings : EngineSettings | None, default=None
-            Settings of that engine; None uses its defaults. Only
-            ``"DifferentialEquations"`` takes settings (`ODESolver`).
+            Settings of that engine; None uses its defaults: `ODESolver` for
+            ``"DifferentialEquations"``, `StochasticEventsSettings` and
+            `StochasticStepsSettings` for the stochastic engines.
 
         Returns
         -------
@@ -803,8 +806,8 @@ class ModelBuilder:
             one the engine cannot run (a position between two steps for an
             engine that steps only at integers, or a ``"pulse"`` point between
             two steps), a per-compartment override names an unknown
-            compartment or makes the initial amounts exceed the total, or the
-            origin has a time zone or a step unit that is not of fixed
+            compartment, a stochastic engine gets an amount that is not whole,
+            or the origin has a time zone or a step unit that is not of fixed
             calendar length.
         """
         model: Model[StructureT] = Model(
@@ -1233,8 +1236,7 @@ Each transition's rate is evaluated independently, giving per-compartment dynami
 
 **$compartment Usage Rules**:
 
-- Only valid when len(source) > 1
-- Target must be empty [] or have exactly one element
+- Only valid with several sources (and one or no target) or several targets (and one or no source)
 - Can be used with stratified_rates - the placeholder will be expanded in both the base rate and all stratified rate expressions
 - The placeholder $compartment will be replaced with each source compartment name
 
@@ -1249,12 +1251,12 @@ Parameters:
 | ------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`               | `str`                 | Unique identifier for the transition. When using $compartment expansion, the system will append "\_\_" to create unique IDs for each expanded transition (e.g., "out\_\_A", "out\_\_B"). | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `source`           | `list[str]`           | List of source state/category identifiers. When using $compartment in the rate, each source will generate a separate transition.                                                         | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `target`           | `list[str]`           | List of target state/category identifiers. When using $compartment, target must be empty [] or have exactly one element.                                                                 | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `rate`             | \`str                 | float                                                                                                                                                                                    | None\`                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `target`           | `list[str]`           | List of target state/category identifiers. When using $compartment with several targets, each target generates a separate transition.                                                    | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `rate`             | \`str                 | float                                                                                                                                                                                    | AxisPattern                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `stratified_rates` | \`list[dict]          | None\`                                                                                                                                                                                   | List of stratification-specific rates. Each dict must contain: - "conditions": List of dicts with "stratification" and "category" keys - "rate": Rate expression string                                                                                                                                                                                                                                                                                                      |
 | `per_compartment`  | \`bool                | None\`                                                                                                                                                                                   | When True, each id of a source or target bin in a rate reads the compartment of the flow (A_g1) instead of the total of the bin. Any other bin keeps its total: in a transition from A to B, k * A * (C + D) / total reads A_g1 and the totals of C and D. It applies to the fallback rate, to every stratified rate, and to every transition that $compartment expands to, where $compartment reads the compartment that flows. A transition between categories ignores it. |
 | `accumulators`     | \`list[str]           | None\`                                                                                                                                                                                   | Ids of accumulators that add up the flow of this transition.                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `impulse_at`       | \`list[float]         | None\`                                                                                                                                                                                   | Make the transition an impulse at these positions on the axis. At each one, rate is the fraction of the source (proportional) or the amount (absolute) moved at once, before the flows of that step. A DifferenceEquations model needs integer positions.                                                                                                                                                                                                                    |
+| `impulse_at`       | \`list[float]         | None\`                                                                                                                                                                                   | Make the transition an impulse at these positions on the axis. At each one, rate is the fraction of the source (proportional) or the amount (absolute) moved at once, before the flows of that step. A DifferenceEquations or StochasticSteps model needs integer positions.                                                                                                                                                                                                 |
 | `impulse_every`    | \`tuple[float, float] | None\`                                                                                                                                                                                   | (period, offset): make the transition an impulse at offset, offset + period, offset + 2 * period, ...                                                                                                                                                                                                                                                                                                                                                                        |
 
 Returns:
@@ -1307,8 +1309,8 @@ def add_transition(
     flow of each compartment is proportional to its own amount.
 
     **$compartment Usage Rules**:
-    - Only valid when len(source) > 1
-    - Target must be empty [] or have exactly one element
+    - Only valid with several sources (and one or no target) or several
+      targets (and one or no source)
     - Can be used with stratified_rates - the placeholder will be expanded in
       both the base rate and all stratified rate expressions
     - The placeholder $compartment will be replaced with each source compartment
@@ -1330,9 +1332,9 @@ def add_transition(
         List of source state/category identifiers. When using $compartment in
         the rate, each source will generate a separate transition.
     target : list[str]
-        List of target state/category identifiers. When using $compartment,
-        target must be empty [] or have exactly one element.
-    rate : str | float | None, default=None
+        List of target state/category identifiers. When using $compartment
+        with several targets, each target generates a separate transition.
+    rate : str | float | AxisPattern | None, default=None
         Default mathematical formula, parameter reference, or constant value for
         the transition rate. Used when no stratified rate matches.
         Can be:
@@ -1374,7 +1376,8 @@ def add_transition(
         Make the transition an impulse at these positions on the axis. At
         each one, ``rate`` is the fraction of the source (proportional) or the
         amount (absolute) moved at once, before the flows of that step. A
-        DifferenceEquations model needs integer positions.
+        DifferenceEquations or StochasticSteps model needs integer
+        positions.
 
     impulse_every : tuple[float, float] | None, default=None
         ``(period, offset)``: make the transition an impulse at ``offset``,
@@ -1652,11 +1655,11 @@ The process is written once; the structure lays it out and sets the kind of the 
 
 Parameters:
 
-| Name        | Type             | Description                                                                                                                                                   | Default                                                                                                   |
-| ----------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `structure` | `ModelStructure` | How the process is laid out, such as Aggregate (amounts per compartment). The model is a Model of its class.                                                  | *required*                                                                                                |
-| `engine`    | `EngineName`     | The engine that runs the model, which must run the kind of the structure: "DifferenceEquations" (discrete time) or "DifferentialEquations" (continuous time). | *required*                                                                                                |
-| `settings`  | \`EngineSettings | None\`                                                                                                                                                        | Settings of that engine; None uses its defaults. Only "DifferentialEquations" takes settings (ODESolver). |
+| Name        | Type             | Description                                                                                                                                                                                                      | Default                                                                                                                                                                  |
+| ----------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `structure` | `ModelStructure` | How the process is laid out, such as Aggregate (amounts per compartment). The model is a Model of its class.                                                                                                     | *required*                                                                                                                                                               |
+| `engine`    | `EngineName`     | The engine that runs the model, which must run the kind of the structure: "DifferenceEquations" (discrete time), "DifferentialEquations" (continuous time), "StochasticEvents" or "StochasticSteps" (at random). | *required*                                                                                                                                                               |
+| `settings`  | \`EngineSettings | None\`                                                                                                                                                                                                           | Settings of that engine; None uses its defaults: ODESolver for "DifferentialEquations", StochasticEventsSettings and StochasticStepsSettings for the stochastic engines. |
 
 Returns:
 
@@ -1666,9 +1669,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If validation fails, the structure does not fit the process (for example a fraction names no bin, or a rate reads neighbors\_<bin> and the structure has no neighbors), the engine is unknown or does not run the kind of the structure, the settings are not settings of that engine, a series point or an impulse position is one the engine cannot run (a position between two steps for an engine that steps only at integers, or a "pulse" point between two steps), a per-compartment override names an unknown compartment or makes the initial amounts exceed the total, or the origin has a time zone or a step unit that is not of fixed calendar length. |
+| Type         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If validation fails, the structure does not fit the process (for example a fraction names no bin, or a rate reads neighbors\_<bin> and the structure has no neighbors), the engine is unknown or does not run the kind of the structure, the settings are not settings of that engine, a series point or an impulse position is one the engine cannot run (a position between two steps for an engine that steps only at integers, or a "pulse" point between two steps), a per-compartment override names an unknown compartment, a stochastic engine gets an amount that is not whole, or the origin has a time zone or a step unit that is not of fixed calendar length. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -1695,11 +1698,13 @@ def build(
         compartment). The model is a ``Model`` of its class.
     engine : EngineName
         The engine that runs the model, which must run the kind of the
-        structure: ``"DifferenceEquations"`` (discrete time) or
-        ``"DifferentialEquations"`` (continuous time).
+        structure: ``"DifferenceEquations"`` (discrete time),
+        ``"DifferentialEquations"`` (continuous time), ``"StochasticEvents"``
+        or ``"StochasticSteps"`` (at random).
     settings : EngineSettings | None, default=None
-        Settings of that engine; None uses its defaults. Only
-        ``"DifferentialEquations"`` takes settings (`ODESolver`).
+        Settings of that engine; None uses its defaults: `ODESolver` for
+        ``"DifferentialEquations"``, `StochasticEventsSettings` and
+        `StochasticStepsSettings` for the stochastic engines.
 
     Returns
     -------
@@ -1717,8 +1722,8 @@ def build(
         one the engine cannot run (a position between two steps for an
         engine that steps only at integers, or a ``"pulse"`` point between
         two steps), a per-compartment override names an unknown
-        compartment or makes the initial amounts exceed the total, or the
-        origin has a time zone or a step unit that is not of fixed
+        compartment, a stochastic engine gets an amount that is not whole,
+        or the origin has a time zone or a step unit that is not of fixed
         calendar length.
     """
     model: Model[StructureT] = Model(

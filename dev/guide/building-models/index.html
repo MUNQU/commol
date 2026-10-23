@@ -1338,34 +1338,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1444,6 +1416,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
   
 
     
@@ -1548,14 +1548,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../uncertainty/observation-models/" class="md-nav__link">
+      <a href="../uncertainty/local/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Observation Models
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
   
 
     
@@ -1625,65 +1653,37 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/local/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Local Approximations
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/profiles/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Profile Likelihood
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3526,10 +3526,10 @@
 <p><code>ModelBuilder</code> writes the <strong>process</strong> of a model: its bins, parameters,
 stratifications, accumulators and transitions. <code>build</code> joins the process with a
 <strong>structure</strong>, which lays it out, and an <strong>engine</strong>, which runs it, and returns
-a validated <code>Model</code>. The process is written once; the structure is what changes
-between kinds of model. Today the structure is <code>Aggregate</code>: amounts per
-compartment. This page documents every builder method except transitions,
-which have their own page:</p>
+a validated <code>Model</code> (<a href="../core-concepts/#build-and-run">Build and run</a>). The
+structure of an aggregate model is <code>Aggregate</code>: amounts per compartment. This
+page documents every builder method except transitions, which have their own
+page:</p>
 <table>
 <thead>
 <tr>
@@ -3633,6 +3633,12 @@ which have their own page:</p>
 <td>The default unit of every bin. It enables <a href="../units-and-equations/#unit-checking">unit checking</a>.</td>
 </tr>
 <tr>
+<td><code>step_unit</code></td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>The unit of one step of the axis, such as <code>"day"</code> or <code>"meter"</code>. The unit check reads each flow as <code>&lt;bin unit&gt;/&lt;step_unit&gt;</code>. <code>None</code> means <code>step</code>. See <a href="../units-and-equations/">Units</a>.</td>
+</tr>
+<tr>
 <td><code>origin</code></td>
 <td><code>date \| datetime \| None</code></td>
 <td><code>None</code></td>
@@ -3668,12 +3674,12 @@ which have their own page:</p>
 <tr>
 <td><code>reset()</code></td>
 <td><code>ModelBuilder</code></td>
-<td>Removes bins, accumulators, stratifications, transitions and parameters; keeps the name, description, version and <code>bin_unit</code>.</td>
+<td>Removes bins, accumulators, stratifications, transitions and parameters; keeps the name, description, version, <code>bin_unit</code>, <code>step_unit</code> and <code>origin</code>.</td>
 </tr>
 <tr>
 <td><code>get_summary()</code></td>
 <td><code>dict</code></td>
-<td>The name, description, version and the ids added so far.</td>
+<td>The name, description, version, and the count and ids of the bins, stratifications, transitions and parameters added so far.</td>
 </tr>
 </tbody>
 </table>
@@ -4042,8 +4048,8 @@ only name a stratification declared before this one; otherwise the call raises
 <a href="../transitions/#stratified-rates">Transitions</a> for rates that depend on the
 category.</p>
 <h2 id="accumulators">Accumulators<a class="headerlink" href="#accumulators" title="Permanent link">&para;</a></h2>
-<p>An accumulator counts what one or more transitions move. It is an output, not
-part of the state or of the total.</p>
+<p>An <a href="../core-concepts/#accumulators">accumulator</a> counts what one or more
+transitions move.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">counted</span> <span class="o">=</span> <span class="p">(</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Counted&quot;</span><span class="p">)</span>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
@@ -4230,8 +4236,8 @@ process carries over to structures where units have their own neighbors. Under
 </tr>
 <tr>
 <td><code>Groups(stratification, weights=None)</code></td>
-<td><code>Σ_g' w[g][g'] × (amount of the bin in g')</code></td>
-<td><code>Σ_g' w[g][g'] × (amount of every bin in g')</code></td>
+<td>The sum over the categories <code>g'</code> of <code>w[g][g']</code> times the amount of the bin in <code>g'</code></td>
+<td>The same sum, of the amount of every bin in <code>g'</code></td>
 </tr>
 </tbody>
 </table>

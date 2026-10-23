@@ -1212,34 +1212,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="guide/reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1315,6 +1287,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="guide/uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
   
 
     
@@ -1419,14 +1419,42 @@
   
   
     <li class="md-nav__item">
-      <a href="guide/uncertainty/observation-models/" class="md-nav__link">
+      <a href="guide/uncertainty/local/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Observation Models
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="guide/uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
   
 
     
@@ -1496,65 +1524,37 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="guide/uncertainty/local/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Local Approximations
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="guide/uncertainty/profiles/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Profile Likelihood
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="guide/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3284,9 +3284,11 @@
 <h1 id="commol">Commol<a class="headerlink" href="#commol" title="Permanent link">&para;</a></h1>
 <p>Commol builds, simulates and calibrates compartment models: amounts move
 between states (compartments) at rates you write as formulas. An amount can be
-a count, a mass or a concentration. You describe the
-model in Python; a Rust engine expands it over your stratifications, compiles
-every rate to machine code, and runs it or fits it to your data.</p>
+a count, a mass or a concentration. You describe the process once, in Python,
+and choose the engine that runs it: difference equations, differential
+equations or a stochastic process of whole units. A Rust engine expands the
+model over your stratifications, compiles every rate to machine code, runs it,
+fits it to your data and measures how sure the fit is.</p>
 <div class="admonition warning">
 <p class="admonition-title">Before version 1.0</p>
 <p>The API can change between minor versions (<code>0.2</code> → <code>0.3</code>). The
@@ -3312,6 +3314,11 @@ every rate to machine code, and runs it or fits it to your data.</p>
 <td>Building a model</td>
 <td><a href="guide/building-models/">Building Models</a></td>
 <td><a href="guide/transitions/">Transitions</a>, <a href="guide/mathematical-expressions/">Mathematical Expressions</a></td>
+</tr>
+<tr>
+<td>Running a model</td>
+<td><a href="guide/simulations/">Running Simulations</a></td>
+<td><a href="guide/stochastic/">Stochastic Simulation</a></td>
 </tr>
 <tr>
 <td>Fitting a model to data</td>
@@ -3342,25 +3349,39 @@ every rate to machine code, and runs it or fits it to your data.</p>
 </table>
 <h2 id="how-commol-works">How Commol works<a class="headerlink" href="#how-commol-works" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>flowchart LR
-    A[ModelBuilder] --&gt;|build| B[Model]
+    A[ModelBuilder: the process] --&gt;|build with a structure and an engine| B[Model]
     B --&gt; C[Simulation]
-    C --&gt;|run| D[Results]
-    B --&gt; E[CalibrationProblem]
-    E --&gt; F[Calibrator]
-    F --&gt;|run| G[CalibrationResult]
-    G --&gt;|apply_calibration_parameters| B</code></pre>
+    C --&gt;|run, replicates| D[Results: read, plot, report]
+    B --&gt; E[Calibrator]
+    E --&gt;|run| F[CalibrationResult]
+    F --&gt;|apply_calibration_parameters| B
+    E --&gt;|uncertainty| G[ParameterSample]
+    G --&gt; H[Predictive, Scenarios]
+    H --&gt; D</code></pre>
 <ol>
-<li><strong>Build</strong> a <code>Model</code> with <code>ModelBuilder</code>: bins, parameters, transitions,
-   stratifications and initial conditions. Commol validates it as you go.</li>
-<li><strong>Simulate</strong> it with <code>Simulation</code>: one series per compartment and
-   accumulator.</li>
-<li><strong>Calibrate</strong> unknown values against observations with <code>Calibrator</code>, and
-   write the result back into the model.</li>
+<li><strong>Build</strong> the process once with <code>ModelBuilder</code>: bins, parameters,
+   transitions, stratifications and accumulators. <code>build</code> joins it with a
+   structure (the amount each bin starts with) and an engine, and checks the
+   whole definition.</li>
+<li><strong>Run</strong> it with <code>Simulation</code>. The same process runs as difference
+   equations, as differential equations or as a stochastic process of whole
+   units; only the engine changes.</li>
+<li><strong>Read</strong> the results by output name, and draw or report them with their
+   own methods (<code>results.plot</code>, <code>results.report</code>).</li>
+<li><strong>Calibrate</strong> the unknown values against observations with <code>Calibrator</code>,
+   and write the result back into the model.</li>
+<li><strong>Quantify</strong> how sure the fit is: an uncertainty method gives a sample of
+   the parameters, and its predictive gives bands and scores.</li>
+<li><strong>Compare</strong> runs: <code>Scenarios</code> runs a sample under other parameter values,
+   and <code>plot_compared</code> draws several results on the same panels.</li>
 </ol>
+<p>Every parallel step (the starts of a calibration, the replicates, the draws
+of a predictive) runs in Rust on the threads you choose.</p>
 <h2 id="quick-example">Quick example<a class="headerlink" href="#quick-example" title="Permanent link">&para;</a></h2>
+<p>One process, run by two engines:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Aggregate</span><span class="p">,</span> <span class="n">ModelBuilder</span><span class="p">,</span> <span class="n">Simulation</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">model</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">process</span> <span class="o">=</span> <span class="p">(</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Basic Model&quot;</span><span class="p">)</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
@@ -3369,15 +3390,12 @@ every rate to machine code, and runs it or fits it to your data.</p>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * A * B / total&quot;</span><span class="p">)</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_bc&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">)</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>        <span class="n">Aggregate</span><span class="p">(</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>            <span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">990</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>        <span class="p">),</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>        <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="p">)</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="p">)</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="n">results</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="n">structure</span> <span class="o">=</span> <span class="n">Aggregate</span><span class="p">(</span><span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">990</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="n">steps</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">process</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="n">flows</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">process</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferentialEquations&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">steps</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span> <span class="nb">round</span><span class="p">(</span><span class="n">flows</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>  <span class="c1"># the amount of C in each model</span>
 </span></code></pre></div>
 <h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
 <table>
@@ -3389,7 +3407,7 @@ every rate to machine code, and runs it or fits it to your data.</p>
 </thead>
 <tbody>
 <tr>
-<td>Fluent, validated model building</td>
+<td>Fluent, checked model building</td>
 <td><a href="guide/building-models/">Building Models</a></td>
 </tr>
 <tr>
@@ -3405,28 +3423,32 @@ every rate to machine code, and runs it or fits it to your data.</p>
 <td><a href="guide/axis-patterns/">Axis Patterns</a></td>
 </tr>
 <tr>
-<td>Unit checking</td>
+<td>Unit checking, and dates on the axis</td>
 <td><a href="guide/units-and-equations/">Units</a></td>
-</tr>
-<tr>
-<td>One process run as difference equations, differential equations or a stochastic process of whole units</td>
-<td><a href="guide/stochastic/">Stochastic Simulation</a></td>
 </tr>
 <tr>
 <td>A description of a model: equations, state graphs, the ODD protocol (text, Markdown, LaTeX)</td>
 <td><a href="guide/describing-models/">Describing a Model</a></td>
 </tr>
 <tr>
+<td>One process run as difference equations or differential equations; results read, plotted and compared</td>
+<td><a href="guide/simulations/">Running Simulations</a></td>
+</tr>
+<tr>
+<td>The same process as a stochastic process of whole units, with seeds and replicates</td>
+<td><a href="guide/stochastic/">Stochastic Simulation</a></td>
+</tr>
+<tr>
 <td>Calibration of parameters, initial conditions and scale factors</td>
 <td><a href="guide/calibration/">Model Calibration</a></td>
 </tr>
 <tr>
-<td>Parameter samples, predictive bands and scores</td>
+<td>Parameter samples, predictive bands, scenarios and scores</td>
 <td><a href="guide/uncertainty/">Uncertainty</a></td>
 </tr>
 <tr>
-<td>JSON-ready reports and matplotlib figures</td>
-<td><a href="guide/reports/">Reports</a>, <a href="guide/simulations/#plotting">Plotting</a></td>
+<td>JSON-ready reports</td>
+<td><a href="guide/reports/">Reports</a></td>
 </tr>
 <tr>
 <td>Parallel starts, replicates, particles and draws, on the threads you choose</td>

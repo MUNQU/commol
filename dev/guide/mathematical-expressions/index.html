@@ -1266,34 +1266,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1372,6 +1344,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
   
 
     
@@ -1476,14 +1476,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../uncertainty/observation-models/" class="md-nav__link">
+      <a href="../uncertainty/local/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Observation Models
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
   
 
     
@@ -1553,65 +1581,37 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/local/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Local Approximations
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/profiles/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Profile Likelihood
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3378,7 +3378,7 @@
 
 
 <h1 id="mathematical-expressions">Mathematical Expressions<a class="headerlink" href="#mathematical-expressions" title="Permanent link">&para;</a></h1>
-<p><a href="../../">Back to Home</a></p>
+<p><a href="../building-models/">Back to Building Models</a></p>
 <p>Rates and formula parameters are written as expressions, such as
 <code>"k1 * A * B / total"</code>. This page lists everything an expression can contain:
 operators, variables, functions, and the security limits. The engine compiles
@@ -3435,8 +3435,7 @@ each expression to machine code (Cranelift) once, and reuses it at every step.</
 </tr>
 </tbody>
 </table>
-<p>Whether a rate is the flow itself or a rate per member of the source depends on
-the variables it names; see
+<p>The variables a rate names decide whether it is absolute or proportional; see
 <a href="../transitions/#absolute-and-proportional-rates">Absolute and proportional rates</a>.</p>
 <h2 id="operators">Operators<a class="headerlink" href="#operators" title="Permanent link">&para;</a></h2>
 <table>
@@ -3535,7 +3534,7 @@ never a variable.</p>
 </tr>
 <tr>
 <td><code>neighbors_&lt;bin&gt;</code>, <code>neighbors</code></td>
-<td>In a transition rate only: the amount of a bin among the neighbors of a unit, and their total. The structure says who they are; a rate that reads them and no compartment is proportional. See <a href="../building-models/#neighbors">Neighbors</a></td>
+<td>In a transition rate only: what the neighbors of a unit hold, of one bin or of every bin. The structure says who they are; a rate that reads them and no compartment is proportional. See <a href="../building-models/#neighbors">Neighbors</a></td>
 </tr>
 <tr>
 <td><code>t</code></td>
@@ -3555,7 +3554,7 @@ never a variable.</p>
 <p>With stratifications, the engine also provides sums of compartments, the
 subgroup totals. Category suffixes must follow the order in which the
 stratifications were declared. <code>commol_rs.model.subgroup_total_names</code> (in
-<code>crates/commol-model/src/builder.rs</code>) lists them for a structure.</p>
+<code>crates/commol-model/src/builder.rs</code>) lists them for a process.</p>
 <table>
 <thead>
 <tr>
@@ -3669,7 +3668,7 @@ stratifications were declared. <code>commol_rs.model.subgroup_total_names</code>
 </tr>
 <tr>
 <td>Rounding</td>
-<td><code>floor</code>, <code>ceil</code>, <code>round</code> (halves round up: <code>round(2.5)</code> is 3)</td>
+<td><code>floor</code>, <code>ceil</code>, <code>round</code> (halves round away from zero: <code>round(2.5)</code> is 3, <code>round(-2.5)</code> is -3)</td>
 </tr>
 <tr>
 <td>Conditional</td>

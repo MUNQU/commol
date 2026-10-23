@@ -64,7 +64,7 @@ Each flow of the model is one kind of event. An event moves one unit: it takes o
 | No source (inflow), `r` | Events at rate `r`                                                    | `Poisson(r)`                                                 |
 
 - `StochasticEvents`: a flow has no events while a source holds fewer units than an event takes. A negative propensity is an error that names the flow.
-- `StochasticSteps`: every draw reads the state at the start of the step. The units of one compartment leave by its proportional flows in one multinomial draw (each flow with its probability, staying with `1 − Σ k`), so a unit never leaves twice and an amount never goes below zero. The absolute flows then draw in the order of the model, each capped by what its sources still hold. A negative rate, a proportional rate above 1, or proportional rates out of one compartment that sum to more than 1 raise `InfeasibleStateError`, which names the compartment, the step and the flows (`StochasticSteps::step` in `crates/commol-stochastic/src/steps.rs`).
+- `StochasticSteps`: every draw reads the state at the start of the step. The units of one compartment leave by its proportional flows in one multinomial draw (each flow with its probability, staying with `1 − Σ k`), so a unit never leaves twice and an amount never goes below zero. The absolute flows then draw in the order of the model, each capped by what its sources still hold. A negative rate, a proportional rate above 1, or a sum above 1 of the proportional rates out of one compartment raises `InfeasibleStateError`, which names the compartment, the step and the flows (`StochasticSteps::step` in `crates/commol-stochastic/src/steps.rs`).
 
 ```python
 from commol import InfeasibleStateError
@@ -100,20 +100,20 @@ print(model.describe().render("markdown").split("### Events")[1].split("\n\n")[1
 
 A stochastic engine moves whole units, so it starts from whole amounts (`check_model` in `crates/commol-model/src/builder.rs`):
 
-| Initial amounts                           | What happens                                                                                             |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| The amount of a bin is not a whole number | `build` raises `ValueError` and names the engine and the bin                                             |
-| Every amount is whole                     | Nothing more is needed                                                                                   |
-| An amount is not whole                    | `build` raises `ValueError`, unless the settings of the engine name a `rounding`; the message lists both |
+| Initial amounts                                                                      | What happens                                                                                             |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| The amount of a bin is not a whole number                                            | `build` raises `ValueError` and names the engine and the bin                                             |
+| Every amount is whole                                                                | Nothing more is needed                                                                                   |
+| The amount of a compartment is not whole (a bin amount times its category fractions) | `build` raises `ValueError`, unless the settings of the engine name a `rounding`; the message lists both |
 
-There is no default rounding: with small amounts the rounding decides which compartments start with a unit, so it is a modelling choice. Half a unit in each of ten groups starts five groups with one unit and five with none.
+There is no default rounding: with small amounts the rounding decides which compartments start with a unit, so it is a modelling choice. With half a unit in each of ten groups, five groups start with one unit and the others empty.
 
 | `rounding`            | Start of each run                                                                                                                                                   |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `"largest_remainder"` | The same whole amounts in every run: in each bin, each amount rounded down, and the units left over to the largest remainders, so they sum to the amount of the bin |
-| `"random"`            | A multinomial draw of the amount of each bin with the fractions of the model, in each run, so the mean start equals the amounts of the model                        |
+| `"random"`            | In each run, the amount of each bin split by a multinomial draw with the fractions of the model, so the mean start equals the amounts of the model                  |
 
-Both round each bin on its own, so a unit never moves to another bin, such as from a bin of a concentration to a bin of a count.
+Both round each bin on its own: no unit goes from one bin to another, such as from a bin of a concentration to a bin of a count.
 
 ```python
 from commol import StochasticEventsSettings
@@ -149,7 +149,7 @@ Initial conditions that calibration sets go through the same rounding. With no r
 
 ## Seeds and replicates
 
-A run is reproducible from its model and its seed: `simulation.run(…, seed=s)` gives one run, and `simulation.replicates(count, seed=s).run(…)` gives `count` runs with one seed each, in parallel. A run does not depend on the positions it reports at: the output at a position is the state after the last event before it. See [Randomness, seeds and replicates](https://munqu.github.io/commol/latest/guide/simulations/#randomness-seeds-and-replicates) for the seeds, `SimulationReplicates` and its statistics, plots of the mean and a band, and reports. A `Predictive` or a `Propagation` of a sample gives draw `j` a seed of its own, `draw_seeds[j]`, and runs its replicates as `simulation.replicates(count, seed=draw_seeds[j])` runs them, so those replicates of the model at the values of the draw repeat its runs.
+A run is reproducible from its model and its seed: `simulation.run(…, seed=s)` gives one run, and `simulation.replicates(count, seed=s).run(…)` gives `count` runs with one seed each, in parallel. A run does not depend on the positions it reports at: the output at a position is the state after the last event before it. See [Randomness, seeds and replicates](https://munqu.github.io/commol/latest/guide/simulations/#randomness-seeds-and-replicates) for the seeds, `SimulationReplicates` and its statistics, plots of the mean and a band, and reports. The draws of a sample that the uncertainty methods run follow a tree of these seeds ([The predictive](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive)).
 
 ```python
 again = simulation.run(num_steps=100, seed=1)

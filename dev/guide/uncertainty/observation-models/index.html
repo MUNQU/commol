@@ -15,10 +15,10 @@
         <link rel="canonical" href="https://munqu.github.io/commol/dev/guide/uncertainty/observation-models/">
       
       
-        <link rel="prev" href="../smc/">
+        <link rel="prev" href="../">
       
       
-        <link rel="next" href="../conformal/">
+        <link rel="next" href="../identifiability/">
       
       
         
@@ -1123,34 +1123,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1231,90 +1203,6 @@
     
   
     Uncertainty
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../identifiability/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Identifiability
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../resampling/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Resampling
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../smc/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Sequential Monte Carlo
   
 
     
@@ -1498,14 +1386,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../conformal/" class="md-nav__link">
+      <a href="../identifiability/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Conformal
+    Identifiability
   
 
     
@@ -1526,14 +1414,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../sensitivity/" class="md-nav__link">
+      <a href="../resampling/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Sensitivity Analysis
+    Resampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sequential Monte Carlo
   
 
     
@@ -1603,9 +1519,93 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3572,8 +3572,9 @@ a stochastic model with a loss and its replicates
 (<a href="../../calibration/#stochastic-engines">Stochastic engines</a>).</p>
 <h2 id="the-likelihood">The likelihood<a class="headerlink" href="#the-likelihood" title="Permanent link">&para;</a></h2>
 <p>The log-likelihood is <code>Σᵢ wᵢ · log p(yᵢ | μᵢ)</code>, where <code>μᵢ</code> is the prediction
-and <code>wᵢ</code> the observation weight: a weight is a power of its term, so a
-weight of 2 counts the observation twice, as in every loss. The log
+and <code>wᵢ</code> the observation weight. The weight raises the density of the
+observation to its power: an observation of weight 2 counts twice, as in
+every loss. The log
 densities are written in commol (<code>Noise::log_density</code> in
 <code>crates/commol-calibration/src/likelihood/density.rs</code>), and
 <code>crates/commol-calibration/tests/test_likelihood.rs</code> checks them against
@@ -3630,10 +3631,9 @@ around each draw's prediction, with the draw's noise parameters, so
 prediction interval and every score of <code>commol.scores</code> scores one. It needs a
 problem with <code>observation_models</code>, and serves the series they name, at any
 position.</p>
-<p><code>scores.log_score(predictive, observations, DistributionNoise())</code> is the log
-density of each observed value under the predictive, the mixture of the
-models over the draws, <code>log Σ_d w_d · p(y | μ_d)</code>. It needs the densities of
-the models, so another noise raises a <code>TypeError</code>. Higher is better.</p>
+<p><code>scores.log_score(predictive, observations, DistributionNoise())</code> scores the
+observed values by the densities of these models
+(<a href="../#scores">Scores</a>).</p>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
 <li>[ ] Every observed series has a model that fits how its data were measured.</li>

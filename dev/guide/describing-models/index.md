@@ -43,7 +43,7 @@ A `ModelDescription` has a `title`, a `layout` and a list of `sections`. Each se
 | `entities`       | What holds the state                                                     | Bins, accumulators, stratifications and their categories, the expanded compartments            |
 | `dynamics`       | How the state changes                                                    | The state graphs, the compact and expanded forms of the equations, the impulses, the neighbors |
 | `schedule`       | How the engine advances, and the settings it advances with               | From the engine (`EngineType.schedule`) and `Model.engine.settings`                            |
-| `initialization` | The state the model starts from                                          | Bin and stratification fractions, overrides, and the initial state the engine builds           |
+| `initialization` | The state the model starts from                                          | Bin amounts, category fractions, overrides, and the initial state the engine builds            |
 | `parameters`     | Every parameter                                                          | Value, unit, whether calibration sets it, description                                          |
 | `outputs`        | What a run returns                                                       | The outputs of each bin and accumulator                                                        |
 

@@ -18,7 +18,7 @@
         <link rel="prev" href="../calibration-optimizers/">
       
       
-        <link rel="next" href="../reports/">
+        <link rel="next" href="../uncertainty/">
       
       
         
@@ -1238,34 +1238,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1344,6 +1316,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
   
 
     
@@ -1448,14 +1448,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../uncertainty/observation-models/" class="md-nav__link">
+      <a href="../uncertainty/local/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Observation Models
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
   
 
     
@@ -1525,65 +1553,37 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/local/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Local Approximations
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/profiles/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Profile Likelihood
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3416,13 +3416,13 @@ outputs is checked at the steps you list.</p>
 <td><code>weight</code></td>
 <td><code>float</code></td>
 <td><code>1.0</code></td>
-<td>Scales the penalty of a violation.</td>
+<td>Above zero. Multiplies the amount of a violation in the penalty.</td>
 </tr>
 <tr>
 <td><code>at</code></td>
 <td><code>list[float] \| None</code></td>
 <td><code>None</code></td>
-<td>The positions on the axis at which to evaluate it. Required when the expression names an output. A difference model accepts integer steps only.</td>
+<td>The positions on the axis at which to evaluate it. Required when the expression names an output. The engine accepts the positions it accepts for <a href="../calibration-observations/#positions-between-integers">observations</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -3484,8 +3484,8 @@ passes the same security check.</p>
 </tr>
 <tr>
 <td>With <code>at</code></td>
-<td>The unknowns and the simulation outputs (compartments and accumulators)</td>
-<td>At each listed position of the simulation</td>
+<td>The unknowns and the simulation outputs (compartments, accumulators and the total of a bin over its categories, such as <code>B</code> of a stratified model)</td>
+<td>At each listed position of the simulation, in every replicate of a stochastic engine</td>
 </tr>
 </tbody>
 </table>
@@ -3505,8 +3505,12 @@ it:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>loss = P × (1 + Σ weight × |violation|)
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>P    = max(1000 × n × (largest observed value)², 1e10)
 </span></code></pre></div>
-<p>where the sum runs over the violated constraints and <code>n</code> is the number of
-observations. Parameter constraints are checked first, and the simulation is
+<p>where the sum runs over the violated constraints (and, for a constraint with
+<code>at</code>, over its positions) and <code>n</code> is the number of observations. With
+<a href="../uncertainty/observation-models/">observation models</a>, <code>P</code> comes from the
+cost of each observation at the narrowest noise the bounds allow
+(<code>Discrepancy::penalty_base</code> in <code>crates/commol-calibration/src/discrepancy.rs</code>).
+Parameter constraints are checked first, and the simulation is
 skipped when one fails. So constraints act almost as hard limits; <code>weight</code>
 only ranks violations against each other.</p>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
@@ -3533,6 +3537,10 @@ only ranks violations against each other.</p>
 <tr>
 <td>Reporting the result</td>
 <td><a href="../reports/">Reports</a></td>
+</tr>
+<tr>
+<td>How sure the fit is</td>
+<td><a href="../uncertainty/">Uncertainty</a></td>
 </tr>
 </tbody>
 </table>

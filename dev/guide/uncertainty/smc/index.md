@@ -124,12 +124,12 @@ The sampler draws `particles` particles from the priors, runs the model at each,
 1. **Resamples** (systematic) when the effective size falls below `resample_threshold` of the particles.
 1. **Moves** every particle by random-walk Metropolis, in parallel, each from its own stream of the generator. The walk proposes on an unbounded scale: the logit of the position between two finite bounds, `log(θ − a)` with a lower bound `a` only, `log(b − θ)` with an upper bound only, the parameter itself with none; so no proposal leaves the bounds. Its covariance is that of the particles on that scale, times `2.38² / d`. If the first move accepts a share `a` of its proposals, the step moves every particle `⌈log c / log(1 − a)⌉` times (Drovandi and Pettitt 2011), with `c` the `stay_probability`: each particle moves at least once with probability `1 − c`.
 
-| Setting              | Meaning                                                  | Larger values                     |
-| -------------------- | -------------------------------------------------------- | --------------------------------- |
-| `particles`          | The size of the sample                                   | Less Monte Carlo error, more runs |
-| `target_cess`        | The share of the particles each step keeps               | More, smaller steps               |
-| `resample_threshold` | Resample below this share of effective size (Gibbs only) | More resampling                   |
-| `stay_probability`   | The chance that a particle does not move in a step       | Fewer moves per step              |
+| Setting              | Meaning                                                                                | Larger values                     |
+| -------------------- | -------------------------------------------------------------------------------------- | --------------------------------- |
+| `particles`          | The size of the sample                                                                 | Less Monte Carlo error, more runs |
+| `target_cess`        | The share of the particles each step keeps                                             | More, smaller steps               |
+| `resample_threshold` | Resample below this share of effective size (`GibbsPosterior` and `BayesianPosterior`) | More resampling                   |
+| `stay_probability`   | The chance that a particle does not move in a step                                     | Fewer moves per step              |
 
 None of them has a default: each sets the cost and the accuracy of the run.
 
@@ -147,7 +147,7 @@ None of them has a default: each sets the cost and the accuracy of the run.
 | `InformationMatchingEta(block_length, starts=1)`                             | `η = tr(J I⁻¹ J) / tr(J)` at the fit: the Gauss–Newton curvature `J` of the objective against the variance `I` of the scores of its terms, summed over blocks of `block_length` positions (Holmes and Walker 2017) | `loss_function="sse"` or observation models, a deterministic engine, more blocks than parameters | A fit, finite differences and one sampler     |
 | `BootstrapCoverageEta(replicates, block_length, confidence_level, starts=1)` | The posteriors of Bayesian-bootstrap data sets hold the fit at `confidence_level` (Syring and Martin 2019)                                                                                                         | Any loss and engine                                                                              | A fit and one sampler per replicate, then one |
 
-Both calibrations read the fit `Calibrator.run(starts)`: the best of `starts` starts, the initial guess and then rows of a Latin hypercube over the bounds ([several starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)). One start (the default) can end at a local minimum.
+Both calibrations read the fit `Calibrator.run(starts)`, the best of [several starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts).
 
 Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. `J` and `I` are the curvature and the meat of the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich): `I` sums the scores over blocks, so it holds when the noise depends on its neighbours inside a block, and `block_length` has no default: `block_length=1` gives the independent version, every observation its own block. Bootstrap coverage runs one tempered sampler per replicate to a large `η`, reads the posterior of every smaller `η` by reweighting, so its search runs no model, and finds for each replicate and parameter the `η` where the interval stops holding the fit. `η` interpolates those thresholds at the level, so the expected coverage is the level; it needs at least `1/(1 − c) − 1` replicates times parameters.
 

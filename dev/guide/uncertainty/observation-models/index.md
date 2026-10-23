@@ -130,7 +130,7 @@ A stochastic engine is refused because the likelihood of a stochastic model inte
 
 ## The likelihood
 
-The log-likelihood is `Σᵢ wᵢ · log p(yᵢ | μᵢ)`, where `μᵢ` is the prediction and `wᵢ` the observation weight: a weight is a power of its term, so a weight of 2 counts the observation twice, as in every loss. The log densities are written in commol (`Noise::log_density` in `crates/commol-calibration/src/likelihood/density.rs`), and `crates/commol-calibration/tests/test_likelihood.rs` checks them against reference values of SciPy.
+The log-likelihood is `Σᵢ wᵢ · log p(yᵢ | μᵢ)`, where `μᵢ` is the prediction and `wᵢ` the observation weight. The weight raises the density of the observation to its power: an observation of weight 2 counts twice, as in every loss. The log densities are written in commol (`Noise::log_density` in `crates/commol-calibration/src/likelihood/density.rs`), and `crates/commol-calibration/tests/test_likelihood.rs` checks them against reference values of SciPy.
 
 A prediction outside the means a model allows, such as a negative count or a binomial mean above its trials, leaves the point outside the support: the optimizer gets a penalty, and a sampler a density of 0.
 
@@ -157,7 +157,7 @@ print(low < 0.05 < high)  # True
 
 `DistributionNoise()` draws every observation from the model of its series around each draw's prediction, with the draw's noise parameters, so `Predictive.at_observations(observations, DistributionNoise())` gives a prediction interval and every score of `commol.scores` scores one. It needs a problem with `observation_models`, and serves the series they name, at any position.
 
-`scores.log_score(predictive, observations, DistributionNoise())` is the log density of each observed value under the predictive, the mixture of the models over the draws, `log Σ_d w_d · p(y | μ_d)`. It needs the densities of the models, so another noise raises a `TypeError`. Higher is better.
+`scores.log_score(predictive, observations, DistributionNoise())` scores the observed values by the densities of these models ([Scores](https://munqu.github.io/commol/latest/guide/uncertainty/#scores)).
 
 ## Checklist
 

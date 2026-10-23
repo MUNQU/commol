@@ -65,16 +65,17 @@ print(calibrate_k1(observed))  # 0.4
 
 Each observation compares the model output named in `output` with `value` at the position `at`. Any output works: a compartment (`B`, `B_g1`) or an accumulator (`cum_ab`). The observation's `label` names its series in reports, plots and the per-series normalization; it defaults to `output`.
 
-| Field       | Type                | Default  | Meaning                                                                              |
-| ----------- | ------------------- | -------- | ------------------------------------------------------------------------------------ |
-| `at`        | `float`             | required | The position on the axis. The engine decides which positions its model type accepts. |
-| `output`    | `str \| None`       | `None`   | The observed output. Give `output` or `outputs`, not both.                           |
-| `outputs`   | `list[str] \| None` | `None`   | Outputs summed before the comparison; needs a `label`.                               |
-| `label`     | `str`               | `output` | The name of the observed series.                                                     |
-| `value`     | `float`             | required | The observed value, not negative.                                                    |
-| `weight`    | `float`             | `1.0`    | How much the observation counts in the loss.                                         |
-| `factor_id` | `str \| None`       | `None`   | A `factor` unknown that multiplies the prediction.                                   |
-| `window`    | `float \| None`     | `None`   | Compares with the gain over `(at − window, at]` instead of the value.                |
+| Field       | Type                | Default  | Meaning                                                                                                                                                                                                                   |
+| ----------- | ------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `at`        | `float`             | required | The position on the axis. The engine decides which positions its model type accepts.                                                                                                                                      |
+| `output`    | `str \| None`       | `None`   | The observed output. Give `output` or `outputs`, not both.                                                                                                                                                                |
+| `outputs`   | `list[str] \| None` | `None`   | Outputs summed before the comparison; needs a `label`.                                                                                                                                                                    |
+| `label`     | `str`               | `output` | The name of the observed series.                                                                                                                                                                                          |
+| `value`     | `float`             | required | The observed value, zero or more.                                                                                                                                                                                         |
+| `weight`    | `float`             | `1.0`    | Above zero. How much the observation counts in every loss, and the power of its term of a likelihood; see [Losses](https://munqu.github.io/commol/latest/guide/calibration/#losses).                                      |
+| `factor_id` | `str \| None`       | `None`   | A `factor` unknown that multiplies the prediction.                                                                                                                                                                        |
+| `window`    | `float \| None`     | `None`   | Compares with the gain over `(at − window, at]` instead of the value.                                                                                                                                                     |
+| `trials`    | `int \| None`       | `None`   | The trials of the observation, for a `BinomialObservations()` model that reads them from each observation. See [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md). |
 
 An unknown field, such as a misspelt name, raises `ValidationError` and names it.
 
@@ -99,10 +100,10 @@ print(calibrate_k1(b_and_c))  # 0.4
 
 ## Weights and normalization
 
-| Option                        | Where                | Effect                                                                                                                                                                                                                                                                                                                              |
-| ----------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `weight=2.0`                  | `ObservedDataPoint`  | The observation counts twice as much in every loss: its squared (or absolute) residual is multiplied by 2. With [observation models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#the-likelihood) its log density is. See [Losses](https://munqu.github.io/commol/latest/guide/calibration/#losses). |
-| `normalize_observations=True` | `CalibrationProblem` | Divides each residual by the RMS of its series, so a series of thousands does not drown a series of tens.                                                                                                                                                                                                                           |
+| Option                        | Where                | Effect                                                                                                                                                                                                                                                        |
+| ----------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `weight=2.0`                  | `ObservedDataPoint`  | The observation counts twice as much, in every loss and in a [likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#the-likelihood) ([How weights count](https://munqu.github.io/commol/latest/guide/calibration/#losses)). |
+| `normalize_observations=True` | `CalibrationProblem` | Divides each residual by the RMS of its series ([Losses](https://munqu.github.io/commol/latest/guide/calibration/#losses)), so a series of thousands does not drown a series of tens.                                                                         |
 
 ```python
 weighted = [
@@ -175,7 +176,7 @@ print(calibrate_k1(windowed))  # 0.4
 
 ## Positions between integers
 
-A `DifferentialEquations` model runs in continuous time, so an observation may be at any position, such as `2.5`, and a window may cover any length. The calibration reads the engine at those positions (`SimulationEngine::run_at_positions_into_buffer`). The engine decides which positions its model type accepts (`SimulationEngine::check_position`): a `DifferenceEquations` model reports only at integer steps, so `Calibrator` raises `ValueError` for any other position, and the engine's message names the observation, or the constraint, that holds it (`check_positions` in `crates/commol-calibration/src/calibration_problem.rs`).
+An observation is at a position that the engine of the model reports at, as for [`Simulation.run_at`](https://munqu.github.io/commol/latest/guide/simulations/#simulation): a model in continuous time (`DifferentialEquations`, `StochasticEvents`) at any position, such as `2.5`, with windows of any length; a model of whole steps (`DifferenceEquations`, `StochasticSteps`) at integer steps only. The calibration reads the engine at those positions (`SimulationEngine::run_at_positions_into_buffer`), and the engine checks each one (`SimulationEngine::check_position`): `Calibrator` raises `ValueError` for a position the engine does not accept, and the engine's message names the observation, or the constraint, that holds it (`check_positions` in `crates/commol-calibration/src/calibration_problem.rs`).
 
 ```python
 def ode_model(k1: float | None):

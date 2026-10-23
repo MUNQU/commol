@@ -1123,34 +1123,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1231,6 +1203,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
   
 
     
@@ -1525,14 +1525,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../observation-models/" class="md-nav__link">
+      <a href="../local/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Observation Models
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
   
 
     
@@ -1602,65 +1630,37 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../local/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Local Approximations
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../profiles/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Profile Likelihood
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3805,8 +3805,9 @@ against the interval, run more replicates.</p>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">lower</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">lower</span> <span class="o">&lt;=</span> <span class="n">error</span><span class="o">.</span><span class="n">lower</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>  <span class="c1"># True</span>
 </span></code></pre></div>
 <h2 id="how-replicates-run">How replicates run<a class="headerlink" href="#how-replicates-run" title="Permanent link">&para;</a></h2>
-<p>Each replicate starts from the fit. With <code>starts &gt; 1</code> it also starts from rows
-of a Latin hypercube over the bounds, and keeps the end of lowest loss, so a
+<p>Each replicate starts from the fit. With <code>starts &gt; 1</code> it also starts from the
+<a href="../../calibration-optimizers/#several-starts">other starts</a> of the optimizer,
+and keeps the end of lowest loss, so a
 second basin of the loss shows up instead of adding optimizer noise to the
 data's uncertainty. Replicate <code>b</code> draws its data and its starts from
 <code>replicate_seed(seed, b)</code> of the problem's seed: two runs with one seed give one

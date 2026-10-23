@@ -13,30 +13,32 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 
 ## User guide
 
-- [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md): Compartments, stratifications, transitions, rates, the process and the structure, with runnable examples
-- [Model Builder](https://munqu.github.io/commol/latest/guide/building-models/index.md): Every ModelBuilder method and argument, series parameters, validation rules, save and load
-- [Transitions](https://munqu.github.io/commol/latest/guide/transitions/index.md): Absolute and proportional rates, several sources, $compartment, category transitions, per_compartment, stratified rates, what build checks
+- [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md): Compartments, parameters, transitions, accumulators, the process and the structure, the four engines and what a rate means in each, stratifications, units of the axis
+- [Model Builder](https://munqu.github.io/commol/latest/guide/building-models/index.md): Every ModelBuilder method and argument, series parameters, the Aggregate structure and its neighbors, build, save and load
+- [Transitions](https://munqu.github.io/commol/latest/guide/transitions/index.md): Absolute and proportional rates, several sources, $compartment, category transitions, per_compartment, stratified rates, impulses, amounts below zero, what build checks
 - [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md): Operators, variables, subgroup totals, functions and security limits of rate formulas
 - [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md): AxisPattern pulses, windows, ramps, sinusoids, combinations and schedules per subgroup
-- [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md): Unit checking of rates, impulses and the step unit
+- [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md): Unit checking of rates, the step unit, positions and numbers in a rate, impulses, and dates on the axis
 - [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md): Model.describe, its sections and blocks, text, Markdown, LaTeX, JSON and DOT renderings, the ODD layout
-- [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md): Simulation.run, output formats, totals by bin and category, windowed totals, plotting
-- [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md): The StochasticEvents and StochasticSteps engines, how rates become events, whole units, methods, calibration with replicates
-- [Calibration Basics](https://munqu.github.io/commol/latest/guide/calibration/index.md): CalibrationProblem, observations, unknowns, losses, results and writing results back
+- [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md): Simulation.run and run_at, results by output name, seeds and replicates, accumulators, totals by bin and category, windowed totals, differential equations, figures and plot_compared
+- [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md): The StochasticEvents and StochasticSteps engines, how rates become events, whole units, seeds and replicates, methods, calibration with replicates
+- [Calibration Basics](https://munqu.github.io/commol/latest/guide/calibration/index.md): CalibrationProblem, observations, unknowns, losses, stochastic engines, results and writing results back
 - [Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md): Calibrating bins, categories and compartments, the remainder and the order of application
-- [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md): Several outputs, sums of outputs, weights, scale factors and windowed observations
-- [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md): Nelder-Mead and particle swarm settings, reproducibility, troubleshooting
+- [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md): The fields of an observation, several outputs, sums of outputs, weights, scale factors and windowed observations
+- [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md): Nelder-Mead and particle swarm settings, several starts, reproducibility, troubleshooting
 - [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md): Constraints on unknowns and outputs, and how violations count
-- [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md): The three questions, bands and prediction intervals, which method answers which question, the parameter sample, the predictive, scores and the entry point
+- [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md): The three questions, bands and prediction intervals, which method answers which question, the parameter sample, the predictive, scenarios, scores and the entry point
+- [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md): Observation models of each series, noise parameters, maximum likelihood, the Bayesian posterior and its evidence, prediction intervals with noise, the log score and the parametric bootstrap
 - [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md): Structural against practical identifiability, the structural rank, collinearity, a sample, starts, combinations and the report
 - [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md): The Bayesian, residual and wild block bootstraps, the block jackknife, block lengths and prediction intervals from residuals
 - [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md): Priors, the sequential Monte Carlo sampler, the Gibbs posterior and its scale eta, ABC and its distances, and the diagnostics
-- [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md): Observation models of each series, noise parameters, maximum likelihood, the Bayesian posterior and its evidence, prediction intervals with noise, the log score and the parametric bootstrap
+- [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/index.md): The curvature and the unbounded scale, the Laplace approximation and the delta method, the sandwich, the Laplace mixture and PSIS
+- [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md): Profile likelihood of parameters and predictions, how to read a profile, the chi-square, Beale and bootstrap thresholds, the adaptive step, verdicts, the report and plots
 - [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md): Conformal prediction intervals, the guarantee, scores and pooling, split, rolling origins, jackknife+ and CV+, EnbPI, adaptive conformal, plots and reports
 - [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md): Forward questions with no data, input spaces, quantities of interest, propagation, PRCC, Morris screening, Sobol indices, polynomial chaos and their plots
-- [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md): Profile likelihood of parameters and predictions, how to read a profile, the chi-square, Beale and bootstrap thresholds, the adaptive step, verdicts, the report and plots
-- [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md): applied_parameters_report and simulation_report
-- [Examples](https://munqu.github.io/commol/latest/guide/examples/index.md): Complete models
+- [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md): The applied parameters of a model, and the reports of a run, of replicates, of a predictive and of an identifiability analysis
+- [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md): The threads and levels of the parallel work, commol.set_threads and commol.threads, RAYON_NUM_THREADS
+- [Examples](https://munqu.github.io/commol/latest/guide/examples/index.md): Complete models, from rates and stratifications to other engines, a fit, its uncertainty and scenarios
 
 ## API reference
 

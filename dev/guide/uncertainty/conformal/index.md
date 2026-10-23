@@ -100,7 +100,7 @@ Every variant takes a `score`, a `by` and a `confidence_level`, none with a defa
 
 `by="series"` gives each series (observation label) its own quantile; `by="all"` gives every series one quantile. Per series is the safer first choice: a small series does not borrow the errors of a large one, but it needs `1/α − 1` scores of its own.
 
-- `score="normalized"` with `by="series"` raises a `ValueError`: its factor is one constant per series, so its intervals equal those of `"absolute"`.
+- `score="normalized"` with `by="series"` raises a `ValueError`: with one constant factor per series, its intervals are those of `"absolute"`.
 - `score="spread"` needs predictions with a spread. `SplitConformal` and `AdaptiveConformal` take it from a `sample`, whose predictive gives the prediction (its weighted median) and the spread (its weighted standard deviation); without one they raise a `ValueError`. `JackknifePlus` and `EnbPI` take it from their own refits. `RollingConformal` fits once per origin, so it rejects `"spread"`.
 
 ```python
@@ -235,7 +235,7 @@ print(round(sum(misses) / len(misses), 3))  # 0.125
 
 ## Results, plots and reports
 
-Every variant returns a `ConformalResult(intervals, scores, guarantee, failed, not_converged)`. A variant that refits lists each refit that failed in `failed`, named by its unit: `"Origin <index> failed: <reason>"` for `RollingConformal`, `"Block <index> failed: <reason>"` for `JackknifePlus`, and `"Replicate <index> failed: <reason>"` for `EnbPI`; each is also logged as a warning, and gives no score. `not_converged` counts the refits kept although their optimizer did not converge. Split and adaptive conformal do not refit, so their `failed` is empty and their `not_converged` is 0. `intervals` is a `PredictionIntervals`: its `confidence_level`, a `SeriesIntervals` per series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`. `plot.series(prediction_intervals=...)` of a run, of replicates or of a predictive draws the band of each series on its panel, and `SimulationResults.report(..., prediction_intervals=...)` adds it under the key `prediction_intervals`.
+Every variant returns a `ConformalResult(intervals, scores, guarantee, failed, not_converged)`. A variant that refits lists each refit that failed in `failed`, named by its unit: `"Origin <index> failed: <reason>"` for `RollingConformal`, `"Block <index> failed: <reason>"` for `JackknifePlus`, and `"Replicate <index> failed: <reason>"` for `EnbPI`; each is also logged as a warning, and gives no score. `not_converged` counts the refits kept although their optimizer did not converge. Split and adaptive conformal do not refit, so their `failed` is empty and their `not_converged` is 0. `intervals` is a `PredictionIntervals`: its `confidence_level`, a `SeriesIntervals` per series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`. `plot.series(prediction_intervals=...)` of a run, of replicates or of a predictive draws the band of each series on its panel. `SimulationResults.report`, `SimulationReplicates.report` and `Predictive.report` take `prediction_intervals=...` too, and add the intervals under the key `prediction_intervals`.
 
 ```python
 run = Simulation(ab_model(0.05)).run(num_steps=90)

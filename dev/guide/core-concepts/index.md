@@ -49,10 +49,10 @@ builder = (
 
 A transition moves an amount from its `source` compartments to its `target` compartments along the axis. How much it moves depends on its rate:
 
-| The rate…                                   | Kind             | Flow            | Example                |
-| ------------------------------------------- | ---------------- | --------------- | ---------------------- |
-| names a compartment, a bin total or `total` | **Absolute**     | the rate itself | `"k1 * A * B / total"` |
-| names no compartment                        | **Proportional** | rate × source   | `"k2"` moves `k2 × B`  |
+| The rate…                          | Kind             | Flow            | Example                |
+| ---------------------------------- | ---------------- | --------------- | ---------------------- |
+| names a compartment or a bin total | **Absolute**     | the rate itself | `"k1 * A * B / total"` |
+| names no compartment               | **Proportional** | rate × source   | `"k2"` moves `k2 × B`  |
 
 ```python
 builder = (
@@ -62,7 +62,7 @@ builder = (
 )
 ```
 
-The engine decides the kind when the model is built, and [`model.describe()`](https://munqu.github.io/commol/latest/guide/describing-models/index.md) shows the result: the proportional rate above shows as `k2 * B`. See [Design decisions](https://munqu.github.io/commol/latest/codebase/decisions/transitions-and-rates/#absolute-and-proportional-rates) for the exact rule.
+The engine decides the kind when the model is built, and [`model.describe()`](https://munqu.github.io/commol/latest/guide/describing-models/index.md) shows the result: the proportional rate above shows as `k2 * B`. [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-proportional-rates) gives the exact rule, with its edge cases.
 
 ## Accumulators
 
@@ -89,13 +89,7 @@ The calls above write the **process**: what changes and how. The **structure** l
 structure = Aggregate(bin_amounts={"A": 900, "B": 100, "C": 0})
 ```
 
-| Rule                                                    | Checked when       |
-| ------------------------------------------------------- | ------------------ |
-| Every amount is finite and not negative                 | `Aggregate(...)`   |
-| Every bin has an amount                                 | The model is built |
-| Every stratification has fractions, and they sum to 1.0 | The model is built |
-
-An amount may be `None` when calibration will find it; see [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md).
+Every bin needs an amount. An amount may be `None` when calibration will find it ([Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)). [The structure](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate) lists every argument of `Aggregate` and when each rule is checked.
 
 ## Build and run
 
@@ -132,7 +126,7 @@ See [Differential equations](https://munqu.github.io/commol/latest/guide/simulat
 
 ### What a rate means
 
-A flow is per unit of the axis in every engine, and the unit check is the same for both. What its value means is the engine's (`rate_meaning` of the engine's list, `EngineType` in `crates/commol-core/src/types/engine.rs`):
+A flow is per unit of the axis in every engine, and the unit check is the same for every engine. What its value means is the engine's (`rate_meaning` of the engine's list, `EngineType` in `crates/commol-core/src/types/engine.rs`):
 
 | Engine                  | `rate_meaning` | A flow of value `f`                                                                                              | Equation                               |
 | ----------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
@@ -185,12 +179,12 @@ for compartment in stratified.structure.initial_state(stratified.process):
     print(compartment.name, compartment.amount)
 ```
 
-| Compartment | Calculation       | Initial amount |
-| ----------- | ----------------- | -------------- |
-| `A_g1`      | 10000 × 0.9 × 0.6 | 5400           |
-| `A_g2`      | 10000 × 0.9 × 0.4 | 3600           |
-| `B_g1`      | 10000 × 0.1 × 0.6 | 600            |
-| `B_g2`      | 10000 × 0.1 × 0.4 | 400            |
+| Compartment | Calculation | Initial amount |
+| ----------- | ----------- | -------------- |
+| `A_g1`      | 9000 × 0.6  | 5400           |
+| `A_g2`      | 9000 × 0.4  | 3600           |
+| `B_g1`      | 1000 × 0.6  | 600            |
+| `B_g2`      | 1000 × 0.4  | 400            |
 
 `model.structure.initial_state(model.process)` returns this table as the engine builds it: each compartment with its bin, its categories and its amount.
 
@@ -296,48 +290,11 @@ A category name that two stratifications declare must be qualified with its stra
 
 ## Several sources or targets
 
-A transition with several sources or targets moves **one** flow: each source loses it and each target gains it. Its rate must be absolute, because a proportional rate has no single source to multiply.
-
-```python
-merge = (
-    ModelBuilder(name="Merge")
-    .add_bin(id="A", name="State A")
-    .add_bin(id="B", name="State B")
-    .add_bin(id="C", name="State C")
-    .add_parameter(id="k", value=0.001)
-    .add_transition(id="t1", source=["A", "B"], target=["C", "C"], rate="k * A * B")
-    .build(
-        Aggregate(
-            bin_amounts={"A": 500, "B": 500, "C": 0},
-        ),
-        engine="DifferenceEquations",
-    )
-)
-# Each step: A loses k*A*B, B loses k*A*B, C gains 2*k*A*B
-```
-
-For **independent** flows from several compartments, use the `$compartment` placeholder: the builder creates one transition per source. An empty `target` removes the flow from the system.
-
-```python
-outflow = (
-    ModelBuilder(name="Outflow")
-    .add_bin(id="A", name="State A")
-    .add_bin(id="B", name="State B")
-    .add_parameter(id="mu", value=0.01)
-    .add_transition(id="outflow", source=["A", "B"], target=[], rate="mu * $compartment")
-    .build(
-        Aggregate(
-            bin_amounts={"A": 500, "B": 500},
-        ),
-        engine="DifferenceEquations",
-    )
-)
-print([t.id for t in outflow.process.transitions])  # ['outflow__A', 'outflow__B']
-```
+A transition can have several sources or several targets. It then moves **one** flow, which each source loses and each target gains, so its rate must be absolute. For independent flows of one formula from several compartments, the `$compartment` placeholder makes one transition per compartment. See [Several sources or targets](https://munqu.github.io/commol/latest/guide/transitions/#several-sources-or-targets).
 
 ## Units of the axis
 
-A model knows only steps: a rate is per step, and a position or a period is a number of steps. `AxisUnits` converts values in units to steps, and gives the rate that the engine of a model reads. `Model.axis_units()` gives the one of a model: its `step_unit` (or `step` when it declares none) and its engine.
+A model knows only steps: a rate is per step, and a position or a period is a number of steps. `AxisUnits` converts values in units to steps, and gives the rate that the engine of a model reads. `Model.axis_units()` gives the one of a model: its `step_unit` (or `step` when it declares none), its `origin` and its engine.
 
 ```python
 from commol import AxisUnits

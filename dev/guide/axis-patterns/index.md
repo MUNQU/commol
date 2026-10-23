@@ -36,16 +36,16 @@ A transition with no source uses the pattern as the flow. With a source, a patte
 
 Each pattern reads `step` or `t` (see [Patterns in a differential model](#patterns-in-a-differential-model)). In a difference model both are the step `s`.
 
-| Pattern                                            | Reads                                  | Value                                                                             | Arguments                                                          |
-| -------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `pulse(at, value)`                                 | `step`                                 | `value` when `step == at`, else 0                                                 | integer `at >= 0`                                                  |
-| `pulses(at, value)`                                | `step`                                 | `value` at each step in `at`, else 0                                              | unique integer steps, not empty; `value` may be one value per step |
-| `periodic(period, value, offset=0)`                | `step`                                 | `value` when `step = offset, offset + period, …`, else 0                          | integer `period > 0`, `0 <= offset < period`                       |
-| `interval(start, end, value)`                      | `t`                                    | `value` for `start <= t < end`, else 0                                            | `start < end`, any finite positions                                |
-| `linear_ramp(start, end, start_value, end_value)`  | `t`                                    | From `start_value` at `start` towards `end_value`, for `start <= t < end`; else 0 | `start < end`, any finite positions                                |
-| `sinusoid(amplitude, period, phase=0, baseline=0)` | `t`                                    | `baseline + amplitude × sin(2π (t − phase) / period)`                             | numeric `period != 0`                                              |
-| `gaussian_pulse(center, width, peak)`              | `t`                                    | `peak × exp(−(t − center)² / (2 width²))`                                         | `width > 0`                                                        |
-| `from_formula(expr)`                               | Any expression, wrapped in parentheses | not empty; passes the security check                                              |                                                                    |
+| Pattern                                            | Reads         | Value                                                                             | Arguments                                                          |
+| -------------------------------------------------- | ------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `pulse(at, value)`                                 | `step`        | `value` when `step == at`, else 0                                                 | integer `at >= 0`                                                  |
+| `pulses(at, value)`                                | `step`        | `value` at each step in `at`, else 0                                              | unique integer steps, not empty; `value` may be one value per step |
+| `periodic(period, value, offset=0)`                | `step`        | `value` when `step = offset, offset + period, …`, else 0                          | integer `period > 0`, `0 <= offset < period`                       |
+| `interval(start, end, value)`                      | `t`           | `value` for `start <= t < end`, else 0                                            | `start < end`, any finite positions                                |
+| `linear_ramp(start, end, start_value, end_value)`  | `t`           | From `start_value` at `start` towards `end_value`, for `start <= t < end`; else 0 | `start < end`, any finite positions                                |
+| `sinusoid(amplitude, period, phase=0, baseline=0)` | `t`           | `baseline + amplitude × sin(2π (t − phase) / period)`                             | numeric `period != 0`                                              |
+| `gaussian_pulse(center, width, peak)`              | `t`           | `peak × exp(−(t − center)² / (2 width²))`                                         | `width > 0`                                                        |
+| `from_formula(expr)`                               | What it names | The expression, wrapped in parentheses                                            | not empty; passes the security check                               |
 
 An invalid argument raises `pydantic.ValidationError` (a `ValueError`). These arguments also accept a parameter name, so calibration can fit them: `value` of `pulse`, `pulses`, `periodic` and `interval`; every argument of `sinusoid`; and `peak` of `gaussian_pulse`.
 
@@ -155,6 +155,7 @@ print(stratified_flows(schedule))
 | A compartment that matches no group, with no default | No flow                                                                      |
 | A compartment that matches several groups            | The group with the most conditions wins                                      |
 | `conditions`                                         | Not empty; each entry has `stratification` and `category`, and may have `to` |
+| Two groups with the same conditions                  | `ValueError`                                                                 |
 
 ```python
 only_cat1 = AxisPattern.add_group(
@@ -231,11 +232,11 @@ print(routed["A_s0"], routed["A_s1"])  # [500.0, 500.0, 250.0] [500.0, 500.0, 75
 
 In a `DifferentialEquations` model `step` is constant on each unit interval `[n, n + 1)` and `t` moves continuously.
 
-| Pattern                                     | In a differential model                                                                                                                                                                                                                                                     |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pulse`, `pulses`, `periodic` (read `step`) | A rate that holds for one unit: a proportional `pulse` of `value` moves `1 − e^(−value)` of its source, and `value` in a difference model. To move a fraction at once in both engines, use an [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses). |
-| `interval`, `linear_ramp` (read `t`)        | Open and close at any position, such as `interval(start=2.5, end=4, …)`; the ramp is continuous. The engine restarts its integration at both bounds.                                                                                                                        |
-| `sinusoid`, `gaussian_pulse` (read `t`)     | Continuous in `t`.                                                                                                                                                                                                                                                          |
+| Pattern                                     | In a differential model                                                                                                                                                                                                                                                                             |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pulse`, `pulses`, `periodic` (read `step`) | A rate that holds for one unit of the axis ([Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step) says what it moves). To move a fraction at once in both engines, use an [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses). |
+| `interval`, `linear_ramp` (read `t`)        | Open and close at any position, such as `interval(start=2.5, end=4, …)`; the ramp is continuous. The engine restarts its integration at both bounds.                                                                                                                                                |
+| `sinusoid`, `gaussian_pulse` (read `t`)     | Continuous in `t`.                                                                                                                                                                                                                                                                                  |
 
 ```python
 def remaining_a(rate: AxisPattern, at: float) -> float:
@@ -270,7 +271,7 @@ Numeric `pulse` and `pulses` patterns become [series parameters](https://munqu.g
 | Not in a group | `_series_<n>`                                                                                                        |
 | In a group     | `{transition}_{source bin}_{source categories}_to_{target bin}_{target categories}`, such as `flow_A_cat1_to_B_cat1` |
 
-A generated id must not clash with a parameter of yours; building the model raises if it does.
+A generated id must not clash with a parameter of yours: the second of the two calls (`add_parameter` or `add_transition`) raises `ValueError`.
 
 ## Next steps
 

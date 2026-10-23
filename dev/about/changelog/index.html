@@ -1110,34 +1110,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../guide/reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1213,6 +1185,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
   
 
     
@@ -1317,14 +1317,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/uncertainty/observation-models/" class="md-nav__link">
+      <a href="../../guide/uncertainty/local/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Observation Models
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
   
 
     
@@ -1394,65 +1422,37 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../guide/uncertainty/local/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Local Approximations
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../guide/uncertainty/profiles/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Profile Likelihood
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3148,6 +3148,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3610,7 +3621,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
+  <a href="#documentation_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Documentation
@@ -3840,6 +3851,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4302,7 +4324,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
+  <a href="#documentation_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Documentation
@@ -4507,6 +4529,19 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   bins of different units are "a count and a concentration". A test checks
   the words of the user pages and of the source of <code>commol</code>.</p>
 </li>
+</ul>
+<h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The documentation reads as one account of the library: the home page, the
+  quickstart and the examples show one process run by several engines, then
+  calibration, uncertainty, the comparison of runs and parallel work, and the
+  guide follows that order. Each rule lives in one page and the others link
+  to it; a test checks that every page is in the navigation and that no text
+  repeats across pages. The API reference names every name of
+  <code>commol.__all__</code> and the module of each name that the root does not export.
+  The maintainer pages name the paths, symbols and tests of the code, and the
+  design note of per-compartment initial conditions is part of
+  <a href="../../codebase/decisions/initial-conditions/">Initial conditions</a>.</li>
 </ul>
 <h2 id="0100-2026-10-23">[0.10.0] - 2026-10-23<a class="headerlink" href="#0100-2026-10-23" title="Permanent link">&para;</a></h2>
 <p>This release makes equivalent things the same across commol, after an audit
@@ -6382,7 +6417,7 @@ place), and every interval uses one quantile, so the intervals of
   found", and bin prefixes (<code>"B_g1"</code>) and qualified categories (<code>"group:g1"</code>)
   are accepted, as documented. Before, both were rejected as "not found".</li>
 </ul>
-<h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>
+<h3 id="documentation_1">Documentation<a class="headerlink" href="#documentation_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>The guide is rewritten and split into pages with one job each (building
   models, transitions, expressions, time patterns, units, simulations, and six

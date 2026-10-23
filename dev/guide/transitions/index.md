@@ -51,12 +51,14 @@ A rate is a formula (a string), a number, or a [`AxisPattern`](https://munqu.git
 
 The engine decides for each flow whether its rate is the flow itself or a rate per member of the source:
 
-| Case                                                                       | Kind         | Flow            |
-| -------------------------------------------------------------------------- | ------------ | --------------- |
-| The rate names a compartment, a bin total, `total` or a `total_…` variable | Absolute     | `rate`          |
-| The transition has no source                                               | Absolute     | `rate`          |
-| A stratified rate sets `"absolute": True` or `False`                       | As set       | —               |
-| Otherwise                                                                  | Proportional | `rate × source` |
+| Case                                                              | Kind         | Flow            |
+| ----------------------------------------------------------------- | ------------ | --------------- |
+| The rate names a compartment, a bin total or a `total_…` variable | Absolute     | `rate`          |
+| No source                                                         | Absolute     | `rate`          |
+| A stratified rate sets `"absolute": True` or `False`              | As set       | —               |
+| Otherwise                                                         | Proportional | `rate × source` |
+
+A rate that reads `total` and no compartment, such as `k1 / total`, is proportional (`plan_transition_flows` in `crates/commol-model/src/flows.rs`).
 
 | Rate                     | Kind         | Flow from `B` to `C`    |
 | ------------------------ | ------------ | ----------------------- |
@@ -339,19 +341,19 @@ print([round(a, 1) for a in jumped["A"]])  # [1000.0, 675.0, 607.5]
 print(jumped["moved"][2])  # 225.0: a quarter of the 900 left at step 1
 ```
 
-| Rule                         | In both engines                                                                                                                                                                                                                                                           |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Order                        | At step `n` the state jumps first; then the flows of the step run from the new state. The output at `n` shows the state after the jump (`CompiledModel::apply_impulses` in `crates/commol-model/src/system.rs`).                                                          |
-| Several impulses at one step | Every jump is computed from the state before any of them.                                                                                                                                                                                                                 |
-| Steps                        | A `DifferentialEquations` model takes any steps, such as `0.5`: the engine stops there, applies the jump and restarts. A `DifferenceEquations` or `StochasticSteps` model needs integer steps: `ModelBuilder.build` raises `ValidationError`, which names the transition. |
-| Units                        | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units](https://munqu.github.io/commol/latest/guide/units-and-equations/#impulses)).                                                                                                              |
-| `describe()`                 | Lists impulses apart from the equations, with their steps ([Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/#the-equations)).                                                                                                           |
+| Rule                         | In every engine                                                                                                                                                                                                                                                                                 |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Order                        | At step `n` the state jumps first; then the flows of the step run from the new state. The output at `n` shows the state after the jump (`CompiledModel::apply_impulses` in `crates/commol-model/src/system.rs`).                                                                                |
+| Several impulses at one step | Every jump is computed from the state before any of them.                                                                                                                                                                                                                                       |
+| Steps                        | A `DifferentialEquations` or `StochasticEvents` model takes any steps, such as `0.5`: the engine stops there, applies the jump and restarts. A `DifferenceEquations` or `StochasticSteps` model needs integer steps: `ModelBuilder.build` raises `ValidationError`, which names the transition. |
+| Units                        | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units](https://munqu.github.io/commol/latest/guide/units-and-equations/#impulses)).                                                                                                                                    |
+| `describe()`                 | Lists impulses apart from the equations, with their steps ([Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/#the-equations)).                                                                                                                                 |
 
-An impulse is not a pulse rate. A [`AxisPattern.pulse`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) is a rate: a difference model applies it for one step with the other flows, and a differential model applies it as a constant rate for one unit of the axis, so it moves `1 − e^(−p)` of its source. An impulse moves exactly `p` of its source in both engines.
+An impulse is not a pulse rate. An [`AxisPattern.pulse`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) is a rate, which acts with the other flows for one step, and in a differential model moves less than `p` ([Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step)). An impulse moves exactly `p` of its source in both deterministic engines; a [stochastic engine](https://munqu.github.io/commol/latest/guide/stochastic/index.md) moves each unit with probability `p`.
 
 ## Amounts below zero
 
-A `DifferenceEquations` step never leaves a compartment below zero. After the impulses of a step and after its flows, the engine checks every compartment. An amount below `−10⁻¹² × total` (the total at the start of the step) stops the run with `InfeasibleStateError`, a `ValueError`. The message names the compartment, the step, its amount before the step and the flows out of it, largest first. The tolerance lets a flow that empties a compartment exactly pass. Accumulators are not checked: a net flow may count negative (`DifferenceEquations::step` in `crates/commol-difference/src/simulation.rs`).
+A `DifferenceEquations` step never leaves a compartment below zero. After the impulses of a step and after its flows, the engine checks every compartment. An amount below `−10⁻¹² × total` (the total at the start of the step) stops the run with `InfeasibleStateError`, a `ValueError`. Its message gives the compartment, the step and the amount before the step, and lists the flows out of the compartment, largest first. The tolerance lets a flow that empties a compartment exactly pass. Accumulators are not checked: a net flow may count negative (`DifferenceEquations::step` in `crates/commol-difference/src/simulation.rs`).
 
 ```python
 from commol import InfeasibleStateError
@@ -400,7 +402,7 @@ A calibration gives a run that stops this way a penalty and goes on; see [Calibr
 | A `to` condition on a transition without a source                                            | The transition; use `category` to choose the compartment it enters |
 | A flow that ends in categories no compartment has                                            | The transition; add a `to` condition                               |
 | `impulse_at` and `impulse_every` together, a negative step, or a period that is not positive | The transition                                                     |
-| A non-integer impulse step in a `DifferenceEquations` model                                  | The transition and the step                                        |
+| A non-integer impulse step in a `DifferenceEquations` or `StochasticSteps` model             | The transition and the step                                        |
 
 ## Next steps
 

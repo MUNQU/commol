@@ -1,6 +1,6 @@
 # Reports
 
-[Back to Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)
+[Back to Home](https://munqu.github.io/commol/latest/index.md)
 
 A report turns the data of an object into plain dictionaries, ready for JSON. Each report is a method of the object whose data it describes:
 
@@ -111,17 +111,19 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | The model                    | Call the method on the model **after** `apply_calibration_parameters`.                                                                  |
 | `values`                     | A `CalibrationResult`, or an `{id: value}` mapping such as one of `sample.draws()`.                                                     |
-| `problem`                    | Optional. Adds the `factor` parameters, which the model does not hold.                                                                  |
+| `problem`                    | Optional. Adds the calibrated `factor` and `noise` parameters, which the model does not hold.                                           |
 | `sample`, `confidence_level` | Optional. A `ParameterSample`: each entry gains its weighted statistics (`ParameterSample.summary`). A sample needs a confidence level. |
 
-| Entry                               | Rule                                                                                                                                                                                                      |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Parameters                          | Only numeric parameters: formulas and series are inputs, not fitted values.                                                                                                                               |
-| `initial_amounts`                   | One row per bin and per overridden compartment: the `amount` the engine builds, overrides included, and the `unit` of its bin. No row is a share of a total, so bins of different units sit side by side. |
-| `category_splits`                   | One row per category: its `fraction` of the group it splits. A category has no amount, because it can split bins of different units.                                                                      |
-| `group`                             | The conditioning categories of a conditional stratification, or `[]` when it splits every bin.                                                                                                            |
-| An uncalibrated bin (`None` amount) | `amount` is `null`.                                                                                                                                                                                       |
-| A `sample`                          | Each entry gains an `interval` block (`mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max`, `std`, all weighted), and the report starts with `confidence_level`.                                        |
+| Entry                                            | Rule                                                                                                                                                                                                      |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Parameters                                       | Only numeric parameters: formulas and series are inputs, not fitted values.                                                                                                                               |
+| `initial_amounts`                                | One row per bin and per overridden compartment: the `amount` the engine builds, overrides included, and the `unit` of its bin. No row is a share of a total, so bins of different units sit side by side. |
+| `category_splits`                                | One row per category: its `fraction` of the group it splits. A category has no amount, because it can split bins of different units.                                                                      |
+| `group`                                          | The conditioning categories of a conditional stratification, or `[]` when it splits every bin.                                                                                                            |
+| An uncalibrated bin (`None` amount)              | `amount` is `null`.                                                                                                                                                                                       |
+| A bin with no unit                               | `unit` is `null`.                                                                                                                                                                                         |
+| A category name that two stratifications declare | Its row is under the qualified id, such as `group:g1`.                                                                                                                                                    |
+| A `sample`                                       | Each entry gains an `interval` block (`mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max`, `std`, all weighted), and the report starts with `confidence_level`.                                        |
 
 The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `amount`, `unit`, `calibrated`, then `interval`; `group`, `fraction`, `calibrated`, then `interval`), so saved JSON files stay comparable. An interval is in the unit of its entry: an amount in the unit of its bin, a split as a fraction of its group.
 
@@ -129,11 +131,11 @@ The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `a
 
 `SimulationResults.report(positions, window, windows, observed_data=(), accumulators=(), prediction_intervals=None)` reports a run on one axis of windows. It reads each value at a position of the results (`results.positions`), so it works for any model type: a differential model reports at non-integer positions once the results hold them ([Reporting at any position](https://munqu.github.io/commol/latest/guide/simulations/#reporting-at-any-position)).
 
-| Block          | Content                                                                                                                                                                                                                                                                           |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `observed`     | For each observation label: `values`, padded to `windows`, so it lines up with `windowed` index for index. An observation goes to the window that holds its position (the rule of `AxisUnits.window_index`). `weights`, `outputs` and `factor_id` appear when a series uses them. |
-| `series`       | Each compartment output sampled at `positions`                                                                                                                                                                                                                                    |
-| `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window that ends within the results, as the loss compares it) and `cumulative` (sampled at `positions`); each reading as a `total` and `by_output`                                                  |
+| Block          | Content                                                                                                                                                                                                                                                                                                        |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `observed`     | For each observation label: `values`, padded to `windows`, so it lines up with `windowed` index for index. An observation goes to the window that holds its position (the rule of `AxisUnits.window_index`). `outputs` and `factor_id` appear when a series uses them, and `weights` when a weight is not 1.0. |
+| `series`       | Each output sampled at `positions`, sorted by name, except the outputs of the accumulators in `accumulators`                                                                                                                                                                                                   |
+| `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window that ends within the results, as the loss compares it) and `cumulative` (sampled at `positions`); each reading as a `total` and `by_output`                                                                               |
 
 | Argument               | Meaning                                                                                                                                                                                                                                                                                                                       |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -176,12 +178,13 @@ print(list(band_report["series"]["A"]))  # ['mean', 'median', 'ci_lower', 'ci_up
 ## Checklist
 
 - [ ] The model reports `applied_parameters` after `apply_calibration_parameters`.
-- [ ] `problem` is passed when there are `factor` parameters.
+- [ ] `problem` is passed when there are `factor` or `noise` parameters.
 - [ ] `positions`, `window` and `windows` match the observations, and the results hold every position the report reads.
 
 ## Next steps
 
-| To learn                           | Read                                                                                 |
-| ---------------------------------- | ------------------------------------------------------------------------------------ |
-| Samples, predictives and intervals | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)      |
-| Signatures                         | [API reference: Reports](https://munqu.github.io/commol/latest/api/reports/index.md) |
+| To learn                           | Read                                                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------------------- |
+| Samples, predictives and intervals | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)             |
+| The threads of the parallel work   | [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md) |
+| Signatures                         | [API reference: Reports](https://munqu.github.io/commol/latest/api/reports/index.md)        |

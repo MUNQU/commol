@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://munqu.github.io/commol/dev/guide/uncertainty/local/">
       
       
-        <link rel="prev" href="../sensitivity/">
+        <link rel="prev" href="../smc/">
       
       
         <link rel="next" href="../profiles/">
@@ -1123,34 +1123,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1251,6 +1223,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../identifiability/" class="md-nav__link">
         
   
@@ -1315,90 +1315,6 @@
     
   
     Sequential Monte Carlo
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../observation-models/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Observation Models
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../conformal/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Conformal
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../sensitivity/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Sensitivity Analysis
   
 
     
@@ -1620,9 +1536,93 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sensitivity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3479,7 +3479,7 @@ run in Rust (<code>crates/commol-inference/src/local/</code>) through
 <h2 id="the-curvature-and-the-unbounded-scale">The curvature and the unbounded scale<a class="headerlink" href="#the-curvature-and-the-unbounded-scale" title="Permanent link">&para;</a></h2>
 <p>Every method of this page reads the curvature <code>H</code> of the objective at the
 fit: <code>−log L</code> of the <a href="../observation-models/">observation models</a>, or the
-loss. <code>curvature</code> chooses it:</p>
+loss. The setting <code>curvature</code> of each method chooses it:</p>
 <table>
 <thead>
 <tr>
@@ -3553,33 +3553,30 @@ engine (machine precision, or the <code>rtol</code> of the ODE engine): the step
 balances the truncation error of the differences with the error of the runs,
 and keeps every run inside the bounds. Each entry of either curvature has an
 estimated error. An entry whose error is above 1 % of <code>√(H_jj · H_kk)</code> is
-listed in <code>notes</code> and logged as a warning: the error on the scale of a
-correlation, so an off-diagonal entry near 0 is judged against its row and
-column, not against itself. A note changes no result.</p>
-<p>Every distribution lives on an <strong>unbounded scale</strong>: the logit of a parameter
-between two bounds, <code>log(θ − a)</code> with a lower bound only, <code>log(b − θ)</code> with an
-upper bound only, the parameter itself with none. The curvature there is
+listed in <code>notes</code> and logged as a warning. The error is read as a share of a
+correlation: an off-diagonal entry near 0 is compared with the diagonal of its
+row and column, not with its own size. A note changes no result.</p>
+<p>Every distribution lives on the <strong>unbounded scale</strong> of the parameters, the
+scale on which the <a href="../smc/#how-the-sampler-works">sampler</a> of sequential Monte
+Carlo proposes its moves. The curvature there is
 <code>H_u = D · H · D</code> with <code>D = dθ/du</code> at the fit, and <code>covariance</code> is on that
 scale. Every draw maps back inside the bounds, so a fit near a bound gives a
 skewed sample, not draws outside it. A fit <strong>on</strong> a bound of its parameter
 (within <code>1e-8</code> of the width of its bounds) raises a <code>ValueError</code>: its
-variance on the unbounded scale is infinite there, and a profile likelihood
-describes it (MUNQU/commol#132).</p>
+variance on the unbounded scale is infinite there, and a
+<a href="../profiles/">profile likelihood</a> describes it.</p>
 <h2 id="laplace-approximation-and-the-delta-method">Laplace approximation and the delta method<a class="headerlink" href="#laplace-approximation-and-the-delta-method" title="Permanent link">&para;</a></h2>
-<p><code>Laplace(draws, starts=1)</code> fits the problem (<code>Calibrator.run(starts)</code>) and
+<p><code>Laplace(draws, curvature="gauss_newton", starts=1)</code> fits the problem (<code>Calibrator.run(starts)</code>) and
 returns a <code>LaplaceResult</code>: the fit, the covariance <code>Σ = H⁻¹</code> of the normal on the
 unbounded scale, the draws mapped back (<code>sample</code>, equal weights) and the
-notes. It needs <code>observation_models</code>: a loss has no noise scale, so its
-curvature is no inverse variance, and <code>Laplace</code> with a loss raises a
+notes. It needs <code>observation_models</code>. A loss has no scale of the noise, and
+its curvature is no inverse variance, and <code>Laplace</code> with a loss raises a
 <code>ValueError</code>. To get a Laplace approximation, give a model with a noise
 parameter, such as <code>NormalObservations(sd="sd")</code> with <code>sd</code> calibrated, or
 use <code>Sandwich</code>, which needs none.</p>
-<p>Every local approximation sits at the best of its <code>starts</code>: the initial guess,
-then rows of a Latin hypercube over the bounds, as
+<p>Every local approximation sits at the best of its <code>starts</code>, as
 <a href="../../calibration-optimizers/#several-starts">several starts</a> of
-<code>Calibrator.run</code>. One start (the default) can end at a local minimum; more
-starts find the best one of the optima they reach. <code>Sandwich</code> takes <code>starts</code>
-the same way.</p>
+<code>Calibrator.run</code>. <code>Sandwich</code> takes <code>starts</code> the same way.</p>
 <p>With a noise parameter the fit estimates the noise by maximum likelihood:
 for <code>NormalObservations(sd="sd")</code>, <code>σ̂² = SSE/n</code>, not <code>SSE/(n − p)</code>. The
 Laplace intervals are then narrower than the classical ones by
@@ -3598,7 +3595,7 @@ works.</p>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">widths</span><span class="p">)</span>  <span class="c1"># [6.01, 12.01, 18.02]</span>
 </span></code></pre></div>
 <h2 id="sandwich">Sandwich<a class="headerlink" href="#sandwich" title="Permanent link">&para;</a></h2>
-<p><code>Sandwich(block_length, draws, starts=1)</code> gives the covariance <code>H⁻¹ B H⁻¹</code>, where <code>B</code>
+<p><code>Sandwich(block_length, draws, curvature="gauss_newton", starts=1)</code> gives the covariance <code>H⁻¹ B H⁻¹</code>, where <code>B</code>
 sums the outer products of the <strong>scores</strong> of blocks of observations:
 <code>B = G/(G − 1) · Σ_b s_b s_bᵀ</code>, with <code>s_b</code> the sum of the gradients of the
 terms of block <code>b</code> (the clustered estimator CR1, Cameron and Miller 2015).
@@ -3639,12 +3636,12 @@ rescaling the objective does not change the sandwich).</p>
   directions would get zero variance. The <code>ValueError</code> suggests shorter
   blocks.</li>
 <li><strong><code>loss_function="mae"</code> is refused.</strong> The absolute error has no curvature:
-  its sandwich needs a density of the residuals at 0 and a bandwidth, a
-  choice the library would hide. Use a <a href="../resampling/">bootstrap</a>.</li>
+  its sandwich would need the density of the residuals at 0, with a
+  bandwidth that the library would choose for you. Use a <a href="../resampling/">bootstrap</a>.</li>
 </ul>
 <h2 id="laplace-mixture-and-importance-sampling">Laplace mixture and importance sampling<a class="headerlink" href="#laplace-mixture-and-importance-sampling" title="Permanent link">&para;</a></h2>
 <p>A multi-start fit can end at several optima. <code>LaplaceMixture(draws, target,
-starts=1)</code> runs <code>Calibrator.run(starts)</code>, keeps the distinct ends (an end
+curvature="gauss_newton", starts=1)</code> runs <code>Calibrator.run(starts)</code>, keeps the distinct ends (an end
 closer than one Mahalanobis unit to a kept one merges into it), puts a
 Laplace approximation at each, weights each by its Laplace evidence, draws
 from the mixture, and weights every draw by the target over the mixture on

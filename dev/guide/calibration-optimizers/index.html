@@ -1136,10 +1136,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#choosing" class="md-nav__link">
+  <a href="#quick-path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Choosing
+        Quick path
       
     </span>
   </a>
@@ -1147,10 +1147,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-path" class="md-nav__link">
+  <a href="#choosing" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick path
+        Choosing
       
     </span>
   </a>
@@ -1299,34 +1299,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1405,6 +1377,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
   
 
     
@@ -1509,14 +1509,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../uncertainty/observation-models/" class="md-nav__link">
+      <a href="../uncertainty/local/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Observation Models
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
   
 
     
@@ -1586,65 +1614,37 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/local/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Local Approximations
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/profiles/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Profile Likelihood
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3297,10 +3297,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#choosing" class="md-nav__link">
+  <a href="#quick-path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Choosing
+        Quick path
       
     </span>
   </a>
@@ -3308,10 +3308,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-path" class="md-nav__link">
+  <a href="#choosing" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick path
+        Choosing
       
     </span>
   </a>
@@ -3449,33 +3449,6 @@
 a fast local search, <code>ParticleSwarmConfig</code> for a global one. Both run in Rust on
 the <a href="https://github.com/MUNQU/argmin">argmin</a> library, and both keep every
 unknown inside its bounds.</p>
-<h2 id="choosing">Choosing<a class="headerlink" href="#choosing" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Optimizer</th>
-<th>Strength</th>
-<th>Weakness</th>
-<th>Use when</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Nelder-Mead</td>
-<td>Few evaluations; precise near the answer</td>
-<td>Local: can stop at a bound or a local minimum</td>
-<td>Few unknowns, a good <code>initial_guess</code></td>
-</tr>
-<tr>
-<td>Particle swarm</td>
-<td>Searches the whole box; robust to local minima</td>
-<td>Many evaluations</td>
-<td>Several unknowns, no good starting point</td>
-</tr>
-</tbody>
-</table>
-<p>A common pattern: run particle swarm first, then Nelder-Mead from its result
-with <code>initial_guess</code>.</p>
 <h2 id="quick-path">Quick path<a class="headerlink" href="#quick-path" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">Aggregate</span><span class="p">,</span>
@@ -3530,6 +3503,33 @@ with <code>initial_guess</code>.</p>
 </span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="nb">print</span><span class="p">(</span><span class="n">calibrate</span><span class="p">(</span><span class="n">NelderMeadConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">2000</span><span class="p">)))</span>                    <span class="c1"># {&#39;k1&#39;: 0.4, &#39;k2&#39;: 0.1}</span>
 </span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a><span class="nb">print</span><span class="p">(</span><span class="n">calibrate</span><span class="p">(</span><span class="n">ParticleSwarmConfig</span><span class="p">(</span><span class="n">particles</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">300</span><span class="p">)))</span>  <span class="c1"># {&#39;k1&#39;: 0.4, &#39;k2&#39;: 0.1}</span>
 </span></code></pre></div>
+<h2 id="choosing">Choosing<a class="headerlink" href="#choosing" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Optimizer</th>
+<th>Strength</th>
+<th>Weakness</th>
+<th>Use when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Nelder-Mead</td>
+<td>Few evaluations; precise near the answer</td>
+<td>Local: can stop at a bound or a local minimum</td>
+<td>Few unknowns, a good <code>initial_guess</code></td>
+</tr>
+<tr>
+<td>Particle swarm</td>
+<td>Searches the whole box; robust to local minima</td>
+<td>Many evaluations</td>
+<td>Several unknowns, no good starting point</td>
+</tr>
+</tbody>
+</table>
+<p>A common pattern: run particle swarm first, then Nelder-Mead from its result
+with <code>initial_guess</code>.</p>
 <h2 id="nelder-mead">Nelder-Mead<a class="headerlink" href="#nelder-mead" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">nelder_mead</span> <span class="o">=</span> <span class="n">NelderMeadConfig</span><span class="p">(</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">max_iterations</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
@@ -3586,8 +3586,8 @@ with <code>initial_guess</code>.</p>
 </tbody>
 </table>
 <p>The search starts at <code>initial_guess</code>, or at the midpoint of the bounds; a start
-of 0 works. Nelder-Mead searches an unbounded coordinate <code>u</code> and scores
-<code>x = lo + (hi − lo)·(sin u + 1)/2</code> (the transform of MINUIT and lmfit), so every
+of 0 works. Nelder-Mead moves in an unbounded coordinate <code>u</code>, and the value it
+scores is <code>lo + (hi − lo)·(sin u + 1)/2</code> (the transform of MINUIT and lmfit), so every
 value it tries is inside the bounds (<code>SineTransform</code> of the argmin fork). An
 optimum exactly at a bound is reached only asymptotically, so it can take more
 iterations. Nelder-Mead needs finite bounds: a run with an infinite bound fails
@@ -3608,11 +3608,6 @@ with the message <code>Nelder-Mead needs finite bounds</code>.</p>
 <td>Nelder-Mead: the spread of the simplex values fell below <code>sd_tolerance</code>. Particle swarm: a <a href="#stop-rules">stop rule</a> held</td>
 </tr>
 <tr>
-<td><code>Terminated(TargetCostReached)</code></td>
-<td><code>True</code></td>
-<td>Particle swarm: the loss reached <code>target_cost</code></td>
-</tr>
-<tr>
 <td><code>Terminated(MaxItersReached)</code></td>
 <td><code>False</code></td>
 <td>The run used all <code>max_iterations</code></td>
@@ -3620,11 +3615,12 @@ with the message <code>Nelder-Mead needs finite bounds</code>.</p>
 <tr>
 <td>Any other reason</td>
 <td><code>False</code></td>
-<td>The run stopped for another reason, such as a timeout</td>
+<td>The run stopped for another reason that argmin reports</td>
 </tr>
 </tbody>
 </table>
-<p><code>converged</code> comes from <code>converged</code> in <code>optimization.rs</code>. A particle swarm
+<p><code>converged</code> comes from <code>converged</code> in
+<code>crates/commol-calibration/src/optimization.rs</code>. A particle swarm
 without a <a href="#stop-rules">stop rule</a> always stops at <code>max_iterations</code>, so it
 reports <code>converged=False</code>; judge it by <code>final_loss</code>.</p>
 <h2 id="particle-swarm">Particle swarm<a class="headerlink" href="#particle-swarm" title="Permanent link">&para;</a></h2>

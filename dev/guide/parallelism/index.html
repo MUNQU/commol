@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://munqu.github.io/commol/dev/guide/parallelism/">
       
       
-        <link rel="prev" href="../uncertainty/profiles/">
+        <link rel="prev" href="../reports/">
       
       
         <link rel="next" href="../examples/">
@@ -1123,34 +1123,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1229,6 +1201,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
   
 
     
@@ -1333,14 +1333,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../uncertainty/observation-models/" class="md-nav__link">
+      <a href="../uncertainty/local/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Observation Models
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
   
 
     
@@ -1410,65 +1438,37 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/local/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Local Approximations
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/profiles/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Profile Likelihood
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3386,7 +3386,8 @@ same result whatever you choose.</p>
 </tr>
 </tbody>
 </table>
-<p>A number below 1 raises <code>ValueError</code>, which names the number.</p>
+<p>A number below 1, or <code>levels</code> other than <code>"all"</code> and <code>"outer"</code>, raises
+<code>ValueError</code>.</p>
 <h2 id="what-runs-in-parallel">What runs in parallel<a class="headerlink" href="#what-runs-in-parallel" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3569,6 +3570,10 @@ threads and either level, bit for bit, the history of
 <tr>
 <td>The uncertainty methods</td>
 <td><a href="../uncertainty/">Uncertainty</a></td>
+</tr>
+<tr>
+<td>Complete models, with a fit on two threads</td>
+<td><a href="../examples/">Examples</a></td>
 </tr>
 </tbody>
 </table>

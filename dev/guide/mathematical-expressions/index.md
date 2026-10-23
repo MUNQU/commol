@@ -1,6 +1,6 @@
 # Mathematical Expressions
 
-[Back to Home](https://munqu.github.io/commol/latest/index.md)
+[Back to Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)
 
 Rates and formula parameters are written as expressions, such as `"k1 * A * B / total"`. This page lists everything an expression can contain: operators, variables, functions, and the security limits. The engine compiles each expression to machine code (Cranelift) once, and reuses it at every step.
 
@@ -35,7 +35,7 @@ results = Simulation(model).run(num_steps=60)
 | Stratified rate `rate`              | `"k_g1 * A"`           | Like a transition rate                                                                    |
 | Calibration constraint `expression` | `"k1 - k2"`            | See [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md) |
 
-Whether a rate is the flow itself or a rate per member of the source depends on the variables it names; see [Absolute and proportional rates](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-proportional-rates).
+The variables a rate names decide whether it is absolute or proportional; see [Absolute and proportional rates](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-proportional-rates).
 
 ## Operators
 
@@ -62,21 +62,21 @@ outside = "if(step < 10, 0.05, if(step > 20, 0.05, 0))"    # 0.05 outside that w
 
 An id starts with a letter or `_` and can hold digits after it, such as `e1` or `c1star`. A number such as `1e5` or `2.5E-3` is a number: its exponent is never a variable.
 
-| Variable                           | Value                                                                                                                                                                                                                                                                              |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A parameter id                     | The parameter's value at this step                                                                                                                                                                                                                                                 |
-| A bin id, without stratifications  | The bin's amount                                                                                                                                                                                                                                                                   |
-| A compartment name, such as `A_g1` | That compartment's amount                                                                                                                                                                                                                                                          |
-| A bin id, with stratifications     | The total of all its compartments                                                                                                                                                                                                                                                  |
-| `total`                            | The total: the sum of every compartment, accumulators excluded                                                                                                                                                                                                                     |
-| `neighbors_<bin>`, `neighbors`     | In a transition rate only: the amount of a bin among the neighbors of a unit, and their total. The structure says who they are; a rate that reads them and no compartment is proportional. See [Neighbors](https://munqu.github.io/commol/latest/guide/building-models/#neighbors) |
-| `t`                                | The current position on the axis. A difference model reads it at each step, so there it equals `step`; a differential model reads it anywhere                                                                                                                                      |
-| `step`                             | The step that holds the current position, `floor(t)`: 0, 1, 2, … It is constant on each unit interval of a differential model; see [Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step)                                               |
-| `pi`, `e`                          | π and e                                                                                                                                                                                                                                                                            |
+| Variable                           | Value                                                                                                                                                                                                                                                                         |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A parameter id                     | The parameter's value at this step                                                                                                                                                                                                                                            |
+| A bin id, without stratifications  | The bin's amount                                                                                                                                                                                                                                                              |
+| A compartment name, such as `A_g1` | That compartment's amount                                                                                                                                                                                                                                                     |
+| A bin id, with stratifications     | The total of all its compartments                                                                                                                                                                                                                                             |
+| `total`                            | The total: the sum of every compartment, accumulators excluded                                                                                                                                                                                                                |
+| `neighbors_<bin>`, `neighbors`     | In a transition rate only: what the neighbors of a unit hold, of one bin or of every bin. The structure says who they are; a rate that reads them and no compartment is proportional. See [Neighbors](https://munqu.github.io/commol/latest/guide/building-models/#neighbors) |
+| `t`                                | The current position on the axis. A difference model reads it at each step, so there it equals `step`; a differential model reads it anywhere                                                                                                                                 |
+| `step`                             | The step that holds the current position, `floor(t)`: 0, 1, 2, … It is constant on each unit interval of a differential model; see [Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step)                                          |
+| `pi`, `e`                          | π and e                                                                                                                                                                                                                                                                       |
 
 ### Subgroup totals
 
-With stratifications, the engine also provides sums of compartments, the subgroup totals. Category suffixes must follow the order in which the stratifications were declared. `commol_rs.model.subgroup_total_names` (in `crates/commol-model/src/builder.rs`) lists them for a structure.
+With stratifications, the engine also provides sums of compartments, the subgroup totals. Category suffixes must follow the order in which the stratifications were declared. `commol_rs.model.subgroup_total_names` (in `crates/commol-model/src/builder.rs`) lists them for a process.
 
 | Variable       | Sum of                                       | Example (`group` then `type`)                                           |
 | -------------- | -------------------------------------------- | ----------------------------------------------------------------------- |
@@ -128,15 +128,15 @@ print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 
 ## Functions
 
-| Group                     | Functions                                                     |
-| ------------------------- | ------------------------------------------------------------- |
-| Trigonometric             | `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2(y, x)`    |
-| Hyperbolic                | `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`             |
-| Exponential and logarithm | `exp`, `log` (natural), `ln` (natural), `log10`, `log2`       |
-| Power and root            | `sqrt`, `cbrt`, `pow(x, y)`, `hypot(x, y)`                    |
-| Comparison                | `min(a, b)`, `max(a, b)`, `abs`                               |
-| Rounding                  | `floor`, `ceil`, `round` (halves round up: `round(2.5)` is 3) |
-| Conditional               | `if(condition, value_if_true, value_if_false)`                |
+| Group                     | Functions                                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------------------------- |
+| Trigonometric             | `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2(y, x)`                                     |
+| Hyperbolic                | `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`                                              |
+| Exponential and logarithm | `exp`, `log` (natural), `ln` (natural), `log10`, `log2`                                        |
+| Power and root            | `sqrt`, `cbrt`, `pow(x, y)`, `hypot(x, y)`                                                     |
+| Comparison                | `min(a, b)`, `max(a, b)`, `abs`                                                                |
+| Rounding                  | `floor`, `ceil`, `round` (halves round away from zero: `round(2.5)` is 3, `round(-2.5)` is -3) |
+| Conditional               | `if(condition, value_if_true, value_if_false)`                                                 |
 
 For rates that change along the axis, [`AxisPattern`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) builds tested expressions for pulses, windows, ramps and sinusoids.
 

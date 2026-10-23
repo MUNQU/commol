@@ -1366,34 +1366,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1472,6 +1444,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
   
 
     
@@ -1576,14 +1576,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../uncertainty/observation-models/" class="md-nav__link">
+      <a href="../uncertainty/local/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Observation Models
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
   
 
     
@@ -1653,65 +1681,37 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/local/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Local Approximations
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/profiles/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Profile Likelihood
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3690,12 +3690,12 @@ per member of the source:</p>
 </thead>
 <tbody>
 <tr>
-<td>The rate names a compartment, a bin total, <code>total</code> or a <code>total_…</code> variable</td>
+<td>The rate names a compartment, a bin total or a <code>total_…</code> variable</td>
 <td>Absolute</td>
 <td><code>rate</code></td>
 </tr>
 <tr>
-<td>The transition has no source</td>
+<td>No source</td>
 <td>Absolute</td>
 <td><code>rate</code></td>
 </tr>
@@ -3711,6 +3711,8 @@ per member of the source:</p>
 </tr>
 </tbody>
 </table>
+<p>A rate that reads <code>total</code> and no compartment, such as <code>k1 / total</code>, is
+proportional (<code>plan_transition_flows</code> in <code>crates/commol-model/src/flows.rs</code>).</p>
 <table>
 <thead>
 <tr>
@@ -4102,7 +4104,7 @@ stratified rates and accumulators as any transition.</p>
 <thead>
 <tr>
 <th>Rule</th>
-<th>In both engines</th>
+<th>In every engine</th>
 </tr>
 </thead>
 <tbody>
@@ -4116,7 +4118,7 @@ stratified rates and accumulators as any transition.</p>
 </tr>
 <tr>
 <td>Steps</td>
-<td>A <code>DifferentialEquations</code> model takes any steps, such as <code>0.5</code>: the engine stops there, applies the jump and restarts. A <code>DifferenceEquations</code> or <code>StochasticSteps</code> model needs integer steps: <code>ModelBuilder.build</code> raises <code>ValidationError</code>, which names the transition.</td>
+<td>A <code>DifferentialEquations</code> or <code>StochasticEvents</code> model takes any steps, such as <code>0.5</code>: the engine stops there, applies the jump and restarts. A <code>DifferenceEquations</code> or <code>StochasticSteps</code> model needs integer steps: <code>ModelBuilder.build</code> raises <code>ValidationError</code>, which names the transition.</td>
 </tr>
 <tr>
 <td>Units</td>
@@ -4128,18 +4130,18 @@ stratified rates and accumulators as any transition.</p>
 </tr>
 </tbody>
 </table>
-<p>An impulse is not a pulse rate. A <a href="../axis-patterns/"><code>AxisPattern.pulse</code></a> is a
-rate: a difference model applies it for one step with the other flows, and a
-differential model applies it as a constant rate for one unit of the axis, so it
-moves <code>1 − e^(−p)</code> of its source. An impulse moves exactly <code>p</code> of its source in
-both engines.</p>
+<p>An impulse is not a pulse rate. An <a href="../axis-patterns/"><code>AxisPattern.pulse</code></a> is a
+rate, which acts with the other flows for one step, and in a differential
+model moves less than <code>p</code> (<a href="../simulations/#time-inside-a-step">Time inside a step</a>).
+An impulse moves exactly <code>p</code> of its source in both deterministic engines; a
+<a href="../stochastic/">stochastic engine</a> moves each unit with probability <code>p</code>.</p>
 <h2 id="amounts-below-zero">Amounts below zero<a class="headerlink" href="#amounts-below-zero" title="Permanent link">&para;</a></h2>
 <p>A <code>DifferenceEquations</code> step never leaves a compartment below zero. After the
 impulses of a step and after its flows, the engine checks every compartment.
 An amount below <code>−10⁻¹² × total</code> (the total at the start of the step) stops the
-run with <code>InfeasibleStateError</code>, a <code>ValueError</code>. The message names the
-compartment, the step, its amount before the step and the flows out of it,
-largest first. The tolerance lets a flow that empties a compartment exactly
+run with <code>InfeasibleStateError</code>, a <code>ValueError</code>. Its message gives the
+compartment, the step and the amount before the step, and lists the flows out
+of the compartment, largest first. The tolerance lets a flow that empties a compartment exactly
 pass. Accumulators are not checked: a net flow may count negative
 (<code>DifferenceEquations::step</code> in <code>crates/commol-difference/src/simulation.rs</code>).</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">InfeasibleStateError</span>
@@ -4237,7 +4239,7 @@ simulate as written:</p>
 <td>The transition</td>
 </tr>
 <tr>
-<td>A non-integer impulse step in a <code>DifferenceEquations</code> model</td>
+<td>A non-integer impulse step in a <code>DifferenceEquations</code> or <code>StochasticSteps</code> model</td>
 <td>The transition and the step</td>
 </tr>
 </tbody>

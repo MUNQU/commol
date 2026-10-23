@@ -1271,34 +1271,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1377,6 +1349,34 @@
     
   
     Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/observation-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observation Models
   
 
     
@@ -1481,14 +1481,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../uncertainty/observation-models/" class="md-nav__link">
+      <a href="../uncertainty/local/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Observation Models
+    Local Approximations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile Likelihood
   
 
     
@@ -1558,65 +1586,37 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/local/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Local Approximations
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../uncertainty/profiles/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Profile Likelihood
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3491,13 +3491,13 @@ plots and the per-series normalization; it defaults to <code>output</code>.</p>
 <td><code>value</code></td>
 <td><code>float</code></td>
 <td>required</td>
-<td>The observed value, not negative.</td>
+<td>The observed value, zero or more.</td>
 </tr>
 <tr>
 <td><code>weight</code></td>
 <td><code>float</code></td>
 <td><code>1.0</code></td>
-<td>How much the observation counts in the loss.</td>
+<td>Above zero. How much the observation counts in every loss, and the power of its term of a likelihood; see <a href="../calibration/#losses">Losses</a>.</td>
 </tr>
 <tr>
 <td><code>factor_id</code></td>
@@ -3510,6 +3510,12 @@ plots and the per-series normalization; it defaults to <code>output</code>.</p>
 <td><code>float \| None</code></td>
 <td><code>None</code></td>
 <td>Compares with the gain over <code>(at − window, at]</code> instead of the value.</td>
+</tr>
+<tr>
+<td><code>trials</code></td>
+<td><code>int \| None</code></td>
+<td><code>None</code></td>
+<td>The trials of the observation, for a <code>BinomialObservations()</code> model that reads them from each observation. See <a href="../uncertainty/observation-models/">Observation Models</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -3544,12 +3550,12 @@ and <code>window</code>. It must not be empty.</p>
 <tr>
 <td><code>weight=2.0</code></td>
 <td><code>ObservedDataPoint</code></td>
-<td>The observation counts twice as much in every loss: its squared (or absolute) residual is multiplied by 2. With <a href="../uncertainty/observation-models/#the-likelihood">observation models</a> its log density is. See <a href="../calibration/#losses">Losses</a>.</td>
+<td>The observation counts twice as much, in every loss and in a <a href="../uncertainty/observation-models/#the-likelihood">likelihood</a> (<a href="../calibration/#losses">How weights count</a>).</td>
 </tr>
 <tr>
 <td><code>normalize_observations=True</code></td>
 <td><code>CalibrationProblem</code></td>
-<td>Divides each residual by the RMS of its series, so a series of thousands does not drown a series of tens.</td>
+<td>Divides each residual by the RMS of its series (<a href="../calibration/#losses">Losses</a>), so a series of thousands does not drown a series of tens.</td>
 </tr>
 </tbody>
 </table>
@@ -3657,13 +3663,15 @@ observation without <code>window</code> reads its output at <code>at</code>; <co
 <code>Simulation.sample</code> read a run there in the same way
 (<a href="../simulations/#values-at-positions">Values at positions</a>).</p>
 <h2 id="positions-between-integers">Positions between integers<a class="headerlink" href="#positions-between-integers" title="Permanent link">&para;</a></h2>
-<p>A <code>DifferentialEquations</code> model runs in continuous time, so an observation may
-be at any position, such as <code>2.5</code>, and a window may cover any length. The
+<p>An observation is at a position that the engine of the model reports at, as
+for <a href="../simulations/#simulation"><code>Simulation.run_at</code></a>: a model in continuous
+time (<code>DifferentialEquations</code>, <code>StochasticEvents</code>) at any position, such as
+<code>2.5</code>, with windows of any length; a model of whole steps
+(<code>DifferenceEquations</code>, <code>StochasticSteps</code>) at integer steps only. The
 calibration reads the engine at those positions
-(<code>SimulationEngine::run_at_positions_into_buffer</code>). The engine decides which
-positions its model type accepts (<code>SimulationEngine::check_position</code>): a
-<code>DifferenceEquations</code> model reports only at integer steps, so <code>Calibrator</code>
-raises <code>ValueError</code> for any other position, and the engine's message names the
+(<code>SimulationEngine::run_at_positions_into_buffer</code>), and the engine checks each
+one (<code>SimulationEngine::check_position</code>): <code>Calibrator</code> raises <code>ValueError</code> for a
+position the engine does not accept, and the engine's message names the
 observation, or the constraint, that holds it (<code>check_positions</code> in
 <code>crates/commol-calibration/src/calibration_problem.rs</code>).</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">ode_model</span><span class="p">(</span><span class="n">k1</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">):</span>
