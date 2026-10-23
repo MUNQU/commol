@@ -135,7 +135,7 @@ renormalises their weights; the user writes the condition.
 (`crates/commol-inference/src/quantity.rs`). `Quantities::terms` gives each
 scalar of a run as a numerator and a denominator (1 for a scalar that is not
 a ratio), and `Quantities::combine` reduces the terms of the replicates of a
-point by the `Replicates` rule of the scalar: `Within` (E[N/D], the mean that
+point by the `ReplicateRule` of the scalar: `Within` (E[N/D], the mean that
 every other scalar takes), `WithinPositive` (E[N/D | D > 0]) or `Pooled`
 (E[N]/E[D]). `BatchRunner::means` reads `combine`, so PRCC, Morris, Sobol and
 the polynomial chaos see one value per point; `Quantities::evaluate` gives
@@ -144,7 +144,7 @@ denominator of 0 makes the ratio of a run NaN, whatever the numerator. A point
 with no value is `Undefined::Replicate` (the first replicate that is NaN) or
 `Undefined::Point` (no replicate with D > 0, or a pooled denominator of 0),
 and `NanRun::replicate` is `None` for the second. The rule has no default:
-the Python class requires `replicates`.
+`Ratio` requires `replicate_rule`.
 
 | Alternative | Why not |
 |---|---|

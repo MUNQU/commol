@@ -13,7 +13,8 @@ Before creating a bug report:
 - Check the [issue tracker](https://github.com/MUNQU/commol/issues) for existing reports
 - Verify the bug exists in the latest version
 
-When creating a bug report, include:
+Open the report from the template "Bug or small change" of
+`.github/ISSUE_TEMPLATE/` ([Planning](workflow.md#planning)), and include:
 
 - **Clear title and description**
 - **Steps to reproduce** the issue
@@ -23,7 +24,8 @@ When creating a bug report, include:
 
 ### Suggesting Features
 
-Feature suggestions are welcome! Please:
+Feature suggestions are welcome! A feature becomes work as a proposal, an
+issue from the template "Proposal" ([Planning](workflow.md#planning)). Please:
 
 - Check if the feature has already been requested
 - Provide a clear use case and rationale
@@ -37,6 +39,8 @@ Feature suggestions are welcome! Please:
 3. **Update docs (mandatory)**: Every change ships with its documentation. Follow the [documentation definition of done](../codebase/conventions.md#documentation-definition-of-done)
 4. **Follow conventions**: Use the project's code style
 5. **Be descriptive**: Write clear commit messages and PR descriptions
+6. **Link the issue**: The description says `Closes #N` for the issue it
+   finishes
 
 ## Development Guidelines
 

@@ -13,3 +13,6 @@ engine. The limits are in
 `SecurityConfig`.
 
 **Rule:** any new field that accepts an expression must call it.
+
+**Guard:** `tests/rates/test_security.py` (the limits and the rejected
+expressions); `tests/axis_patterns/test_patterns.py` (a pattern calls it).

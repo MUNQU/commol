@@ -8,14 +8,11 @@ What a rate means, which stratified rate applies, and how expressions are evalua
 
 The flow planner (`plan_transition_flows` in
 `crates/commol-model/src/flows.rs`) decides for each flow whether the rate
-is absolute or proportional:
-
-| Case | Rate is | Flow per step |
-|---|---|---|
-| A stratified rate sets `absolute` | As set | — |
-| The rate references a compartment, a bin total, `total` or a `total_…` variable | Absolute | `rate` |
-| The transition has no source | Absolute | `rate` |
-| Otherwise | Proportional | `rate × source` |
+is absolute or proportional; the cases are in the table of
+[Absolute and proportional rates](../../guide/transitions.md#absolute-and-proportional-rates).
+The closure `is_absolute` reads only the compartment names and the names of
+`subgroup_total_names` (`builder.rs`): `total` is not one of them, so a rate
+that reads `total` and no compartment stays proportional.
 
 A transition with several sources and a proportional rate is rejected, because
 it has no single source to multiply. `Model.describe` shows the planned flows,
@@ -36,6 +33,8 @@ largest number of conditions wins (`helpers.rs`). On a tie, the first one in
 the list wins. If none matches, the transition's default `rate` applies.
 Building a model fails if a stratified rate matches no compartment that the
 transition starts from.
+
+**Guard:** `crates/commol-model/tests/flows.rs::the_most_specific_stratified_rate_wins_and_the_first_on_a_tie`.
 
 ## Formula parameters are evaluated every step, in order
 

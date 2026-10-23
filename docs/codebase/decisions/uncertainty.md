@@ -35,8 +35,10 @@ point; each entry point refuses another kind with a `TypeError` that names the
 right one.
 A method is three parts: a configuration that subclasses `UncertaintyMethod`
 with its result type (`context/inference/`), a runner in Rust bound in
-`py-commol/src/inference.rs`, and a result (`context/inference/`). It registers
-its runner in `api/inference/registry.py`; the entry point looks the runner up
+`py-commol/src/`, in the module of its family, and a result
+(`context/inference/`). The module of its family under `api/inference/`
+registers its runner with `register` (`api/inference/registry.py`); the entry
+point looks the runner up
 by the configuration's type and knows no method. A static type checker infers
 `R` from the configuration's type.
 
@@ -85,8 +87,8 @@ of each method lists `ValueError` and `RuntimeError` by this rule.
 
 | Alternative | Why not |
 |---|---|
-| One error enum per method family | The same mistake raised `ValueError` in one family and `RuntimeError` in another, and each binding chose again. |
-| A `String` error | The binding cannot tell an input error from a failure, so it chose one exception for both. |
+| One error enum per method family | The same mistake raises `ValueError` in one family and `RuntimeError` in another, and each binding chooses again. |
+| A `String` error | The binding cannot tell an input error from a failure, so it chooses one exception for both. |
 | One variant per cause | Callers read the message, not the cause; two kinds set the exception, and the structured errors that callers read stay variants. |
 
 **Guards:** `crates/commol-inference/tests/test_errors.rs`,
@@ -192,7 +194,6 @@ has residuals of.
 | `NoNoise` by default | A band of the model would be scored against data with no notice, and cover less than its level. |
 | A port per observation | It cannot draw one block for several observations, and sees no position or series. |
 | Residual noise on the band at positions | A series may sum outputs with a factor: a residual has no correct split among outputs, and none for an output nobody observed. |
-
 | A kernel density of the draws for the log score | A bandwidth to choose, and bias in the tails the log score weighs most. |
 
 **Guards:** `crates/commol-inference/tests/test_resampling.rs::residual_noise_rejects_a_series_with_no_residuals`,

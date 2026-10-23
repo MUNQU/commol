@@ -102,11 +102,11 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
       `SmcSampler` (`crates/commol-inference/src/smc/`), not a sampler of its
       own, and its configuration takes required `priors` (`WithPriors`)
       ([Design decisions](decisions/uncertainty.md#one-smc-core-many-targets)).
-- [ ] The runner, bound in `py-commol/src/inference.rs`, which runs the
-      method through `parallel` (`py-commol/src/parallelism.rs`), and its
-      stub in `_commol_rs.pyi`; a row in the table of
-      `docs/guide/parallelism.md` and a case of
-      `test_one_thread_keeps_every_parallel_method_on_one_core`.
+- [ ] The runner, bound in `py-commol/src/` (`inference.rs` or the module
+      of its family), which runs the method through `parallel`
+      (`py-commol/src/parallelism.rs`), and its stub in `_commol_rs.pyi`; a
+      row in the table of `docs/guide/parallelism.md` and a case of `METHODS`
+      in `tests/parallelism/test_threads.py`.
 - [ ] The configuration, a subclass of `UncertaintyMethod[YourResult]`, and
       the result, in `context/inference/`; a result with draws holds a
       `ParameterSample`.
@@ -121,8 +121,9 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
       binding maps it with `method_error`, and the "Raises" section of its
       docstring lists `ValueError` and `RuntimeError` by that rule
       ([Design decisions](decisions/uncertainty.md#methods-raise-one-error-type)).
-- [ ] `register(YourMethod, runner)` in `api/inference/registry.py` (import it
-      from `commol.api.inference`).
+- [ ] The Python runner in the module of its family under `api/inference/`,
+      which calls `register(YourMethod, runner)` (`api/inference/registry.py`);
+      `api/inference/__init__.py` imports every such module.
 - [ ] A coverage study (`tests/support/coverage.py`, marker `coverage_study`)
       that shows its intervals cover at their level.
 - [ ] A guide page under `docs/guide/uncertainty/`, a row in the table

@@ -19,8 +19,9 @@ input reaches is removed, not tested.
 | Python (`py-commol/commol/`) | `pytest --cov=commol --cov-fail-under=100`, from `py-commol/` | 100 % of the statements, in the job Python Coverage |
 | Rust (`crates/`, `py-commol/src/`) | `.github/scripts/rust_coverage.sh`, from the root, with the virtual environment of `py-commol` active | Every line, or a marker `// coverage: <reason>` on it, in the job Rust Code Quality |
 
-The bindings have no Rust tests: `pytest` runs them. So the script builds the
-Rust tests and the extension with the instrumentation of `cargo llvm-cov`,
+The bindings have few Rust tests (`py-commol/src/engine.rs`,
+`py-commol/src/build_info.rs`); `pytest` runs the rest of them. So the script
+builds the Rust tests and the extension with the instrumentation of `cargo llvm-cov`,
 runs both, and writes one report. It builds in the debug profile, so
 `debug_assert!` runs and each line keeps its own count; the time budget
 (`test_slow_tests_are_listed`) stays out, as the job Test of Build times the

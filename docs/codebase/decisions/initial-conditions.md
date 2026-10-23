@@ -2,8 +2,9 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-How the fractions of the categories compose, and how calibrated values reach
-the initial state. The initial state itself is an amount per bin
+How the fractions of the categories compose, how an amount of one compartment
+overrides them, and how calibrated values reach the initial state. The initial
+state itself is an amount per bin
 ([Model structure](model-structure.md#the-initial-state-is-an-amount-per-bin)).
 
 ## Category fractions compose down the condition chain
@@ -20,15 +21,46 @@ the engine builds, overrides included, and
 **Guard:** `tests/simulation/test_outputs.py::TestSubgroupTotal` compares the
 result with the state the engine starts from.
 
+## A compartment amount overrides the expansion
+
+`compartment_amounts` (`Aggregate`, and `InitialConditions` in
+`crates/commol-core/src/types/aggregate.rs`) sets the amount of one expanded
+compartment, such as `{"B_g1": 0}`, in the unit of its bin. `initial_state`
+(`builder.rs`) applies it after the expansion, keyed by the name of the
+compartment, so a conditional stratification that leaves a compartment
+unsplit needs no special case, and the expansion does not change. An override
+replaces what the bin amount and the fractions give, and it may be above the
+amount of its bin. A calibrated value replaces the definition when a run
+starts (`apply_values`), and the write-back writes overrides
+([below](#calibrated-initial-conditions-are-applied-in-layers)).
+
+**Rule:** only the engine knows the expansion, so only the engine checks an
+override: `initial_state` rejects a name that is not an expanded compartment
+and an amount that is not finite or is negative, and checks every override
+before it applies one. `Aggregate.check_model` and
+`Aggregate.update_compartment_amounts` (on a copy, so a rejected update
+leaves the structure as it was) ask the engine through
+`engine_state.initial_state`; Python keeps only the checks of the schema.
+
+| Alternative | Why not |
+|---|---|
+| A fraction of a total | A model has no total: bins of different units start without a sum over them. |
+| An amount per combination of categories before the expansion | It repeats the expansion in Python and needs every combination, also those a condition leaves out. |
+
+**Guards:**
+`crates/commol-model/src/builder.rs::override_on_truncated_conditional_compartment`,
+`crates/commol-model/src/builder.rs::unknown_compartment_override_is_a_build_error`,
+`tests/initial_conditions/test_compartment_amounts.py`.
+
 ## Calibrated initial conditions are applied in layers
 
 `InitialConditionPlan` in `crates/commol-model/src/initial_conditions.rs`
 applies calibrated values in a fixed order: bins, category splits, exact
 compartments, and then the remainder named by
 `CalibrationProblem.initial_condition_remainder`. A bin, prefix or compartment
-value is an amount in the unit of its bin; a category value is a split. Both engines of the aggregate
-kind
-resolve and write initial conditions through it
+value is an amount in the unit of its bin; a category value is a split.
+Every engine of the aggregate kind (difference, differential and the two
+stochastic engines) resolves and writes initial conditions through it
 (`SimulationEngine::plan_values` and `apply_values`), and the calibration
 writes every value through the engine (`ValueWriter` in
 `crates/commol-calibration/src/values.rs`), so the objective, the predictions
@@ -40,6 +72,13 @@ whose every compartment a value or the remainder sets and the split of every
 calibrated category, and pins as per-compartment overrides every compartment
 that these cannot reproduce.
 
+An id names, in this order: an expanded compartment (`A_g1`), a qualified
+category (`group:g1`), a bin or a bin prefix (`A`, or `A_g1` over a deeper
+stratification), or a category of exactly one binary stratification (`g1`)
+(`InitialConditionPlan::new`). The plan matches categories on the labels of
+the compartments, never on their names. A bare category that two
+stratifications declare is an error that names the qualified ids.
+
 **Rule:** the plan reads the initial state of the engine
 (`CompartmentalEngine::initial_state`), never its current state: the split of
 a bin, a prefix or the remainder and the pair totals of a category. A
@@ -48,6 +87,7 @@ of a run.
 
 **Guards:**
 `crates/commol-model/tests/initial_conditions.rs::a_bin_and_the_remainder_keep_the_split_of_the_initial_state_after_a_run`,
+`crates/commol-model/src/initial_conditions.rs::category_shared_by_two_stratifications_is_ambiguous`,
 `tests/calibration/test_initial_conditions.py::test_a_calibrator_on_a_simulation_that_has_run_splits_a_bin_by_the_initial_state`.
 
 ## The remainder keeps the sum the model declares
@@ -87,4 +127,3 @@ unit of every compartment a value sets, from the coverage the engine resolves
 `crates/commol-model/tests/initial_conditions.rs` (the layers, the remainder
 and the targets of an id, and
 `the_remainder_keeps_the_declared_sum_of_what_it_covers`).
-See also [Per-compartment initial conditions](../../development/design-per-compartment-initial-conditions.md).

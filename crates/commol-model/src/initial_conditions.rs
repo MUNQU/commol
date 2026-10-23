@@ -3,7 +3,8 @@
 //! This module is the single source of truth for how an initial-condition
 //! value reaches a compartmental engine: how its id resolves to compartments,
 //! in which order the values are written, and how the remainder keeps the
-//! sum of the amounts the model states. Both engines resolve and write values of their kind through it
+//! sum of the amounts the model states. Every engine of the aggregate kind
+//! resolves and writes the values of its kind through it
 //! ([`commol_core::SimulationEngine::plan_values`] and
 //! [`commol_core::SimulationEngine::apply_values`]), so the calibration
 //! objective, the calibrated predictions and the model write-back all use it.

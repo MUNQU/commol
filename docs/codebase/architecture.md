@@ -70,7 +70,7 @@ flowchart TB
 | Model compiler | `commol-model` | Expands the model into compartments, builds the initial state, plans the flows and compiles the rates. |
 | Difference | `commol-difference` | Adds the change of each step: `X += derivatives`. |
 | Differential | `commol-differential` | Integrates the ODEs with `diffsol`. |
-| Stochastic | `commol-stochastic` | Moves whole units by random events. |
+| Stochastic | `commol-stochastic` | Moves whole units at random: events in continuous time, or a chain binomial draw per step. |
 | Calibration | `commol-calibration` | The calibration problem in layers (forward model, observation operator, feasibility, discrepancy: a loss or the likelihood of observation models, optimization objective), and the optimizers that find the values that make an engine match observations, from one or several starts, or with one parameter or prediction held fixed (`Subproblem`); the one quantile of commol (`statistics`), which the summary of the replicates and every method of inference take. |
 | Inference | `commol-inference` | What every uncertainty method returns or reads: the weighted parameter sample, the predictive of a sample, its observation noise and its scores; the resampling methods, which fit copies of the problem with other data (`CalibrationProblem::with_data`); the conformal prediction intervals; the port of sensitivities and the identifiability analyses; the distributions and priors, and the sequential Monte Carlo sampler with its targets (Gibbs posterior, ABC, the posterior of observation models); the noise, the parametric bootstrap and the log score of observation models; the input spaces, designs, quantities of interest and estimators of global sensitivity, which run on a forward model with no observations; the profile likelihood of parameters and predictions and its thresholds. It depends on calibration, never the reverse. |
 
@@ -106,7 +106,6 @@ flowchart TB
    `build_engine` (`context/_model/engine_state.py`). Rust compiles it.
 3. Each `run` calls the Rust engine and returns `SimulationResults`
    (`api/results.py`).
-
 4. `Calibrator` (`api/calibrator.py`) takes the compiled engine of a
    `Simulation` and builds the calibration problem in Rust once
    (`commol_rs.inference.CalibrationProblem`, `py-commol/src/inference.rs`).
@@ -115,7 +114,7 @@ flowchart TB
    `commol.threads`, and returns the best `CalibrationResult`.
 5. `apply_calibration_parameters` writes the result back into the `Model`.
 6. `Calibrator.uncertainty(method)` runs a method on the same problem. A method
-   with draws returns a `ParameterSample`; a `Predictive`
+   with draws returns a result that holds a `ParameterSample`; a `Predictive`
    (`api/inference/predictive.py`) runs its draws, and `commol.scores` checks
    them against observations.
 

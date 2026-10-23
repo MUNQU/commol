@@ -9,8 +9,8 @@ check some of these rules. The rest depend on the author and the reviewer.
 
 | Area | Rule | Checked by |
 |---|---|---|
-| Python style | Ruff, line length 88 | `ruff check`, `ruff format` (pre-commit, CI) |
-| Python types | Annotations on every signature; never `Any` | `ty check` (pre-commit, CI) |
+| Python style | Ruff, line length 88; PEP 8 names | `ruff check` (rules `N`), `ruff format` (pre-commit, CI) |
+| Python types | Annotations on every signature; never `Any` | `ty check` (pre-commit, CI) checks the types; review checks the annotations and `Any` |
 | Python dead code | No unused code; a name used only in a string annotation goes in `py-commol/.vulture_allowlist.py` | `vulture` (pre-commit, CI) |
 | Rust style | `cargo fmt`; no Clippy warnings | pre-commit, CI (`-D warnings`) |
 | Rust docs | Every public item documented (`missing_docs`); no broken doc links | clippy and `cargo doc` (CI) |
@@ -94,7 +94,7 @@ Design reasons and invariants that cross components go to
 
 | If the change… | Update |
 |---|---|
-| Adds or changes a public Python name, argument, default or error | Its docstring; a `::: path` entry in `docs/api/` for a new name in `commol.__all__`; the guide page that uses it |
+| Adds or changes a public Python name, argument, default or error | Its docstring; for a new name in `commol.__all__`, a `::: path` entry in `docs/api/` and a place in the table of `docs/api/index.md`; the guide page that uses it |
 | Changes model behavior (expansion, rates, initial conditions, simulation) | The guide page in `docs/guide/`; [Model structure](../advanced/model-structure.md) if a type changes |
 | Changes calibration or uncertainty | `guide/calibration.md` and its sub-pages, or `guide/uncertainty/` |
 | Changes an expression function or variable | `guide/mathematical-expressions.md` |
@@ -162,13 +162,13 @@ every match.
 | The site builds with no broken internal link or anchor | `mkdocs build --strict` (with `validation:` in `mkdocs.yaml`) | CI (Documentation) |
 | External links answer | lychee (`.github/workflows/links.yaml`) | CI on documentation changes, weekly; not a required check |
 | The documentation examples run | `pytest -m docs` (from `py-commol/`) | CI (Python Coverage, and Test of Build) |
-| Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
+| Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) and is in the table of `docs/api/index.md` | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
 | Every crate under `crates/` is named in [Architecture](architecture.md) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
-| Every test or definition a page names as `<file>::<name>` exists in that file (the dated design records `development/design-*.md` keep the names of their date) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
+| Every test or definition a page names as `<file>::<name>` exists in that file | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
 | Public Python modules, classes, functions and arguments have docstrings | `ruff check . ../.github/scripts` (rules `D1`, `D417`, NumPy convention) | pre-commit, CI |
 | Every path a page of `AGENTS.md` or `docs/codebase/` names in code format exists, and a bare file name matches one file | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
 | Every area page of decisions has a row on the index, and no link points to a decision on the index | `pytest -m docs` (`tests/docs/test_layout.py`) | CI (Python Coverage, and Test of Build) |
-| No run of 12 words is in two pages of `AGENTS.md`, `docs/codebase/` or `docs/development/`; the repository map and the workflow include the task table and the commands of `AGENTS.md` | `pytest -m docs` (`tests/docs/test_layout.py`) | CI (Python Coverage, and Test of Build) |
+| No run of 12 words, outside code blocks and the header rows of tables, is in two pages of `AGENTS.md` and `docs/` (the changelog left out): a page links to the page that owns a text; the repository map and the workflow include the task table and the commands of `AGENTS.md` | `pytest -m docs` (`tests/docs/test_layout.py`) | CI (Python Coverage, and Test of Build) |
 | `AGENTS.md` stays within 110 lines, a page of `docs/codebase/` within 300 and a page of `docs/codebase/decisions/` within 250 | `pytest -m docs` (`tests/docs/test_layout.py`) | CI (Python Coverage, and Test of Build) |
 | Public Rust items have docs, without broken links | `#![warn(missing_docs)]` in every crate (denied by `clippy -D warnings`); `RUSTDOCFLAGS="-D warnings" cargo doc` | pre-commit (clippy), CI |
 | The table in step 1 is complete for this change | — | Pull request checklist and review |

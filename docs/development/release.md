@@ -20,7 +20,7 @@ Incremented for incompatible API changes:
 Incremented for backwards-compatible new features:
 
 - New functionality added
-- New compartment states, stratifications, or transition types
+- New kinds of bins, stratifications or transitions
 - Performance improvements without API changes
 - Deprecation notices (without removal)
 - Example: Adding new mathematical functions, new model types
@@ -67,7 +67,9 @@ that the tests run on, and the Rust tests of `build_info.rs` check the rule.
 
 ## Release Workflow
 
-A release is always made from `main`. Publishing a GitHub release starts the
+A release is a tag on `main`. Only a fix of a version that `main` has left
+behind is a tag on its branch `release/X.Y`
+([Branching Strategy](workflow.md#branching-strategy)). Publishing a GitHub release starts the
 **Release to PyPI** workflow (`.github/workflows/release.yaml`), which
 publishes to PyPI immediately: the `pypi` environment has no approval step.
 The release issue (label `release`) holds the checklist of this page, and the

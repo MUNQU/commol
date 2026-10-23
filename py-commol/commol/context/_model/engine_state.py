@@ -137,9 +137,9 @@ def initial_state(
     Raises
     ------
     ValueError
-        If the total is not finite or not greater than 0, or a per-compartment
-        override names an unknown or repeated compartment, holds a fraction
-        outside ``[0.0, 1.0]``, or makes the initial amounts exceed the total.
+        If a bin amount or a per-compartment override is not finite or is
+        negative, or an override names a compartment that is not part of the
+        expansion.
     """
     return [
         InitialCompartment(name, bin_id, dict(categories), amount)
