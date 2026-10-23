@@ -406,7 +406,7 @@ impl CompiledModel {
                 .map_err(|error| {
                     format!(
                         "Failed to evaluate the time threshold '{}': {error}",
-                        threshold.preprocessed()
+                        threshold.formula
                     )
                 })?;
             if position > from && position < to {

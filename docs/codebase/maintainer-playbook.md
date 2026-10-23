@@ -62,7 +62,12 @@ Use this page before you make or review a change. It turns the
 - [ ] Change the language in `crates/commol-core/src/math_expression/`: a
       function is one entry of `FUNCTIONS` (`language.rs`), which the check,
       the JIT and Python (`commol_rs.core.FUNCTIONS`) read; an operator is a
-      case of `check` (`language.rs`) and of the JIT (`jit/`).
+      token and a level of the parser (`jit/parser.rs`), a case of `check`
+      (`language.rs`) and of the JIT (`jit/codegen.rs`).
+- [ ] Keep every walk of a tree (`Expr`) recursive only into the operands of
+      a node: a chain of one level is one node, and `MAX_NESTING` bounds the
+      depth. A new walk at the limit runs in
+      `crates/commol-core/tests/expressions.rs::every_level_of_operators_at_the_limit_reads_on_a_worker_thread`.
 - [ ] Give a new function its value in
       `crates/commol-core/tests/expressions.rs::every_function_of_the_guide_has_its_value`
       and its unit rule in `_FUNCTION_UNITS` (`utils/equations.py`).

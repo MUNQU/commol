@@ -124,3 +124,10 @@ class TestOperators:
         result = run(_ab_model("k * A % 7"), 1)
 
         assert result["B"][1] == pytest.approx((0.1 * 1000) % 7)
+
+    @pytest.mark.parametrize("rate", ["k * 2 ** 3 ** 2 / 512", "k * 2 ^ 3 ^ 2 / 512"])
+    def test_a_chain_of_powers_groups_from_the_right(self, rate: str) -> None:
+        result = run(_ab_model(rate), 1)
+
+        # 2 ** (3 ** 2) is 512, so the rate is k: 0.1 of the 1000 in A move.
+        assert result["B"][1] == pytest.approx(100.0)

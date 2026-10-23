@@ -48,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   documents. Before, it limited nothing.
 - The unit check reads `^` as a power, as the engine does, and `cbrt` takes
   the cube root of a unit.
+- A formula with a long chain of terms, such as a sum of 20 000 terms, no
+  longer stops the Python process with a segmentation fault. The engine reads
+  formulas with a parser of its own: a sum or a product of any length is one
+  level, and a formula that nests deeper than 100 levels of parentheses,
+  calls, signs and powers fails with a message that names the limit. Before,
+  the parse used one step of the stack for each term, and the process
+  crashed near 20 000 terms, or near 2 000 on a thread of the parallel work.
+- A chain of powers groups from the right, as in Python: `2 ** 3 ** 2` is
+  512. Before, it was 64, `(2 ** 3) ** 2`.
 
 ## [0.10.1] - 2026-10-23
 

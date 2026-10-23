@@ -22,7 +22,6 @@ serde_json = { workspace = true }
 indexmap = { version = "2.12", features = ["serde"] }
 rayon = { workspace = true }
 thiserror = "2.0"
-evalexpr = "13.1"
 
 # Cranelift JIT compiler
 cranelift = "0.126"

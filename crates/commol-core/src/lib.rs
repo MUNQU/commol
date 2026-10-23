@@ -29,7 +29,7 @@ pub mod simulation_engine;
 pub mod types;
 
 // Re-export commonly used types from math_expression
-pub use math_expression::preprocessing::{SPECIAL_VAR_STEP, SPECIAL_VAR_T};
+pub use math_expression::variables::{SPECIAL_VAR_STEP, SPECIAL_VAR_T};
 pub use math_expression::{
     ENGINE_VARIABLES, FUNCTIONS, MathExpression, MathExpressionContext, MathExpressionError,
     RateMathExpression, SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX,

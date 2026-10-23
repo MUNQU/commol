@@ -1,4 +1,4 @@
-//! The engine variables, and the formula the parser reads.
+//! The engine variables: the names every formula can read.
 
 /// The total: the sum of every compartment at the current position,
 /// accumulators excluded.
@@ -26,19 +26,3 @@ pub const ENGINE_VARIABLES: [&str; 5] = [
     SPECIAL_VAR_PI,
     SPECIAL_VAR_E,
 ];
-
-/// The formula the parser reads: `**`, the power of Python, written as `^`,
-/// the power of the parser.
-pub fn preprocess_formula(formula: &str) -> String {
-    formula.replace("**", "^")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_python_power_is_a_power_of_the_parser() {
-        assert_eq!(preprocess_formula("2 ** 3 * sin(x)"), "2 ^ 3 * sin(x)");
-    }
-}

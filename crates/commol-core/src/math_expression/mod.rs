@@ -9,8 +9,9 @@
 //! ## Module Organization
 //!
 //! - `language` - The functions of the language and the check of a formula
-//! - `jit` - The tree of a formula (`jit::ast`), its parser and its compiler
-//! - `preprocessing` - The engine variables, and the formula the parser reads
+//! - `jit` - The tree of a formula (`jit::ast`), its parser (`jit::parser`)
+//!   and its compiler
+//! - `variables` - The engine variables
 //! - `context` - Evaluation context with parameters and compartments
 //! - `error` - Error types for expression evaluation
 //!
@@ -19,8 +20,10 @@
 //! - Numbers, such as `2`, `0.5` and `1e5`, and variables: parameters, bins,
 //!   compartments and the engine variables ([`ENGINE_VARIABLES`]): `total`,
 //!   `step`, `t`, and the constants `pi` and `e`.
-//! - Arithmetic: `+`, `-` (also unary), `*`, `/`, `%` (remainder), `^` or
-//!   `**` (power).
+//! - Arithmetic: `+`, `-` (also the sign), `*`, `/`, `%` (remainder), `^` or
+//!   `**` (power). A chain of one level applies from the left (`a - b + c`
+//!   is `(a - b) + c`), and a chain of powers from the right (`2 ** 3 ** 2`
+//!   is `2 ** 9`); a power binds more tightly than a sign (`-2 ** 2` is -4).
 //! - The functions of [`FUNCTIONS`]: `sin`, `cos`, `tan`, `asin`, `acos`,
 //!   `atan`, `atan2(y, x)`, `sinh`, `cosh`, `tanh`, `asinh`, `acosh`,
 //!   `atanh`, `exp`, `log` and `ln` (natural), `log10`, `log2`, `sqrt`,
@@ -30,6 +33,9 @@
 //!   condition is a comparison (`<`, `>`, `<=`, `>=`, `==`, `!=`) of two
 //!   numbers, or `!` of a condition; a comparison or `!` is nowhere else.
 //!   `&&` and `||` are not in the language: nest `if` calls.
+//! - A formula nests at most [`MAX_NESTING`] levels deep: parentheses,
+//!   calls, signs and powers. A sum or a product of any number of terms is
+//!   one level.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -38,22 +44,22 @@ pub mod context;
 pub mod error;
 pub mod jit;
 pub mod language;
-pub mod preprocessing;
+pub mod variables;
 
 // Re-export main types
 pub use context::MathExpressionContext;
 pub use error::MathExpressionError;
+pub use jit::parser::MAX_NESTING;
 pub use jit::{JITCompiler, JITFunction};
 pub use language::{Arguments, FUNCTIONS, Function};
-pub use preprocessing::{ENGINE_VARIABLES, SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX};
+pub use variables::{ENGINE_VARIABLES, SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX};
 
 use jit::ast::Expr;
 use jit::parser::parse_expression;
-use preprocessing::preprocess_formula;
 
 /// Global cache for JIT-compiled functions.
 ///
-/// This cache ensures that the same preprocessed formula always uses the same
+/// This cache ensures that the same formula always uses the same
 /// compiled machine code, which is critical for deterministic floating-point results.
 /// Without caching, each JIT compilation can produce slightly different machine code
 /// (due to memory layout, instruction scheduling, etc.) that leads to ULP-level
@@ -61,26 +67,26 @@ use preprocessing::preprocess_formula;
 static JIT_CACHE: std::sync::LazyLock<Mutex<HashMap<String, Arc<JITFunction>>>> =
     std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
 
-/// The JIT function of a preprocessed formula: the cached one, or a new one
+/// The JIT function of a formula: the cached one, or a new one
 /// compiled and cached. Expressions are compiled when a model is built, not
 /// while it runs, so one lock serves every caller.
 ///
 /// # Errors
 ///
 /// Returns a message when the formula does not compile.
-fn get_or_compile_jit(preprocessed: &str) -> Result<Arc<JITFunction>, String> {
+fn get_or_compile_jit(formula: &str) -> Result<Arc<JITFunction>, String> {
     // A thread that panicked while it held the lock left a complete map: an
     // entry is inserted whole or not at all.
     let mut cache = JIT_CACHE.lock().unwrap_or_else(PoisonError::into_inner);
-    if let Some(jit_fn) = cache.get(preprocessed) {
+    if let Some(jit_fn) = cache.get(formula) {
         return Ok(Arc::clone(jit_fn));
     }
     let jit_fn = Arc::new(
         JITCompiler::new()
-            .compile(preprocessed)
+            .compile(formula)
             .map_err(|error| error.to_string())?,
     );
-    cache.insert(preprocessed.to_string(), Arc::clone(&jit_fn));
+    cache.insert(formula.to_string(), Arc::clone(&jit_fn));
     Ok(jit_fn)
 }
 
@@ -104,28 +110,21 @@ fn get_or_compile_jit(preprocessed: &str) -> Result<Arc<JITFunction>, String> {
 /// ```
 #[derive(Debug, Clone)]
 pub struct MathExpression {
-    /// The original mathematical formula as a string
+    /// The formula, as it was written.
     pub formula: String,
-    /// Preprocessed formula (cached for performance)
-    preprocessed: String,
     /// The compiled function, or why the formula does not compile.
     compiled: Result<Arc<JITFunction>, String>,
 }
 
 impl MathExpression {
-    /// Create a new expression (preprocesses and JIT-compiles the formula)
+    /// Create a new expression: the formula and its compiled function.
     ///
     /// JIT-compiled functions are cached globally to ensure deterministic
     /// floating-point results. Without caching, each compilation could produce
     /// slightly different machine code leading to ULP-level differences.
     pub fn new(formula: String) -> Self {
-        let preprocessed = preprocess_formula(&formula);
-        let compiled = get_or_compile_jit(&preprocessed);
-        Self {
-            formula,
-            preprocessed,
-            compiled,
-        }
+        let compiled = get_or_compile_jit(&formula);
+        Self { formula, compiled }
     }
 
     /// The compiled function.
@@ -149,7 +148,7 @@ impl MathExpression {
     ///
     /// Returns why the formula does not parse.
     pub fn tree(&self) -> Result<Expr, MathExpressionError> {
-        parse_expression(&self.preprocessed)
+        parse_expression(&self.formula)
     }
 
     /// Check that the formula is in the language of formulas, and count the
@@ -160,7 +159,8 @@ impl MathExpression {
     ///
     /// Returns [`MathExpressionError::NotInLanguage`], which names the
     /// formula and the first part of it that is not in the language: a
-    /// formula that does not parse, a function that is not one of
+    /// formula that does not parse or that nests deeper than
+    /// [`MAX_NESTING`], a function that is not one of
     /// [`FUNCTIONS`] or that has the wrong number of arguments, `&&` or `||`,
     /// or a comparison or `!` outside the condition of an `if`.
     pub fn check(&self) -> Result<usize, MathExpressionError> {
@@ -168,12 +168,7 @@ impl MathExpression {
             formula: self.formula.clone(),
             reason,
         };
-        let tree = self.tree().map_err(|error| {
-            outside(match error {
-                MathExpressionError::InvalidExpression(reason) => reason,
-                other => other.to_string(),
-            })
-        })?;
+        let tree = jit::parser::tree(&self.formula).map_err(outside)?;
         let nodes = language::check(&tree).map_err(outside)?;
         self.jit()?;
         Ok(nodes)
@@ -209,11 +204,6 @@ impl MathExpression {
     pub fn reads_variable(&self, name: &str) -> bool {
         self.tree()
             .is_ok_and(|tree| language::variables(&tree).iter().any(|read| read == name))
-    }
-
-    /// The formula the parser reads: `**` written as `^`.
-    pub fn preprocessed(&self) -> &str {
-        &self.preprocessed
     }
 
     /// The variable names of the compiled function, in the order
@@ -253,7 +243,7 @@ impl RateMathExpression {
     /// `Parameter`, and anything else is a `Formula`, also one that is not in
     /// the language ([`Self::check`]).
     pub fn from_string(s: String) -> Self {
-        match parse_expression(&preprocess_formula(&s)) {
+        match parse_expression(&s) {
             Ok(Expr::Constant(value)) => Self::Constant(value),
             Ok(Expr::Variable(name)) if !ENGINE_VARIABLES.contains(&name.as_str()) => {
                 Self::Parameter(name)

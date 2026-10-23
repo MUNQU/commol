@@ -1,7 +1,7 @@
 //! The language of formulas: its functions and the check of a formula.
 //!
 //! A formula is a number: numbers, variables, the arithmetic operators
-//! `+ - * / % ^` (`**` is `^`), unary `-`, the calls of [`FUNCTIONS`] and
+//! `+ - * / % ^` (`**` is `^`), the sign `-`, the calls of [`FUNCTIONS`] and
 //! `if(condition, a, b)`. A condition is a comparison of two numbers
 //! (`< > <= >= == !=`) or `!` of a condition, and it is the only place a
 //! comparison or `!` may be. The check of a formula
@@ -9,7 +9,9 @@
 //! ([`Expr`]), so a formula it accepts compiles, and the JIT compiles the
 //! functions of [`FUNCTIONS`] and no other.
 
-use super::jit::ast::{BinaryOperator, Expr, UnaryOperator};
+use std::collections::HashSet;
+
+use super::jit::ast::{BinaryOperator, Expr, Level, UnaryOperator};
 
 /// How many arguments a function takes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -139,19 +141,6 @@ pub(crate) fn check(tree: &Expr) -> Result<usize, String> {
     Ok(nodes)
 }
 
-/// Whether `op` compares two numbers.
-fn is_comparison(op: BinaryOperator) -> bool {
-    matches!(
-        op,
-        BinaryOperator::Lt
-            | BinaryOperator::Gt
-            | BinaryOperator::Le
-            | BinaryOperator::Ge
-            | BinaryOperator::Eq
-            | BinaryOperator::Ne
-    )
-}
-
 /// The reason `&&` and `||` are rejected.
 fn logical(op: BinaryOperator) -> String {
     format!(
@@ -160,22 +149,36 @@ fn logical(op: BinaryOperator) -> String {
     )
 }
 
+/// The reason a comparison outside a condition is rejected.
+fn comparison(op: BinaryOperator) -> String {
+    format!("the comparison '{op}' is only allowed in the condition of if(condition, a, b)")
+}
+
+/// The operator of a chain that the tree applies last.
+fn last(rest: &[(BinaryOperator, Expr)]) -> BinaryOperator {
+    rest.last().expect("a chain has an operator").0
+}
+
 /// Check a part of the tree that must be a number.
 fn number(expr: &Expr, nodes: &mut usize) -> Result<(), String> {
     *nodes += 1;
     match expr {
         Expr::Constant(_) | Expr::Variable(_) => Ok(()),
-        Expr::BinaryOp { op, left, right } => match op {
-            BinaryOperator::And | BinaryOperator::Or => Err(logical(*op)),
-            op if is_comparison(*op) => Err(format!(
-                "the comparison '{op}' is only allowed in the condition of \
-                 if(condition, a, b)"
-            )),
-            _ => {
-                number(left, nodes)?;
-                number(right, nodes)
+        Expr::Chain { first, rest } => match last(rest).level() {
+            Level::Or | Level::And => Err(logical(last(rest))),
+            Level::Comparison => Err(comparison(last(rest))),
+            Level::Sum | Level::Product => {
+                // Each operator of the chain is one node.
+                *nodes += rest.len() - 1;
+                number(first, nodes)?;
+                rest.iter()
+                    .try_for_each(|(_, operand)| number(operand, nodes))
             }
         },
+        Expr::Power { base, exponent } => {
+            number(base, nodes)?;
+            number(exponent, nodes)
+        }
         Expr::UnaryOp {
             op: UnaryOperator::Neg,
             operand,
@@ -218,15 +221,19 @@ fn number(expr: &Expr, nodes: &mut usize) -> Result<(), String> {
 /// Check a part of the tree that must be a condition.
 fn condition(expr: &Expr, nodes: &mut usize) -> Result<(), String> {
     match expr {
-        Expr::BinaryOp { op, left, right } if is_comparison(*op) => {
+        Expr::Chain { first, rest } if last(rest).is_comparison() => {
+            // `a < b < c` compares `a < b`, a comparison, with `c`.
+            let (_, earlier) = rest.split_last().expect("a chain has an operator");
+            if let Some(&(op, _)) = earlier.last() {
+                return Err(comparison(op));
+            }
             *nodes += 1;
-            number(left, nodes)?;
-            number(right, nodes)
+            number(first, nodes)?;
+            number(&rest[0].1, nodes)
         }
-        Expr::BinaryOp {
-            op: op @ (BinaryOperator::And | BinaryOperator::Or),
-            ..
-        } => Err(logical(*op)),
+        Expr::Chain { rest, .. } if matches!(last(rest).level(), Level::Or | Level::And) => {
+            Err(logical(last(rest)))
+        }
         Expr::UnaryOp {
             op: UnaryOperator::Not,
             operand,
@@ -243,36 +250,17 @@ fn condition(expr: &Expr, nodes: &mut usize) -> Result<(), String> {
 
 /// The variables `tree` reads, in the order it first reads them.
 pub(crate) fn variables(tree: &Expr) -> Vec<String> {
-    fn collect(expr: &Expr, out: &mut Vec<String>) {
-        match expr {
-            Expr::Constant(_) => {}
-            Expr::Variable(name) => {
-                if !out.contains(name) {
-                    out.push(name.clone());
-                }
-            }
-            Expr::BinaryOp { left, right, .. } => {
-                collect(left, out);
-                collect(right, out);
-            }
-            Expr::UnaryOp { operand, .. } => collect(operand, out),
-            Expr::FunctionCall { args, .. } => {
-                for arg in args {
-                    collect(arg, out);
-                }
-            }
-            Expr::Conditional {
-                condition,
-                true_expr,
-                false_expr,
-            } => {
-                for part in [condition, true_expr, false_expr] {
-                    collect(part, out);
-                }
-            }
+    fn collect<'a>(expr: &'a Expr, seen: &mut HashSet<&'a str>, out: &mut Vec<String>) {
+        if let Expr::Variable(name) = expr
+            && seen.insert(name)
+        {
+            out.push(name.clone());
+        }
+        for operand in expr.operands() {
+            collect(operand, seen, out);
         }
     }
     let mut out = Vec::new();
-    collect(tree, &mut out);
+    collect(tree, &mut HashSet::new(), &mut out);
     out
 }

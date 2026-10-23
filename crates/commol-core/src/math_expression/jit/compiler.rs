@@ -8,7 +8,10 @@ use super::libm::LibmRegistry;
 use super::parser::parse_expression;
 use crate::math_expression::MathExpressionContext;
 use crate::math_expression::error::MathExpressionError;
-use crate::math_expression::preprocessing::{SPECIAL_VAR_STEP, SPECIAL_VAR_T, SPECIAL_VAR_TOTAL};
+use crate::math_expression::language;
+use crate::math_expression::variables::{
+    SPECIAL_VAR_E, SPECIAL_VAR_PI, SPECIAL_VAR_STEP, SPECIAL_VAR_T, SPECIAL_VAR_TOTAL,
+};
 use cranelift::prelude::*;
 use cranelift_codegen::ir::AbiParam;
 use cranelift_jit::{JITBuilder, JITModule};
@@ -130,8 +133,14 @@ impl JITCompiler {
         Self
     }
 
-    /// Compile a preprocessed expression to a JIT function
-    pub fn compile(&self, preprocessed: &str) -> Result<JITFunction, MathExpressionError> {
+    /// Compile a formula to a JIT function.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the formula does not parse, or calls a
+    /// function that is not in the language or with the wrong number of
+    /// arguments.
+    pub fn compile(&self, formula: &str) -> Result<JITFunction, MathExpressionError> {
         // Create a new JIT module for this function
         let mut builder =
             JITBuilder::new(cranelift_module::default_libcall_names()).map_err(|e| {
@@ -144,7 +153,7 @@ impl JITCompiler {
         builder.symbol_lookup_fn(Box::new(super::libm::address));
         let mut module = JITModule::new(builder);
         // Parse to AST
-        let ast = parse_expression(preprocessed)?;
+        let ast = parse_expression(formula)?;
 
         // Collect all variables in the expression
         let variable_names = collect_variables(&ast);
@@ -245,54 +254,13 @@ impl JITCompiler {
     }
 }
 
-/// Collect all variable names used in an expression
+/// The variables the compiled function reads, in the order the formula first
+/// reads them: every variable but `pi` and `e`, which compile to numbers.
 fn collect_variables(expr: &Expr) -> Vec<String> {
-    // Use HashMap for O(1) lookups while maintaining insertion order with Vec
-    let mut seen = HashMap::new();
-    let mut result = Vec::new();
-    collect_variables_recursive(expr, &mut seen, &mut result);
-    result
-}
-
-/// Recursively collect variables from an expression, deduplicating on the fly
-fn collect_variables_recursive(
-    expr: &Expr,
-    seen: &mut HashMap<String, ()>,
-    result: &mut Vec<String>,
-) {
-    match expr {
-        Expr::Variable(name) => {
-            // Skip special constants that are compiled directly
-            if name != "pi" && name != "e" {
-                // Only insert if we haven't seen this variable before
-                if seen.insert(name.clone(), ()).is_none() {
-                    result.push(name.clone());
-                }
-            }
-        }
-        Expr::BinaryOp { left, right, .. } => {
-            collect_variables_recursive(left, seen, result);
-            collect_variables_recursive(right, seen, result);
-        }
-        Expr::UnaryOp { operand, .. } => {
-            collect_variables_recursive(operand, seen, result);
-        }
-        Expr::FunctionCall { args, .. } => {
-            for arg in args {
-                collect_variables_recursive(arg, seen, result);
-            }
-        }
-        Expr::Conditional {
-            condition,
-            true_expr,
-            false_expr,
-        } => {
-            collect_variables_recursive(condition, seen, result);
-            collect_variables_recursive(true_expr, seen, result);
-            collect_variables_recursive(false_expr, seen, result);
-        }
-        Expr::Constant(_) => {}
-    }
+    language::variables(expr)
+        .into_iter()
+        .filter(|name| name != SPECIAL_VAR_PI && name != SPECIAL_VAR_E)
+        .collect()
 }
 
 #[cfg(test)]

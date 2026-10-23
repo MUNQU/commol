@@ -6,8 +6,9 @@
 //!
 //! ## Architecture
 //!
-//! 1. **Parser** (`parser.rs`): Converts preprocessed formula strings to AST
-//! 2. **AST** (`ast.rs`): Abstract syntax tree representation
+//! 1. **Parser** (`parser.rs`): the text of a formula into its tree, up to
+//!    [`MAX_NESTING`](parser::MAX_NESTING) levels deep
+//! 2. **AST** (`ast.rs`): the tree of a formula
 //! 3. **Code Generator** (`codegen.rs`): Converts AST to Cranelift IR
 //! 4. **Compiler** (`compiler.rs`): Main JIT compilation interface
 //!
