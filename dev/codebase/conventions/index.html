@@ -3550,7 +3550,10 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
 </ul>
 <h2 id="rust">Rust<a class="headerlink" href="#rust" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Edition 2024.</li>
+<li>Edition 2024. Every crate takes its version, edition and metadata from
+  <code>[workspace.package]</code> of the root manifest, and a dependency that more
+  than one crate uses from <code>[workspace.dependencies]</code>
+  (<code>py-commol/tests/suite/test_workflows.py</code>).</li>
 <li>Public items have rustdoc comments, and a new module starts with a <code>//!</code>
   summary.</li>
 <li>Hot paths avoid allocation: reuse buffers, access by index, keep evaluation

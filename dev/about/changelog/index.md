@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Removed
+
+- `cffi` is no longer a dependency of commol: no code of commol uses it, so `pip install commol` no longer installs it. Code that imports `cffi` installs it itself.
+
 ### Fixed
 
 - In the `StochasticEvents` engine, a parameter or a seed changed between two runs acts from the position where the first run stopped. The pending wait is drawn again from there, and a pending leap keeps only its events up to there, by binomial thinning. Before, the new rate acted back from the last event, and copies of one state with new seeds shared their next event. In Python this changes only `simulation.engine.set_seed` between two calls of `simulation.engine.step()`; `Simulation.run`, replicates and calibration reset the engine after the seed, so their results do not change.

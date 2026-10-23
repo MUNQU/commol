@@ -3676,11 +3676,12 @@ fixes only. So a breaking change waits for the next minor release, and a
 new feature never goes into a patch release.</p>
 </div>
 <h2 id="where-the-version-comes-from">Where the Version Comes From<a class="headerlink" href="#where-the-version-comes-from" title="Permanent link">&para;</a></h2>
-<p>The version is not stored in the repository. <code>Cargo.toml</code> keeps a placeholder
-(<code>0.1.0</code>), and <code>pyproject.toml</code> declares the version as dynamic. When a release
-is built, the <code>set-version</code> action (<code>.github/actions/set-version</code>) reads the
-git tag, writes it into <code>py-commol/Cargo.toml</code>, and maturin turns it into the
-Python package version.</p>
+<p>The version is not stored in the repository. <code>[workspace.package]</code> of the root
+<code>Cargo.toml</code> keeps a placeholder (<code>0.1.0</code>), which every crate takes, and
+<code>pyproject.toml</code> declares the version as dynamic. When a release is built, the
+<code>set-version</code> action (<code>.github/actions/set-version</code>) reads the git tag, writes
+it into <code>[workspace.package]</code>, and maturin turns it into the Python package
+version.</p>
 <p>Do not commit version bumps. The tag is the version.</p>
 <p>A build that is not a release, such as an install from a git commit or
 <code>maturin develop</code>, keeps the placeholder. The build script of the extension
@@ -3758,7 +3759,8 @@ release", tag <code>vX.Y.Z</code>, title <code>Version X.Y.Z</code>) or with the
 <ol>
 <li>Builds the wheels for Linux and macOS (x86_64 and aarch64) and Windows
    (x86_64), for Python 3.12, 3.13 and 3.14</li>
-<li>Builds the source distribution (sdist)</li>
+<li>Builds the source distribution (sdist); the wheels and the sdist build
+   with the maturin of <code>py-commol/uv.lock</code>, never the latest one</li>
 <li>Runs the coverage studies (<code>coverage.yaml</code>), about 10 min</li>
 <li>Publishes all of them to PyPI with trusted publishing, only when every
    step before passed</li>
