@@ -18,6 +18,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 | Comments | Describe the code as it is | Review |
 | Documentation | Mandatory with every change: [definition of done](#documentation-definition-of-done) | CI and review |
 | Doc examples | Abstract names; every block runs | `pytest -m docs` (CI) and review |
+| Field words | No application field in the user pages or the source of `commol` | `tests/docs/test_pages.py` (`pytest -m docs`, CI) |
 | Tests | One package per guide page; shared factories; every test checks a result, once, within its time budget: [Tests](tests.md) | `tests/suite/` (CI) and review; pytest 10 deprecations fail the run (`filterwarnings`) |
 | Commits | `type(scope): description` | Review |
 
@@ -127,7 +128,9 @@ every match.
 
 - Use abstract names only: bins `A`, `B`, `C`; categories `group1`, `cat1`;
   parameters `k1`, `alpha`. No names from epidemiology, chemistry or any other
-  field.
+  field. `py-commol/tests/docs/test_pages.py` checks the user pages and the
+  source of `commol` against a list of field words; a cited title is the only
+  exception.
 - Every Python block runs, top to bottom within its page, in one namespace and
   from a temporary directory (`py-commol/tests/docs/test_examples.py`). Define
   what a block needs in an earlier block of the same page.

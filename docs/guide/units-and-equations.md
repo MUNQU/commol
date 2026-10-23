@@ -82,7 +82,7 @@ rate must use it (`UnitChecker._step_unit` in
 `py-commol/commol/context/_model/units.py`).
 
 The axis of a model is its independent variable: the quantity the model steps
-along or differentiates over. Time is one case; a length, a dose or any other
+along or differentiates over. Time is one case; a length, a mass or any other
 quantity is another. So the step unit may have any single dimension. Declare it
 with `ModelBuilder(..., step_unit="day")` (`Model.step_unit`); `check_step_unit`
 accepts one unit of one dimension with exponent 1, such as `day` or `meter`, and

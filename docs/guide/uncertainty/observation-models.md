@@ -116,7 +116,7 @@ window and factor), except the median of a `LogNormalObservations` with
 | Positive values with errors that grow with the value | `LogNormalObservations(sigma, center)` | `(e^{σ²} − 1)·μ²` with `center="mean"` | `center` is required: `"mean"` makes `E[y] = μ`; `"median"` is the proportional error `y = μ·e^ε` |
 | Continuous values with outliers | `StudentTObservations(df, scale)` | `scale²·df/(df − 2)` when `df > 2` | Heavier tails: an outlier pulls the fit less |
 | Counts | `PoissonObservations()` | `μ` | |
-| Counts that scatter more than a Poisson | `NegativeBinomialObservations(overdispersion)` | `μ + φμ²` | `φ = 0` is the Poisson; the dispersion `k` of epidemiology (`size` in R) is `1/φ` |
+| Counts that scatter more than a Poisson | `NegativeBinomialObservations(overdispersion)` | `μ + φμ²` | `φ = 0` is the Poisson; the dispersion `k` (`size` in R) is `1/φ` |
 | Successes out of known trials | `BinomialObservations(trials)` | `μ(1 − μ/n)` | The prediction is the expected count `n·p`, not a proportion |
 
 A `BinomialObservations` takes its trials from `trials=n`, for every
