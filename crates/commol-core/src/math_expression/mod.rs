@@ -1,97 +1,55 @@
-//! Mathematical expression evaluation module
+//! Mathematical expressions: the language of formulas, and their compiled
+//! functions.
 //!
-//! This module provides mathematical expression evaluation for compartment models.
+//! A rate, a formula parameter and a calibration constraint are formulas.
+//! [`MathExpression::check`] decides whether a formula is in the language
+//! that `docs/guide/mathematical-expressions.md` documents, and the JIT
+//! (Cranelift) compiles it to machine code once.
 //!
 //! ## Module Organization
 //!
-//! - `error` - Error types for expression evaluation
-//! - `preprocessing` - Formula preprocessing and syntax conversion
+//! - `language` - The functions of the language and the check of a formula
+//! - `jit` - The tree of a formula (`jit::ast`), its parser and its compiler
+//! - `preprocessing` - The engine variables, and the formula the parser reads
 //! - `context` - Evaluation context with parameters and compartments
-//! - `compiled` - Compiled expression patterns for fast evaluation
+//! - `error` - Error types for expression evaluation
 //!
-//! ## Special Variables
+//! ## The language
 //!
-//! The following variables are automatically available in all expressions:
-//! - `total` - The sum of every compartment, accumulators excluded
-//! - `total_<cat>…` - A subgroup total: the sum of the compartments with the
-//!   categories `<cat>…`
-//! - `step` - The step that holds the current position, `floor(t)`
-//! - `t` - The current position on the axis; equal to `step` in a difference
-//!   engine, continuous in a differential engine
-//! - `pi` - Mathematical constant π (≈ 3.14159)
-//! - `e` - Mathematical constant e (≈ 2.71828)
-//!
-//! ## Supported Operators
-//!
-//! - Arithmetic: `+`, `-`, `*`, `/`, `%` (modulo), `^` or `**` (power)
-//! - Comparison: `<`, `>`, `<=`, `>=`, `==`, `!=`
-//! - Logical: `&&` (and), `||` (or), `!` (not)
-//!
-//! Note: Both `^` and `**` are accepted for exponentiation. Python users can use
-//! the familiar `**` syntax, which is automatically converted to `^`.
-//!
-//! ## Supported Functions
-//!
-//! ### Trigonometric
-//! - `sin(x)`, `cos(x)`, `tan(x)` - Basic trigonometric functions (x in radians)
-//! - `asin(x)`, `acos(x)`, `atan(x)` - Inverse trigonometric functions
-//! - `atan2(y, x)` - Two-argument arctangent
-//! - `sinh(x)`, `cosh(x)`, `tanh(x)` - Hyperbolic functions
-//! - `asinh(x)`, `acosh(x)`, `atanh(x)` - Inverse hyperbolic functions
-//!
-//! ### Exponential and Logarithmic
-//! - `exp(x)` - e raised to the power of x
-//! - `ln(x)` - Natural logarithm (base e)
-//! - `log(x)`, `log2(x)`, `log10(x)` - Logarithms with different bases
-//! - `pow(x, y)` - x raised to the power of y
-//!
-//! ### Roots and Absolute Value
-//! - `sqrt(x)` - Square root
-//! - `cbrt(x)` - Cube root
-//! - `hypot(x, y)` - Euclidean distance: sqrt(x² + y²)
-//! - `abs(x)` - Absolute value
-//!
-//! ### Rounding
-//! - `floor(x)` - Round down to nearest integer
-//! - `ceil(x)` - Round up to nearest integer
-//! - `round(x)` - Round to nearest integer
-//! - `trunc(x)` - Truncate to integer (towards zero)
-//!
-//! ### Advanced Math Functions
-//! - `fma(x, y, z)` - Fused multiply-add: x*y+z (single rounding, more accurate)
-//! - `copysign(x, y)` - Copy sign of y to magnitude of x
-//! - `fdim(x, y)` - Positive difference: max(x-y, 0)
-//! - `fmax(x, y)` - Maximum (NaN-aware, different from min/max)
-//! - `fmin(x, y)` - Minimum (NaN-aware, different from min/max)
-//! - `remainder(x, y)` - IEEE remainder
-//!
-//! ### Special Functions
-//! - `erf(x)` - Error function
-//! - `erfc(x)` - Complementary error function
-//! - `tgamma(x)` - Gamma function
-//! - `lgamma(x)` - Natural logarithm of gamma function
-//!
-//! ### Other
-//! - `min(a, b, ...)` - Minimum value (variadic)
-//! - `max(a, b, ...)` - Maximum value (variadic)
-//! - `if(condition, value_if_true, value_if_false)` - Conditional expression
+//! - Numbers, such as `2`, `0.5` and `1e5`, and variables: parameters, bins,
+//!   compartments and the engine variables ([`ENGINE_VARIABLES`]): `total`,
+//!   `step`, `t`, and the constants `pi` and `e`.
+//! - Arithmetic: `+`, `-` (also unary), `*`, `/`, `%` (remainder), `^` or
+//!   `**` (power).
+//! - The functions of [`FUNCTIONS`]: `sin`, `cos`, `tan`, `asin`, `acos`,
+//!   `atan`, `atan2(y, x)`, `sinh`, `cosh`, `tanh`, `asinh`, `acosh`,
+//!   `atanh`, `exp`, `log` and `ln` (natural), `log10`, `log2`, `sqrt`,
+//!   `cbrt`, `pow(x, y)`, `hypot(x, y)`, `min` and `max` (two arguments or
+//!   more), `abs`, `floor`, `ceil`, `round`.
+//! - `if(condition, a, b)`: `a` when the condition holds, else `b`. A
+//!   condition is a comparison (`<`, `>`, `<=`, `>=`, `==`, `!=`) of two
+//!   numbers, or `!` of a condition; a comparison or `!` is nowhere else.
+//!   `&&` and `||` are not in the language: nest `if` calls.
 
-use evalexpr::{ContextWithMutableVariables, HashMapContext, Value};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
 
 pub mod context;
 pub mod error;
 pub mod jit;
+pub mod language;
 pub mod preprocessing;
 
 // Re-export main types
 pub use context::MathExpressionContext;
 pub use error::MathExpressionError;
 pub use jit::{JITCompiler, JITFunction};
+pub use language::{Arguments, FUNCTIONS, Function};
 pub use preprocessing::{ENGINE_VARIABLES, SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX};
 
-use preprocessing::{get_variables, preprocess_formula, reads_variable};
+use jit::ast::Expr;
+use jit::parser::parse_expression;
+use preprocessing::preprocess_formula;
 
 /// Global cache for JIT-compiled functions.
 ///
@@ -185,13 +143,40 @@ impl MathExpression {
         })
     }
 
-    /// Check that the formula compiles.
+    /// The tree of the formula, the one the JIT compiles.
     ///
     /// # Errors
     ///
-    /// Returns the reason when it does not.
-    pub fn compiles(&self) -> Result<(), MathExpressionError> {
-        self.jit().map(|_| ())
+    /// Returns why the formula does not parse.
+    pub fn tree(&self) -> Result<Expr, MathExpressionError> {
+        parse_expression(&self.preprocessed)
+    }
+
+    /// Check that the formula is in the language of formulas, and count the
+    /// nodes of its tree: numbers, variables, operators and calls, `if`
+    /// among them. A formula that passes the check compiles.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MathExpressionError::NotInLanguage`], which names the
+    /// formula and the first part of it that is not in the language: a
+    /// formula that does not parse, a function that is not one of
+    /// [`FUNCTIONS`] or that has the wrong number of arguments, `&&` or `||`,
+    /// or a comparison or `!` outside the condition of an `if`.
+    pub fn check(&self) -> Result<usize, MathExpressionError> {
+        let outside = |reason: String| MathExpressionError::NotInLanguage {
+            formula: self.formula.clone(),
+            reason,
+        };
+        let tree = self.tree().map_err(|error| {
+            outside(match error {
+                MathExpressionError::InvalidExpression(reason) => reason,
+                other => other.to_string(),
+            })
+        })?;
+        let nodes = language::check(&tree).map_err(outside)?;
+        self.jit()?;
+        Ok(nodes)
     }
 
     /// Evaluate the expression with the given context
@@ -207,61 +192,26 @@ impl MathExpression {
         self.jit()?.call(context)
     }
 
-    /// Validate that the expression is syntactically correct
-    pub fn validate(&self) -> Result<(), MathExpressionError> {
-        // First check if we can build the operator tree
-        let tree = match evalexpr::build_operator_tree(&self.preprocessed) {
-            Ok(tree) => tree,
-            Err(e) => return Err(MathExpressionError::EvalError(e)),
-        };
-
-        // Create a dummy context with some common variables to validate the expression
-        // This will catch issues like incomplete expressions, invalid operator sequences, etc.
-        let mut context = HashMapContext::new();
-
-        // Add dummy values for common variables that might be in the expression
-        let variables = self.get_variables();
-        for var in variables {
-            context.set_value(var, Value::Float(1.0)).ok();
-        }
-
-        // Add special variables
-        context
-            .set_value(SPECIAL_VAR_TOTAL.to_string(), Value::Float(1.0))
-            .ok();
-        context
-            .set_value("step".to_string(), Value::Float(1.0))
-            .ok();
-        context.set_value("t".to_string(), Value::Float(1.0)).ok();
-        context
-            .set_value("pi".to_string(), Value::Float(std::f64::consts::PI))
-            .ok();
-        context
-            .set_value("e".to_string(), Value::Float(std::f64::consts::E))
-            .ok();
-
-        // Try to evaluate with dummy context - this will catch syntax errors
-        match tree.eval_with_context(&context) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MathExpressionError::EvalError(e)),
-        }
-    }
-
-    /// Get all variable identifiers used in the expression.
-    ///
-    /// Returns an empty vector if the expression is syntactically invalid.
+    /// The variables the formula reads, in the order it first reads them,
+    /// without the engine variables ([`ENGINE_VARIABLES`]): the names a
+    /// model must define. Empty when the formula does not parse.
     pub fn get_variables(&self) -> Vec<String> {
-        get_variables(&self.preprocessed)
+        self.tree()
+            .map(|tree| language::variables(&tree))
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|name| !ENGINE_VARIABLES.contains(&name.as_str()))
+            .collect()
     }
 
-    /// Whether the expression reads the variable `name`, special variables
-    /// such as `step` included.
+    /// Whether the formula reads the variable `name`, an engine variable
+    /// such as `step` included. False when the formula does not parse.
     pub fn reads_variable(&self, name: &str) -> bool {
-        reads_variable(&self.preprocessed, name)
+        self.tree()
+            .is_ok_and(|tree| language::variables(&tree).iter().any(|read| read == name))
     }
 
-    /// Get the preprocessed formula string (Python operators normalised,
-    /// transcendental functions prefixed).
+    /// The formula the parser reads: `**` written as `^`.
     pub fn preprocessed(&self) -> &str {
         &self.preprocessed
     }
@@ -285,58 +235,44 @@ impl MathExpression {
     }
 }
 
-/// Represents different types of rate expressions
+/// A rate or a formula parameter, by the shape of its tree.
 #[derive(Debug, Clone)]
 pub enum RateMathExpression {
-    /// Simple parameter reference (backward compatibility)
+    /// A single variable that is not an engine variable: a parameter, a bin
+    /// or a compartment, such as `k1`.
     Parameter(String),
-    /// Mathematical expression
+    /// Any other formula, such as `k1 * 2` or `step`.
     Formula(MathExpression),
-    /// Constant value
+    /// A single number, such as `0.3`.
     Constant(f64),
 }
 
 impl RateMathExpression {
-    /// Parse a string into the appropriate rate expression type.
-    ///
-    /// - Numeric values become `Constant`
-    /// - Single variable names become `Parameter` (e.g., "k1")
-    /// - Expressions with an operator or a call become `Formula` (e.g.,
-    ///   "k1 * 2"); one that does not compile keeps the reason
-    ///   ([`Self::compiles`])
+    /// Classify a formula from its tree: a number is a `Constant`, a single
+    /// variable that is not an engine variable ([`ENGINE_VARIABLES`]) is a
+    /// `Parameter`, and anything else is a `Formula`, also one that is not in
+    /// the language ([`Self::check`]).
     pub fn from_string(s: String) -> Self {
-        // First check if it's a numeric constant
-        if let Ok(value) = s.parse::<f64>() {
-            return Self::Constant(value);
-        }
-
-        // Simple heuristic: if the string contains operators or functions, it's a formula
-        // Otherwise, treat it as a simple parameter name
-        let has_operators = s.contains('+')
-            || s.contains('-')
-            || s.contains('*')
-            || s.contains('/')
-            || s.contains('^')
-            || s.contains('%')
-            || s.contains('(')
-            || s.contains(')');
-
-        if has_operators {
-            Self::Formula(MathExpression::new(s))
-        } else {
-            Self::Parameter(s)
+        match parse_expression(&preprocess_formula(&s)) {
+            Ok(Expr::Constant(value)) => Self::Constant(value),
+            Ok(Expr::Variable(name)) if !ENGINE_VARIABLES.contains(&name.as_str()) => {
+                Self::Parameter(name)
+            }
+            _ => Self::Formula(MathExpression::new(s)),
         }
     }
 
-    /// Check that a formula compiles; a parameter or a constant always does.
+    /// Check that a formula is in the language
+    /// ([`MathExpression::check`]), and count the nodes of its tree; a
+    /// parameter or a constant is one node.
     ///
     /// # Errors
     ///
-    /// Returns the reason when a formula does not compile.
-    pub fn compiles(&self) -> Result<(), MathExpressionError> {
+    /// Returns the error of [`MathExpression::check`].
+    pub fn check(&self) -> Result<usize, MathExpressionError> {
         match self {
-            Self::Formula(expr) => expr.compiles(),
-            Self::Parameter(_) | Self::Constant(_) => Ok(()),
+            Self::Formula(expr) => expr.check(),
+            Self::Parameter(_) | Self::Constant(_) => Ok(1),
         }
     }
 
@@ -354,7 +290,8 @@ impl RateMathExpression {
         }
     }
 
-    /// Get all variables referenced in this rate expression
+    /// The variables this rate expression reads, without the engine
+    /// variables ([`MathExpression::get_variables`]).
     pub fn get_variables(&self) -> Vec<String> {
         match self {
             Self::Parameter(param_name) => vec![param_name.clone()],
@@ -363,8 +300,8 @@ impl RateMathExpression {
         }
     }
 
-    /// Whether this rate expression reads the variable `name`, special
-    /// variables such as `step` included.
+    /// Whether this rate expression reads the variable `name`, an engine
+    /// variable such as `step` included.
     pub fn reads_variable(&self, name: &str) -> bool {
         match self {
             Self::Parameter(param_name) => param_name == name,
@@ -435,13 +372,9 @@ mod tests {
         let expr = MathExpression::new("typeof(k1)".to_string());
         let mut ctx = MathExpressionContext::new();
         ctx.set_parameter("k1".to_string(), 0.5);
+        let reason = "Invalid expression: 'typeof(k1)' does not compile: Invalid expression: \
+                      Unknown function: typeof";
 
-        let reason = expr.compiles().unwrap_err().to_string();
-
-        assert!(
-            reason.contains("'typeof(k1)' does not compile: "),
-            "{reason}"
-        );
         assert_eq!(expr.evaluate(&mut ctx).unwrap_err().to_string(), reason);
         assert_eq!(
             expr.call_jit_with_buffer(&[0.5]).unwrap_err().to_string(),
@@ -449,22 +382,27 @@ mod tests {
         );
         assert_eq!(expr.jit_variable_names(), None);
         let rate = RateMathExpression::from_string("typeof(k1)".to_string());
-        assert_eq!(rate.compiles().unwrap_err().to_string(), reason);
-        assert!(
+        assert_eq!(
+            rate.check().unwrap_err().to_string(),
+            expr.check().unwrap_err().to_string()
+        );
+        assert_eq!(
             RateMathExpression::from_string("k1".to_string())
-                .compiles()
-                .is_ok()
+                .check()
+                .unwrap(),
+            1
         );
     }
 
     #[test]
-    fn a_formula_that_does_not_parse_is_not_valid() {
+    fn a_formula_that_does_not_parse_names_itself() {
         let error = MathExpression::new("(k1 + 2".to_string())
-            .validate()
-            .unwrap_err();
+            .check()
+            .unwrap_err()
+            .to_string();
 
         assert!(
-            matches!(error, MathExpressionError::EvalError(_)),
+            error.starts_with("Formula '(k1 + 2': it does not parse: "),
             "{error}"
         );
     }
@@ -515,5 +453,23 @@ mod tests {
         let rate = RateMathExpression::from_string("k1 * 2".to_string());
         assert!(matches!(rate, RateMathExpression::Formula(_)));
         assert!((rate.evaluate(&mut ctx).unwrap() - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn a_rate_is_classified_by_its_tree() {
+        let mut ctx = MathExpressionContext::new();
+        ctx.set_step(3.0);
+        let classify = |formula: &str| RateMathExpression::from_string(formula.to_string());
+
+        assert!(matches!(classify("1e5"), RateMathExpression::Constant(value) if value == 1e5));
+        assert!(matches!(classify(" k1 "), RateMathExpression::Parameter(name) if name == "k1"));
+        assert!(matches!(
+            classify("step > 1"),
+            RateMathExpression::Formula(_)
+        ));
+        assert!(matches!(classify("-0.5"), RateMathExpression::Formula(_)));
+        let step = classify("step");
+        assert!(matches!(step, RateMathExpression::Formula(_)));
+        assert_eq!(step.evaluate(&mut ctx).unwrap(), 3.0);
     }
 }

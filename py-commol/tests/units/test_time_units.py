@@ -234,8 +234,6 @@ class TestVariableUnits:
             "z": "dimensionless",
             "A": "item",
             "C": "item",
-            "g1": "item",
-            "g2": "item",
             "A_g1": "item",
             "A_g2": "item",
             "C_g1": "item",
@@ -274,14 +272,12 @@ class TestVariableUnits:
             "total",
             "total_g1",
             "total_g2",
-            "g1",
-            "g2",
             "neighbors",
         }
         assert not helper.mixed_unit_totals() & set(units)
         assert ModelCompartmentHelper(self._model("item")).mixed_unit_totals() == set()
 
-    @pytest.mark.parametrize("total", ["total", "total_g1", "g1"])
+    @pytest.mark.parametrize("total", ["total", "total_g1"])
     def test_a_rate_that_adds_bins_of_different_units_is_rejected(
         self, total: str
     ) -> None:

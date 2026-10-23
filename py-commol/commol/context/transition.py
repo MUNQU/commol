@@ -5,16 +5,15 @@ from typing import Self
 
 from pydantic import ConfigDict, BaseModel, Field, field_validator, model_validator
 
-from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.stratification_condition import StratificationCondition
 from commol.utils.security import validate_expression_security
 
 
 def _checked_rate(value: str) -> str:
-    """``value`` once it passes the security and the syntax checks."""
+    """``value`` once it passes the security check and the check of the
+    language of formulas."""
     try:
         validate_expression_security(value)
-        commol_rs.core.MathExpression(value).validate()
     except ValueError as e:
         raise ValueError(f"Validation failed for rate '{value}': {e}")
     return value

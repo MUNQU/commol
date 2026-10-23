@@ -35,14 +35,14 @@ pub(crate) fn evaluate_rate(
         (None, RateMathExpression::Formula(expr), Some(slots)) => {
             evaluate_jit_rate(expr, slots, amounts, ctx, clock, jit_buf)
         }
-        // coverage: invariant, the builder rejects a formula that does not compile
+        // coverage: invariant, the builder rejects a formula outside the language
         _ => unreachable!("the builder gives every rate a fast path or the slots of its JIT"),
     };
 
     rate_result.map_err(|error| {
         format!(
-            "Failed to evaluate rate for transition from {:?} to {:?}: {}",
-            flow.source_index, flow.target_index, error
+            "The rate of transition '{}' cannot be evaluated: {error}",
+            flow.transition_id
         )
     })
 }
@@ -77,8 +77,7 @@ fn evaluate_jit_rate(
     }
 }
 
-/// Resolve a pre-computed `VarSlot` to its current numeric value. Compartments
-/// and the step alias are O(1); parameters fall back to a single HashMap probe.
+/// Resolve a pre-computed `VarSlot` to its current numeric value, in O(1).
 #[inline]
 fn resolve_slot(
     slot: &VarSlot,
@@ -94,9 +93,6 @@ fn resolve_slot(
         VarSlot::ParameterIndex(idx) => ctx
             .get_parameter_by_index(*idx)
             .ok_or_else(|| format!("Parameter index '{}' not found", idx)),
-        VarSlot::Parameter(name) => ctx
-            .get_parameter(name)
-            .ok_or_else(|| format!("Variable '{}' not found", name)),
     }
 }
 

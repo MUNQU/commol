@@ -4,8 +4,9 @@
 
 Rates and formula parameters are written as expressions, such as
 `"k1 * A * B / total"`. This page lists everything an expression can contain:
-operators, variables, functions, and the security limits. The engine compiles
-each expression to machine code (Cranelift) once, and reuses it at every step.
+operators, variables, functions, and the security limits. The engine checks
+each expression against this language, compiles it to machine code
+(Cranelift) once, and reuses it at every step.
 
 ## Quick path
 
@@ -146,9 +147,11 @@ print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 | Hyperbolic | `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh` |
 | Exponential and logarithm | `exp`, `log` (natural), `ln` (natural), `log10`, `log2` |
 | Power and root | `sqrt`, `cbrt`, `pow(x, y)`, `hypot(x, y)` |
-| Comparison | `min(a, b)`, `max(a, b)`, `abs` |
+| Comparison | `min(a, b, ...)`, `max(a, b, ...)` (two arguments or more), `abs` |
 | Rounding | `floor`, `ceil`, `round` (halves round away from zero: `round(2.5)` is 3, `round(-2.5)` is -3) |
 | Conditional | `if(condition, value_if_true, value_if_false)` |
+
+No other function is in the language: `erf(x)` or `trunc(x)` is rejected.
 
 For rates that change along the axis, [`AxisPattern`](axis-patterns.md) builds
 tested expressions for pulses, windows, ramps and sinusoids.
@@ -174,9 +177,34 @@ To keep a rate readable, move part of it into a formula parameter:
 `add_parameter(id="k1_periodic", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")`
 and then `rate="k1_periodic * A * B / total"`.
 
+## Rejected expressions
+
+The engine checks each expression when it is added: a transition rate, a
+stratified rate, a formula parameter, a calibration constraint or an axis
+pattern. An expression outside the language of this page fails with a
+`ValueError` that names the expression and its first part outside the
+language: an unknown function, a call with the wrong number of arguments,
+`&&` or `||`, or a comparison or `!` outside the condition of an `if`.
+
+```python
+try:
+    ModelBuilder(name="Rejected").add_parameter(id="k2", value="k1 * (step > 30)")
+except ValueError as error:
+    print(error)  # ... Parameter 'k2': Formula 'k1 * (step > 30)': the comparison '>' ...
+```
+
+When the model is built, the engine checks the variables each rate and each
+formula parameter reads. A variable that no parameter, bin, compartment,
+subgroup total or engine variable defines fails the build, with a message
+that names the transition or the parameter, the expression, the undefined
+variables, and the parameters and bins of the model:
+`Undefined variables in transition 'bc' rate 'k9 * B': k9. Available
+parameters: k1, k2. Available bins: A, B, C.` A category id, such as `g1`,
+is not a variable: write `total_g1` for its compartments.
+
 ## Security
 
-Every rate and constraint expression is checked before it reaches the engine
+Every expression is also checked before it reaches the engine
 (`commol.utils.security.validate_expression_security`). An expression that is not
 plain mathematics is rejected when the transition is added:
 
@@ -196,7 +224,7 @@ except ValueError as error:
 | Function calls | 500 |
 | Variable name length | 50 characters |
 | Numeric literal | 1e12 |
-| Complexity score | 1000 |
+| Complexity score: the nodes of the tree of the expression (numbers, variables, operators and calls) | 1000 |
 
 ## Next steps
 

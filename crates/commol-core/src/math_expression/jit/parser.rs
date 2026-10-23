@@ -9,12 +9,12 @@ use evalexpr::{Node, Operator};
 
 /// Macro to reduce boilerplate for binary operators
 macro_rules! binary_op {
-    ($node:expr, $op_name:expr, $binary_op:expr) => {{
+    ($node:expr, $binary_op:expr) => {{
         let children = $node.children();
         if children.len() != 2 {
             return Err(MathExpressionError::InvalidExpression(format!(
-                "{} requires exactly 2 operands",
-                $op_name
+                "the operator '{}' needs two operands",
+                $binary_op
             )));
         }
         Ok(Expr::binary(
@@ -27,12 +27,12 @@ macro_rules! binary_op {
 
 /// Macro to reduce boilerplate for unary operators
 macro_rules! unary_op {
-    ($node:expr, $op_name:expr, $unary_op:expr) => {{
+    ($node:expr, $unary_op:expr) => {{
         let children = $node.children();
         if children.len() != 1 {
             return Err(MathExpressionError::InvalidExpression(format!(
-                "{} requires exactly 1 operand",
-                $op_name
+                "the operator '{}' needs one operand",
+                $unary_op
             )));
         }
         Ok(Expr::unary($unary_op, convert_node(&children[0])?))
@@ -43,7 +43,7 @@ macro_rules! unary_op {
 pub fn parse_expression(preprocessed: &str) -> Result<Expr, MathExpressionError> {
     // Use evalexpr to parse the expression into its AST
     let evalexpr_tree =
-        evalexpr::build_operator_tree(preprocessed).map_err(MathExpressionError::EvalError)?;
+        evalexpr::build_operator_tree(preprocessed).map_err(MathExpressionError::ParseError)?;
 
     // Convert evalexpr's AST to our AST
     convert_node(&evalexpr_tree)
@@ -52,23 +52,21 @@ pub fn parse_expression(preprocessed: &str) -> Result<Expr, MathExpressionError>
 /// Convert an evalexpr Node to our Expr
 fn convert_node(node: &Node) -> Result<Expr, MathExpressionError> {
     match node.operator() {
-        // RootNode - just unwrap and convert the child
-        Operator::RootNode => {
-            let children = node.children();
-            if children.len() == 1 {
-                convert_node(&children[0])
-            } else {
-                Err(MathExpressionError::InvalidExpression(
-                    "RootNode should have exactly 1 child".to_string(),
-                ))
-            }
-        }
+        // A root holds the formula or the inside of a pair of parentheses.
+        Operator::RootNode => match node.children() {
+            [child] => convert_node(child),
+            _ => Err(MathExpressionError::InvalidExpression(
+                "the formula, or a pair of parentheses in it, holds nothing".to_string(),
+            )),
+        },
 
         // Constants
         Operator::Const { value } => match value {
             evalexpr::Value::Float(f) => Ok(Expr::Constant(*f)),
             evalexpr::Value::Int(i) => Ok(Expr::Constant(*i as f64)),
-            evalexpr::Value::Boolean(b) => Ok(Expr::Constant(if *b { 1.0 } else { 0.0 })),
+            evalexpr::Value::Boolean(b) => Err(MathExpressionError::InvalidExpression(format!(
+                "the boolean '{b}' is not a number"
+            ))),
             _ => Err(MathExpressionError::InvalidExpression(
                 "Unsupported constant type".to_string(),
             )),
@@ -78,37 +76,38 @@ fn convert_node(node: &Node) -> Result<Expr, MathExpressionError> {
         Operator::VariableIdentifierRead { identifier } => Ok(Expr::Variable(identifier.clone())),
 
         // Binary operations - Arithmetic
-        Operator::Add => binary_op!(node, "Add", BinaryOperator::Add),
-        Operator::Sub => binary_op!(node, "Sub", BinaryOperator::Sub),
-        Operator::Mul => binary_op!(node, "Mul", BinaryOperator::Mul),
-        Operator::Div => binary_op!(node, "Div", BinaryOperator::Div),
-        Operator::Mod => binary_op!(node, "Mod", BinaryOperator::Mod),
-        Operator::Exp => binary_op!(node, "Exp", BinaryOperator::Pow),
+        Operator::Add => binary_op!(node, BinaryOperator::Add),
+        Operator::Sub => binary_op!(node, BinaryOperator::Sub),
+        Operator::Mul => binary_op!(node, BinaryOperator::Mul),
+        Operator::Div => binary_op!(node, BinaryOperator::Div),
+        Operator::Mod => binary_op!(node, BinaryOperator::Mod),
+        Operator::Exp => binary_op!(node, BinaryOperator::Pow),
 
         // Binary operations - Comparison
-        Operator::Lt => binary_op!(node, "Lt", BinaryOperator::Lt),
-        Operator::Gt => binary_op!(node, "Gt", BinaryOperator::Gt),
-        Operator::Leq => binary_op!(node, "Leq", BinaryOperator::Le),
-        Operator::Geq => binary_op!(node, "Geq", BinaryOperator::Ge),
-        Operator::Eq => binary_op!(node, "Eq", BinaryOperator::Eq),
-        Operator::Neq => binary_op!(node, "Neq", BinaryOperator::Ne),
+        Operator::Lt => binary_op!(node, BinaryOperator::Lt),
+        Operator::Gt => binary_op!(node, BinaryOperator::Gt),
+        Operator::Leq => binary_op!(node, BinaryOperator::Le),
+        Operator::Geq => binary_op!(node, BinaryOperator::Ge),
+        Operator::Eq => binary_op!(node, BinaryOperator::Eq),
+        Operator::Neq => binary_op!(node, BinaryOperator::Ne),
 
         // Binary operations - Logical
-        Operator::And => binary_op!(node, "And", BinaryOperator::And),
-        Operator::Or => binary_op!(node, "Or", BinaryOperator::Or),
+        Operator::And => binary_op!(node, BinaryOperator::And),
+        Operator::Or => binary_op!(node, BinaryOperator::Or),
 
         // Unary operations
-        Operator::Neg => unary_op!(node, "Neg", UnaryOperator::Neg),
-        Operator::Not => unary_op!(node, "Not", UnaryOperator::Not),
+        Operator::Neg => unary_op!(node, UnaryOperator::Neg),
+        Operator::Not => unary_op!(node, UnaryOperator::Not),
 
         // Function calls: evalexpr gives a call one child, a root that holds
-        // a tuple of the arguments or the one argument.
+        // a tuple of the arguments, the one argument or nothing.
         Operator::FunctionIdentifier { identifier } => {
             let [arguments] = node.children() else {
                 // coverage: invariant, evalexpr gives a call one child
                 unreachable!("evalexpr gives a call one child")
             };
             let arg_exprs: Vec<Expr> = match arguments.children() {
+                [] if matches!(arguments.operator(), Operator::RootNode) => Vec::new(),
                 [tuple] if matches!(tuple.operator(), Operator::Tuple) => tuple
                     .children()
                     .iter()
@@ -188,9 +187,9 @@ mod tests {
 
     #[test]
     fn test_parse_function_call() {
-        let expr = parse_expression("math::sin(x)").unwrap();
+        let expr = parse_expression("sin(x)").unwrap();
         assert!(
-            matches!(&expr, Expr::FunctionCall { name, args } if name == "math::sin" && args.len() == 1)
+            matches!(&expr, Expr::FunctionCall { name, args } if name == "sin" && args.len() == 1)
         );
     }
 
@@ -215,7 +214,7 @@ mod tests {
             "!x",
             "if(x, 1, 2)",
             "max(x, y, 2)",
-            "math::sin(x)",
+            "sin(x)",
         ] {
             let printed = parse_expression(formula).unwrap().to_string();
             let again = parse_expression(&printed).unwrap().to_string();
@@ -228,11 +227,8 @@ mod tests {
     }
 
     #[test]
-    fn a_boolean_is_a_number() {
-        assert!(matches!(
-            parse_expression("if(true, 1, 2)").unwrap(),
-            Expr::Conditional { condition, .. } if *condition == Expr::Constant(1.0)
-        ));
+    fn a_call_without_arguments_has_none() {
+        assert_eq!(parse_expression("f()").unwrap(), Expr::call("f", vec![]));
     }
 
     #[test]
@@ -243,7 +239,7 @@ mod tests {
             ("1; 2", "Unsupported operator: Chain"),
             ("1, 2", "Unexpected tuple with 2 elements in expression"),
             ("if(1, 2)", "if requires exactly 3 arguments, got 2"),
-            ("f()", "RootNode should have exactly 1 child"),
+            ("if(true, 1, 2)", "the boolean 'true' is not a number"),
         ] {
             assert_eq!(
                 parse_expression(formula).unwrap_err().to_string(),

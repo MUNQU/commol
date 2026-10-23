@@ -216,26 +216,21 @@ class TestMissingUnits:
 
         assert "constant parameters are missing units: k1, k2. " in str(error.value)
 
-    def test_a_formula_of_an_unknown_variable_has_no_unit(self) -> None:
+    def test_a_formula_whose_unit_cannot_be_inferred_has_no_unit(self) -> None:
         model = _abc(
             parameters={
-                "k1_base": 0.3,
-                "multiplier": 2.0,
-                "invalid_param": "nonexistent_var * 2",
                 "k2": 0.1,
+                "f1": "2 * f2",
+                "f2": "f1 / 2",
             },
-            units={
-                "k1_base": "1/day",
-                "multiplier": "dimensionless",
-                "k2": "1/day",
-            },
-            ab="invalid_param * A * B / total",
+            units={"k2": "1/day"},
+            ab="f1 * A * B / total",
         )
 
         with pytest.raises(UnitConsistencyError, match="no defined unit") as error:
             model.check_unit_consistency()
 
-        assert "invalid_param" in str(error.value)
+        assert "Variable 'f1'" in str(error.value)
 
 
 class TestInconsistentModels:

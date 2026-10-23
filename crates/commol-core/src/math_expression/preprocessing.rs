@@ -1,9 +1,4 @@
-//! Formula preprocessing utilities
-//!
-//! This module handles conversion of formulas from user-friendly syntax to evalexpr-compatible syntax.
-
-use evalexpr::{Node, build_operator_tree};
-use std::collections::HashSet;
+//! The engine variables, and the formula the parser reads.
 
 /// The total: the sum of every compartment at the current position,
 /// accumulators excluded.
@@ -32,97 +27,10 @@ pub const ENGINE_VARIABLES: [&str; 5] = [
     SPECIAL_VAR_E,
 ];
 
-/// Preprocesses a formula by adding `math::` prefix to mathematical functions that require it
-/// and converting Python-style operators to evalexpr syntax.
-///
-/// Transformations:
-/// - `sin(x)` → `math::sin(x)` (adds prefix for math functions)
-/// - `**` → `^` (converts Python power operator to evalexpr syntax)
-///
-/// Note: Functions like `min`, `max`, `floor`, `ceil`, `round`, `if` are available
-/// without the `math::` prefix in evalexpr and are not modified.
+/// The formula the parser reads: `**`, the power of Python, written as `^`,
+/// the power of the parser.
 pub fn preprocess_formula(formula: &str) -> String {
-    // Functions that need math:: prefix (not available as built-ins)
-    // Order matters. Longer function names must come first to avoid
-    // replacing substrings (e.g., process "asin" before "sin")
-    // Note: "log" is not in this list - it's handled separately below
-    const MATH_FUNCTIONS: &[&str] = &[
-        "asinh", "acosh", "atanh", "asin", "acos", "atan2", "atan", "sinh", "cosh", "tanh", "sin",
-        "cos", "tan", "log10", "log2", "ln", "cbrt", "sqrt", "hypot", "exp", "abs", "pow",
-    ];
-
-    // First, convert Python-style ** to evalexpr-style ^
-    let mut result = formula.replace("**", "^");
-
-    // Replace log( with ln( since evalexpr's math::log requires 2 arguments
-    // Process log10 and log2 first (already in MATH_FUNCTIONS), then replace remaining log(
-    result = result.replace("log(", "ln(");
-
-    for func in MATH_FUNCTIONS {
-        // Replace "func(" with "math::func(" but avoid replacing if already prefixed
-        let pattern = format!("{}(", func);
-        let replacement = format!("math::{}(", func);
-
-        // We need to check if the match is a valid function call, not part of another identifier
-        // Valid function call: preceded by whitespace, operator, or start of string
-        let mut new_result = String::new();
-        let mut remaining = result.as_str();
-
-        while let Some(pos) = remaining.find(&pattern) {
-            // Check if it's already prefixed with "math::"
-            let prefix_start = pos.saturating_sub(6);
-            let prefix = &remaining[prefix_start..pos];
-
-            // Check if this is a valid function boundary (not part of another identifier)
-            let is_valid_boundary = remaining[..pos]
-                .chars()
-                .next_back()
-                .is_none_or(|c| !c.is_alphanumeric() && c != '_');
-
-            if is_valid_boundary && !prefix.ends_with("math::") {
-                new_result.push_str(&remaining[..pos]);
-                new_result.push_str(&replacement);
-                remaining = &remaining[pos + pattern.len()..];
-            } else {
-                new_result.push_str(&remaining[..pos + pattern.len()]);
-                remaining = &remaining[pos + pattern.len()..];
-            }
-        }
-        new_result.push_str(remaining);
-        result = new_result;
-    }
-
-    result
-}
-
-/// Collects all variable identifiers from an AST node, excluding special variables.
-pub fn get_variables_from_node(node: &Node, variables: &mut HashSet<String>) {
-    for ident in node.iter_variable_identifiers() {
-        // Exclude special variables that are automatically available
-        if !ENGINE_VARIABLES.contains(&ident) {
-            variables.insert(ident.to_string());
-        }
-    }
-}
-
-/// Get all variable identifiers used in an expression.
-///
-/// Returns an empty vector if the expression is syntactically invalid.
-pub fn get_variables(preprocessed: &str) -> Vec<String> {
-    let mut variables = HashSet::new();
-    if let Ok(node) = build_operator_tree(preprocessed) {
-        get_variables_from_node(&node, &mut variables);
-    }
-    variables.into_iter().collect()
-}
-
-/// Whether an expression reads the variable `name`, special variables such as
-/// `step` included.
-///
-/// Returns `false` if the expression is syntactically invalid.
-pub fn reads_variable(preprocessed: &str, name: &str) -> bool {
-    build_operator_tree(preprocessed)
-        .is_ok_and(|node: Node| node.iter_variable_identifiers().any(|ident| ident == name))
+    formula.replace("**", "^")
 }
 
 #[cfg(test)]
@@ -130,44 +38,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_preprocess_formula() {
-        assert_eq!(preprocess_formula("sin(x)"), "math::sin(x)");
-        assert_eq!(preprocess_formula("2 ** 3"), "2 ^ 3");
-        assert_eq!(preprocess_formula("log(x)"), "math::ln(x)");
-        assert_eq!(preprocess_formula("log10(x)"), "math::log10(x)");
-        assert_eq!(preprocess_formula("max(a, b)"), "max(a, b)"); // No prefix needed
-    }
-
-    #[test]
-    fn a_function_name_inside_an_identifier_gets_no_prefix() {
-        assert_eq!(
-            preprocess_formula("cosin(x) + sin(x)"),
-            "cosin(x) + math::sin(x)"
-        );
-        assert_eq!(preprocess_formula("my_exp(x)"), "my_exp(x)");
-        assert_eq!(preprocess_formula("é + sin(x)"), "é + math::sin(x)");
-        assert_eq!(preprocess_formula("math::sin(x)"), "math::sin(x)");
-    }
-
-    #[test]
-    fn test_get_variables() {
-        let vars = get_variables("k1 * A * B");
-        assert_eq!(vars.len(), 3);
-        assert!(vars.contains(&"k1".to_string()));
-        assert!(vars.contains(&"A".to_string()));
-        assert!(vars.contains(&"B".to_string()));
-
-        // Special variables should be excluded
-        let vars = get_variables("k1 * total + pi");
-        assert_eq!(vars.len(), 1);
-        assert!(vars.contains(&"k1".to_string()));
-    }
-
-    #[test]
-    fn reads_variable_sees_special_variables() {
-        assert!(reads_variable("k * (step + 1)", "step"));
-        assert!(reads_variable("if(t >= 2, k, 0)", "t"));
-        assert!(!reads_variable("k * steps", "step"));
-        assert!(!reads_variable("k * (", "k"));
+    fn a_python_power_is_a_power_of_the_parser() {
+        assert_eq!(preprocess_formula("2 ** 3 * sin(x)"), "2 ^ 3 * sin(x)");
     }
 }

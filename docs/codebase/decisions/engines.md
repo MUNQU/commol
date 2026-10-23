@@ -166,7 +166,7 @@ version may change a run, and the changelog says so.
 | A random source passed to every call | The trait grows an argument that the deterministic engines ignore. |
 | The seed in the model file | A model is a description; the seed belongs to a run, as `CalibrationProblem.seed` does. |
 | `StdRng` or `SmallRng` | `StdRng` is slower and its security is not needed; `SmallRng` is documented as not portable. |
-| A pure-Rust `libm` for every function of the JIT | `pow` takes 4 times as long (21 ns against 5 ns) and `exp`, `log` and `sin` about 40 % more, in every engine, for a difference in the last bit; the levels above are documented instead. The `libm` crate gives only the functions the standard library does not have (`erf`, `erfc`, `tgamma`, `lgamma`, the Bessel functions, `fdim`, `remainder`). |
+| A pure-Rust `libm` for every function of the JIT | `pow` takes 4 times as long (21 ns against 5 ns) and `exp`, `log` and `sin` about 40 % more, in every engine, for a difference in the last bit; the levels above are documented instead. Every function of the language has a method in the standard library. |
 | The JIT looks each function up in the process (`dlsym`) | A Linux binary links the system `libm` only for the functions Rust calls, so `floor` can be missing and the build fails; Windows names some functions otherwise (`_j0`). `address` gives the JIT the address of each function. |
 | One run per calibration evaluation | The loss is noise, and Nelder-Mead stops anywhere. |
 | The mean as the default summary | What to fit is a modelling choice; the mean of runs where half go extinct describes no run. |

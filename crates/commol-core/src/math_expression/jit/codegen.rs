@@ -3,11 +3,9 @@
 //! This module generates Cranelift IR from our AST.
 
 use super::ast::{BinaryOperator, Expr, UnaryOperator};
-use super::libm::{
-    LibmRegistry, is_single_arg_function, is_three_arg_function, is_two_arg_function,
-    map_function_name,
-};
+use super::libm::LibmRegistry;
 use crate::math_expression::error::MathExpressionError;
+use crate::math_expression::language;
 use cranelift::prelude::*;
 use cranelift_codegen::ir::InstBuilder;
 use cranelift_module::{FuncId, Module};
@@ -232,75 +230,36 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
         self.builder.ins().fcvt_from_uint(types::F64, int_val)
     }
 
-    /// Generate a function call
+    /// Generate a function call of the language
+    /// ([`FUNCTIONS`](crate::math_expression::language::FUNCTIONS)).
     fn generate_function_call(
         &mut self,
         name: &str,
         args: &[Expr],
     ) -> Result<Value, MathExpressionError> {
-        // Map function name (e.g., "math::sin" -> "sin")
-        let libm_name = map_function_name(name);
-
-        // Handle special multi-argument functions
-        if name == "min" || name == "max" {
+        let Some(function) = language::function(name) else {
+            return Err(MathExpressionError::InvalidExpression(format!(
+                "Unknown function: {name}"
+            )));
+        };
+        if !function.arguments.accepts(args.len()) {
+            return Err(MathExpressionError::InvalidExpression(format!(
+                "Function {name} takes {}, got {}",
+                function.arguments,
+                args.len()
+            )));
+        }
+        let Some(symbol) = function.symbol else {
             return self.generate_min_max(name, args);
-        }
-
-        // Single-argument function
-        if is_single_arg_function(name) {
-            if args.len() != 1 {
-                return Err(MathExpressionError::InvalidExpression(format!(
-                    "Function {} requires exactly 1 argument, got {}",
-                    name,
-                    args.len()
-                )));
-            }
-
-            let arg_val = self.generate(&args[0])?;
-            let func_id = self
-                .libm_registry
-                .import_f64_to_f64(self.module, libm_name)?;
-            return Ok(self.call_imported(func_id, &[arg_val]));
-        }
-
-        // Two-argument function
-        if is_two_arg_function(name) {
-            if args.len() != 2 {
-                return Err(MathExpressionError::InvalidExpression(format!(
-                    "Function {} requires exactly 2 arguments, got {}",
-                    name,
-                    args.len()
-                )));
-            }
-
-            let arg1_val = self.generate(&args[0])?;
-            let arg2_val = self.generate(&args[1])?;
-            return self.call_two_arg_libm(libm_name, arg1_val, arg2_val);
-        }
-
-        // Three-argument function
-        if is_three_arg_function(name) {
-            if args.len() != 3 {
-                return Err(MathExpressionError::InvalidExpression(format!(
-                    "Function {} requires exactly 3 arguments, got {}",
-                    name,
-                    args.len()
-                )));
-            }
-
-            let arg1_val = self.generate(&args[0])?;
-            let arg2_val = self.generate(&args[1])?;
-            let arg3_val = self.generate(&args[2])?;
-            let func_id = self
-                .libm_registry
-                .import_f64_f64_f64_to_f64(self.module, libm_name)?;
-            return Ok(self.call_imported(func_id, &[arg1_val, arg2_val, arg3_val]));
-        }
-
-        Err(MathExpressionError::InvalidExpression(format!(
-            "Unknown function: {}",
-            name
-        )))
+        };
+        let values = args
+            .iter()
+            .map(|arg| self.generate(arg))
+            .collect::<Result<Vec<_>, _>>()?;
+        let func_id = self
+            .libm_registry
+            .import(self.module, symbol, values.len())?;
+        Ok(self.call_imported(func_id, &values))
     }
 
     /// Call a two-argument libm function.
@@ -310,9 +269,7 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
         left: Value,
         right: Value,
     ) -> Result<Value, MathExpressionError> {
-        let func_id = self
-            .libm_registry
-            .import_f64_f64_to_f64(self.module, name)?;
+        let func_id = self.libm_registry.import(self.module, name, 2)?;
         Ok(self.call_imported(func_id, &[left, right]))
     }
 
@@ -330,8 +287,8 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
         args: &[Expr],
     ) -> Result<Value, MathExpressionError> {
         let [first, rest @ ..] = args else {
-            // coverage: invariant, the parser gives a call at least one argument
-            unreachable!("the parser gives a call at least one argument")
+            // coverage: invariant, `generate_function_call` gives min and max two arguments or more
+            unreachable!("min and max take two arguments or more")
         };
         let mut result = self.generate(first)?;
 

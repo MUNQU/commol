@@ -6,7 +6,6 @@ from commol.utils.equations import (
     check_equation_units,
     ureg,
 )
-from commol.utils.security import get_expression_variables
 
 
 def check_step_unit(unit: str) -> str:
@@ -183,7 +182,7 @@ class UnitChecker:
         A flow moves ``<bin unit>`` per step; an impulse moves ``<bin unit>``
         at once.
         """
-        variables = get_expression_variables(rate)
+        variables = engine_state.formula_inputs(rate)
 
         rate_variable_units: dict[str, str] = {}
         for var in variables:

@@ -6,6 +6,8 @@ import re
 import string
 import unicodedata
 
+from commol.commol_rs import _commol_rs as commol_rs
+
 # An identifier starts where no letter, digit or underscore precedes it, so the
 # exponent of ``1e5`` belongs to the number and ``e1`` is a name.
 _IDENTIFIER_REGEX: re.Pattern[str] = re.compile(
@@ -23,7 +25,12 @@ def _without_identifier_digits(expression: str) -> str:
 
 @dataclass
 class SecurityConfig:
-    """Configuration for security validation."""
+    """
+    Configuration for security validation.
+
+    ``max_complexity_score`` limits the number of nodes of the tree of a
+    formula: its numbers, variables, operators and calls.
+    """
 
     max_expression_length: int = 10000
     max_nesting_depth: int = 10
@@ -65,52 +72,11 @@ class ExpressionSecurityValidator:
         "\t",
         "\n",
         "\r",
-        # Comparison operators (used in conditional expressions via evalexpr `if`)
+        # Comparison operators, for the condition of `if`
         "=",
         "<",
         ">",
         "!",
-    }
-
-    # Safe mathematical functions supported by evalexpr (case-insensitive matching)
-    SAFE_FUNCTIONS: set[str] = {
-        # Trigonometric functions
-        "sin",
-        "cos",
-        "tan",
-        "asin",
-        "acos",
-        "atan",
-        "atan2",
-        "sinh",
-        "cosh",
-        "tanh",
-        "asinh",
-        "acosh",
-        "atanh",
-        # Exponential and logarithmic functions
-        "exp",
-        "ln",
-        "log",
-        "log2",
-        "log10",
-        # Power and root functions
-        "sqrt",
-        "cbrt",
-        "pow",
-        "hypot",
-        # Rounding and absolute value functions
-        "abs",
-        "floor",
-        "ceil",
-        "round",
-        # Min/max and conditional
-        "max",
-        "min",
-        "if",
-        # Type checking (evalexpr specific)
-        "typeof",
-        # Note: 'pi' and 'e' are constants, not functions
     }
 
     # Python-specific dangerous patterns
@@ -252,7 +218,6 @@ class ExpressionSecurityValidator:
         "parts",
         "as_ptr",
         "as_mut_ptr",
-        # Note: "offset" removed - it's a common mathematical term
         "add",
         "sub",
         "wrapping",
@@ -460,7 +425,10 @@ class ExpressionSecurityValidator:
         Raises
         ------
         SecurityError
-            If the expression contains security violations
+            If the expression contains security violations, or its tree has
+            more nodes than ``max_complexity_score``.
+        ValueError
+            If the expression is not in the language of formulas.
         """
         if not expression or not expression.strip():
             raise SecurityError("Empty expression")
@@ -486,6 +454,19 @@ class ExpressionSecurityValidator:
 
         # Strict mode additional checks
         self._strict_validation(tokens, expression)
+
+        # The language of formulas, and the size of the formula
+        self._check_language(expression)
+
+    def _check_language(self, expression: str) -> None:
+        """Check the formula in the engine, and its number of nodes against
+        the complexity score."""
+        nodes = commol_rs.core.MathExpression(expression).check()
+        if nodes > self.config.max_complexity_score:
+            raise SecurityError(
+                f"Complexity score too high: {nodes} nodes "
+                f"(maximum: {self.config.max_complexity_score})"
+            )
 
     def _check_length(self, expression: str) -> None:
         """Check if expression length is within limits."""
@@ -706,8 +687,6 @@ class ExpressionSecurityValidator:
         for token in tokens:
             if self._is_number(token) or token in self.ALLOWED_OPERATORS:
                 continue
-            if token.lower() in self.SAFE_FUNCTIONS:
-                continue
             # Check for dunder methods
             if self._dunder_regex.search(token):
                 raise SecurityError(f"Suspicious dunder pattern: '{token}'")
@@ -756,10 +735,14 @@ def validate_expression_security(
     expression: str, config: SecurityConfig | None = None
 ) -> None:
     """
-    Validate an expression for security concerns.
+    Validate an expression for security concerns and against the language of
+    formulas.
 
-    This is the main entry point for comprehensive expression security validation
-    that protects against both Python and Rust-specific attack vectors.
+    This is the main entry point for every expression a user supplies. The
+    text guards protect against Python- and Rust-specific attack vectors;
+    then the engine checks that the expression is in the language of formulas
+    (``commol_rs.core.MathExpression.check``) and counts the nodes of its
+    tree, which must not exceed ``max_complexity_score``.
 
     Parameters
     ----------
@@ -771,8 +754,12 @@ def validate_expression_security(
     Raises
     ------
     SecurityError
-        If the expression contains security violations with detailed information
-        about the violation type and context
+        If the expression contains security violations, with detailed
+        information about the violation type and context, or its tree has
+        more nodes than ``max_complexity_score``.
+    ValueError
+        If the expression is not in the language of formulas; the message
+        names the first part of it that is not.
 
     Examples
     --------
@@ -783,32 +770,3 @@ def validate_expression_security(
     """
     validator = ExpressionSecurityValidator(config)
     validator.validate_expression(expression)
-
-
-def get_expression_variables(expression: str) -> list[str]:
-    """
-    Extracts variable names from a mathematical expression.
-
-    This function identifies sequences of characters that represent variable names,
-    ignoring numbers, operators, and known mathematical functions.
-
-    Parameters
-    ----------
-    expression : str
-        The mathematical expression.
-
-    Returns
-    -------
-    list[str]
-        A list of unique variable names found in the expression.
-    """
-    all_identifiers: list[str] = _IDENTIFIER_REGEX.findall(expression)
-
-    # Filter out known safe functions and constants
-    safe_tokens = ExpressionSecurityValidator.SAFE_FUNCTIONS | {"pi", "e"}
-    variables: list[str] = []
-    for var in all_identifiers:
-        if var.lower() not in safe_tokens:
-            variables.append(var)
-
-    return list(set(variables))

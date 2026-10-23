@@ -6,6 +6,7 @@ with the same formula evaluated by hand in Python (``tests.support.reference_run
 """
 
 import math
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -372,28 +373,21 @@ def test_a_function_gives_the_value_it_computes(formula: str, by_hand: ByHand) -
 
 class TestInvalidFormulas:
     @pytest.mark.parametrize(
-        "formula", ["A * B /", "k1 * * k2", "sin()", "A +", "/ k1"]
+        ("formula", "reason"),
+        [
+            ("A * B /", "the operator '/' needs two operands"),
+            ("k1 * * k2", "the operator '*' needs two operands"),
+            ("sin()", "'sin' takes 1 argument, got 0"),
+            ("A +", "the operator '+' needs two operands"),
+            ("/ k1", "the operator '/' needs two operands"),
+        ],
     )
-    def test_an_incomplete_expression_is_rejected(self, formula: str) -> None:
-        with pytest.raises((ValueError, SyntaxError)):
-            build(
-                abc_builder(
-                    parameters={"k1": 0.1, "k2": 0.05},
-                    ab=formula,
-                    bc=None,
-                )
-            )
-
-    def test_a_rate_that_does_not_parse_names_itself(self) -> None:
-        with pytest.raises(ValueError, match=r"Validation failed for rate 'k1 \+\* 2'"):
-            abc_builder(parameters={"k1": 0.1, "k2": 0.05}, ab="k1 +* 2")
-
-    def test_an_undefined_parameter_is_rejected_at_build(self) -> None:
-        builder = abc_builder(
-            parameters={"k1": 0.1},
-            ab="k1 * A * B",
-            bc="undefined_k2 * B",
+    def test_an_incomplete_rate_names_itself_and_its_first_error(
+        self, formula: str, reason: str
+    ) -> None:
+        message = (
+            f"Validation failed for rate '{formula}': Formula '{formula}': {reason}"
         )
 
-        with pytest.raises(ValueError, match="Undefined variables in transition"):
-            build(builder)
+        with pytest.raises(ValueError, match=re.escape(message)):
+            abc_builder(parameters={"k1": 0.1, "k2": 0.05}, ab=formula)

@@ -255,16 +255,16 @@ mod jit_tests {
     }
 
     #[test]
-    fn a_function_of_three_arguments_needs_three() {
+    fn a_function_of_two_arguments_needs_two() {
         let compiler = JITCompiler::new();
 
         let error = compiler
-            .compile(&preprocess_formula("fma(k1, k2)"))
+            .compile(&preprocess_formula("hypot(k1)"))
             .unwrap_err();
 
         assert_eq!(
             error.to_string(),
-            "Invalid expression: Function fma requires exactly 3 arguments, got 2"
+            "Invalid expression: Function hypot takes 2 arguments, got 1"
         );
     }
 
@@ -620,8 +620,6 @@ mod jit_tests {
         );
     }
 
-    // ===== Tests for Exotic Math Functions =====
-
     #[test]
     fn test_jit_atan2() {
         let compiler = JITCompiler::new();
@@ -645,99 +643,6 @@ mod jit_tests {
         let result = jit_fn.call(&ctx).unwrap();
 
         let expected = 0.5_f64.hypot(0.2);
-        assert!((result - expected).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_jit_copysign() {
-        let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("copysign(k1, -k2)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
-
-        let ctx = create_test_context();
-        let result = jit_fn.call(&ctx).unwrap();
-
-        let expected = 0.5_f64.copysign(-0.2);
-        assert!((result - expected).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_jit_fma() {
-        let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("fma(k1, k2, 0.1)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
-
-        let ctx = create_test_context();
-        let result = jit_fn.call(&ctx).unwrap();
-
-        // fma(0.5, 0.2, 0.1) = 0.5 * 0.2 + 0.1 = 0.1 + 0.1 = 0.2
-        let expected = 0.5_f64.mul_add(0.2, 0.1);
-        assert!((result - expected).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_jit_trunc() {
-        let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("trunc(k1 + 2)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
-
-        let ctx = create_test_context();
-        let result = jit_fn.call(&ctx).unwrap();
-
-        // trunc(0.5 + 2) = trunc(2.5) = 2.0
-        assert!((result - 2.0).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_jit_erf() {
-        let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("erf(k1)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
-
-        let ctx = create_test_context();
-        let result = jit_fn.call(&ctx).unwrap();
-
-        // Just verify it returns a reasonable value (erf is monotonic, erf(0.5) ≈ 0.5205)
-        assert!(result > 0.5 && result < 0.53);
-    }
-
-    #[test]
-    fn test_jit_fdim() {
-        let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("fdim(k1, k2)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
-
-        let ctx = create_test_context();
-        let result = jit_fn.call(&ctx).unwrap();
-
-        // fdim(0.5, 0.2) = max(0.5 - 0.2, 0) = 0.3
-        assert!((result - 0.3).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_jit_fmax_fmin() {
-        let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("fmax(k1, k2) + fmin(k1, k2)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
-
-        let ctx = create_test_context();
-        let result = jit_fn.call(&ctx).unwrap();
-
-        // fmax(0.5, 0.2) + fmin(0.5, 0.2) = 0.5 + 0.2 = 0.7
-        assert!((result - 0.7).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_jit_remainder() {
-        let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("remainder(k1, k2)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
-
-        let ctx = create_test_context();
-        let result = jit_fn.call(&ctx).unwrap();
-
-        // IEEE remainder: 0.5 rem 0.2 = 0.1
-        let expected = 0.5_f64.rem_euclid(0.2);
         assert!((result - expected).abs() < 1e-10);
     }
 
@@ -889,64 +794,27 @@ mod jit_tests {
     }
 
     #[test]
-    fn test_jit_empty_expression_error() {
+    fn what_the_jit_does_not_compile_is_an_error_that_names_it() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("");
-        let result = compiler.compile(&preprocessed);
-
-        // Empty expression should fail to compile
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_jit_malformed_function_wrong_arg_count() {
-        let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("sin(1, 2)");
-        let result = compiler.compile(&preprocessed);
-
-        // sin with 2 arguments should fail
-        assert!(result.is_err());
-        if let Err(e) = result {
-            let error_msg = format!("{:?}", e);
-            assert!(error_msg.contains("sin") || error_msg.contains("argument"));
-        }
-    }
-
-    #[test]
-    fn test_jit_malformed_function_no_args() {
-        let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("sqrt()");
-        let result = compiler.compile(&preprocessed);
-
-        // sqrt with no arguments should fail
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_jit_unknown_function() {
-        let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("unknown_func(1)");
-        let result = compiler.compile(&preprocessed);
-
-        // Unknown function should fail
-        assert!(result.is_err());
-        if let Err(e) = result {
-            let error_msg = format!("{:?}", e);
-            assert!(error_msg.contains("unknown") || error_msg.contains("Unknown"));
-        }
-    }
-
-    #[test]
-    fn test_jit_pow_with_too_many_args() {
-        let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("pow(2, 3, 4)");
-        let result = compiler.compile(&preprocessed);
-
-        // pow with 3 arguments should fail
-        assert!(result.is_err());
-        if let Err(e) = result {
-            let error_msg = format!("{:?}", e);
-            assert!(error_msg.contains("pow") || error_msg.contains("argument"));
+        for (formula, reason) in [
+            (
+                "",
+                "the formula, or a pair of parentheses in it, holds nothing",
+            ),
+            ("sin(1, 2)", "Function sin takes 1 argument, got 2"),
+            ("sqrt()", "Function sqrt takes 1 argument, got 0"),
+            ("min(1)", "Function min takes 2 arguments or more, got 1"),
+            ("unknown_func(1)", "Unknown function: unknown_func"),
+            ("pow(2, 3, 4)", "Function pow takes 2 arguments, got 3"),
+        ] {
+            assert_eq!(
+                compiler
+                    .compile(&preprocess_formula(formula))
+                    .unwrap_err()
+                    .to_string(),
+                format!("Invalid expression: {reason}"),
+                "{formula}"
+            );
         }
     }
 

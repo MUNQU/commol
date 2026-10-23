@@ -1,6 +1,17 @@
-"""A bin id in a rate is the total of the compartments of that bin."""
+"""The variables of a formula: what the engine reads from its tree, the
+engine variables, and a bin id as the total of the compartments of that bin."""
+
+import re
+
+import pytest
 
 from commol import Simulation
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.constants import (
+    RESERVED_VARIABLE_NAMES,
+    SUBGROUP_TOTAL_PREFIX,
+    TOTAL_VARIABLE,
+)
 from tests.support import (
     ENGINE_REL,
     assert_close,
@@ -69,3 +80,42 @@ class TestBinTotals:
         assert_close(
             Simulation(by_bin).run(10), Simulation(by_sum).run(10), rel=ENGINE_REL
         )
+
+
+def test_an_undefined_variable_is_rejected_by_the_engine() -> None:
+    builder = abc_builder(parameters={"k1": 0.3, "k2": 0.1}, bc="k9 * B")
+    message = (
+        "Undefined variables in transition 'bc' rate 'k9 * B': k9. Available "
+        "parameters: k1, k2. Available bins: A, B, C."
+    )
+
+    with pytest.raises(ValueError, match=re.escape(message)):
+        build(builder)
+
+
+def test_a_category_in_a_rate_is_rejected() -> None:
+    builder = abc_builder(
+        parameters={"k1": 0.3, "k2": 0.1},
+        bc="k2 * B * g1",
+        stratifications={"group": {"g1": 0.5, "g2": 0.5}},
+    )
+    message = (
+        "Undefined variables in transition 'bc' rate 'k2 * B * g1': g1. Available "
+        "parameters: k1, k2. Available bins: A, B, C."
+    )
+
+    with pytest.raises(ValueError, match=re.escape(message)):
+        build(builder)
+
+
+def test_the_variables_of_a_formula_come_from_the_engine() -> None:
+    expression = commol_rs.core.MathExpression("k1 * exp(-e1 * step) + 1e5")
+
+    assert expression.variables == ["k1", "e1"]
+    assert expression.inputs == ["k1", "e1", "step"]
+
+
+def test_the_engine_variables_come_from_the_engine() -> None:
+    assert RESERVED_VARIABLE_NAMES == ("total", "step", "t", "pi", "e")
+    assert RESERVED_VARIABLE_NAMES == tuple(commol_rs.model.ENGINE_VARIABLES)
+    assert (TOTAL_VARIABLE, SUBGROUP_TOTAL_PREFIX) == ("total", "total_")

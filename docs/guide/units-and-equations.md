@@ -45,7 +45,7 @@ bin in `item` gives `item/day`. The bin unit of a flow is the unit of the bin
 it leaves, or of the bin it enters when it has no source; so a category
 transition in a model of bins in `item` and `kg` moves `item/day` in one bin
 and `kg/day` in the other. In such a model `total`, a subgroup total
-`total_<categories>`, a category and `neighbors` add amounts of different
+`total_<categories>` and `neighbors` add amounts of different
 units, so they have none, and a rate that reads one fails the check; read the
 bins or the compartments instead. A rate that reads the
 [neighbors of a unit](building-models.md#neighbors) is checked as the sums

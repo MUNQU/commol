@@ -74,11 +74,11 @@ impl PyAggregate {
     }
 }
 
-/// Wrapper for commol_core::MathExpression
+/// A formula of the language of formulas (`commol_core::MathExpression`)
 #[pyclass(name = "MathExpression", from_py_object)]
 #[derive(Clone)]
 pub struct PyMathExpression {
-    expression: String,
+    inner: commol_core::MathExpression,
 }
 
 // coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
@@ -87,14 +87,49 @@ pub struct PyMathExpression {
 impl PyMathExpression {
     #[new]
     fn new(expression: String) -> Self {
-        Self { expression }
+        Self {
+            inner: commol_core::MathExpression::new(expression),
+        }
     }
 
-    /// Validate the mathematical expression syntax
-    fn validate(&self) -> PyResult<()> {
-        commol_core::MathExpression::new(self.expression.clone())
-            .validate()
+    /// Check that the formula is in the language of formulas, and count the
+    /// nodes of its tree: numbers, variables, operators and calls
+    ///
+    /// Returns:
+    ///     The number of nodes
+    ///
+    /// Raises:
+    ///     ValueError: If the formula is not in the language; the message
+    ///         names the formula and the first part of it that is not
+    fn check(&self) -> PyResult<usize> {
+        self.inner
+            .check()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+    }
+
+    /// The variables the formula reads, in the order it first reads them,
+    /// without the engine variables: the names a model must define
+    #[getter]
+    fn variables(&self) -> Vec<String> {
+        self.inner.get_variables()
+    }
+
+    /// The values the compiled formula reads, in the order it first reads
+    /// them: its variables and the engine variables `total`, `step` and `t`,
+    /// but not the constants `pi` and `e`
+    ///
+    /// Raises:
+    ///     ValueError: If the formula does not compile
+    #[getter]
+    fn inputs(&self) -> PyResult<Vec<String>> {
+        self.inner
+            .check()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        Ok(self
+            .inner
+            .jit_variable_names()
+            .expect("a formula that passes the check compiles")
+            .to_vec())
     }
 }
 
@@ -104,5 +139,10 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyProcess>()?;
     m.add_class::<PyAggregate>()?;
     m.add_class::<PyMathExpression>()?;
+    let functions: Vec<&str> = commol_core::FUNCTIONS
+        .iter()
+        .map(|function| function.name)
+        .collect();
+    m.add("FUNCTIONS", functions)?;
     Ok(())
 }

@@ -339,7 +339,7 @@ fn a_problem_has_observations_and_parameters_of_the_model() {
 }
 
 #[test]
-fn a_constraint_compiles_and_reads_outputs_only_at_positions() {
+fn a_constraint_is_a_formula_that_reads_outputs_only_at_positions() {
     let error = |expression: &str| {
         problem(vec![CalibrationConstraint::new(
             "c".to_string(),
@@ -349,15 +349,14 @@ fn a_constraint_compiles_and_reads_outputs_only_at_positions() {
         .unwrap()
     };
 
-    assert!(
-        error("k +").starts_with("Constraint 'c' has invalid expression: "),
-        "{}",
-        error("k +")
+    assert_eq!(
+        error("k +"),
+        "Constraint 'c': Formula 'k +': the operator '+' needs two operands"
     );
-    assert!(
-        error("typeof(k)").contains("does not compile"),
-        "{}",
-        error("typeof(k)")
+    assert_eq!(
+        error("1 - (k > 1)"),
+        "Constraint 'c': Formula '1 - (k > 1)': the comparison '>' is only allowed in the \
+         condition of if(condition, a, b)"
     );
     assert_eq!(
         error("1 - x"),

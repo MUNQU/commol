@@ -84,6 +84,9 @@ class EngineModule(Protocol):
 class ModelModule(Protocol):
     NEIGHBORS: str
     NEIGHBORS_PREFIX: str
+    ENGINE_VARIABLES: list[str]
+    TOTAL: str
+    SUBGROUP_TOTAL_PREFIX: str
     def initial_state(
         self, process: RustProcessProtocol, structure: RustAggregateProtocol
     ) -> list[tuple[str, str, list[tuple[str, str]], float]]: ...
@@ -1093,7 +1096,11 @@ class InferenceModule(Protocol):
 
 class MathExpressionProtocol(Protocol):
     def __init__(self, expression: str) -> None: ...
-    def validate(self) -> None: ...
+    def check(self) -> int: ...
+    @property
+    def variables(self) -> list[str]: ...
+    @property
+    def inputs(self) -> list[str]: ...
 
 class ParallelismProtocol(Protocol):
     def __init__(self, threads: int, levels: str) -> None: ...
@@ -1112,6 +1119,7 @@ class CoreModule(Protocol):
     Process: type[RustProcessProtocol]
     Aggregate: type[RustAggregateProtocol]
     MathExpression: type[MathExpressionProtocol]
+    FUNCTIONS: list[str]
 
 class RustCommolModule(Protocol):
     core: CoreModule
