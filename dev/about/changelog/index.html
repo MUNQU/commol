@@ -3123,7 +3123,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0101-2026-10-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.10.1] - 2026-10-23
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.10.1] - 2026-10-23">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3826,7 +3837,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0101-2026-10-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.10.1] - 2026-10-23
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.10.1] - 2026-10-23">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4504,6 +4526,15 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h2 id="0101-2026-10-23">[0.10.1] - 2026-10-23<a class="headerlink" href="#0101-2026-10-23" title="Permanent link">&para;</a></h2>
+<p>This release ships the fixes of the audit at 0.9.0 that change no API. In the
+<code>StochasticEvents</code> engine, a parameter or a seed changed between two runs acts
+from the position where the first run stopped. The documentation reads as one
+account of the library and names no application field, and commol no longer
+installs <code>cffi</code>. CI runs with read rights and pinned tools, and the test suite
+checks its own layout. Nothing breaks: code that runs on 0.10.0 runs on
+0.10.1. See <a href="../../guide/stochastic/">Stochastic engines</a> and the
+<a href="../../getting-started/quickstart/">Quickstart</a>.</p>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>cffi</code> is no longer a dependency of commol: no code of commol uses it, so
@@ -6599,6 +6630,7 @@ the details of these versions.</p>
 <h2 id="version-history">Version History<a class="headerlink" href="#version-history" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Unreleased</strong> - Current development version</li>
+<li><strong>0.10.1</strong> - Fixes of the audit: stochastic changes from the position, one account in the documentation, read-only CI and pinned tools</li>
 <li><strong>0.10.0</strong> - One way for equivalent things: setting names, seeds and starts, result shapes, error types, the quantile and logging</li>
 <li><strong>0.9.0</strong> - Control over the work and the record: threads and levels, swarm stop rules, truncated chaos bases, ratios, seeds and build info</li>
 <li><strong>0.8.0</strong> - Comparing runs: scenarios, quantities of a series, figures as methods and runs on the same panels</li>

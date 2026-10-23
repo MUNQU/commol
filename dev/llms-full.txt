@@ -40868,6 +40868,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-10-23
+
+This release ships the fixes of the audit at 0.9.0 that change no API. In the `StochasticEvents` engine, a parameter or a seed changed between two runs acts from the position where the first run stopped. The documentation reads as one account of the library and names no application field, and commol no longer installs `cffi`. CI runs with read rights and pinned tools, and the test suite checks its own layout. Nothing breaks: code that runs on 0.10.0 runs on 0.10.1. See [Stochastic engines](https://munqu.github.io/commol/latest/guide/stochastic/index.md) and the [Quickstart](https://munqu.github.io/commol/latest/getting-started/quickstart/index.md).
+
 ### Removed
 
 - `cffi` is no longer a dependency of commol: no code of commol uses it, so `pip install commol` no longer installs it. Code that imports `cffi` installs it itself.
@@ -41464,6 +41468,7 @@ ______________________________________________________________________
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.10.1** - Fixes of the audit: stochastic changes from the position, one account in the documentation, read-only CI and pinned tools
 - **0.10.0** - One way for equivalent things: setting names, seeds and starts, result shapes, error types, the quantile and logging
 - **0.9.0** - Control over the work and the record: threads and levels, swarm stop rules, truncated chaos bases, ratios, seeds and build info
 - **0.8.0** - Comparing runs: scenarios, quantities of a series, figures as methods and runs on the same panels
