@@ -18,16 +18,20 @@ def check_window(window: float) -> None:
         raise ValueError(f"window must be a finite, positive length, got {window}.")
 
 
+def is_whole(count: float) -> bool:
+    """Whether a number of windows is a whole number, within ``1e-9``."""
+    return math.isclose(
+        count, round(count), rel_tol=WINDOW_COUNT_TOLERANCE, abs_tol=1e-9
+    )
+
+
 def _windows_in(at: float, window: float) -> float:
     """
     Number of windows in `at`, snapped to the nearest whole number within
     ``1e-9``, so ``0.3 / 0.1`` counts as 3.
     """
     count = at / window
-    nearest = round(count)
-    if math.isclose(count, nearest, rel_tol=WINDOW_COUNT_TOLERANCE, abs_tol=1e-9):
-        return float(nearest)
-    return count
+    return float(round(count)) if is_whole(count) else count
 
 
 def window_start(index: int, window: float) -> float:

@@ -203,29 +203,21 @@ def run_collinearity(
         admissible=subsets(analysis.admissible),
     )
     practical: dict[str, PracticalVerdict] = {}
-    for name in names:
-        others = {other: g for other, g in pair_gamma[name].items() if other != name}
-        collinear = [
-            other for other, gamma in others.items() if gamma >= method.threshold
-        ]
-        if section.sensitivity[name] == 0.0:
-            verdict, reason = (
-                "poorly_determined",
-                "Collinearity: no observation is sensitive to it.",
-            )
-        elif collinear:
-            verdict, reason = (
-                "poorly_determined",
-                "Collinearity: it cannot be fitted together with "
-                f"{', '.join(collinear)} (index at or above {method.threshold:g}).",
+    for name, verdict in zip(names, analysis.verdicts, strict=True):
+        if verdict.insensitive:
+            reason = "Collinearity: no observation is sensitive to it."
+        elif verdict.collinear_with:
+            collinear = ", ".join(names[k] for k in verdict.collinear_with)
+            reason = (
+                f"Collinearity: it cannot be fitted together with {collinear} "
+                f"(index at or above {method.threshold:g})."
             )
         else:
-            verdict, reason = (
-                "determined",
+            reason = (
                 f"Collinearity: every pair that holds it has an index below "
-                f"{method.threshold:g}.",
+                f"{method.threshold:g}."
             )
-        practical[name] = PracticalVerdict(verdict=verdict, reasons=[reason])
+        practical[name] = PracticalVerdict(verdict=verdict.verdict, reasons=[reason])
     return _report(calibrator, practical_verdicts=practical, collinearity=[section])
 
 
@@ -259,26 +251,17 @@ def run_sample_identifiability(
         modes=dict(zip(names, analysis.modes, strict=True)),
     )
     practical: dict[str, PracticalVerdict] = {}
-    for name, multimodal in zip(names, analysis.multimodal, strict=True):
+    for name, verdict in zip(names, analysis.verdicts, strict=True):
         reasons = [
-            f"Sample: correlation {pair.correlation:.3f} with "
-            f"{pair.second if pair.first == name else pair.first}."
-            for pair in pairs
-            if name in (pair.first, pair.second)
+            f"Sample: correlation {r:.3f} with {names[k]}."
+            for k, r in verdict.correlated_with
         ]
-        if multimodal:
-            reasons.append(
-                f"Sample: its marginal has {len(section.modes[name])} modes."
-            )
-        contraction = section.contraction[name]
-        practical[name] = (
-            PracticalVerdict(verdict="poorly_determined", reasons=reasons)
-            if reasons
-            else PracticalVerdict(
-                verdict="determined",
-                reasons=[f"Sample: contraction {contraction:.2f}, no strong pair."],
-            )
-        )
+        if verdict.modes >= 2:
+            reasons.append(f"Sample: its marginal has {verdict.modes} modes.")
+        if verdict.verdict == "determined":
+            contraction = section.contraction[name]
+            reasons = [f"Sample: contraction {contraction:.2f}, no strong pair."]
+        practical[name] = PracticalVerdict(verdict=verdict.verdict, reasons=reasons)
     return _report(calibrator, practical_verdicts=practical, sample=[section])
 
 

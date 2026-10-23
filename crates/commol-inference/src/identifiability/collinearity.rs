@@ -11,10 +11,14 @@
 //!
 //! Over several points (the draws of a sample), each index is computed at
 //! each point and summarized by its weighted median.
+//!
+//! A parameter is poorly determined when no observation is sensitive to it
+//! (its sensitivity measure is 0), or when a pair that holds it has an index
+//! at or above the threshold; otherwise it is determined.
 
 use rayon::prelude::*;
 
-use super::skippable;
+use super::{PracticalVerdict, skippable};
 use crate::error::MethodError;
 use crate::sensitivity::{Matrix, SensitivitySource};
 use crate::statistics::quantiles;
@@ -35,6 +39,19 @@ pub struct Subset {
     pub share_below: f64,
 }
 
+/// The verdict of one parameter and its causes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CollinearityVerdict {
+    /// Poorly determined when it is insensitive or collinear with another
+    /// parameter.
+    pub verdict: PracticalVerdict,
+    /// No observation is sensitive to it: its sensitivity measure is 0.
+    pub insensitive: bool,
+    /// The other parameters, ascending, whose pair with it has an index at
+    /// or above the threshold.
+    pub collinear_with: Vec<usize>,
+}
+
 /// The result of [`collinearity`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct Collinearity {
@@ -48,6 +65,8 @@ pub struct Collinearity {
     /// The largest subsets whose index is below the threshold; single
     /// parameters when no pair is.
     pub admissible: Vec<Subset>,
+    /// The verdict of each parameter.
+    pub verdicts: Vec<CollinearityVerdict>,
     /// How many points were used.
     pub points: usize,
     /// Why each infeasible point was skipped.
@@ -222,14 +241,44 @@ pub fn collinearity<S: SensitivitySource>(
         }
         best_by_size.push(best);
     }
+    let verdicts = verdicts(&sensitivity, &pair_gamma, threshold);
     Ok(Collinearity {
         sensitivity,
         pair_gamma,
         best_by_size,
         admissible,
+        verdicts,
         points: columns.len(),
         skipped,
     })
+}
+
+/// The verdict of each parameter from its sensitivity measure and the
+/// indices of its pairs.
+fn verdicts(
+    sensitivity: &[f64],
+    pair_gamma: &[Vec<f64>],
+    threshold: f64,
+) -> Vec<CollinearityVerdict> {
+    sensitivity
+        .iter()
+        .zip(pair_gamma)
+        .enumerate()
+        .map(|(j, (&measure, row))| {
+            let insensitive = measure == 0.0;
+            let collinear_with: Vec<usize> = row
+                .iter()
+                .enumerate()
+                .filter(|&(k, &gamma)| k != j && gamma >= threshold)
+                .map(|(k, _)| k)
+                .collect();
+            CollinearityVerdict {
+                verdict: PracticalVerdict::of(insensitive || !collinear_with.is_empty()),
+                insensitive,
+                collinear_with,
+            }
+        })
+        .collect()
 }
 
 /// The subset of lowest index, the first on a tie.

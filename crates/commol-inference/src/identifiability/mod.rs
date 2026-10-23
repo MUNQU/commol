@@ -15,14 +15,44 @@ pub mod sample;
 pub mod starts;
 pub mod structural;
 
-pub use collinearity::{Collinearity, Subset, collinearity, collinearity_index};
-pub use sample::{Reference, SampleIdentifiability, sample_identifiability};
+pub use collinearity::{
+    Collinearity, CollinearityVerdict, Subset, collinearity, collinearity_index,
+};
+pub use sample::{Reference, SampleIdentifiability, SampleVerdict, sample_identifiability};
 pub use starts::{StartsIdentifiability, starts_identifiability};
 pub use structural::{
     Combination, PointRank, StructuralAnalysis, StructuralVerdict, structural_rank,
 };
 
 use crate::sensitivity::SensitivityError;
+
+/// What the data say about a parameter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PracticalVerdict {
+    /// The data determine it.
+    Determined,
+    /// The data leave it poorly determined.
+    PoorlyDetermined,
+}
+
+impl PracticalVerdict {
+    /// The verdict `PoorlyDetermined` when `poorly` holds, else `Determined`.
+    fn of(poorly: bool) -> Self {
+        if poorly {
+            Self::PoorlyDetermined
+        } else {
+            Self::Determined
+        }
+    }
+
+    /// The name of the verdict: `"determined"` or `"poorly_determined"`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Determined => "determined",
+            Self::PoorlyDetermined => "poorly_determined",
+        }
+    }
+}
 
 /// Whether a failure of the sensitivities is a point to skip.
 fn skippable(error: &SensitivityError) -> bool {

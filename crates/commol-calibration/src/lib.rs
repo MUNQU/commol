@@ -83,7 +83,9 @@ pub use likelihood::{
     Argument, Center, Likelihood, Noise, ObservationModel, Term, TermDerivatives,
 };
 pub use objective::{OptimizationObjective, Score};
-pub use observation::{ObservationOperator, index_at};
+pub use observation::{
+    ObservationOperator, WindowError, index_at, window_increments, window_start,
+};
 pub use optimization::{
     AccelerationStrategy, ImprovementStop, InertiaWeightStrategy, InitializationStrategy,
     MutationApplication, MutationStrategy, NelderMeadConfig, NelderMeadState, NoObserver,

@@ -115,11 +115,13 @@ class ResultsPlot:
         Raises
         ------
         ValueError
-            If an entry of ``series`` is neither an output nor a bin or
-            accumulator id, or a bin or accumulator id of results with no
-            model; the results have no value at the position of an
+            If an entry of ``series`` is a bin or accumulator id of results
+            with no model; the results have no value at the position of an
             observation read on its own or at the start of its window; or
             ``axes`` has no panel of a series.
+        KeyError
+            If an entry of ``series`` is neither an output nor a bin or
+            accumulator id of the model.
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
@@ -182,8 +184,10 @@ class ResultsPlot:
         Raises
         ------
         ValueError
+            If ``axes`` has no panel of a series.
+        KeyError
             If an entry of ``series`` is neither an output nor a bin or
-            accumulator id, or ``axes`` has no panel of a series.
+            accumulator id of the model.
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
@@ -372,6 +376,8 @@ class ReplicatesPlot:
         ValueError
             As `ResultsPlot.series`; or if there are no replicates or the
             confidence level is out of range.
+        KeyError
+            As `ResultsPlot.series`.
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
@@ -434,6 +440,8 @@ class ReplicatesPlot:
         ------
         ValueError
             As `ResultsPlot.cumulative`; or if there are no replicates.
+        KeyError
+            As `ResultsPlot.cumulative`.
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
@@ -615,10 +623,12 @@ class PredictivePlot:
         Raises
         ------
         ValueError
+            If an observation names an unknown output or factor, the
+            confidence level is out of range, or ``axes`` has no panel of a
+            series.
+        KeyError
             If an entry of ``series`` is neither an output nor a bin or
-            accumulator id, an observation names an unknown output or factor,
-            the confidence level is out of range, or ``axes`` has no panel of
-            a series.
+            accumulator id of the model.
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
@@ -681,9 +691,11 @@ class PredictivePlot:
         Raises
         ------
         ValueError
+            If the confidence level is out of range, or ``axes`` has no panel
+            of a series.
+        KeyError
             If an entry of ``series`` is neither an output nor a bin or
-            accumulator id, the confidence level is out of range, or ``axes``
-            has no panel of a series.
+            accumulator id of the model.
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """

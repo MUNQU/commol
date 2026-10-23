@@ -99,7 +99,9 @@ class Increments(_Outputs):
     reads it.
 
     The positions of a quantity of increments are window ends, each at
-    least `window`, so no window starts before 0.
+    least `window` within the rounding of the window (`window_start` of
+    `crates/commol-calibration/src/observation.rs`), so no window starts
+    before 0.
 
     Attributes
     ----------
@@ -122,14 +124,19 @@ class Increments(_Outputs):
 
     def check_ends(self, positions: Sequence[float]) -> None:
         """
-        Each end is at least the window, so no window starts before 0.
+        No window starts before 0, with the start of the engine
+        (`window_start` of `crates/commol-calibration/src/observation.rs`).
 
         Raises
         ------
         ValueError
-            If an end is less than the window.
+            If a window starts before 0.
         """
-        early = [at for at in positions if at < self.window]
+        early = [
+            at
+            for at in positions
+            if commol_rs.calibration.window_start(at, self.window) < 0
+        ]
         if early:
             raise ValueError(
                 f"Increments over windows of {_position_text(self.window)} start "

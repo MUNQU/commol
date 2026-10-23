@@ -194,7 +194,7 @@ where
                 Some(i) => Err(Undetermined::OnBound(i)),
                 None => Ok(StructuralReading::NonIdentifiable),
             }
-        } else if profile.lowest() < -floor {
+        } else if profile.below_fit(floor) {
             Err(Undetermined::BelowFit)
         } else if !flat {
             Err(Undetermined::NotFlat)

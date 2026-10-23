@@ -5,7 +5,9 @@
 //! report.
 
 use crate::parallelism::parallel;
-use commol_inference::identifiability::{self, Reference, StructuralVerdict, Subset};
+use commol_inference::identifiability::{
+    self, CollinearityVerdict, Reference, SampleVerdict, StructuralVerdict, Subset,
+};
 use commol_inference::sensitivity::{Design, FiniteDifferences};
 use pyo3::prelude::*;
 
@@ -112,6 +114,29 @@ fn structural_rank(
     })
 }
 
+/// The verdict of one parameter of a collinearity analysis and its causes
+#[pyclass(name = "CollinearityVerdict", frozen, get_all, skip_from_py_object)]
+#[derive(Clone)]
+pub struct PyCollinearityVerdict {
+    /// "determined" or "poorly_determined"
+    verdict: String,
+    /// No observation is sensitive to it
+    insensitive: bool,
+    /// The other parameters, by index, whose pair with it has an index at
+    /// or above the threshold
+    collinear_with: Vec<usize>,
+}
+
+impl From<CollinearityVerdict> for PyCollinearityVerdict {
+    fn from(verdict: CollinearityVerdict) -> Self {
+        Self {
+            verdict: verdict.verdict.name().to_string(),
+            insensitive: verdict.insensitive,
+            collinear_with: verdict.collinear_with,
+        }
+    }
+}
+
 /// Brun's collinearity analysis of a problem
 #[pyclass(name = "CollinearityAnalysis", frozen, get_all)]
 pub struct PyCollinearityAnalysis {
@@ -124,6 +149,8 @@ pub struct PyCollinearityAnalysis {
     best_by_size: Vec<(Vec<usize>, f64, f64)>,
     /// The largest subsets whose index is below the threshold, as above
     admissible: Vec<(Vec<usize>, f64, f64)>,
+    /// The verdict of each parameter
+    verdicts: Vec<PyCollinearityVerdict>,
     /// How many points were used
     points: usize,
     /// Why each infeasible point was skipped
@@ -169,9 +196,33 @@ fn collinearity(
         pair_gamma: analysis.pair_gamma,
         best_by_size: subsets(analysis.best_by_size),
         admissible: subsets(analysis.admissible),
+        verdicts: analysis.verdicts.into_iter().map(Into::into).collect(),
         points: analysis.points,
         skipped: analysis.skipped,
     })
+}
+
+/// The verdict of one parameter of a sample and its causes
+#[pyclass(name = "SampleVerdict", frozen, get_all, skip_from_py_object)]
+#[derive(Clone)]
+pub struct PySampleVerdict {
+    /// "determined" or "poorly_determined"
+    verdict: String,
+    /// The other parameters, by index, correlated with it above the
+    /// threshold, with the correlation
+    correlated_with: Vec<(usize, f64)>,
+    /// The number of modes of its marginal
+    modes: usize,
+}
+
+impl From<SampleVerdict> for PySampleVerdict {
+    fn from(verdict: SampleVerdict) -> Self {
+        Self {
+            verdict: verdict.verdict.name().to_string(),
+            correlated_with: verdict.correlated_with,
+            modes: verdict.modes,
+        }
+    }
 }
 
 /// The practical identifiability of a sample
@@ -184,10 +235,10 @@ pub struct PySampleAnalysis {
     /// The pairs `(j, k, r)` whose absolute correlation is above the
     /// threshold
     correlated_pairs: Vec<(usize, usize, f64)>,
-    /// Whether each marginal has several modes
-    multimodal: Vec<bool>,
     /// The modes of each marginal
     modes: Vec<Vec<f64>>,
+    /// The verdict of each parameter
+    verdicts: Vec<PySampleVerdict>,
 }
 
 /// The contraction, correlations and modes of `sample`
@@ -222,8 +273,8 @@ fn sample_identifiability(
         contraction: analysis.contraction,
         correlation: analysis.correlation,
         correlated_pairs: analysis.correlated_pairs,
-        multimodal: analysis.multimodal,
         modes: analysis.modes,
+        verdicts: analysis.verdicts.into_iter().map(Into::into).collect(),
     })
 }
 
@@ -273,7 +324,9 @@ fn starts_identifiability(
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPointRank>()?;
     m.add_class::<PyStructuralAnalysis>()?;
+    m.add_class::<PyCollinearityVerdict>()?;
     m.add_class::<PyCollinearityAnalysis>()?;
+    m.add_class::<PySampleVerdict>()?;
     m.add_class::<PySampleAnalysis>()?;
     m.add_class::<PyStartsAnalysis>()?;
     m.add_function(wrap_pyfunction!(structural_rank, m)?)?;

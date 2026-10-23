@@ -93,19 +93,31 @@ come from Rust. `Calibrator` builds the Rust problem once
 (`commol_rs.inference.CalibrationProblem`) and every call reads it. The
 helpers that present results already computed, such as `windowed_totals`
 (`api/windows.py`) for a run or its replicates, are not predictions; they
-must agree with the operator, which
-`tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss` checks.
+read the rules of the operator through bindings (`index_at` and
+`window_increments` of `observation.rs`), which
+`tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss` and
+`tests/simulation/test_windows.py::test_windowed_totals_equal_the_prediction_of_a_windowed_observation`
+check.
 
 An observation is given by `at` and `window`, so its window starts at
-`at − window`. A quantity given by its start, `Gain(start, end)`, passes the
+`at − window` (`observation::window_start`), read as 0 when
+`|at − window|` is at most `1e-9` times the larger of `|at|`, `window` and 1:
+the rounding of the subtraction grows with its operands, and `same_position`
+near 0 loses that scale, so a window of `1000 + 1e-7` has one verdict whether
+it ends at 1000 or at 2000. `check_positions`, `schedule_of`, the windows of a
+quantity, `window_increments` and the checks of Python (`ObservedDataPoint`,
+`Increments`, through the binding) read this one rule. A quantity given by its start, `Gain(start, end)`, passes the
 start itself (`ObservationOperator::with_starts`): `end − (end − start)` can
 round away from `start`, as `0.4 − (0.4 − 0.1)` is `0.09999999999999998`.
 The operator finds the row of each position and of each start with the
 tolerance of the axis (`observation::index_at`: equal within `1e-9` of the
-larger of their magnitudes and 1, as `index_at` of `api/results.py`), so a start
-computed as `at − window` reads the row of the position it rounds away from.
+larger of their magnitudes and 1), so a start computed as `at − window`
+(`window_start`) reads the row of the position it rounds away from. Results
+read a position with the same `index_at`.
 
 **Guards:** `observation::tests`,
+`crates/commol-calibration/tests/test_positions.rs::a_window_that_starts_at_zero_within_the_rounding_of_its_end_is_accepted`,
+`tests/calibration/test_observations.py::TestPositionsAndEngines::test_a_window_that_starts_at_zero_within_its_rounding_is_calibrated`,
 `crates/commol-inference/tests/test_predictive.rs::observation_draws_are_the_predictions_the_loss_compares`,
 `tests/uncertainty/test_predictive.py::TestObservations`,
 `crates/commol-inference/tests/test_global_sensitivity.rs::a_gain_reads_its_start_exactly`,

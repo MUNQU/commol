@@ -125,6 +125,10 @@ pub struct PyProfile {
     box_crossings: (Option<usize>, Option<usize>),
     /// The error of a refit at the fit, for a profile of a parameter
     refit_error: Option<f64>,
+    /// A refit at the fit lands farther from it than the tolerance
+    inaccurate_refit: bool,
+    /// A refit is below the fit by more than the tolerance
+    below_fit: bool,
 }
 
 /// What the resets of a flat profile say, as the runner returns it
@@ -187,12 +191,14 @@ impl PyProfile {
         rises: Option<Vec<f64>>,
         verdict: Option<ProfileVerdict>,
         structure: Option<Structure>,
-        refit_error: Option<f64>,
+        tolerance: f64,
     ) -> Self {
         let [lower, upper] = profile.interval();
         Self {
             box_crossings: (profile.box_crossings[0], profile.box_crossings[1]),
-            refit_error,
+            refit_error: profile.refit_error,
+            inaccurate_refit: profile.inaccurate_refit(tolerance),
+            below_fit: profile.below_fit(tolerance),
             verdict: verdict.map(|verdict| verdict.name().to_string()),
             lowest: profile.lowest(),
             structure: structure.map(PyStructure::from),
@@ -341,20 +347,20 @@ fn trace_profiles(
         let rises = rises
             .as_ref()
             .map(|rises: &Vec<Vec<f64>>| rises[index].clone());
-        // Every profile of a parameter gets the error of a refit at the fit;
-        // one that does not cross on both sides also gets its resets.
-        let (structure, refit_error) = match quantity {
-            ProfiledQuantity::Parameter(parameter) => parallel(py, || {
-                let read = !matches!(
+        // A profile of a parameter that does not cross on both sides gets its
+        // resets.
+        let structure = match quantity {
+            ProfiledQuantity::Parameter(parameter)
+                if !matches!(
                     profile.verdict(tracer.tolerance()),
                     None | Some(ProfileVerdict::Identifiable)
-                );
-                (
-                    read.then(|| tracer.read_structure(*parameter, &profile)),
-                    tracer.refit_error(*parameter, &profile),
-                )
-            })?,
-            ProfiledQuantity::Prediction(_) => (None, None),
+                ) =>
+            {
+                Some(parallel(py, || {
+                    tracer.read_structure(*parameter, &profile)
+                })?)
+            }
+            _ => None,
         };
         let verdict = tracer.verdict_with(&profile, structure.as_ref());
         profiles.push(PyProfile::new(
@@ -362,7 +368,7 @@ fn trace_profiles(
             rises,
             verdict,
             structure,
-            refit_error,
+            tracer.tolerance(),
         ));
     }
     Ok(PyProfileRun {

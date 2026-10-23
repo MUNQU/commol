@@ -28,9 +28,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with the message of the engine, as a calibration does. The bands, the
   automatic block lengths and their estimates keep their values: one Rust
   function of each computes them for every method.
+- The engine decides the practical verdicts of `Collinearity` and
+  `SampleIdentifiability` and the two notes of a profile on its refits, and
+  results read a position with the rule of an observation: the verdicts,
+  reasons, notes and values stay. `windowed_totals` reads each window as a
+  calibration reads a windowed observation, and it gives floats. A figure asked for a series that is neither an
+  output nor a bin or accumulator raises `KeyError` with the message of
+  `Simulation.outputs_for`, and a sum of outputs that the results do not hold
+  gives one message, `Missing output series in results`, in a simulation, a
+  report and a figure.
 
 ### Fixed
 
+- A window whose start rounds to just below 0, such as a window of
+  `1000 + 1e-7` that ends at 1000, starts at 0 in an observation, a
+  calibration and a quantity, as `windowed_totals` reads it. Before, a
+  calibration rejected it while the same window that ends at 2000 was
+  accepted. One rule of the engine gives the start of a window.
 - One check of the engine defines the language of formulas, the one
   [Mathematical expressions](../guide/mathematical-expressions.md)
   documents, for rates, formula parameters, calibration constraints and the

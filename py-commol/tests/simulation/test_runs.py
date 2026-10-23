@@ -257,3 +257,12 @@ def test_each_engine_names_itself_when_it_rejects_a_position(
         assert f"{position:g} is not one" in str(error.value)
     if not integer:
         assert simulation.run_at([2.5], seed=1).positions == [2.5]
+
+
+def test_a_result_reads_a_position_with_the_tolerance_of_the_engine() -> None:
+    simulation = Simulation(build_ode(a_to_b_builder(parameters={"k": 0.1})))
+    results = simulation.run_at([0.3])
+
+    assert simulation.sample(results, ["A"], [0.1 + 0.2]) == results["A"]
+    with pytest.raises(ValueError, match=r"no value at 0\.31;"):
+        simulation.sample(results, ["A"], [0.31])

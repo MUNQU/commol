@@ -11,7 +11,13 @@ from commol.commol_rs import _commol_rs as commol_rs
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import EngineProtocol
 
-from commol.api.results import SimulationReplicates, SimulationResults, sample
+from commol.api.results import (
+    SimulationReplicates,
+    SimulationResults,
+    outputs_for,
+    sample,
+    total_series,
+)
 from commol.api.windows import windowed_totals
 from commol.context._model.engine_state import build_engine
 from commol.context.model import Model
@@ -351,14 +357,7 @@ class Simulation:
         KeyError
             If `id` is not a source of the model.
         """
-        model = self.model_definition
-        outputs = model.structure.outputs_by_source(model)
-        if id not in outputs:
-            raise KeyError(
-                f"'{id}' is not a bin or accumulator of model "
-                f"'{self.model_definition.name}'. Available: {sorted(outputs)}"
-            )
-        return outputs[id]
+        return outputs_for(self.model_definition, id)
 
     def group_outputs(self, ids: Iterable[str]) -> dict[str, list[str]]:
         """
@@ -438,16 +437,7 @@ class Simulation:
             If an id is not a bin, accumulator or output of the model, or an
             expected output is missing from `results`.
         """
-        names = self._series_names(ids)
-        missing = [name for name in names if name not in results]
-        if missing:
-            raise KeyError(f"Missing output series in results: {sorted(missing)}")
-        if not names:
-            return []
-        return [
-            sum(values)
-            for values in zip(*(results[name] for name in names), strict=True)
-        ]
+        return total_series(results, self._series_names(ids))
 
     def windowed_totals(
         self,

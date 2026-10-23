@@ -14,7 +14,7 @@ from typing import NotRequired, TypedDict, cast
 import numpy as np
 
 from commol.api.inference.intervals import member_statistics
-from commol.api.results import SimulationResults, sample
+from commol.api.results import SimulationResults, outputs_for, sample, total_series
 from commol.api.windows import windowed_totals
 from commol.context._windows import window_end, window_index
 from commol.context.calibration import (
@@ -230,20 +230,7 @@ class _ReportRuns:
                 f"The results know no model, so they cannot report '{id}': "
                 "report the results of Simulation.run, run_at or replicates."
             )
-        outputs = model.structure.outputs_by_source(model)
-        if id not in outputs:
-            raise KeyError(
-                f"'{id}' is not a bin or accumulator of model '{model.name}'. "
-                f"Available: {sorted(outputs)}"
-            )
-        return outputs[id]
-
-
-def _total_series(run: SimulationResults, outputs: Sequence[str]) -> list[float]:
-    """The sum of some outputs of a run at each position."""
-    return [
-        sum(values) for values in zip(*(run[name] for name in outputs), strict=True)
-    ]
+        return outputs_for(model, id)
 
 
 def _observed_report(
@@ -344,7 +331,7 @@ def _accumulators_report(
             "windowed": {
                 "total": runs.leaf(
                     lambda run, ids=outputs: windowed(
-                        _total_series(run, ids), run.positions
+                        total_series(run, ids), run.positions
                     )
                 ),
                 "by_output": {
@@ -357,7 +344,7 @@ def _accumulators_report(
             "cumulative": {
                 "total": runs.leaf(
                     lambda run, ids=outputs: sample(
-                        _total_series(run, ids), run.positions, at
+                        total_series(run, ids), run.positions, at
                     )
                 ),
                 "by_output": {

@@ -144,6 +144,10 @@ class TestWindowedTotals:
             f"Position 1 has no complete window of {1 + 1.5e-9} before it."
         )
 
+    def test_a_series_has_one_value_per_position(self) -> None:
+        with pytest.raises(ValueError, match="2 values for 3 positions"):
+            windowed_totals([0.0, 1.0], range(3), 1)
+
     def test_an_empty_series_has_no_windows(self) -> None:
         assert windowed_totals([], [], 1) == []
 
@@ -237,6 +241,27 @@ class TestAgreementWithTheCalibrationLoss:
         result = Calibrator(_model(None), problem).run()
 
         assert result.final_loss > 1.0
+
+
+def test_windowed_totals_equal_the_prediction_of_a_windowed_observation() -> None:
+    truth = 0.05
+    results = _model(truth).run(14)
+    observations = [
+        ObservedDataPoint(at=at, output="events", value=0.0, window=7) for at in (7, 14)
+    ]
+    problem = CalibrationProblem(
+        observed_data=observations,
+        parameters=[bounded("k1", 0.01, 0.1)],
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(),
+    )
+    calibrator = Calibrator(_model(None), problem)
+
+    [[predictions]] = calibrator.rust_problem.predict_observations([[truth]])
+
+    assert windowed_totals(results["events"], results.positions, 7, [7, 14]) == (
+        predictions
+    )
 
 
 def test_windowed_totals_take_output_names() -> None:

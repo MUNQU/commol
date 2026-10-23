@@ -179,8 +179,8 @@ impulse step and restarts from the new state, so `diffsol` needs no event.
 
 An observation at `at` with `window = W` is compared with
 `output(at) - output(at - W)`, anchored at its own position. The Rust loss and
-`windowed_totals` (`api/windows.py`) must give the same number, and the
-predictive reads windows through the observation operator
+`windowed_totals` (`api/windows.py`) give the same number from one rule
+(`window_increments`), and the predictive reads windows through the observation operator
 ([One observation operator](calibration.md#one-observation-operator)). Window `w`
 covers `(w · W, (w + 1) · W]`; `window_index` places a position with
 `max(ceil(at / W) − 1, 0)`, and the `observed` block of a report (`_observed_report` in `api/reporting.py`) calls it.
@@ -239,12 +239,12 @@ checks whether a model type accepts a position.
 `positions` and the rows in `rows()`. A `dict` keeps `results["A"]`,
 `json.dumps` and `pandas.DataFrame(results)` working; a reserved key could clash
 with an output name. Windows, reports and plots read a value at a position
-(`index_at`, which matches within a relative `1e-9`), never at a list index, so
+with the Rust `index_at` of an observation (`observation.rs`, a relative `1e-9`), never at a list index, so
 a model type that reports between integers fits them. The engines take the
 same tolerance (`same_position` in `crates/commol-core/src/position.rs`). A
 predictive holds the positions it was asked for (`Predictive.positions`).
 
-**Guards:** `tests/simulation/test_runs.py::TestResults`,
+**Guards:** `tests/simulation/test_runs.py::TestResults`, `tests/simulation/test_runs.py::test_a_result_reads_a_position_with_the_tolerance_of_the_engine`,
 `crates/commol-core/tests/positions.rs::same_position_is_relative_to_the_larger_magnitude`,
 `tests/reporting/test_simulation_report.py::TestNonIntegerPositions`,
 `tests/plotting/test_figures.py::TestDifferentialModel`.

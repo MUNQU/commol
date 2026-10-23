@@ -294,7 +294,7 @@ from commol import AxisUnits, windowed_totals
 daily = AxisUnits(step_unit="day")
 print(daily.window_ends(1, "week", 30))  # [7.0, 14.0, 21.0, 28.0]
 print(daily.window_end(0, 1, "week"), daily.window_index(7, 1, "week"))  # 7.0 0
-print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], range(8), 3))  # [6, 15]
+print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], range(8), 3))  # [6.0, 15.0]
 ```
 
 A window of the grid is a whole number of steps. The `window` of

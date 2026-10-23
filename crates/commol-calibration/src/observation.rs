@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use commol_core::same_position;
+use commol_core::{POSITION_TOLERANCE, same_position};
 
 use crate::types::{CalibrationParameter, CalibrationParameterType, ObservedDataPoint};
 
@@ -27,6 +27,88 @@ pub fn index_at(positions: &[f64], at: f64) -> Option<usize> {
                     .is_some_and(|&position| same_position(position, at))
             }),
     }
+}
+
+/// The start of the window of length `window` that ends at `at`, where an
+/// observation with that window reads the start of its increment: `at −
+/// window`, or 0 when `|at − window|` is at most [`POSITION_TOLERANCE`] times
+/// the larger of `|at|`, `window` and 1.
+///
+/// The rounding of `at − window` grows with its operands, and
+/// [`same_position`] measures a difference by the magnitude of the two
+/// positions, which near 0 loses that scale; so a start at 0 is read at the
+/// scale of the window, and a window has one verdict whatever its end.
+pub fn window_start(at: f64, window: f64) -> f64 {
+    let start = at - window;
+    if start.abs() <= POSITION_TOLERANCE * at.abs().max(window).max(1.0) {
+        0.0
+    } else {
+        start
+    }
+}
+
+/// Why a window has no increment ([`window_increments`]).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum WindowError {
+    /// The window that ends at `end` starts before 0 ([`window_start`]) and
+    /// before every position.
+    Incomplete {
+        /// The end of the window.
+        end: f64,
+        /// The length of the window.
+        window: f64,
+    },
+    /// No position is this position, the end or the start of a window.
+    Missing(f64),
+}
+
+impl std::fmt::Display for WindowError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Incomplete { end, window } => write!(
+                f,
+                "Position {end} has no complete window of {window} before it"
+            ),
+            Self::Missing(at) => write!(f, "No position is {at}"),
+        }
+    }
+}
+
+impl std::error::Error for WindowError {}
+
+/// The increment of `series` over the window of length `window` that ends at
+/// each of `ends`, as [`ObservationOperator`] reads a windowed observation:
+/// the value at the end minus the value at [`window_start`], each found with
+/// [`index_at`]. `series` has one value per entry of `positions`, ascending.
+///
+/// # Errors
+///
+/// [`WindowError::Incomplete`] for the first window that starts before 0 at
+/// no position, and [`WindowError::Missing`] for the first end or start that
+/// is no position.
+///
+/// # Panics
+///
+/// Panics when `series` and `positions` differ in length.
+pub fn window_increments(
+    series: &[f64],
+    positions: &[f64],
+    window: f64,
+    ends: &[f64],
+) -> Result<Vec<f64>, WindowError> {
+    assert_eq!(series.len(), positions.len(), "one value per position");
+    ends.iter()
+        .map(|&end| {
+            let start = window_start(end, window);
+            let start_row = index_at(positions, start);
+            if start_row.is_none() && start < 0.0 {
+                return Err(WindowError::Incomplete { end, window });
+            }
+            let end_row = index_at(positions, end).ok_or(WindowError::Missing(end))?;
+            let start_row = start_row.ok_or(WindowError::Missing(start))?;
+            Ok(series[end_row] - series[start_row])
+        })
+        .collect()
 }
 
 /// How each observation reads a run: the outputs it sums, the row of its
@@ -66,7 +148,7 @@ impl ObservationOperator {
     ) -> Result<Self, String> {
         let starts: Vec<Option<f64>> = observed_data
             .iter()
-            .map(|obs| obs.window.map(|window| obs.at - window))
+            .map(ObservedDataPoint::window_start)
             .collect();
         Self::with_starts(observed_data, &starts, parameters, output_names, positions)
     }
@@ -267,6 +349,82 @@ mod tests {
         assert_eq!(index_at(&positions, 0.5), None);
         assert_eq!(index_at(&positions, 2e12), None);
         assert_eq!(index_at(&[], 0.0), None);
+    }
+
+    #[test]
+    fn an_increment_is_read_as_a_windowed_observation() {
+        let positions = [0.0, 0.1, 0.2, 0.3];
+        let series = [0.0, 1.0, 3.0, 6.0];
+        let mut windowed = ObservedDataPoint::new(0.3, "C".to_string(), 0.0);
+        windowed.window = Some(0.2);
+        let operator = ObservationOperator::new(&[windowed], &[], &names(), &positions).unwrap();
+        let rows: Vec<Vec<f64>> = series.iter().map(|&c| vec![0.0, 0.0, c]).collect();
+        let mut out = [0.0];
+
+        operator.apply(&rows, &[], &mut out);
+
+        assert_eq!(
+            window_increments(&series, &positions, 0.2, &[0.3]),
+            Ok(out.to_vec())
+        );
+        assert_eq!(
+            window_increments(&series, &positions, 0.1, &[0.1 + 0.2]),
+            Ok(vec![3.0])
+        );
+    }
+
+    #[test]
+    fn a_window_without_its_end_or_start_has_no_increment() {
+        let positions = [0.0, 1.0, 2.0];
+        let series = [0.0, 1.0, 3.0];
+
+        assert_eq!(
+            window_increments(&series, &positions, 1.0, &[1.0 + 1e-10]),
+            Ok(vec![1.0])
+        );
+        assert_eq!(
+            window_increments(&series, &positions, 5.0, &[9.0, 2.0]),
+            Err(WindowError::Missing(9.0))
+        );
+        assert_eq!(
+            window_increments(&series, &positions, 0.5, &[2.0]),
+            Err(WindowError::Missing(1.5))
+        );
+        let incomplete = window_increments(&series, &positions, 3.0, &[2.0]).unwrap_err();
+        assert_eq!(
+            incomplete.to_string(),
+            "Position 2 has no complete window of 3 before it"
+        );
+        assert_eq!(WindowError::Missing(1.5).to_string(), "No position is 1.5");
+    }
+
+    #[test]
+    fn a_window_has_one_verdict_whatever_its_end() {
+        let positions: Vec<f64> = (0..=2000).map(f64::from).collect();
+        let window = 1000.0 + 1e-7;
+
+        // At 1000 the start rounds to 0, at 2000 to the position 1000.
+        assert_eq!(window_start(1000.0, window), 0.0);
+        for end in [1000.0, 2000.0] {
+            assert_eq!(
+                window_increments(&positions, &positions, window, &[end]),
+                Ok(vec![1000.0]),
+                "{end}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_window_that_starts_clearly_before_zero_is_incomplete() {
+        let positions: Vec<f64> = (0..=1000).map(f64::from).collect();
+
+        for (window, end) in [(1000.0 + 1e-5, 1000.0), (1.0 + 1.5e-9, 1.0)] {
+            assert!(window_start(end, window) < 0.0, "{window}");
+            assert_eq!(
+                window_increments(&positions, &positions, window, &[end]),
+                Err(WindowError::Incomplete { end, window })
+            );
+        }
     }
 
     #[test]
