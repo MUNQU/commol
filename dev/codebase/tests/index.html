@@ -3442,7 +3442,7 @@ kind that is not aggregate through every generic layer.</p>
 </tr>
 <tr>
 <td><code>units/</code></td>
-<td>Unit checks; the dates of an axis with an origin (<code>test_calendar_axis.py</code>)</td>
+<td>Unit checks of an equation (<code>test_unit_checks.py</code>) and of a model (<code>test_model_units.py</code>); the step unit, the unit of the axis and a position in a rate (<code>test_time_units.py</code>); the dates of an axis with an origin (<code>test_calendar_axis.py</code>)</td>
 <td><a href="../../guide/units-and-equations/">Units</a></td>
 </tr>
 <tr>
@@ -3452,7 +3452,7 @@ kind that is not aggregate through every generic layer.</p>
 </tr>
 <tr>
 <td><code>calibration/</code></td>
-<td>One file per calibration page: <code>test_problem.py</code>, <code>test_optimizers.py</code>, <code>test_starts.py</code>, <code>test_constraints.py</code>, <code>test_observations.py</code>, <code>test_initial_conditions.py</code>, <code>test_write_back.py</code></td>
+<td>One file per calibration page: <code>test_problem.py</code>, <code>test_optimizers.py</code>, <code>test_starts.py</code>, <code>test_constraints.py</code>, <code>test_observations.py</code>, <code>test_initial_conditions.py</code>, <code>test_write_back.py</code>; and a run below zero, which the calibration avoids (<code>test_infeasible_runs.py</code>)</td>
 <td><a href="../../guide/calibration/">Model Calibration</a> and its sub-pages</td>
 </tr>
 <tr>
@@ -3461,13 +3461,18 @@ kind that is not aggregate through every generic layer.</p>
 <td><a href="../../guide/uncertainty/">Uncertainty</a></td>
 </tr>
 <tr>
+<td><code>parallelism/</code></td>
+<td>The setting of the threads and its levels, the threads that each parallel method runs on, a swarm in parallel, and one result for one seed whatever the threads and the level (<code>test_threads.py</code>). A new parallel method adds a case to <code>METHODS</code></td>
+<td><a href="../../guide/parallelism/">Threads and Parallelism</a></td>
+</tr>
+<tr>
 <td><code>reporting/</code></td>
 <td>Reports</td>
 <td><a href="../../guide/reports/">Reports</a></td>
 </tr>
 <tr>
 <td><code>plotting/</code></td>
-<td>The figures of results (<code>plot</code> of <code>SimulationResults</code>, <code>SimulationReplicates</code>, <code>Predictive</code> and of the results of sensitivity methods and profiles), their panels (<code>panels.py</code>) and their style</td>
+<td>The figures of results (<code>plot</code> of <code>SimulationResults</code>, <code>SimulationReplicates</code>, <code>Predictive</code> and of the results of sensitivity methods and profiles), their panels (<code>panels.py</code>) and their style: what every figure does (<code>test_figures.py</code>), the figures of a run (<code>test_run_figures.py</code>), the bands of a predictive and of replicates (<code>test_band_figures.py</code>), the panels of observed series (<code>test_observed_series.py</code>) and <code>plot_compared</code> (<code>test_compared.py</code>)</td>
 <td><a href="../../guide/simulations/#plotting">Running Simulations</a></td>
 </tr>
 <tr>
@@ -3487,25 +3492,28 @@ kind that is not aggregate through every generic layer.</p>
 </tr>
 <tr>
 <td><code>suite/</code></td>
-<td>The rules of this page that a program can check (<code>test_rules.py</code>), the plugin that records how long each test takes (<code>durations.py</code>), the checks of the package as a whole: its version (<code>test_version.py</code>) and its logging, in a fresh interpreter (<code>test_logging.py</code>), the checks of CI: its rights, its pinned tools, the workspace of the crates and the commands the documentation shows (<code>test_workflows.py</code>), and the checks of the scripts of <code>.github/scripts/</code>: the next issues and what can run in parallel (<code>test_planning.py</code>), the precedence levels (<code>test_levels.py</code>), the links of the releases (<code>test_releases.py</code>), the REST calls (<code>test_github.py</code>), the affected issues (<code>test_affected.py</code>), the release notes (<code>test_release_notes.py</code>) and the Rust lines no test runs (<code>test_rust_uncovered.py</code>). No test calls GitHub: each one patches the REST calls (<code>support/planning.py</code>)</td>
+<td>The rules of this page that a program can check, for the Python tests (<code>test_rules.py</code>) and for the Rust tests (<code>test_rust_rules.py</code>), the plugin that records how long each test takes (<code>durations.py</code>), the checks of the package as a whole: its version (<code>test_version.py</code>) and its logging, in a fresh interpreter (<code>test_logging.py</code>), the checks of CI: its rights, its pinned tools, the workspace of the crates and the commands the documentation shows (<code>test_workflows.py</code>), and the checks of the scripts of <code>.github/scripts/</code>: the next issues and what can run in parallel (<code>test_planning.py</code>), the precedence levels (<code>test_levels.py</code>), the links of the releases (<code>test_releases.py</code>), the REST calls (<code>test_github.py</code>), the affected issues (<code>test_affected.py</code>), the release notes (<code>test_release_notes.py</code>) and the Rust lines no test runs (<code>test_rust_uncovered.py</code>). No test calls GitHub: each one patches the REST calls (<code>support/planning.py</code>)</td>
 <td>—</td>
 </tr>
 <tr>
 <td><code>support/</code></td>
-<td>No tests: the code the tests share</td>
+<td>No tests: the code the tests share. <code>support/plotted.py</code> reads figures and imports matplotlib, so <code>tests/support</code> does not import it: a module of <code>plotting/</code> imports it by name</td>
 <td>—</td>
 </tr>
 </tbody>
 </table>
-<p>Keep a test module under about 600 lines. When it grows past that, split it by
-topic inside its package.</p>
+<p>A module of <code>tests/</code> has at most 600 lines. When it grows past that, split it
+by topic inside its package. <code>tests/suite/test_rules.py</code> checks the limit, that
+each package has a row in this table, and that the row of <code>suite/</code> names each
+of its modules.</p>
 <h2 id="models-use-the-factories">Models: use the factories<a class="headerlink" href="#models-use-the-factories" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Build models with the factories of <code>tests/support/models.py</code>:
   <code>abc_builder</code> (A → B → C), <code>abcd_builder</code> (A → B → C → D) and
   <code>a_to_b_builder</code>, and the special models
-  <code>override_builder</code>, <code>shared_category_builder</code> and
-  <code>conditional_pathway_builder</code>. A factory returns a <code>FactoryBuilder</code>: a
+  <code>override_builder</code>, <code>shared_category_builder</code>,
+  <code>conditional_pathway_builder</code> and <code>mixed_units_builder</code> (A and B in <code>item</code>,
+  C in <code>mg/l</code>). A factory returns a <code>FactoryBuilder</code>: a
   <code>ModelBuilder</code> of the process and the <code>Aggregate</code> that lays it out
   (<code>builder.structure</code>, which <code>set_structure</code> replaces). A keyword overrides
   one part of the default model, so a test names only what it changes. <code>build</code> builds for difference
@@ -3519,12 +3527,26 @@ topic inside its package.</p>
   parameters <code>k1</code>, <code>k2</code>, categories <code>g1</code>, <code>t1</code>. Only <code>tests/reference_models/</code>
   and the support code that only it uses (<code>support/oracles.py</code>,
   <code>support/flows.py</code>) keep the names of their published source.</li>
-<li>Fixtures: <code>abc_model</code> and <code>abc_simulation</code> (<code>tests/conftest.py</code>); <code>truth</code>
-  and <code>truth_run</code> (<code>tests/calibration/conftest.py</code>). A fixture is
-  function-scoped unless its cost is measured; a wider scope never holds an
-  object a test can change. A class-scoped fixture is never an instance
-  method (removed in pytest 10).</li>
+<li>Fixtures that more than one module uses:</li>
+<li><code>tests/conftest.py</code>: <code>abc_model</code> and <code>abc_simulation</code>, the default model
+    of <code>abc_builder</code> and its simulation; <code>close_figures</code>, which runs for every
+    test and closes the figures it drew, and imports no plotting library when
+    it drew none.</li>
+<li><code>tests/calibration/conftest.py</code>: <code>truth</code>, <code>abc_builder</code> at the values to
+    recover, and <code>truth_run</code>, 100 steps of it.</li>
+<li><code>tests/uncertainty/conftest.py</code>: <code>calibrator</code>, which fits <code>k1</code> and <code>k2</code> of
+    <code>abc_builder</code> to <code>truth_run_50</code>, 50 steps at the values to recover;
+    <code>simulation</code>, the default model of <code>abc_builder</code>, for the sensitivity
+    methods.</li>
+<li><code>tests/plotting/conftest.py</code>: <code>run</code>, 100 steps of the default model of
+    <code>abc_builder</code>; <code>prcc_result</code>, <code>morris_result</code>, <code>sobol_result</code> and
+    <code>profile_result</code>, the results that the figures draw.</li>
 </ul>
+<p>A fixture name has one meaning in the whole suite: no two conftest files
+  define a fixture of one name, and <code>tests/suite/test_rules.py</code> checks it. A
+  fixture is function-scoped unless its cost is measured; a wider scope never
+  holds an object a test can change. A class-scoped fixture is never an
+  instance method (removed in pytest 10).</p>
 <h2 id="every-test-checks-a-result">Every test checks a result<a class="headerlink" href="#every-test-checks-a-result" title="Permanent link">&para;</a></h2>
 <p>A test compares a result with an oracle:</p>
 <table>
@@ -3566,10 +3588,10 @@ rejection.</p>
 <li>an attribute read back as the test set it;</li>
 <li>the absence of an API that was removed: that is history, not behavior.</li>
 </ul>
-<p><code>tests/suite/test_rules.py</code> checks the part of this that a program can read:
-every Python test has an <code>assert</code>, a <code>pytest.raises</code>, <code>pytest.warns</code> or
-<code>pytest.fail</code>, a call of <code>np.testing.assert_*</code>, or a call of a helper of
-<code>tests/</code> that has one; every Rust test has an <code>assert*!</code>, <code>panic!</code> or
+<p><code>tests/suite/test_rules.py</code> and <code>tests/suite/test_rust_rules.py</code> check the part
+of this that a program can read: every Python test has an <code>assert</code>, a
+<code>pytest.raises</code>, <code>pytest.warns</code> or <code>pytest.fail</code>, a call of
+<code>np.testing.assert_*</code>, or a call of a helper of <code>tests/</code> that has one; every Rust test has an <code>assert*!</code>, <code>panic!</code> or
 <code>unreachable!</code>, calls a function of its crate that has one, is
 <code>#[should_panic]</code>, or returns a <code>Result</code>. Review checks the rest.</p>
 <h2 id="duplicates">Duplicates<a class="headerlink" href="#duplicates" title="Permanent link">&para;</a></h2>
@@ -3600,7 +3622,7 @@ the exact formula).</p>
   <code>abs=1e-5</code> for Nelder-Mead on noise-free data.</li>
 <li><code>np.testing.assert_allclose</code> skips masked values. Read the points of a
   matplotlib collection as floats (<code>np.asarray(offsets, dtype=float)</code>, as
-  <code>_scatter</code> in <code>tests/plotting/test_figures.py</code> does), so a point at <code>None</code>
+  <code>scatter</code> in <code>tests/support/plotted.py</code> does), so a point at <code>None</code>
   is NaN and fails.</li>
 </ul>
 <h2 id="reference-models">Reference models<a class="headerlink" href="#reference-models" title="Permanent link">&para;</a></h2>
@@ -3644,8 +3666,8 @@ and cite the papers.</p>
   such as the benchmarks of <code>crates/commol-differential/src/tests.rs</code>. A
   benchmark also asserts that the methods it times give the same result.</li>
 </ul>
-<p><code>tests/suite/test_rules.py</code> checks the <code>xfail</code> markers and the reasons of
-<code>#[ignore]</code>.</p>
+<p><code>tests/suite/test_rules.py</code> checks the <code>xfail</code> markers, and
+<code>tests/suite/test_rust_rules.py</code> the reasons of <code>#[ignore]</code>.</p>
 <h2 id="time-budget">Time budget<a class="headerlink" href="#time-budget" title="Permanent link">&para;</a></h2>
 <p>A test takes at most 1 s, setup and teardown included, in the job Test of
 Build on Ubuntu, which runs every test without coverage. Coverage slows a test

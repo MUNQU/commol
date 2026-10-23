@@ -3369,7 +3369,7 @@ and chaos refuse a sample; PRCC reads its weights.</p>
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_global_sensitivity.rs</code>,
 <code>crates/commol-inference/tests/test_predictive.rs::a_draw_keeps_its_runs_when_the_replicates_change</code>,
-<code>tests/uncertainty/test_sensitivity.py</code>,
+<code>tests/uncertainty/test_sensitivity.py</code>, <code>tests/uncertainty/test_propagation.py</code>,
 <code>tests/simulation/test_quantities.py::test_the_replicates_of_a_draw_are_those_of_its_seed</code>.</p>
 <h2 id="a-quantity-is-a-series-and-a-reduction">A quantity is a series and a reduction<a class="headerlink" href="#a-quantity-is-a-series-and-a-reduction" title="Permanent link">&para;</a></h2>
 <p>A quantity reads a <code>Series</code> of a run, the <code>Level</code> of some outputs or their
@@ -3445,7 +3445,7 @@ with its quantity; <code>quantity_schedule</code> gives the positions to run at.
 (<code>a_done_run_is_read_at_the_schedule_within_the_tolerance_of_the_axis</code>,
 <code>a_done_run_lists_every_position_it_lacks_with_its_quantity</code>),
 <code>tests/simulation/test_quantities.py</code>,
-<code>tests/uncertainty/test_sensitivity.py::TestPropagation::test_propagation_values_have_one_row_per_replicate_of_each_draw</code>.</p>
+<code>tests/uncertainty/test_propagation.py::TestPropagation::test_propagation_values_have_one_row_per_replicate_of_each_draw</code>.</p>
 <h2 id="the-modeller-truncates-a-polynomial-chaos-basis">The modeller truncates a polynomial chaos basis<a class="headerlink" href="#the-modeller-truncates-a-polynomial-chaos-basis" title="Permanent link">&para;</a></h2>
 <p><code>Truncation</code> (<code>global_sensitivity/chaos.rs</code>) keeps the terms of a basis of
 <code>degree</code> whose degrees have <code>Σ α_i^q ≤ degree^q</code> and that hold at most

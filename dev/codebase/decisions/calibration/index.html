@@ -3460,7 +3460,7 @@ computed as <code>at − window</code> reads the row of the position it rounds a
 <code>crates/commol-inference/tests/test_predictive.rs::observation_draws_are_the_predictions_the_loss_compares</code>,
 <code>tests/uncertainty/test_predictive.py::TestObservations</code>,
 <code>crates/commol-inference/tests/test_global_sensitivity.rs::a_gain_reads_its_start_exactly</code>,
-<code>tests/uncertainty/test_sensitivity.py::TestPropagation::test_a_gain_reads_its_start_exactly</code>.</p>
+<code>tests/uncertainty/test_propagation.py::TestPropagation::test_a_gain_reads_its_start_exactly</code>.</p>
 <h2 id="constraints-bound-the-support">Constraints bound the support<a class="headerlink" href="#constraints-bound-the-support" title="Permanent link">&para;</a></h2>
 <p>A point is feasible, or it violates the problem by an amount: a bound, a
 constraint, an infeasible start or run, a value that is not finite, or a
@@ -3602,8 +3602,7 @@ or reads <code>RAYON_NUM_THREADS</code>.</p>
 </tbody>
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-core/src/parallelism.rs</code> <code>tests</code>;
-<code>tests/uncertainty/test_parallelism.py::test_every_parallel_method_runs_on_the_threads_of_the_setting</code>;
-<code>tests/calibration/test_parallelism.py::test_a_thread_limit_bounds_every_parallel_method</code>.
+<code>tests/parallelism/test_threads.py::test_every_parallel_method_runs_on_the_threads_of_the_setting</code>.
 They read the threads that ran the test kind (<code>threads_of_runs</code>), not the
 CPU time, so the load of the machine does not change them.</p>
 

@@ -3427,7 +3427,7 @@ matplotlib places, so a long run does not get one label per position.</p>
 <p><strong>Rule:</strong> a conversion between dates and positions goes through <code>AxisUnits</code>;
 an application keeps no origin of its own.</p>
 <p><strong>Guards:</strong> <code>tests/units/test_calendar_axis.py</code>,
-<code>tests/plotting/test_figures.py::test_an_axis_with_origin_labels_ticks_with_dates</code>.</p>
+<code>tests/plotting/test_run_figures.py::test_an_axis_with_origin_labels_ticks_with_dates</code>.</p>
 <h2 id="one-step-unit-in-the-unit-check">One step unit in the unit check<a class="headerlink" href="#one-step-unit-in-the-unit-check" title="Permanent link">&para;</a></h2>
 <p>The engine converts no value between units. So <code>UnitChecker._step_unit</code>
 (<code>context/_model/units.py</code>) uses one step unit: the declared
@@ -3452,9 +3452,9 @@ reads it (<code>parse_equation_unit</code>); a computed number stays dimensionle
 model would read a weekly rate as a daily one.</p>
 <p><strong>Guards:</strong> <code>tests/units/test_model_units.py::TestConsistentModels</code>
 (<code>test_a_proportional_rate_is_checked_as_its_flow</code>),
-<code>tests/units/test_model_units.py::TestStepUnit</code>,
-<code>tests/units/test_model_units.py::TestAxisUnit</code>,
-<code>tests/units/test_model_units.py::TestPositionOnTheAxis</code>.</p>
+<code>tests/units/test_time_units.py::TestStepUnit</code>,
+<code>tests/units/test_time_units.py::TestAxisUnit</code>,
+<code>tests/units/test_time_units.py::TestPositionOnTheAxis</code>.</p>
 <h2 id="time-inside-a-step">Time inside a step<a class="headerlink" href="#time-inside-a-step" title="Permanent link">&para;</a></h2>
 <p>A differential model integrates in continuous time, but on <code>[n, n + 1)</code> its
 rates see <code>step = n</code>: <code>t</code> is continuous, <code>step</code> is the floor of <code>t</code>. A rate that
@@ -3522,7 +3522,7 @@ end of that grid.</p>
 <p><strong>Guards:</strong> <code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> (the loss at
 the generating parameters is zero),
 <code>tests/reporting/test_simulation_report.py::test_observed_report_places_each_observation_by_window_index</code>
-<code>tests/plotting/test_figures.py::TestPredictiveSeries::test_a_windowed_band_of_one_draw_is_its_windowed_run</code>
+<code>tests/plotting/test_band_figures.py::TestPredictiveSeries::test_a_windowed_band_of_one_draw_is_its_windowed_run</code>
 and
 <code>tests/plotting/test_figures.py::test_each_observed_point_is_read_through_its_own_window_and_position</code>.</p>
 <h2 id="the-engine-owns-positions">The engine owns positions<a class="headerlink" href="#the-engine-owns-positions" title="Permanent link">&para;</a></h2>

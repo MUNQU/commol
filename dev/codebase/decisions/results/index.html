@@ -3439,7 +3439,7 @@ commol_calibration::statistics</code>), so there is one copy.</p>
 <code>crates/commol-calibration/tests/test_replicate_summary.rs</code>,
 <code>tests/uncertainty/test_intervals.py</code>,
 <code>tests/stochastic/test_calibration.py::test_a_quantile_summary_agrees_with_the_quantiles_of_the_replicates</code>,
-and <code>tests/suite/test_rules.py::test_commol_has_one_quantile</code>, which fails
+and <code>tests/suite/test_rust_rules.py::test_commol_has_one_quantile</code>, which fails
 when a Rust function named for a quantile sorts values outside
 <code>statistics.rs</code>. The conformal quantile (<code>conformal/quantile.rs</code>) is the one
 exception: it is a rank that gives an interval its coverage, not an estimate
@@ -3764,10 +3764,10 @@ structure: <code>ModelStructure.outputs_by_source</code> and <code>series_label<
 <p><strong>Guards:</strong> <code>tests/plotting/test_figures.py</code> (<code>test_a_figure_leaves_the_global_style</code>,
 <code>test_import_commol_loads_no_plotting_library</code>,
 <code>test_each_accessor_passes_on_the_arguments_of_its_function</code>,
-<code>test_a_figure_draws_on_given_axes</code>, <code>test_compared_runs_share_the_panels</code>,
-<code>test_compared_runs_need_the_same_outputs</code>,
-<code>test_compared_results_draw_a_panel_per_observed_series</code>,
-<code>test_each_observed_point_is_read_through_its_own_window</code>,
+<code>test_a_figure_draws_on_given_axes</code>), <code>tests/plotting/test_compared.py</code>
+(<code>test_compared_runs_share_the_panels</code>, <code>test_compared_runs_need_the_same_outputs</code>,
+<code>test_compared_results_draw_a_panel_per_observed_series</code>),
+<code>tests/plotting/test_observed_series.py</code> (<code>test_each_observed_point_is_read_through_its_own_window</code>,
 <code>test_a_windowed_value_is_drawn_as_a_step_over_its_window</code>) and
 <code>tests/plotting/test_panels.py::test_the_panels_of_a_run_need_no_matplotlib</code>.</p>
 <h2 id="model-files-are-written-in-full">Model files are written in full<a class="headerlink" href="#model-files-are-written-in-full" title="Permanent link">&para;</a></h2>
