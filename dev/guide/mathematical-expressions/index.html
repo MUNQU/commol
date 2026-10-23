@@ -3515,8 +3515,12 @@ each expression against this language, compiles it to machine code
 </tr>
 </tbody>
 </table>
-<p>Precedence, from high to low: parentheses, power, multiplication, division and remainder,
-addition and subtraction. So <code>"2 ** 3 * 4"</code> is 32 and <code>"2 + 3 * 4"</code> is 14.</p>
+<p>Precedence, from high to low: parentheses, power, the sign <code>-</code>,
+multiplication, division and remainder, addition and subtraction. So
+<code>"2 ** 3 * 4"</code> is 32, <code>"2 + 3 * 4"</code> is 14 and <code>"-2 ** 2"</code> is -4. Operators of
+one level apply from the left: <code>"8 - 4 - 2"</code> is 2 and <code>"8 / 4 * 2"</code> is 4. A
+chain of powers applies from the right, as in Python: <code>"2 ** 3 ** 2"</code> is
+<code>"2 ** (3 ** 2)"</code>, 512.</p>
 <p>A comparison gives a boolean, not a number, so it cannot be multiplied:
 <code>"k1 * (step &gt; 30)"</code> is rejected. Write <code>"if(step &gt; 30, k1, 0)"</code>. Rates do not
 accept <code>&amp;&amp;</code> or <code>||</code>; nest <code>if</code> calls instead:</p>
@@ -3784,6 +3788,11 @@ plain mathematics is rejected when the transition is added:</p>
 </tr>
 </tbody>
 </table>
+<p>The engine has one limit of its own, which no configuration changes: a formula
+nests at most 100 levels deep. Each pair of parentheses, each call, each sign
+and each power is one level; a sum or a product of any number of terms is
+one. A deeper formula fails with
+<code>it nests deeper than 100 levels of parentheses, calls, signs and powers</code>.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

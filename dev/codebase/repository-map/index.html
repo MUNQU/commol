@@ -3374,7 +3374,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-core/src/math_expression/</code></td>
-<td>The language of formulas (<code>language.rs</code>: <code>FUNCTIONS</code> and the check of a formula, <code>MathExpression::check</code>), the parsing and evaluation of rate expressions; the Cranelift JIT and its global cache (<code>jit/</code>).</td>
+<td>The language of formulas (<code>language.rs</code>: <code>FUNCTIONS</code> and the check of a formula, <code>MathExpression::check</code>), the engine variables (<code>variables.rs</code>); the parser of formulas and its nesting limit (<code>jit/parser.rs</code>: <code>MAX_NESTING</code>), the tree of a formula (<code>jit/ast.rs</code>), the Cranelift JIT and its global cache (<code>jit/</code>).</td>
 <td>Model-specific variables.</td>
 </tr>
 <tr>
@@ -4057,9 +4057,9 @@
 <td><code>api/plotting/accessors.py</code>, <code>api/plotting/compared.py</code> (<code>plot_compared</code>), the <code>plot</code> method of the result, <code>docs/guide/simulations.md</code> (Plotting), <code>docs/codebase/decisions/figures.md</code></td>
 </tr>
 <tr>
-<td>Add a function or variable to rate expressions</td>
-<td><code>crates/commol-core/src/math_expression/</code> (<code>language.rs</code>: <code>FUNCTIONS</code>, <code>check</code>)</td>
-<td><code>py-commol/commol/utils/equations.py</code> (<code>_FUNCTION_UNITS</code>), <code>docs/guide/mathematical-expressions.md</code></td>
+<td>Add a function, a variable or an operator to rate expressions, or change their grammar</td>
+<td><code>crates/commol-core/src/math_expression/</code> (<code>language.rs</code>: <code>FUNCTIONS</code>, <code>check</code>; <code>jit/parser.rs</code>: <code>parse_expression</code>, <code>MAX_NESTING</code>)</td>
+<td><code>jit/ast.rs</code> (<code>Expr</code>), <code>jit/codegen.rs</code>, <code>py-commol/commol/utils/equations.py</code> (<code>_FUNCTION_UNITS</code>), <code>docs/guide/mathematical-expressions.md</code></td>
 </tr>
 <tr>
 <td>Change initial conditions</td>

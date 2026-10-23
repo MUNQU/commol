@@ -3310,7 +3310,7 @@ parameters in dependency order.</p>
 <p><strong>Guard:</strong> <code>crates/commol-model/tests/rates.rs::a_formula_reads_an_earlier_formula_of_the_same_step</code>.</p>
 <h2 id="compiled-expressions-are-cached-globally">Compiled expressions are cached globally<a class="headerlink" href="#compiled-expressions-are-cached-globally" title="Permanent link">&para;</a></h2>
 <p><code>JIT_CACHE</code> in <code>crates/commol-core/src/math_expression/mod.rs</code> maps each
-preprocessed formula to one compiled function for the life of the process. The
+formula to one compiled function for the life of the process. The
 same formula always runs the same machine code, so results are reproducible.</p>
 <p><strong>Rule:</strong> do not invalidate or bypass the cache.</p>
 <p><strong>Guard:</strong> <code>crates/commol-core/src/math_expression/mod.rs::one_formula_compiles_to_one_function</code>.</p>

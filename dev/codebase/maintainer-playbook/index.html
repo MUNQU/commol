@@ -3631,7 +3631,12 @@
 <li>[ ] Change the language in <code>crates/commol-core/src/math_expression/</code>: a
       function is one entry of <code>FUNCTIONS</code> (<code>language.rs</code>), which the check,
       the JIT and Python (<code>commol_rs.core.FUNCTIONS</code>) read; an operator is a
-      case of <code>check</code> (<code>language.rs</code>) and of the JIT (<code>jit/</code>).</li>
+      token and a level of the parser (<code>jit/parser.rs</code>), a case of <code>check</code>
+      (<code>language.rs</code>) and of the JIT (<code>jit/codegen.rs</code>).</li>
+<li>[ ] Keep every walk of a tree (<code>Expr</code>) recursive only into the operands of
+      a node: a chain of one level is one node, and <code>MAX_NESTING</code> bounds the
+      depth. A new walk at the limit runs in
+      <code>crates/commol-core/tests/expressions.rs::every_level_of_operators_at_the_limit_reads_on_a_worker_thread</code>.</li>
 <li>[ ] Give a new function its value in
       <code>crates/commol-core/tests/expressions.rs::every_function_of_the_guide_has_its_value</code>
       and its unit rule in <code>_FUNCTION_UNITS</code> (<code>utils/equations.py</code>).</li>

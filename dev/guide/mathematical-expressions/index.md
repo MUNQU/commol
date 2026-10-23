@@ -49,7 +49,7 @@ The variables a rate names decide whether it is absolute or proportional; see [A
 | `>`, `<`, `>=`, `<=`, `==`, `!=` | Comparison, only inside `if`    | `"if(step > 30, k1, 0)"`    |        |
 | `!`                              | Not, only inside `if`           | `"if(!(step > 30), k1, 0)"` |        |
 
-Precedence, from high to low: parentheses, power, multiplication, division and remainder, addition and subtraction. So `"2 ** 3 * 4"` is 32 and `"2 + 3 * 4"` is 14.
+Precedence, from high to low: parentheses, power, the sign `-`, multiplication, division and remainder, addition and subtraction. So `"2 ** 3 * 4"` is 32, `"2 + 3 * 4"` is 14 and `"-2 ** 2"` is -4. Operators of one level apply from the left: `"8 - 4 - 2"` is 2 and `"8 / 4 * 2"` is 4. A chain of powers applies from the right, as in Python: `"2 ** 3 ** 2"` is `"2 ** (3 ** 2)"`, 512.
 
 A comparison gives a boolean, not a number, so it cannot be multiplied: `"k1 * (step > 30)"` is rejected. Write `"if(step > 30, k1, 0)"`. Rates do not accept `&&` or `||`; nest `if` calls instead:
 
@@ -195,6 +195,8 @@ except ValueError as error:
 | Variable name length                                                                                | 50 characters    |
 | Numeric literal                                                                                     | 1e12             |
 | Complexity score: the nodes of the tree of the expression (numbers, variables, operators and calls) | 1000             |
+
+The engine has one limit of its own, which no configuration changes: a formula nests at most 100 levels deep. Each pair of parentheses, each call, each sign and each power is one level; a sum or a product of any number of terms is one. A deeper formula fails with `it nests deeper than 100 levels of parentheses, calls, signs and powers`.
 
 ## Next steps
 
