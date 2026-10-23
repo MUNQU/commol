@@ -235,6 +235,10 @@ takes `StochasticStepsSettings` (only `rounding`):
   impulse moves a binomial draw of its source (its rate is the probability
   that one unit moves, between 0 and 1); an absolute impulse moves its rate,
   a whole number of units. Each moves at most what its sources still hold.
+- **A new seed between two steps.** `simulation.engine.set_seed(seed)` acts
+  from the current position: the state there stays, and every event after it
+  comes from the new seed. A wait that was pending is drawn again from the
+  position, and a pending leap keeps only its events up to the position.
 
 ```python
 leaping = builder.build(

@@ -253,9 +253,21 @@ pub trait SimulationEngine: Clone {
     /// it, so a run is reproducible from its seed. The default does nothing:
     /// a deterministic engine draws no random number, and gives the same run
     /// for every seed.
+    ///
+    /// The new seed acts from the current position
+    /// ([`Self::current_position`]): the state there stays, and every draw
+    /// after it comes from the new generator. A stochastic engine first
+    /// settles at the position what it drew for later, such as a pending
+    /// wait or leap, so two copies of one state with new seeds share
+    /// nothing after it.
     fn set_seed(&mut self, _seed: u64) {}
 
     /// Update a parameter value by its identifier.
+    ///
+    /// The new value acts from the current position
+    /// ([`Self::current_position`]), never before it: a stochastic engine
+    /// first settles at the position what it drew with the old value, such
+    /// as a pending wait or leap.
     ///
     /// # Arguments
     ///

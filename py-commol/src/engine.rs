@@ -497,7 +497,9 @@ impl PyEngine {
 
     /// Seed the random numbers of the engine, and restore its generator
     ///
-    /// A deterministic engine ignores the seed.
+    /// The seed acts from the current position: the state there stays, and
+    /// every draw after it comes from the new seed. A deterministic engine
+    /// ignores the seed.
     ///
     /// Args:
     ///     seed: The seed, from 0 to 2**64 - 1
