@@ -1,4 +1,5 @@
-//! Samplers of the distributions the stochastic engines draw from.
+//! Samplers of the distributions the stochastic engines and the inference
+//! methods draw from.
 //!
 //! Each sampler reads only [`Generator`], so a seed gives the same values on
 //! every platform. The algorithms are exact and their choice depends only on
@@ -10,9 +11,17 @@
 //! | [`poisson`] | Multiplication of uniforms below a mean of 10; PTRS above (Hörmann 1993) |
 //! | [`binomial`] | Inversion below a mean of 10; BTRS above (Hörmann 1993) |
 //! | [`multinomial`] | Conditional binomials, category by category |
+//! | [`normal`] | Box–Muller (1958), one draw from two uniforms |
+//! | [`gamma`] | Marsaglia and Tsang (2000); below a shape of 1, a draw of shape + 1 times `U^(1/shape)` |
+//! | [`index`] | The floor of `n` times a uniform |
 //!
-//! A change of algorithm changes the values of a seed, so the tests of this
-//! module hold the first values of each sampler for a fixed seed.
+//! The logarithms, roots and cosines of [`normal`] and [`gamma`] come from
+//! `libm`, so their values are the same on every platform, as the special
+//! functions of the inference methods are.
+//!
+//! A change of algorithm changes the values of a seed, so
+//! `tests/test_samplers.rs` holds the first values of each sampler for a
+//! fixed seed (`tests/reference_values.txt`).
 
 use crate::Generator;
 
@@ -204,6 +213,67 @@ pub fn multinomial(
     }
 }
 
+/// A draw of the standard normal distribution: `√(−2 ln U₁) cos(2π U₂)`
+/// of two uniforms strictly between 0 and 1 (Box and Muller 1958).
+pub fn normal(generator: &mut Generator) -> f64 {
+    let radius = libm::sqrt(-2.0 * libm::log(generator.open_uniform()));
+    let angle = 2.0 * std::f64::consts::PI * generator.open_uniform();
+    radius * libm::cos(angle)
+}
+
+/// A draw of a gamma distribution of shape `shape` and rate `rate`: mean
+/// `shape / rate`.
+///
+/// Marsaglia and Tsang (2000), "A simple method for generating gamma
+/// variables". Below a shape of 1, a draw of shape `shape + 1` times
+/// `U^(1/shape)`, with `U` uniform.
+///
+/// # Panics
+///
+/// Panics in debug builds when the shape or the rate is not positive and
+/// finite.
+pub fn gamma(generator: &mut Generator, shape: f64, rate: f64) -> f64 {
+    debug_assert!(shape.is_finite() && shape > 0.0, "shape {shape}");
+    debug_assert!(rate.is_finite() && rate > 0.0, "rate {rate}");
+    if shape < 1.0 {
+        let draw = gamma_squeeze(generator, shape + 1.0);
+        return draw * libm::pow(generator.open_uniform(), 1.0 / shape) / rate;
+    }
+    gamma_squeeze(generator, shape) / rate
+}
+
+/// The rejection with squeeze of Marsaglia and Tsang for a shape of at least
+/// 1, at rate 1.
+fn gamma_squeeze(generator: &mut Generator, shape: f64) -> f64 {
+    let d = shape - 1.0 / 3.0;
+    let c = 1.0 / libm::sqrt(9.0 * d);
+    loop {
+        let x = normal(generator);
+        let root = 1.0 + c * x;
+        if root <= 0.0 {
+            continue;
+        }
+        let v = root * root * root;
+        let u = generator.open_uniform();
+        let x2 = x * x;
+        if u < 1.0 - 0.0331 * x2 * x2 || libm::log(u) < 0.5 * x2 + d * (1.0 - v + libm::log(v)) {
+            return d * v;
+        }
+    }
+}
+
+/// A draw of a whole number below `n`, each with probability `1/n`: the
+/// floor of `n` times [`Generator::uniform`]. The 53 bits of the uniform
+/// leave each index within a few multiples of `2⁻⁵³` of `1/n`.
+///
+/// # Panics
+///
+/// Panics in debug builds when `n` is 0.
+pub fn index(generator: &mut Generator, n: usize) -> usize {
+    debug_assert!(n > 0, "an index below 0");
+    ((generator.uniform() * n as f64) as usize).min(n - 1)
+}
+
 /// `ln(k!)` for a whole number `k`: a table below 10, the Stirling series of
 /// `ln Γ(k + 1)` from there (absolute error below `1e-12`).
 fn ln_factorial(k: f64) -> f64 {
@@ -235,104 +305,12 @@ fn ln_factorial(k: f64) -> f64 {
 mod tests {
     use super::*;
 
-    const SEED: u64 = 20_261_016;
-    const DRAWS: usize = 40_000;
-
-    fn mean_and_variance(values: &[f64]) -> (f64, f64) {
-        let n = values.len() as f64;
-        let mean = values.iter().sum::<f64>() / n;
-        let variance = values.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0);
-        (mean, variance)
-    }
-
-    /// The mean and the variance of many draws match the distribution
-    /// within five standard errors.
-    fn assert_moments(values: &[f64], mean: f64, variance: f64) {
-        let (sample_mean, sample_variance) = mean_and_variance(values);
-        let n = values.len() as f64;
-        let mean_error = (variance / n).sqrt();
-        assert!(
-            (sample_mean - mean).abs() <= 5.0 * mean_error + 1e-12,
-            "mean {sample_mean}, expected {mean}"
-        );
-        assert!(
-            (sample_variance - variance).abs() <= 0.05 * variance + 1e-12,
-            "variance {sample_variance}, expected {variance}"
-        );
-    }
-
     #[test]
     fn ln_factorial_matches_the_product() {
         let mut exact = 0.0_f64;
         for k in 1..=40 {
             exact += (k as f64).ln();
             assert!((ln_factorial(k as f64) - exact).abs() < 1e-11, "{k}");
-        }
-    }
-
-    #[test]
-    fn the_first_values_of_each_sampler_are_fixed() {
-        let mut generator = Generator::from_seed(SEED);
-        let exponentials: Vec<f64> = (0..3).map(|_| exponential(&mut generator, 2.0)).collect();
-        let small_poisson: Vec<u64> = (0..5).map(|_| poisson(&mut generator, 3.5)).collect();
-        let large_poisson: Vec<u64> = (0..5).map(|_| poisson(&mut generator, 250.0)).collect();
-        let small_binomial: Vec<u64> = (0..5).map(|_| binomial(&mut generator, 20, 0.3)).collect();
-        let large_binomial: Vec<u64> = (0..5)
-            .map(|_| binomial(&mut generator, 10_000, 0.2))
-            .collect();
-        let mut counts = [0; 3];
-        multinomial(&mut generator, 1_000, &[0.2, 0.5, 0.3], &mut counts);
-
-        let reference = include_str!("../tests/reference_values.txt");
-        let rendered = format!(
-            "{exponentials:?}\n{small_poisson:?}\n{large_poisson:?}\n{small_binomial:?}\n\
-             {large_binomial:?}\n{counts:?}\n"
-        );
-        assert_eq!(rendered, reference);
-    }
-
-    #[test]
-    fn exponential_draws_have_the_moments_of_their_rate() {
-        let mut generator = Generator::from_seed(SEED);
-        let values: Vec<f64> = (0..DRAWS)
-            .map(|_| exponential(&mut generator, 4.0))
-            .collect();
-        assert_moments(&values, 0.25, 0.0625);
-        assert_eq!(exponential(&mut generator, 0.0), f64::INFINITY);
-    }
-
-    #[test]
-    fn poisson_draws_have_the_moments_of_their_mean() {
-        for mean in [0.5, 3.0, 9.9, 10.0, 37.5, 1_200.0] {
-            let mut generator = Generator::from_seed(SEED);
-            let values: Vec<f64> = (0..DRAWS)
-                .map(|_| poisson(&mut generator, mean) as f64)
-                .collect();
-            assert_moments(&values, mean, mean);
-        }
-    }
-
-    #[test]
-    fn binomial_draws_have_the_moments_of_their_trials() {
-        for (trials, probability) in [
-            (10, 0.3),
-            (100, 0.05),
-            (100, 0.5),
-            (1_000, 0.2),
-            (1_000_000, 0.003),
-            (500, 0.9),
-        ] {
-            let mut generator = Generator::from_seed(SEED);
-            let values: Vec<f64> = (0..DRAWS)
-                .map(|_| binomial(&mut generator, trials, probability) as f64)
-                .collect();
-            let n = trials as f64;
-            assert_moments(
-                &values,
-                n * probability,
-                n * probability * (1.0 - probability),
-            );
-            assert!(values.iter().all(|value| *value <= n));
         }
     }
 
@@ -347,46 +325,5 @@ mod tests {
         let draw = binomial(&mut forced, 1_000, 0.001);
 
         assert_eq!(draw, binomial(&mut next, 1_000, 0.001));
-    }
-
-    #[test]
-    fn binomial_edges_are_exact() {
-        let mut generator = Generator::from_seed(SEED);
-        assert_eq!(binomial(&mut generator, 0, 0.5), 0);
-        assert_eq!(binomial(&mut generator, 50, 0.0), 0);
-        assert_eq!(binomial(&mut generator, 50, 1.0), 50);
-        assert_eq!(poisson(&mut generator, 0.0), 0);
-    }
-
-    #[test]
-    fn multinomial_draws_split_every_unit() {
-        let mut generator = Generator::from_seed(SEED);
-        let probabilities = [0.1, 0.6, 0.3];
-        let mut sums = [0.0; 3];
-        for _ in 0..DRAWS {
-            let mut counts = [0; 3];
-            multinomial(&mut generator, 200, &probabilities, &mut counts);
-            assert_eq!(counts.iter().sum::<u64>(), 200);
-            for (sum, count) in sums.iter_mut().zip(counts) {
-                *sum += count as f64;
-            }
-        }
-        for (sum, probability) in sums.iter().zip(probabilities) {
-            let mean = sum / DRAWS as f64;
-            assert!((mean - 200.0 * probability).abs() < 0.2, "{mean}");
-        }
-    }
-
-    #[test]
-    fn multinomial_leaves_out_the_units_no_category_takes() {
-        let mut generator = Generator::from_seed(SEED);
-        let mut total = 0;
-        for _ in 0..DRAWS {
-            let mut counts = [0; 2];
-            multinomial(&mut generator, 100, &[0.2, 0.3], &mut counts);
-            total += counts.iter().sum::<u64>();
-        }
-        let mean = total as f64 / DRAWS as f64;
-        assert!((mean - 50.0).abs() < 0.2, "{mean}");
     }
 }

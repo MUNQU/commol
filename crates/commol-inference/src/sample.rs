@@ -3,6 +3,7 @@
 use commol_random::Generator;
 
 use crate::statistics;
+use crate::streams::Stream;
 
 /// Draws of the parameters of a calibration problem, each with a weight.
 ///
@@ -226,7 +227,8 @@ impl ParameterSample {
     }
 
     /// The indices of `count` draws taken with replacement, each with
-    /// probability its weight, from the generator seeded with `seed`.
+    /// probability its weight, from the stream [`Stream::SampleResampling`]
+    /// of `seed`.
     pub fn resample(&self, count: usize, seed: u64) -> Vec<usize> {
         let mut cumulative = Vec::with_capacity(self.weights.len());
         let mut total = 0.0;
@@ -234,7 +236,7 @@ impl ParameterSample {
             total += w;
             cumulative.push(total);
         }
-        let mut generator = Generator::from_seed(seed);
+        let mut generator = Generator::from_seed(Stream::SampleResampling.seed(seed));
         (0..count)
             .map(|_| {
                 let point = generator.uniform() * total;

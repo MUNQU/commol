@@ -1,6 +1,7 @@
 //! Latin hypercubes on the unit cube.
 
 use crate::Generator;
+use crate::sample::index;
 
 /// A Latin hypercube of `rows` points in `[0, 1)^columns`, point after
 /// point.
@@ -15,8 +16,7 @@ pub fn latin_hypercube(generator: &mut Generator, rows: usize, columns: usize) -
     for _ in 0..columns {
         let mut strata: Vec<usize> = (0..rows).collect();
         for i in (1..rows).rev() {
-            let j = (generator.uniform() * (i + 1) as f64) as usize;
-            strata.swap(i, j.min(i));
+            strata.swap(i, index(generator, i + 1));
         }
         for (point, stratum) in points.iter_mut().zip(strata) {
             point.push((stratum as f64 + generator.uniform()) / rows as f64);

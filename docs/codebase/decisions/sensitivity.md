@@ -14,7 +14,7 @@ operator. A design point is the mean of its replicates on common seeds; a
 predictive or a propagation gives each draw its own seed and each of its
 replicates a seed of that one (`run_sets`, `draw_seeds`; see
 [Stochastic engines and seeds](engines.md#stochastic-engines-and-seeds)), and
-each purpose has a stream (`stream_seed`). Morris, Sobol
+each purpose has a stream (`Stream`, `streams.rs`). Morris, Sobol
 and chaos refuse a sample; PRCC reads its weights.
 
 | Alternative | Why not |

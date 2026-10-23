@@ -12,6 +12,7 @@ use rayon::prelude::*;
 use crate::error::MethodError;
 use crate::resampling::resamplers::{Perturbation, Resampler};
 use crate::sample::ParameterSample;
+use crate::streams::Stream;
 
 /// What a method fits once per perturbation: a replicate of the data, a
 /// block left out, or an origin. Its messages name it.
@@ -113,8 +114,9 @@ impl ReplicateFits {
 
 /// Fits replicates of a problem from its fit.
 ///
-/// Replicate `b` draws its data and its starts from the seed
-/// `replicate_seed(seed, b)`. It starts from the fit and, with more than one
+/// Replicate `b` draws its data from `Stream::ReplicateData.replicate(seed, b)`
+/// and its starts from `Stream::ReplicateFits.replicate(seed, b)`
+/// ([`Stream`]). It starts from the fit and, with more than one
 /// start, from rows of a Latin hypercube over the bounds
 /// ([`commol_calibration::start_points`]), and keeps the end of lowest loss.
 pub struct ReplicateRunner<'a, E: SimulationEngine> {
@@ -178,8 +180,7 @@ where
         &self.fit
     }
 
-    /// The seed of the replicates: replicate `b` draws from
-    /// `replicate_seed(seed, b)`.
+    /// The seed of the method, which its streams come from ([`Stream`]).
     pub fn seed(&self) -> u64 {
         self.seed
     }
@@ -218,7 +219,7 @@ where
         perturbation: &Perturbation,
     ) -> Result<CalibrationResult, MethodError> {
         let problem = self.replicate_problem(perturbation)?;
-        let seed = replicate_seed(self.seed, index as u64);
+        let seed = Stream::ReplicateFits.replicate(self.seed, index as u64);
         let mut starts = start_points(problem.parameters(), self.starts, replicate_seed(seed, 1));
         starts[0] = self.fit.clone();
         let mut best: Option<CalibrationResult> = None;
@@ -243,12 +244,13 @@ where
     }
 
     /// The perturbations of `replicates` replicates of `resampler`:
-    /// replicate `b` draws from `replicate_seed(seed, b)`.
+    /// replicate `b` draws from `Stream::ReplicateData.replicate(seed, b)`.
     pub fn perturbations(&self, resampler: &dyn Resampler, replicates: usize) -> Vec<Perturbation> {
         (0..replicates)
             .into_par_iter()
             .map(|index| {
-                let mut generator = Generator::from_seed(replicate_seed(self.seed, index as u64));
+                let mut generator =
+                    Generator::from_seed(Stream::ReplicateData.replicate(self.seed, index as u64));
                 resampler.replicate(&mut generator)
             })
             .collect()

@@ -283,8 +283,9 @@ class Simulation:
         The returned object has ``run`` and ``run_at``, as `Simulation`, and
         they return `SimulationReplicates`: ``count`` runs, each with its own seed,
         run in parallel in the engine. Replicate ``i`` takes the seed derived
-        from ``seed`` and ``i`` (the SplitMix64 of ``seed + i``), so it gives
-        the same run however many replicates run.
+        from ``seed`` and ``i`` (the SplitMix64 of the SplitMix64 of ``seed``
+        plus ``i``), so two seeds share no replicate, and a replicate gives the
+        same run however many replicates run.
 
         Parameters
         ----------

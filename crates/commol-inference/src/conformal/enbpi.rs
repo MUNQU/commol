@@ -11,7 +11,8 @@
 
 use commol_calibration::ObservedDataPoint;
 use commol_core::SimulationEngine;
-use commol_random::{Generator, replicate_seed};
+use commol_random::Generator;
+use commol_random::sample::index;
 
 use crate::conformal::intervals::{ConformalRun, PredictionIntervals, quantile_lookup};
 use crate::conformal::predict::{ensemble_mean, ensemble_spread, set_predictions, targets};
@@ -19,6 +20,7 @@ use crate::conformal::quantile::group_quantiles;
 use crate::conformal::score::{ConformalSettings, NonconformityScore, scales};
 use crate::error::MethodError;
 use crate::resampling::{BlockScheme, FitUnit, Perturbation, ReplicateRunner};
+use crate::streams::Stream;
 
 /// Blocks drawn with replacement: one multinomial count per block, of as
 /// many draws as there are blocks, multiplies the weight of every
@@ -44,8 +46,7 @@ impl BlockMultinomial {
     pub fn counts(&self, generator: &mut Generator) -> Vec<usize> {
         let mut counts = vec![0; self.blocks];
         for _ in 0..self.blocks {
-            let block = ((generator.uniform() * self.blocks as f64) as usize).min(self.blocks - 1);
-            counts[block] += 1;
+            counts[index(generator, self.blocks)] += 1;
         }
         counts
     }
@@ -63,8 +64,8 @@ impl BlockMultinomial {
 /// EnbPI intervals of `runner`'s problem at `positions`, for each series of
 /// the problem, from `replicates` replicates of the blocks of `scheme`.
 ///
-/// Replicate `b` draws its blocks from `replicate_seed(runner.seed(), b)`,
-/// as [`ReplicateRunner::perturbations`] does.
+/// Replicate `b` draws its blocks from
+/// `Stream::EnbpiBlocks.replicate(runner.seed(), b)` ([`Stream`]).
 ///
 /// # Errors
 ///
@@ -86,7 +87,8 @@ where
     let resampler = BlockMultinomial::new(observed, scheme);
     let counts: Vec<Vec<usize>> = (0..replicates)
         .map(|index| {
-            let mut generator = Generator::from_seed(replicate_seed(runner.seed(), index as u64));
+            let mut generator =
+                Generator::from_seed(Stream::EnbpiBlocks.replicate(runner.seed(), index as u64));
             resampler.counts(&mut generator)
         })
         .collect();

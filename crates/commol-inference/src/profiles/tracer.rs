@@ -23,6 +23,7 @@ use rayon::prelude::*;
 
 use crate::error::MethodError;
 use crate::profiles::verdict::ProfileVerdict;
+use crate::streams::Stream;
 
 /// The share of the threshold a step aims to rise by.
 const RISE_FRACTION: f64 = 0.1;
@@ -155,7 +156,7 @@ where
     /// A tracer of `problem` from the parameter values `fit`, whose
     /// subproblems run the optimizer of `config`. A particle swarm takes the
     /// seed of point `k` of side `d` of quantity `i` from
-    /// `replicate_seed(replicate_seed(replicate_seed(seed, i), d), k)`.
+    /// `replicate_seed(replicate_seed(Stream::ProfileRefits.replicate(seed, i), d), k)`.
     ///
     /// # Errors
     ///
@@ -497,7 +498,10 @@ where
         let mut evaluations = 0;
         let mut attempt = 0;
         let mut misses = 0;
-        let stream_seed = replicate_seed(replicate_seed(self.seed, stream), side as u64);
+        let stream_seed = replicate_seed(
+            Stream::ProfileRefits.replicate(self.seed, stream),
+            side as u64,
+        );
         let end = loop {
             if points.len() >= max_steps {
                 break ProfileEnd::MaxSteps;

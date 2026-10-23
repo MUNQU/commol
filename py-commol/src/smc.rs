@@ -9,8 +9,9 @@
 use crate::parallelism::parallel;
 use commol_inference::resampling::{BlockDrawing, BlockScheme, FitUnit};
 use commol_inference::smc::{self, AbcTarget, Distance, RandomWalk, SmcRun, SmcSampler, Stop};
+use commol_inference::streams::Stream;
 use commol_inference::{Distribution, Family, Priors};
-use commol_random::{Generator, replicate_seed};
+use commol_random::Generator;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
@@ -95,9 +96,9 @@ impl PyDistribution {
         Ok(self.inner.quantile(p))
     }
 
-    /// `count` draws from the generator seeded with `seed`
+    /// `count` draws from the stream of draws of a distribution of `seed`
     fn sample(&self, count: usize, seed: u64) -> Vec<f64> {
-        let mut generator = Generator::from_seed(replicate_seed(seed, 0));
+        let mut generator = Generator::from_seed(Stream::DistributionDraws.seed(seed));
         (0..count)
             .map(|_| self.inner.sample(&mut generator))
             .collect()

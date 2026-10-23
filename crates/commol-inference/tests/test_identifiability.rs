@@ -12,6 +12,7 @@ use commol_inference::sensitivity::{
 };
 use commol_inference::{MethodError, ParameterSample};
 use commol_random::Generator;
+use commol_random::sample::normal;
 
 /// A → B at the rate `rate`, from A = 1000, with the parameters `ids`.
 fn decay(rate: &str, ids: &[&str]) -> DifferenceEquations {
@@ -144,15 +145,10 @@ fn sample(columns: &[Vec<f64>]) -> ParameterSample {
     .unwrap()
 }
 
-/// `n` standard normal draws (Box–Muller).
+/// `n` standard normal draws.
 fn normals(n: usize, seed: u64) -> Vec<f64> {
     let mut generator = Generator::from_seed(seed);
-    (0..n)
-        .map(|_| {
-            let (u, v) = (generator.uniform_positive(), generator.uniform());
-            (-2.0 * u.ln()).sqrt() * (std::f64::consts::TAU * v).cos()
-        })
-        .collect()
+    (0..n).map(|_| normal(&mut generator)).collect()
 }
 
 #[test]

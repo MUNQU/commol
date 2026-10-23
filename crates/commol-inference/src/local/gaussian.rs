@@ -1,18 +1,15 @@
 //! A normal or Student-t distribution on the unbounded scale, and the
 //! Laplace approximation `N(û, H_u⁻¹)` of a curvature.
 
-use commol_random::{Generator, stream_seed};
+use commol_random::Generator;
+use commol_random::sample::{gamma, normal};
 use nalgebra::DVector;
 
 use super::curvature::Curvature;
-use crate::distribution::{Distribution, Family};
 use crate::error::MethodError;
 use crate::sensitivity::Matrix;
-use crate::smc::kernel::standard_normals;
+use crate::streams::Stream;
 use crate::transform::Transform;
-
-/// The stream of the draws of a local approximation ([`stream_seed`]).
-const DRAWS_STREAM: u64 = 1;
 
 /// A normal distribution on the unbounded scale, or a multivariate Student t
 /// with `degrees_of_freedom`, whose draws map back to the parameters.
@@ -114,19 +111,10 @@ impl Gaussian {
     /// One draw on the unbounded scale: `c + L z`, with `z` standard normal,
     /// divided by `√(w/ν)` with `w ~ χ²_ν` for a Student t.
     pub fn draw_unbounded(&self, generator: &mut Generator) -> Vec<f64> {
-        let normals = DVector::from_vec(standard_normals(generator, self.center.len()));
+        let normals = DVector::from_fn(self.center.len(), |_, _| normal(generator));
         let mut step = &self.factor * normals;
         if let Some(nu) = self.degrees_of_freedom {
-            let chi_square = Distribution::new(
-                Family::Gamma {
-                    shape: 0.5 * nu,
-                    rate: 0.5,
-                },
-                0.0,
-                f64::INFINITY,
-            )
-            .expect("a chi-square of positive degrees of freedom")
-            .sample(generator);
+            let chi_square = gamma(generator, 0.5 * nu, 0.5);
             step *= (nu / chi_square).sqrt();
         }
         self.center
@@ -139,7 +127,7 @@ impl Gaussian {
     /// `count` draws mapped back to the parameters, from the stream of
     /// draws of `seed`; every draw lies inside the bounds.
     pub fn draws(&self, count: usize, seed: u64) -> Vec<Vec<f64>> {
-        let mut generator = Generator::from_seed(stream_seed(seed, DRAWS_STREAM));
+        let mut generator = Generator::from_seed(Stream::LocalDraws.seed(seed));
         (0..count)
             .map(|_| {
                 self.transform

@@ -45,6 +45,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   calibration and a quantity, as `windowed_totals` reads it. Before, a
   calibration rejected it while the same window that ends at 2000 was
   accepted. One rule of the engine gives the start of a window.
+- Two neighbouring seeds share no replicate: before, replicate `i + 1` of
+  `simulation.replicates(n, seed=42)` was replicate `i` of `seed=43`, and so
+  were the starts and the swarms of a calibration with neighbouring seeds.
+  Two methods that take one seed no longer draw from one sequence either:
+  every random method draws from a stream of its own of the seed, and with
+  one seed, replicate `i + 1` of a bootstrap no longer has the generator of
+  particle `i` of an SMC sampler, nor the draws of `Laplace` the design of a
+  sensitivity analysis. Every method draws with the samplers of the one
+  generator of commol. So with one seed, the draws of the random methods and
+  the replicates of a stochastic engine differ from 0.10.1; a run stays
+  reproducible from its seed on one version.
 - One check of the engine defines the language of formulas, the one
   [Mathematical expressions](../guide/mathematical-expressions.md)
   documents, for rates, formula parameters, calibration constraints and the

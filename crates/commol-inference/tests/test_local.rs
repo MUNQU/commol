@@ -313,7 +313,7 @@ fn mixture_finds_both_modes_in_proportion() {
 
     let run = laplace_mixture(
         &problem,
-        &TemperedPosterior::new(&target),
+        &TemperedPosterior::new(&target, 3),
         1.0,
         &ends,
         4000,
@@ -379,7 +379,7 @@ fn an_end_on_a_bound_worse_than_every_component_is_only_noted() {
     // The end on the bound fits worse than the optimum −2.
     let run = laplace_mixture(
         &problem,
-        &TemperedPosterior::new(&target),
+        &TemperedPosterior::new(&target, 3),
         1.0,
         &[vec![-2.0], vec![1.5]],
         400,
@@ -406,7 +406,7 @@ fn an_end_on_a_bound_better_than_a_component_marks_the_sample_unreliable() {
     // misses a mode at least as good as one it holds.
     let run = laplace_mixture(
         &problem,
-        &TemperedPosterior::new(&target),
+        &TemperedPosterior::new(&target, 3),
         1.0,
         &[vec![-1.0], vec![1.5]],
         400,
@@ -451,7 +451,7 @@ fn banana_target_gives_a_large_k_hat() {
 
     let run = laplace_mixture(
         &problem,
-        &TemperedPosterior::new(&target),
+        &TemperedPosterior::new(&target, 5),
         1.0,
         &[vec![0.0, 0.0]],
         2000,
@@ -683,7 +683,7 @@ fn a_posterior_is_minus_infinity_outside_its_support() {
     let problem = poisson_line(&[1.0, 2.0]);
     let priors = Priors::uniform_on_bounds(&["a".to_string()], &[(-1.0, 5.0)]).unwrap();
     let target = LikelihoodTarget::new(&problem, &priors).unwrap();
-    let posterior = TemperedPosterior::new(&target);
+    let posterior = TemperedPosterior::new(&target, 1);
     let mut workspace = Workspace::default();
 
     assert_eq!(posterior.dimension(), 1);
@@ -725,7 +725,7 @@ fn an_end_whose_curvature_is_singular_gives_no_component() {
 
     let run = laplace_mixture(
         &problem,
-        &TemperedPosterior::new(&target),
+        &TemperedPosterior::new(&target, 1),
         1.0,
         &[vec![2.0], vec![0.0]],
         200,
@@ -918,7 +918,7 @@ fn a_mixture_whose_optima_the_prior_rules_out_is_refused() {
 
     let error = laplace_mixture(
         &problem,
-        &TemperedPosterior::new(&target),
+        &TemperedPosterior::new(&target, 1),
         1.0,
         &[vec![-0.5]],
         100,

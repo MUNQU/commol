@@ -1,14 +1,17 @@
-//! Reproducible random numbers for the stochastic engines of commol.
+//! Reproducible random numbers for the stochastic engines and the inference
+//! methods of commol.
 //!
-//! What the stochastic engines of every model kind share, and no model:
+//! What the stochastic engines of every model kind and the inference methods
+//! share, and no model:
 //!
 //! - [`Generator`]: one `Xoshiro256PlusPlus` generator, seeded from a `u64`
 //!   by SplitMix64, whose sequence is the same on every platform and version;
 //! - [`replicate_seed`]: the seed of replicate `index` of a run seeded with
 //!   `seed`, and [`stream_seed`]: the seed of one purpose of a method;
 //! - the samplers of [`sample`] (exponential, Poisson, binomial,
-//!   multinomial), written here so that their values do not change with a
-//!   dependency;
+//!   multinomial, normal, gamma, an index below `n`) and the uniforms of
+//!   [`Generator`], written here so that their values do not change with a
+//!   dependency; the inference methods draw with nothing else;
 //! - [`SumTree`]: the rates of a set of events, to pick the next one in
 //!   `O(log n)`. The stochastic engine of the test model kind uses it;
 //!   `StochasticEvents` picks an event by a scan of its propensities;

@@ -261,6 +261,7 @@ dependencies = [
 name = "commol-random"
 version = "0.1.0"
 dependencies = [
+ "libm",
  "rand_core 0.10.1",
  "rand_xoshiro",
 ]

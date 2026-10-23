@@ -418,10 +418,10 @@ fn weighted_first_block() -> CalibrationProblem<Constant> {
 
 #[test]
 fn enbpi_fails_when_every_replicate_fails() {
-    // The replicate of seed 0 draws no copy of the first block.
+    // The replicate of seed 1 draws no copy of the first block.
     let problem = weighted_first_block();
     let config = config();
-    let runner = ReplicateRunner::new(&problem, &config, &[10.0], 1, 0).unwrap();
+    let runner = ReplicateRunner::new(&problem, &config, &[10.0], 1, 1).unwrap();
     let scheme = BlockScheme::new(problem.observed_data(), 3).unwrap();
 
     let message = failed(enbpi(
