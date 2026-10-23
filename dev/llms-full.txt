@@ -3159,6 +3159,7 @@ print(replicates.member_statistics("C", confidence_level=0.9)["ci_lower"][-1] >=
 - **Rates that read `t`.** Between events the state is fixed, but a rate that reads `t`, such as `k * (1 + sin(t))`, still changes. The direct method then integrates the total propensity from the last event until it reaches an exponential draw (a time change, Anderson 2007), within `tolerance`. A model whose rates do not read `t` pays nothing for it.
 - **Breakpoints.** The engine stops at every position where a rate can jump (the impulses, the values a rate compares `t` with, the points of a series read at `t`, and every integer when a rate reads `step`), so no wait and no leap crosses one (`CompiledModel::breakpoints`).
 - **Impulses.** At its positions, before the events there, a proportional impulse moves a binomial draw of its source (its rate is the probability that one unit moves, between 0 and 1); an absolute impulse moves its rate, a whole number of units. Each moves at most what its sources still hold.
+- **A new seed between two steps.** `simulation.engine.set_seed(seed)` acts from the current position: the state there stays, and every event after it comes from the new seed. A wait that was pending is drawn again from the position, and a pending leap keeps only its events up to the position.
 
 ```python
 leaping = builder.build(
@@ -40593,6 +40594,10 @@ All notable changes to Commol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Fixed
+
+- In the `StochasticEvents` engine, a parameter or a seed changed between two runs acts from the position where the first run stopped. The pending wait is drawn again from there, and a pending leap keeps only its events up to there, by binomial thinning. Before, the new rate acted back from the last event, and copies of one state with new seeds shared their next event. In Python this changes only `simulation.engine.set_seed` between two calls of `simulation.engine.step()`; `Simulation.run`, replicates and calibration reset the engine after the seed, so their results do not change.
 
 ## [0.10.0] - 2026-10-23
 

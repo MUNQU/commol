@@ -174,6 +174,7 @@ print(replicates.member_statistics("C", confidence_level=0.9)["ci_lower"][-1] >=
 - **Rates that read `t`.** Between events the state is fixed, but a rate that reads `t`, such as `k * (1 + sin(t))`, still changes. The direct method then integrates the total propensity from the last event until it reaches an exponential draw (a time change, Anderson 2007), within `tolerance`. A model whose rates do not read `t` pays nothing for it.
 - **Breakpoints.** The engine stops at every position where a rate can jump (the impulses, the values a rate compares `t` with, the points of a series read at `t`, and every integer when a rate reads `step`), so no wait and no leap crosses one (`CompiledModel::breakpoints`).
 - **Impulses.** At its positions, before the events there, a proportional impulse moves a binomial draw of its source (its rate is the probability that one unit moves, between 0 and 1); an absolute impulse moves its rate, a whole number of units. Each moves at most what its sources still hold.
+- **A new seed between two steps.** `simulation.engine.set_seed(seed)` acts from the current position: the state there stays, and every event after it comes from the new seed. A wait that was pending is drawn again from the position, and a pending leap keeps only its events up to the position.
 
 ```python
 leaping = builder.build(

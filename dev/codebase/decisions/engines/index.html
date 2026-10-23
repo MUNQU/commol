@@ -3508,6 +3508,10 @@ event only when the event happens.</p>
 <td>One tree of seeds: draw <code>j</code> takes <code>replicate_seed(stream_seed(seed, DRAWS_STREAM), j)</code> (<code>draw_seeds</code> in <code>crates/commol-inference/src/predictive.rs</code>), and its replicate <code>i</code> takes <code>replicate_seed</code> of that seed and <code>i</code>, the rule of <code>Simulation.replicates</code>. <code>Predictive</code> and <code>Propagation</code> give the seed of each draw (<code>draw_seeds</code>), and the runs of a draw depend on neither the number of replicates nor the number of draws.</td>
 </tr>
 <tr>
+<td>A change between runs</td>
+<td><code>set_parameter</code> and <code>set_seed</code> act from the current position, never before it. <code>StochasticEvents</code> first settles there (<code>settle</code> in <code>events.rs</code>): it draws the pending exponential wait again from the position (the wait has no memory), and cuts a pending leap there by binomial thinning (of <code>N ~ Poisson(λτ)</code> events, the part in a fraction <code>f</code> of the leap is <code>Binomial(N, f)</code>), applies that part and drops the rest. Keeping the pending wait would let a new rate act back from the last change of the state, and copies of one state with new seeds would share their next event. <code>StochasticSteps</code> holds nothing pending.</td>
+</tr>
+<tr>
 <td>Calibration</td>
 <td>Common random numbers: the same replicate seeds at every evaluation, so the loss is a deterministic function of the parameters (<code>CalibrationProblem::with_replicates</code>). The user chooses the summary (<code>ReplicateSummary</code>); <code>LossConfig</code> computes it.</td>
 </tr>
@@ -3562,7 +3566,7 @@ sampler in <code>tests/reference_values.txt</code>), <code>py-commol/src/engine.
 (<code>a_stochastic_engine_repeats_a_run_from_its_seed</code>,
 <code>an_aggregate_stochastic_engine_repeats_a_run_from_its_seed</code>,
 <code>a_deterministic_engine_ignores_the_seed</code>),
-<code>crates/commol-stochastic/tests/oracles.rs::a_run_depends_on_its_seed_and_not_on_where_it_reports</code>,
+<code>crates/commol-stochastic/tests/oracles.rs::a_run_depends_on_its_seed_and_not_on_where_it_reports</code>, <code>crates/commol-stochastic/tests/test_state.rs</code>,
 <code>crates/commol-calibration/src/types.rs</code> (<code>replicate_tests</code>),
 <code>tests/model_kinds/test_stochastic.py</code>.</p>
 <h2 id="whole-units-in-a-stochastic-engine">Whole units in a stochastic engine<a class="headerlink" href="#whole-units-in-a-stochastic-engine" title="Permanent link">&para;</a></h2>

@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- In the `StochasticEvents` engine, a parameter or a seed changed between two runs acts from the position where the first run stopped. The pending wait is drawn again from there, and a pending leap keeps only its events up to there, by binomial thinning. Before, the new rate acted back from the last event, and copies of one state with new seeds shared their next event. In Python this changes only `simulation.engine.set_seed` between two calls of `simulation.engine.step()`; `Simulation.run`, replicates and calibration reset the engine after the seed, so their results do not change.
+
 ## [0.10.0] - 2026-10-23
 
 This release makes equivalent things the same across commol, after an audit of the code, the repository and the documentation at 0.9.0. A setting that means the same thing has one name, every method takes its seed from its source and fits from its starts, equivalent results hold their failed fits in one place, equivalent methods raise one error type, a replicate summary takes the one quantile of commol, and commol adds no log handler. Before you upgrade, read each **Breaking** entry: most code changes only the names of settings and the type of an exception. See [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md) and [Log messages](https://munqu.github.io/commol/latest/getting-started/quickstart/#log-messages).
