@@ -187,7 +187,7 @@ where
         ));
     }
     let curvature = curvature_at(problem, fit, CurvatureKind::GaussNewton)?;
-    let (blocks, _) = blocks_at(problem, &curvature, block_length)?;
+    let blocks = blocks_at(problem, &curvature, block_length)?;
     let meat = block_meat(&curvature, &blocks)?;
     // Back to the scale of the parameters: `X_θ = D⁻¹ X_u D⁻¹`.
     let derivatives = curvature.derivatives();

@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `The DifferenceEquations engine reports only at integer steps; 2.5 is not
   one`, and an impulse or a series point between two steps names `the
   DifferenceEquations engine` or `the StochasticSteps engine`.
+- `Predictive.at_observations` and every method that reads a predictive at
+  other observations raise `ValueError` for a position the engine rejects,
+  with the message of the engine, as a calibration does. The bands, the
+  automatic block lengths and their estimates keep their values: one Rust
+  function of each computes them for every method.
 
 ## [0.10.1] - 2026-10-23
 

@@ -14,7 +14,7 @@ use commol_calibration::{
 use commol_inference::resampling::{
     BayesianBootstrap, BlockDrawing, BlockScheme, FitUnit, Multipliers, ParametricResampler,
     ReplicateRunner, Resampler, ResidualBlocks, ResidualBootstrap, ResidualNoise, ResidualScale,
-    Residuals, WildBootstrap, automatic_block_length, block_jackknife, bootstrap,
+    Residuals, WildBootstrap, block_jackknife, bootstrap,
 };
 use commol_inference::{
     DistributionNoise, ErrorKind, MethodError, NoNoise, ObservationDraws, ObservationNoise,
@@ -113,19 +113,19 @@ impl ResamplerSpec {
 }
 
 impl PyCalibrationProblem {
-    /// The resampler of `spec` around the fit `fit`, and the block length it
-    /// chose, if it draws blocks.
+    /// The resampler of `spec` around the fit `fit`, and its blocks, if it
+    /// draws blocks.
     pub(crate) fn resampler(
         &self,
         spec: &ResamplerSpec,
         fit: &[f64],
-    ) -> PyResult<(Box<dyn Resampler>, Option<BlockLength>)> {
+    ) -> PyResult<(Box<dyn Resampler>, Option<BlockScheme>)> {
         let observed = self.inner.observed_data();
         let blocks = |scale: ResidualScale, requested: Option<usize>, drawing: BlockDrawing| {
             let residuals = Residuals::new(&self.inner, fit, scale).map_err(method_error)?;
-            let chosen = BlockLength::resolve(observed, &residuals, requested, drawing);
-            let scheme = BlockScheme::new(observed, chosen.length).map_err(method_error)?;
-            Ok::<_, PyErr>((residuals, chosen, scheme))
+            let scheme = BlockScheme::resolve(observed, residuals.residuals(), requested, drawing)
+                .map_err(method_error)?;
+            Ok::<_, PyErr>((residuals, scheme))
         };
         match spec {
             ResamplerSpec::Parametric => {
@@ -133,14 +133,16 @@ impl PyCalibrationProblem {
                 Ok((Box::new(resampler), None))
             }
             ResamplerSpec::Bayesian { block_length } => {
-                let (_, chosen, scheme) = blocks(
-                    ResidualScale::Additive,
+                let scheme = BlockScheme::at_fit(
+                    &self.inner,
+                    fit,
                     *block_length,
                     BlockDrawing::NonOverlapping,
-                )?;
+                )
+                .map_err(method_error)?;
                 Ok((
                     Box::new(BayesianBootstrap::new(observed, &scheme)),
-                    Some(chosen),
+                    Some(scheme),
                 ))
             }
             ResamplerSpec::Residual {
@@ -152,7 +154,7 @@ impl PyCalibrationProblem {
                     ResidualBlocks::Moving => BlockDrawing::Moving,
                     ResidualBlocks::Stationary => BlockDrawing::Stationary,
                 };
-                let (residuals, chosen, scheme) = blocks(*scale, *block_length, drawing)?;
+                let (residuals, scheme) = blocks(*scale, *block_length, drawing)?;
                 Ok((
                     Box::new(ResidualBootstrap::new(
                         observed,
@@ -160,28 +162,28 @@ impl PyCalibrationProblem {
                         &scheme,
                         *residual_blocks,
                     )),
-                    Some(chosen),
+                    Some(scheme),
                 ))
             }
             ResamplerSpec::Wild {
                 block_length,
                 multipliers,
             } => {
-                let (residuals, chosen, scheme) = blocks(
+                let (residuals, scheme) = blocks(
                     ResidualScale::Additive,
                     *block_length,
                     BlockDrawing::NonOverlapping,
                 )?;
                 Ok((
                     Box::new(WildBootstrap::new(residuals, &scheme, *multipliers)),
-                    Some(chosen),
+                    Some(scheme),
                 ))
             }
         }
     }
 
     /// Run `replicates` of the resampler that `resampler` makes from the fit,
-    /// and the block length it chose, if it draws blocks.
+    /// and the block length of its blocks, if it draws blocks.
     #[allow(clippy::too_many_arguments)]
     fn run_bootstrap(
         &self,
@@ -191,11 +193,11 @@ impl PyCalibrationProblem {
         replicates: usize,
         starts: usize,
         seed: u64,
-        resampler: impl FnOnce(&[f64]) -> PyResult<(Box<dyn Resampler>, Option<BlockLength>)>,
+        resampler: impl FnOnce(&[f64]) -> PyResult<(Box<dyn Resampler>, Option<BlockScheme>)>,
     ) -> PyResult<PyBootstrapRun> {
         let runner = ReplicateRunner::new(&self.inner, &config.inner, fit, starts, seed)
             .map_err(method_error)?;
-        let (resampler, chosen) = resampler(runner.fit())?;
+        let (resampler, scheme) = resampler(runner.fit())?;
         let run = parallel(py, || bootstrap(&runner, resampler.as_ref(), replicates))?
             .map_err(method_error)?;
         Ok(PyBootstrapRun {
@@ -208,8 +210,11 @@ impl PyCalibrationProblem {
             failed: FitUnit::Replicate.entries(&run.failed),
             not_converged: run.not_converged,
             negative_values: run.negative_values,
-            block_length: chosen.as_ref().map(|chosen| chosen.length),
-            block_length_estimates: chosen.and_then(|chosen| chosen.estimates),
+            block_length: scheme.as_ref().map(BlockScheme::length),
+            block_length_estimates: scheme
+                .as_ref()
+                .and_then(BlockScheme::estimates)
+                .map(<[_]>::to_vec),
         })
     }
 }
@@ -665,18 +670,15 @@ impl PyCalibrationProblem {
         starts: usize,
         seed: u64,
     ) -> PyResult<PyJackknifeRun> {
-        let observed = self.inner.observed_data();
         let runner = ReplicateRunner::new(&self.inner, &config.inner, &fit, starts, seed)
             .map_err(method_error)?;
-        let residuals = Residuals::new(&self.inner, runner.fit(), ResidualScale::Additive)
-            .map_err(method_error)?;
-        let chosen = BlockLength::resolve(
-            observed,
-            &residuals,
+        let scheme = BlockScheme::at_fit(
+            &self.inner,
+            runner.fit(),
             block_length,
             BlockDrawing::NonOverlapping,
-        );
-        let scheme = BlockScheme::new(observed, chosen.length).map_err(method_error)?;
+        )
+        .map_err(method_error)?;
         let jackknife =
             parallel(py, || block_jackknife(&runner, &scheme))?.map_err(method_error)?;
         let spans = scheme.spans();
@@ -689,38 +691,9 @@ impl PyCalibrationProblem {
             influence: jackknife.statistics.influence,
             failed: FitUnit::Block.entries(&jackknife.failed),
             not_converged: jackknife.not_converged,
-            block_length: chosen.length,
-            block_length_estimates: chosen.estimates,
+            block_length: scheme.length(),
+            block_length_estimates: scheme.estimates().map(<[_]>::to_vec),
         })
-    }
-}
-
-/// The block length a method runs with, and the estimates of `"auto"`.
-pub(crate) struct BlockLength {
-    pub(crate) length: usize,
-    pub(crate) estimates: Option<Vec<(String, f64)>>,
-}
-
-impl BlockLength {
-    pub(crate) fn resolve(
-        observed: &[commol_calibration::ObservedDataPoint],
-        residuals: &Residuals,
-        requested: Option<usize>,
-        drawing: BlockDrawing,
-    ) -> Self {
-        match requested {
-            Some(length) => Self {
-                length,
-                estimates: None,
-            },
-            None => {
-                let automatic = automatic_block_length(observed, residuals.residuals(), drawing);
-                Self {
-                    length: automatic.length,
-                    estimates: Some(automatic.estimates),
-                }
-            }
-        }
     }
 }
 

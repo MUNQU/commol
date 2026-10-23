@@ -191,6 +191,30 @@ class ObservationDraws:
         )
 
 
+def by_output(
+    names: Sequence[str], table: Sequence[Sequence[float]]
+) -> dict[str, list[float]]:
+    """
+    The columns of a table of a band, ``[position][output]``, by output name.
+
+    Every band of the engine has this layout: the band of a predictive and the
+    band of the delta method.
+
+    Parameters
+    ----------
+    names : Sequence[str]
+        The name of each output, one per column.
+    table : Sequence[Sequence[float]]
+        One row per position, one value per output.
+
+    Returns
+    -------
+    dict[str, list[float]]
+        For each output, its value at each position.
+    """
+    return {name: [row[index] for row in table] for index, name in enumerate(names)}
+
+
 class Predictive:
     """
     The run of every draw of a parameter sample.
@@ -403,20 +427,14 @@ class Predictive:
             If the confidence level is not strictly between 0 and 1.
         """
         mean, median, lower, upper = self._rust.band(confidence_level)
-
-        def by_output(table: list[list[float]]) -> dict[str, list[float]]:
-            return {
-                name: [row[index] for row in table]
-                for index, name in enumerate(self.output_names)
-            }
-
+        names = self.output_names
         return PredictiveBand(
             confidence_level=confidence_level,
             positions=self.positions,
-            mean=by_output(mean),
-            median=by_output(median),
-            lower=by_output(lower),
-            upper=by_output(upper),
+            mean=by_output(names, mean),
+            median=by_output(names, median),
+            lower=by_output(names, lower),
+            upper=by_output(names, upper),
         )
 
     def series_band(

@@ -66,7 +66,7 @@ pub use distribution::{Distribution, Family};
 pub use error::{ErrorKind, MethodError};
 pub use predictive::{
     Band, DistributionNoise, NanRun, NoNoise, ObservationDraws, ObservationNoise, Predictive,
-    PredictiveError, SeriesBand, draw_seeds, observation_draws,
+    PredictiveError, SeriesBand, draw_seeds, observation_draws, share_among_replicates,
 };
 pub use priors::Priors;
 pub use sample::ParameterSample;

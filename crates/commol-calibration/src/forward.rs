@@ -122,12 +122,7 @@ impl<E: SimulationEngine> ForwardModel<E> {
     /// an unknown output or factor.
     pub fn with_observations(&self, observed_data: &[ObservedDataPoint]) -> Result<Self, String> {
         crate::calibration_problem::check_positions(&self.base_engine, observed_data, &[])?;
-        let mut schedule: Vec<f64> = observed_data
-            .iter()
-            .flat_map(|obs| std::iter::once(obs.at).chain(obs.window.map(|window| obs.at - window)))
-            .collect();
-        schedule.sort_by(f64::total_cmp);
-        schedule.dedup();
+        let schedule = schedule_of(observed_data, []);
         let observation = ObservationOperator::new(
             observed_data,
             &self.parameters,
@@ -382,6 +377,40 @@ impl<E: SimulationEngine> ForwardModel<E> {
         self.run_into(&mut engine, positions, &mut rows)?;
         Ok(rows)
     }
+}
+
+/// The positions a run reports at to read `observations`, and `extra`
+/// positions: each position and the start of each window, sorted, once.
+pub fn schedule_of(
+    observations: &[ObservedDataPoint],
+    extra: impl IntoIterator<Item = f64>,
+) -> Vec<f64> {
+    let mut schedule: Vec<f64> = observations
+        .iter()
+        .flat_map(|obs| std::iter::once(obs.at).chain(obs.window.map(|window| obs.at - window)))
+        .chain(extra)
+        .collect();
+    schedule.sort_by(f64::total_cmp);
+    schedule.dedup();
+    schedule
+}
+
+/// The mean over `replicates` of each of `count` predictions: entry `i` is
+/// the mean of entry `i` of every replicate, summed in replicate order.
+/// With no replicate, each mean is NaN.
+pub fn replicate_mean<'a>(
+    replicates: impl IntoIterator<Item = &'a [f64]>,
+    count: usize,
+) -> Vec<f64> {
+    let mut sums = vec![0.0; count];
+    let mut runs = 0usize;
+    for replicate in replicates {
+        for (sum, value) in sums.iter_mut().zip(replicate) {
+            *sum += value;
+        }
+        runs += 1;
+    }
+    sums.into_iter().map(|sum| sum / runs as f64).collect()
 }
 
 fn simulation_error(error: SimulationError) -> EvaluationError {

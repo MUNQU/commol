@@ -8,8 +8,8 @@ use commol_calibration::{
 use commol_core::Model;
 use commol_difference::DifferenceEquations;
 use commol_inference::{
-    NoNoise, ObservationDraws, ParameterSample, Predictive, PredictiveError, draw_seeds,
-    observation_draws, scores,
+    Band, NoNoise, ObservationDraws, ParameterSample, Predictive, PredictiveError, draw_seeds,
+    observation_draws, scores, share_among_replicates,
 };
 use commol_random::replicate_seed;
 
@@ -187,6 +187,17 @@ fn a_band_of_an_output_the_rows_lack_is_an_error() {
     );
 }
 
+#[test]
+fn a_band_of_a_series_checks_its_confidence_level() {
+    let problem = problem();
+    let predictive =
+        Predictive::new(problem.forward(), &sample(vec![vec![0.2]]), &[1.0, 2.0], 0).unwrap();
+
+    let error = predictive.series_band(&[0], false, 1.5).unwrap_err();
+
+    assert!(error.contains("1.5"), "{error}");
+}
+
 /// A → B at `k`, from A = 1000, with the chain binomial, `replicates`
 /// replicates per evaluation.
 fn stochastic_problem(replicates: usize) -> CalibrationProblem<commol_stochastic::StochasticSteps> {
@@ -326,4 +337,36 @@ fn the_pit_of_ties_follows_the_seed_of_the_draws() {
         ..draws.clone()
     };
     assert_ne!(scores::pit(&reseeded, &observed).unwrap(), pit);
+}
+
+#[test]
+fn observation_draws_reject_a_position_the_engine_rejects() {
+    let problem = problem();
+    let between_steps = [ObservedDataPoint::new(2.5, "A".to_string(), 0.0)];
+
+    let error = observation_draws(
+        problem.forward(),
+        &sample(vec![vec![0.2]]),
+        &between_steps,
+        &NoNoise,
+        0,
+    )
+    .unwrap_err();
+
+    let PredictiveError::Mismatch(message) = error else {
+        panic!("expected a mismatch, got {error:?}");
+    };
+    assert!(message.contains("2.5"), "{message}");
+}
+
+#[test]
+fn each_replicate_has_its_share_of_the_weight_of_its_draw() {
+    // Draw 0 has 4 replicates at 1; draw 1 has one replicate at 0.
+    let runs = vec![vec![vec![vec![1.0]]; 4], vec![vec![vec![0.0]]]];
+
+    let (trajectories, weights) = share_among_replicates(runs, &[0.2, 0.8]);
+    let band = Band::of(&trajectories, &weights, 0.5).unwrap();
+
+    assert_eq!(weights, [0.05, 0.05, 0.05, 0.05, 0.8]);
+    assert!((band.mean[0][0] - 0.2).abs() < 1e-12);
 }

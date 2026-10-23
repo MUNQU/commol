@@ -11,6 +11,7 @@ use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 use commol_inference::conformal::{
     ConformalSettings, NonconformityScore, Pooling, enbpi, jackknife_plus, rolling_conformal,
 };
+use commol_inference::local::{CurvatureKind, sandwich_approximation};
 use commol_inference::profiles::{ProfiledQuantity, bootstrap_thresholds};
 use commol_inference::resampling::{
     BayesianBootstrap, BlockDrawing, BlockScheme, Multipliers, Perturbation, ReplicateRunner,
@@ -283,6 +284,35 @@ fn the_median_length_of_white_noise_is_one() {
         .collect();
     lengths.sort_unstable();
     assert_eq!(lengths[25], 1, "{lengths:?}");
+}
+
+#[test]
+fn every_method_resolves_an_automatic_block_length_alike() {
+    let noise = ar1(0.8, 60, 3);
+    let values: Vec<f64> = noise
+        .iter()
+        .enumerate()
+        .map(|(t, e)| 2.0 + 0.5 * t as f64 + e)
+        .collect();
+    let problem = line_problem(&values);
+    let fit = [2.0, 0.5];
+    let drawing = BlockDrawing::NonOverlapping;
+
+    // The bootstrap, the jackknife, the calibration of η and the conformal
+    // methods resolve at the fit; the sandwich from its curvature.
+    let at_fit = BlockScheme::at_fit(&problem, &fit, None, drawing).unwrap();
+    let sandwich =
+        sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, None).unwrap();
+    let additive = Residuals::new(&problem, &fit, ResidualScale::Additive).unwrap();
+    let resolved =
+        BlockScheme::resolve(problem.observed_data(), additive.residuals(), None, drawing).unwrap();
+
+    assert!(at_fit.length() > 1, "{at_fit:?}");
+    assert_eq!(sandwich.block_length, at_fit.length());
+    assert_eq!(sandwich.estimates.as_deref(), at_fit.estimates());
+    assert_eq!(resolved, at_fit);
+    let given = BlockScheme::at_fit(&problem, &fit, Some(3), drawing).unwrap();
+    assert_eq!((given.length(), given.estimates()), (3, None));
 }
 
 #[test]

@@ -10,12 +10,10 @@ use commol_inference::conformal::{
 };
 use pyo3::prelude::*;
 
-use commol_inference::resampling::{
-    BlockDrawing, BlockScheme, FitUnit, ReplicateRunner, ResidualScale, Residuals,
-};
+use commol_inference::resampling::{BlockDrawing, BlockScheme, FitUnit, ReplicateRunner};
 
 use crate::calibration::{PyObservedDataPoint, PyOptimizationConfig};
-use crate::inference::{BlockLength, PyCalibrationProblem, PyParameterSample, method_error};
+use crate::inference::{PyCalibrationProblem, PyParameterSample, method_error};
 
 fn settings(score: &str, by: &str, confidence_level: f64) -> PyResult<ConformalSettings> {
     let score = NonconformityScore::from_name(Some(score)).map_err(method_error)?;
@@ -192,13 +190,8 @@ fn blocks(
     runner: &ReplicateRunner<'_, crate::engine::Engine>,
     block_length: Option<usize>,
     drawing: BlockDrawing,
-) -> PyResult<(BlockScheme, BlockLength)> {
-    let problem = runner.problem();
-    let residuals =
-        Residuals::new(problem, runner.fit(), ResidualScale::Additive).map_err(method_error)?;
-    let chosen = BlockLength::resolve(problem.observed_data(), &residuals, block_length, drawing);
-    let scheme = BlockScheme::new(problem.observed_data(), chosen.length).map_err(method_error)?;
-    Ok((scheme, chosen))
+) -> PyResult<BlockScheme> {
+    BlockScheme::at_fit(runner.problem(), runner.fit(), block_length, drawing).map_err(method_error)
 }
 
 /// Jackknife+ intervals at `positions`, for each series of the problem
@@ -237,7 +230,7 @@ fn jackknife_plus(
     let settings = settings(score, by, confidence_level)?;
     let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
         .map_err(method_error)?;
-    let (scheme, chosen) = blocks(&runner, block_length, BlockDrawing::NonOverlapping)?;
+    let scheme = blocks(&runner, block_length, BlockDrawing::NonOverlapping)?;
     let run = parallel(py, || {
         conformal::jackknife_plus(&runner, &scheme, &positions, settings)
     })?
@@ -245,8 +238,8 @@ fn jackknife_plus(
     Ok(PyConformalRun {
         bound: Some(run.bound),
         blocks: Some(run.blocks),
-        block_length: Some(chosen.length),
-        block_length_estimates: chosen.estimates,
+        block_length: Some(scheme.length()),
+        block_length_estimates: scheme.estimates().map(<[_]>::to_vec),
         ..PyConformalRun::of(run.run, FitUnit::Block)
     })
 }
@@ -289,15 +282,15 @@ fn enbpi(
     let settings = settings(score, by, confidence_level)?;
     let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
         .map_err(method_error)?;
-    let (scheme, chosen) = blocks(&runner, block_length, BlockDrawing::NonOverlapping)?;
+    let scheme = blocks(&runner, block_length, BlockDrawing::NonOverlapping)?;
     let run = parallel(py, || {
         conformal::enbpi(&runner, &scheme, replicates, &positions, settings)
     })?
     .map_err(method_error)?;
     Ok(PyConformalRun {
         blocks: Some(scheme.count()),
-        block_length: Some(chosen.length),
-        block_length_estimates: chosen.estimates,
+        block_length: Some(scheme.length()),
+        block_length_estimates: scheme.estimates().map(<[_]>::to_vec),
         ..PyConformalRun::of(run, FitUnit::Replicate)
     })
 }

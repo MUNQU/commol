@@ -13,7 +13,7 @@ use commol_core::SimulationEngine;
 
 use crate::discrepancy::{Discrepancy, DiscrepancyConfig, TermError};
 use crate::feasibility::{EvaluationError, Feasibility, Violation, constraint_positions};
-use crate::forward::{ForwardModel, Workspace};
+use crate::forward::{ForwardModel, Workspace, schedule_of};
 use crate::likelihood::TermDerivatives;
 use crate::observation::ObservationOperator;
 use crate::types::{CalibrationConstraint, CalibrationParameter, ObservedDataPoint, Replicates};
@@ -105,13 +105,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             return Err("No calibration parameters provided".to_string());
         }
 
-        let mut schedule: Vec<f64> = observed_data
-            .iter()
-            .flat_map(|obs| std::iter::once(obs.at).chain(obs.window.map(|window| obs.at - window)))
-            .chain(constraint_positions(&constraints))
-            .collect();
-        schedule.sort_by(f64::total_cmp);
-        schedule.dedup();
+        let schedule = schedule_of(&observed_data, constraint_positions(&constraints));
 
         let output_names = base_engine.output_names();
         let observation =
@@ -265,14 +259,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         extra: &[ObservedDataPoint],
     ) -> Result<(Self, ObservationOperator), String> {
         check_positions(self.forward.base_engine(), extra, &[])?;
-        let mut schedule: Vec<f64> = self.forward.schedule().to_vec();
-        schedule.extend(
-            extra
-                .iter()
-                .flat_map(|obs| std::iter::once(obs.at).chain(obs.window.map(|w| obs.at - w))),
-        );
-        schedule.sort_by(f64::total_cmp);
-        schedule.dedup();
+        let schedule = schedule_of(extra, self.forward.schedule().iter().copied());
         let operator = ObservationOperator::new(
             extra,
             self.parameters(),

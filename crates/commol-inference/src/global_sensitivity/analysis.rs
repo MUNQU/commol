@@ -19,7 +19,7 @@ use crate::error::MethodError;
 use crate::global_sensitivity::{
     ChaosExpansion, Morris, Prcc, Sobol, Truncation, morris, prcc, sobol,
 };
-use crate::predictive::{draw_seeds, run_sets};
+use crate::predictive::{draw_seeds, run_sets, share_among_replicates};
 use crate::quantity::{Quantities, Quantity};
 use crate::sample::ParameterSample;
 
@@ -170,9 +170,9 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         quantities: &[Quantity],
     ) -> Result<Propagation, MethodError> {
         let sample = self.draws("Propagation", draws)?;
-        let mut values = Vec::new();
-        let mut weights = Vec::new();
-        if !quantities.is_empty() {
+        let (values, weights) = if quantities.is_empty() {
+            (Vec::new(), Vec::new())
+        } else {
             let compiled = self.compile(quantities)?;
             let runs = run_sets(
                 &self.forward,
@@ -180,14 +180,14 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
                 compiled.schedule(),
                 Some(self.seed),
             )?;
-            for (replicates, &weight) in runs.iter().zip(sample.weights()) {
-                let share = weight / replicates.len() as f64;
-                for rows in replicates {
-                    values.push(compiled.evaluate(rows));
-                    weights.push(share);
-                }
-            }
-        }
+            let evaluated = runs.iter().map(|replicates| {
+                replicates
+                    .iter()
+                    .map(|rows| compiled.evaluate(rows))
+                    .collect::<Vec<_>>()
+            });
+            share_among_replicates(evaluated, sample.weights())
+        };
         Ok(Propagation {
             draw_seeds: draw_seeds(self.seed, sample.values().len()),
             sample,

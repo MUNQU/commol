@@ -1,22 +1,23 @@
 //! The predictive of a parameter sample: the run of every draw, its bands,
 //! and every draw's value of a set of observations.
 //!
-//! A band of the model reduces the trajectories draw by draw with the
-//! weights. With observation noise ([`ObservationNoise`]) the values of
-//! observations are draws of what an observation would show, so their
-//! interval is a prediction interval; without noise ([`NoNoise`]) it is a
-//! band of the model. [`DistributionNoise`] draws from the observation
-//! models of the problem. A stochastic engine runs every replicate of each draw;
-//! each replicate is a draw of the predictive with an equal share of the
-//! draw's weight, and has a seed of its own ([`run_sets`]): draw `d` takes a
-//! seed of its own from the seed of the caller ([`draw_seeds`]), and its
-//! replicates are the replicates of that seed, so the predictive draws fresh
-//! noise for every draw instead of the same replicates for all.
+//! Every band has the layout of [`Band`] and comes from one reducer, which
+//! reduces each column of values across the draws with their weights. With
+//! observation noise ([`ObservationNoise`]) the values of observations are
+//! draws of what an observation would show, so their interval is a
+//! prediction interval; without noise ([`NoNoise`]) it is a band of the
+//! model. [`DistributionNoise`] draws from the observation models of the
+//! problem. A stochastic engine runs every replicate of each draw; each
+//! replicate is a draw of the predictive with an equal share of the draw's
+//! weight ([`share_among_replicates`]), and has a seed of its own
+//! ([`run_sets`]): draw `d` takes a seed of its own from the seed of the
+//! caller ([`draw_seeds`]), and its replicates are the replicates of that
+//! seed, so the predictive draws fresh noise for every draw instead of the
+//! same replicates for all.
 
 use commol_calibration::likelihood::log_location;
 use commol_calibration::{
-    CalibrationProblem, EvaluationError, ForwardModel, Likelihood, Noise, ObservationOperator,
-    ObservedDataPoint,
+    CalibrationProblem, EvaluationError, ForwardModel, Likelihood, Noise, ObservedDataPoint,
 };
 use commol_core::SimulationEngine;
 use commol_random::sample::{binomial, poisson};
@@ -300,7 +301,11 @@ pub struct Predictive {
     draw_seeds: Vec<u64>,
 }
 
-/// A band of a predictive: four values at every position and output.
+/// A band: four values at every position and output, `[position][output]`.
+///
+/// The band of a predictive and of a sensitivity analysis reduces draws
+/// ([`Band::of`]); the band of the delta method
+/// ([`crate::local::delta_band`]) has the same layout.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Band {
     /// The weighted mean, `[position][output]`.
@@ -311,6 +316,86 @@ pub struct Band {
     pub lower: Vec<Vec<f64>>,
     /// The upper quantile, `(1 + c)/2`.
     pub upper: Vec<Vec<f64>>,
+}
+
+impl Band {
+    /// The band of `confidence_level` of `values`, `[draw][position][output]`,
+    /// with the weight of each draw: at every position and output, the
+    /// weighted mean, median and central interval across the draws.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when `confidence_level` is not strictly between 0
+    /// and 1, or a value is NaN.
+    pub fn of(
+        values: &[Vec<Vec<f64>>],
+        weights: &[f64],
+        confidence_level: f64,
+    ) -> Result<Self, String> {
+        let positions = values.first().map_or(0, Vec::len);
+        let outputs = values
+            .first()
+            .and_then(|rows| rows.first())
+            .map_or(0, Vec::len);
+        Self::reduce(
+            positions,
+            outputs,
+            weights,
+            confidence_level,
+            |draw, position, output| values[draw][position][output],
+        )
+    }
+
+    /// The reducer of every band: at each of `positions` and `outputs`, the
+    /// weighted mean, median and central interval of `value(draw, position,
+    /// output)` across the draws of `weights`.
+    fn reduce(
+        positions: usize,
+        outputs: usize,
+        weights: &[f64],
+        confidence_level: f64,
+        value: impl Fn(usize, usize, usize) -> f64,
+    ) -> Result<Self, String> {
+        let [low, high] = statistics::interval_levels(confidence_level)?;
+        let table = vec![vec![0.0; outputs]; positions];
+        let mut band = Self {
+            mean: table.clone(),
+            median: table.clone(),
+            lower: table.clone(),
+            upper: table,
+        };
+        let mut column = vec![0.0; weights.len()];
+        for position in 0..positions {
+            for output in 0..outputs {
+                for (draw, slot) in column.iter_mut().enumerate() {
+                    *slot = value(draw, position, output);
+                }
+                let q = statistics::quantiles(&column, weights, &[low, 0.5, high])?;
+                band.mean[position][output] = statistics::mean(&column, weights);
+                band.lower[position][output] = q[0];
+                band.median[position][output] = q[1];
+                band.upper[position][output] = q[2];
+            }
+        }
+        Ok(band)
+    }
+}
+
+/// Every replicate of every draw of `runs`, `[draw][replicate]`, draw after
+/// draw, and its weight: the weight of its draw shared equally among the
+/// draw's replicates, `weight / replicates`.
+pub fn share_among_replicates<T>(
+    runs: impl IntoIterator<Item = Vec<T>>,
+    weights: &[f64],
+) -> (Vec<T>, Vec<f64>) {
+    let mut items = Vec::new();
+    let mut shares = Vec::new();
+    for (replicates, &weight) in runs.into_iter().zip(weights) {
+        let share = weight / replicates.len() as f64;
+        shares.extend(std::iter::repeat_n(share, replicates.len()));
+        items.extend(replicates);
+    }
+    (items, shares)
 }
 
 impl Predictive {
@@ -340,15 +425,7 @@ impl Predictive {
         commol_core::check_positions(positions, 0.0, |position| engine.check_position(position))
             .map_err(PredictiveError::Mismatch)?;
         let runs = run_sets(forward, sample.values(), positions, Some(seed))?;
-        let mut trajectories = Vec::new();
-        let mut weights = Vec::new();
-        for (replicates, &weight) in runs.into_iter().zip(sample.weights()) {
-            let share = weight / replicates.len() as f64;
-            for rows in replicates {
-                trajectories.push(rows);
-                weights.push(share);
-            }
-        }
+        let (trajectories, weights) = share_among_replicates(runs, sample.weights());
         Ok(Self {
             positions: positions.to_vec(),
             trajectories,
@@ -382,36 +459,12 @@ impl Predictive {
     /// Returns a message when `confidence_level` is not strictly between 0
     /// and 1, or a value is NaN.
     pub fn band(&self, confidence_level: f64) -> Result<Band, String> {
-        let [low, high] = statistics::interval_levels(confidence_level)?;
-        let outputs = self
-            .trajectories
-            .first()
-            .and_then(|rows| rows.first())
-            .map_or(0, Vec::len);
-        let mut band = Band {
-            mean: vec![vec![0.0; outputs]; self.positions.len()],
-            median: vec![vec![0.0; outputs]; self.positions.len()],
-            lower: vec![vec![0.0; outputs]; self.positions.len()],
-            upper: vec![vec![0.0; outputs]; self.positions.len()],
-        };
-        let mut values = vec![0.0; self.trajectories.len()];
-        for position in 0..self.positions.len() {
-            for output in 0..outputs {
-                for (slot, rows) in values.iter_mut().zip(&self.trajectories) {
-                    *slot = rows[position][output];
-                }
-                let q = statistics::quantiles(&values, &self.weights, &[low, 0.5, high])?;
-                band.mean[position][output] = statistics::mean(&values, &self.weights);
-                band.lower[position][output] = q[0];
-                band.median[position][output] = q[1];
-                band.upper[position][output] = q[2];
-            }
-        }
-        Ok(band)
+        Band::of(&self.trajectories, &self.weights, confidence_level)
     }
 }
 
-/// The band of one series of a predictive: four values at every position.
+/// The band of one series of a predictive: four values at every position,
+/// the one output of a [`Band`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct SeriesBand {
     /// The weighted mean.
@@ -422,6 +475,19 @@ pub struct SeriesBand {
     pub lower: Vec<f64>,
     /// The upper quantile, `(1 + c)/2`.
     pub upper: Vec<f64>,
+}
+
+impl SeriesBand {
+    /// The band of the one output of `band`.
+    fn of_one_output(band: Band) -> Self {
+        let column = |table: Vec<Vec<f64>>| table.into_iter().map(|row| row[0]).collect();
+        Self {
+            mean: column(band.mean),
+            median: column(band.median),
+            lower: column(band.lower),
+            upper: column(band.upper),
+        }
+    }
 }
 
 impl Predictive {
@@ -439,7 +505,6 @@ impl Predictive {
         cumulative: bool,
         confidence_level: f64,
     ) -> Result<SeriesBand, String> {
-        let [low, high] = statistics::interval_levels(confidence_level)?;
         let width = self
             .trajectories
             .first()
@@ -468,21 +533,14 @@ impl Predictive {
                     .collect()
             })
             .collect();
-        let mut band = SeriesBand {
-            mean: Vec::new(),
-            median: Vec::new(),
-            lower: Vec::new(),
-            upper: Vec::new(),
-        };
-        for position in 0..self.positions.len() {
-            let values: Vec<f64> = series.iter().map(|s| s[position]).collect();
-            let q = statistics::quantiles(&values, &self.weights, &[low, 0.5, high])?;
-            band.mean.push(statistics::mean(&values, &self.weights));
-            band.lower.push(q[0]);
-            band.median.push(q[1]);
-            band.upper.push(q[2]);
-        }
-        Ok(band)
+        let band = Band::reduce(
+            self.positions.len(),
+            1,
+            &self.weights,
+            confidence_level,
+            |draw, position, _| series[draw][position],
+        )?;
+        Ok(SeriesBand::of_one_output(band))
     }
 }
 
@@ -509,23 +567,11 @@ impl ObservationDraws {
     /// Returns a message when `confidence_level` is not strictly between 0
     /// and 1, or a value is NaN.
     pub fn band(&self, confidence_level: f64) -> Result<SeriesBand, String> {
-        let [low, high] = statistics::interval_levels(confidence_level)?;
         let n = self.values.first().map_or(0, Vec::len);
-        let mut band = SeriesBand {
-            mean: Vec::new(),
-            median: Vec::new(),
-            lower: Vec::new(),
-            upper: Vec::new(),
-        };
-        for i in 0..n {
-            let values: Vec<f64> = self.values.iter().map(|row| row[i]).collect();
-            let q = statistics::quantiles(&values, &self.weights, &[low, 0.5, high])?;
-            band.mean.push(statistics::mean(&values, &self.weights));
-            band.lower.push(q[0]);
-            band.median.push(q[1]);
-            band.upper.push(q[2]);
-        }
-        Ok(band)
+        let band = Band::reduce(n, 1, &self.weights, confidence_level, |draw, i, _| {
+            self.values[draw][i]
+        })?;
+        Ok(SeriesBand::of_one_output(band))
     }
 }
 
@@ -540,9 +586,9 @@ impl ObservationDraws {
 /// # Errors
 ///
 /// Returns an error when the sample's parameters are not the forward
-/// model's, an
-/// observation names an unknown output or factor or is one `noise` cannot
-/// serve, or a draw has no run.
+/// model's, an observation is at a position the engine rejects, names an
+/// unknown output or factor or is one `noise` cannot serve, or a draw has no
+/// run.
 pub fn observation_draws<E>(
     forward: &ForwardModel<E>,
     sample: &ParameterSample,
@@ -559,33 +605,39 @@ where
         .map_err(PredictiveError::Mismatch)?;
     let runs = observe_sets(forward, sample.values(), observations, Some(seed))?;
     let mut generator = Generator::from_seed(seed);
-    let mut draws = ObservationDraws {
-        values: Vec::new(),
-        weights: Vec::new(),
+    let shown: Vec<Vec<Vec<f64>>> = runs
+        .into_iter()
+        .zip(sample.values())
+        .map(|(replicates, values)| {
+            replicates
+                .into_iter()
+                .map(|predicted| {
+                    let mut shown = vec![0.0; predicted.len()];
+                    noise.observe(observations, values, &predicted, &mut generator, &mut shown);
+                    shown
+                })
+                .collect()
+        })
+        .collect();
+    let (values, weights) = share_among_replicates(shown, sample.weights());
+    Ok(ObservationDraws {
+        values,
+        weights,
         seed,
-    };
-    for ((replicates, &weight), values) in
-        runs.into_iter().zip(sample.weights()).zip(sample.values())
-    {
-        let share = weight / replicates.len() as f64;
-        for predicted in replicates {
-            let mut shown = vec![0.0; predicted.len()];
-            noise.observe(observations, values, &predicted, &mut generator, &mut shown);
-            draws.values.push(shown);
-            draws.weights.push(share);
-        }
-    }
-    Ok(draws)
+    })
 }
 
 /// The values of `observations` for each parameter set of `sets`, read
-/// through the observation operator, in parallel: `[set][replicate][observation]`.
-/// `seed` seeds the replicates as [`run_sets`] does.
+/// through the forward model observed at them
+/// ([`ForwardModel::with_observations`]), in parallel:
+/// `[set][replicate][observation]`. `seed` seeds the replicates as
+/// [`run_sets`] does.
 ///
 /// # Errors
 ///
-/// Returns an error when an observation names an unknown output or factor,
-/// or a set has no run; [`PredictiveError::Draw`] names the set's index.
+/// Returns an error when the engine rejects a position of an observation,
+/// an observation names an unknown output or factor, or a set has no run;
+/// [`PredictiveError::Draw`] names the set's index.
 pub(crate) fn observe_sets<E>(
     forward: &ForwardModel<E>,
     sets: &[Vec<f64>],
@@ -595,20 +647,11 @@ pub(crate) fn observe_sets<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
-    let mut schedule: Vec<f64> = observations
-        .iter()
-        .flat_map(|obs| std::iter::once(obs.at).chain(obs.window.map(|w| obs.at - w)))
-        .collect();
-    schedule.sort_by(f64::total_cmp);
-    schedule.dedup();
-    let operator = ObservationOperator::new(
-        observations,
-        forward.parameters(),
-        &forward.base_engine().output_names(),
-        &schedule,
-    )
-    .map_err(PredictiveError::Mismatch)?;
-    Ok(run_sets(forward, sets, &schedule, seed)?
+    let observed = forward
+        .with_observations(observations)
+        .map_err(PredictiveError::Mismatch)?;
+    let operator = observed.observation();
+    Ok(run_sets(&observed, sets, observed.schedule(), seed)?
         .into_iter()
         .zip(sets)
         .map(|(replicates, values)| {

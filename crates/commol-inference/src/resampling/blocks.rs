@@ -3,13 +3,20 @@
 //! A block holds every observation, of every series, whose position falls in
 //! one window of consecutive distinct positions, so that the dependence
 //! across series and along the positions stays inside blocks. The
-//! resamplers, the jackknife and the residual noise read their blocks here.
+//! resamplers, the jackknife, the residual noise, the sandwich, the
+//! calibration of `η` and the conformal methods read their blocks here, and
+//! resolve a block length, given or automatic, with
+//! [`BlockScheme::resolve`] or [`BlockScheme::at_fit`].
 
-use std::collections::BTreeMap;
-
-use commol_calibration::ObservedDataPoint;
+use commol_calibration::{CalibrationProblem, ObservedDataPoint, SeriesIndex};
+use commol_core::SimulationEngine;
 
 use crate::error::MethodError;
+use crate::resampling::residuals::{ResidualScale, Residuals};
+
+/// The estimate of the automatic block length of each series, by label, in
+/// order of first appearance.
+pub type Estimates = Vec<(String, f64)>;
 
 /// The observations of a problem grouped into blocks of `length`
 /// consecutive distinct positions.
@@ -22,6 +29,7 @@ pub struct BlockScheme {
     positions: Vec<f64>,
     position_of: Vec<usize>,
     blocks: Vec<Vec<usize>>,
+    estimates: Option<Estimates>,
 }
 
 impl BlockScheme {
@@ -45,7 +53,60 @@ impl BlockScheme {
             positions,
             position_of,
             blocks,
+            estimates: None,
         })
+    }
+
+    /// The blocks of `observations` with `requested` positions each, or for
+    /// `None` with the automatic length of `residuals`, one per observation,
+    /// for blocks drawn as `drawing` ([`automatic_block_length`]); then the
+    /// scheme keeps the estimate of each series ([`Self::estimates`]).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::new`].
+    pub fn resolve(
+        observations: &[ObservedDataPoint],
+        residuals: &[f64],
+        requested: Option<usize>,
+        drawing: BlockDrawing,
+    ) -> Result<Self, MethodError> {
+        match requested {
+            Some(length) => Self::new(observations, length),
+            None => {
+                let automatic = automatic_block_length(observations, residuals, drawing);
+                let mut scheme = Self::new(observations, automatic.length)?;
+                scheme.estimates = Some(automatic.estimates);
+                Ok(scheme)
+            }
+        }
+    }
+
+    /// The blocks of the observations of `problem`, as [`Self::resolve`]
+    /// with the additive residuals of the fit `fit`.
+    ///
+    /// # Errors
+    ///
+    /// As [`Residuals::new`] when the fit has no run, and as [`Self::new`].
+    pub fn at_fit<E: SimulationEngine>(
+        problem: &CalibrationProblem<E>,
+        fit: &[f64],
+        requested: Option<usize>,
+        drawing: BlockDrawing,
+    ) -> Result<Self, MethodError> {
+        let residuals = Residuals::new(problem, fit, ResidualScale::Additive)?;
+        Self::resolve(
+            problem.observed_data(),
+            residuals.residuals(),
+            requested,
+            drawing,
+        )
+    }
+
+    /// With the automatic length, the estimate of each series; `None` for a
+    /// length given.
+    pub fn estimates(&self) -> Option<&[(String, f64)]> {
+        self.estimates.as_deref()
     }
 
     /// The number of positions of a block.
@@ -209,7 +270,7 @@ pub struct AutomaticLength {
     /// number of distinct positions.
     pub length: usize,
     /// The estimate of each series, by label, in order of first appearance.
-    pub estimates: Vec<(String, f64)>,
+    pub estimates: Estimates,
 }
 
 /// The automatic block length of `residuals`, one per observation: the
@@ -220,24 +281,14 @@ pub fn automatic_block_length(
     residuals: &[f64],
     drawing: BlockDrawing,
 ) -> AutomaticLength {
-    let mut order: Vec<&str> = Vec::new();
-    let mut series: BTreeMap<&str, Vec<(f64, f64)>> = BTreeMap::new();
-    for (obs, &residual) in observations.iter().zip(residuals) {
-        if !series.contains_key(obs.label.as_str()) {
-            order.push(&obs.label);
-        }
-        series
-            .entry(&obs.label)
-            .or_default()
-            .push((obs.at, residual));
-    }
-    let estimates: Vec<(String, f64)> = order
+    let series = SeriesIndex::new(observations);
+    let estimates: Estimates = series
+        .labels()
         .iter()
-        .map(|label| {
-            let mut points = series[label].clone();
-            points.sort_by(|a, b| a.0.total_cmp(&b.0));
-            let values: Vec<f64> = points.into_iter().map(|(_, r)| r).collect();
-            (label.to_string(), automatic_length(&values, drawing))
+        .zip(series.indices())
+        .map(|(label, members)| {
+            let values: Vec<f64> = members.iter().map(|&i| residuals[i]).collect();
+            (label.clone(), automatic_length(&values, drawing))
         })
         .collect();
     let positions = distinct_positions(observations).len();

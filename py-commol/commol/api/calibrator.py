@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     )
     from commol.context.model import Model
 
+from commol.api.inference.predictive import by_output
 from commol.api.simulation import Simulation, check_seed, draw_seed
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context._model import engine_state
@@ -278,9 +279,9 @@ class Calibrator:
         return DeltaBand(
             confidence_level=confidence_level,
             positions=points,
-            center=dict(zip(outputs, center, strict=True)),
-            lower=dict(zip(outputs, lower, strict=True)),
-            upper=dict(zip(outputs, upper, strict=True)),
+            center=by_output(outputs, center),
+            lower=by_output(outputs, lower),
+            upper=by_output(outputs, upper),
         )
 
     def rust_observation_draws(

@@ -14,6 +14,9 @@
 //! | [`Discrepancy`] | Compares predictions with the observations: a loss, or the likelihood of an observation model per series ([`Likelihood`]) |
 //! | [`OptimizationObjective`] | The argmin cost function: the only place that turns a violation into a penalty |
 //!
+//! Every method that reads the observations series by series takes the
+//! series from [`SeriesIndex`].
+//!
 //! The summary of the replicates of a stochastic engine and every method of
 //! `commol-inference` take the one quantile of [`statistics`].
 //!
@@ -65,6 +68,7 @@ pub mod likelihood;
 pub mod objective;
 pub mod observation;
 pub mod optimization;
+pub mod series;
 pub mod starts;
 pub mod statistics;
 pub mod subproblem;
@@ -74,7 +78,7 @@ pub mod values;
 pub use calibration_problem::{CalibrationProblem, check_positions};
 pub use discrepancy::{Discrepancy, DiscrepancyConfig, TermError};
 pub use feasibility::{EvaluationError, Feasibility, Violation};
-pub use forward::{ForwardModel, Workspace};
+pub use forward::{ForwardModel, Workspace, replicate_mean, schedule_of};
 pub use likelihood::{
     Argument, Center, Likelihood, Noise, ObservationModel, Term, TermDerivatives,
 };
@@ -86,6 +90,7 @@ pub use optimization::{
     OptimizationConfig, ParticleSwarmConfig, ParticleSwarmState, converged, optimize,
     optimize_from, optimize_subproblem, optimize_with_history, optimize_with_observer,
 };
+pub use series::SeriesIndex;
 pub use starts::{StartOutcome, optimize_starts, start_points};
 pub use subproblem::{ConstraintSettings, Subproblem, SubproblemResult, predict};
 pub use types::{

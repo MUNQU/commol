@@ -7,9 +7,7 @@
 //! builds the result.
 
 use crate::parallelism::parallel;
-use commol_inference::resampling::{
-    BlockDrawing, BlockScheme, FitUnit, ResidualScale, Residuals, automatic_block_length,
-};
+use commol_inference::resampling::{BlockDrawing, BlockScheme, FitUnit};
 use commol_inference::smc::{self, AbcTarget, Distance, RandomWalk, SmcRun, SmcSampler, Stop};
 use commol_inference::{Distribution, Family, Priors};
 use commol_random::{Generator, replicate_seed};
@@ -342,21 +340,13 @@ fn bootstrap_coverage_eta(
 ) -> PyResult<PyEtaCoverage> {
     let priors = problem_priors(problem, priors)?;
     let mut sampler = sampler(particles, resample_threshold, target_cess, stay_probability)?;
-    let observed = problem.inner.observed_data();
-    let length = match block_length {
-        Some(length) => length,
-        None => {
-            let residuals = Residuals::new(&problem.inner, &fit, ResidualScale::Additive)
-                .map_err(method_error)?;
-            automatic_block_length(
-                observed,
-                residuals.residuals(),
-                BlockDrawing::NonOverlapping,
-            )
-            .length
-        }
-    };
-    let blocks = BlockScheme::new(observed, length).map_err(method_error)?;
+    let blocks = BlockScheme::at_fit(
+        &problem.inner,
+        &fit,
+        block_length,
+        BlockDrawing::NonOverlapping,
+    )
+    .map_err(method_error)?;
     let calibration = parallel(py, || {
         smc::bootstrap_coverage_eta(
             &problem.inner,
