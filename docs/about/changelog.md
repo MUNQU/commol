@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of `simulation.engine.step()`; `Simulation.run`, replicates and calibration
   reset the engine after the seed, so their results do not change.
 
+- The documentation and the docstrings name no application field, as
+  [Conventions](../codebase/conventions.md) asks: the dispersion of
+  `NegativeBinomialObservations` is "the dispersion `k` (`size` in R)", and
+  bins of different units are "a count and a concentration". A test checks
+  the words of the user pages and of the source of `commol`.
+
 ## [0.10.0] - 2026-10-23
 
 This release makes equivalent things the same across commol, after an audit
@@ -605,9 +611,9 @@ capitals. See [Uncertainty](../guide/uncertainty/index.md).
 - `ParametricBootstrap(replicates)`: fits to data sets drawn from the
   observation models at the fit. `ResamplingDiagnostics.block_length` is `None`
   for it.
-- A model can hold bins of different units, such as people and the
-  concentration of bacteria in water: each bin starts at an amount in its own
-  unit, a model whose bins all start at `0` builds and runs, and the
+- A model can hold bins of different units, such as a count and a
+  concentration: each bin starts at an amount in its own unit, a model whose
+  bins all start at `0` builds and runs, and the
   `Calibrator` rejects an initial-condition remainder whose unit is not the
   unit of a calibrated amount. See
   [Bins of different units](../guide/building-models.md#bins-of-different-units).

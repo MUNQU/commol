@@ -119,7 +119,7 @@ def initial_amounts_report(
     The ``initial_amounts`` section of `Model.applied_parameters`
     for an aggregate model. Each row gives its amount in the unit of its bin,
     and no row is a share of a total, so bins of different units, such as
-    people and a concentration, are reported side by side.
+    a count and a concentration, are reported side by side.
 
     A bin row reports the amount the engine builds: its declared amount, or
     the sum of its compartments when an override touches one of them. A bin
