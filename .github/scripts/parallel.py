@@ -12,23 +12,27 @@ to what exists: a module, a method of a shared class, a variant, an entry of a
 registry. Two proposals can run in parallel when no chain of "blocked by" links
 joins them and no *Changes* of one touches what the other changes or adds.
 Two *Adds* to the same class never conflict: their merge only keeps both.
-A proposal blocked by an open issue of another repository is not ready.
+A proposal blocked by an open issue that is not one of them, of another
+repository or of this one with no label ``proposal``, ``change`` or
+``release``, is not ready either.
 
 A change has no section Touches: the paths of its section ``## Where`` count
 as its *Changes*. An issue with an assignee is in progress. The next issues
 (``--next``) are the open proposals and changes that nobody holds and nothing
 blocks, that can run at the same time as every issue in progress and as each
-other, by effective priority, then milestone, then number. The effective
-priority is the highest of the field Priority of the issue in its project
-(``Now``, ``Next``, ``Later``; no value counts as ``Next``) and of every open
-issue it blocks, in any repository, through chains of "blocked by" links: an
-issue that another issue needs inherits the priority of that issue. An open
-milestone comes before none; the nearest due date first, then the oldest
-milestone.
+other, by effective priority, then the version of the milestone, then
+number. The effective priority is the highest of the field Priority of the
+issue in its project (``Now``, ``Next``, ``Later``; no value counts as
+``Next``) and of every open issue it blocks, in any repository, through chains
+of "blocked by" links: an issue that another issue needs inherits the
+priority of that issue. The version is the one that the title of the
+milestone names (``0.10.1`` before ``0.15.0``), not the number of the
+milestone; a milestone that names no version comes after every version, and
+no milestone last. The nearest due date of a milestone breaks a tie.
 
 The precedence level (``--levels``) of an open proposal, change or release is
 0 when no open issue blocks it, else one more than the highest level of its
-blockers; an open blocker of another repository counts as level 0. The
+blockers; an open blocker that is not one of them counts as level 0. The
 script writes it into the number field ``Level`` of the project, only where
 it changes, and empties the field of an issue that is no longer open. First
 it adds to the project each open issue that is not an item of it.
@@ -53,8 +57,8 @@ issues, and the release before only orders the work.
 The script reads the repository from the git remote, and the project is the
 one of the organization with the name of the repository. Usage, from the root
 of the repository:
-``python .github/scripts/parallel.py`` prints what can run in parallel,
-``--write`` also writes it under the Delivery of each proposal,
+``python .github/scripts/parallel.py`` prints what can run in parallel (no
+script writes it into an issue body, where it would go out of date),
 ``--next N`` prints the next N issues (``.github/scripts/next.sh`` runs it),
 ``--releases`` writes the links to the release before each milestone, and
 ``--levels`` writes the precedence levels. Given together, the links come
@@ -75,7 +79,6 @@ from github import JsonValue, repository, rest
 ITEM = re.compile(r"`([^`]+)`")
 PRIORITIES = ("Now", "Next", "Later")
 DEFAULT_PRIORITY = "Next"
-PARALLEL = re.compile(r"^- Parallel with:.*$", re.MULTILINE)
 VERSION = re.compile(r"v?(\d+(?:\.\d+)*)")
 
 
@@ -92,7 +95,12 @@ class Issue:
 
 @dataclass
 class Proposal:
-    """An open proposal: its number, title, blockers and what it touches."""
+    """An open proposal: its number, title, blockers and what it touches.
+
+    ``blocked_by`` holds its open blockers that are loaded issues;
+    ``blocked_elsewhere`` counts the others: of another repository, or of this
+    one with no label ``proposal``, ``change`` or ``release``.
+    """
 
     number: int
     title: str
@@ -309,7 +317,7 @@ def load() -> dict[int, Proposal]:
         open_blockers = [b for b in blockers if b.state == "OPEN"]
         here = {b.number for b in open_blockers if b.repository in ("", repository())}
         proposal.blocked_by = here & found.keys()
-        proposal.blocked_elsewhere = len(open_blockers) - len(here)
+        proposal.blocked_elsewhere = len(open_blockers) - len(proposal.blocked_by)
         if proposal.kind == "change":
             proposal.changes = where(proposal.body)
         else:
@@ -477,26 +485,6 @@ def write_release_links(issues: dict[int, Proposal]) -> None:
     print(f"Releases: {len(added)} links added, {len(removed)} removed")
 
 
-def write_line(proposal: Proposal, others: list[int]) -> None:
-    """Write the line ``Parallel with`` under the Delivery of a proposal."""
-    line = (
-        "- Parallel with: "
-        + (", ".join(f"#{n}" for n in others) if others else "none")
-        + " (`python .github/scripts/parallel.py`)"
-    )
-    body = proposal.body
-    if PARALLEL.search(body):
-        body = PARALLEL.sub(line, body)
-    else:
-        body = body.replace("## Delivery\n\n", f"## Delivery\n\n{line}\n", 1)
-    if body != proposal.body:
-        rest(
-            f"repos/{repository()}/issues/{proposal.number}",
-            method="PATCH",
-            data={"body": body},
-        )
-
-
 def project_number(owner: str, name: str) -> int | None:
     """Return the number of the project of a repository: the one with its name."""
     answer = rest(f"orgs/{owner}/projectsV2?per_page=100", every_page=True)
@@ -579,8 +567,9 @@ def levels(issues: dict[int, Proposal]) -> dict[int, int]:
     """Return the precedence level of each issue.
 
     An issue that no open issue blocks is level 0; another is one level above
-    its highest blocker. An open blocker of another repository counts as
-    level 0. A cycle of links ends at the issue where it closes.
+    its highest blocker. An open blocker that is not a loaded issue
+    (``blocked_elsewhere``) counts as level 0. A cycle of links ends at the
+    issue where it closes.
     """
     found: dict[int, int] = {}
 
@@ -757,14 +746,23 @@ def ready(issue: Proposal) -> bool:
     )
 
 
-def sort_key(issue: Proposal, rank: Rank) -> tuple[int, int, str, int, int]:
-    """Sort by priority, then milestone (nearest due, then oldest), then number."""
-    due, milestone = issue.milestone or ("", 0)
+def sort_key(issue: Proposal, rank: Rank) -> tuple[int, int, tuple[int, ...], str, int]:
+    """Sort by priority, then version, then nearest due date, then number.
+
+    The version is the one that the title of the milestone names, not the
+    number of the milestone, which does not follow the versions. A milestone
+    that names no version comes after every version, and no milestone last.
+    """
+    due = issue.milestone[0] if issue.milestone else ""
+    if issue.version is not None:
+        place = 0
+    else:
+        place = 1 if issue.milestone else 2
     return (
         PRIORITIES.index(rank[0]),
-        0 if issue.milestone else 1,
+        place,
+        issue.version or (),
         due or "~",
-        milestone,
         issue.number,
     )
 
@@ -831,8 +829,8 @@ def show_next(issues: dict[int, Proposal], count: int) -> None:
         )
 
 
-def show_parallel(proposals: dict[int, Proposal], write: bool) -> None:
-    """Print, and with ``write`` store, the issues each one can run with."""
+def show_parallel(proposals: dict[int, Proposal]) -> None:
+    """Print the issues ready now, and the issues each one can run with."""
     before = ancestors(proposals)
     candidates = [
         p for p in proposals.values() if "## Touches" in p.body or p.kind == "change"
@@ -853,8 +851,6 @@ def show_parallel(proposals: dict[int, Proposal], write: bool) -> None:
         others = sorted(parallel[number])
         print(f"#{number} {proposals[number].title}")
         print("    parallel with:", ", ".join(f"#{n}" for n in others) or "none")
-        if write:
-            write_line(proposals[number], others)
 
 
 def main() -> None:
@@ -864,11 +860,10 @@ def main() -> None:
     milestone; a failure there stops it, because the blockers it reads after
     would be wrong. With --levels it then writes the precedence levels into
     the project. Alone, each does only that. A failure to write the levels
-    prints one line and the rest goes on: the next issues, or what can run in
-    parallel with --write.
+    prints one line and the next issues follow. No option edits the body of
+    an issue.
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--write", action="store_true", help="write it under Delivery")
     parser.add_argument("--next", type=int, metavar="N", help="the next N issues")
     parser.add_argument(
         "--releases",
@@ -889,8 +884,8 @@ def main() -> None:
             print(f"Level: not written: {error}", file=sys.stderr)
     if arguments.next is not None:
         show_next(issues, arguments.next)
-    elif arguments.write or not (arguments.levels or arguments.releases):
-        show_parallel(issues, arguments.write)
+    elif not (arguments.levels or arguments.releases):
+        show_parallel(issues)
 
 
 if __name__ == "__main__":

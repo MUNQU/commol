@@ -55,7 +55,7 @@ Planned work lives in GitHub issues, written from the templates of
 | The specification of a change | The body of its issue |
 | Decisions and findings during the work | Comments of the issue (`L<n> (decision|implementation): …`), and the Decisions table of the body |
 | What a change does to other work | The bodies and comments of the open issues it affects; work it leaves undone, in an open issue |
-| Priority and dependencies | The field `Priority` of the project (`Now`, `Next`, `Later`); "Blocked by" links between issues; "Why here" in the Delivery of a proposal |
+| Priority and dependencies | The field `Priority` of the project (`Now`, `Next`, `Later`); "Blocked by" links between issues |
 | Releases | A milestone per release, and its release issue |
 | Status | The [commol project](https://github.com/orgs/MUNQU/projects/1): "Board" by status, "By release" by milestone, "By precedence" by the field `Level` |
 | Evidence of the delivery | The body of the pull request: each requirement and the tests that pass |
@@ -69,19 +69,24 @@ To find the next piece of work, in one call and one line:
 
 It runs `.github/scripts/parallel.py --next` and lists the open proposals and
 changes that no open issue blocks and nobody has taken, that can run at the
-same time as every issue in progress and as each other. It names each issue
-it skips and the issue in progress it would touch. A change has no section
-Touches: the paths of its section Where count as what it changes. The issues
-come by:
+same time as every issue in progress and as each other. Every open blocker
+counts, with or without a label `proposal`, `change` or `release`, as it does
+for `start.sh`, so `next.sh` never offers an issue that `start.sh` refuses. It
+names each issue it skips and the issue in progress it would touch. A change
+has no section Touches: the paths of its section Where count as what it
+changes. The issues come by:
 
 1. Effective priority: the highest of the field `Priority` of the issue in the
    project (`Now`, `Next`, `Later`; no value is `Next`) and of every open issue
    it blocks, through chains of "blocked by" links. So an issue that another
    one needs inherits the priority of that issue.
-2. Milestone: an open milestone before none; the nearest due date, then the
-   oldest. The milestones of commol have no due date, and their numbers follow
-   the versions, so the next release comes first.
-3. Number.
+2. The version of the milestone, which its title names (`0.10.1` before
+   `0.15.0`), so the next release comes first. The number of a milestone does
+   not count: it follows the order in which the milestones were made, not
+   their versions. A milestone that names no version comes after every
+   version, and an issue with no milestone comes last.
+3. The due date of the milestone, the nearest first.
+4. Number.
 
 The dependencies set what must come first; `Priority` is set only to move an
 issue ahead of (`Now`) or behind (`Later`) its milestone.
@@ -91,9 +96,10 @@ its milestone, and each open release to the issues of its milestone
 ([Milestones](#milestones)), and then writes the precedence level of each open
 proposal, change and release into the number field `Level` of the project:
 0 when no open issue blocks it, else one more than the highest level of its
-open blockers (an open blocker of another repository counts as level 0). The
-view "By precedence" groups the open issues by `Level`, so each group can
-start when the groups above it close. GitHub Projects cannot group by
+open blockers (an open blocker of another repository, or one of this
+repository with no label `proposal`, `change` or `release`, counts as level
+0). The view "By precedence" groups the open issues by `Level`, so each group
+can start when the groups above it close. GitHub Projects cannot group by
 "blocked by" links, and its hierarchy view follows sub-issues only, so the
 script writes the field. First it adds to the project each open proposal,
 change and release that is not an item of it, so that every one gets its
@@ -243,10 +249,11 @@ says what it touches (section Touches of the template):
 
 An item is a path or `path::Symbol`; a path that ends in `/` is a directory.
 `.github/scripts/parallel.py` reads the Touches and the links of the open
-issues, prints the proposals ready now and the ones each can run with, and
-with `--write` keeps the line "Parallel with" of each Delivery up to date; run
-it after a proposal is added or its Touches change. The `area:` labels filter
-the same zones (`gh issue list --label area:inference -s open`).
+issues, and prints the proposals ready now and the ones each can run with.
+No script writes this into an issue body, where it would go out of date when
+another issue changes: run `parallel.py` to see it, and `next.sh` checks it
+each time it runs. The `area:` labels filter the same zones
+(`gh issue list --label area:inference -s open`).
 
 To take a proposal while others run:
 

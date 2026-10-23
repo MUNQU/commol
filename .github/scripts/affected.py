@@ -30,7 +30,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 
-from parallel import ITEM, issue_of, open_issues, split, touches
+from parallel import ITEM, issue_of, names_a_path, open_issues, split, touches
 
 INDEXES = {
     "AGENTS.md",
@@ -81,12 +81,12 @@ def changed(base: str) -> dict[str, str]:
 
 
 def is_path(item: str) -> bool:
-    """Whether an item names a file or a directory, not a command or a symbol."""
+    """Whether an item names a file or a directory to read: a path for
+    ``names_a_path`` of ``parallel.py`` (so ``Model.save`` is a symbol), and
+    neither an index nor a directory of one level."""
     path, _ = split(item)
     return (
-        bool(path)
-        and not any(c.isspace() for c in path)
-        and ("/" in path or "." in path.lstrip("."))
+        names_a_path(item)
         and path not in INDEXES
         and not (path.endswith("/") and path.count("/") < 2)
     )
