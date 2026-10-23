@@ -2,7 +2,7 @@
 //! a stack program or the JIT with resolved slots), and every path gives the
 //! value of the formula.
 
-use commol_core::{MathExpression, MathExpressionContext, Model};
+use commol_core::{MathExpression, MathExpressionContext, Model, ParameterValue};
 use commol_model::CompiledModel;
 
 const PARAMETERS: [(&str, f64); 3] = [("k1", 0.3), ("k2", 0.1), ("k3", 0.25)];
@@ -82,8 +82,8 @@ fn every_shape_of_rate_gives_the_value_of_its_formula() {
         "(0.5)",
         // A stack program, and the JIT for an operator the program lacks.
         "k1 * -A + k2 * (B - C) / k3",
-        "k1 * A * !(t > 5)",
-        "k1 * A * !(t > 1)",
+        "k1 * A * if(t > 5, 0, 1)",
+        "if(!(t > 1), k1 * A, 0)",
     ] {
         for t in [0.0, 2.5] {
             let value = rate_of(rate, 0, t);
@@ -98,7 +98,7 @@ fn every_shape_of_rate_gives_the_value_of_its_formula() {
 #[test]
 fn a_rate_of_more_variables_than_the_stack_buffer_holds_reads_them_all() {
     let sum: Vec<String> = (0..17).map(|i| format!("v{i}")).collect();
-    let rate = format!("!(t > 5) * ({})", sum.join(" + "));
+    let rate = format!("if(t > 5, 0, 1) * ({})", sum.join(" + "));
 
     assert_eq!(rate_of(&rate, 17, 0.0), 136.0);
     assert_eq!(rate_of(&rate, 17, 6.0), 0.0);
@@ -188,4 +188,47 @@ fn a_formula_reads_an_earlier_formula_of_the_same_step() {
     // f1 is 0.3 · step at the step f2 reads it, not at the step before.
     assert_eq!(rate_at(3.0), 0.3 * 3.0 + 1.0);
     assert_eq!(rate_at(5.0), 0.3 * 5.0 + 1.0);
+}
+
+#[test]
+fn a_rate_outside_the_language_fails_at_build() {
+    let error = CompiledModel::try_from_model(&model("step > 1", 0))
+        .err()
+        .unwrap();
+
+    assert_eq!(
+        error,
+        "Transition 'ab': Formula 'step > 1': the comparison '>' is only allowed in the \
+         condition of if(condition, a, b)"
+    );
+}
+
+#[test]
+fn an_error_of_a_rate_names_its_transition() {
+    let mut model = model("k1 * A * B", 0);
+    model.parameters[0].value = None;
+    let mut compiled = CompiledModel::try_from_model(&model).unwrap();
+    let state = compiled.initial_state().to_vec();
+    let mut rates = vec![0.0; 1];
+
+    let error = compiled
+        .transition_rates(0.0, 0.0, &state, &mut rates)
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        "The rate of transition 'ab' cannot be evaluated: Parameter index '4' not found"
+    );
+}
+
+#[test]
+fn a_formula_parameter_outside_the_language_fails_at_build() {
+    let mut model = model("k2", 0);
+    model.parameters[1].value = Some(ParameterValue::Formula("k1 * (step > 30)".to_string()));
+
+    assert_eq!(
+        CompiledModel::try_from_model(&model).err().unwrap(),
+        "Parameter 'k2': Formula 'k1 * (step > 30)': the comparison '>' is only allowed in \
+         the condition of if(condition, a, b)"
+    );
 }

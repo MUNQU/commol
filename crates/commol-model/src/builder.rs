@@ -122,7 +122,7 @@ impl CompiledModel {
                 Some(commol_core::ParameterValue::Formula(formula)) => {
                     let rate_expr = RateMathExpression::from_string(formula.clone());
                     rate_expr
-                        .compiles()
+                        .check()
                         .map_err(|error| format!("Parameter '{}': {error}", p.id))?;
                     formula_parameters.push((p.id.clone(), rate_expr));
                 }
@@ -742,7 +742,8 @@ pub fn initial_state(
 ///
 /// # Errors
 ///
-/// Returns a message when the rate of a flow does not compile.
+/// Returns a message that names the transition when the rate of a flow is
+/// not in the language of formulas.
 fn compile_transition_flows(
     planned_flows: Vec<PlannedFlow>,
     compartment_map: &HashMap<String, usize>,
@@ -753,7 +754,7 @@ fn compile_transition_flows(
         .map(|flow| {
             let rate_expression = RateMathExpression::from_string(flow.rate);
             rate_expression
-                .compiles()
+                .check()
                 .map_err(|error| format!("Transition '{}': {error}", flow.transition_id))?;
             let resolved_slots =
                 resolve_jit_slots(&rate_expression, compartment_map, expression_context);
@@ -904,6 +905,8 @@ pub fn subgroup_total_names(process: &Process) -> Vec<String> {
 /// This function returns an error when:
 ///
 /// - the variant or the neighbors of the structure do not fit the process;
+/// - a rate, a stratified rate or a formula parameter is not in the language
+///   of formulas ([`RateMathExpression::check`]);
 /// - a `"pulse"` series has a point that is not an integer, or the engine
 ///   steps only at integers (`DifferenceEquations`, `StochasticSteps`) and a
 ///   series point or an impulse position is not an integer;
@@ -925,7 +928,10 @@ pub fn subgroup_total_names(process: &Process) -> Vec<String> {
 ///   not a subgroup total of the model. Category suffixes follow the
 ///   declaration order of the stratifications, so `total_t1_g1` is not a name
 ///   when `group` is declared before `type`. A parameter or compartment whose
-///   id starts with `total_` is not such a name.
+///   id starts with `total_` is not such a name;
+/// - a rate or a formula parameter reads a variable that no parameter, bin,
+///   compartment, engine variable, subgroup total or name of the neighbors
+///   defines. A category id is not a variable.
 ///
 /// # Errors
 ///
@@ -935,6 +941,7 @@ pub fn check_model(model: &Model) -> Result<(), String> {
     let aggregate = model.aggregate()?;
     let process = &model.process;
     aggregate.check(process)?;
+    check_formulas(model)?;
     check_engine_variable_ids(model, process)?;
     check_neighbor_terms(model, aggregate)?;
     check_whole_units(model, aggregate)?;
@@ -968,21 +975,13 @@ pub fn check_model(model: &Model) -> Result<(), String> {
         ));
     }
 
-    let mut used: HashSet<String> = HashSet::new();
-    for transition in &process.transitions {
-        if let Some(rate) = &transition.rate {
-            used.extend(RateMathExpression::from_string(rate.clone()).get_variables());
-        }
-        for stratified in transition.stratified_rates.iter().flatten() {
-            used.extend(RateMathExpression::from_string(stratified.rate.clone()).get_variables());
-        }
-    }
-    for parameter in &model.parameters {
-        if let Some(commol_core::ParameterValue::Formula(formula)) = &parameter.value {
-            used.extend(RateMathExpression::from_string(formula.clone()).get_variables());
-        }
-    }
-
+    let formulas = model_formulas(model);
+    let used: HashSet<String> = formulas
+        .iter()
+        .flat_map(|formula| {
+            RateMathExpression::from_string(formula.text.to_string()).get_variables()
+        })
+        .collect();
     let mut unknown: Vec<&String> = used
         .iter()
         .filter(|name| name.starts_with(SUBGROUP_TOTAL_PREFIX))
@@ -990,30 +989,152 @@ pub fn check_model(model: &Model) -> Result<(), String> {
         .filter(|name| !compartments.contains(name.as_str()))
         .filter(|name| !parameter_ids.contains(name.as_str()))
         .collect();
-    if unknown.is_empty() {
-        return Ok(());
-    }
-    unknown.sort();
-    let mut valid: Vec<&str> = subgroup_totals
-        .iter()
-        .map(String::as_str)
-        .filter(|name| name.starts_with(SUBGROUP_TOTAL_PREFIX))
-        .collect();
-    valid.sort_unstable();
-    let valid = if valid.is_empty() {
-        "none (the model has no stratifications)".to_string()
-    } else {
-        valid.join(", ")
-    };
-    Err(format!(
-        "Unknown subgroup total(s) {}. Category suffixes follow the \
-         declaration order of the stratifications. Valid names: {valid}",
-        unknown
+    if !unknown.is_empty() {
+        unknown.sort();
+        let mut valid: Vec<&str> = subgroup_totals
             .iter()
-            .map(|name| format!("'{name}'"))
-            .collect::<Vec<_>>()
-            .join(", ")
-    ))
+            .map(String::as_str)
+            .filter(|name| name.starts_with(SUBGROUP_TOTAL_PREFIX))
+            .collect();
+        valid.sort_unstable();
+        let valid = if valid.is_empty() {
+            "none (the model has no stratifications)".to_string()
+        } else {
+            valid.join(", ")
+        };
+        return Err(format!(
+            "Unknown subgroup total(s) {}. Category suffixes follow the \
+             declaration order of the stratifications. Valid names: {valid}",
+            unknown
+                .iter()
+                .map(|name| format!("'{name}'"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+
+    let defined: HashSet<&str> = parameter_ids
+        .iter()
+        .copied()
+        .chain(compartments.iter().copied())
+        .chain(subgroup_totals.iter().map(String::as_str))
+        .chain(process.bins.iter().map(|bin| bin.id.as_str()))
+        .chain(ENGINE_VARIABLES)
+        .chain(std::iter::once(NEIGHBORS))
+        .collect();
+    check_formula_variables(model, &formulas, &defined)
+}
+
+/// A formula of a model: a rate, a stratified rate or the value of a formula
+/// parameter.
+struct ModelFormula<'a> {
+    /// `"transition"` or `"parameter"`.
+    owner: &'static str,
+    /// The id of the transition or the parameter.
+    id: &'a str,
+    /// `"rate"`, `"stratified rate"` or `"formula"`.
+    part: &'static str,
+    /// The formula.
+    text: &'a str,
+}
+
+/// Every formula of a model, in the order of its transitions and then of its
+/// parameters.
+fn model_formulas(model: &Model) -> Vec<ModelFormula<'_>> {
+    let mut formulas = Vec::new();
+    for transition in &model.process.transitions {
+        let rates = transition.rate.iter().map(|rate| ("rate", rate)).chain(
+            transition
+                .stratified_rates
+                .iter()
+                .flatten()
+                .map(|stratified| ("stratified rate", &stratified.rate)),
+        );
+        for (part, text) in rates {
+            formulas.push(ModelFormula {
+                owner: "transition",
+                id: &transition.id,
+                part,
+                text,
+            });
+        }
+    }
+    for parameter in &model.parameters {
+        if let Some(ParameterValue::Formula(text)) = &parameter.value {
+            formulas.push(ModelFormula {
+                owner: "parameter",
+                id: &parameter.id,
+                part: "formula",
+                text,
+            });
+        }
+    }
+    formulas
+}
+
+/// Check that every rate and formula parameter of a model is in the
+/// language of formulas ([`RateMathExpression::check`]).
+///
+/// # Errors
+///
+/// Returns the message of the check, after the transition or the parameter
+/// that holds the formula.
+fn check_formulas(model: &Model) -> Result<(), String> {
+    for formula in model_formulas(model) {
+        RateMathExpression::from_string(formula.text.to_string())
+            .check()
+            .map_err(|error| {
+                let owner = match formula.owner {
+                    "transition" => "Transition",
+                    _ => "Parameter",
+                };
+                format!("{owner} '{}': {error}", formula.id)
+            })?;
+    }
+    Ok(())
+}
+
+/// Check that every variable a formula of the model reads is `defined`.
+///
+/// # Errors
+///
+/// Returns a message that names the transition or the parameter, its
+/// formula, the variables it reads that are not defined, and the parameters
+/// and the bins of the model.
+fn check_formula_variables(
+    model: &Model,
+    formulas: &[ModelFormula<'_>],
+    defined: &HashSet<&str>,
+) -> Result<(), String> {
+    let list = |mut ids: Vec<&str>| {
+        ids.sort_unstable();
+        if ids.is_empty() {
+            "none".to_string()
+        } else {
+            ids.join(", ")
+        }
+    };
+    for formula in formulas {
+        let undefined: Vec<String> = RateMathExpression::from_string(formula.text.to_string())
+            .get_variables()
+            .into_iter()
+            .filter(|name| !defined.contains(name.as_str()) && !is_neighbor_term(name))
+            .collect();
+        if !undefined.is_empty() {
+            return Err(format!(
+                "Undefined variables in {} '{}' {} '{}': {}. Available parameters: {}. \
+                 Available bins: {}.",
+                formula.owner,
+                formula.id,
+                formula.part,
+                formula.text,
+                undefined.join(", "),
+                list(model.parameters.iter().map(|p| p.id.as_str()).collect()),
+                list(model.process.bins.iter().map(|b| b.id.as_str()).collect()),
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// The variables a rate reads that name the neighbors of a unit:
@@ -1398,7 +1519,6 @@ fn specialized_fast_expr(
             compartment_map,
             expression_context,
         ))),
-        Expr::Constant(value) => Some(FastRateExpression::Constant(*value)),
         _ => None,
     }
 }
@@ -1589,6 +1709,7 @@ fn push_fast_ops_from_ast(
                 push_fast_ops_from_ast(operand, compartment_map, expression_context, ops)?;
                 ops.push(FastRateOp::Neg);
             }
+            // coverage: the check of the language rejects '!' outside the condition of an if
             UnaryOperator::Not => return None,
         },
         Expr::BinaryOp { op, left, right } => {
@@ -1631,10 +1752,11 @@ fn resolve_var_slot(
         VarSlot::Constant(std::f64::consts::PI)
     } else if name == SPECIAL_VAR_E {
         VarSlot::Constant(std::f64::consts::E)
-    } else if let Some(idx) = expression_context.parameter_index(name) {
-        VarSlot::ParameterIndex(idx)
     } else {
-        VarSlot::Parameter(name.to_string())
+        VarSlot::ParameterIndex(expression_context.parameter_index(name).expect(
+            "check_model rejects a variable that is not a compartment, an engine variable or a \
+             parameter of the context",
+        ))
     }
 }
 
@@ -1956,30 +2078,84 @@ mod tests {
     }
 
     #[test]
-    fn a_rate_or_a_formula_parameter_that_does_not_compile_is_a_build_error() {
-        use commol_core::{Parameter, ParameterValue};
-        let error = CompiledModel::try_from_model(&model_with_rate("k * typeof(A)"))
+    fn a_rate_or_a_formula_parameter_outside_the_language_is_a_build_error() {
+        use commol_core::{Parameter, ParameterValue, StratifiedRate};
+        let condition = "is only allowed in the condition of if(condition, a, b)";
+        let error = CompiledModel::try_from_model(&model_with_rate("k * (step > 1)"))
             .err()
-            .expect("the JIT has no typeof");
-        assert!(
-            error.starts_with(
-                "Transition 'ab': Invalid expression: 'k * typeof(A)' does not compile"
-            ),
-            "{error}"
+            .unwrap();
+        assert_eq!(
+            error,
+            format!("Transition 'ab': Formula 'k * (step > 1)': the comparison '>' {condition}")
+        );
+
+        let mut model = model_with_rate("k");
+        model.process.transitions[0].stratified_rates = Some(vec![StratifiedRate {
+            conditions: vec![StratificationCondition {
+                stratification: "group".to_string(),
+                category: Some("g1".to_string()),
+                to: None,
+            }],
+            rate: "!k".to_string(),
+            absolute: None,
+        }]);
+        assert_eq!(
+            check_model(&model).unwrap_err(),
+            format!("Transition 'ab': Formula '!k': the operator '!' {condition}")
         );
 
         let mut model = model_with_rate("k");
         model.parameters.push(Parameter {
             id: "f".to_string(),
-            value: Some(ParameterValue::Formula("typeof(k)".to_string())),
+            value: Some(ParameterValue::Formula("k > 1".to_string())),
             description: None,
         });
-        let error = CompiledModel::try_from_model(&model)
-            .err()
-            .expect("the JIT has no typeof");
-        assert!(
-            error.starts_with("Parameter 'f': Invalid expression: 'typeof(k)' does not compile"),
-            "{error}"
+        assert_eq!(
+            CompiledModel::try_from_model(&model).err().unwrap(),
+            format!("Parameter 'f': Formula 'k > 1': the comparison '>' {condition}")
+        );
+    }
+
+    #[test]
+    fn a_formula_that_reads_an_undefined_variable_is_a_build_error() {
+        use commol_core::{Parameter, ParameterValue};
+        let error = check_model(&model_with_rate("k9 * A + k * k8")).unwrap_err();
+        assert_eq!(
+            error,
+            "Undefined variables in transition 'ab' rate 'k9 * A + k * k8': k9, k8. \
+             Available parameters: k. Available bins: A, B."
+        );
+
+        let mut model = model_with_rate("f");
+        model.parameters.push(Parameter {
+            id: "f".to_string(),
+            value: Some(ParameterValue::Formula("k * k9".to_string())),
+            description: None,
+        });
+        assert_eq!(
+            check_model(&model).unwrap_err(),
+            "Undefined variables in parameter 'f' formula 'k * k9': k9. Available \
+             parameters: f, k. Available bins: A, B."
+        );
+
+        let mut model = model_with_rate("k9");
+        model.parameters.clear();
+        assert_eq!(
+            check_model(&model).unwrap_err(),
+            "Undefined variables in transition 'ab' rate 'k9': k9. Available \
+             parameters: none. Available bins: A, B."
+        );
+
+        let defined = "k * A * A_g1 * A_g1_s1 * total_g1 * total * step * t * pi * e";
+        assert_eq!(check_model(&model_with_rate(defined)), Ok(()));
+    }
+
+    #[test]
+    fn a_category_in_a_rate_is_rejected() {
+        assert_eq!(
+            check_model(&model_with_rate("k * g1")).unwrap_err(),
+            "Undefined variables in transition 'ab' rate 'k * g1': g1. Available \
+             parameters: k. Available bins: A, B."
         );
     }
 

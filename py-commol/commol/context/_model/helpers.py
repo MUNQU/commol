@@ -7,7 +7,6 @@ from commol.utils.equations import (
     define_units,
     get_predefined_variable_units,
 )
-from commol.utils.security import get_expression_variables
 
 
 class ModelCompartmentHelper:
@@ -38,7 +37,6 @@ class ModelCompartmentHelper:
     def _add_base_variable_units(self, variable_units: dict[str, str]) -> None:
         self._add_parameter_units(variable_units)
         self._add_bin_units(variable_units)
-        self._add_stratification_category_units(variable_units)
         self._add_compartment_units(variable_units)
         self._add_predefined_variable_units(variable_units)
         self._add_special_variable_units(variable_units)
@@ -65,7 +63,7 @@ class ModelCompartmentHelper:
     def mixed_unit_totals(self) -> set[str]:
         """
         The variables that add amounts of every bin: ``total``, the subgroup
-        totals ``total_<categories>``, a category and ``neighbors``. With bins
+        totals ``total_<categories>`` and ``neighbors``. With bins
         of different units they have none.
         """
         if self._common_bin_unit() is not None:
@@ -79,18 +77,7 @@ class ModelCompartmentHelper:
                 for name in engine_state.subgroup_total_names(process)
                 if name.startswith(SUBGROUP_TOTAL_PREFIX)
             ),
-            *(category for s in process.stratifications for category in s.categories),
         }
-
-    def _add_stratification_category_units(
-        self, variable_units: dict[str, str]
-    ) -> None:
-        bin_unit = self._common_bin_unit()
-        if bin_unit is None:
-            return
-        for strat in self._model.process.stratifications:
-            for category in strat.categories:
-                variable_units[category] = bin_unit
 
     def _add_compartment_units(self, variable_units: dict[str, str]) -> None:
         bin_units = self.bin_units()
@@ -167,7 +154,7 @@ class ModelCompartmentHelper:
         """
         try:
             self.register_custom_units()
-            variables = get_expression_variables(rate)
+            variables = engine_state.formula_inputs(rate)
             rate_variable_units: dict[str, str] = {}
             for var in variables:
                 if var in variable_units:
@@ -237,7 +224,7 @@ class ModelCompartmentHelper:
 
 def _infer_single_formula_unit(param, variable_units: dict[str, str]) -> bool:
     """Infer unit for a single formula parameter. Returns True if successful."""
-    formula_vars = get_expression_variables(param.value)
+    formula_vars = engine_state.formula_inputs(param.value)
     formula_var_units: dict[str, str] = {}
     for var in formula_vars:
         if var in variable_units:

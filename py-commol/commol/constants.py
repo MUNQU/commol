@@ -1,10 +1,12 @@
-"""Constants shared across the package."""
+"""Constants shared across the package, read from the engine."""
 
-TOTAL_VARIABLE = "total"
+from commol.commol_rs import _commol_rs as commol_rs
+
+TOTAL_VARIABLE: str = commol_rs.model.TOTAL
 """The sum of every compartment, accumulators excluded, in every expression."""
 
-RESERVED_VARIABLE_NAMES: tuple[str, ...] = (TOTAL_VARIABLE, "step", "t", "pi", "e")
+RESERVED_VARIABLE_NAMES: tuple[str, ...] = tuple(commol_rs.model.ENGINE_VARIABLES)
 """Variables the engine provides in every expression."""
 
-SUBGROUP_TOTAL_PREFIX = f"{TOTAL_VARIABLE}_"
+SUBGROUP_TOTAL_PREFIX: str = commol_rs.model.SUBGROUP_TOTAL_PREFIX
 """Prefix of the subgroup totals ``total_<cat>…`` the engine provides."""

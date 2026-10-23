@@ -556,9 +556,10 @@ def check_model(model: "Model") -> None:
     ValueError
         If the variant or the neighbors do not fit the process, a parameter
         id is an expanded compartment, a subgroup total or a name of the
-        neighbors, a rate or formula parameter uses a ``total_…`` name that
-        is not a subgroup total of the model, or a rate reads neighbors the
-        model cannot resolve.
+        neighbors, a rate or formula parameter is not in the language of
+        formulas, uses a ``total_…`` name that is not a subgroup total of the
+        model or reads a variable the model does not define, or a rate reads
+        neighbors the model cannot resolve.
     """
     commol_rs.model.check_model(_rust_model(model))
 
@@ -581,6 +582,30 @@ def subgroup_total_names(process: "Process") -> list[str]:
         The names, sorted. A process without stratifications has none.
     """
     return commol_rs.model.subgroup_total_names(_rust_process(process))
+
+
+def formula_inputs(formula: str) -> list[str]:
+    """
+    The values a formula reads, as the engine compiles it.
+
+    Parameters
+    ----------
+    formula : str
+        A formula of the language, such as a rate.
+
+    Returns
+    -------
+    list[str]
+        Its variables and the engine variables ``total``, ``step`` and ``t``
+        it reads, in the order it first reads them; not the constants ``pi``
+        and ``e``.
+
+    Raises
+    ------
+    ValueError
+        If the formula is not in the language of formulas.
+    """
+    return commol_rs.core.MathExpression(formula).inputs
 
 
 REPLICATE_SUMMARIES = ('"mean"', '"median"', "Quantile(level)", '"crps"')

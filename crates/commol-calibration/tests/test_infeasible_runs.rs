@@ -10,10 +10,11 @@ use commol_calibration::{
 use commol_core::Model;
 use commol_difference::DifferenceEquations;
 
-/// A → B at the proportional rate `rate`, in discrete steps from A = 1000.
+/// A → B at the proportional rate `rate`, in discrete steps from A = 1000,
+/// with `k = 0.1` and `m`, which has no value.
 fn decay_engine(rate: &str) -> DifferenceEquations {
     let json = format!(
-        r#"{{"name":"m","parameters":[{{"id":"k","value":0.1}}],
+        r#"{{"name":"m","parameters":[{{"id":"k","value":0.1}},{{"id":"m","value":null}}],
         "engine":{{"type":"DifferenceEquations"}},
         "process":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}}],
         "accumulators":[],"stratifications":[],
@@ -85,12 +86,15 @@ fn a_calibration_whose_bounds_include_infeasible_rates_finds_the_rate_of_the_dat
 
 #[test]
 fn a_rate_that_cannot_be_evaluated_stops_the_calibration_with_its_message() {
-    let problem = problem("k * missing", 0.5);
+    let problem = problem("k * m", 0.5);
 
     let error = OptimizationObjective::new(&problem)
         .cost(&vec![0.5])
         .unwrap_err()
         .to_string();
 
-    assert!(error.contains("missing"), "{error}");
+    assert!(
+        error.contains("The rate of transition 'ab' cannot be evaluated: "),
+        "{error}"
+    );
 }

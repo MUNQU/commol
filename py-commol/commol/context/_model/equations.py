@@ -28,7 +28,6 @@ from commol.context.description import (
     Table,
     Text,
 )
-from commol.utils.security import get_expression_variables
 
 if TYPE_CHECKING:
     from commol.context.model import Model
@@ -587,7 +586,7 @@ def replace_variables(text: str, rate: str, replace: Callable[[str], str]) -> st
     One pass replaces every variable, so a replacement is never read again:
     the category ``g1`` inside ``A_{g1}``, which replaces ``A_g1``, stays.
     """
-    variables = get_expression_variables(rate)
+    variables = engine_state.formula_inputs(rate)
     if not variables:
         return text
     names = "|".join(re.escape(variable) for variable in variables)

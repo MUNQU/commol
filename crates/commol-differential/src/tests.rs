@@ -566,13 +566,16 @@ fn a_missing_parameter_is_an_error_not_a_nan() {
     let model = model(
         "DifferentialEquations",
         &[("A", 1000.0), ("B", 0.0)],
-        &[],
+        &[("missing", "null")],
         &[],
         &[transition("ab", &["A"], &["B"], "missing * A", "")],
         "",
     );
     let error = engine(&model).run(2).unwrap_err().to_string();
-    assert!(error.contains("missing"), "{error}");
+    assert!(
+        error.contains("The rate of transition 'ab' cannot be evaluated: "),
+        "{error}"
+    );
 }
 
 #[test]

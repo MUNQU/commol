@@ -347,12 +347,17 @@ mod tests {
         }
     }
 
+    /// A → B at the rate `missing * A`, where `missing` has no value.
     fn make_missing_parameter_model() -> Model {
         Model {
             name: "AB_missing_parameter".to_string(),
             description: None,
             version: None,
-            parameters: vec![],
+            parameters: vec![commol_core::Parameter {
+                id: "missing".to_string(),
+                value: None,
+                description: None,
+            }],
             process: Process {
                 bins: vec![
                     Bin {
@@ -461,7 +466,10 @@ mod tests {
             .expect_err("missing parameter must not be treated as zero")
             .to_string();
 
-        assert!(error.contains("Variable 'missing' not found"));
+        assert!(
+            error.contains("The rate of transition 'flow' cannot be evaluated: Parameter index"),
+            "{error}"
+        );
     }
 
     fn make_three_bin_model() -> Model {

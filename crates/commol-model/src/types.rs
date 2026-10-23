@@ -17,12 +17,10 @@ use commol_core::{
 pub(crate) enum VarSlot {
     /// Direct index into the amounts of the compartments in the state.
     Compartment(usize),
-    /// Direct index into `MathExpressionContext`'s parameter value storage.
+    /// Direct index into `MathExpressionContext`'s parameter value storage:
+    /// user parameters, formula parameters, series, `total`, subgroup totals,
+    /// bin totals and partial bin totals.
     ParameterIndex(usize),
-    /// Look up by name in `MathExpressionContext.parameters` (covers user
-    /// parameters, formula parameters, series, subgroup totals,
-    /// base bin sums, and partial bin-strat sums).
-    Parameter(String),
     /// The step that holds the current time (`step`).
     Step,
     /// The current time (`t`). Equal to `step` in an engine that reports only

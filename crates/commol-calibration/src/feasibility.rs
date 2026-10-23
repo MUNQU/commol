@@ -132,7 +132,8 @@ impl Feasibility {
     ///
     /// # Errors
     ///
-    /// Returns a message when a constraint expression is invalid, names an
+    /// Returns a message that names the constraint when its expression is
+    /// not in the language of formulas ([`MathExpression::check`]), names an
     /// unknown variable, or reads an output without positions.
     pub fn new(
         parameters: &[CalibrationParameter],
@@ -158,11 +159,8 @@ impl Feasibility {
         let mut position_constraints = Vec::new();
         for constraint in constraints {
             let expression = MathExpression::new(constraint.expression.clone());
-            if let Err(e) = expression.validate().and_then(|()| expression.compiles()) {
-                return Err(format!(
-                    "Constraint '{}' has invalid expression: {:?}",
-                    constraint.id, e
-                ));
+            if let Err(error) = expression.check() {
+                return Err(format!("Constraint '{}': {error}", constraint.id));
             }
             // The engine variables (`total`, `t`, ...) are not among them.
             for variable in expression.get_variables() {

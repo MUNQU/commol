@@ -3,11 +3,12 @@
 import ast
 import math
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any
 
 import pint
 
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.parameter import Parameter
 from commol.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
 
@@ -180,6 +181,53 @@ def _min(*operands: Any) -> Any:
     return _match_units(*operands)[0]
 
 
+def _cbrt(operand: Any) -> Any:
+    """``cbrt(x)``: the cube root of a quantity is the cube root of its unit."""
+    if isinstance(operand, pint.Quantity):
+        return operand ** (1 / 3)
+    return math.cbrt(operand)
+
+
+_FUNCTION_UNITS: dict[str, Callable[..., Any]] = {
+    "sin": math.sin,
+    "cos": math.cos,
+    "tan": math.tan,
+    "asin": math.asin,
+    "acos": math.acos,
+    "atan": math.atan,
+    "atan2": math.atan2,
+    "sinh": math.sinh,
+    "cosh": math.cosh,
+    "tanh": math.tanh,
+    "asinh": math.asinh,
+    "acosh": math.acosh,
+    "atanh": math.atanh,
+    "exp": math.exp,
+    "log": math.log,
+    "ln": math.log,
+    "log10": math.log10,
+    "log2": math.log2,
+    "sqrt": math.sqrt,
+    "cbrt": _cbrt,
+    "pow": math.pow,
+    "hypot": math.hypot,
+    "min": _min,
+    "max": _min,
+    "abs": abs,
+    "floor": math.floor,
+    "ceil": math.ceil,
+    "round": round,
+}
+"""The rule of each function: a function of `math` takes and gives numbers
+without a unit; ``abs`` and ``round`` keep the unit of their argument,
+``cbrt`` takes its cube root, and ``min`` and ``max`` need one unit."""
+
+_FUNCTIONS: dict[str, Callable[..., Any]] = {
+    name: _FUNCTION_UNITS[name] for name in commol_rs.core.FUNCTIONS
+}
+"""The rule of each function of the engine (``commol_rs.core.FUNCTIONS``)."""
+
+
 class _ReadWrittenNumbers(ast.NodeTransformer):
     """Mark written numbers, and route sums, differences and comparisons."""
 
@@ -220,10 +268,12 @@ def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Q
     Parse an equation and compute its resulting unit.
 
     The equation is evaluated with every variable as a `pint` quantity of
-    value 1 in its unit. A number written in the equation and added to,
-    subtracted from or compared with a quantity is read in that quantity's
-    unit, as the engine reads it; the two branches of ``if(c, a, b)`` and
-    the arguments of ``min`` and ``max`` share one unit.
+    value 1 in its unit. ``^`` and ``**`` are a power. A number written in the
+    equation and added to, subtracted from or compared with a quantity is read
+    in that quantity's unit, as the engine reads it; the two branches of
+    ``if(c, a, b)`` and the arguments of ``min`` and ``max`` share one unit.
+    ``cbrt`` takes the cube root of a unit, ``abs`` and ``round`` keep it,
+    and the other functions take and give numbers without a unit.
 
     Parameters
     ----------
@@ -242,37 +292,11 @@ def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Q
     for var, unit_str in variable_units.items():
         namespace[var] = ureg(unit_str)
 
+    namespace.update(_FUNCTIONS)
     namespace.update(
         {
             "pi": math.pi,
             "e": math.e,
-            "sin": math.sin,
-            "cos": math.cos,
-            "tan": math.tan,
-            "asin": math.asin,
-            "acos": math.acos,
-            "atan": math.atan,
-            "atan2": math.atan2,
-            "sinh": math.sinh,
-            "cosh": math.cosh,
-            "tanh": math.tanh,
-            "asinh": math.asinh,
-            "acosh": math.acosh,
-            "atanh": math.atanh,
-            "exp": math.exp,
-            "log": math.log,
-            "log10": math.log10,
-            "log2": math.log2,
-            "ln": math.log,
-            "sqrt": math.sqrt,
-            "pow": math.pow,
-            "hypot": math.hypot,
-            "abs": abs,
-            "floor": math.floor,
-            "ceil": math.ceil,
-            "round": round,
-            "min": _min,
-            "max": _min,
             "_literal": _Literal,
             "_add": _add,
             "_subtract": _subtract,
@@ -282,7 +306,8 @@ def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Q
     )
 
     try:
-        tree = ast.parse(_IF_CALL.sub("_if(", equation), mode="eval")
+        python = _IF_CALL.sub("_if(", equation).replace("^", "**")
+        tree = ast.parse(python, mode="eval")
         tree = ast.fix_missing_locations(_ReadWrittenNumbers().visit(tree))
         eval_result: object = eval(
             compile(tree, "<equation>", "eval"), {"__builtins__": {}}, namespace

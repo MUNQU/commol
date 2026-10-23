@@ -171,5 +171,8 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(subgroup_total_names, m)?)?;
     m.add("NEIGHBORS", commol_core::NEIGHBORS)?;
     m.add("NEIGHBORS_PREFIX", commol_core::NEIGHBORS_PREFIX)?;
+    m.add("ENGINE_VARIABLES", commol_core::ENGINE_VARIABLES.to_vec())?;
+    m.add("TOTAL", commol_core::SPECIAL_VAR_TOTAL)?;
+    m.add("SUBGROUP_TOTAL_PREFIX", commol_core::SUBGROUP_TOTAL_PREFIX)?;
     Ok(())
 }

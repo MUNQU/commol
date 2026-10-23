@@ -260,7 +260,7 @@ class TestCombine:
         )
 
     def test_a_formula_longer_than_the_default_cap_follows_its_configuration(self):
-        expr = " + ".join(f"k{i}" for i in range(3000))
+        expr = " + ".join(f"rate_of_part_{i}_of_the_long_formula" for i in range(400))
         config = SecurityConfig(max_expression_length=len(expr) + 2)
 
         pattern = AxisPattern.from_formula(expr, config=config)

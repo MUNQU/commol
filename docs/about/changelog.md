@@ -24,6 +24,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one`, and an impulse or a series point between two steps names `the
   DifferenceEquations engine` or `the StochasticSteps engine`.
 
+### Fixed
+
+- One check of the engine defines the language of formulas, the one
+  [Mathematical expressions](../guide/mathematical-expressions.md)
+  documents, for rates, formula parameters, calibration constraints and the
+  unit check. A formula outside it fails when it is added, with a message
+  that names the formula and its first part outside the language. Before,
+  `k1 * (step > 30)` was accepted as a formula parameter, and `step > 1` as
+  a rate became a parameter named `step > 1` that failed only when the model
+  ran. A formula that calls a function the guide does not list, such as
+  `erf`, `fma` or `trunc`, fails as a rate always did; a formula parameter
+  accepted it before.
+- A rate or a formula parameter that reads a variable the model does not
+  define fails when the model is built. Before, only a transition rate was
+  checked, and a formula parameter failed when the model ran. A category id
+  is not a variable: before, a rate that read one passed the build and
+  failed when the model ran.
+- An error of a rate when the model runs names its transition, not the
+  indices of its compartments.
+- `SecurityConfig.max_complexity_score` limits the number of nodes of the
+  tree of a formula (numbers, variables, operators and calls), as the guide
+  documents. Before, it limited nothing.
+- The unit check reads `^` as a power, as the engine does, and `cbrt` takes
+  the cube root of a unit.
+
 ## [0.10.1] - 2026-10-23
 
 This release ships the fixes of the audit at 0.9.0 that change no API. In the

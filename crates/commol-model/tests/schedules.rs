@@ -125,12 +125,30 @@ fn an_impulse_has_positions_or_a_period_not_both() {
 }
 
 #[test]
-fn an_impulse_period_is_positive_and_its_offset_finite() {
-    for (period, offset) in [(0.0, 0.0), (f64::INFINITY, 0.0), (1.0, f64::INFINITY)] {
+fn an_impulse_period_that_is_not_positive_names_the_transition() {
+    for (period, offset, message) in [
+        (
+            0.0,
+            0.0,
+            "Transition 'ab' has the impulse period 0; it must be positive",
+        ),
+        (
+            f64::INFINITY,
+            0.0,
+            "Transition 'ab' has the impulse period inf; it must be positive",
+        ),
+        (
+            1.0,
+            f64::INFINITY,
+            "Transition 'ab' has the impulse offset inf; it must be finite and not negative",
+        ),
+    ] {
         let mut model = model("k", "k", "step_function", r#","impulse_every":[1,0]"#);
         model.process.transitions[0].impulse_every = Some((period, offset));
-        let error = CompiledModel::try_from_model(&model).err();
-        assert!(error.is_some(), "period {period}, offset {offset}");
+        assert_eq!(
+            CompiledModel::try_from_model(&model).err().as_deref(),
+            Some(message)
+        );
     }
 }
 

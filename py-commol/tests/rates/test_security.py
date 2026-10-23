@@ -1,5 +1,8 @@
+import re
+
 import pytest
 
+from commol import ModelBuilder
 from commol.utils.security import (
     validate_expression_security,
     SecurityError,
@@ -104,7 +107,6 @@ class TestBasicValidation:
             "floor(x)",
             "ceil(x)",
             "round(x)",
-            "trunc(x)",
             # Min/max
             "max(a, b)",
             "min(a, b)",
@@ -501,7 +503,7 @@ class TestDisallowedCharacters:
             "k1_k2",  # Underscore
             "alpha123",  # Alphanumeric
             "value + 2.5",  # Decimal point in numbers
-            "func(arg1, arg2)",  # Parentheses and comma
+            "max(arg1, arg2)",  # Parentheses and comma
             "x * y / z",  # Basic operators
             "rate**2",  # Double asterisk (power)
             "a % b",  # Modulo operator
@@ -548,3 +550,24 @@ class TestStrictModeValidation:
     def test_a_suspicious_keyword_between_underscores_is_rejected(self):
         with pytest.raises(SecurityError, match="Suspicious keyword 'key'"):
             validate_expression_security("my_key * A")
+
+
+def test_a_formula_parameter_passes_the_expression_check() -> None:
+    message = (
+        "Parameter 'k2': Formula 'k1 * (step > 30)': the comparison '>' is only "
+        "allowed in the condition of if(condition, a, b)"
+    )
+
+    with pytest.raises(ValueError, match=re.escape(message)):
+        ModelBuilder(name="m").add_parameter(id="k2", value="k1 * (step > 30)")
+
+
+def test_a_formula_above_the_complexity_score_is_rejected() -> None:
+    config = SecurityConfig(max_complexity_score=5)
+
+    with pytest.raises(
+        SecurityError,
+        match=re.escape("Complexity score too high: 7 nodes (maximum: 5)"),
+    ):
+        validate_expression_security("k1 + k2 + k3 + k4", config)
+    assert_accepted(validate_expression_security, "k1 + k2 + k3", config)

@@ -59,9 +59,13 @@ Use this page before you make or review a change. It turns the
 
 ### Expressions (functions, variables)
 
-- [ ] Change `crates/commol-core/src/math_expression/`, including the JIT
-      (`jit/`) and its tests.
-- [ ] Add a new function to `SAFE_FUNCTIONS` in `utils/security.py`.
+- [ ] Change the language in `crates/commol-core/src/math_expression/`: a
+      function is one entry of `FUNCTIONS` (`language.rs`), which the check,
+      the JIT and Python (`commol_rs.core.FUNCTIONS`) read; an operator is a
+      case of `check` (`language.rs`) and of the JIT (`jit/`).
+- [ ] Give a new function its value in
+      `crates/commol-core/tests/expressions.rs::every_function_of_the_guide_has_its_value`
+      and its unit rule in `_FUNCTION_UNITS` (`utils/equations.py`).
 - [ ] Update [Mathematical expressions](../guide/mathematical-expressions.md).
 
 ### Initial conditions
