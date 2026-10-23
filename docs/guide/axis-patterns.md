@@ -52,7 +52,7 @@ difference model both are the step `s`.
 | `linear_ramp(start, end, start_value, end_value)` | `t` | From `start_value` at `start` towards `end_value`, for `start <= t < end`; else 0 | `start < end`, any finite positions |
 | `sinusoid(amplitude, period, phase=0, baseline=0)` | `t` | `baseline + amplitude × sin(2π (t − phase) / period)` | numeric `period != 0` |
 | `gaussian_pulse(center, width, peak)` | `t` | `peak × exp(−(t − center)² / (2 width²))` | `width > 0` |
-| `from_formula(expr)` | Any expression, wrapped in parentheses | not empty; passes the security check |
+| `from_formula(expr)` | What it names | The expression, wrapped in parentheses | not empty; passes the security check |
 
 An invalid argument raises `pydantic.ValidationError` (a `ValueError`). These
 arguments also accept a parameter name, so calibration can fit them: `value`
@@ -168,6 +168,7 @@ print(stratified_flows(schedule))
 | A compartment that matches no group, with no default | No flow |
 | A compartment that matches several groups | The group with the most conditions wins |
 | `conditions` | Not empty; each entry has `stratification` and `category`, and may have `to` |
+| Two groups with the same conditions | `ValueError` |
 
 ```python
 only_cat1 = AxisPattern.add_group(
@@ -249,7 +250,7 @@ In a `DifferentialEquations` model `step` is constant on each unit interval
 
 | Pattern | In a differential model |
 |---|---|
-| `pulse`, `pulses`, `periodic` (read `step`) | A rate that holds for one unit: a proportional `pulse` of `value` moves `1 − e^(−value)` of its source, and `value` in a difference model. To move a fraction at once in both engines, use an [impulse](transitions.md#impulses). |
+| `pulse`, `pulses`, `periodic` (read `step`) | A rate that holds for one unit of the axis ([Time inside a step](simulations.md#time-inside-a-step) says what it moves). To move a fraction at once in both engines, use an [impulse](transitions.md#impulses). |
 | `interval`, `linear_ramp` (read `t`) | Open and close at any position, such as `interval(start=2.5, end=4, …)`; the ramp is continuous. The engine restarts its integration at both bounds. |
 | `sinusoid`, `gaussian_pulse` (read `t`) | Continuous in `t`. |
 
@@ -288,8 +289,8 @@ long formulas, so equations stay readable and many pulses stay fast:
 | Not in a group | `_series_<n>` |
 | In a group | `{transition}_{source bin}_{source categories}_to_{target bin}_{target categories}`, such as `flow_A_cat1_to_B_cat1` |
 
-A generated id must not clash with a parameter of yours; building the model
-raises if it does.
+A generated id must not clash with a parameter of yours: the second of the two
+calls (`add_parameter` or `add_transition`) raises `ValueError`.
 
 ## Next steps
 

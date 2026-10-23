@@ -67,30 +67,32 @@ plugins:
           - index.md: Overview and where to go
           - getting-started/*.md
         User guide:
-          - guide/core-concepts.md: Compartments, stratifications, transitions, rates, the process and the structure, with runnable examples
-          - guide/building-models.md: Every ModelBuilder method and argument, series parameters, validation rules, save and load
-          - guide/transitions.md: Absolute and proportional rates, several sources, $compartment, category transitions, per_compartment, stratified rates, what build checks
+          - guide/core-concepts.md: Compartments, parameters, transitions, accumulators, the process and the structure, the four engines and what a rate means in each, stratifications, units of the axis
+          - guide/building-models.md: Every ModelBuilder method and argument, series parameters, the Aggregate structure and its neighbors, build, save and load
+          - guide/transitions.md: Absolute and proportional rates, several sources, $compartment, category transitions, per_compartment, stratified rates, impulses, amounts below zero, what build checks
           - guide/mathematical-expressions.md: Operators, variables, subgroup totals, functions and security limits of rate formulas
           - guide/axis-patterns.md: AxisPattern pulses, windows, ramps, sinusoids, combinations and schedules per subgroup
-          - guide/units-and-equations.md: Unit checking of rates, impulses and the step unit
+          - guide/units-and-equations.md: Unit checking of rates, the step unit, positions and numbers in a rate, impulses, and dates on the axis
           - guide/describing-models.md: Model.describe, its sections and blocks, text, Markdown, LaTeX, JSON and DOT renderings, the ODD layout
-          - guide/simulations.md: Simulation.run, output formats, totals by bin and category, windowed totals, plotting
-          - guide/stochastic.md: The StochasticEvents and StochasticSteps engines, how rates become events, whole units, methods, calibration with replicates
-          - guide/calibration.md: CalibrationProblem, observations, unknowns, losses, results and writing results back
+          - guide/simulations.md: Simulation.run and run_at, results by output name, seeds and replicates, accumulators, totals by bin and category, windowed totals, differential equations, figures and plot_compared
+          - guide/stochastic.md: The StochasticEvents and StochasticSteps engines, how rates become events, whole units, seeds and replicates, methods, calibration with replicates
+          - guide/calibration.md: CalibrationProblem, observations, unknowns, losses, stochastic engines, results and writing results back
           - guide/calibration-initial-conditions.md: Calibrating bins, categories and compartments, the remainder and the order of application
-          - guide/calibration-observations.md: Several outputs, sums of outputs, weights, scale factors and windowed observations
-          - guide/calibration-optimizers.md: Nelder-Mead and particle swarm settings, reproducibility, troubleshooting
+          - guide/calibration-observations.md: The fields of an observation, several outputs, sums of outputs, weights, scale factors and windowed observations
+          - guide/calibration-optimizers.md: Nelder-Mead and particle swarm settings, several starts, reproducibility, troubleshooting
           - guide/calibration-constraints.md: Constraints on unknowns and outputs, and how violations count
-          - guide/uncertainty/index.md: The three questions, bands and prediction intervals, which method answers which question, the parameter sample, the predictive, scores and the entry point
+          - guide/uncertainty/index.md: The three questions, bands and prediction intervals, which method answers which question, the parameter sample, the predictive, scenarios, scores and the entry point
+          - guide/uncertainty/observation-models.md: Observation models of each series, noise parameters, maximum likelihood, the Bayesian posterior and its evidence, prediction intervals with noise, the log score and the parametric bootstrap
           - guide/uncertainty/identifiability.md: Structural against practical identifiability, the structural rank, collinearity, a sample, starts, combinations and the report
           - guide/uncertainty/resampling.md: The Bayesian, residual and wild block bootstraps, the block jackknife, block lengths and prediction intervals from residuals
           - guide/uncertainty/smc.md: Priors, the sequential Monte Carlo sampler, the Gibbs posterior and its scale eta, ABC and its distances, and the diagnostics
-          - guide/uncertainty/observation-models.md: Observation models of each series, noise parameters, maximum likelihood, the Bayesian posterior and its evidence, prediction intervals with noise, the log score and the parametric bootstrap
+          - guide/uncertainty/local.md: The curvature and the unbounded scale, the Laplace approximation and the delta method, the sandwich, the Laplace mixture and PSIS
+          - guide/uncertainty/profiles.md: Profile likelihood of parameters and predictions, how to read a profile, the chi-square, Beale and bootstrap thresholds, the adaptive step, verdicts, the report and plots
           - guide/uncertainty/conformal.md: Conformal prediction intervals, the guarantee, scores and pooling, split, rolling origins, jackknife+ and CV+, EnbPI, adaptive conformal, plots and reports
           - guide/uncertainty/sensitivity.md: Forward questions with no data, input spaces, quantities of interest, propagation, PRCC, Morris screening, Sobol indices, polynomial chaos and their plots
-          - guide/uncertainty/profiles.md: Profile likelihood of parameters and predictions, how to read a profile, the chi-square, Beale and bootstrap thresholds, the adaptive step, verdicts, the report and plots
-          - guide/reports.md: applied_parameters_report and simulation_report
-          - guide/examples.md: Complete models
+          - guide/reports.md: The applied parameters of a model, and the reports of a run, of replicates, of a predictive and of an identifiability analysis
+          - guide/parallelism.md: The threads and levels of the parallel work, commol.set_threads and commol.threads, RAYON_NUM_THREADS
+          - guide/examples.md: Complete models, from rates and stratifications to other engines, a fit, its uncertainty and scenarios
         API reference:
           - api/*.md
           - advanced/model-structure.md: The data model of a Model
@@ -152,17 +154,17 @@ nav:
           - Observations: guide/calibration-observations.md
           - Optimizers: guide/calibration-optimizers.md
           - Constraints: guide/calibration-constraints.md
-          - Reports: guide/reports.md
       - Uncertainty:
           - Uncertainty: guide/uncertainty/index.md
+          - Observation Models: guide/uncertainty/observation-models.md
           - Identifiability: guide/uncertainty/identifiability.md
           - Resampling: guide/uncertainty/resampling.md
           - Sequential Monte Carlo: guide/uncertainty/smc.md
-          - Observation Models: guide/uncertainty/observation-models.md
-          - Conformal: guide/uncertainty/conformal.md
-          - Sensitivity Analysis: guide/uncertainty/sensitivity.md
           - Local Approximations: guide/uncertainty/local.md
           - Profile Likelihood: guide/uncertainty/profiles.md
+          - Conformal: guide/uncertainty/conformal.md
+          - Sensitivity Analysis: guide/uncertainty/sensitivity.md
+      - Reports: guide/reports.md
       - Threads and Parallelism: guide/parallelism.md
       - Examples: guide/examples.md
   - API Reference:

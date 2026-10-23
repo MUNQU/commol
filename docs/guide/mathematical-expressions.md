@@ -1,6 +1,6 @@
 # Mathematical Expressions
 
-[Back to Home](../index.md)
+[Back to Building Models](building-models.md)
 
 Rates and formula parameters are written as expressions, such as
 `"k1 * A * B / total"`. This page lists everything an expression can contain:
@@ -38,8 +38,7 @@ results = Simulation(model).run(num_steps=60)
 | Stratified rate `rate` | `"k_g1 * A"` | Like a transition rate |
 | Calibration constraint `expression` | `"k1 - k2"` | See [Model Calibration](calibration.md) |
 
-Whether a rate is the flow itself or a rate per member of the source depends on
-the variables it names; see
+The variables a rate names decide whether it is absolute or proportional; see
 [Absolute and proportional rates](transitions.md#absolute-and-proportional-rates).
 
 ## Operators
@@ -79,7 +78,7 @@ never a variable.
 | A compartment name, such as `A_g1` | That compartment's amount |
 | A bin id, with stratifications | The total of all its compartments |
 | `total` | The total: the sum of every compartment, accumulators excluded |
-| `neighbors_<bin>`, `neighbors` | In a transition rate only: the amount of a bin among the neighbors of a unit, and their total. The structure says who they are; a rate that reads them and no compartment is proportional. See [Neighbors](building-models.md#neighbors) |
+| `neighbors_<bin>`, `neighbors` | In a transition rate only: what the neighbors of a unit hold, of one bin or of every bin. The structure says who they are; a rate that reads them and no compartment is proportional. See [Neighbors](building-models.md#neighbors) |
 | `t` | The current position on the axis. A difference model reads it at each step, so there it equals `step`; a differential model reads it anywhere |
 | `step` | The step that holds the current position, `floor(t)`: 0, 1, 2, … It is constant on each unit interval of a differential model; see [Time inside a step](simulations.md#time-inside-a-step) |
 | `pi`, `e` | π and e |
@@ -89,7 +88,7 @@ never a variable.
 With stratifications, the engine also provides sums of compartments, the
 subgroup totals. Category suffixes must follow the order in which the
 stratifications were declared. `commol_rs.model.subgroup_total_names` (in
-`crates/commol-model/src/builder.rs`) lists them for a structure.
+`crates/commol-model/src/builder.rs`) lists them for a process.
 
 | Variable | Sum of | Example (`group` then `type`) |
 |---|---|---|
@@ -148,7 +147,7 @@ print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 | Exponential and logarithm | `exp`, `log` (natural), `ln` (natural), `log10`, `log2` |
 | Power and root | `sqrt`, `cbrt`, `pow(x, y)`, `hypot(x, y)` |
 | Comparison | `min(a, b)`, `max(a, b)`, `abs` |
-| Rounding | `floor`, `ceil`, `round` (halves round up: `round(2.5)` is 3) |
+| Rounding | `floor`, `ceil`, `round` (halves round away from zero: `round(2.5)` is 3, `round(-2.5)` is -3) |
 | Conditional | `if(condition, value_if_true, value_if_false)` |
 
 For rates that change along the axis, [`AxisPattern`](axis-patterns.md) builds

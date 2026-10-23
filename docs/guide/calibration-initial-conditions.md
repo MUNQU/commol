@@ -78,8 +78,9 @@ Here `B` is calibrated, and `A`, the remainder, takes what `B` leaves of the
 | An expanded compartment | `"B_g1_t2"` | The amount of that compartment alone, in the unit of its bin. |
 | A category of a **binary** stratification | `"g1"` or `"group:g1"` | The split: every `(g1, g2)` pair of compartments keeps its total and gives `g1` this fraction. |
 
-A category name that two stratifications declare must be qualified with its
-stratification, as in `"group:g1"`; a bare name is rejected as ambiguous.
+A category that two stratifications share is written with its stratification,
+as in `"group:g1"` ([the same rule](core-concepts.md#updating-the-initial-state-after-building)
+as for the initial state); a bare name is rejected as ambiguous.
 
 The engine resolves every id when you create the `Calibrator`
 (`InitialConditionPlan` in

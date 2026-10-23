@@ -1,6 +1,6 @@
-"""Check the layout of the maintainer documentation: one page per area of
-decisions, one owner for each piece of shared content, and a size budget for
-each page."""
+"""Check the layout of the documentation: every page in the navigation, one
+page per area of decisions, one owner for each piece of text, and a size budget
+for each maintainer page."""
 
 import re
 from collections import defaultdict
@@ -22,6 +22,38 @@ HEADING = re.compile(r"^## (?P<title>.+)$", re.MULTILINE)
 def relative(page: Path) -> str:
     """The path of ``page`` from the root of the repository."""
     return page.relative_to(REPO_ROOT).as_posix()
+
+
+NAV_PAGE = re.compile(r"^\s+- (?:.+: )?(?P<page>[\w./-]+\.md)\s*$", re.MULTILINE)
+INCLUDE = re.compile(r'--8<-- "(?P<path>[^":]+\.md)')
+
+
+def navigation() -> list[str]:
+    """The pages of the ``nav`` of ``mkdocs.yaml``, relative to ``docs/``."""
+    mkdocs = (REPO_ROOT / "mkdocs.yaml").read_text(encoding="utf-8")
+    nav = re.search(r"^nav:\n(?P<items>(?:[ \t].*\n|\n)*)", mkdocs, re.MULTILINE)
+    assert nav, "mkdocs.yaml has no nav"
+    return [match.group("page") for match in NAV_PAGE.finditer(nav.group("items"))]
+
+
+@pytest.mark.docs
+def test_every_page_is_in_the_navigation() -> None:
+    """Every page of ``docs/`` is in the navigation once, or is included in
+    another page; every page of the navigation exists."""
+    nav = navigation()
+    pages = {page.relative_to(DOCS_DIR).as_posix() for page in DOCS_DIR.rglob("*.md")}
+    included = {
+        Path(match.group("path")).relative_to("docs").as_posix()
+        for page in DOCS_DIR.rglob("*.md")
+        for match in INCLUDE.finditer(page.read_text(encoding="utf-8"))
+        if match.group("path").startswith("docs/")
+    }
+    missing = sorted(pages - set(nav) - included)
+    assert not missing, f"Add these pages to the nav of mkdocs.yaml: {missing}"
+    absent = sorted(set(nav) - pages)
+    assert not absent, f"The nav of mkdocs.yaml names pages that do not exist: {absent}"
+    twice = sorted({page for page in nav if nav.count(page) > 1})
+    assert not twice, f"The nav of mkdocs.yaml names these pages twice: {twice}"
 
 
 def anchor(title: str) -> str:
@@ -69,26 +101,45 @@ def test_no_link_to_a_moved_decision() -> None:
 
 
 REPEAT_WORDS = 12
+CHANGELOG = DOCS_DIR / "about" / "changelog.md"
+TABLE_RULE = re.compile(r"^ *\|?( *:?-+:? *\|)+( *:?-+:? *)?$")
 
 
-def shared_pages() -> list[Path]:
-    """The pages that must not repeat one another."""
+def documentation_pages() -> list[Path]:
+    """The pages that must not repeat one another: ``AGENTS.md`` and every
+    page of ``docs/`` but the changelog, whose entries name the changes."""
     return [
         AGENTS,
-        *sorted(CODEBASE_DIR.rglob("*.md")),
-        *sorted((DOCS_DIR / "development").rglob("*.md")),
+        *sorted(page for page in DOCS_DIR.rglob("*.md") if page != CHANGELOG),
     ]
+
+
+def prose_words(page: Path) -> list[str]:
+    """
+    The words of ``page`` outside code blocks and the header rows of tables,
+    without the bars between cells.
+
+    A header row (``| Argument | Type | Default |``) and the bars are the
+    layout that many tables share, not text.
+    """
+    lines = CODE_BLOCK.sub("", page.read_text(encoding="utf-8")).splitlines()
+    kept = [
+        line
+        for line, after in zip(lines, [*lines[1:], ""], strict=True)
+        if not TABLE_RULE.match(line) and not TABLE_RULE.match(after)
+    ]
+    return [word for word in " ".join(kept).split() if word.strip("|")]
 
 
 @pytest.mark.docs
 def test_no_text_is_repeated_across_pages() -> None:
-    """No run of twelve words, outside code blocks, is in two pages."""
+    """No run of twelve words of text is in two pages."""
     runs: defaultdict[str, set[str]] = defaultdict(set)
     words_of: dict[str, list[str]] = {}
     keys_of: dict[str, list[str]] = {}
-    for page in shared_pages():
+    for page in documentation_pages():
         name = relative(page)
-        words = CODE_BLOCK.sub("", page.read_text(encoding="utf-8")).split()
+        words = prose_words(page)
         # The run of twelve words that starts at each word, joined once.
         keys = [
             " ".join(words[start : start + REPEAT_WORDS])

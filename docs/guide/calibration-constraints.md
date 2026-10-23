@@ -73,8 +73,8 @@ print(round(best["k1"] / best["k2"], 2))  # 3.0: the best fit that respects k1 /
 | `id` | `str` | required | A unique identifier, used in error messages. |
 | `expression` | `str` | required | Must evaluate to `>= 0` when the constraint holds. |
 | `description` | `str \| None` | `None` | A free-text description. |
-| `weight` | `float` | `1.0` | Scales the penalty of a violation. |
-| `at` | `list[float] \| None` | `None` | The positions on the axis at which to evaluate it. Required when the expression names an output. A difference model accepts integer steps only. |
+| `weight` | `float` | `1.0` | Above zero. Multiplies the amount of a violation in the penalty. |
+| `at` | `list[float] \| None` | `None` | The positions on the axis at which to evaluate it. Required when the expression names an output. The engine accepts the positions it accepts for [observations](calibration-observations.md#positions-between-integers). |
 
 ## Writing the expression
 
@@ -96,7 +96,7 @@ passes the same security check.
 | Kind | Can name | Checked |
 |---|---|---|
 | Without `at` | The calibration unknowns only | Once per evaluation, before the simulation |
-| With `at` | The unknowns and the simulation outputs (compartments and accumulators) | At each listed position of the simulation |
+| With `at` | The unknowns and the simulation outputs (compartments, accumulators and the total of a bin over its categories, such as `B` of a stratified model) | At each listed position of the simulation, in every replicate of a stochastic engine |
 
 A constraint cannot name a model parameter that is not calibrated, and an
 expression that names an output without `at` is rejected when the
@@ -121,8 +121,12 @@ loss = P × (1 + Σ weight × |violation|)
 P    = max(1000 × n × (largest observed value)², 1e10)
 ```
 
-where the sum runs over the violated constraints and `n` is the number of
-observations. Parameter constraints are checked first, and the simulation is
+where the sum runs over the violated constraints (and, for a constraint with
+`at`, over its positions) and `n` is the number of observations. With
+[observation models](uncertainty/observation-models.md), `P` comes from the
+cost of each observation at the narrowest noise the bounds allow
+(`Discrepancy::penalty_base` in `crates/commol-calibration/src/discrepancy.rs`).
+Parameter constraints are checked first, and the simulation is
 skipped when one fails. So constraints act almost as hard limits; `weight`
 only ranks violations against each other.
 
@@ -140,3 +144,4 @@ only ranks violations against each other.
 |---|---|
 | Tuning the optimizer | [Optimizers](calibration-optimizers.md) |
 | Reporting the result | [Reports](reports.md) |
+| How sure the fit is | [Uncertainty](uncertainty/index.md) |

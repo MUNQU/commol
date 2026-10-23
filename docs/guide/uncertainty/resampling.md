@@ -241,8 +241,9 @@ print(error.lower[0] <= lower <= error.lower[1])  # True
 
 ## How replicates run
 
-Each replicate starts from the fit. With `starts > 1` it also starts from rows
-of a Latin hypercube over the bounds, and keeps the end of lowest loss, so a
+Each replicate starts from the fit. With `starts > 1` it also starts from the
+[other starts](../calibration-optimizers.md#several-starts) of the optimizer,
+and keeps the end of lowest loss, so a
 second basin of the loss shows up instead of adding optimizer noise to the
 data's uncertainty. Replicate `b` draws its data and its starts from
 `replicate_seed(seed, b)` of the problem's seed: two runs with one seed give one

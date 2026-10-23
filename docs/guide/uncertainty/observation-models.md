@@ -155,8 +155,9 @@ a stochastic model with a loss and its replicates
 ## The likelihood
 
 The log-likelihood is `Σᵢ wᵢ · log p(yᵢ | μᵢ)`, where `μᵢ` is the prediction
-and `wᵢ` the observation weight: a weight is a power of its term, so a
-weight of 2 counts the observation twice, as in every loss. The log
+and `wᵢ` the observation weight. The weight raises the density of the
+observation to its power: an observation of weight 2 counts twice, as in
+every loss. The log
 densities are written in commol (`Noise::log_density` in
 `crates/commol-calibration/src/likelihood/density.rs`), and
 `crates/commol-calibration/tests/test_likelihood.rs` checks them against
@@ -198,10 +199,9 @@ prediction interval and every score of `commol.scores` scores one. It needs a
 problem with `observation_models`, and serves the series they name, at any
 position.
 
-`scores.log_score(predictive, observations, DistributionNoise())` is the log
-density of each observed value under the predictive, the mixture of the
-models over the draws, `log Σ_d w_d · p(y | μ_d)`. It needs the densities of
-the models, so another noise raises a `TypeError`. Higher is better.
+`scores.log_score(predictive, observations, DistributionNoise())` scores the
+observed values by the densities of these models
+([Scores](index.md#scores)).
 
 ## Checklist
 

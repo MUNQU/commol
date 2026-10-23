@@ -85,7 +85,7 @@ print(round(sandwich.covariance[0][0] / laplace.covariance[0][0], 2))  # 0.71
 
 Every method of this page reads the curvature `H` of the objective at the
 fit: `−log L` of the [observation models](observation-models.md), or the
-loss. `curvature` chooses it:
+loss. The setting `curvature` of each method chooses it:
 
 | `curvature` | What it is | Runs | Use it when |
 |---|---|---|---|
@@ -110,37 +110,34 @@ engine (machine precision, or the `rtol` of the ODE engine): the step that
 balances the truncation error of the differences with the error of the runs,
 and keeps every run inside the bounds. Each entry of either curvature has an
 estimated error. An entry whose error is above 1 % of `√(H_jj · H_kk)` is
-listed in `notes` and logged as a warning: the error on the scale of a
-correlation, so an off-diagonal entry near 0 is judged against its row and
-column, not against itself. A note changes no result.
+listed in `notes` and logged as a warning. The error is read as a share of a
+correlation: an off-diagonal entry near 0 is compared with the diagonal of its
+row and column, not with its own size. A note changes no result.
 
-Every distribution lives on an **unbounded scale**: the logit of a parameter
-between two bounds, `log(θ − a)` with a lower bound only, `log(b − θ)` with an
-upper bound only, the parameter itself with none. The curvature there is
+Every distribution lives on the **unbounded scale** of the parameters, the
+scale on which the [sampler](smc.md#how-the-sampler-works) of sequential Monte
+Carlo proposes its moves. The curvature there is
 `H_u = D · H · D` with `D = dθ/du` at the fit, and `covariance` is on that
 scale. Every draw maps back inside the bounds, so a fit near a bound gives a
 skewed sample, not draws outside it. A fit **on** a bound of its parameter
 (within `1e-8` of the width of its bounds) raises a `ValueError`: its
-variance on the unbounded scale is infinite there, and a profile likelihood
-describes it (MUNQU/commol#132).
+variance on the unbounded scale is infinite there, and a
+[profile likelihood](profiles.md) describes it.
 
 ## Laplace approximation and the delta method
 
-`Laplace(draws, starts=1)` fits the problem (`Calibrator.run(starts)`) and
+`Laplace(draws, curvature="gauss_newton", starts=1)` fits the problem (`Calibrator.run(starts)`) and
 returns a `LaplaceResult`: the fit, the covariance `Σ = H⁻¹` of the normal on the
 unbounded scale, the draws mapped back (`sample`, equal weights) and the
-notes. It needs `observation_models`: a loss has no noise scale, so its
-curvature is no inverse variance, and `Laplace` with a loss raises a
+notes. It needs `observation_models`. A loss has no scale of the noise, and
+its curvature is no inverse variance, and `Laplace` with a loss raises a
 `ValueError`. To get a Laplace approximation, give a model with a noise
 parameter, such as `NormalObservations(sd="sd")` with `sd` calibrated, or
 use `Sandwich`, which needs none.
 
-Every local approximation sits at the best of its `starts`: the initial guess,
-then rows of a Latin hypercube over the bounds, as
+Every local approximation sits at the best of its `starts`, as
 [several starts](../calibration-optimizers.md#several-starts) of
-`Calibrator.run`. One start (the default) can end at a local minimum; more
-starts find the best one of the optima they reach. `Sandwich` takes `starts`
-the same way.
+`Calibrator.run`. `Sandwich` takes `starts` the same way.
 
 With a noise parameter the fit estimates the noise by maximum likelihood:
 for `NormalObservations(sd="sd")`, `σ̂² = SSE/n`, not `SSE/(n − p)`. The
@@ -165,7 +162,7 @@ print(widths)  # [6.01, 12.01, 18.02]
 
 ## Sandwich
 
-`Sandwich(block_length, draws, starts=1)` gives the covariance `H⁻¹ B H⁻¹`, where `B`
+`Sandwich(block_length, draws, curvature="gauss_newton", starts=1)` gives the covariance `H⁻¹ B H⁻¹`, where `B`
 sums the outer products of the **scores** of blocks of observations:
 `B = G/(G − 1) · Σ_b s_b s_bᵀ`, with `s_b` the sum of the gradients of the
 terms of block `b` (the clustered estimator CR1, Cameron and Miller 2015).
@@ -195,13 +192,13 @@ rescaling the objective does not change the sandwich).
   directions would get zero variance. The `ValueError` suggests shorter
   blocks.
 - **`loss_function="mae"` is refused.** The absolute error has no curvature:
-  its sandwich needs a density of the residuals at 0 and a bandwidth, a
-  choice the library would hide. Use a [bootstrap](resampling.md).
+  its sandwich would need the density of the residuals at 0, with a
+  bandwidth that the library would choose for you. Use a [bootstrap](resampling.md).
 
 ## Laplace mixture and importance sampling
 
 A multi-start fit can end at several optima. `LaplaceMixture(draws, target,
-starts=1)` runs `Calibrator.run(starts)`, keeps the distinct ends (an end
+curvature="gauss_newton", starts=1)` runs `Calibrator.run(starts)`, keeps the distinct ends (an end
 closer than one Mahalanobis unit to a kept one merges into it), puts a
 Laplace approximation at each, weights each by its Laplace evidence, draws
 from the mixture, and weights every draw by the target over the mixture on

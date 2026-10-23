@@ -30,7 +30,8 @@ with commol.threads(levels="outer"):  # the particles of a swarm in order
 | `commol.get_threads()` | The number of threads: the one set, or the number of cores. |
 | `commol.get_levels()` | `"all"` or `"outer"`: the levels set, or `"all"`. |
 
-A number below 1 raises `ValueError`, which names the number.
+A number below 1, or `levels` other than `"all"` and `"outer"`, raises
+`ValueError`.
 
 ## What runs in parallel
 
@@ -151,3 +152,4 @@ commol does not read the environment variable `RAYON_NUM_THREADS` of the
 |---|---|
 | The optimizers and their starts | [Optimizers](calibration-optimizers.md) |
 | The uncertainty methods | [Uncertainty](uncertainty/index.md) |
+| Complete models, with a fit on two threads | [Examples](examples.md) |

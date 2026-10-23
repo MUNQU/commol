@@ -2,20 +2,23 @@
 
 [Back to Home](../index.md)
 
-Build, run, check and calibrate your first compartment model in five minutes.
-This page assumes Commol is installed (see [Installation](installation.md)).
+Build a model, run it, read and plot its results, run the same process with
+another engine, and fit it to data. Each step takes a few lines. This page
+assumes Commol is installed with its figures (`pip install 'commol[plot]'`,
+see [Installation](installation.md)).
 
 ## Quick path
 
-1. Write the process with `ModelBuilder`, and build it with a structure
-   (`Aggregate`) and an engine.
-2. Run it with `Simulation`.
-3. Read the results by compartment name.
+1. Write the process with `ModelBuilder`: bins, parameters and transitions.
+2. Build it with a structure (`Aggregate`, the amount each bin starts with)
+   and an engine.
+3. Run it with `Simulation`, read a series by its output name, and draw it
+   with `results.plot`.
 
 ```python
 from commol import Aggregate, ModelBuilder, Simulation
 
-model = (
+process = (
     ModelBuilder(name="Basic Model", version="1.0")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
@@ -24,24 +27,21 @@ model = (
     .add_parameter(id="k2", value=0.1)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
-    .build(
-        Aggregate(
-            bin_amounts={"A": 990, "B": 10, "C": 0},
-        ),
-        engine="DifferenceEquations",
-    )
 )
+structure = Aggregate(bin_amounts={"A": 990, "B": 10, "C": 0})
 
+model = process.build(structure, engine="DifferenceEquations")
 simulation = Simulation(model)
 results = simulation.run(num_steps=100)
 
-print(f"A at step 100: {results['A'][-1]:.0f}")
-print(f"B at step 100: {results['B'][-1]:.0f}")
-print(f"C at step 100: {results['C'][-1]:.0f}")
+print(simulation.simulation_outputs)  # ['A', 'B', 'C']
+print(results.positions[-1], round(results["C"][-1]))  # 100.0 and the amount of C
+results.plot.series(output_file="quickstart.png")  # one panel per bin
 ```
 
-`results` maps each compartment name to its values, one per step, from step 0
-to step 100.
+`results` maps each output name to its values, one per position from step 0
+to step 100; `results.positions` holds the positions. `results.plot.series`
+returns the matplotlib `Figure`, and saves it when you give `output_file`.
 
 ## What each call does
 
@@ -49,14 +49,47 @@ to step 100.
 |---|---|
 | `ModelBuilder(name=..., version=...)` | Starts a model definition. Every method returns the builder, so calls chain. |
 | `.add_bin(id="A", name="State A")` | Adds a compartment (a *bin*): a state that holds an amount, in the unit of the bin. |
-| `.add_parameter(id="k1", value=0.3)` | Adds a named constant for rate formulas. `value=None` marks it for calibration. |
-| `.add_transition(..., rate="k1 * A * B / total")` | Moves an amount from `source` to `target` along the axis. This rate names compartments, so it is the flow itself (*absolute*). A `DifferenceEquations` model moves the flow once per step; see [What a rate means](../guide/core-concepts.md#what-a-rate-means). |
+| `.add_parameter(id="k1", value=0.3)` | Adds a named value for rate formulas. `value=None` leaves it for calibration. |
+| `.add_transition(..., rate="k1 * A * B / total")` | Moves an amount from `source` to `target` along the axis. This rate names compartments, so it is the flow itself (*absolute*). |
 | `.add_transition(..., rate="k2")` | This rate names no compartment, so it is *proportional*: the flow is `k2 × B`. |
-| `.build(Aggregate(...), engine="DifferenceEquations")` | Joins what you wrote, the *process*, with a *structure* and an engine, validates it and returns a `Model`. `Aggregate` holds an amount per compartment: `bin_amounts` gives the amount each bin starts with. |
-| `Simulation(model).run(num_steps=100)` | Runs the Rust engine and returns the results. |
+| `Aggregate(bin_amounts=...)` | The *structure*: the amount each bin starts with. |
+| `.build(structure, engine=...)` | Joins the *process* (what you wrote) with the structure and an engine, checks the definition and returns a `Model`. |
+| `Simulation(model).run(num_steps=100)` | Runs the model in the Rust engine and returns its `SimulationResults`. |
+| `results["B"]`, `results.positions` | The values of one output, and the positions they were read at. |
+| `results.plot.series(...)` | Draws each series along the axis. |
 
-See [Core Concepts](../guide/core-concepts.md) for bins, transitions and the
-two kinds of rate.
+See [Core Concepts](../guide/core-concepts.md) for bins, transitions and
+[what a rate means](../guide/core-concepts.md#what-a-rate-means) in each
+engine.
+
+## One process, several engines
+
+The process is written once. The same builder and structure build a model of
+another engine: differential equations in continuous time, or a stochastic
+process of whole units. `plot_compared` draws the runs on the same panels:
+
+```python
+from commol import plot_compared
+
+differential = Simulation(process.build(structure, engine="DifferentialEquations"))
+stochastic = Simulation(process.build(structure, engine="StochasticEvents"))
+
+continuous = differential.run(num_steps=100)
+replicates = stochastic.replicates(50, seed=1).run(num_steps=100)
+
+print(len(replicates))  # 50 runs of whole units, one seed each
+plot_compared(
+    {"difference": results, "differential": continuous, "stochastic": replicates},
+    series=["B"],
+    output_file="engines.png",
+)
+```
+
+A difference model applies each flow once per step; a differential model
+integrates the flows; a stochastic engine moves whole units at random, so
+`replicates` holds one run per seed and the figure shows their mean and band.
+See [Running Simulations](../guide/simulations.md) and
+[Stochastic Simulation](../guide/stochastic.md).
 
 ## Check units
 
@@ -73,34 +106,32 @@ model_with_units = (
     .add_parameter(id="k2", value=0.1, unit="1/day")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-    .build(
-        Aggregate(
-            bin_amounts={"A": 990, "B": 10, "C": 0},
-        ),
-        engine="DifferenceEquations",
-    )
+    .build(structure, engine="DifferenceEquations")
 )
 
 model_with_units.check_unit_consistency()  # raises UnitConsistencyError on a mismatch
 ```
 
-The check catches rates in another unit than the step unit, and quantities
-with units passed to a function that needs a plain number. See
-[Unit checking](../guide/units-and-equations.md#unit-checking).
+See [Unit checking](../guide/units-and-equations.md#unit-checking).
 
 ## Calibrate unknown parameters
 
-Set unknown parameters to `None`, describe the observations, and let an
-optimizer find the values:
+Set the unknown parameters to `None`, describe the observations and the
+unknowns in a `CalibrationProblem`, and let an optimizer find the values:
 
 ```python
 from commol import (
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
+    NelderMeadConfig,
     ObservedDataPoint,
-    ParticleSwarmConfig,
 )
+
+observed_data = [
+    ObservedDataPoint(at=step, output="B", value=value)
+    for step, value in [(10, 45.2), (20, 78.5), (30, 62.3), (40, 38.1)]
+]
 
 calibration_model = (
     ModelBuilder(name="Calibration Model", version="1.0")
@@ -111,54 +142,37 @@ calibration_model = (
     .add_parameter(id="k2", value=None)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-    .build(
-        Aggregate(
-            bin_amounts={"A": 990, "B": 10, "C": 0},
-        ),
-        engine="DifferenceEquations",
-    )
+    .build(structure, engine="DifferenceEquations")
 )
-
-observed_data = [
-    ObservedDataPoint(at=10, output="B", value=45.2),
-    ObservedDataPoint(at=20, output="B", value=78.5),
-    ObservedDataPoint(at=30, output="B", value=62.3),
-    ObservedDataPoint(at=40, output="B", value=38.1),
-]
 
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=[
-        CalibrationParameter(
-            id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0
-        ),
-        CalibrationParameter(
-            id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0
-        ),
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+        CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
     ],
     loss_function="sse",
-    optimization_config=ParticleSwarmConfig(particles=30, max_iterations=300),
+    optimization_config=NelderMeadConfig(max_iterations=2000),
     seed=42,
 )
 
-# A Simulation of a model with uncalibrated parameters can be calibrated, not run.
-result = Calibrator(Simulation(calibration_model), problem).run()
+# A simulation of a model with a parameter at None can be calibrated, not run.
+calibration = Simulation(calibration_model)
+result = Calibrator(calibration, problem).run()
+print({name: round(value, 3) for name, value in result.best_parameters.items()})
 
-print(f"k1 = {result.best_parameters['k1']:.4f}")
-print(f"k2 = {result.best_parameters['k2']:.4f}")
-print(f"loss = {result.final_loss:.4f}")
-
-calibration_model.update_parameters(result.best_parameters)
-calibrated_results = Simulation(calibration_model).run(num_steps=100)
+calibration_model.apply_calibration_parameters(result, problem)
+fitted = calibration.run(num_steps=60)  # the simulation follows its model
+fitted.plot.series(series=["B"], observed_data=observed_data, output_file="fit.png")
 ```
 
 | Object | Role |
 |---|---|
-| `ObservedDataPoint` | One measurement: a step, a compartment and a value. |
-| `CalibrationParameter` | One unknown, with its bounds. `initial_guess` is optional. |
-| `CalibrationProblem` | The observations, the unknowns, the loss (`"sse"`, `"rmse"`, `"mae"`, …), the optimizer and an optional `seed`. |
+| `ObservedDataPoint` | One observation: a position (`at`), an output and a value. |
+| `CalibrationParameter` | One unknown, with its bounds. |
+| `CalibrationProblem` | The observations, the unknowns, the loss, the optimizer and the `seed` of its random numbers. |
 | `Calibrator(...).run()` | Runs the optimizer in Rust and returns a `CalibrationResult` (`best_parameters`, `final_loss`, `converged`, …). |
-| `Model.update_parameters(...)` | Writes the calibrated values into the model. |
+| `Model.apply_calibration_parameters(result, problem)` | Writes the calibrated values into the model. |
 
 See [Model Calibration](../guide/calibration.md) for initial conditions,
 constraints, scale factors and the optimizers.
@@ -197,7 +211,9 @@ handlers, formats and levels.
 ## Checklist
 
 - [ ] The model builds without errors.
-- [ ] `Simulation(model).run(...)` returns one series per compartment.
+- [ ] `Simulation(model).run(...)` returns one series per output, and
+      `results.plot.series()` draws them.
+- [ ] Another engine runs the same process when you change only `engine`.
 - [ ] `check_unit_consistency()` passes when you give units.
 - [ ] Calibration returns `best_parameters` within the bounds you set.
 
@@ -207,8 +223,8 @@ handlers, formats and levels.
 |---|---|
 | The concepts behind models | [Core Concepts](../guide/core-concepts.md) |
 | Every builder option | [Building Models](../guide/building-models.md) |
-| What rate formulas can contain | [Mathematical Expressions](../guide/mathematical-expressions.md) |
-| Running and reading simulations | [Running Simulations](../guide/simulations.md) |
-| Runs at random, with whole units | [Stochastic Simulation](../guide/stochastic.md) |
+| Running, reading and plotting runs, and comparing them | [Running Simulations](../guide/simulations.md) |
 | Calibration in depth | [Model Calibration](../guide/calibration.md) |
+| How sure a fit is: samples, predictive bands, scenarios | [Uncertainty](../guide/uncertainty/index.md) |
+| How many threads the parallel work uses | [Threads and Parallelism](../guide/parallelism.md) |
 | Complete models | [Examples](../guide/examples.md) |

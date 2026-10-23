@@ -145,12 +145,11 @@ noise.
 
 The bootstrap threshold calibrates the statistic itself (prepivoting, Beran
 1988). Each replicate of `bootstrap` is the replicate
-`Calibrator.uncertainty(bootstrap)` makes from the problem's seed. It is fitted
-(`θ̂_b`), then fitted again with the quantity held at its value at the fit of
-the original data; the rise of the replicate is `PL_b(θ̂ⱼ) − L_b(θ̂_b)`. The
-threshold of the quantity is the quantile `confidence_level` of the rises, so
-each
-parameter gets its own. It costs one fit and one refit per quantity for each
+`Calibrator.uncertainty(bootstrap)` makes from the problem's seed. Each
+replicate has two fits: a free one (`θ̂_b`), and one that holds the quantity
+at the value of the fit of the original data. The rise of the replicate is
+`PL_b(θ̂ⱼ) − L_b(θ̂_b)`. The threshold of the quantity is the quantile
+`confidence_level` of the rises, so each parameter gets its own. It costs one fit and one refit per quantity for each
 replicate. Any bootstrap of [Resampling](resampling.md) works, and the
 [parametric bootstrap](observation-models.md#maximum-likelihood-against-the-posterior)
 with observation models.
@@ -197,12 +196,13 @@ models, raises one too.
 
 Every side of every quantity runs in parallel. A held parameter leaves the
 values the optimizer searches, so Nelder-Mead searches one dimension less. A
-held prediction `g(θ) = c` is an equality constraint met by an augmented
+held prediction `g(θ) = c` is met as an equality constraint, by an augmented
 Lagrangian whose inner solver is the problem's optimizer. Its final
 multiplier is minus the slope of the profile (`Profile.multipliers`). With a
 particle swarm, each refit draws from a seed of its own, derived from the
 problem's seed, so a profile repeats; a swarm runs each outer iteration of a
-held prediction to its `max_iterations`.
+held prediction to its `max_iterations`, or until one of its
+[stop rules](../calibration-optimizers.md#stop-rules) holds.
 
 ## Prediction profiles
 
@@ -237,24 +237,26 @@ of the ODE solver). A solver holds its tolerances at each step, so `ν` is an
 estimate, not a bound. A threshold at or below `ε` gives no verdict: the
 profile cannot tell a rise from numerical error, and `notes` says so.
 
-A refit whose free parameter sits on a bound, within `1e-8` of the width of
-its bounds, that it is not on at the fit has left the box of the parameters:
-the bound, not the data, makes its rise. The flatness reads only the points
-inside the box, and a note names the parameter and the value where the ridge
-leaves it. A side whose crossing point has a free parameter on a bound it is
-not on over the whole side from the fit crosses because of the box: it
-counts as open, and its interval end stays, with a note. A parameter that
-stays on its bound from the fit to the crossing is not seen this way: the
-verdict holds within the box.
+The box of the parameters is the space inside their bounds. A free parameter
+of a refit is on a bound when it is within `1e-8` of the width of its bounds.
+When it is on a bound that it is not on at the fit, the refit has left the
+box: the bound makes its rise, not the data. The flatness reads only the
+points inside the box, and a note names the parameter and the value where
+the ridge leaves it. When the crossing point of a side has such a parameter,
+and the parameter is not on that bound over the whole side, the side crosses
+because of the box. It counts as open, and its interval end stays, with a
+note. A parameter on its bound at every point from the fit to the crossing
+does not count: the verdict then holds within the box.
 
 A profile is flat for one of two reasons: other parameters compensate the
 parameter along it, or nothing the data read depends on it. Raue et al.
 (2009) read such relations from the paths of the profiles. To tell them
-apart with no optimizer, the parameter is set to each value of its profile
-inside the box, and to both ends of its box, with every other parameter at
-its fitted value, and the objective is evaluated once and compared with the
-objective at the fit, `f̂`. Two evaluations differ by up to the evaluation
-floor `2 · (ν₁ + ν₂) + 2 · γₙ · Σ |ℓᵢ|` (`ProfileResult.evaluation_floor`):
+apart with no optimizer, each *reset* puts the parameter at one value of its
+profile inside the box, or at one end of its box, and every other parameter
+at its fitted value. Each reset evaluates the objective once and compares it
+with the objective at the fit, `f̂`. The evaluation floor
+`2(ν₁ + ν₂) + 2γₙ Σ|ℓᵢ|` (`ProfileResult.evaluation_floor`) is how
+far two evaluations can differ:
 `ν₁` is `ν`, `ν₂ = Σ ½ |ℓᵢ''| · eᵢ²` uses the expected curvature of each
 term (an estimate for a model that is not normal), and `γₙ · Σ |ℓᵢ|` bounds
 the rounding of the sum of the `n` terms, with the constants of `−log L`.
@@ -357,9 +359,9 @@ print(merged.verdicts["k1"].structural.verdict, merged.verdicts["s"].structural.
 ## Plots
 
 `result.plot()` draws one panel per profile: the statistic of each point, the
-threshold as a dashed line and the ends of the interval as dotted lines. It
-returns the matplotlib `Figure` ([Plotting](../simulations.md#plotting): the
-extra `commol[plot]`, `output_file`, `config` and `axes`).
+threshold as a dashed line and the ends of the interval as dotted lines. Like
+every figure of commol, it returns the matplotlib `Figure` and takes
+`output_file`, `config` and `axes` ([Plotting](../simulations.md#plotting)).
 
 ```python
 figure = result.plot()

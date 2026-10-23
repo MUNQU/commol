@@ -7,16 +7,6 @@ a fast local search, `ParticleSwarmConfig` for a global one. Both run in Rust on
 the [argmin](https://github.com/MUNQU/argmin) library, and both keep every
 unknown inside its bounds.
 
-## Choosing
-
-| Optimizer | Strength | Weakness | Use when |
-|---|---|---|---|
-| Nelder-Mead | Few evaluations; precise near the answer | Local: can stop at a bound or a local minimum | Few unknowns, a good `initial_guess` |
-| Particle swarm | Searches the whole box; robust to local minima | Many evaluations | Several unknowns, no good starting point |
-
-A common pattern: run particle swarm first, then Nelder-Mead from its result
-with `initial_guess`.
-
 ## Quick path
 
 ```python
@@ -74,6 +64,16 @@ print(calibrate(NelderMeadConfig(max_iterations=2000)))                    # {'k
 print(calibrate(ParticleSwarmConfig(particles=30, max_iterations=300)))  # {'k1': 0.4, 'k2': 0.1}
 ```
 
+## Choosing
+
+| Optimizer | Strength | Weakness | Use when |
+|---|---|---|---|
+| Nelder-Mead | Few evaluations; precise near the answer | Local: can stop at a bound or a local minimum | Few unknowns, a good `initial_guess` |
+| Particle swarm | Searches the whole box; robust to local minima | Many evaluations | Several unknowns, no good starting point |
+
+A common pattern: run particle swarm first, then Nelder-Mead from its result
+with `initial_guess`.
+
 ## Nelder-Mead
 
 ```python
@@ -101,8 +101,8 @@ print(calibrate(nelder_mead))  # {'k1': 0.4, 'k2': 0.1}
 | `header_interval` | `100` | With `verbose`, repeats the table header every this many iterations. |
 
 The search starts at `initial_guess`, or at the midpoint of the bounds; a start
-of 0 works. Nelder-Mead searches an unbounded coordinate `u` and scores
-`x = lo + (hi − lo)·(sin u + 1)/2` (the transform of MINUIT and lmfit), so every
+of 0 works. Nelder-Mead moves in an unbounded coordinate `u`, and the value it
+scores is `lo + (hi − lo)·(sin u + 1)/2` (the transform of MINUIT and lmfit), so every
 value it tries is inside the bounds (`SineTransform` of the argmin fork). An
 optimum exactly at a bound is reached only asymptotically, so it can take more
 iterations. Nelder-Mead needs finite bounds: a run with an infinite bound fails
@@ -113,11 +113,11 @@ with the message `Nelder-Mead needs finite bounds`.
 | `termination_reason` | `converged` | Meaning |
 |---|---|---|
 | `Terminated(SolverConverged)` | `True` | Nelder-Mead: the spread of the simplex values fell below `sd_tolerance`. Particle swarm: a [stop rule](#stop-rules) held |
-| `Terminated(TargetCostReached)` | `True` | Particle swarm: the loss reached `target_cost` |
 | `Terminated(MaxItersReached)` | `False` | The run used all `max_iterations` |
-| Any other reason | `False` | The run stopped for another reason, such as a timeout |
+| Any other reason | `False` | The run stopped for another reason that argmin reports |
 
-`converged` comes from `converged` in `optimization.rs`. A particle swarm
+`converged` comes from `converged` in
+`crates/commol-calibration/src/optimization.rs`. A particle swarm
 without a [stop rule](#stop-rules) always stops at `max_iterations`, so it
 reports `converged=False`; judge it by `final_loss`.
 

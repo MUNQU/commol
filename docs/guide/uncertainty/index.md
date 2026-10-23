@@ -9,68 +9,6 @@ what every method returns and reads: a weighted **parameter sample**, the
 **predictive** of a sample, and the **scores** that check it against data.
 Each method has its own page, listed in the table below.
 
-## The three questions
-
-| Question | What answers it |
-|---|---|
-| Which parameters fit the data? | The [identifiability](identifiability.md) methods; a sample of the parameters, or a [profile](profiles.md) of the likelihood or the loss; several starts that end apart with equal losses show that the data do not identify the parameters |
-| How do the inputs move the outputs? | The predictive of a sample: the run of every draw, and its band; with no data, a [sensitivity analysis](sensitivity.md), which propagates the inputs and ranks them |
-| Are the intervals calibrated? | Scores of the predictive against observations the method did not see, and coverage studies |
-
-## A band of the model, or a prediction interval
-
-A **band of the model** is the spread of the model's output across the draws of
-the parameters. It says where the model curve lies, not where the next
-observation will fall: an observation also carries measurement noise. A
-**prediction interval** adds that noise to every draw before it reduces them
-(the `ObservationNoise` port of `commol-inference`). Every reader of
-observations takes the noise as an argument with no default: `NoNoise()` gives
-a band of the model, `ResidualNoise(...)` adds residuals of a fit, which
-gives a prediction interval with no noise model
-([Resampling](resampling.md#prediction-intervals)), and `DistributionNoise()`
-draws from the [observation models](observation-models.md) of the problem. Comparing a band of the
-model with data underestimates the spread, so its coverage of the data is below
-its level. A [conformal](conformal.md) interval is a prediction interval with a
-coverage guarantee, from the scores of observations the fit did not use.
-
-## Which method answers which question
-
-| Method | Question | Needs a noise model | Page |
-|---|---|---|---|
-| Several starts, `Calibrator.run(starts=n)` | Which parameters fit the data: distinct ends with equal losses | No | [Optimizers](../calibration-optimizers.md#several-starts) |
-| `StructuralRank` | Which parameters any data of this design can determine, and which combinations | No | [Identifiability](identifiability.md#structural-rank) |
-| `Collinearity` | Which parameters can be fitted together | No | [Identifiability](identifiability.md#collinearity) |
-| `SampleIdentifiability` | Which parameters a sample determines: contraction, correlations, modes | No | [Identifiability](identifiability.md#a-sample) |
-| `StartsIdentifiability` | Which parameters differ between starts of equal loss | No | [Identifiability](identifiability.md#starts) |
-| `BayesianBootstrap` | How far the parameters move when the data are reweighted by blocks | No | [Resampling](resampling.md#bayesian-bootstrap) |
-| `ResidualBootstrap` | How far the parameters move when the residuals of the fit are resampled by blocks | No | [Resampling](resampling.md#residual-block-bootstrap) |
-| `WildBootstrap` | The same, when the size of the noise changes along the series | No | [Resampling](resampling.md#wild-block-bootstrap) |
-| `BlockJackknife` | The standard error and bias of each parameter, and which block of data moves it most | No | [Resampling](resampling.md#block-jackknife) |
-| `ResidualNoise` | Where the next observations fall: a prediction interval | No | [Resampling](resampling.md#prediction-intervals) |
-| `GibbsPosterior` | A posterior of the parameters from the loss and priors, with a scale `η` of the loss | No | [Sequential Monte Carlo](smc.md#gibbs-posterior) |
-| `ABCSMC` | A posterior of the parameters whose runs come within a tolerance of the data, with priors | No | [Sequential Monte Carlo](smc.md#abc) |
-| `ABCRejection` | The same, from the closest draws of the priors | No | [Sequential Monte Carlo](smc.md#abc) |
-| `SplitConformal` | Where new observations fall, with a guaranteed coverage, from held-out observations | No | [Conformal](conformal.md#split-conformal) |
-| `RollingConformal` | Where the next observations fall at each horizon ahead of the data | No | [Conformal](conformal.md#rolling-origins) |
-| `JackknifePlus` | Where new observations fall, with a guaranteed coverage and no held-out data | No | [Conformal](conformal.md#jackknife) |
-| `EnbPI` | Where the next observations of a series with dependent errors fall | No | [Conformal](conformal.md#enbpi) |
-| `AdaptiveConformal` | Intervals for observations as they arrive, whose share of misses tends to its level | No | [Conformal](conformal.md#adaptive-conformal-inference) |
-| `observation_models` with `Calibrator.run()` | The maximum-likelihood fit of the parameters and the noise | Yes | [Observation Models](observation-models.md#maximum-likelihood-against-the-posterior) |
-| `BayesianPosterior` | The posterior of the parameters from the likelihood and priors, with its evidence | Yes | [Observation Models](observation-models.md#maximum-likelihood-against-the-posterior) |
-| `ParametricBootstrap` | How far the parameters move in data sets drawn from the models at the fit | Yes | [Observation Models](observation-models.md#maximum-likelihood-against-the-posterior) |
-| `DistributionNoise` | Where the next observations fall: a prediction interval of the models | Yes | [Observation Models](observation-models.md#prediction-with-noise) |
-| `Laplace` | A normal around the fit from the curvature of `−log L`, and the band of the outputs by the delta method | Yes | [Local Approximations](local.md#laplace-approximation-and-the-delta-method) |
-| `Sandwich` | A covariance around the fit that holds when the noise model is wrong or the noise depends on its neighbours | No | [Local Approximations](local.md#sandwich) |
-| `LaplaceMixture` | A posterior from Laplace approximations at the optima of several starts, corrected by importance sampling, with `k_hat` | With `LikelihoodTarget` | [Local Approximations](local.md#laplace-mixture-and-importance-sampling) |
-| `Propagation` | How uncertainty in the inputs moves the outputs, with no data | No | [Sensitivity Analysis](sensitivity.md#propagation) |
-| `PRCC` | How steadily each output rises or falls with each input, of independent inputs or a sample | No | [Sensitivity Analysis](sensitivity.md#prcc) |
-| `Morris` | Which inputs matter, in few runs | No | [Sensitivity Analysis](sensitivity.md#morris-screening) |
-| `Sobol` | The share of the variance of an output each input explains, alone and with interactions | No | [Sensitivity Analysis](sensitivity.md#sobol-indices) |
-| `PolynomialChaos` | A polynomial surrogate of an output and its Sobol indices, in few runs | No | [Sensitivity Analysis](sensitivity.md#polynomial-chaos) |
-| `ProfileLikelihood` | The interval of each parameter and whether the data determine it, from refits with the parameter held | No: `Threshold.chi_square` needs one, `beale` and `bootstrap_calibrated` do not | [Profile Likelihood](profiles.md) |
-| `PredictionProfile` | The interval of a prediction: the values the data do not reject | No, as `ProfileLikelihood` | [Profile Likelihood](profiles.md#prediction-profiles) |
-
-Each uncertainty method adds its row here when it lands.
 ## Quick path
 
 ```python
@@ -148,6 +86,67 @@ print(scores.coverage(predictive, held_out, NoNoise(), confidence_level=0.9).mea
 print(scores.crps(predictive, held_out, NoNoise()).per_series)
 ```
 
+## The three questions
+
+| Question | What answers it |
+|---|---|
+| Which parameters fit the data? | The [identifiability](identifiability.md) methods; a sample of the parameters, or a [profile](profiles.md) of the likelihood or the loss; several starts that end apart with equal losses show that the data do not identify the parameters |
+| How do the inputs move the outputs? | The predictive of a sample: the run of every draw, and its band; with no data, a [sensitivity analysis](sensitivity.md), which propagates the inputs and ranks them |
+| Are the intervals calibrated? | Scores of the predictive against observations the method did not see, and coverage studies |
+
+## A band of the model, or a prediction interval
+
+A **band of the model** is the spread of the model's output across the draws of
+the parameters. It says where the model curve lies, not where the next
+observation will fall: an observation also carries measurement noise. A
+**prediction interval** adds that noise to every draw before it reduces them
+(the `ObservationNoise` port of `commol-inference`). Every reader of
+observations takes the noise as an argument with no default: `NoNoise()` gives
+a band of the model, `ResidualNoise(...)` adds residuals of a fit, which
+gives a prediction interval with no noise model
+([Resampling](resampling.md#prediction-intervals)), and `DistributionNoise()`
+draws from the [observation models](observation-models.md) of the problem. Comparing a band of the
+model with data underestimates the spread, so its coverage of the data is below
+its level. A [conformal](conformal.md) interval is a prediction interval with a
+coverage guarantee, from the scores of observations the fit did not use.
+
+## Which method answers which question
+
+| Method | Question | Needs a noise model | Page |
+|---|---|---|---|
+| Several starts, `Calibrator.run(starts=n)` | Which parameters fit the data: distinct ends with equal losses | No | [Optimizers](../calibration-optimizers.md#several-starts) |
+| `StructuralRank` | Which parameters any data of this design can determine, and which combinations | No | [Identifiability](identifiability.md#structural-rank) |
+| `Collinearity` | Which parameters can be fitted together | No | [Identifiability](identifiability.md#collinearity) |
+| `SampleIdentifiability` | Which parameters a sample determines: contraction, correlations, modes | No | [Identifiability](identifiability.md#a-sample) |
+| `StartsIdentifiability` | Which parameters differ between starts of equal loss | No | [Identifiability](identifiability.md#starts) |
+| `BayesianBootstrap` | How far the parameters move when the data are reweighted by blocks | No | [Resampling](resampling.md#bayesian-bootstrap) |
+| `ResidualBootstrap` | How far the parameters move when the residuals of the fit are resampled by blocks | No | [Resampling](resampling.md#residual-block-bootstrap) |
+| `WildBootstrap` | As `ResidualBootstrap`, for noise whose size varies along the series | No | [Resampling](resampling.md#wild-block-bootstrap) |
+| `BlockJackknife` | The standard error and bias of each parameter, and which block of data moves it most | No | [Resampling](resampling.md#block-jackknife) |
+| `ResidualNoise` | Where the next observations fall: a prediction interval | No | [Resampling](resampling.md#prediction-intervals) |
+| `GibbsPosterior` | A posterior of the parameters from the loss and priors, with a scale `η` of the loss | No | [Sequential Monte Carlo](smc.md#gibbs-posterior) |
+| `ABCSMC` | A posterior of the parameters whose runs come within a tolerance of the data, with priors | No | [Sequential Monte Carlo](smc.md#abc) |
+| `ABCRejection` | The same, from the closest draws of the priors | No | [Sequential Monte Carlo](smc.md#abc) |
+| `SplitConformal` | Where new observations fall, with a guaranteed coverage, from held-out observations | No | [Conformal](conformal.md#split-conformal) |
+| `RollingConformal` | Where the next observations fall at each horizon ahead of the data | No | [Conformal](conformal.md#rolling-origins) |
+| `JackknifePlus` | Where new observations fall, with a guaranteed coverage and no held-out data | No | [Conformal](conformal.md#jackknife) |
+| `EnbPI` | Where the next observations of a series with dependent errors fall | No | [Conformal](conformal.md#enbpi) |
+| `AdaptiveConformal` | Intervals for observations as they arrive, whose share of misses tends to its level | No | [Conformal](conformal.md#adaptive-conformal-inference) |
+| `observation_models` with `Calibrator.run()` | The maximum-likelihood fit of the parameters and the noise | Yes | [Observation Models](observation-models.md#maximum-likelihood-against-the-posterior) |
+| `BayesianPosterior` | The posterior of the parameters from the likelihood and priors, with its evidence | Yes | [Observation Models](observation-models.md#maximum-likelihood-against-the-posterior) |
+| `ParametricBootstrap` | How far the parameters move in data sets drawn from the models at the fit | Yes | [Observation Models](observation-models.md#maximum-likelihood-against-the-posterior) |
+| `DistributionNoise` | Where the next observations fall: a prediction interval of the models | Yes | [Observation Models](observation-models.md#prediction-with-noise) |
+| `Laplace` | A normal around the fit from the curvature of `−log L`, and the band of the outputs by the delta method | Yes | [Local Approximations](local.md#laplace-approximation-and-the-delta-method) |
+| `Sandwich` | A covariance around the fit that holds when the noise model is wrong or the noise depends on its neighbours | No | [Local Approximations](local.md#sandwich) |
+| `LaplaceMixture` | A posterior from Laplace approximations at the optima of several starts, corrected by importance sampling, with `k_hat` | With `LikelihoodTarget` | [Local Approximations](local.md#laplace-mixture-and-importance-sampling) |
+| `Propagation` | How uncertainty in the inputs moves the outputs, with no data | No | [Sensitivity Analysis](sensitivity.md#propagation) |
+| `PRCC` | How steadily each output rises or falls with each input, of independent inputs or a sample | No | [Sensitivity Analysis](sensitivity.md#prcc) |
+| `Morris` | Which inputs matter, in few runs | No | [Sensitivity Analysis](sensitivity.md#morris-screening) |
+| `Sobol` | The share of the variance of an output each input explains, alone and with interactions | No | [Sensitivity Analysis](sensitivity.md#sobol-indices) |
+| `PolynomialChaos` | A polynomial surrogate of an output and its Sobol indices, in few runs | No | [Sensitivity Analysis](sensitivity.md#polynomial-chaos) |
+| `ProfileLikelihood` | The interval of each parameter and whether the data determine it, from refits with the parameter held | No: `Threshold.chi_square` needs one, `beale` and `bootstrap_calibrated` do not | [Profile Likelihood](profiles.md) |
+| `PredictionProfile` | The interval of a prediction: the values the data do not reject | No, as `ProfileLikelihood` | [Profile Likelihood](profiles.md#prediction-profiles) |
+
 ## The parameter sample
 
 A `ParameterSample` holds draws of the parameters of one problem, each with a
@@ -188,9 +187,9 @@ A sample has no single set of parameters, so
 
 ### The one quantile
 
-Every interval of commol is a weighted quantile: the inverse of the weighted
-empirical distribution, interpolated between the midpoints of the cumulative
-weights. With equal weights it equals `numpy.percentile(..., method="hazen")`.
+Every interval of commol reads one weighted quantile. It inverts the
+empirical distribution of the weighted values, and interpolates between the
+midpoints of their cumulative weights. With equal weights it equals `numpy.percentile(..., method="hazen")`.
 A draw of weight zero does not count. `weighted_quantiles` computes it for any
 values, and `member_statistics` reduces ensemble members with it.
 
@@ -231,7 +230,7 @@ calibration gives for the same values: the remainder and the excess
 | `runs()`, `weights` | The trajectory and weight of every draw |
 | `quantities(quantities)` | The quantities of interest of every draw, one dict per draw, as `SimulationResults.quantities` reads one run |
 | `draw_seeds` | The seed of each draw of the sample: `Simulation.replicates(count, seed=draw_seeds[j])` of the model at the values of draw `j` gives its runs |
-| `report(confidence_level, positions, window, windows, observed_data=(), accumulators=())` | The report of a run, with each number reduced across the draws with their weights ([Reports](../reports.md#the-report-of-an-ensemble)) |
+| `report(confidence_level, positions, window, windows, observed_data=(), accumulators=(), prediction_intervals=None)` | The report of a run, with each number reduced across the draws with their weights ([Reports](../reports.md#the-report-of-an-ensemble)); `prediction_intervals` adds the intervals of a [conformal method](conformal.md#results-plots-and-reports) |
 | `plot.series(…)`, `plot.cumulative(…)`, `plot.observations(…)` | The weighted median of the draws of each series and their band, those of its running total, or those of each observed series, read through `at_observations(…, NoNoise())` ([Plotting](../simulations.md#a-panel-per-observed-series)) |
 
 `predictive.plot.series()` and `predictive.plot.cumulative()` draw the band of
@@ -377,7 +376,7 @@ print(type(result).__name__, len(result.sample))  # BootstrapResult 20
 
 ## Checklist
 
-- [ ] You report a band of the model as a band of the model, not as a prediction interval.
+- [ ] A band of the model is reported as such, never as a prediction interval.
 - [ ] You score observations the method did not see.
 - [ ] The effective size of a weighted sample is large enough for the intervals you read.
 - [ ] You compare scenarios with `Scenarios.compare`, run by run, not as the difference of two intervals.
@@ -386,12 +385,14 @@ print(type(result).__name__, len(result.sample))  # BootstrapResult 20
 
 | To learn | Read |
 |---|---|
+| Maximum likelihood, the posterior and prediction intervals of observation models | [Observation Models](observation-models.md) |
+| Which parameters the data determine | [Identifiability](identifiability.md) |
 | Bootstraps, the jackknife and prediction intervals with no noise model | [Resampling](resampling.md) |
 | Posteriors with no noise model: the Gibbs posterior and ABC | [Sequential Monte Carlo](smc.md) |
-| Maximum likelihood, the posterior and prediction intervals of observation models | [Observation Models](observation-models.md) |
+| The curvature at the fit: Laplace, the sandwich and the Laplace mixture | [Local Approximations](local.md) |
+| Intervals and verdicts from profiles of the likelihood or the loss | [Profile Likelihood](profiles.md) |
 | Prediction intervals with a coverage guarantee | [Conformal Prediction Intervals](conformal.md) |
 | How the inputs move the outputs, with no data | [Sensitivity Analysis](sensitivity.md) |
 | Several starts of an optimizer | [Optimizers](../calibration-optimizers.md#several-starts) |
-| Which parameters the data determine | [Identifiability](identifiability.md) |
-| Reports of a sample | [Reports](../reports.md) |
-| Plots of a predictive | [Running Simulations](../simulations.md#plotting) |
+| Reports of a predictive | [Reports](../reports.md) |
+| Plots of a predictive, and several results on the same panels | [Running Simulations](../simulations.md#plotting) |
