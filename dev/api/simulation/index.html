@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://munqu.github.io/commol/dev/api/simulation/">
       
       
-        <link rel="prev" href="../model/">
+        <link rel="prev" href="../axis-units/">
       
       
         <link rel="next" href="../plotting/">
@@ -1668,6 +1668,90 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/model-structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../axis-patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AxisPattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../axis-units/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AxisUnits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -2379,62 +2463,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../axis-patterns/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    AxisPattern
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../axis-units/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    AxisUnits
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../calibrator/" class="md-nav__link">
         
   
@@ -2443,6 +2471,34 @@
     
   
     Calibration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
   
 
     
@@ -2547,62 +2603,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../package/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Package
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../parallelism/" class="md-nav__link">
         
   
@@ -2631,14 +2631,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../advanced/model-structure/" class="md-nav__link">
+      <a href="../package/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Model Structure
+    Package
   
 
     
@@ -12120,8 +12120,11 @@ whole amounts.</p>
     <div class="doc doc-contents first">
 
         <p>A run left the values its model allows, such as an amount below zero.</p>
-<p>A difference-equations step that leaves a compartment below zero raises it.
-It is a <code>ValueError</code>; a calibration treats such a run as infeasible.</p>
+<p>A difference-equations step or an impulse that leaves a compartment below
+zero raises it. A stochastic engine raises it for a rate it cannot draw, such
+as a negative rate, an impulse fraction outside 0 to 1, or an absolute
+impulse that is not a whole number. It is a <code>ValueError</code>; a calibration
+treats such a run as infeasible.</p>
 
     </div>
 

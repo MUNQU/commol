@@ -8,19 +8,7 @@ Builds a `Model`. Guide: [Building Models](https://munqu.github.io/commol/latest
 
 A fluent interface that writes the process of a model, once.
 
-The builder adds bins, accumulators, stratifications, transitions and parameters: the process, which is the same for every kind of model. `build` joins it with a structure, which lays the process out (such as `Aggregate`, amounts per compartment), and an engine, which runs it.
-
-Attributes:
-
-| Name               | Type                   | Description                               |
-| ------------------ | ---------------------- | ----------------------------------------- |
-| `_name`            | `str`                  | The model name.                           |
-| `_description`     | \`str                  | None\`                                    |
-| `_version`         | \`str                  | None\`                                    |
-| `_bins`            | `list[Bin]`            | List of bins (compartments) in the model. |
-| `_stratifications` | `list[Stratification]` | List of stratifications.                  |
-| `_transitions`     | `list[Transition]`     | List of transitions between states.       |
-| `_parameters`      | `list[Parameter]`      | List of model parameters.                 |
+The builder adds bins, accumulators, stratifications, transitions and parameters: the process, which is the same for every kind of model. `build` joins it with a structure, which lays the process out (such as `Aggregate`, amounts per compartment), and an engine, which runs it. Each method that adds returns the builder, so the calls chain.
 
 Source code in `commol/api/model_builder.py`
 
@@ -33,23 +21,7 @@ class ModelBuilder:
     parameters: the process, which is the same for every kind of model.
     `build` joins it with a structure, which lays the process out (such as
     `Aggregate`, amounts per compartment), and an engine, which runs it.
-
-    Attributes
-    ----------
-    _name : str
-        The model name.
-    _description : str | None
-        The model description.
-    _version : str | None
-        The model version.
-    _bins : list[Bin]
-        List of bins (compartments) in the model.
-    _stratifications : list[Stratification]
-        List of stratifications.
-    _transitions : list[Transition]
-        List of transitions between states.
-    _parameters : list[Parameter]
-        List of model parameters.
+    Each method that adds returns the builder, so the calls chain.
     """
 
     def __init__(
@@ -138,7 +110,27 @@ class ModelBuilder:
         return self
 
     def add_accumulator(self, id: str, name: str) -> Self:
-        """Add a cumulative event counter to the model outputs."""
+        """
+        Add an accumulator: a cumulative event counter in the model outputs.
+
+        A transition adds its flow to the accumulators it names
+        (``add_transition(accumulators=...)``). An accumulator is an output,
+        not a part of the state, so ``total`` leaves it out.
+
+        Parameters
+        ----------
+        id : str
+            Unique identifier for the accumulator. It names its output, which
+            stratifications expand as they expand a bin (``acc_g1``,
+            ``acc_g2``).
+        name : str
+            Human-readable name for the accumulator.
+
+        Returns
+        -------
+        ModelBuilder
+            Self for method chaining.
+        """
         self._accumulators.append(Accumulator(id=id, name=name))
         logger.info(f"Added accumulator: id='{id}', name='{name}'")
         return self
@@ -728,7 +720,8 @@ class ModelBuilder:
         """
         Reset the builder to empty state.
 
-        The name, description, version and ``bin_unit`` are kept. Every bin,
+        The name, description, version, ``bin_unit``, ``step_unit`` and
+        ``origin`` are kept. Every bin,
         accumulator, stratification, transition and parameter is removed.
 
         Returns
@@ -973,13 +966,48 @@ def add_bin(self, id: str, name: str, unit: str | None = None) -> Self:
 add_accumulator(id: str, name: str) -> Self
 ```
 
-Add a cumulative event counter to the model outputs.
+Add an accumulator: a cumulative event counter in the model outputs.
+
+A transition adds its flow to the accumulators it names (`add_transition(accumulators=...)`). An accumulator is an output, not a part of the state, so `total` leaves it out.
+
+Parameters:
+
+| Name   | Type  | Description                                                                                                                     | Default    |
+| ------ | ----- | ------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `id`   | `str` | Unique identifier for the accumulator. It names its output, which stratifications expand as they expand a bin (acc_g1, acc_g2). | *required* |
+| `name` | `str` | Human-readable name for the accumulator.                                                                                        | *required* |
+
+Returns:
+
+| Type           | Description               |
+| -------------- | ------------------------- |
+| `ModelBuilder` | Self for method chaining. |
 
 Source code in `commol/api/model_builder.py`
 
 ```python
 def add_accumulator(self, id: str, name: str) -> Self:
-    """Add a cumulative event counter to the model outputs."""
+    """
+    Add an accumulator: a cumulative event counter in the model outputs.
+
+    A transition adds its flow to the accumulators it names
+    (``add_transition(accumulators=...)``). An accumulator is an output,
+    not a part of the state, so ``total`` leaves it out.
+
+    Parameters
+    ----------
+    id : str
+        Unique identifier for the accumulator. It names its output, which
+        stratifications expand as they expand a bin (``acc_g1``,
+        ``acc_g2``).
+    name : str
+        Human-readable name for the accumulator.
+
+    Returns
+    -------
+    ModelBuilder
+        Self for method chaining.
+    """
     self._accumulators.append(Accumulator(id=id, name=name))
     logger.info(f"Added accumulator: id='{id}', name='{name}'")
     return self
@@ -1531,7 +1559,7 @@ reset() -> Self
 
 Reset the builder to empty state.
 
-The name, description, version and `bin_unit` are kept. Every bin, accumulator, stratification, transition and parameter is removed.
+The name, description, version, `bin_unit`, `step_unit` and `origin` are kept. Every bin, accumulator, stratification, transition and parameter is removed.
 
 Returns:
 
@@ -1546,7 +1574,8 @@ def reset(self) -> Self:
     """
     Reset the builder to empty state.
 
-    The name, description, version and ``bin_unit`` are kept. Every bin,
+    The name, description, version, ``bin_unit``, ``step_unit`` and
+    ``origin`` are kept. Every bin,
     accumulator, stratification, transition and parameter is removed.
 
     Returns

@@ -18,7 +18,7 @@
         <link rel="prev" href="../simulation/">
       
       
-        <link rel="next" href="../axis-patterns/">
+        <link rel="next" href="../calibrator/">
       
       
         
@@ -1671,6 +1671,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../advanced/model-structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../axis-patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AxisPattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../axis-units/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AxisUnits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../simulation/" class="md-nav__link">
         
   
@@ -2141,62 +2225,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../axis-patterns/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    AxisPattern
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../axis-units/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    AxisUnits
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../calibrator/" class="md-nav__link">
         
   
@@ -2205,6 +2233,34 @@
     
   
     Calibration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
   
 
     
@@ -2309,62 +2365,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../package/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Package
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../parallelism/" class="md-nav__link">
         
   
@@ -2393,14 +2393,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../advanced/model-structure/" class="md-nav__link">
+      <a href="../package/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Model Structure
+    Package
   
 
     
@@ -3915,12 +3915,13 @@
 <h1 id="plotting-api">Plotting API<a class="headerlink" href="#plotting-api" title="Permanent link">&para;</a></h1>
 <p><a href="../">Back to API Reference</a></p>
 <p>The figures are read from the results they draw, and return a matplotlib
-<code>Figure</code>: <code>results.plot</code>, <code>replicates.plot</code> and <code>predictive.plot</code> give the
-figures of a run, of replicates and of a predictive, and the result of a
-sensitivity method or of a profile likelihood draws its figure with <code>plot()</code>.
-<code>plot_compared</code> draws several runs, replicates or predictives on the same
-panels. They need the optional extra <code>commol[plot]</code>. Guide:
-<a href="../../guide/simulations/#plotting">Plotting</a>.</p>
+<code>Figure</code>. <code>results.plot</code>, <code>replicates.plot</code> and <code>predictive.plot</code> give the
+figures of a run, of replicates and of a predictive: <code>plot.series()</code>,
+<code>plot.cumulative()</code> and <code>plot.observations()</code>. The results of PRCC, Morris,
+Sobol and polynomial chaos, and the result of a profile likelihood, draw
+their figure with <code>plot()</code>. <code>plot_compared</code> draws several runs, replicates or
+predictives on the same panels. The figures need the optional extra
+<code>commol[plot]</code>. Guide: <a href="../../guide/simulations/#plotting">Plotting</a>.</p>
 
 
 <div class="doc doc-object doc-class">

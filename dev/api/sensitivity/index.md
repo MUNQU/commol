@@ -49,7 +49,7 @@ class SensitivityAnalysis:
             polynomial chaos holds the mean of its replicates, on the same
             seeds at every point; a propagation keeps every replicate, each
             with a seed of its own. A deterministic engine does not use it, so
-            the same analysis runs on either engine.
+            the same analysis runs on every engine.
         seed : int | None, optional
             The seed of the designs and the replicates. Required with a
             stochastic engine; otherwise None draws one from the operating
@@ -320,12 +320,12 @@ Build the analysis of `inputs` on `simulation`.
 
 Parameters:
 
-| Name         | Type         | Description           | Default                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------ | ------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `simulation` | `Simulation` | The model to analyse. | *required*                                                                                                                                                                                                                                                                                                                                                                     |
-| `inputs`     | `InputSpace` | What varies.          | *required*                                                                                                                                                                                                                                                                                                                                                                     |
-| `replicates` | \`int        | None\`                | For a stochastic engine, required, at least 1: how many replicates each point runs. A point of the design of PRCC, Morris, Sobol or polynomial chaos holds the mean of its replicates, on the same seeds at every point; a propagation keeps every replicate, each with a seed of its own. A deterministic engine does not use it, so the same analysis runs on either engine. |
-| `seed`       | \`int        | None\`                | The seed of the designs and the replicates. Required with a stochastic engine; otherwise None draws one from the operating system, which the analysis logs.                                                                                                                                                                                                                    |
+| Name         | Type         | Description           | Default                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------ | ------------ | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `simulation` | `Simulation` | The model to analyse. | *required*                                                                                                                                                                                                                                                                                                                                                                    |
+| `inputs`     | `InputSpace` | What varies.          | *required*                                                                                                                                                                                                                                                                                                                                                                    |
+| `replicates` | \`int        | None\`                | For a stochastic engine, required, at least 1: how many replicates each point runs. A point of the design of PRCC, Morris, Sobol or polynomial chaos holds the mean of its replicates, on the same seeds at every point; a propagation keeps every replicate, each with a seed of its own. A deterministic engine does not use it, so the same analysis runs on every engine. |
+| `seed`       | \`int        | None\`                | The seed of the designs and the replicates. Required with a stochastic engine; otherwise None draws one from the operating system, which the analysis logs.                                                                                                                                                                                                                   |
 
 Raises:
 
@@ -359,7 +359,7 @@ def __init__(
         polynomial chaos holds the mean of its replicates, on the same
         seeds at every point; a propagation keeps every replicate, each
         with a seed of its own. A deterministic engine does not use it, so
-        the same analysis runs on either engine.
+        the same analysis runs on every engine.
     seed : int | None, optional
         The seed of the designs and the replicates. Required with a
         stochastic engine; otherwise None draws one from the operating
@@ -2903,6 +2903,7 @@ Attributes:
 | -------- | ------- | ----------------------------------------------------- |
 | `series` | \`Level | Increments\`                                          |
 | `at`     | `float` | The position; with Increments, the end of the window. |
+| `label`  | \`str   | None\`                                                |
 
 Source code in `commol/context/inference/quantities.py`
 
@@ -2918,6 +2919,9 @@ class ValueAt(_OfSeries, _OneScalar):
         The series read; a name or a list of names is their `Level`.
     at : float
         The position; with `Increments`, the end of the window.
+    label : str | None
+        The name of the quantity in results and plots. If None, a name that
+        says what the quantity reads.
     """
 
     kind: Literal["value_at"] = "value_at"
@@ -2983,6 +2987,7 @@ Attributes:
 | `outputs` | `list[str]` | The outputs summed; one name is a list of one. |
 | `start`   | `float`     | The start of the window.                       |
 | `end`     | `float`     | The end of the window, after start.            |
+| `label`   | \`str       | None\`                                         |
 
 Source code in `commol/context/inference/quantities.py`
 
@@ -3001,6 +3006,9 @@ class Gain(_Outputs, _OneScalar):
         The start of the window.
     end : float
         The end of the window, after `start`.
+    label : str | None
+        The name of the quantity in results and plots. If None, a name that
+        says what the quantity reads.
     """
 
     kind: Literal["gain"] = "gain"
@@ -3078,6 +3086,7 @@ Attributes:
 | ----------- | ------------- | ---------------------------------------------------------------- |
 | `series`    | \`Level       | Increments\`                                                     |
 | `positions` | `list[float]` | The positions compared, ascending; with Increments, window ends. |
+| `label`     | \`str         | None\`                                                           |
 
 Source code in `commol/context/inference/quantities.py`
 
@@ -3097,6 +3106,9 @@ class Peak(_AtPositions, _OneScalar):
         The series read; a name or a list of names is their `Level`.
     positions : list[float]
         The positions compared, ascending; with `Increments`, window ends.
+    label : str | None
+        The name of the quantity in results and plots. If None, a name that
+        says what the quantity reads.
     """
 
     kind: Literal["peak"] = "peak"
@@ -3136,6 +3148,7 @@ Attributes:
 | ----------- | ------------- | ---------------------------------------------------------------- |
 | `series`    | \`Level       | Increments\`                                                     |
 | `positions` | `list[float]` | The positions compared, ascending; with Increments, window ends. |
+| `label`     | \`str         | None\`                                                           |
 
 Source code in `commol/context/inference/quantities.py`
 
@@ -3151,6 +3164,9 @@ class PeakPosition(_AtPositions, _OneScalar):
         The series read; a name or a list of names is their `Level`.
     positions : list[float]
         The positions compared, ascending; with `Increments`, window ends.
+    label : str | None
+        The name of the quantity in results and plots. If None, a name that
+        says what the quantity reads.
     """
 
     kind: Literal["peak_position"] = "peak_position"
@@ -3275,6 +3291,7 @@ Attributes:
 | `numerator`      | \`ValueAt                           | Gain                                                                                                                                                                                            |
 | `denominator`    | \`ValueAt                           | Gain                                                                                                                                                                                            |
 | `replicate_rule` | `{within, within_positive, pooled}` | "within": the mean of the ratio of each replicate, E[N/D]; a replicate with D = 0 leaves the point with no value. "within_positive": the mean of the ratio of the replicates with D > 0, E\[N/D |
+| `label`          | \`str                               | None\`                                                                                                                                                                                          |
 
 Source code in `commol/context/inference/quantities.py`
 
@@ -3305,6 +3322,9 @@ class Ratio(_OneScalar):
         ``"pooled"``: the ratio of the means, E[N]/E[D]; a point with
         E[D] = 0 has no value. With a deterministic engine, the three give
         N/D, and a point with D = 0 has no value.
+    label : str | None
+        The name of the quantity in results and plots. If None, a name that
+        says what the quantity reads.
     """
 
     kind: Literal["ratio"] = "ratio"

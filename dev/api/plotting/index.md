@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-The figures are read from the results they draw, and return a matplotlib `Figure`: `results.plot`, `replicates.plot` and `predictive.plot` give the figures of a run, of replicates and of a predictive, and the result of a sensitivity method or of a profile likelihood draws its figure with `plot()`. `plot_compared` draws several runs, replicates or predictives on the same panels. They need the optional extra `commol[plot]`. Guide: [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting).
+The figures are read from the results they draw, and return a matplotlib `Figure`. `results.plot`, `replicates.plot` and `predictive.plot` give the figures of a run, of replicates and of a predictive: `plot.series()`, `plot.cumulative()` and `plot.observations()`. The results of PRCC, Morris, Sobol and polynomial chaos, and the result of a profile likelihood, draw their figure with `plot()`. `plot_compared` draws several runs, replicates or predictives on the same panels. The figures need the optional extra `commol[plot]`. Guide: [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting).
 
 ## ResultsPlot
 

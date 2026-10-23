@@ -7076,23 +7076,37 @@ results = Simulation(model).run(num_steps=60)
 
 Every public name of `commol`, generated from the docstrings. The guide pages explain how to use them; these pages list every argument, attribute and error.
 
-| Page                                                                                  | Names                                                                                                                                                                                                                                                                                                                                   |
-| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md)      | `ModelBuilder`                                                                                                                                                                                                                                                                                                                          |
-| [Model](https://munqu.github.io/commol/latest/api/model/index.md)                     | `Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete`, `Groups`, `ModelDescription`, `InitialCompartment`, `SeriesValue`, `UnitConsistencyError`                                                                                                                                                                                |
-| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)           | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `ODESolver`, `StochasticEventsSettings`, `StochasticStepsSettings`, `InfeasibleStateError`, `windowed_totals`, `sample`                                                                                                                                     |
-| [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)               | `SimulationResults.plot`, `SimulationReplicates.plot`, `Predictive.plot`, `PRCCResult.plot`, `MorrisResult.plot`, `SobolResult.plot`, `ChaosResult.plot`, `ProfileResult.plot`, `PlotConfig`                                                                                                                                            |
-| [AxisPattern](https://munqu.github.io/commol/latest/api/axis-patterns/index.md)       | `AxisPattern`                                                                                                                                                                                                                                                                                                                           |
-| [AxisUnits](https://munqu.github.io/commol/latest/api/axis-units/index.md)            | `AxisUnits`                                                                                                                                                                                                                                                                                                                             |
-| [Calibration](https://munqu.github.io/commol/latest/api/calibrator/index.md)          | `Calibrator`, `CalibrationProblem`, `Quantile`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `NelderMeadConfig`, `ParticleSwarmConfig`, `CalibrationResult`, `StartSummary`, `CalibrationHistory`, `CalibrationEvaluation`, `LossFunction`, `OptimizationAlgorithm`                                            |
-| [Uncertainty](https://munqu.github.io/commol/latest/api/uncertainty/index.md)         | `InferenceMethod`, `UncertaintyMethod`, `ParameterSample`, `SampleMethod`, `ParameterSummary`, `Predictive`, `PredictiveBand`, `SeriesBand`, `ObservationDraws`, `Scenarios`, `ScenarioSummary`, `commol.scores`, `weighted_quantiles`, `member_statistics`, `ci_percentiles`                                                           |
-| [Sensitivity](https://munqu.github.io/commol/latest/api/sensitivity/index.md)         | `SensitivityAnalysis`, `InputSpace`, `SensitivityMethod`, `Propagation`, `PropagationResult`, `QuantitySummary`, `PRCC`, `PRCCResult`, `Morris`, `MorrisResult`, `Sobol`, `SobolResult`, `PolynomialChaos`, `ChaosResult`, `Level`, `Increments`, `ValueAt`, `Gain`, `Peak`, `PeakPosition`, `Trajectory`, `Ratio`, `quantity_schedule` |
-| [Identifiability](https://munqu.github.io/commol/latest/api/identifiability/index.md) | `IdentifiabilityMethod`, `StructuralRank`, `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, `IdentifiabilityReport`                                                                                                                                                                                                    |
-| [Parallelism](https://munqu.github.io/commol/latest/api/parallelism/index.md)         | `set_threads`, `threads`, `get_threads`, `get_levels`                                                                                                                                                                                                                                                                                   |
-| [Reports](https://munqu.github.io/commol/latest/api/reports/index.md)                 | `Model.applied_parameters`, `SimulationResults.report`, `SimulationReplicates.report`, `Predictive.report`, `IdentifiabilityReport.report`                                                                                                                                                                                              |
-| [Package](https://munqu.github.io/commol/latest/api/package/index.md)                 | `__version__`, `build_info`, `BuildInfo`                                                                                                                                                                                                                                                                                                |
+The table lists each name that the package root exports (`commol.__all__`), on the page that documents it. Import these names from the package root, as in `from commol import Simulation`.
 
-Import every name from the package root, as in `from commol import Simulation`. `UnitConsistencyError` is in `commol.utils.equations`; the scores are the module `commol.scores` (`from commol import scores`).
+| Page                                                                                                    | Names                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md)                        | `ModelBuilder`                                                                                                                                                                                                                                                                                                                          |
+| [Model](https://munqu.github.io/commol/latest/api/model/index.md)                                       | `Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete`, `Groups`, `SeriesValue`, `ModelDescription`                                                                                                                                                                                                                              |
+| [AxisPattern](https://munqu.github.io/commol/latest/api/axis-patterns/index.md)                         | `AxisPattern`                                                                                                                                                                                                                                                                                                                           |
+| [AxisUnits](https://munqu.github.io/commol/latest/api/axis-units/index.md)                              | `AxisUnits`                                                                                                                                                                                                                                                                                                                             |
+| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)                             | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `ODESolver`, `StochasticEventsSettings`, `StochasticStepsSettings`, `InfeasibleStateError`, `windowed_totals`, `sample`                                                                                                                                     |
+| [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)                                 | `plot_compared`, `PlotConfig`; the methods `SimulationResults.plot`, `SimulationReplicates.plot`, `Predictive.plot`, `PRCCResult.plot`, `MorrisResult.plot`, `SobolResult.plot`, `ChaosResult.plot`, `ProfileResult.plot`                                                                                                               |
+| [Calibration](https://munqu.github.io/commol/latest/api/calibrator/index.md)                            | `Calibrator`, `CalibrationProblem`, `Quantile`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `NelderMeadConfig`, `ParticleSwarmConfig`, `CalibrationResult`, `StartSummary`, `CalibrationHistory`, `CalibrationEvaluation`                                                                                     |
+| [Observation models](https://munqu.github.io/commol/latest/api/calibrator/#observation-models)          | `ObservationModel`, `NormalObservations`, `LogNormalObservations`, `StudentTObservations`, `PoissonObservations`, `NegativeBinomialObservations`, `BinomialObservations`                                                                                                                                                                |
+| [Reports](https://munqu.github.io/commol/latest/api/reports/index.md)                                   | the methods `Model.applied_parameters`, `SimulationResults.report`, `SimulationReplicates.report`, `Predictive.report`, `IdentifiabilityReport.report`                                                                                                                                                                                  |
+| [Uncertainty](https://munqu.github.io/commol/latest/api/uncertainty/index.md)                           | `InferenceMethod`, `UncertaintyMethod`, `ParameterSample`, `SampleMethod`, `ParameterSummary`, `Predictive`, `PredictiveBand`, `SeriesBand`, `ObservationDraws`, `Scenarios`, `ScenarioSummary`, `NoNoise`, `ResidualNoise`, `DistributionNoise`                                                                                        |
+| [Resampling](https://munqu.github.io/commol/latest/api/uncertainty/#resampling)                         | `BayesianBootstrap`, `ResidualBootstrap`, `WildBootstrap`, `BlockJackknife`, `ParametricBootstrap`, `BootstrapResult`, `JackknifeResult`, `ResamplingDiagnostics`, `BoundError`                                                                                                                                                         |
+| [Profile likelihood](https://munqu.github.io/commol/latest/api/uncertainty/#profile-likelihood)         | `ProfileLikelihood`, `PredictionProfile`, `PredictionSpec`, `Threshold`, `ProfileResult`, `Profile`, `ProfileInterval`                                                                                                                                                                                                                  |
+| [Sequential Monte Carlo](https://munqu.github.io/commol/latest/api/uncertainty/#sequential-monte-carlo) | `Priors`, `Uniform`, `LogUniform`, `Beta`, `Normal`, `LogNormal`, `Gamma`, `GibbsPosterior`, `BayesianPosterior`, `InformationMatchingEta`, `BootstrapCoverageEta`, `ABCSMC`, `ABCRejection`, `LossDistance`, `SeriesDistance`, `SMCResult`, `GibbsResult`, `SMCDiagnostics`                                                            |
+| [Local approximations](https://munqu.github.io/commol/latest/api/uncertainty/#local-approximations)     | `Laplace`, `Sandwich`, `LaplaceMixture`, `LikelihoodTarget`, `GibbsTarget`, `LocalResult`, `LaplaceResult`, `SandwichResult`, `DeltaBand`, `ImportanceResult`, `MixtureComponent`                                                                                                                                                       |
+| [Conformal prediction](https://munqu.github.io/commol/latest/api/uncertainty/#conformal-prediction)     | `SplitConformal`, `RollingConformal`, `JackknifePlus`, `EnbPI`, `AdaptiveConformal`, `ConformalResult`, `PredictionIntervals`, `SeriesIntervals`                                                                                                                                                                                        |
+| [Scores and intervals](https://munqu.github.io/commol/latest/api/uncertainty/#scores-and-intervals)     | `weighted_quantiles`, `member_statistics`, `ci_percentiles`                                                                                                                                                                                                                                                                             |
+| [Identifiability](https://munqu.github.io/commol/latest/api/identifiability/index.md)                   | `IdentifiabilityMethod`, `StructuralRank`, `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, `IdentifiabilityReport`                                                                                                                                                                                                    |
+| [Sensitivity](https://munqu.github.io/commol/latest/api/sensitivity/index.md)                           | `SensitivityAnalysis`, `InputSpace`, `SensitivityMethod`, `Propagation`, `PropagationResult`, `QuantitySummary`, `PRCC`, `PRCCResult`, `Morris`, `MorrisResult`, `Sobol`, `SobolResult`, `PolynomialChaos`, `ChaosResult`, `Level`, `Increments`, `ValueAt`, `Gain`, `Peak`, `PeakPosition`, `Trajectory`, `Ratio`, `quantity_schedule` |
+| [Parallelism](https://munqu.github.io/commol/latest/api/parallelism/index.md)                           | `set_threads`, `threads`, `get_threads`, `get_levels`                                                                                                                                                                                                                                                                                   |
+| [Package](https://munqu.github.io/commol/latest/api/package/index.md)                                   | `__version__`, `build_info`, `BuildInfo`                                                                                                                                                                                                                                                                                                |
+
+The pages also document names that are not in the package root:
+
+- The scores are the module `commol.scores` (`from commol import scores`), on the [Uncertainty](https://munqu.github.io/commol/latest/api/uncertainty/#scores-and-intervals) page.
+- `LossFunction`, the values of `CalibrationProblem.loss_function`, is in `commol.context.constants`.
+- `UnitConsistencyError` is in `commol.utils.equations`.
+- Some types are only read from what a method returns, and you do not import them: `InitialCompartment` (an entry of `Aggregate.initial_state()`), the blocks of a `ModelDescription`, the parts of an `IdentifiabilityReport`, and the types of a model in [Model Structure](https://munqu.github.io/commol/latest/advanced/model-structure/index.md).
 
 # AxisPattern API
 
@@ -7111,6 +7125,13 @@ Instances are created exclusively via the factory classmethods (`pulse`, `period
 Multi-group schedules are built by calling `AxisPattern.add_group(...)` directly on the class. The first call returns a new schedule; chain further `add_group` and `set_default` calls on the returned instance.
 
 A `AxisPattern` is accepted directly by :meth:`commol.api.model_builder.ModelBuilder.add_transition` via the `rate` argument; no auxiliary conversion is required.
+
+Attributes:
+
+| Name                 | Type                  | Description |
+| -------------------- | --------------------- | ----------- |
+| `conditions`         | \`list[ConditionDict] | None\`      |
+| `source_compartment` | \`str                 | None\`      |
 
 Examples:
 
@@ -7149,6 +7170,16 @@ class AxisPattern(BaseModel):
     A ``AxisPattern`` is accepted directly by
     :meth:`commol.api.model_builder.ModelBuilder.add_transition` via the
     ``rate`` argument; no auxiliary conversion is required.
+
+    Attributes
+    ----------
+    conditions : list[ConditionDict] | None
+        The stratification conditions of the sub-group the pattern applies
+        to, set by ``for_group``. None: every compartment of the transition.
+    source_compartment : str | None
+        A compartment the rate is multiplied by, which makes the flow
+        absolute, set by ``for_group``. None: the flow is proportional to its
+        source.
 
     Examples
     --------
@@ -7205,7 +7236,23 @@ class AxisPattern(BaseModel):
         *,
         source_compartment: str | None = None,
     ) -> Self:
-        """Return a copy of this pattern restricted to a stratification sub-group."""
+        """
+        Return a copy of this pattern restricted to a stratification sub-group.
+
+        Parameters
+        ----------
+        conditions : list[ConditionDict]
+            The stratification conditions of the sub-group, as in a
+            stratified rate.
+        source_compartment : str | None, default=None
+            A compartment to multiply the rate by, which makes the flow
+            absolute. If None, the flow is proportional to its source.
+
+        Returns
+        -------
+        AxisPattern
+            The copy, with `conditions` and `source_compartment` set.
+        """
         copied: list[ConditionDict] = [_copy_condition(c) for c in conditions]
         return self.model_copy(
             update={
@@ -7255,7 +7302,29 @@ class AxisPattern(BaseModel):
     # ------------------------------------------------------------------
 
     def set_default(self, pattern: "AxisPattern") -> "AxisPattern":  # noqa: ARG002
-        """Register the condition-free fallback pattern (schedules only)."""
+        """
+        Register the condition-free fallback pattern (schedules only).
+
+        Parameters
+        ----------
+        pattern : AxisPattern
+            The pattern of every compartment that no group matches, with no
+            conditions and no ``source_compartment``.
+
+        Returns
+        -------
+        AxisPattern
+            The schedule.
+
+        Raises
+        ------
+        TypeError
+            If this pattern is not a schedule, one that
+            ``AxisPattern.add_group`` started.
+        ValueError
+            If the schedule has a default already, or `pattern` has
+            conditions or a ``source_compartment``.
+        """
         raise TypeError(
             "set_default is only valid on a schedule AxisPattern; "
             "start one with AxisPattern.add_group(...) first."
@@ -7458,6 +7527,19 @@ for_group(conditions: list[ConditionDict], *, source_compartment: str | None = N
 
 Return a copy of this pattern restricted to a stratification sub-group.
 
+Parameters:
+
+| Name                 | Type                  | Description                                                              | Default                                                                                                                |
+| -------------------- | --------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `conditions`         | `list[ConditionDict]` | The stratification conditions of the sub-group, as in a stratified rate. | *required*                                                                                                             |
+| `source_compartment` | \`str                 | None\`                                                                   | A compartment to multiply the rate by, which makes the flow absolute. If None, the flow is proportional to its source. |
+
+Returns:
+
+| Type          | Description                                           |
+| ------------- | ----------------------------------------------------- |
+| `AxisPattern` | The copy, with conditions and source_compartment set. |
+
 Source code in `commol/api/patterns.py`
 
 ```python
@@ -7467,7 +7549,23 @@ def for_group(
     *,
     source_compartment: str | None = None,
 ) -> Self:
-    """Return a copy of this pattern restricted to a stratification sub-group."""
+    """
+    Return a copy of this pattern restricted to a stratification sub-group.
+
+    Parameters
+    ----------
+    conditions : list[ConditionDict]
+        The stratification conditions of the sub-group, as in a
+        stratified rate.
+    source_compartment : str | None, default=None
+        A compartment to multiply the rate by, which makes the flow
+        absolute. If None, the flow is proportional to its source.
+
+    Returns
+    -------
+    AxisPattern
+        The copy, with `conditions` and `source_compartment` set.
+    """
     copied: list[ConditionDict] = [_copy_condition(c) for c in conditions]
     return self.model_copy(
         update={
@@ -7517,11 +7615,52 @@ set_default(pattern: AxisPattern) -> AxisPattern
 
 Register the condition-free fallback pattern (schedules only).
 
+Parameters:
+
+| Name      | Type          | Description                                                                                           | Default    |
+| --------- | ------------- | ----------------------------------------------------------------------------------------------------- | ---------- |
+| `pattern` | `AxisPattern` | The pattern of every compartment that no group matches, with no conditions and no source_compartment. | *required* |
+
+Returns:
+
+| Type          | Description   |
+| ------------- | ------------- |
+| `AxisPattern` | The schedule. |
+
+Raises:
+
+| Type         | Description                                                                               |
+| ------------ | ----------------------------------------------------------------------------------------- |
+| `TypeError`  | If this pattern is not a schedule, one that AxisPattern.add_group started.                |
+| `ValueError` | If the schedule has a default already, or pattern has conditions or a source_compartment. |
+
 Source code in `commol/api/patterns.py`
 
 ```python
 def set_default(self, pattern: "AxisPattern") -> "AxisPattern":  # noqa: ARG002
-    """Register the condition-free fallback pattern (schedules only)."""
+    """
+    Register the condition-free fallback pattern (schedules only).
+
+    Parameters
+    ----------
+    pattern : AxisPattern
+        The pattern of every compartment that no group matches, with no
+        conditions and no ``source_compartment``.
+
+    Returns
+    -------
+    AxisPattern
+        The schedule.
+
+    Raises
+    ------
+    TypeError
+        If this pattern is not a schedule, one that
+        ``AxisPattern.add_group`` started.
+    ValueError
+        If the schedule has a default already, or `pattern` has
+        conditions or a ``source_compartment``.
+    """
     raise TypeError(
         "set_default is only valid on a schedule AxisPattern; "
         "start one with AxisPattern.add_group(...) first."
@@ -10772,12 +10911,13 @@ class CalibrationProblem(BaseModel):
     optimization_config : OptimizationConfig
         Configuration for the optimization algorithm
     initial_condition_remainder : str | None
-        Expanded compartment or bin that absorbs the difference to the
-        total once the calibrated initial conditions are applied
-        (default: None). It is not calibrated itself. With a remainder, the
-        sum of the initial amounts always equals ``total``; without one,
-        calibrated initial conditions are applied as given and only a sum
-        above ``total`` is penalized.
+        Expanded compartment or bin that takes what the calibrated initial
+        conditions leave of the amounts the model states (default: None). It
+        is not calibrated itself: it takes the sum of the amounts the model
+        states, less every other compartment, so that sum does not change.
+        A value that would make it negative is penalized. Without a
+        remainder, calibrated initial conditions are applied as given, and
+        the other compartments keep their amounts.
     replicates : int | None
         For a stochastic engine: how many replicates each evaluation runs,
         with common random numbers (the same seeds, derived from ``seed``, at
@@ -10833,8 +10973,8 @@ class CalibrationProblem(BaseModel):
     initial_condition_remainder: str | None = Field(
         default=None,
         description=(
-            "Expanded compartment or bin that absorbs the difference to the "
-            "total once the calibrated initial conditions are applied."
+            "Expanded compartment or bin that takes what the calibrated "
+            "initial conditions leave of the amounts the model states."
         ),
     )
     replicates: int | None = Field(
@@ -11592,7 +11732,7 @@ Attributes:
 | `id`          | `str`         | Unique identifier for this constraint                                                                                                                                                                                      |
 | `expression`  | `str`         | Mathematical expression that must evaluate >= 0 for constraint satisfaction. Can reference calibration parameters by their IDs. When at is specified, can also reference output values (A, B, C, etc.) at those positions. |
 | `description` | \`str         | None\`                                                                                                                                                                                                                     |
-| `weight`      | `float`       | Penalty weight multiplier (default: 1.0). Higher values make this constraint more important relative to others. The penalty for violating this constraint is: weight * violation^2                                         |
+| `weight`      | `float`       | Penalty weight multiplier (default: 1.0). Higher values make this constraint more important relative to others. The amount of a violation of this constraint is weight \*                                                  |
 | `at`          | \`list[float] | None\`                                                                                                                                                                                                                     |
 
 Examples:
@@ -11657,8 +11797,10 @@ class CalibrationConstraint(BaseModel):
         Human-readable description of the constraint (optional)
     weight : float
         Penalty weight multiplier (default: 1.0). Higher values make this constraint
-        more important relative to others. The penalty for violating this constraint
-        is: weight * violation^2
+        more important relative to others. The amount of a violation of this
+        constraint is weight * |violation|, summed over its positions; the loss
+        of a point that violates constraints is P * (1 + the sum of the amounts),
+        with P much larger than any fit.
     at : list[float] | None
         Optional positions on the axis at which to evaluate this constraint.
         The engine decides which positions its model type accepts: a
@@ -13035,36 +13177,6 @@ class LossFunction(StrEnum):
     MAE = "mae"
 ```
 
-## OptimizationAlgorithm
-
-Bases: `StrEnum`
-
-Available optimization algorithms.
-
-Values
-
-NELDER_MEAD Nelder-Mead simplex algorithm PARTICLE_SWARM Particle Swarm Optimization
-
-Source code in `commol/context/constants.py`
-
-```python
-@unique
-class OptimizationAlgorithm(StrEnum):
-    """
-    Available optimization algorithms.
-
-    Values
-    ------
-    NELDER_MEAD
-        Nelder-Mead simplex algorithm
-    PARTICLE_SWARM
-        Particle Swarm Optimization
-    """
-
-    NELDER_MEAD = "nelder_mead"
-    PARTICLE_SWARM = "particle_swarm"
-```
-
 # Identifiability API
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
@@ -14129,19 +14241,7 @@ Builds a `Model`. Guide: [Building Models](https://munqu.github.io/commol/latest
 
 A fluent interface that writes the process of a model, once.
 
-The builder adds bins, accumulators, stratifications, transitions and parameters: the process, which is the same for every kind of model. `build` joins it with a structure, which lays the process out (such as `Aggregate`, amounts per compartment), and an engine, which runs it.
-
-Attributes:
-
-| Name               | Type                   | Description                               |
-| ------------------ | ---------------------- | ----------------------------------------- |
-| `_name`            | `str`                  | The model name.                           |
-| `_description`     | \`str                  | None\`                                    |
-| `_version`         | \`str                  | None\`                                    |
-| `_bins`            | `list[Bin]`            | List of bins (compartments) in the model. |
-| `_stratifications` | `list[Stratification]` | List of stratifications.                  |
-| `_transitions`     | `list[Transition]`     | List of transitions between states.       |
-| `_parameters`      | `list[Parameter]`      | List of model parameters.                 |
+The builder adds bins, accumulators, stratifications, transitions and parameters: the process, which is the same for every kind of model. `build` joins it with a structure, which lays the process out (such as `Aggregate`, amounts per compartment), and an engine, which runs it. Each method that adds returns the builder, so the calls chain.
 
 Source code in `commol/api/model_builder.py`
 
@@ -14154,23 +14254,7 @@ class ModelBuilder:
     parameters: the process, which is the same for every kind of model.
     `build` joins it with a structure, which lays the process out (such as
     `Aggregate`, amounts per compartment), and an engine, which runs it.
-
-    Attributes
-    ----------
-    _name : str
-        The model name.
-    _description : str | None
-        The model description.
-    _version : str | None
-        The model version.
-    _bins : list[Bin]
-        List of bins (compartments) in the model.
-    _stratifications : list[Stratification]
-        List of stratifications.
-    _transitions : list[Transition]
-        List of transitions between states.
-    _parameters : list[Parameter]
-        List of model parameters.
+    Each method that adds returns the builder, so the calls chain.
     """
 
     def __init__(
@@ -14259,7 +14343,27 @@ class ModelBuilder:
         return self
 
     def add_accumulator(self, id: str, name: str) -> Self:
-        """Add a cumulative event counter to the model outputs."""
+        """
+        Add an accumulator: a cumulative event counter in the model outputs.
+
+        A transition adds its flow to the accumulators it names
+        (``add_transition(accumulators=...)``). An accumulator is an output,
+        not a part of the state, so ``total`` leaves it out.
+
+        Parameters
+        ----------
+        id : str
+            Unique identifier for the accumulator. It names its output, which
+            stratifications expand as they expand a bin (``acc_g1``,
+            ``acc_g2``).
+        name : str
+            Human-readable name for the accumulator.
+
+        Returns
+        -------
+        ModelBuilder
+            Self for method chaining.
+        """
         self._accumulators.append(Accumulator(id=id, name=name))
         logger.info(f"Added accumulator: id='{id}', name='{name}'")
         return self
@@ -14849,7 +14953,8 @@ class ModelBuilder:
         """
         Reset the builder to empty state.
 
-        The name, description, version and ``bin_unit`` are kept. Every bin,
+        The name, description, version, ``bin_unit``, ``step_unit`` and
+        ``origin`` are kept. Every bin,
         accumulator, stratification, transition and parameter is removed.
 
         Returns
@@ -15094,13 +15199,48 @@ def add_bin(self, id: str, name: str, unit: str | None = None) -> Self:
 add_accumulator(id: str, name: str) -> Self
 ```
 
-Add a cumulative event counter to the model outputs.
+Add an accumulator: a cumulative event counter in the model outputs.
+
+A transition adds its flow to the accumulators it names (`add_transition(accumulators=...)`). An accumulator is an output, not a part of the state, so `total` leaves it out.
+
+Parameters:
+
+| Name   | Type  | Description                                                                                                                     | Default    |
+| ------ | ----- | ------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `id`   | `str` | Unique identifier for the accumulator. It names its output, which stratifications expand as they expand a bin (acc_g1, acc_g2). | *required* |
+| `name` | `str` | Human-readable name for the accumulator.                                                                                        | *required* |
+
+Returns:
+
+| Type           | Description               |
+| -------------- | ------------------------- |
+| `ModelBuilder` | Self for method chaining. |
 
 Source code in `commol/api/model_builder.py`
 
 ```python
 def add_accumulator(self, id: str, name: str) -> Self:
-    """Add a cumulative event counter to the model outputs."""
+    """
+    Add an accumulator: a cumulative event counter in the model outputs.
+
+    A transition adds its flow to the accumulators it names
+    (``add_transition(accumulators=...)``). An accumulator is an output,
+    not a part of the state, so ``total`` leaves it out.
+
+    Parameters
+    ----------
+    id : str
+        Unique identifier for the accumulator. It names its output, which
+        stratifications expand as they expand a bin (``acc_g1``,
+        ``acc_g2``).
+    name : str
+        Human-readable name for the accumulator.
+
+    Returns
+    -------
+    ModelBuilder
+        Self for method chaining.
+    """
     self._accumulators.append(Accumulator(id=id, name=name))
     logger.info(f"Added accumulator: id='{id}', name='{name}'")
     return self
@@ -15652,7 +15792,7 @@ reset() -> Self
 
 Reset the builder to empty state.
 
-The name, description, version and `bin_unit` are kept. Every bin, accumulator, stratification, transition and parameter is removed.
+The name, description, version, `bin_unit`, `step_unit` and `origin` are kept. Every bin, accumulator, stratification, transition and parameter is removed.
 
 Returns:
 
@@ -15667,7 +15807,8 @@ def reset(self) -> Self:
     """
     Reset the builder to empty state.
 
-    The name, description, version and ``bin_unit`` are kept. Every bin,
+    The name, description, version, ``bin_unit``, ``step_unit`` and
+    ``origin`` are kept. Every bin,
     accumulator, stratification, transition and parameter is removed.
 
     Returns
@@ -15834,7 +15975,7 @@ def build(
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-The validated model that `ModelBuilder.build` returns: a header, the process written once, the structure that lays it out (`Aggregate`, with its neighbors `Complete` and `Groups`), the entries of `Aggregate.initial_state()`, and the `SeriesValue` of a series parameter. Guide: [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md), [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate), [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md), [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md). The tree of types is in [Model Structure](https://munqu.github.io/commol/latest/advanced/model-structure/index.md).
+The validated model that `ModelBuilder.build` returns: a header, the process written once, the structure that lays it out (`Aggregate`, with its neighbors `Complete` and `Groups`), the entries of `Aggregate.initial_state()`, the `SeriesValue` of a series parameter, and `UnitConsistencyError`, the error of `Model.check_unit_consistency`. Guide: [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md), [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate), [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md), [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md). The tree of types is in [Model Structure](https://munqu.github.io/commol/latest/advanced/model-structure/index.md).
 
 ## Model
 
@@ -19924,6 +20065,21 @@ def validate_data(
     return value
 ```
 
+## UnitConsistencyError
+
+Bases: `Exception`
+
+Raised when unit consistency check fails.
+
+Source code in `commol/utils/equations.py`
+
+```python
+class UnitConsistencyError(Exception):
+    """Raised when unit consistency check fails."""
+
+    pass
+```
+
 ## Descriptions
 
 `Model.describe` returns a `ModelDescription`; its blocks are in `commol.context.description`.
@@ -20772,21 +20928,6 @@ def check_shape(self) -> Self:
     return self
 ```
 
-## UnitConsistencyError
-
-Bases: `Exception`
-
-Raised when unit consistency check fails.
-
-Source code in `commol/utils/equations.py`
-
-```python
-class UnitConsistencyError(Exception):
-    """Raised when unit consistency check fails."""
-
-    pass
-```
-
 # Package API
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
@@ -21052,7 +21193,7 @@ def get_levels() -> Levels:
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-The figures are read from the results they draw, and return a matplotlib `Figure`: `results.plot`, `replicates.plot` and `predictive.plot` give the figures of a run, of replicates and of a predictive, and the result of a sensitivity method or of a profile likelihood draws its figure with `plot()`. `plot_compared` draws several runs, replicates or predictives on the same panels. They need the optional extra `commol[plot]`. Guide: [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting).
+The figures are read from the results they draw, and return a matplotlib `Figure`. `results.plot`, `replicates.plot` and `predictive.plot` give the figures of a run, of replicates and of a predictive: `plot.series()`, `plot.cumulative()` and `plot.observations()`. The results of PRCC, Morris, Sobol and polynomial chaos, and the result of a profile likelihood, draw their figure with `plot()`. `plot_compared` draws several runs, replicates or predictives on the same panels. The figures need the optional extra `commol[plot]`. Guide: [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting).
 
 ## ResultsPlot
 
@@ -24340,7 +24481,7 @@ class SensitivityAnalysis:
             polynomial chaos holds the mean of its replicates, on the same
             seeds at every point; a propagation keeps every replicate, each
             with a seed of its own. A deterministic engine does not use it, so
-            the same analysis runs on either engine.
+            the same analysis runs on every engine.
         seed : int | None, optional
             The seed of the designs and the replicates. Required with a
             stochastic engine; otherwise None draws one from the operating
@@ -24611,12 +24752,12 @@ Build the analysis of `inputs` on `simulation`.
 
 Parameters:
 
-| Name         | Type         | Description           | Default                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------ | ------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `simulation` | `Simulation` | The model to analyse. | *required*                                                                                                                                                                                                                                                                                                                                                                     |
-| `inputs`     | `InputSpace` | What varies.          | *required*                                                                                                                                                                                                                                                                                                                                                                     |
-| `replicates` | \`int        | None\`                | For a stochastic engine, required, at least 1: how many replicates each point runs. A point of the design of PRCC, Morris, Sobol or polynomial chaos holds the mean of its replicates, on the same seeds at every point; a propagation keeps every replicate, each with a seed of its own. A deterministic engine does not use it, so the same analysis runs on either engine. |
-| `seed`       | \`int        | None\`                | The seed of the designs and the replicates. Required with a stochastic engine; otherwise None draws one from the operating system, which the analysis logs.                                                                                                                                                                                                                    |
+| Name         | Type         | Description           | Default                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------ | ------------ | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `simulation` | `Simulation` | The model to analyse. | *required*                                                                                                                                                                                                                                                                                                                                                                    |
+| `inputs`     | `InputSpace` | What varies.          | *required*                                                                                                                                                                                                                                                                                                                                                                    |
+| `replicates` | \`int        | None\`                | For a stochastic engine, required, at least 1: how many replicates each point runs. A point of the design of PRCC, Morris, Sobol or polynomial chaos holds the mean of its replicates, on the same seeds at every point; a propagation keeps every replicate, each with a seed of its own. A deterministic engine does not use it, so the same analysis runs on every engine. |
+| `seed`       | \`int        | None\`                | The seed of the designs and the replicates. Required with a stochastic engine; otherwise None draws one from the operating system, which the analysis logs.                                                                                                                                                                                                                   |
 
 Raises:
 
@@ -24650,7 +24791,7 @@ def __init__(
         polynomial chaos holds the mean of its replicates, on the same
         seeds at every point; a propagation keeps every replicate, each
         with a seed of its own. A deterministic engine does not use it, so
-        the same analysis runs on either engine.
+        the same analysis runs on every engine.
     seed : int | None, optional
         The seed of the designs and the replicates. Required with a
         stochastic engine; otherwise None draws one from the operating
@@ -27194,6 +27335,7 @@ Attributes:
 | -------- | ------- | ----------------------------------------------------- |
 | `series` | \`Level | Increments\`                                          |
 | `at`     | `float` | The position; with Increments, the end of the window. |
+| `label`  | \`str   | None\`                                                |
 
 Source code in `commol/context/inference/quantities.py`
 
@@ -27209,6 +27351,9 @@ class ValueAt(_OfSeries, _OneScalar):
         The series read; a name or a list of names is their `Level`.
     at : float
         The position; with `Increments`, the end of the window.
+    label : str | None
+        The name of the quantity in results and plots. If None, a name that
+        says what the quantity reads.
     """
 
     kind: Literal["value_at"] = "value_at"
@@ -27274,6 +27419,7 @@ Attributes:
 | `outputs` | `list[str]` | The outputs summed; one name is a list of one. |
 | `start`   | `float`     | The start of the window.                       |
 | `end`     | `float`     | The end of the window, after start.            |
+| `label`   | \`str       | None\`                                         |
 
 Source code in `commol/context/inference/quantities.py`
 
@@ -27292,6 +27438,9 @@ class Gain(_Outputs, _OneScalar):
         The start of the window.
     end : float
         The end of the window, after `start`.
+    label : str | None
+        The name of the quantity in results and plots. If None, a name that
+        says what the quantity reads.
     """
 
     kind: Literal["gain"] = "gain"
@@ -27369,6 +27518,7 @@ Attributes:
 | ----------- | ------------- | ---------------------------------------------------------------- |
 | `series`    | \`Level       | Increments\`                                                     |
 | `positions` | `list[float]` | The positions compared, ascending; with Increments, window ends. |
+| `label`     | \`str         | None\`                                                           |
 
 Source code in `commol/context/inference/quantities.py`
 
@@ -27388,6 +27538,9 @@ class Peak(_AtPositions, _OneScalar):
         The series read; a name or a list of names is their `Level`.
     positions : list[float]
         The positions compared, ascending; with `Increments`, window ends.
+    label : str | None
+        The name of the quantity in results and plots. If None, a name that
+        says what the quantity reads.
     """
 
     kind: Literal["peak"] = "peak"
@@ -27427,6 +27580,7 @@ Attributes:
 | ----------- | ------------- | ---------------------------------------------------------------- |
 | `series`    | \`Level       | Increments\`                                                     |
 | `positions` | `list[float]` | The positions compared, ascending; with Increments, window ends. |
+| `label`     | \`str         | None\`                                                           |
 
 Source code in `commol/context/inference/quantities.py`
 
@@ -27442,6 +27596,9 @@ class PeakPosition(_AtPositions, _OneScalar):
         The series read; a name or a list of names is their `Level`.
     positions : list[float]
         The positions compared, ascending; with `Increments`, window ends.
+    label : str | None
+        The name of the quantity in results and plots. If None, a name that
+        says what the quantity reads.
     """
 
     kind: Literal["peak_position"] = "peak_position"
@@ -27566,6 +27723,7 @@ Attributes:
 | `numerator`      | \`ValueAt                           | Gain                                                                                                                                                                                            |
 | `denominator`    | \`ValueAt                           | Gain                                                                                                                                                                                            |
 | `replicate_rule` | `{within, within_positive, pooled}` | "within": the mean of the ratio of each replicate, E[N/D]; a replicate with D = 0 leaves the point with no value. "within_positive": the mean of the ratio of the replicates with D > 0, E\[N/D |
+| `label`          | \`str                               | None\`                                                                                                                                                                                          |
 
 Source code in `commol/context/inference/quantities.py`
 
@@ -27596,6 +27754,9 @@ class Ratio(_OneScalar):
         ``"pooled"``: the ratio of the means, E[N]/E[D]; a point with
         E[D] = 0 has no value. With a deterministic engine, the three give
         N/D, and a point with D = 0 has no value.
+    label : str | None
+        The name of the quantity in results and plots. If None, a name that
+        says what the quantity reads.
     """
 
     kind: Literal["ratio"] = "ratio"
@@ -30719,7 +30880,7 @@ InfeasibleStateError = _engine.InfeasibleStateError
 
 A run left the values its model allows, such as an amount below zero.
 
-A difference-equations step that leaves a compartment below zero raises it. It is a `ValueError`; a calibration treats such a run as infeasible.
+A difference-equations step or an impulse that leaves a compartment below zero raises it. A stochastic engine raises it for a rate it cannot draw, such as a negative rate, an impulse fraction outside 0 to 1, or an absolute impulse that is not a whole number. It is a `ValueError`; a calibration treats such a run as infeasible.
 
 ## Windows and positions
 
@@ -30884,7 +31045,7 @@ def sample(
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-What every uncertainty method takes and returns: the configuration base, the weighted parameter sample, the predictive and its observation noise, the scenarios, the resampling, profile and conformal methods, the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
+What every uncertainty method takes and returns: the configuration bases, the weighted parameter sample, the predictive and its observation noise, and the scenarios. Then the methods of each family with their results (resampling, profile likelihood, sequential Monte Carlo, local approximations and conformal prediction), the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
 
 ## InferenceMethod
 
@@ -36546,7 +36707,7 @@ class SMCResult(BaseModel):
 
 Bases: `SMCResult`
 
-The result of a Gibbs posterior.
+The result of a Gibbs posterior: the attributes of `SMCResult`, and these.
 
 Attributes:
 
@@ -36562,7 +36723,7 @@ Source code in `commol/context/inference/smc.py`
 ```python
 class GibbsResult(SMCResult):
     """
-    The result of a Gibbs posterior.
+    The result of a Gibbs posterior: the attributes of `SMCResult`, and these.
 
     Attributes
     ----------
@@ -37336,6 +37497,8 @@ Split conformal prediction.
 
 It fits the problem's observations and scores `calibration_data`, observations held out of the fit. When the scores of the held-out and of new observations are exchangeable, each interval covers a new observation with probability at least `confidence_level`.
 
+It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
+
 Attributes:
 
 | Name               | Type                      | Description                                                   |
@@ -37356,6 +37519,8 @@ class SplitConformal(ConformalMethod):
     observations held out of the fit. When the scores of the held-out and of
     new observations are exchangeable, each interval covers a new
     observation with probability at least `confidence_level`.
+
+    It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
 
     Attributes
     ----------
@@ -37415,6 +37580,8 @@ Rolling-origin conformal prediction: intervals ahead of the data, one quantile p
 
 Each origin fits the observations at or before it and scores the later ones. Horizon `k` is the `k`-th observation of a series after the origin: a count, not a distance on the axis.
 
+It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
+
 Attributes:
 
 | Name        | Type          | Description                                                                  |
@@ -37434,6 +37601,8 @@ class RollingConformal(ConformalMethod):
     Each origin fits the observations at or before it and scores the later
     ones. Horizon ``k`` is the ``k``-th observation of a series after the
     origin: a count, not a distance on the axis.
+
+    It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
 
     Attributes
     ----------
@@ -37493,6 +37662,8 @@ Jackknife+ (Barber et al. 2021) with blocks: one refit per block left out, and i
 
 With exchangeable blocks it covers at least `1 − 2α` when each block holds one observation, and the CV+ bound with `K` blocks otherwise.
 
+It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
+
 Attributes:
 
 | Name           | Type          | Description                                              |
@@ -37511,6 +37682,8 @@ class JackknifePlus(ConformalMethod):
 
     With exchangeable blocks it covers at least ``1 − 2α`` when each block
     holds one observation, and the CV+ bound with ``K`` blocks otherwise.
+
+    It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
 
     Attributes
     ----------
@@ -37535,6 +37708,8 @@ Ensemble batch prediction intervals (Xu and Xie 2021).
 
 Each replicate draws blocks with replacement and fits. The replicates that left out the block of an observation give its leave-one-out prediction and score; their mean over every observation is the point prediction.
 
+It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
+
 Attributes:
 
 | Name           | Type          | Description                                              |
@@ -37555,6 +37730,8 @@ class EnbPI(ConformalMethod):
     that left out the block of an observation give its leave-one-out
     prediction and score; their mean over every observation is the point
     prediction.
+
+    It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
 
     Attributes
     ----------
@@ -37582,6 +37759,8 @@ Adaptive conformal inference (Gibbs and Candès 2021).
 
 It fits the problem's observations and walks `stream` in order of position. The interval of each point is the quantile, at the working level `1 − α_t`, of the scores of the earlier points of the stream; then the working level moves by `α_{t+1} = α_t + γ (α − err_t)`. The long-run share of misses tends to `α`, with no assumption on the data.
 
+It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
+
 Attributes:
 
 | Name     | Type                      | Description                                  |
@@ -37603,6 +37782,8 @@ class AdaptiveConformal(ConformalMethod):
     level ``1 − α_t``, of the scores of the earlier points of the stream;
     then the working level moves by ``α_{t+1} = α_t + γ (α − err_t)``. The
     long-run share of misses tends to ``α``, with no assumption on the data.
+
+    It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
 
     Attributes
     ----------
@@ -38470,194 +38651,13 @@ def ci_percentiles(confidence_level: float) -> tuple[float, float]:
     return lower * 100.0, upper * 100.0
 ```
 
-## registry
-
-The runners of inference methods, looked up by configuration type.
-
-A method registers its runner with `register`; `Calibrator.uncertainty`, `Calibrator.identifiability` and `SensitivityAnalysis.run` find it with `run_method`, and pass the runner themselves. The entry points know no method.
-
-### Type Aliases
-
-#### EntryPoint
-
-```python
-EntryPoint = Calibrator | SensitivityAnalysis
-```
-
-What a runner runs on: the calibrator of an uncertainty or identifiability method, or the analysis of a sensitivity method.
-
-### Classes
-
-### Functions:
-
-#### register
-
-```python
-register(method_type: type[MethodT], runner: Callable[[Any, MethodT], BaseModel]) -> None
-```
-
-Register the runner of an inference method.
-
-Parameters:
-
-| Name          | Type                     | Description                                           | Default                                                                                                                                    |
-| ------------- | ------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `method_type` | `type[InferenceMethod]`  | The configuration type of the method.                 | *required*                                                                                                                                 |
-| `runner`      | \`Callable\[\[Calibrator | SensitivityAnalysis, InferenceMethod\], BaseModel\]\` | Runs the method on the object of its entry point (a Calibrator, or a SensitivityAnalysis for a sensitivity method) and returns its result. |
-
-Raises:
-
-| Type         | Description                       |
-| ------------ | --------------------------------- |
-| `ValueError` | If the type already has a runner. |
-
-Source code in `commol/api/inference/registry.py`
-
-```python
-def register(
-    method_type: type[MethodT],
-    runner: Callable[[Any, MethodT], BaseModel],
-) -> None:
-    """
-    Register the runner of an inference method.
-
-    Parameters
-    ----------
-    method_type : type[InferenceMethod]
-        The configuration type of the method.
-    runner : Callable[[Calibrator | SensitivityAnalysis, InferenceMethod], BaseModel]
-        Runs the method on the object of its entry point (a `Calibrator`,
-        or a `SensitivityAnalysis` for a sensitivity method) and returns its
-        result.
-
-    Raises
-    ------
-    ValueError
-        If the type already has a runner.
-    """
-    if method_type in _RUNNERS:
-        raise ValueError(f"{method_type.__name__} already has a runner.")
-    _RUNNERS[method_type] = cast("Runner", runner)
-```
-
-#### registered
-
-```python
-registered() -> list[str]
-```
-
-The names of the configuration types that have a runner.
-
-Returns:
-
-| Type        | Description   |
-| ----------- | ------------- |
-| `list[str]` | Sorted names. |
-
-Source code in `commol/api/inference/registry.py`
-
-```python
-def registered() -> list[str]:
-    """
-    The names of the configuration types that have a runner.
-
-    Returns
-    -------
-    list[str]
-        Sorted names.
-    """
-    return sorted(method_type.__name__ for method_type in _RUNNERS)
-```
-
-#### run_method
-
-```python
-run_method(entry_point: EntryPoint, method: InferenceMethod[ResultT], kind: type[InferenceMethod[BaseModel]]) -> ResultT
-```
-
-Run `method` on `entry_point` with the runner of its type.
-
-Parameters:
-
-| Name          | Type                       | Description                                                                                              | Default                                               |
-| ------------- | -------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `entry_point` | \`Calibrator               | SensitivityAnalysis\`                                                                                    | The calibration problem, or the sensitivity analysis. |
-| `method`      | `InferenceMethod[ResultT]` | The configuration of the method.                                                                         | *required*                                            |
-| `kind`        | `type[InferenceMethod]`    | The kind of method the entry point takes: UncertaintyMethod, IdentifiabilityMethod or SensitivityMethod. | *required*                                            |
-
-Returns:
-
-| Type      | Description          |
-| --------- | -------------------- |
-| `ResultT` | The method's result. |
-
-Raises:
-
-| Type         | Description                                                  |
-| ------------ | ------------------------------------------------------------ |
-| `TypeError`  | If method is not of kind; the message names its entry point. |
-| `ValueError` | If no runner is registered for the configuration's type.     |
-
-Source code in `commol/api/inference/registry.py`
-
-```python
-def run_method(
-    entry_point: EntryPoint,
-    method: InferenceMethod[ResultT],
-    kind: type[InferenceMethod[BaseModel]],
-) -> ResultT:
-    """
-    Run `method` on `entry_point` with the runner of its type.
-
-    Parameters
-    ----------
-    entry_point : Calibrator | SensitivityAnalysis
-        The calibration problem, or the sensitivity analysis.
-    method : InferenceMethod[ResultT]
-        The configuration of the method.
-    kind : type[InferenceMethod]
-        The kind of method the entry point takes: `UncertaintyMethod`,
-        `IdentifiabilityMethod` or `SensitivityMethod`.
-
-    Returns
-    -------
-    ResultT
-        The method's result.
-
-    Raises
-    ------
-    TypeError
-        If `method` is not of `kind`; the message names its entry point.
-    ValueError
-        If no runner is registered for the configuration's type.
-    """
-    if not isinstance(method, kind):
-        right = next(
-            (
-                name
-                for other, name in _ENTRY_POINTS.items()
-                if isinstance(method, other)
-            ),
-            None,
-        )
-        hint = f" Run it with {right}." if right else ""
-        raise TypeError(f"{type(method).__name__} is not a {kind.__name__}.{hint}")
-    runner = _RUNNERS.get(type(method))
-    if runner is None:
-        raise ValueError(
-            f"No method is registered for {type(method).__name__}. "
-            f"Registered: {registered()}."
-        )
-    return cast("ResultT", runner(entry_point, method))
-```
-
 # Model Structure
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
 A `Model` is a tree of Pydantic models. `ModelBuilder` creates it, `Model.to_json` writes it, and the Rust engine reads the same tree from JSON (`crates/commol-core/src/types/`). Most users never build these types by hand; read this page to understand model files or to work on Commol.
 
-A model has a header, a **process** written once, a **structure** that lays the process out, and an **engine** that runs it. The process (bins, accumulators, stratifications, transitions) is the same for every kind of model; the structure changes between kinds and is tagged in JSON by `kind`, and by `variant` for a narrower form of a structure. The kind today is `aggregate`: amounts per compartment.
+A model has a header, a **process** written once, a **structure** that lays the process out, and an **engine** that runs it. The process (bins, accumulators, stratifications, transitions) is the same for every kind of model; the structure changes between kinds and is tagged in JSON by `kind`, and by `variant` for a narrower form of a structure. The one kind is `aggregate`: amounts per compartment.
 
 ```text
 Model                      name, description, version, step_unit, origin
@@ -38768,11 +38768,28 @@ Bases: `BaseModel`
 
 A cumulative event counter tracked as output but not as part of the state.
 
+Attributes:
+
+| Name   | Type  | Description                                                                                     |
+| ------ | ----- | ----------------------------------------------------------------------------------------------- |
+| `id`   | `str` | Identifier of the accumulator, and the name of its output before the stratifications expand it. |
+| `name` | `str` | A descriptive, human-readable name for the accumulator.                                         |
+
 Source code in `commol/context/bin.py`
 
 ```python
 class Accumulator(BaseModel):
-    """A cumulative event counter tracked as output but not as part of the state."""
+    """
+    A cumulative event counter tracked as output but not as part of the state.
+
+    Attributes
+    ----------
+    id : str
+        Identifier of the accumulator, and the name of its output before the
+        stratifications expand it.
+    name : str
+        A descriptive, human-readable name for the accumulator.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -39315,13 +39332,17 @@ Defines a rule for system evolution.
 
 Attributes:
 
-| Name               | Type                   | Description                   |
-| ------------------ | ---------------------- | ----------------------------- |
-| `id`               | `str`                  | Id of the transition.         |
-| `source`           | `list[str]`            | The origin compartments.      |
-| `target`           | `list[str]`            | The destination compartments. |
-| `rate`             | \`str                  | None\`                        |
-| `stratified_rates` | \`list[StratifiedRate] | None\`                        |
+| Name               | Type                   | Description                                                      |
+| ------------------ | ---------------------- | ---------------------------------------------------------------- |
+| `id`               | `str`                  | Id of the transition.                                            |
+| `source`           | `list[str]`            | The origin compartments.                                         |
+| `target`           | `list[str]`            | The destination compartments.                                    |
+| `accumulators`     | `list[str]`            | Ids of the accumulators that add up the flow of this transition. |
+| `rate`             | \`str                  | None\`                                                           |
+| `stratified_rates` | \`list[StratifiedRate] | None\`                                                           |
+| `per_compartment`  | \`bool                 | None\`                                                           |
+| `impulse_at`       | \`list[float]          | None\`                                                           |
+| `impulse_every`    | \`tuple[float, float]  | None\`                                                           |
 
 Source code in `commol/context/transition.py`
 
@@ -39338,6 +39359,8 @@ class Transition(BaseModel):
         The origin compartments.
     target : list[str]
         The destination compartments.
+    accumulators : list[str]
+        Ids of the accumulators that add up the flow of this transition.
     rate : str | None
         Default mathematical formula, parameter name, or constant value for the flow.
         Used when no stratified rate matches. Numeric values are automatically
@@ -39358,6 +39381,18 @@ class Transition(BaseModel):
     stratified_rates : list[StratifiedRate] | None
         Stratification-specific rates. Each rate applies to compartments that match
         all specified stratification conditions.
+    per_compartment : bool | None
+        When True, the id of each source and target bin in a rate reads the
+        compartment of each flow; any other bin keeps its total. A transition
+        between categories ignores it.
+    impulse_at : list[float] | None
+        Positions on the axis where the transition is an impulse: at each one,
+        the rate is a fraction (proportional) or an amount (absolute) moved at
+        once. Between them the transition moves nothing.
+    impulse_every : tuple[float, float] | None
+        ``(period, offset)``: the transition is an impulse at ``offset``,
+        ``offset + period``, ``offset + 2 * period``, and so on. At most one
+        of `impulse_at` and `impulse_every` is set.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -39548,6 +39583,7 @@ Attributes:
 | ------------ | ------------------------------- | ---------------------------------------------------------- |
 | `conditions` | `list[StratificationCondition]` | List of stratification-category pairs that must match      |
 | `rate`       | `str`                           | Rate expression for compartments matching these conditions |
+| `absolute`   | \`bool                          | None\`                                                     |
 
 Source code in `commol/context/transition.py`
 
@@ -39562,6 +39598,11 @@ class StratifiedRate(BaseModel):
         List of stratification-category pairs that must match
     rate : str
         Rate expression for compartments matching these conditions
+    absolute : bool | None
+        True: the flow is the rate, not multiplied by the source amount.
+        False: the flow is the rate times the source amount. None: the rate
+        is absolute when it reads a compartment, a bin total or a
+        ``total_…`` variable.
     """
 
     model_config = ConfigDict(extra="forbid")

@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-What every uncertainty method takes and returns: the configuration base, the weighted parameter sample, the predictive and its observation noise, the scenarios, the resampling, profile and conformal methods, the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
+What every uncertainty method takes and returns: the configuration bases, the weighted parameter sample, the predictive and its observation noise, and the scenarios. Then the methods of each family with their results (resampling, profile likelihood, sequential Monte Carlo, local approximations and conformal prediction), the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
 
 ## InferenceMethod
 
@@ -5664,7 +5664,7 @@ class SMCResult(BaseModel):
 
 Bases: `SMCResult`
 
-The result of a Gibbs posterior.
+The result of a Gibbs posterior: the attributes of `SMCResult`, and these.
 
 Attributes:
 
@@ -5680,7 +5680,7 @@ Source code in `commol/context/inference/smc.py`
 ```python
 class GibbsResult(SMCResult):
     """
-    The result of a Gibbs posterior.
+    The result of a Gibbs posterior: the attributes of `SMCResult`, and these.
 
     Attributes
     ----------
@@ -6454,6 +6454,8 @@ Split conformal prediction.
 
 It fits the problem's observations and scores `calibration_data`, observations held out of the fit. When the scores of the held-out and of new observations are exchangeable, each interval covers a new observation with probability at least `confidence_level`.
 
+It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
+
 Attributes:
 
 | Name               | Type                      | Description                                                   |
@@ -6474,6 +6476,8 @@ class SplitConformal(ConformalMethod):
     observations held out of the fit. When the scores of the held-out and of
     new observations are exchangeable, each interval covers a new
     observation with probability at least `confidence_level`.
+
+    It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
 
     Attributes
     ----------
@@ -6533,6 +6537,8 @@ Rolling-origin conformal prediction: intervals ahead of the data, one quantile p
 
 Each origin fits the observations at or before it and scores the later ones. Horizon `k` is the `k`-th observation of a series after the origin: a count, not a distance on the axis.
 
+It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
+
 Attributes:
 
 | Name        | Type          | Description                                                                  |
@@ -6552,6 +6558,8 @@ class RollingConformal(ConformalMethod):
     Each origin fits the observations at or before it and scores the later
     ones. Horizon ``k`` is the ``k``-th observation of a series after the
     origin: a count, not a distance on the axis.
+
+    It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
 
     Attributes
     ----------
@@ -6611,6 +6619,8 @@ Jackknife+ (Barber et al. 2021) with blocks: one refit per block left out, and i
 
 With exchangeable blocks it covers at least `1 − 2α` when each block holds one observation, and the CV+ bound with `K` blocks otherwise.
 
+It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
+
 Attributes:
 
 | Name           | Type          | Description                                              |
@@ -6629,6 +6639,8 @@ class JackknifePlus(ConformalMethod):
 
     With exchangeable blocks it covers at least ``1 − 2α`` when each block
     holds one observation, and the CV+ bound with ``K`` blocks otherwise.
+
+    It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
 
     Attributes
     ----------
@@ -6653,6 +6665,8 @@ Ensemble batch prediction intervals (Xu and Xie 2021).
 
 Each replicate draws blocks with replacement and fits. The replicates that left out the block of an observation give its leave-one-out prediction and score; their mean over every observation is the point prediction.
 
+It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
+
 Attributes:
 
 | Name           | Type          | Description                                              |
@@ -6673,6 +6687,8 @@ class EnbPI(ConformalMethod):
     that left out the block of an observation give its leave-one-out
     prediction and score; their mean over every observation is the point
     prediction.
+
+    It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
 
     Attributes
     ----------
@@ -6700,6 +6716,8 @@ Adaptive conformal inference (Gibbs and Candès 2021).
 
 It fits the problem's observations and walks `stream` in order of position. The interval of each point is the quantile, at the working level `1 − α_t`, of the scores of the earlier points of the stream; then the working level moves by `α_{t+1} = α_t + γ (α − err_t)`. The long-run share of misses tends to `α`, with no assumption on the data.
 
+It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
+
 Attributes:
 
 | Name     | Type                      | Description                                  |
@@ -6721,6 +6739,8 @@ class AdaptiveConformal(ConformalMethod):
     level ``1 − α_t``, of the scores of the earlier points of the stream;
     then the working level moves by ``α_{t+1} = α_t + γ (α − err_t)``. The
     long-run share of misses tends to ``α``, with no assumption on the data.
+
+    It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
 
     Attributes
     ----------
@@ -7586,185 +7606,4 @@ def ci_percentiles(confidence_level: float) -> tuple[float, float]:
     """
     lower, upper = commol_rs.inference.interval_levels(confidence_level)
     return lower * 100.0, upper * 100.0
-```
-
-## registry
-
-The runners of inference methods, looked up by configuration type.
-
-A method registers its runner with `register`; `Calibrator.uncertainty`, `Calibrator.identifiability` and `SensitivityAnalysis.run` find it with `run_method`, and pass the runner themselves. The entry points know no method.
-
-### Type Aliases
-
-#### EntryPoint
-
-```python
-EntryPoint = Calibrator | SensitivityAnalysis
-```
-
-What a runner runs on: the calibrator of an uncertainty or identifiability method, or the analysis of a sensitivity method.
-
-### Classes
-
-### Functions:
-
-#### register
-
-```python
-register(method_type: type[MethodT], runner: Callable[[Any, MethodT], BaseModel]) -> None
-```
-
-Register the runner of an inference method.
-
-Parameters:
-
-| Name          | Type                     | Description                                           | Default                                                                                                                                    |
-| ------------- | ------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `method_type` | `type[InferenceMethod]`  | The configuration type of the method.                 | *required*                                                                                                                                 |
-| `runner`      | \`Callable\[\[Calibrator | SensitivityAnalysis, InferenceMethod\], BaseModel\]\` | Runs the method on the object of its entry point (a Calibrator, or a SensitivityAnalysis for a sensitivity method) and returns its result. |
-
-Raises:
-
-| Type         | Description                       |
-| ------------ | --------------------------------- |
-| `ValueError` | If the type already has a runner. |
-
-Source code in `commol/api/inference/registry.py`
-
-```python
-def register(
-    method_type: type[MethodT],
-    runner: Callable[[Any, MethodT], BaseModel],
-) -> None:
-    """
-    Register the runner of an inference method.
-
-    Parameters
-    ----------
-    method_type : type[InferenceMethod]
-        The configuration type of the method.
-    runner : Callable[[Calibrator | SensitivityAnalysis, InferenceMethod], BaseModel]
-        Runs the method on the object of its entry point (a `Calibrator`,
-        or a `SensitivityAnalysis` for a sensitivity method) and returns its
-        result.
-
-    Raises
-    ------
-    ValueError
-        If the type already has a runner.
-    """
-    if method_type in _RUNNERS:
-        raise ValueError(f"{method_type.__name__} already has a runner.")
-    _RUNNERS[method_type] = cast("Runner", runner)
-```
-
-#### registered
-
-```python
-registered() -> list[str]
-```
-
-The names of the configuration types that have a runner.
-
-Returns:
-
-| Type        | Description   |
-| ----------- | ------------- |
-| `list[str]` | Sorted names. |
-
-Source code in `commol/api/inference/registry.py`
-
-```python
-def registered() -> list[str]:
-    """
-    The names of the configuration types that have a runner.
-
-    Returns
-    -------
-    list[str]
-        Sorted names.
-    """
-    return sorted(method_type.__name__ for method_type in _RUNNERS)
-```
-
-#### run_method
-
-```python
-run_method(entry_point: EntryPoint, method: InferenceMethod[ResultT], kind: type[InferenceMethod[BaseModel]]) -> ResultT
-```
-
-Run `method` on `entry_point` with the runner of its type.
-
-Parameters:
-
-| Name          | Type                       | Description                                                                                              | Default                                               |
-| ------------- | -------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `entry_point` | \`Calibrator               | SensitivityAnalysis\`                                                                                    | The calibration problem, or the sensitivity analysis. |
-| `method`      | `InferenceMethod[ResultT]` | The configuration of the method.                                                                         | *required*                                            |
-| `kind`        | `type[InferenceMethod]`    | The kind of method the entry point takes: UncertaintyMethod, IdentifiabilityMethod or SensitivityMethod. | *required*                                            |
-
-Returns:
-
-| Type      | Description          |
-| --------- | -------------------- |
-| `ResultT` | The method's result. |
-
-Raises:
-
-| Type         | Description                                                  |
-| ------------ | ------------------------------------------------------------ |
-| `TypeError`  | If method is not of kind; the message names its entry point. |
-| `ValueError` | If no runner is registered for the configuration's type.     |
-
-Source code in `commol/api/inference/registry.py`
-
-```python
-def run_method(
-    entry_point: EntryPoint,
-    method: InferenceMethod[ResultT],
-    kind: type[InferenceMethod[BaseModel]],
-) -> ResultT:
-    """
-    Run `method` on `entry_point` with the runner of its type.
-
-    Parameters
-    ----------
-    entry_point : Calibrator | SensitivityAnalysis
-        The calibration problem, or the sensitivity analysis.
-    method : InferenceMethod[ResultT]
-        The configuration of the method.
-    kind : type[InferenceMethod]
-        The kind of method the entry point takes: `UncertaintyMethod`,
-        `IdentifiabilityMethod` or `SensitivityMethod`.
-
-    Returns
-    -------
-    ResultT
-        The method's result.
-
-    Raises
-    ------
-    TypeError
-        If `method` is not of `kind`; the message names its entry point.
-    ValueError
-        If no runner is registered for the configuration's type.
-    """
-    if not isinstance(method, kind):
-        right = next(
-            (
-                name
-                for other, name in _ENTRY_POINTS.items()
-                if isinstance(method, other)
-            ),
-            None,
-        )
-        hint = f" Run it with {right}." if right else ""
-        raise TypeError(f"{type(method).__name__} is not a {kind.__name__}.{hint}")
-    runner = _RUNNERS.get(type(method))
-    if runner is None:
-        raise ValueError(
-            f"No method is registered for {type(method).__name__}. "
-            f"Registered: {registered()}."
-        )
-    return cast("ResultT", runner(entry_point, method))
 ```
