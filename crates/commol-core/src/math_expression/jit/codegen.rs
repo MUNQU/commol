@@ -60,13 +60,21 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
                 self.load_variable(name)
             }
 
-            Expr::BinaryOp { op, left, right } => {
-                // Generate code for operands
-                let left_val = self.generate(left)?;
-                let right_val = self.generate(right)?;
+            Expr::Chain { first, rest } => {
+                // Apply the operators from the left: `a - b + c` is
+                // `(a - b) + c`.
+                let mut value = self.generate(first)?;
+                for (op, operand) in rest {
+                    let right = self.generate(operand)?;
+                    value = self.generate_binary_op(*op, value, right)?;
+                }
+                Ok(value)
+            }
 
-                // Generate operation
-                self.generate_binary_op(*op, left_val, right_val)
+            Expr::Power { base, exponent } => {
+                let base = self.generate(base)?;
+                let exponent = self.generate(exponent)?;
+                self.call_two_arg_libm("pow", base, exponent)
             }
 
             Expr::UnaryOp { op, operand } => {
@@ -138,11 +146,6 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
             BinaryOperator::Mod => {
                 // Call libm fmod function
                 return self.call_two_arg_libm("fmod", left, right);
-            }
-
-            BinaryOperator::Pow => {
-                // Call libm pow function
-                return self.call_two_arg_libm("pow", left, right);
             }
 
             // Comparison operations - return 1.0 or 0.0

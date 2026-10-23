@@ -99,8 +99,9 @@ impl PyMathExpression {
     ///     The number of nodes
     ///
     /// Raises:
-    ///     ValueError: If the formula is not in the language; the message
-    ///         names the formula and the first part of it that is not
+    ///     ValueError: If the formula is not in the language, or nests
+    ///         deeper than the limit of the engine; the message names the
+    ///         formula and the first part of it that is not
     fn check(&self) -> PyResult<usize> {
         self.inner
             .check()

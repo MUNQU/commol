@@ -6,7 +6,6 @@
 mod jit_tests {
     use crate::math_expression::MathExpressionContext;
     use crate::math_expression::jit::JITCompiler;
-    use crate::math_expression::preprocessing::preprocess_formula;
 
     /// Helper to create a test context
     fn create_test_context() -> MathExpressionContext {
@@ -23,8 +22,7 @@ mod jit_tests {
     #[test]
     fn test_jit_constant() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("3.14");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("3.14").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -39,8 +37,7 @@ mod jit_tests {
     #[test]
     fn test_jit_variable() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("k1");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("k1").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -51,8 +48,7 @@ mod jit_tests {
     #[test]
     fn test_jit_addition() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("k1 + k2");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("k1 + k2").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -63,8 +59,7 @@ mod jit_tests {
     #[test]
     fn test_jit_subtraction() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("k1 - k2");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("k1 - k2").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -75,8 +70,7 @@ mod jit_tests {
     #[test]
     fn test_jit_multiplication() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("k1 * k2");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("k1 * k2").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -87,8 +81,7 @@ mod jit_tests {
     #[test]
     fn test_jit_division() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("k1 / k2");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("k1 / k2").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -99,8 +92,7 @@ mod jit_tests {
     #[test]
     fn test_jit_negation() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("-k1");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("-k1").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -115,8 +107,7 @@ mod jit_tests {
     #[test]
     fn test_jit_product2() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("k1 * k2");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("k1 * k2").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -128,8 +119,7 @@ mod jit_tests {
     #[test]
     fn test_jit_product3() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("k1 * A * B");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("k1 * A * B").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -145,8 +135,7 @@ mod jit_tests {
     #[test]
     fn test_jit_product3_div() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("k1 * A * B / total");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("k1 * A * B / total").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -162,8 +151,7 @@ mod jit_tests {
     #[test]
     fn test_jit_complex_expression() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("(k1 * A + k2 * B) / total");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("(k1 * A + k2 * B) / total").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -179,8 +167,7 @@ mod jit_tests {
     #[test]
     fn test_jit_special_variable_step() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("step * k1");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("step * k1").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -192,8 +179,7 @@ mod jit_tests {
     #[test]
     fn test_jit_special_variable_total() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("total");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("total").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -209,8 +195,7 @@ mod jit_tests {
     #[test]
     fn test_jit_special_constant_pi() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("pi");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("pi").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -225,8 +210,7 @@ mod jit_tests {
     #[test]
     fn test_jit_special_constant_e() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("e");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("e").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -240,7 +224,7 @@ mod jit_tests {
 
     fn evaluate(formula: &str, ctx: &MathExpressionContext) -> f64 {
         let compiler = JITCompiler::new();
-        let jit_fn = compiler.compile(&preprocess_formula(formula)).unwrap();
+        let jit_fn = compiler.compile(formula).unwrap();
         jit_fn.call(ctx).unwrap()
     }
 
@@ -258,9 +242,7 @@ mod jit_tests {
     fn a_function_of_two_arguments_needs_two() {
         let compiler = JITCompiler::new();
 
-        let error = compiler
-            .compile(&preprocess_formula("hypot(k1)"))
-            .unwrap_err();
+        let error = compiler.compile("hypot(k1)").unwrap_err();
 
         assert_eq!(
             error.to_string(),
@@ -290,7 +272,7 @@ mod jit_tests {
     #[test]
     fn a_buffer_has_one_value_per_variable() {
         let compiler = JITCompiler::new();
-        let jit_fn = compiler.compile(&preprocess_formula("k1 * A")).unwrap();
+        let jit_fn = compiler.compile("k1 * A").unwrap();
 
         assert_eq!(jit_fn.call_with_buffer(&[0.5, 4.0]).unwrap(), 2.0);
         assert_eq!(
@@ -302,8 +284,7 @@ mod jit_tests {
     #[test]
     fn test_jit_comparison_lt() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("k1 < k2");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("k1 < k2").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -315,8 +296,7 @@ mod jit_tests {
     #[test]
     fn test_jit_comparison_gt() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("k1 > k2");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("k1 > k2").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -328,8 +308,7 @@ mod jit_tests {
     #[test]
     fn test_jit_comparison_eq() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("k2 == 0.2");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("k2 == 0.2").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -341,8 +320,7 @@ mod jit_tests {
     #[test]
     fn test_jit_parentheses() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("(k1 + k2) * 10");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("(k1 + k2) * 10").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -354,8 +332,7 @@ mod jit_tests {
     #[test]
     fn test_jit_operator_precedence() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("k1 + k2 * 10");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("k1 + k2 * 10").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -369,8 +346,7 @@ mod jit_tests {
     #[test]
     fn test_jit_sin() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("sin(0)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("sin(0)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -381,8 +357,7 @@ mod jit_tests {
     #[test]
     fn test_jit_cos() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("cos(0)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("cos(0)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -393,8 +368,7 @@ mod jit_tests {
     #[test]
     fn test_jit_exp() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("exp(1)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("exp(1)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -409,8 +383,7 @@ mod jit_tests {
     #[test]
     fn test_jit_ln() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("ln(e)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("ln(e)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -421,8 +394,7 @@ mod jit_tests {
     #[test]
     fn test_jit_sqrt() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("sqrt(4)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("sqrt(4)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -433,8 +405,7 @@ mod jit_tests {
     #[test]
     fn test_jit_pow() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("pow(2, 3)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("pow(2, 3)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -445,8 +416,7 @@ mod jit_tests {
     #[test]
     fn test_jit_pow_operator() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("2 ** 3");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("2 ** 3").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -457,8 +427,7 @@ mod jit_tests {
     #[test]
     fn test_jit_abs() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("abs(-5)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("abs(-5)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -469,8 +438,7 @@ mod jit_tests {
     #[test]
     fn test_jit_floor() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("floor(3.7)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("floor(3.7)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -481,8 +449,7 @@ mod jit_tests {
     #[test]
     fn test_jit_ceil() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("ceil(3.2)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("ceil(3.2)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -493,8 +460,7 @@ mod jit_tests {
     #[test]
     fn test_jit_round() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("round(3.5)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("round(3.5)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -505,8 +471,7 @@ mod jit_tests {
     #[test]
     fn test_jit_min() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("min(k1, k2)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("min(k1, k2)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -518,8 +483,7 @@ mod jit_tests {
     #[test]
     fn test_jit_max() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("max(k1, k2)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("max(k1, k2)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -531,8 +495,7 @@ mod jit_tests {
     #[test]
     fn test_jit_min_multi() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("min(5, 3, 7, 2)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("min(5, 3, 7, 2)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -543,8 +506,7 @@ mod jit_tests {
     #[test]
     fn test_jit_modulo() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("10 % 3");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("10 % 3").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -555,8 +517,7 @@ mod jit_tests {
     #[test]
     fn test_jit_logical_and() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("1 && 1");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("1 && 1").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -567,8 +528,7 @@ mod jit_tests {
     #[test]
     fn test_jit_logical_or() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("0 || 1");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("0 || 1").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -579,8 +539,7 @@ mod jit_tests {
     #[test]
     fn test_jit_logical_not() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("!0");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("!0").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -591,8 +550,7 @@ mod jit_tests {
     #[test]
     fn test_jit_conditional() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("if(k1 > k2, k1, k2)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("if(k1 > k2, k1, k2)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -604,8 +562,7 @@ mod jit_tests {
     #[test]
     fn test_jit_complex_math_expression() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("sqrt(pow(k1, 2) + pow(k2, 2))");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("sqrt(pow(k1, 2) + pow(k2, 2))").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -623,8 +580,7 @@ mod jit_tests {
     #[test]
     fn test_jit_atan2() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("atan2(k2, k1)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("atan2(k2, k1)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -636,8 +592,7 @@ mod jit_tests {
     #[test]
     fn test_jit_hypot() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("hypot(k1, k2)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("hypot(k1, k2)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -649,8 +604,7 @@ mod jit_tests {
     #[test]
     fn test_jit_division_by_zero() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("1 / 0");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("1 / 0").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -663,8 +617,7 @@ mod jit_tests {
     #[test]
     fn test_jit_negative_division_by_zero() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("-1 / 0");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("-1 / 0").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -677,8 +630,7 @@ mod jit_tests {
     #[test]
     fn test_jit_zero_divided_by_zero() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("0 / 0");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("0 / 0").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -690,8 +642,7 @@ mod jit_tests {
     #[test]
     fn test_jit_nan_propagation() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("sqrt(-1)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("sqrt(-1)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -703,8 +654,7 @@ mod jit_tests {
     #[test]
     fn test_jit_nan_in_expression() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("sqrt(-1) + 5");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("sqrt(-1) + 5").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -716,8 +666,7 @@ mod jit_tests {
     #[test]
     fn test_jit_infinity_arithmetic() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("1 / 0 + 100");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("1 / 0 + 100").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -730,8 +679,7 @@ mod jit_tests {
     #[test]
     fn test_jit_infinity_minus_infinity() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("(1 / 0) - (1 / 0)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("(1 / 0) - (1 / 0)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -743,8 +691,7 @@ mod jit_tests {
     #[test]
     fn test_jit_very_large_number() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("1e308");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("1e308").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -756,8 +703,7 @@ mod jit_tests {
     #[test]
     fn test_jit_overflow_to_infinity() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("1e308 * 1e308");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("1e308 * 1e308").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -770,8 +716,7 @@ mod jit_tests {
     #[test]
     fn test_jit_very_small_number() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("1e-308");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("1e-308").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -783,8 +728,7 @@ mod jit_tests {
     #[test]
     fn test_jit_underflow_to_zero() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("1e-308 / 1e308");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("1e-308 / 1e308").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -808,10 +752,7 @@ mod jit_tests {
             ("pow(2, 3, 4)", "Function pow takes 2 arguments, got 3"),
         ] {
             assert_eq!(
-                compiler
-                    .compile(&preprocess_formula(formula))
-                    .unwrap_err()
-                    .to_string(),
+                compiler.compile(formula).unwrap_err().to_string(),
                 format!("Invalid expression: {reason}"),
                 "{formula}"
             );
@@ -821,8 +762,7 @@ mod jit_tests {
     #[test]
     fn test_jit_log_of_zero() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("ln(0)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("ln(0)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -835,8 +775,7 @@ mod jit_tests {
     #[test]
     fn test_jit_log_of_negative() {
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("ln(-1)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("ln(-1)").unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
@@ -851,8 +790,7 @@ mod jit_tests {
     fn test_jit_floor_based_modulo_periodic() {
         // step - floor(step / 7) * 7 == 0 must be 1.0 at multiples of 7 only.
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("step - floor(step / 7) * 7 == 0");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("step - floor(step / 7) * 7 == 0").unwrap();
 
         let mut ctx = MathExpressionContext::new();
 
@@ -875,8 +813,9 @@ mod jit_tests {
         // Full periodic pattern: if(step - floor(step / 7) * 7 == 0, 0.1, 0).
         // Returns 0.1 exactly at multiples of 7 and 0.0 elsewhere.
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("if(step - floor(step / 7) * 7 == 0, 0.1, 0)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler
+            .compile("if(step - floor(step / 7) * 7 == 0, 0.1, 0)")
+            .unwrap();
 
         let mut ctx = MathExpressionContext::new();
 
@@ -900,8 +839,7 @@ mod jit_tests {
         // negative for any `step < O`. The floor of a negative quotient must
         // return the next-lower integer (e.g. floor(-3.0 / 7.0) == -1).
         let compiler = JITCompiler::new();
-        let preprocessed = preprocess_formula("floor(step / 7)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler.compile("floor(step / 7)").unwrap();
 
         let mut ctx = MathExpressionContext::new();
         let cases: [(f64, f64); 6] = [
@@ -931,9 +869,9 @@ mod jit_tests {
         // negative-input floor branch. Verifies the offset case end-to-end
         // via the JIT.
         let compiler = JITCompiler::new();
-        let preprocessed =
-            preprocess_formula("if((step - 3) - floor((step - 3) / 7) * 7 == 0, 1.0, 0.0)");
-        let jit_fn = compiler.compile(&preprocessed).unwrap();
+        let jit_fn = compiler
+            .compile("if((step - 3) - floor((step - 3) / 7) * 7 == 0, 1.0, 0.0)")
+            .unwrap();
 
         let mut ctx = MathExpressionContext::new();
         for step in 0..20_i32 {

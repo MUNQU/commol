@@ -3,6 +3,7 @@
 
 use std::collections::BTreeSet;
 
+use commol_core::math_expression::MAX_NESTING;
 use commol_core::{FUNCTIONS, MathExpression, MathExpressionContext};
 
 /// The message of the check of `formula`.
@@ -78,6 +79,10 @@ fn a_comparison_outside_a_condition_is_rejected() {
             "the condition of if(condition, a, b) is a comparison, such as 'step > 30', or \
              '!' of one; got 'x'"
                 .to_string(),
+        ),
+        (
+            "if(x < 1 < 2, 1, 0)",
+            format!("the comparison '<' {only_in_a_condition}"),
         ),
         (
             "if(true, 1, 0)",
@@ -180,4 +185,112 @@ fn the_variables_of_a_formula_come_from_its_tree() {
     assert_eq!(expression.get_variables(), ["k1", "e1"]);
     assert!(expression.reads_variable("step"));
     assert!(!expression.reads_variable("t"));
+}
+
+/// The stack of a worker thread of the parallel work, the smallest stack a
+/// formula is read on.
+const WORKER_STACK: usize = 2 << 20;
+
+/// `run` on a worker thread of a rayon pool, with the stack of
+/// `WORKER_STACK`.
+fn on_a_worker<T: Send>(run: impl FnOnce() -> T + Send) -> T {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(1)
+        .stack_size(WORKER_STACK)
+        .build()
+        .unwrap()
+        .install(run)
+}
+
+#[test]
+fn a_formula_deeper_than_the_limit_is_rejected() {
+    let shapes: [fn(usize) -> String; 5] = [
+        |levels| format!("{}x{}", "(".repeat(levels), ")".repeat(levels)),
+        |levels| format!("{}x{}", "sin(".repeat(levels), ")".repeat(levels)),
+        |levels| format!("{}x", "-".repeat(levels)),
+        |levels| vec!["x"; levels + 1].join(" ^ "),
+        |levels| format!("{}x{}", "if(x > 1, ".repeat(levels), ", 0)".repeat(levels)),
+    ];
+    on_a_worker(|| {
+        for shape in shapes {
+            let deepest = shape(MAX_NESTING);
+            let expression = MathExpression::new(deepest.clone());
+            expression.check().expect(&deepest);
+            let mut context = MathExpressionContext::new();
+            context.set_parameter("x".to_string(), 0.5);
+            assert!(expression.evaluate(&mut context).is_ok(), "{deepest}");
+            assert_eq!(expression.get_variables(), ["x"]);
+
+            let deeper = shape(MAX_NESTING + 1);
+            assert_eq!(
+                rejection(&deeper),
+                format!(
+                    "Formula '{deeper}': it nests deeper than {MAX_NESTING} levels of \
+                     parentheses, calls, signs and powers"
+                )
+            );
+        }
+    });
+}
+
+#[test]
+fn every_level_of_operators_at_the_limit_reads_on_a_worker_thread() {
+    // Each pair of parentheses holds a chain of every level, one inside the
+    // other: the deepest tree a formula at the limit has.
+    let formula = format!(
+        "{}x{}",
+        "x || x && x < x + x * (".repeat(MAX_NESTING),
+        ")".repeat(MAX_NESTING)
+    );
+    on_a_worker(|| {
+        let expression = MathExpression::new(formula.clone());
+        assert_eq!(expression.get_variables(), ["x"]);
+        assert!(expression.jit_variable_names().is_some());
+        assert!(
+            rejection(&formula).ends_with(
+                "the operator '||' is not in the language; nest if(condition, a, b) calls \
+                 instead"
+            ),
+            "{formula}"
+        );
+        let tree = expression.tree().unwrap();
+        assert_eq!(
+            MathExpression::new(tree.to_string()).tree().unwrap(),
+            tree.clone()
+        );
+    });
+}
+
+#[test]
+fn a_chain_of_terms_is_one_level_and_adds_from_the_left() {
+    let terms = 20_000;
+    let sum = vec!["x"; terms].join(" + ");
+    on_a_worker(|| {
+        assert_eq!(
+            MathExpression::new(sum.clone()).check().unwrap(),
+            2 * terms - 1
+        );
+        assert_eq!(value(&sum, 0.0), 2.5 * terms as f64);
+    });
+    // 1 + 1e16 rounds to 1e16, so the order of the terms shows.
+    assert_eq!(value("1 + 1e16 - 1e16", 0.0), 0.0);
+    assert_eq!(value("1 + (1e16 - 1e16)", 0.0), 1.0);
+    assert_eq!(value("2 / 4 * 8 % 3", 0.0), 1.0);
+}
+
+#[test]
+fn a_chain_of_powers_groups_from_the_right() {
+    assert_eq!(value("2 ** 3 ** 2", 0.0), 512.0);
+    assert_eq!(value("2 ^ 3 ^ 2", 0.0), 512.0);
+    assert_eq!(value("(2 ** 3) ** 2", 0.0), 64.0);
+    assert_eq!(value("-2 ** 2", 0.0), -4.0);
+    assert_eq!(value("2 ** -1", 0.0), 0.5);
+    assert_eq!(value("2 ** -1 ** 2", 0.0), 0.5);
+    assert_eq!(value("2 * 3 ** 4", 0.0), 162.0);
+    let tree = |formula: &str| MathExpression::new(formula.to_string()).tree().unwrap();
+    assert_eq!(tree("2 ** 3 ^ 2"), tree("2 ^ (3 ^ 2)"));
+    assert_ne!(tree("2 ** 3 ^ 2"), tree("(2 ^ 3) ^ 2"));
+    assert_eq!(tree("-x ^ 2"), tree("-(x ^ 2)"));
+    assert_eq!(tree("(2 ^ 3) ^ 2").to_string(), "(2 ^ 3) ^ 2");
+    assert_eq!(tree("2 ^ (3 ^ 2)").to_string(), "2 ^ 3 ^ 2");
 }

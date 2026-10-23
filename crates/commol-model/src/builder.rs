@@ -10,8 +10,7 @@ use crate::types::{
     SubgroupTotalLayout, SubgroupTotalMapping, TransitionFlow, VarSlot,
 };
 use commol_core::math_expression::jit::ast::{BinaryOperator, Expr, UnaryOperator};
-use commol_core::math_expression::jit::parser::parse_expression;
-use commol_core::math_expression::preprocessing::{
+use commol_core::math_expression::variables::{
     ENGINE_VARIABLES, SPECIAL_VAR_E, SPECIAL_VAR_PI, SPECIAL_VAR_STEP, SPECIAL_VAR_T,
     SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX,
 };
@@ -1319,7 +1318,7 @@ fn time_thresholds<'a>(
         .chain(formula_parameters.iter().map(|(_, expression)| expression));
     for expression in expressions {
         if let RateMathExpression::Formula(formula) = expression
-            && let Ok(ast) = parse_expression(formula.preprocessed())
+            && let Ok(ast) = formula.tree()
         {
             collect_time_thresholds(&ast, fixed_parameters, &mut thresholds);
         }
@@ -1334,39 +1333,24 @@ fn time_thresholds<'a>(
 }
 
 fn collect_time_thresholds(expr: &Expr, fixed_parameters: &HashSet<String>, out: &mut Vec<Expr>) {
-    match expr {
-        Expr::Constant(_) | Expr::Variable(_) => {}
-        Expr::BinaryOp { op, left, right } => {
-            if matches!(
-                op,
-                BinaryOperator::Lt | BinaryOperator::Gt | BinaryOperator::Le | BinaryOperator::Ge
-            ) {
-                let is_t =
-                    |side: &Expr| matches!(side, Expr::Variable(name) if name == SPECIAL_VAR_T);
-                if is_t(left) && is_fixed(right, fixed_parameters) {
-                    out.push((**right).clone());
-                } else if is_t(right) && is_fixed(left, fixed_parameters) {
-                    out.push((**left).clone());
-                }
-            }
-            collect_time_thresholds(left, fixed_parameters, out);
-            collect_time_thresholds(right, fixed_parameters, out);
+    // A comparison is a chain of one operator: the language has no chain of
+    // comparisons.
+    if let Expr::Chain { first: left, rest } = expr
+        && let [(op, right)] = rest.as_slice()
+        && matches!(
+            op,
+            BinaryOperator::Lt | BinaryOperator::Gt | BinaryOperator::Le | BinaryOperator::Ge
+        )
+    {
+        let is_t = |side: &Expr| matches!(side, Expr::Variable(name) if name == SPECIAL_VAR_T);
+        if is_t(left) && is_fixed(right, fixed_parameters) {
+            out.push(right.clone());
+        } else if is_t(right) && is_fixed(left, fixed_parameters) {
+            out.push(left.as_ref().clone());
         }
-        Expr::UnaryOp { operand, .. } => collect_time_thresholds(operand, fixed_parameters, out),
-        Expr::FunctionCall { args, .. } => {
-            for arg in args {
-                collect_time_thresholds(arg, fixed_parameters, out);
-            }
-        }
-        Expr::Conditional {
-            condition,
-            true_expr,
-            false_expr,
-        } => {
-            for part in [condition, true_expr, false_expr] {
-                collect_time_thresholds(part, fixed_parameters, out);
-            }
-        }
+    }
+    for operand in expr.operands() {
+        collect_time_thresholds(operand, fixed_parameters, out);
     }
 }
 
@@ -1377,18 +1361,63 @@ fn is_fixed(expr: &Expr, fixed_parameters: &HashSet<String>) -> bool {
         Expr::Variable(name) => {
             name == SPECIAL_VAR_PI || name == SPECIAL_VAR_E || fixed_parameters.contains(name)
         }
-        Expr::BinaryOp { left, right, .. } => {
-            is_fixed(left, fixed_parameters) && is_fixed(right, fixed_parameters)
-        }
-        Expr::UnaryOp { operand, .. } => is_fixed(operand, fixed_parameters),
-        Expr::FunctionCall { args, .. } => args.iter().all(|arg| is_fixed(arg, fixed_parameters)),
-        Expr::Conditional {
-            condition,
-            true_expr,
-            false_expr,
-        } => [condition, true_expr, false_expr]
+        _ => expr
+            .operands()
             .into_iter()
-            .all(|part| is_fixed(part, fixed_parameters)),
+            .all(|operand| is_fixed(operand, fixed_parameters)),
+    }
+}
+
+/// A part of a tree as an operator of a chain reads it: a node, or the
+/// start of a chain up to an operator, which applies before that operator.
+/// `a * b * c` is `(a * b) * c`: the last `*` multiplies the part `a * b`
+/// by `c`.
+#[derive(Clone, Copy)]
+enum Part<'a> {
+    /// A node.
+    Node(&'a Expr),
+    /// The first operand of a chain and the operators after it, one or more.
+    Start(&'a Expr, &'a [(BinaryOperator, Expr)]),
+}
+
+impl<'a> Part<'a> {
+    /// `first` with the operators of `rest`.
+    fn before(first: &'a Expr, rest: &'a [(BinaryOperator, Expr)]) -> Self {
+        if rest.is_empty() {
+            Part::Node(first)
+        } else {
+            Part::Start(first, rest)
+        }
+    }
+
+    /// The node, when the part is one.
+    fn node(self) -> Option<&'a Expr> {
+        match self {
+            Part::Node(expr) => Some(expr),
+            Part::Start(..) => None,
+        }
+    }
+
+    /// The operator the part applies last, what it applies to and its
+    /// operand.
+    fn binary(self) -> Option<(BinaryOperator, Part<'a>, &'a Expr)> {
+        let (first, rest) = match self {
+            Part::Node(Expr::Chain { first, rest }) => (first.as_ref(), rest.as_slice()),
+            Part::Start(first, rest) => (first, rest),
+            Part::Node(_) => return None,
+        };
+        let ((op, right), earlier) = rest
+            .split_last()
+            .expect("a chain, and the start of one, hold an operator");
+        Some((*op, Part::before(first, earlier), right))
+    }
+
+    /// What a product multiplies, when the part is one.
+    fn product(self) -> Option<(Part<'a>, Part<'a>)> {
+        match self.binary()? {
+            (BinaryOperator::Mul, left, right) => Some((left, Part::Node(right))),
+            _ => None,
+        }
     }
 }
 
@@ -1448,7 +1477,7 @@ fn build_fast_rate_expression(
             )));
         }
         RateMathExpression::Formula(expr) => {
-            let ast = parse_expression(expr.preprocessed()).ok()?;
+            let ast = expr.tree().ok()?;
             if let Some(specialized) =
                 specialized_fast_expr(&ast, compartment_map, expression_context)
             {
@@ -1479,213 +1508,132 @@ fn specialized_fast_expr(
     compartment_map: &HashMap<String, usize>,
     expression_context: &MathExpressionContext,
 ) -> Option<FastRateExpression> {
-    match expr {
-        Expr::BinaryOp {
-            op: BinaryOperator::Mul,
-            left,
-            right,
-        } => {
-            if let Some((a, b, c)) = match_mul3(left, right, compartment_map, expression_context) {
+    let slot = |part: Part| slot_from(part, compartment_map, expression_context);
+    match Part::Node(expr).binary() {
+        Some((BinaryOperator::Mul, left, right)) => {
+            let right = Part::Node(right);
+            if let Some((a, b, c)) = match_mul3(left, right, &slot) {
                 return Some(FastRateExpression::Mul3(a, b, c));
             }
-            if let Some((subtract, factor, value)) =
-                match_one_minus_mul3(left, right, compartment_map, expression_context)
-            {
+            if let Some((subtract, factor, value)) = match_one_minus_mul3(left, right, &slot) {
                 return Some(FastRateExpression::OneMinusMul3 {
                     subtract,
                     factor,
                     value,
                 });
             }
-            let left = slot_from_ast(left, compartment_map, expression_context)?;
-            let right = slot_from_ast(right, compartment_map, expression_context)?;
-            Some(FastRateExpression::Mul2(left, right))
+            Some(FastRateExpression::Mul2(slot(left)?, slot(right)?))
         }
-        Expr::BinaryOp {
-            op: BinaryOperator::Div,
-            left,
-            right,
-        } => match_mul_add_div(left, right, compartment_map, expression_context).map(
-            |(first, second, add_left, add_right, denominator)| FastRateExpression::MulAddDiv {
-                first,
-                second,
-                add_left,
-                add_right,
-                denominator,
-            },
-        ),
-        Expr::Variable(name) => Some(FastRateExpression::Slot(resolve_var_slot(
-            name,
-            compartment_map,
-            expression_context,
-        ))),
-        _ => None,
+        Some((BinaryOperator::Div, numerator, denominator)) => {
+            match_mul_add_div(numerator, Part::Node(denominator), &slot).map(
+                |(first, second, add_left, add_right, denominator)| FastRateExpression::MulAddDiv {
+                    first,
+                    second,
+                    add_left,
+                    add_right,
+                    denominator,
+                },
+            )
+        }
+        _ => match expr {
+            Expr::Variable(name) => Some(FastRateExpression::Slot(resolve_var_slot(
+                name,
+                compartment_map,
+                expression_context,
+            ))),
+            _ => None,
+        },
     }
 }
 
+/// `a * b * c`, read as `(a * b) * c` or `a * (b * c)`, of three slots.
 fn match_mul3(
-    left: &Expr,
-    right: &Expr,
-    compartment_map: &HashMap<String, usize>,
-    expression_context: &MathExpressionContext,
+    left: Part,
+    right: Part,
+    slot: &impl Fn(Part) -> Option<VarSlot>,
 ) -> Option<(VarSlot, VarSlot, VarSlot)> {
-    if let Expr::BinaryOp {
-        op: BinaryOperator::Mul,
-        left: inner_left,
-        right: inner_right,
-    } = left
-    {
-        return Some((
-            slot_from_ast(inner_left, compartment_map, expression_context)?,
-            slot_from_ast(inner_right, compartment_map, expression_context)?,
-            slot_from_ast(right, compartment_map, expression_context)?,
-        ));
+    if let Some((inner_left, inner_right)) = left.product() {
+        return Some((slot(inner_left)?, slot(inner_right)?, slot(right)?));
     }
-
-    if let Expr::BinaryOp {
-        op: BinaryOperator::Mul,
-        left: inner_left,
-        right: inner_right,
-    } = right
-    {
-        return Some((
-            slot_from_ast(left, compartment_map, expression_context)?,
-            slot_from_ast(inner_left, compartment_map, expression_context)?,
-            slot_from_ast(inner_right, compartment_map, expression_context)?,
-        ));
+    if let Some((inner_left, inner_right)) = right.product() {
+        return Some((slot(left)?, slot(inner_left)?, slot(inner_right)?));
     }
-
     None
 }
 
+/// `(1 - a) * b * c`, with `1 - a` as any factor of the first product, or
+/// `(1 - a) * (b * c)`.
 fn match_one_minus_mul3(
-    left: &Expr,
-    right: &Expr,
-    compartment_map: &HashMap<String, usize>,
-    expression_context: &MathExpressionContext,
+    left: Part,
+    right: Part,
+    slot: &impl Fn(Part) -> Option<VarSlot>,
 ) -> Option<(VarSlot, VarSlot, VarSlot)> {
-    if let Expr::BinaryOp {
-        op: BinaryOperator::Mul,
-        left: inner_left,
-        right: inner_right,
-    } = left
-    {
-        if let Some(subtract) = match_one_minus(inner_left, compartment_map, expression_context) {
-            return Some((
-                subtract,
-                slot_from_ast(inner_right, compartment_map, expression_context)?,
-                slot_from_ast(right, compartment_map, expression_context)?,
-            ));
+    if let Some((inner_left, inner_right)) = left.product() {
+        if let Some(subtract) = match_one_minus(inner_left, slot) {
+            return Some((subtract, slot(inner_right)?, slot(right)?));
         }
-        if let Some(subtract) = match_one_minus(inner_right, compartment_map, expression_context) {
-            return Some((
-                subtract,
-                slot_from_ast(inner_left, compartment_map, expression_context)?,
-                slot_from_ast(right, compartment_map, expression_context)?,
-            ));
+        if let Some(subtract) = match_one_minus(inner_right, slot) {
+            return Some((subtract, slot(inner_left)?, slot(right)?));
         }
     }
 
-    if let Some(subtract) = match_one_minus(left, compartment_map, expression_context)
-        && let Expr::BinaryOp {
-            op: BinaryOperator::Mul,
-            left: inner_left,
-            right: inner_right,
-        } = right
+    if let Some(subtract) = match_one_minus(left, slot)
+        && let Some((inner_left, inner_right)) = right.product()
     {
-        return Some((
-            subtract,
-            slot_from_ast(inner_left, compartment_map, expression_context)?,
-            slot_from_ast(inner_right, compartment_map, expression_context)?,
-        ));
+        return Some((subtract, slot(inner_left)?, slot(inner_right)?));
     }
 
     None
 }
 
-fn match_one_minus(
-    expr: &Expr,
-    compartment_map: &HashMap<String, usize>,
-    expression_context: &MathExpressionContext,
-) -> Option<VarSlot> {
-    if let Expr::BinaryOp {
-        op: BinaryOperator::Sub,
-        left,
-        right,
-    } = expr
-        && matches!(left.as_ref(), Expr::Constant(value) if *value == 1.0)
+/// The slot `a` of `1 - a`.
+fn match_one_minus(part: Part, slot: &impl Fn(Part) -> Option<VarSlot>) -> Option<VarSlot> {
+    if let Some((BinaryOperator::Sub, left, right)) = part.binary()
+        && matches!(left.node(), Some(Expr::Constant(value)) if *value == 1.0)
     {
-        return slot_from_ast(right, compartment_map, expression_context);
+        return slot(Part::Node(right));
     }
     None
 }
 
+/// `a * b * (c + d) / e`, the product of two on either side of the sum, of
+/// five slots.
 fn match_mul_add_div(
-    numerator: &Expr,
-    denominator: &Expr,
-    compartment_map: &HashMap<String, usize>,
-    expression_context: &MathExpressionContext,
+    numerator: Part,
+    denominator: Part,
+    slot: &impl Fn(Part) -> Option<VarSlot>,
 ) -> Option<(VarSlot, VarSlot, VarSlot, VarSlot, VarSlot)> {
-    let denominator = slot_from_ast(denominator, compartment_map, expression_context)?;
-    let Expr::BinaryOp {
-        op: BinaryOperator::Mul,
-        left,
-        right,
-    } = numerator
-    else {
-        return None;
-    };
+    let denominator = slot(denominator)?;
+    let (left, right) = numerator.product()?;
 
-    let (first, second, add_expr) = if let Expr::BinaryOp {
-        op: BinaryOperator::Mul,
-        left: inner_left,
-        right: inner_right,
-    } = left.as_ref()
-    {
-        (
-            slot_from_ast(inner_left, compartment_map, expression_context)?,
-            slot_from_ast(inner_right, compartment_map, expression_context)?,
-            right.as_ref(),
-        )
-    } else if let Expr::BinaryOp {
-        op: BinaryOperator::Mul,
-        left: inner_left,
-        right: inner_right,
-    } = right.as_ref()
-    {
-        (
-            slot_from_ast(inner_left, compartment_map, expression_context)?,
-            slot_from_ast(inner_right, compartment_map, expression_context)?,
-            left.as_ref(),
-        )
+    let (first, second, add) = if let Some((inner_left, inner_right)) = left.product() {
+        (slot(inner_left)?, slot(inner_right)?, right)
+    } else if let Some((inner_left, inner_right)) = right.product() {
+        (slot(inner_left)?, slot(inner_right)?, left)
     } else {
         return None;
     };
 
-    let Expr::BinaryOp {
-        op: BinaryOperator::Add,
-        left: add_left,
-        right: add_right,
-    } = add_expr
-    else {
+    let Some((BinaryOperator::Add, add_left, add_right)) = add.binary() else {
         return None;
     };
 
     Some((
         first,
         second,
-        slot_from_ast(add_left, compartment_map, expression_context)?,
-        slot_from_ast(add_right, compartment_map, expression_context)?,
+        slot(add_left)?,
+        slot(Part::Node(add_right))?,
         denominator,
     ))
 }
 
-fn slot_from_ast(
-    expr: &Expr,
+/// The slot of a part that is a variable.
+fn slot_from(
+    part: Part,
     compartment_map: &HashMap<String, usize>,
     expression_context: &MathExpressionContext,
 ) -> Option<VarSlot> {
-    match expr {
+    match part.node()? {
         Expr::Variable(name) => Some(resolve_var_slot(name, compartment_map, expression_context)),
         _ => None,
     }
@@ -1712,27 +1660,28 @@ fn push_fast_ops_from_ast(
             // coverage: the check of the language rejects '!' outside the condition of an if
             UnaryOperator::Not => return None,
         },
-        Expr::BinaryOp { op, left, right } => {
-            push_fast_ops_from_ast(left, compartment_map, expression_context, ops)?;
-            push_fast_ops_from_ast(right, compartment_map, expression_context, ops)?;
-            match op {
-                BinaryOperator::Add => ops.push(FastRateOp::Add),
-                BinaryOperator::Sub => ops.push(FastRateOp::Sub),
-                BinaryOperator::Mul => ops.push(FastRateOp::Mul),
-                BinaryOperator::Div => ops.push(FastRateOp::Div),
-                BinaryOperator::Mod
-                | BinaryOperator::Pow
-                | BinaryOperator::Lt
-                | BinaryOperator::Gt
-                | BinaryOperator::Le
-                | BinaryOperator::Ge
-                | BinaryOperator::Eq
-                | BinaryOperator::Ne
-                | BinaryOperator::And
-                | BinaryOperator::Or => return None,
+        Expr::Chain { first, rest } => {
+            push_fast_ops_from_ast(first, compartment_map, expression_context, ops)?;
+            for (op, operand) in rest {
+                push_fast_ops_from_ast(operand, compartment_map, expression_context, ops)?;
+                ops.push(match op {
+                    BinaryOperator::Add => FastRateOp::Add,
+                    BinaryOperator::Sub => FastRateOp::Sub,
+                    BinaryOperator::Mul => FastRateOp::Mul,
+                    BinaryOperator::Div => FastRateOp::Div,
+                    BinaryOperator::Mod
+                    | BinaryOperator::Lt
+                    | BinaryOperator::Gt
+                    | BinaryOperator::Le
+                    | BinaryOperator::Ge
+                    | BinaryOperator::Eq
+                    | BinaryOperator::Ne
+                    | BinaryOperator::And
+                    | BinaryOperator::Or => return None,
+                });
             }
         }
-        Expr::FunctionCall { .. } | Expr::Conditional { .. } => return None,
+        Expr::Power { .. } | Expr::FunctionCall { .. } | Expr::Conditional { .. } => return None,
     }
     Some(())
 }
@@ -1891,7 +1840,7 @@ mod tests {
     fn thresholds_of(formula: &str) -> Vec<String> {
         let fixed: HashSet<String> = ["t_on", "k"].map(String::from).into();
         let expression = MathExpression::new(formula.to_string());
-        let ast = parse_expression(expression.preprocessed()).unwrap();
+        let ast = expression.tree().unwrap();
         let mut thresholds = Vec::new();
         collect_time_thresholds(&ast, &fixed, &mut thresholds);
         thresholds.iter().map(ToString::to_string).collect()
@@ -1900,10 +1849,10 @@ mod tests {
     #[test]
     fn a_comparison_of_t_with_a_fixed_value_is_a_threshold() {
         assert_eq!(thresholds_of("if(t >= 10, k, 0)"), ["10"]);
-        assert_eq!(thresholds_of("if(t_on + 1.5 > t, k, 0)"), ["(t_on + 1.5)"]);
+        assert_eq!(thresholds_of("if(t_on + 1.5 > t, k, 0)"), ["t_on + 1.5"]);
         assert_eq!(
             thresholds_of("k * max(if(t < t_on, 1, 0), if(t >= 2 * pi, 1, 0))"),
-            ["t_on", "(2 * pi)"]
+            ["t_on", "2 * pi"]
         );
     }
 

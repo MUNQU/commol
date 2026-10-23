@@ -2,6 +2,7 @@
 //! a stack program or the JIT with resolved slots), and every path gives the
 //! value of the formula.
 
+use commol_core::math_expression::MAX_NESTING;
 use commol_core::{MathExpression, MathExpressionContext, Model, ParameterValue};
 use commol_model::CompiledModel;
 
@@ -93,6 +94,27 @@ fn every_shape_of_rate_gives_the_value_of_its_formula() {
             );
         }
     }
+}
+
+#[test]
+fn a_rate_at_the_nesting_limit_builds_and_runs_on_a_worker_thread() {
+    // Each call holds a sum, a product and a comparison of `t` with a
+    // fixed value, which the engine stops at.
+    let rate = format!(
+        "{}k1{}",
+        "k1 + A * if(t > 1, ".repeat(MAX_NESTING),
+        ", 0)".repeat(MAX_NESTING)
+    );
+    let worker = std::thread::Builder::new().stack_size(2 << 20);
+    let values = worker
+        .spawn(move || [0.5, 2.5].map(|t| (rate_of(&rate, 0, t), expected(&rate, 0, t))))
+        .unwrap()
+        .join()
+        .unwrap();
+
+    assert_eq!(values[0], (0.3, 0.3));
+    assert_eq!(values[1].0, values[1].1);
+    assert!(values[1].0 > 700.0, "{values:?}");
 }
 
 #[test]

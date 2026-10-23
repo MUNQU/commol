@@ -3,6 +3,7 @@ import re
 import pytest
 
 from commol import ModelBuilder
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.utils.security import (
     validate_expression_security,
     SecurityError,
@@ -571,3 +572,23 @@ def test_a_formula_above_the_complexity_score_is_rejected() -> None:
     ):
         validate_expression_security("k1 + k2 + k3 + k4", config)
     assert_accepted(validate_expression_security, "k1 + k2 + k3", config)
+
+
+def test_a_formula_deeper_than_the_limit_raises() -> None:
+    deep = "-" * 20_000 + "x"
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            r"it nests deeper than \d+ levels of parentheses, calls, signs and powers"
+        ),
+    ):
+        commol_rs.core.MathExpression(deep).check()
+
+
+def test_a_long_chain_of_terms_is_checked() -> None:
+    terms = 20_000
+
+    nodes = commol_rs.core.MathExpression(" + ".join(["a"] * terms)).check()
+
+    assert nodes == 2 * terms - 1

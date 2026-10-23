@@ -48,7 +48,7 @@ parameters in dependency order.
 ## Compiled expressions are cached globally
 
 `JIT_CACHE` in `crates/commol-core/src/math_expression/mod.rs` maps each
-preprocessed formula to one compiled function for the life of the process. The
+formula to one compiled function for the life of the process. The
 same formula always runs the same machine code, so results are reproducible.
 
 **Rule:** do not invalidate or bypass the cache.
