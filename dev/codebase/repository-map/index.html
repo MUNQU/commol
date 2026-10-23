@@ -3899,7 +3899,7 @@
 <tbody>
 <tr>
 <td><code>py-commol/tests/</code></td>
-<td>Python tests: one package per page of the user guide (<code>building/</code>, <code>transitions/</code>, <code>rates/</code>, <code>axis_patterns/</code>, <code>initial_conditions/</code>, <code>simulation/</code>, <code>stochastic/</code>, <code>units/</code>, <code>calibration/</code>, <code>uncertainty/</code>, <code>reporting/</code>, <code>plotting/</code>, <code>docs/</code>); <code>reference_models/</code>, published models checked against their stated results; <code>model_kinds/</code>, the test model kind through every generic layer; <code>suite/</code>, the checks of the rules of the tests; and <code>support/</code> with the shared model factories, the test kind (<code>kinds.py</code>), the threads that run a method (<code>support/parallelism.py</code>), the test uncertainty method (<code>methods.py</code>), the handler that shows the messages of commol in a test run (<code>support/logs.py</code>), the coverage harness (<code>coverage.py</code>), the flow models, the reference solver, the oracles and the assertions. See <a href="../tests/">Tests</a>.</td>
+<td>Python tests: one package per page of the user guide (<code>building/</code>, <code>transitions/</code>, <code>rates/</code>, <code>axis_patterns/</code>, <code>initial_conditions/</code>, <code>simulation/</code>, <code>stochastic/</code>, <code>units/</code>, <code>calibration/</code>, <code>uncertainty/</code>, <code>reporting/</code>, <code>plotting/</code>, <code>docs/</code>); <code>reference_models/</code>, published models checked against their stated results; <code>model_kinds/</code>, the test model kind through every generic layer; <code>suite/</code>, the checks of the rules of the tests; and <code>support/</code> with the shared model factories, the test kind (<code>kinds.py</code>), the threads that run a method (<code>support/parallelism.py</code>), the test uncertainty method (<code>methods.py</code>), the handler that shows the messages of commol in a test run (<code>support/logs.py</code>), the coverage harness (<code>coverage.py</code>), the planning scripts of <code>.github/scripts/</code> loaded as modules (<code>planning.py</code>), the flow models, the reference solver, the oracles and the assertions. See <a href="../tests/">Tests</a>.</td>
 </tr>
 <tr>
 <td><code>crates/*/tests/</code>, <code>#[cfg(test)]</code> modules</td>
@@ -3919,11 +3919,11 @@
 </tr>
 <tr>
 <td><code>.github/scripts/next.sh</code></td>
-<td>The next proposals and changes to implement: open, not blocked, not taken, not touching an issue in progress, by priority, milestone and number, after it writes the links of the releases and refreshes the precedence levels (<code>parallel.py --releases --levels --next</code>).</td>
+<td>The next proposals and changes to implement: open, not blocked, not taken, not touching an issue in progress, by priority, the version of the milestone and number, after it writes the links of the releases and refreshes the precedence levels (<code>parallel.py --releases --levels --next</code>).</td>
 </tr>
 <tr>
 <td><code>.github/scripts/parallel.py</code></td>
-<td>The proposals and changes that can run in parallel, from their Touches or Where and the links of the open issues; <code>--next</code> gives the next ones, <code>--releases</code> writes the links of the releases (<a href="../../development/workflow/#milestones">Milestones</a>), and <code>--levels</code> writes the precedence level of each open issue into the field <code>Level</code> of the project.</td>
+<td>The proposals and changes that can run in parallel, from their Touches or Where and the links of the open issues, printed and never written into an issue body; <code>--next</code> gives the next ones, <code>--releases</code> writes the links of the releases (<a href="../../development/workflow/#milestones">Milestones</a>), and <code>--levels</code> writes the precedence level of each open issue into the field <code>Level</code> of the project.</td>
 </tr>
 <tr>
 <td><code>.github/scripts/github.py</code></td>
@@ -3931,7 +3931,7 @@
 </tr>
 <tr>
 <td><code>.github/scripts/affected.py</code></td>
-<td>The open issues that the changes of a branch affect: those whose body names a changed path.</td>
+<td>The open issues that the changes of a branch affect: those whose body names a changed path, read as a path by <code>names_a_path</code> of <code>parallel.py</code>.</td>
 </tr>
 <tr>
 <td><code>.github/scripts/release_notes.py</code></td>

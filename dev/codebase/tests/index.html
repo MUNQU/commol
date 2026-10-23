@@ -3487,7 +3487,7 @@ kind that is not aggregate through every generic layer.</p>
 </tr>
 <tr>
 <td><code>suite/</code></td>
-<td>The rules of this page that a program can check (<code>test_rules.py</code>), the plugin that records how long each test takes (<code>durations.py</code>), and the checks of the package as a whole: its version (<code>test_version.py</code>) and its logging, in a fresh interpreter (<code>test_logging.py</code>)</td>
+<td>The rules of this page that a program can check (<code>test_rules.py</code>), the plugin that records how long each test takes (<code>durations.py</code>), the checks of the package as a whole: its version (<code>test_version.py</code>) and its logging, in a fresh interpreter (<code>test_logging.py</code>), and the checks of the scripts of <code>.github/scripts/</code>: the next issues and what can run in parallel (<code>test_planning.py</code>), the precedence levels (<code>test_levels.py</code>), the links of the releases (<code>test_releases.py</code>), the REST calls (<code>test_github.py</code>), the affected issues (<code>test_affected.py</code>), the release notes (<code>test_release_notes.py</code>) and the Rust lines no test runs (<code>test_rust_uncovered.py</code>). No test calls GitHub: each one patches the REST calls (<code>support/planning.py</code>)</td>
 <td>—</td>
 </tr>
 <tr>

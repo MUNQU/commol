@@ -3899,7 +3899,7 @@ merges into it, through the merge queue, and a release is a tag on it.</p>
 </tr>
 <tr>
 <td>Priority and dependencies</td>
-<td>The field <code>Priority</code> of the project (<code>Now</code>, <code>Next</code>, <code>Later</code>); "Blocked by" links between issues; "Why here" in the Delivery of a proposal</td>
+<td>The field <code>Priority</code> of the project (<code>Now</code>, <code>Next</code>, <code>Later</code>); "Blocked by" links between issues</td>
 </tr>
 <tr>
 <td>Releases</td>
@@ -3924,18 +3924,23 @@ merges into it, through the merge queue, and a release is a tag on it.</p>
 </span></code></pre></div>
 <p>It runs <code>.github/scripts/parallel.py --next</code> and lists the open proposals and
 changes that no open issue blocks and nobody has taken, that can run at the
-same time as every issue in progress and as each other. It names each issue
-it skips and the issue in progress it would touch. A change has no section
-Touches: the paths of its section Where count as what it changes. The issues
-come by:</p>
+same time as every issue in progress and as each other. Every open blocker
+counts, with or without a label <code>proposal</code>, <code>change</code> or <code>release</code>, as it does
+for <code>start.sh</code>, so <code>next.sh</code> never offers an issue that <code>start.sh</code> refuses. It
+names each issue it skips and the issue in progress it would touch. A change
+has no section Touches: the paths of its section Where count as what it
+changes. The issues come by:</p>
 <ol>
 <li>Effective priority: the highest of the field <code>Priority</code> of the issue in the
    project (<code>Now</code>, <code>Next</code>, <code>Later</code>; no value is <code>Next</code>) and of every open issue
    it blocks, through chains of "blocked by" links. So an issue that another
    one needs inherits the priority of that issue.</li>
-<li>Milestone: an open milestone before none; the nearest due date, then the
-   oldest. The milestones of commol have no due date, and their numbers follow
-   the versions, so the next release comes first.</li>
+<li>The version of the milestone, which its title names (<code>0.10.1</code> before
+   <code>0.15.0</code>), so the next release comes first. The number of a milestone does
+   not count: it follows the order in which the milestones were made, not
+   their versions. A milestone that names no version comes after every
+   version, and an issue with no milestone comes last.</li>
+<li>The due date of the milestone, the nearest first.</li>
 <li>Number.</li>
 </ol>
 <p>The dependencies set what must come first; <code>Priority</code> is set only to move an
@@ -3945,9 +3950,10 @@ its milestone, and each open release to the issues of its milestone
 (<a href="#milestones">Milestones</a>), and then writes the precedence level of each open
 proposal, change and release into the number field <code>Level</code> of the project:
 0 when no open issue blocks it, else one more than the highest level of its
-open blockers (an open blocker of another repository counts as level 0). The
-view "By precedence" groups the open issues by <code>Level</code>, so each group can
-start when the groups above it close. GitHub Projects cannot group by
+open blockers (an open blocker of another repository, or one of this
+repository with no label <code>proposal</code>, <code>change</code> or <code>release</code>, counts as level
+0). The view "By precedence" groups the open issues by <code>Level</code>, so each group
+can start when the groups above it close. GitHub Projects cannot group by
 "blocked by" links, and its hierarchy view follows sub-issues only, so the
 script writes the field. First it adds to the project each open proposal,
 change and release that is not an item of it, so that every one gets its
@@ -4088,10 +4094,11 @@ says what it touches (section Touches of the template):</p>
 </table>
 <p>An item is a path or <code>path::Symbol</code>; a path that ends in <code>/</code> is a directory.
 <code>.github/scripts/parallel.py</code> reads the Touches and the links of the open
-issues, prints the proposals ready now and the ones each can run with, and
-with <code>--write</code> keeps the line "Parallel with" of each Delivery up to date; run
-it after a proposal is added or its Touches change. The <code>area:</code> labels filter
-the same zones (<code>gh issue list --label area:inference -s open</code>).</p>
+issues, and prints the proposals ready now and the ones each can run with.
+No script writes this into an issue body, where it would go out of date when
+another issue changes: run <code>parallel.py</code> to see it, and <code>next.sh</code> checks it
+each time it runs. The <code>area:</code> labels filter the same zones
+(<code>gh issue list --label area:inference -s open</code>).</p>
 <p>To take a proposal while others run:</p>
 <ol>
 <li>Start it with <code>.github/scripts/start.sh &lt;number&gt; &lt;type&gt;/&lt;name&gt;</code>: it assigns
