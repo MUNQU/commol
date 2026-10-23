@@ -165,6 +165,8 @@ class SplitConformal(ConformalMethod):
     new observations are exchangeable, each interval covers a new
     observation with probability at least `confidence_level`.
 
+    It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
+
     Attributes
     ----------
     calibration_data : list[ObservedDataPoint]
@@ -204,6 +206,8 @@ class RollingConformal(ConformalMethod):
     ones. Horizon ``k`` is the ``k``-th observation of a series after the
     origin: a count, not a distance on the axis.
 
+    It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
+
     Attributes
     ----------
     origins : list[float]
@@ -238,6 +242,8 @@ class JackknifePlus(ConformalMethod):
     With exchangeable blocks it covers at least ``1 − 2α`` when each block
     holds one observation, and the CV+ bound with ``K`` blocks otherwise.
 
+    It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
+
     Attributes
     ----------
     block_length : int | "auto"
@@ -261,6 +267,8 @@ class EnbPI(ConformalMethod):
     that left out the block of an observation give its leave-one-out
     prediction and score; their mean over every observation is the point
     prediction.
+
+    It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
 
     Attributes
     ----------
@@ -289,6 +297,8 @@ class AdaptiveConformal(ConformalMethod):
     level ``1 − α_t``, of the scores of the earlier points of the stream;
     then the working level moves by ``α_{t+1} = α_t + γ (α − err_t)``. The
     long-run share of misses tends to ``α``, with no assumption on the data.
+
+    It takes `score`, `by` and `confidence_level`, as every `ConformalMethod`.
 
     Attributes
     ----------

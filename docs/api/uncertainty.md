@@ -2,10 +2,11 @@
 
 [Back to API Reference](index.md)
 
-What every uncertainty method takes and returns: the configuration base, the
-weighted parameter sample, the predictive and its observation noise, the
-scenarios, the resampling, profile and conformal methods, the scores and the
-one quantile.
+What every uncertainty method takes and returns: the configuration bases, the
+weighted parameter sample, the predictive and its observation noise, and the
+scenarios. Then the methods of each family with their results (resampling,
+profile likelihood, sequential Monte Carlo, local approximations and conformal
+prediction), the scores and the one quantile.
 Guide: [Uncertainty](../guide/uncertainty/index.md).
 
 ::: commol.context.inference.method.InferenceMethod
@@ -143,6 +144,7 @@ Guide: [Local Approximations](../guide/uncertainty/local.md).
 ::: commol.context.inference.local.ImportanceResult
 
 ::: commol.context.inference.local.MixtureComponent
+
 ## Conformal prediction
 
 Guide: [Conformal Prediction Intervals](../guide/uncertainty/conformal.md).
@@ -174,5 +176,3 @@ Guide: [Conformal Prediction Intervals](../guide/uncertainty/conformal.md).
 ::: commol.api.inference.intervals.member_statistics
 
 ::: commol.api.inference.intervals.ci_percentiles
-
-::: commol.api.inference.registry

@@ -11,7 +11,7 @@ A model has a header, a **process** written once, a **structure** that lays the
 process out, and an **engine** that runs it. The process (bins, accumulators,
 stratifications, transitions) is the same for every kind of model; the
 structure changes between kinds and is tagged in JSON by `kind`, and by
-`variant` for a narrower form of a structure. The kind today is `aggregate`:
+`variant` for a narrower form of a structure. The one kind is `aggregate`:
 amounts per compartment.
 
 ```text

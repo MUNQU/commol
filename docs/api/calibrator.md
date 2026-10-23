@@ -48,6 +48,4 @@ Guide: [Observation Models](../guide/uncertainty/observation-models.md).
 
 ::: commol.context.calibration.CalibrationEvaluation
 
-::: commol.context.calibration.LossFunction
-
-::: commol.context.calibration.OptimizationAlgorithm
+::: commol.context.constants.LossFunction

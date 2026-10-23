@@ -163,8 +163,11 @@ from commol.api.parallelism import get_levels, get_threads, set_threads, threads
 InfeasibleStateError = _engine.InfeasibleStateError
 """A run left the values its model allows, such as an amount below zero.
 
-A difference-equations step that leaves a compartment below zero raises it.
-It is a `ValueError`; a calibration treats such a run as infeasible.
+A difference-equations step or an impulse that leaves a compartment below
+zero raises it. A stochastic engine raises it for a rate it cannot draw, such
+as a negative rate, an impulse fraction outside 0 to 1, or an absolute
+impulse that is not a whole number. It is a `ValueError`; a calibration
+treats such a run as infeasible.
 """
 
 __version__: str = build_info().version

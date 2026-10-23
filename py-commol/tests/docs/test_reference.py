@@ -36,6 +36,14 @@ def test_public_name_has_an_api_entry(name: str) -> None:
 
 
 @pytest.mark.docs
+def test_every_public_name_is_on_the_api_index() -> None:
+    """The table of ``docs/api/index.md`` names every name in ``commol.__all__``."""
+    index = (API_DIR / "index.md").read_text(encoding="utf-8")
+    missing = [name for name in commol.__all__ if f"`{name}`" not in index]
+    assert not missing, f"docs/api/index.md does not name: {missing}"
+
+
+@pytest.mark.docs
 def test_no_public_name_is_private() -> None:
     """No name of ``commol.__all__`` starts with ``_``."""
     private = [name for name in commol.__all__ if name.startswith("_")]

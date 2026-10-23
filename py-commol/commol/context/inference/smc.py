@@ -206,7 +206,7 @@ class SMCResult(BaseModel):
 
 class GibbsResult(SMCResult):
     """
-    The result of a Gibbs posterior.
+    The result of a Gibbs posterior: the attributes of `SMCResult`, and these.
 
     Attributes
     ----------
