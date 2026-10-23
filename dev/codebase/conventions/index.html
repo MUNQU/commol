@@ -3499,6 +3499,11 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
 <td><code>pytest -m docs</code> (CI) and review</td>
 </tr>
 <tr>
+<td>Field words</td>
+<td>No application field in the user pages or the source of <code>commol</code></td>
+<td><code>tests/docs/test_pages.py</code> (<code>pytest -m docs</code>, CI)</td>
+</tr>
+<tr>
 <td>Tests</td>
 <td>One package per guide page; shared factories; every test checks a result, once, within its time budget: <a href="../tests/">Tests</a></td>
 <td><code>tests/suite/</code> (CI) and review; pytest 10 deprecations fail the run (<code>filterwarnings</code>)</td>
@@ -3669,7 +3674,9 @@ every match.</p>
 <ul>
 <li>Use abstract names only: bins <code>A</code>, <code>B</code>, <code>C</code>; categories <code>group1</code>, <code>cat1</code>;
   parameters <code>k1</code>, <code>alpha</code>. No names from epidemiology, chemistry or any other
-  field.</li>
+  field. <code>py-commol/tests/docs/test_pages.py</code> checks the user pages and the
+  source of <code>commol</code> against a list of field words; a cited title is the only
+  exception.</li>
 <li>Every Python block runs, top to bottom within its page, in one namespace and
   from a temporary directory (<code>py-commol/tests/docs/test_examples.py</code>). Define
   what a block needs in an earlier block of the same page.</li>

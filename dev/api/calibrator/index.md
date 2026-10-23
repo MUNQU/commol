@@ -2286,7 +2286,7 @@ Bases: `_ObservationModel`
 
 Negative binomial counts of mean `μ`, the prediction, and variance `μ + φμ²`: counts that scatter more than a Poisson.
 
-`φ = 0` is the Poisson, so bounds `[0, …]` of a noise parameter hold it. The dispersion `k` of epidemiology (`size` in R) is `1/φ`. Every observed value must be a whole number, at least 0.
+`φ = 0` is the Poisson, so bounds `[0, …]` of a noise parameter hold it. The dispersion `k` (`size` in R) is `1/φ`. Every observed value must be a whole number, at least 0.
 
 Attributes:
 
@@ -2303,7 +2303,7 @@ class NegativeBinomialObservations(_ObservationModel):
     ``μ + φμ²``: counts that scatter more than a Poisson.
 
     ``φ = 0`` is the Poisson, so bounds ``[0, …]`` of a noise parameter hold
-    it. The dispersion ``k`` of epidemiology (``size`` in R) is ``1/φ``.
+    it. The dispersion ``k`` (``size`` in R) is ``1/φ``.
     Every observed value must be a whole number, at least 0.
 
     Attributes

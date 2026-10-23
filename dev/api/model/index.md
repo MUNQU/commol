@@ -2415,7 +2415,7 @@ Bases: `ModelStructure`, `InitialConditions`
 
 Amounts per compartment: how much starts where, and who the neighbors of a unit are.
 
-The bins of the process expand over its stratifications into compartments. `bin_amounts` gives the amount of each bin at the start, in the unit of the bin, `stratification_fractions` splits it among the categories, and `compartment_amounts` overrides single compartments. Bins of different units, such as people and a concentration, need no total over them.
+The bins of the process expand over its stratifications into compartments. `bin_amounts` gives the amount of each bin at the start, in the unit of the bin, `stratification_fractions` splits it among the categories, and `compartment_amounts` overrides single compartments. Bins of different units, such as a count and a concentration, need no total over them.
 
 Attributes:
 
@@ -2440,7 +2440,7 @@ class Aggregate(ModelStructure, InitialConditions):
     compartments. ``bin_amounts`` gives the amount of each bin at the start,
     in the unit of the bin, ``stratification_fractions`` splits it among the
     categories, and ``compartment_amounts`` overrides single compartments.
-    Bins of different units, such as people and a concentration, need no
+    Bins of different units, such as a count and a concentration, need no
     total over them.
 
     Attributes

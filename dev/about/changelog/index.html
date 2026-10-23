@@ -4462,14 +4462,23 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
-<li>In the <code>StochasticEvents</code> engine, a parameter or a seed changed between
+<li>
+<p>In the <code>StochasticEvents</code> engine, a parameter or a seed changed between
   two runs acts from the position where the first run stopped. The pending
   wait is drawn again from there, and a pending leap keeps only its events up
   to there, by binomial thinning. Before, the new rate acted back from the
   last event, and copies of one state with new seeds shared their next event.
   In Python this changes only <code>simulation.engine.set_seed</code> between two calls
   of <code>simulation.engine.step()</code>; <code>Simulation.run</code>, replicates and calibration
-  reset the engine after the seed, so their results do not change.</li>
+  reset the engine after the seed, so their results do not change.</p>
+</li>
+<li>
+<p>The documentation and the docstrings name no application field, as
+  <a href="../../codebase/conventions/">Conventions</a> asks: the dispersion of
+  <code>NegativeBinomialObservations</code> is "the dispersion <code>k</code> (<code>size</code> in R)", and
+  bins of different units are "a count and a concentration". A test checks
+  the words of the user pages and of the source of <code>commol</code>.</p>
+</li>
 </ul>
 <h2 id="0100-2026-10-23">[0.10.0] - 2026-10-23<a class="headerlink" href="#0100-2026-10-23" title="Permanent link">&para;</a></h2>
 <p>This release makes equivalent things the same across commol, after an audit
@@ -5212,9 +5221,9 @@ capitals. See <a href="../../guide/uncertainty/">Uncertainty</a>.</p>
   observation models at the fit. <code>ResamplingDiagnostics.block_length</code> is <code>None</code>
   for it.</li>
 <li>
-<p>A model can hold bins of different units, such as people and the
-  concentration of bacteria in water: each bin starts at an amount in its own
-  unit, a model whose bins all start at <code>0</code> builds and runs, and the
+<p>A model can hold bins of different units, such as a count and a
+  concentration: each bin starts at an amount in its own unit, a model whose
+  bins all start at <code>0</code> builds and runs, and the
   <code>Calibrator</code> rejects an initial-condition remainder whose unit is not the
   unit of a calibrated amount. See
   <a href="../../guide/building-models/#bins-of-different-units">Bins of different units</a>.</p>

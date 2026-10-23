@@ -1149,7 +1149,7 @@ Bases: `BaseModel`
 
 How much starts where: the amount of each bin and the split of it.
 
-Every amount is in the unit of its bin, so bins of different units, such as people and a concentration, start without a total over them. `Aggregate` holds these fields and their methods; the checks against the bins and the stratifications of the process are in `Aggregate.check_model`.
+Every amount is in the unit of its bin, so bins of different units, such as a count and a concentration, start without a total over them. `Aggregate` holds these fields and their methods; the checks against the bins and the stratifications of the process are in `Aggregate.check_model`.
 
 Attributes:
 
@@ -1167,7 +1167,7 @@ class InitialConditions(BaseModel):
     How much starts where: the amount of each bin and the split of it.
 
     Every amount is in the unit of its bin, so bins of different units, such
-    as people and a concentration, start without a total over them.
+    as a count and a concentration, start without a total over them.
     `Aggregate` holds these fields and their methods; the checks against the
     bins and the stratifications of the process are in
     `Aggregate.check_model`.
