@@ -70,8 +70,8 @@ rejected with the fields to use (`InitialConditions.reject_fractions_of_a_total`
 | A total per unit and fractions within it | The unit of a bin is optional free text, and Rust has no units, so the engine could not group the bins. |
 | Fractions of one total | It has no meaning over bins of different units, and a total of 0 makes every fraction 0. |
 
-The cost: a model of one unit writes `{"A": 990, "B": 10}` where it wrote
-`total=1000` and `{"A": 0.99, "B": 0.01}`.
+The cost: a model of one unit writes the amount of each bin, such as
+`{"A": 990, "B": 10}`, not a total and fractions.
 
 **Guards:** `tests/initial_conditions/test_bin_amounts.py`,
 `tests/reference_models/test_quadratic_decay.py::test_zero_is_the_solution_from_zero`,

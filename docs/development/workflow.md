@@ -117,7 +117,7 @@ A level is as fresh as the last of these runs. To see the whole plan:
 
 ```bash
 gh issue list --label proposal --state open
-gh issue list --milestone 0.5.0
+gh issue list --milestone <version>
 ```
 
 An issue is ready when every issue that blocks it is closed.
@@ -270,13 +270,12 @@ To take a proposal while others run:
 
 ### 1. Starting New Work
 
-```bash
-# Always start from the latest main
-git checkout main
-git pull origin main
+Start the issue with `start.sh`, never by hand
+([Lifecycle of a proposal](#lifecycle-of-a-proposal)). It creates the branch
+from the latest `main`, linked to the issue, in a sibling worktree:
 
-# Create a feature branch
-git checkout -b feature/your-feature-name
+```bash
+.github/scripts/start.sh <number> feature/your-feature-name
 ```
 
 ### 2. Making Changes

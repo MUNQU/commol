@@ -8,7 +8,7 @@ use crate::labels::OutputLabels;
 /// An engine whose state is the amount of each compartment of a
 /// aggregate model, followed by its accumulators.
 ///
-/// Both engines of the aggregate kind implement it; the initial
+/// Every engine of the aggregate kind implements it; the initial
 /// conditions that calibration writes ([`crate::InitialConditionPlan`]) use
 /// it.
 pub trait CompartmentalEngine: SimulationEngine {

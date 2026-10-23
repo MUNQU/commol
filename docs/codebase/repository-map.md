@@ -17,8 +17,8 @@ Use this page when you know what to change but not where it belongs.
 | `crates/commol-model/src/builder.rs` | Expansion of the bins and accumulators of a process over its stratifications (`expand`, `expand_compartments`, `expand_accumulators`), the initial state (`initial_state`), the checks of an aggregate model (`check_model`: variant, neighbors, names, whole units for a stochastic engine; `as_whole`), the subgroup total names (`subgroup_total_names`), impulse schedules and the compilation into `CompiledModel` (`try_from_model`). | Flow planning; stepping. |
 | `crates/commol-model/src/layout.rs` | `CompartmentLayout`: compartments in engine order with their labels, and lookups by bin and categories. | Name parsing. |
 | `crates/commol-model/src/labels.rs` | `OutputLabels` (bin and categories of an output) and `output_sums` (bin totals and partial totals). | Name parsing. |
-| `crates/commol-model/src/engine.rs` | `CompartmentalEngine`: what a compartmental engine gives besides `SimulationEngine` (compartments, labels, `state`, `total`, `set_initial_condition`). | Code for one engine. |
-| `crates/commol-model/src/initial_conditions.rs` | How initial-condition values reach a compartmental engine (`InitialConditionPlan`: resolution, layers, remainder); both engines' `plan_values` and `apply_values` use it. | Parameter values. |
+| `crates/commol-model/src/engine.rs` | `CompartmentalEngine`: what a compartmental engine gives besides `SimulationEngine` (`compartments`, `output_labels`, `initial_state`, `total`, `set_initial_condition`). | Code for one engine. |
+| `crates/commol-model/src/initial_conditions.rs` | How initial-condition values reach a compartmental engine (`InitialConditionPlan`: resolution, layers, remainder); the `plan_values` and `apply_values` of every engine of the aggregate kind use it. | Parameter values. |
 | `crates/commol-model/src/flows.rs` | Transition flow planning (`plan_transition_flows`), the sums the neighbors of a unit are (`resolve_neighbors`), and the description of the flows for Python (`describe_flows`). | Rate evaluation at run time. |
 | `crates/commol-model/src/helpers.rs` | Stratified-rate resolution and rate rewriting helpers. | New public API. |
 | `crates/commol-model/src/rates.rs` | Evaluation of a compiled rate: fast path, JIT with resolved slots, evalexpr fallback. | Flow logic. |
@@ -106,7 +106,12 @@ Use this page when you know what to change but not where it belongs.
 | `context/process.py` | `Process`: bins, accumulators, stratifications and transitions, and the checks of the process by itself. | Checks that depend on a structure. |
 | `context/structure.py` | `ModelStructure`, the interface every model kind gives the generic layers, and its registry of kinds and variants. | Code of one kind. |
 | `context/aggregate.py` | `Aggregate`: the initial amounts and the neighbors, their checks against the process, and the aggregate side of the interface. | Generic code. |
-| `context/initial_conditions.py` | `InitialConditions`, the fields and the fraction logic `Aggregate` holds. | Checks against the process. |
+| `context/initial_conditions.py` | `InitialConditions`, the fields `Aggregate` holds (bin amounts, category fractions, compartment amounts), their checks of range and their updates. | Checks against the process. |
+| `context/bin.py`, `context/stratification.py`, `context/stratification_condition.py` | `Bin` and `Accumulator`; `Stratification` and the checks of its categories; `StratificationCondition`. | Expansion (the engine's). |
+| `context/parameter.py` | `Parameter` (a number, a formula, a series or `None` for calibration) and `SeriesValue`. | Evaluation of a formula or a series (the engine's). |
+| `context/calibration.py` | The calibration problem as settings: `CalibrationProblem`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `Quantile`, the optimizer settings (`NelderMeadConfig`, `ParticleSwarmConfig` and its parts, the stop rules), and the results (`CalibrationResult`, `StartSummary`, `CalibrationHistory`). | Losses, penalties, optimizers (the engine's). |
+| `context/constants.py` | The enumerations of the calibration settings: `CalibrationParameterType`, `LossFunction`, `OptimizationAlgorithm` and those of a particle swarm. | — |
+| `context/visualization.py` | `PlotConfig`, the settings of a figure, and its presets. | Drawing (`api/plotting/`). |
 | `context/neighbors.py` | `Complete` and `Groups`, who the neighbors of a unit are. | How the terms resolve (the engine's). |
 | `context/description.py` | `ModelDescription` and its blocks (`Text`, `Table`, `Equations`, `StateGraph`, `Matrix`): a description as data. | Rendering; code of one kind. |
 | `context/transition.py` | `Transition` and `StratifiedRate`. | — |
@@ -116,16 +121,18 @@ Use this page when you know what to change but not where it belongs.
 | `context/engine.py` | `ModelEngine` (`Model.engine`: the engine type and its settings, read with the class of that engine), the settings classes `ODESolver`, `StochasticEventsSettings` and `StochasticStepsSettings`, `Rounding`, and the names of the engines as the `Literal` `EngineName`. | Settings validation or engine meanings: ask `commol_rs.engine.EngineType`. |
 | `context/_model/engine_state.py` | The only Python access to the engine queries, and `build_engine`, which builds the engine the model names. | Python re-implementations of them. |
 | `context/_model/describe.py` | The sections every kind shares and the layouts of a description (`"default"`, `"odd"`). | Sections of one kind. |
-| `context/_model/` (other files) | Internals of an aggregate model: the sections of its description (`aggregate_description.py`, and the equations, event table and state graphs of `_model/equations.py`), unit checker, calibration write-back, the `initial_conditions` report section (`report.py`); JSON rendering of any model. | Public API. |
+| `context/_model/` (other files) | Internals of an aggregate model: the sections of its description (`aggregate_description.py`, and the equations, event table and state graphs of `_model/equations.py`), unit checker, calibration write-back, the `initial_amounts` and `category_splits` report sections (`report.py`); JSON rendering of any model. | Public API. |
 | `context/report_entry.py` | The spread of a report entry from the summary of a sample (`Interval`, `entry_interval`), for every kind. | — |
 | `utils/security.py` | Validation of every user expression (`SecurityConfig` limits). | Expression evaluation. |
 | `utils/equations.py` | Dimensional analysis with `pint`. | — |
+| `commol/constants.py` | The names of the variables every expression has (`TOTAL_VARIABLE`, `RESERVED_VARIABLE_NAMES`) and the prefix of the subgroup totals (`SUBGROUP_TOTAL_PREFIX`). | Names that depend on a model (ask the engine). |
+| `commol/scores.py` | The module `commol.scores`: the scores of `api/inference/scores.py` under a public path. | The scores themselves. |
 
 ## Other paths
 
 | Path | Owns |
 |---|---|
-| `py-commol/tests/` | Python tests: one package per page of the user guide (`building/`, `transitions/`, `rates/`, `axis_patterns/`, `initial_conditions/`, `simulation/`, `stochastic/`, `units/`, `calibration/`, `uncertainty/`, `parallelism/`, `reporting/`, `plotting/`, `docs/`); `reference_models/`, published models checked against their stated results; `model_kinds/`, the test model kind through every generic layer; `suite/`, the checks of the rules of the tests; and `support/` with the shared model factories, the test kind (`kinds.py`), the threads that run a method (`support/parallelism.py`), what a figure draws (`support/plotted.py`), the test uncertainty method (`methods.py`), the handler that shows the messages of commol in a test run (`support/logs.py`), the coverage harness (`coverage.py`), the planning scripts of `.github/scripts/` loaded as modules (`planning.py`), the flow models, the reference solver, the oracles and the assertions. See [Tests](tests.md). |
+| `py-commol/tests/` | Python tests: one package per page of the user guide (`building/`, `transitions/`, `rates/`, `axis_patterns/`, `initial_conditions/`, `simulation/`, `stochastic/`, `units/`, `calibration/`, `uncertainty/`, `parallelism/`, `reporting/`, `plotting/`, `description/`, `docs/`); `reference_models/`, published models checked against their stated results; `model_kinds/`, the test model kind through every generic layer; `suite/`, the checks of the rules of the tests; and `support/` with the shared model factories, the test kind (`kinds.py`), the threads that run a method (`support/parallelism.py`), what a figure draws (`support/plotted.py`), the test uncertainty method (`methods.py`), the handler that shows the messages of commol in a test run (`support/logs.py`), the coverage harness (`coverage.py`), the planning scripts of `.github/scripts/` loaded as modules (`planning.py`), the flow models, the reference solver, the oracles and the assertions. See [Tests](tests.md). |
 | `crates/*/tests/`, `#[cfg(test)]` modules | Rust tests. |
 | `docs/` | This site. `docs/codebase/` is for maintainers; the rest is for users. |
 | `.github/ISSUE_TEMPLATE/` | The templates of a proposal, a bug or small change, and a release ([Planning](../development/workflow.md#planning)). |
@@ -135,7 +142,9 @@ Use this page when you know what to change but not where it belongs.
 | `.github/scripts/github.py` | The REST calls of `parallel.py`: every page, and one line that says why GitHub refused a request. |
 | `.github/scripts/affected.py` | The open issues that the changes of a branch affect: those whose body names a changed path, read as a path by `names_a_path` of `parallel.py`. |
 | `.github/scripts/release_notes.py` | The notes of a GitHub release, from its section of the changelog. |
-| `.github/workflows/` | CI: code quality, build, docs, release, and the coverage studies (`coverage.yaml`), which Build and the release call. |
+| `.github/scripts/rust_coverage.sh`, `.github/scripts/rust_uncovered.py` | The Rust coverage as CI measures it: the Rust tests and `pytest` on an instrumented extension, and the check that every line no test runs has a `// coverage: <reason>` marker ([Coverage](coverage.md)). |
+| `.github/actions/set-version` | The version of a release, from its tag, written into `[workspace.package]` of the root manifest. |
+| `.github/workflows/` | CI: code quality, build, docs, release, the coverage studies (`coverage.yaml`), which Build and the release call, and the external links of the documentation (`links.yaml`). |
 
 ## If you need to…
 

@@ -20,7 +20,7 @@ The axis owns the window grid: `AxisUnits.window_start`, `window_end`,
 `window_index` and `window_ends` take the width as a span and a unit, as
 `steps` does, and check that it is a positive whole number of steps. They call
 the grid in steps of `context/_windows.py`, private, the one grid that
-`windowed_totals` and `observed_report` read; those two take a `window` of any
+`windowed_totals` and `_observed_report` read; those two take a `window` of any
 positive length, because the window of an observation of a differential model
 need not be whole. No public function takes a width in steps: a width of `n`
 steps is the span `n` in the step unit. The grid is in the context layer, so
@@ -125,8 +125,8 @@ a piece (`breakpoints` in `crates/commol-differential/src/solve.rs`).
 A `"step_function"` or `"linear"` series reads `t`
 (`SeriesParameter::evaluate`), so it holds or interpolates from any position.
 The engine ends a piece at each of its points (`CompiledModel::series_points`),
-where the series jumps or bends. A difference engine reads `t = step`, so it
-gives the same values as before, and it rejects a point between integers.
+where the series jumps or bends. A difference engine reads `t = step`, so a
+series gives its value at each step, and it rejects a point between integers.
 
 A rate can also jump where `t` reaches a value it compares `t` with
 (`t >= t_on`, and so `AxisPattern.interval` and `linear_ramp`). The compiler
@@ -164,7 +164,8 @@ length, so it would never act.
 ## Impulses come before the flows of their step
 
 At step `n` the state jumps first, then the flows of the step run from the new
-state, in both engines (`CompiledModel::apply_impulses`). Every jump of one
+state, in every engine of the aggregate kind (`CompiledModel::apply_impulses`;
+`Units::apply_impulses` for the stochastic engines). Every jump of one
 step is computed from the state before any of them. The output at `n` shows the
 state after the jump. With the other order, the differential output at `n`
 would show the state before the jump and the difference output the state after
@@ -204,8 +205,9 @@ keeps `num_steps`. The `SimulationEngine` trait
 (`crates/commol-core/src/simulation_engine.rs`) runs only at positions
 (`run_at_positions_into_buffer`); `run(n)` runs on the grid the engine builds,
 `grid(n)`, and returns it. Each engine says which positions its model type
-accepts (`check_position`): a difference engine non-negative integers, a
-differential engine any finite, non-negative position. The engine checks every
+accepts (`check_position`): the difference engine and the chain binomial
+(`StochasticSteps`) non-negative integers, the differential engine and the
+events engine (`StochasticEvents`) any finite, non-negative position. The engine checks every
 position where it receives it, and its message names the object that holds a
 rejected one: the observation or constraint (`check_positions` in
 `crates/commol-calibration/src/calibration_problem.rs`), the impulse transition

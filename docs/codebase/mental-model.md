@@ -110,7 +110,8 @@ Simulation.run(n) / run_at(at)     -> difference: X += derivatives, once per ste
 Simulation.replicates(count).run(…) -> Engine.run_replicates: one seed per replicate,
                                       run in parallel (run_replicates, in the rayon
                                       pool of commol.threads: parallel, Parallelism)
-Calibrator(simulation, problem)    -> commol_rs.calibration.calibrate(engine, ...):
+Calibrator(simulation, problem)    -> commol_rs.inference.CalibrationProblem(engine, ...),
+                                      built once; run() calls its optimize(...):
                                       parameters by id; values of the kind, such as
                                       initial conditions, through the engine
 ```

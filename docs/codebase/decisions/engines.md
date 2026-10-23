@@ -58,11 +58,11 @@ accumulator. Every engine reads them, and none has flow logic of its own:
 | `StochasticEvents` | `flow_rates` as propensities, and one event of `flow_changes` at a time |
 | `StochasticSteps` | `transition_rates` as per-step probabilities, and the drawn number of events of each flow |
 
-`derivatives` is `flow_changes`ᵀ · `flow_rates`, computed piece by piece in the
-order of the old right-hand side, so the deterministic runs did not change by
-a bit. The deterministic engines are the mean-field limits of the stochastic
-ones, which gives the main test oracle. The positions where a rate can jump
-come from the same model (`CompiledModel::breakpoints`), so the differential
+`derivatives` is `flow_changes`ᵀ · `flow_rates`, computed piece by piece in one
+fixed order; another order changes the last bits of a deterministic run. The
+deterministic engines are the mean-field limits of the stochastic ones, which
+gives the main test oracle. The positions where a rate can jump come from the
+same model (`CompiledModel::breakpoints`), so the differential
 and the continuous-time stochastic engines stop at the same positions.
 
 A rate that is not a number stops the run in every engine, with a
@@ -138,7 +138,7 @@ there.
 A stochastic engine draws every random number from one generator seeded by
 `SimulationEngine::set_seed` (`crates/commol-core/src/simulation_engine.rs`);
 `reset` restores it, so a run is reproducible from its seed. The default
-`set_seed` does nothing, so the deterministic engines did not change.
+`set_seed` does nothing, so a deterministic engine ignores a seed.
 `EngineType::is_stochastic` says which engines draw: `StochasticEvents` and
 `StochasticSteps` (`crates/commol-stochastic/`). A run does not depend on the
 positions it reports at: `StochasticEvents` measures each wait from the last

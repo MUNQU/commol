@@ -102,16 +102,11 @@ NAMED_TEST = re.compile(
 
 
 def named_tests() -> list[tuple[str, str, str]]:
-    """Each ``<file>::<name>`` reference under ``docs/``, with its page.
-
-    The dated design records (``development/design-*.md``) keep the names of
-    their date, so they are left out.
-    """
+    """Each ``<file>::<name>`` reference under ``docs/``, with its page."""
     docs_dir = REPO_ROOT / "docs"
     return [
         (str(page.relative_to(docs_dir)), match.group("file"), match.group("name"))
         for page in sorted(docs_dir.rglob("*.md"))
-        if not page.match("development/design-*.md")
         for match in NAMED_TEST.finditer(page.read_text(encoding="utf-8"))
     ]
 

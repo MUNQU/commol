@@ -214,4 +214,4 @@ its complement the rest.
 |---|---|
 | The rules of initial conditions | [Building Models](building-models.md#the-structure-aggregate) |
 | Reporting fitted initial conditions | [Reports](reports.md) |
-| The design behind this page | [Per-compartment initial conditions](../development/design-per-compartment-initial-conditions.md) |
+| The design behind this page | [Initial conditions](../codebase/decisions/initial-conditions.md) |
