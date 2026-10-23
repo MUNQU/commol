@@ -9,7 +9,6 @@ from commol import (
     CalibrationProblem,
     CalibrationResult,
     Model,
-    ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
     ParameterSample,
@@ -21,6 +20,7 @@ from tests.support import (
     bounded,
     build,
     initial_condition_problem,
+    mixed_units_builder,
     override_builder,
     shared_category_builder,
     stratify,
@@ -114,21 +114,10 @@ class TestParameters:
 
 class TestInitialAmounts:
     def test_amounts_of_different_units_are_reported_in_their_units(self) -> None:
-        model = (
-            ModelBuilder(name="Mixed units")
-            .add_bin(id="A", name="State A", unit="item")
-            .add_bin(id="B", name="State B", unit="item")
-            .add_bin(id="C", name="State C", unit="mg/l")
-            .add_stratification(id="zone", categories=["up", "down"])
-            .add_parameter(id="k", value=0.1)
-            .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
-            .build(
-                Aggregate(
-                    bin_amounts={"A": 990, "B": 10, "C": 1e5},
-                    stratification_fractions={"zone": {"up": 0.25, "down": 0.75}},
-                    compartment_amounts={"C_up": 4e4},
-                ),
-                engine="DifferenceEquations",
+        model = build(
+            mixed_units_builder(
+                stratifications={"zone": {"up": 0.25, "down": 0.75}},
+                compartment_amounts={"C_up": 4e4},
             )
         )
 

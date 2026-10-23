@@ -385,3 +385,31 @@ def conditional_pathway_builder() -> FactoryBuilder:
         conditions={"type": {"group": "g2"}},
         compartment_amounts={"B_g1": 0.0},
     )
+
+
+def mixed_units_builder(
+    *,
+    stratifications: Stratifications | None = None,
+    compartment_amounts: Mapping[str, float] | None = None,
+) -> FactoryBuilder:
+    """
+    Bins of two units: A and B in ``item``, C in ``mg/l``.
+
+    One transition, ``t_ab``, moves ``k = 0.1`` from A to B each step. 990
+    starts in A, 10 in B and ``1e5`` in C. See the module docstring for the
+    keywords.
+    """
+    builder = FactoryBuilder(name="Mixed units", version="1.0")
+    builder.add_bin(id="A", name="State A", unit="item")
+    builder.add_bin(id="B", name="State B", unit="item")
+    builder.add_bin(id="C", name="State C", unit="mg/l")
+    builder.add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
+    return _finish(
+        builder,
+        parameters={"k": 0.1},
+        units={},
+        amounts={"A": 990, "B": 10, "C": 1e5},
+        stratifications=stratifications,
+        conditions=None,
+        compartment_amounts=compartment_amounts,
+    )

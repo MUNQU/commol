@@ -47,4 +47,4 @@ modelling judgments.
 | One verdict | A parameter structurally identifiable and poorly determined by the data, the usual case, would look like a conflict. |
 | Defaults for the thresholds | A judgment hidden in the library. |
 
-**Guards:** `tests/uncertainty/test_identifiability.py` (`TestReport`).
+**Guards:** `tests/uncertainty/test_identifiability_report.py` (`TestReport`).

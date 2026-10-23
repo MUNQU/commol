@@ -133,10 +133,10 @@ class TestBands:
             predictive.series_band(["Z"], 0.9)
 
     def test_the_band_of_one_draw_is_that_draw(
-        self, calibrator: Calibrator, truth_run: dict[str, list[float]]
+        self, calibrator: Calibrator, truth_run_50: dict[str, list[float]]
     ) -> None:
         predictive = Predictive(calibrator, _sample([[0.1, 0.05]]), POSITIONS)
-        run = truth_run
+        run = truth_run_50
 
         band = predictive.band(0.9)
 
@@ -240,7 +240,7 @@ class TestObservations:
         np.testing.assert_allclose(draws.values, [per_set[0] for per_set in expected])
 
     def test_the_truth_predicts_the_data(
-        self, calibrator: Calibrator, truth_run: dict[str, list[float]]
+        self, calibrator: Calibrator, truth_run_50: dict[str, list[float]]
     ) -> None:
         predictive = Predictive(calibrator, _sample([[0.1, 0.05]]), POSITIONS)
 
@@ -248,7 +248,7 @@ class TestObservations:
 
         assert draws.values[0] == pytest.approx(draws.observed)
         # The window of C from 20 to 40 is read as an increment.
-        run = truth_run
+        run = truth_run_50
         assert draws.values[0][-1] == pytest.approx(run["C"][40] - run["C"][20])
 
 

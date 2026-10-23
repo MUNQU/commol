@@ -1,16 +1,15 @@
-"""The figures of a run, of replicates and of a predictive are read from them:
-``results.plot.series()`` and ``results.plot.cumulative()``. Each draws the
-series, observations and bands of its results, and returns the `Figure`."""
+"""What every figure of results does: it is read from its results and returns
+the `Figure`, draws on given axes, reads a series through the observation
+operator and a bin id as the sum of its outputs, keeps the global style, and
+needs matplotlib only when it draws. The figures of each kind of result are in
+the other modules of this package."""
 
 import inspect
 import subprocess
 import sys
 from collections.abc import Callable
-from datetime import date, timedelta
-from pathlib import Path
 
 import matplotlib as mpl
-import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 from matplotlib.colors import to_rgba
@@ -18,103 +17,32 @@ from matplotlib.figure import Figure
 
 import commol
 from commol import (
-    CalibrationProblem,
-    Calibrator,
     ChaosResult,
     MorrisResult,
-    NelderMeadConfig,
-    NoNoise,
     ObservedDataPoint,
-    ParameterSample,
     PlotConfig,
     PRCCResult,
-    Predictive,
     ProfileResult,
-    SampleMethod,
     Simulation,
     SimulationResults,
     SobolResult,
 )
 from commol.api.plotting import figures
 from commol.api.plotting.accessors import PredictivePlot, ReplicatesPlot, ResultsPlot
-from commol.api.inference.intervals import member_statistics
-from commol.api.plotting.panels import _group_observed
-from commol.context.calibration import CalibrationResult
 from tests.support import (
     a_to_b_builder,
     abc_builder,
-    bounded,
     build,
     build_ode,
-    build_stochastic,
 )
-
-BINS = ["A", "B", "C"]
-TITLES = {"A": "State A", "B": "State B", "C": "State C"}
-
-
-@pytest.fixture
-def run(abc_simulation: Simulation) -> SimulationResults:
-    """100 steps of the default model of ``abc_builder``."""
-    return abc_simulation.run(100)
-
-
-def _visible(fig: Figure):
-    return [ax for ax in fig.axes if ax.get_visible()]
-
-
-def _assert_draws(fig: Figure, expected: dict[str, list[float]]) -> None:
-    """One visible panel per series, titled by its bin, with its values."""
-    axes = _visible(fig)
-    assert [ax.get_title() for ax in axes] == [TITLES[name] for name in expected]
-    for ax, values in zip(axes, expected.values(), strict=True):
-        np.testing.assert_allclose(np.asarray(ax.lines[0].get_ydata()), values)
-
-
-def _scatter(ax) -> np.ndarray:
-    """The offsets of the observation markers of a panel."""
-    offsets = [np.asarray(c.get_offsets(), dtype=float) for c in ax.collections]
-    return offsets[int(np.argmax([len(o) for o in offsets]))]
-
-
-def _observed_b(results: dict[str, list[float]]) -> list[ObservedDataPoint]:
-    return [
-        ObservedDataPoint(at=step, output="B", value=results["B"][step])
-        for step in range(0, 100, 10)
-    ]
-
-
-def _fit(**factors: float) -> CalibrationResult:
-    return CalibrationResult(
-        best_parameters=factors,
-        final_loss=0.0,
-        iterations=1,
-        converged=True,
-        termination_reason="Test",
-        seed=0,
-    )
-
-
-def _calibrator() -> Calibrator:
-    """A calibrator of ``k1`` of a model from A to B that counts its events."""
-    model = build(
-        a_to_b_builder(parameters={"k1": None}, rate="k1", accumulator="events")
-    )
-    problem = CalibrationProblem(
-        observed_data=[ObservedDataPoint(at=10, output="events", value=1.0, window=5)],
-        parameters=[bounded("k1", 0.0, 0.5)],
-        loss_function="sse",
-        optimization_config=NelderMeadConfig(max_iterations=1),
-    )
-    return Calibrator(Simulation(model), problem)
-
-
-def _predictive(values: list[float]) -> Predictive:
-    """The predictive of one draw of ``k1`` per value, at positions 0 to 40."""
-    sample = ParameterSample.equally_weighted(
-        ["k1"], [(0.0, 0.5)], [[value] for value in values], SampleMethod(name="t")
-    )
-    return Predictive(_calibrator(), sample, list(range(41)))
+from tests.support.plotted import (
+    BINS,
+    TITLES,
+    fit,
+    predictive_of,
+    scatter,
+    visible,
+)
 
 
 def test_the_figure_of_a_run_is_read_from_the_run() -> None:
@@ -126,7 +54,7 @@ def test_the_figure_of_a_run_is_read_from_the_run() -> None:
 
     fig = run.plot.series()
 
-    axes = _visible(fig)
+    axes = visible(fig)
     assert [ax.get_label() for ax in axes] == BINS
     assert [ax.get_title() for ax in axes] == [TITLES[name] for name in BINS]
     assert {(ax.get_xlabel(), ax.get_ylabel()) for ax in axes} == {("Step", "item")}
@@ -141,7 +69,7 @@ def test_the_figure_of_a_run_is_read_from_the_run() -> None:
 
 
 def test_the_figure_of_a_predictive_is_read_from_the_predictive() -> None:
-    predictive = _predictive([0.02, 0.1])
+    predictive = predictive_of([0.02, 0.1])
 
     fig = predictive.plot.series(series=["B"], confidence_level=0.9)
 
@@ -168,7 +96,7 @@ def test_a_figure_draws_on_given_axes(abc_simulation: Simulation) -> None:
     again = second.plot.series(series=["B"], axes=fig)
 
     assert again is fig
-    panel_a, panel_b = _visible(fig)
+    panel_a, panel_b = visible(fig)
     assert len(panel_a.lines) == 1
     np.testing.assert_allclose(
         [line.get_ydata() for line in panel_b.lines], [first["B"], second["B"]]
@@ -191,219 +119,6 @@ def test_a_series_with_no_panel_is_named(run: SimulationResults) -> None:
         run.plot.series(series=["B", "C"], axes=fig)
 
 
-def _abc_run(k1: float, accumulator: str | None = None) -> SimulationResults:
-    """20 steps of ``abc_builder`` at ``k1``."""
-    builder = abc_builder(parameters={"k1": k1, "k2": 0.1}, accumulator=accumulator)
-    return Simulation(build(builder)).run(20)
-
-
-def _colors(ax) -> list[tuple[float, float, float]]:
-    """The color of each line of a panel, with no alpha."""
-    return [to_rgba(line.get_color())[:3] for line in ax.lines]
-
-
-def test_compared_runs_share_the_panels() -> None:
-    """
-    Each panel has one line per run, labelled with its key, and a run has
-    the same color in every panel.
-    """
-    slow, fast = _abc_run(0.3), _abc_run(0.6)
-
-    fig = commol.plot_compared({"slow": slow, "fast": fast}, series=["A", "B"])
-
-    axes = _visible(fig)
-    assert [ax.get_label() for ax in axes] == ["A", "B"]
-    for ax, name in zip(axes, ["A", "B"], strict=True):
-        assert ax.get_title() == TITLES[name]
-        assert [line.get_label() for line in ax.lines] == ["slow", "fast"]
-        np.testing.assert_allclose(
-            [line.get_ydata() for line in ax.lines], [slow[name], fast[name]]
-        )
-        assert [t.get_text() for t in ax.get_legend().get_texts()] == [
-            "slow",
-            "fast",
-        ]
-    first, second = (_colors(ax) for ax in axes)
-    assert first == second
-    assert first[0] != first[1]
-
-
-@pytest.mark.parametrize(
-    ("labels", "message"),
-    [
-        (("abc", "ab"), r"'ab' does not have the outputs of 'abc': it lacks \['C'\]"),
-        (
-            ("ab", "abc"),
-            r"'abc' does not have the outputs of 'ab': it also has \['C'\]",
-        ),
-    ],
-    ids=["missing", "extra"],
-)
-def test_compared_runs_need_the_same_outputs(
-    labels: tuple[str, str], message: str
-) -> None:
-    runs = {
-        "abc": _abc_run(0.3),
-        "ab": Simulation(build(a_to_b_builder())).run(20),
-    }
-
-    with pytest.raises(ValueError, match=message):
-        commol.plot_compared({label: runs[label] for label in labels})
-
-
-def test_a_comparison_needs_a_result() -> None:
-    with pytest.raises(ValueError, match="at least one result"):
-        commol.plot_compared({})
-
-
-def test_a_compared_predictive_shows_its_band() -> None:
-    """
-    The predictive shows the median and the band of its draws in the color
-    of its key; the run shows its line; the observations are drawn once.
-    """
-    predictive = _predictive([0.02, 0.1])
-    model = build(
-        a_to_b_builder(parameters={"k1": 0.05}, rate="k1", accumulator="events")
-    )
-    run = Simulation(model).run(40)
-    observed = [ObservedDataPoint(at=at, output="B", value=50.0) for at in (10, 20)]
-
-    fig = commol.plot_compared(
-        {"draws": predictive, "run": run},
-        series=["B"],
-        observed_data=observed,
-        confidence_level=0.9,
-    )
-
-    (ax,) = fig.axes
-    band = predictive.series_band(["B"], 0.9)
-    median, line = ax.lines
-    np.testing.assert_allclose(np.asarray(median.get_ydata()), band.median)
-    np.testing.assert_allclose(np.asarray(line.get_ydata()), run["B"])
-    filled, points = ax.collections
-    heights = filled.get_paths()[0].vertices[:, 1]
-    assert heights.min() == pytest.approx(min(band.lower))
-    assert heights.max() == pytest.approx(max(band.upper))
-    assert to_rgba(filled.get_facecolor()[0])[:3] == to_rgba(median.get_color())[:3]
-    np.testing.assert_allclose(points.get_offsets(), [[10.0, 50.0], [20.0, 50.0]])
-    assert sorted(t.get_text() for t in ax.get_legend().get_texts()) == sorted(
-        ["draws", "draws: 90% of the draws", "run", "Observed"]
-    )
-
-
-def test_compared_replicates_show_their_band() -> None:
-    """Replicates show their mean and the band of the replicates."""
-    model = build_stochastic(a_to_b_builder(), "StochasticSteps")
-    replicates = Simulation(model).replicates(5, seed=2).run(20)
-    run = Simulation(build(a_to_b_builder())).run(20)
-
-    fig = commol.plot_compared({"replicates": replicates, "run": run}, series=["B"])
-
-    (ax,) = fig.axes
-    mean, line = ax.lines
-    np.testing.assert_allclose(np.asarray(mean.get_ydata()), replicates.mean()["B"])
-    np.testing.assert_allclose(np.asarray(line.get_ydata()), run["B"])
-    (band,) = ax.collections
-    heights = band.get_paths()[0].vertices[:, 1]
-    values = [replicate["B"] for replicate in replicates]
-    assert heights.min() >= np.min(values) - 1e-9
-    assert heights.max() <= np.max(values) + 1e-9
-    assert [t.get_text() for t in ax.get_legend().get_texts()] == [
-        "replicates",
-        "replicates: 95% of the replicates",
-        "run",
-    ]
-
-
-def test_compared_runs_can_be_windowed() -> None:
-    """Each line is the gain of the accumulator over each window of 7."""
-    slow, fast = _abc_run(0.3, "moved"), _abc_run(0.6, "moved")
-    simulation = Simulation(build(abc_builder(accumulator="moved")))
-
-    fig = commol.plot_compared({"slow": slow, "fast": fast}, series=["moved"], window=7)
-
-    (ax,) = fig.axes
-    for line, run in zip(ax.lines, (slow, fast), strict=True):
-        assert np.asarray(line.get_xdata(), dtype=float).tolist() == [7.0, 14.0]
-        np.testing.assert_allclose(
-            np.asarray(line.get_ydata()),
-            simulation.windowed_totals(run, ["moved"], window=7),
-        )
-
-
-def test_compared_replicates_and_draws_can_be_windowed() -> None:
-    """
-    Replicates show the mean gain over each window and the band of the gains
-    of the replicates; a predictive the median and the band of the gains of
-    its draws, read through the observation operator.
-    """
-    model = build_stochastic(
-        a_to_b_builder(parameters={"k1": 0.1}, rate="k1", accumulator="events"),
-        "StochasticSteps",
-    )
-    replicates = Simulation(model).replicates(5, seed=2).run(40)
-    predictive = _predictive([0.02, 0.1])
-
-    fig = commol.plot_compared(
-        {"replicates": replicates, "draws": predictive},
-        series=["events"],
-        window=10,
-        confidence_level=0.9,
-    )
-
-    (ax,) = fig.axes
-    ends = [10.0, 20.0, 30.0, 40.0]
-    gains = [
-        [run["events"][int(end)] - run["events"][int(end) - 10] for end in ends]
-        for run in replicates
-    ]
-    mean, median = ax.lines
-    np.testing.assert_allclose(np.asarray(mean.get_ydata()), np.mean(gains, axis=0))
-    points = [
-        ObservedDataPoint(at=end, output="events", value=0.0, window=10) for end in ends
-    ]
-    draws = predictive.at_observations(points, commol.NoNoise()).band(0.9)
-    assert np.asarray(median.get_xdata(), dtype=float).tolist() == ends
-    np.testing.assert_allclose(np.asarray(median.get_ydata()), draws.median)
-    replicate_band, draws_band = ax.collections
-    heights = replicate_band.get_paths()[0].vertices[:, 1]
-    assert heights.min() >= np.min(gains) - 1e-9
-    assert heights.max() <= np.max(gains) + 1e-9
-    assert draws_band.get_paths()[0].vertices[:, 1].max() == pytest.approx(
-        max(draws.upper)
-    )
-    assert [t.get_text() for t in ax.get_legend().get_texts()][1::2] == [
-        "replicates: 90% of the replicates",
-        "draws: 90% of the draws",
-    ]
-
-
-def test_compared_results_draw_on_given_axes_with_dates() -> None:
-    """
-    With ``axes=``, each series is drawn on its panel; a model with an
-    origin labels the ticks with dates.
-    """
-    first = _dated_run("day", 20)
-    fig = first.plot.series(series=["B"])
-
-    again = commol.plot_compared(
-        {"first": first, "again": first},
-        series=["B"],
-        axes=fig,
-        tick_every=10,
-        show_legend=False,
-    )
-
-    assert again is fig
-    (ax,) = fig.axes
-    assert [line.get_label() for line in ax.lines] == ["Simulation", "first", "again"]
-    assert _tick_labels(fig) == {
-        0.0: "2020-01-01",
-        10.0: "2020-01-11",
-        20.0: "2020-01-21",
-    }
-
-
 def test_results_built_by_hand_plot_only_outputs() -> None:
     results = SimulationResults(
         [0.0, 1.0, 2.0], {"B_g1": [1.0, 2.0, 3.0], "B_g2": [0.0, 1.0, 1.0]}
@@ -411,8 +126,8 @@ def test_results_built_by_hand_plot_only_outputs() -> None:
 
     fig = results.plot.series()
 
-    assert [ax.get_title() for ax in _visible(fig)] == ["B_g1", "B_g2"]
-    assert {ax.get_ylabel() for ax in _visible(fig)} == {""}
+    assert [ax.get_title() for ax in visible(fig)] == ["B_g1", "B_g2"]
+    assert {ax.get_ylabel() for ax in visible(fig)} == {""}
     with pytest.raises(ValueError, match="'B' is not an output of the results"):
         results.plot.series(series=["B"])
 
@@ -425,7 +140,7 @@ def test_a_sensitivity_result_plots_itself(prcc_result: PRCCResult) -> None:
     """
     fig = prcc_result.plot(x_label="Day")
 
-    over_axis, bars = _visible(fig)
+    over_axis, bars = visible(fig)
     assert [ax.get_label() for ax in (over_axis, bars)] == ["C", "peak of B"]
     *inputs, zero = over_axis.get_lines()
     for j, line in enumerate(inputs):
@@ -550,7 +265,7 @@ def test_a_figure_leaves_the_global_style(
     )
 
     assert {k for k, v in default_style.items() if mpl.rcParams[k] != v} == set()
-    ax = _visible(fig)[0]
+    ax = visible(fig)[0]
     darkgrid = mpl.style.library["seaborn-v0_8-darkgrid"]
     assert ax.get_facecolor() == to_rgba(darkgrid["axes.facecolor"])
     poster = mpl.style.library["seaborn-v0_8-poster"]["axes.titlesize"]
@@ -562,550 +277,7 @@ def test_a_figure_draws_the_first_color_of_its_style(run: SimulationResults) -> 
 
     colors = mpl.style.library["seaborn-v0_8-colorblind"]["axes.prop_cycle"]
     first = colors.by_key()["color"][0]
-    assert to_rgba(_visible(fig)[0].lines[0].get_color()) == to_rgba(first)
-
-
-class TestRunFigures:
-    def test_plot_series_draws_every_bin(self, run: SimulationResults) -> None:
-        fig = run.plot.series()
-
-        _assert_draws(fig, {name: run[name] for name in BINS})
-
-    def test_plot_series_draws_the_observations(self, run: SimulationResults) -> None:
-        observed = _observed_b(run)
-
-        fig = run.plot.series(observed_data=observed)
-
-        ax = _visible(fig)[1]
-        markers = _scatter(ax)
-        np.testing.assert_allclose(markers[:, 0], [p.at for p in observed])
-        np.testing.assert_allclose(markers[:, 1], [p.value for p in observed])
-        (points,) = ax.collections
-        np.testing.assert_allclose(points.get_facecolor(), [[1.0, 0.0, 0.0, 0.7]])
-        assert (list(points.get_sizes()), points.get_zorder()) == ([30.0], 5)
-
-    def test_plot_series_with_calibration_result(self, run: SimulationResults) -> None:
-        scale_factor = 0.5
-        observed = [
-            ObservedDataPoint(
-                at=i,
-                output="B",
-                value=run["B"][i] * scale_factor,
-                factor_id="detection_rate",
-            )
-            for i in range(0, 100, 10)
-        ]
-
-        fig = run.plot.series(
-            observed_data=observed,
-            calibration_result=_fit(detection_rate=scale_factor),
-            series=["B"],
-        )
-
-        ax = fig.axes[0]
-        plotted_y = np.asarray(ax.lines[0].get_ydata(), dtype=float)
-        assert plotted_y[10] == pytest.approx(run["B"][10] * scale_factor)
-        assert _scatter(ax)[1, 1] == pytest.approx(run["B"][10] * scale_factor)
-
-    def test_plot_series_subset_of_bins(self, run: SimulationResults) -> None:
-        fig = run.plot.series(series=["B", "C"])
-
-        _assert_draws(fig, {name: run[name] for name in ("B", "C")})
-
-    def test_plot_series_with_custom_config(self, run: SimulationResults) -> None:
-        config = PlotConfig(
-            figsize=(12, 8),
-            dpi=150,
-            layout=(1, 3),
-            style=["seaborn-v0_8-whitegrid", "seaborn-v0_8-notebook"],
-        )
-
-        fig = run.plot.series(config=config)
-
-        assert len(fig.axes) == 3
-        assert fig.dpi == 150
-        _assert_draws(fig, {name: run[name] for name in BINS})
-
-    def test_plot_cumulative_draws_the_running_sums(
-        self, run: SimulationResults
-    ) -> None:
-        fig = run.plot.cumulative()
-
-        _assert_draws(fig, {name: list(np.cumsum(run[name])) for name in BINS})
-
-    def test_plot_cumulative_draws_the_running_sum_of_observations(
-        self, run: SimulationResults
-    ) -> None:
-        observed = _observed_b(run)
-
-        fig = run.plot.cumulative(observed_data=observed)
-
-        markers = _scatter(_visible(fig)[1])
-        np.testing.assert_allclose(
-            markers[:, 1], np.cumsum([p.value for p in observed])
-        )
-
-    def test_a_cumulative_plot_has_the_size_of_its_configuration(
-        self, run: SimulationResults
-    ) -> None:
-        config = PlotConfig(figsize=(10, 6), dpi=80, layout=(1, 4))
-
-        fig = run.plot.cumulative(config=config)
-
-        assert tuple(fig.get_size_inches()) == (10, 6)
-        assert fig.dpi == 80
-        assert (len(fig.axes), len(_visible(fig))) == (4, 3)
-
-    def test_a_series_plot_has_the_size_of_its_panels(
-        self, run: SimulationResults
-    ) -> None:
-        fig = run.plot.series(config=PlotConfig(layout=(2, 2)))
-
-        assert tuple(fig.get_size_inches()) == (9.0, 8.0)
-        assert (len(fig.axes), len(_visible(fig))) == (4, 3)
-
-    @pytest.mark.parametrize("method", ["series", "cumulative"])
-    def test_a_plot_of_one_series_has_one_panel(
-        self, run: SimulationResults, method: str
-    ) -> None:
-        fig = getattr(run.plot, method)(series=["B"])
-
-        assert [ax.get_title() for ax in fig.axes] == ["State B"]
-
-    @pytest.mark.parametrize(
-        ("method", "name"),
-        [("series", "Series"), ("cumulative", "Cumulative")],
-    )
-    def test_a_saved_plot_is_cropped_and_logged(
-        self,
-        run: SimulationResults,
-        tmp_path: Path,
-        caplog: pytest.LogCaptureFixture,
-        method: str,
-        name: str,
-    ) -> None:
-        path = tmp_path / "plot.png"
-        uncropped = tmp_path / "uncropped.png"
-
-        with caplog.at_level("INFO", logger="commol"):
-            fig = getattr(run.plot, method)(output_file=str(path))
-        fig.savefig(uncropped, dpi=fig.dpi)
-
-        assert f"{name} figure saved to {path}" in caplog.messages
-        assert plt.imread(path).shape != plt.imread(uncropped).shape
-
-    def test_a_cumulative_plot_labels_its_line_and_its_observations(
-        self, run: SimulationResults
-    ) -> None:
-        fig = run.plot.cumulative(observed_data=_observed_b(run))
-
-        ax = _visible(fig)[1]
-        (markers,) = [c for c in ax.collections if len(c.get_offsets()) == 10]
-        np.testing.assert_allclose(_scatter(ax)[:, 0], range(0, 100, 10))
-        assert (ax.get_xlabel(), ax.get_ylabel(), ax.get_title()) == (
-            "Step",
-            "",
-            "State B",
-        )
-        grid = ax.xaxis.get_gridlines()[0]
-        assert (grid.get_visible(), grid.get_alpha()) == (True, 0.3)
-        assert ax.lines[0].get_label() == "Simulation (Cumulative)"
-        assert [t.get_text() for t in ax.get_legend().get_texts()] == [
-            "Simulation (Cumulative)",
-            "Observed (Cumulative)",
-        ]
-        np.testing.assert_allclose(markers.get_facecolor(), [[1.0, 0.0, 0.0, 0.7]])
-        assert (list(markers.get_sizes()), markers.get_zorder()) == ([30.0], 5)
-
-    def test_a_cumulative_plot_labels_the_unit_of_its_series(self) -> None:
-        run = Simulation(build(abc_builder(bin_unit="item"))).run(5)
-
-        fig = run.plot.cumulative()
-
-        assert [ax.get_ylabel() for ax in _visible(fig)] == ["item"] * 3
-
-    def test_cumulative_observations_of_a_factor_are_divided_by_it(
-        self, run: SimulationResults
-    ) -> None:
-        observed = [
-            ObservedDataPoint(at=step, output="B", value=10.0, factor_id="rate")
-            for step in (10, 20)
-        ] + [
-            ObservedDataPoint(at=30, output="B", value=10.0),
-            ObservedDataPoint(at=40, output="B", value=10.0, factor_id="other"),
-        ]
-
-        fig = run.plot.cumulative(
-            observed_data=observed, calibration_result=_fit(rate=0.5), series=["B"]
-        )
-
-        np.testing.assert_allclose(
-            _scatter(fig.axes[0])[:, 1], [20.0, 40.0, 50.0, 60.0]
-        )
-
-    def test_layout(self) -> None:
-        assert figures._layout(1) == (1, 1)
-        assert figures._layout(2) == (1, 2)
-        assert figures._layout(3) == (2, 2)
-        assert figures._layout(4) == (2, 2)
-        assert figures._layout(5) == (2, 3)
-        assert figures._layout(9) == (3, 3)
-
-    def test_group_observed_data(self) -> None:
-        observed = [
-            ObservedDataPoint(at=20, output="B", value=60.0),
-            ObservedDataPoint(at=10, output="B", value=50.0),
-            ObservedDataPoint(at=10, output="C", value=10.0),
-        ]
-
-        grouped = _group_observed(observed)
-
-        assert {name: [p.at for p in points] for name, points in grouped.items()} == {
-            "B": [10, 20],
-            "C": [10],
-        }
-
-    def test_apply_x_labels_anchors_ticks_to_first_plotted_step(self) -> None:
-        """Ticks follow the series' own grid, not the absolute step 0."""
-        _fig, ax = plt.subplots()
-
-        # A series read at its observations: the plotted steps are their
-        # positions, which start at 7 rather than at 0.
-        window = 7
-        positions = list(range(window, 8 * window + 1, window))
-        figures._apply_x_labels(ax, positions, str, tick_every=2 * window)
-
-        ticks = list(ax.get_xticks())
-        assert ticks == [window, 3 * window, 5 * window, 7 * window]
-
-    def test_apply_x_labels_without_tick_every_labels_all_steps(self) -> None:
-        _fig, ax = plt.subplots()
-
-        figures._apply_x_labels(ax, [5, 10, 15], lambda p: f"day {p}", tick_every=None)
-
-        assert list(ax.get_xticks()) == [5, 10, 15]
-        labels = ax.get_xticklabels()
-        assert [label.get_text() for label in labels] == ["day 5", "day 10", "day 15"]
-        assert {(label.get_rotation(), label.get_ha()) for label in labels} == {
-            (45.0, "right")
-        }
-
-    def test_apply_x_labels_with_empty_series(self) -> None:
-        """An empty series produces no ticks instead of an index error."""
-        _fig, ax = plt.subplots()
-
-        figures._apply_x_labels(ax, [], str, tick_every=4)
-
-        assert list(ax.get_xticks()) == []
-
-    def test_plot_series_passes_keywords_to_the_lines(
-        self, run: SimulationResults
-    ) -> None:
-        fig = run.plot.series(linewidth=3, alpha=0.7, linestyle="--")
-
-        for ax in _visible(fig):
-            line = ax.lines[0]
-            assert (line.get_linewidth(), line.get_alpha(), line.get_linestyle()) == (
-                3.0,
-                0.7,
-                "--",
-            )
-
-    def test_plot_cumulative_passes_keywords_to_the_lines(
-        self, run: SimulationResults
-    ) -> None:
-        fig = run.plot.cumulative(linewidth=2, alpha=0.8)
-
-        for ax in _visible(fig):
-            assert (ax.lines[0].get_linewidth(), ax.lines[0].get_alpha()) == (2.0, 0.8)
-
-    def test_a_series_figure_without_legend_has_none(
-        self, run: SimulationResults
-    ) -> None:
-        fig = run.plot.series(show_legend=False)
-
-        assert {ax.get_legend() for ax in _visible(fig)} == {None}
-
-    @pytest.mark.parametrize(
-        ("preset", "expected"),
-        [
-            (
-                PlotConfig.presentation,
-                PlotConfig(
-                    figsize=(16, 10),
-                    dpi=150,
-                    style=[
-                        "seaborn-v0_8-whitegrid",
-                        "seaborn-v0_8-talk",
-                        "seaborn-v0_8-colorblind",
-                    ],
-                ),
-            ),
-            (
-                PlotConfig.publication,
-                PlotConfig(
-                    figsize=(8, 6),
-                    dpi=300,
-                    style=["seaborn-v0_8-ticks", "seaborn-v0_8-paper"],
-                ),
-            ),
-            (
-                PlotConfig.notebook,
-                PlotConfig(
-                    figsize=(12, 8),
-                    dpi=100,
-                    style=["seaborn-v0_8-whitegrid", "seaborn-v0_8-notebook"],
-                ),
-            ),
-        ],
-    )
-    def test_plot_config_presets(
-        self, run: SimulationResults, preset, expected: PlotConfig
-    ) -> None:
-        config = preset()
-
-        fig = run.plot.series(config=config)
-
-        assert config == expected
-        assert fig.dpi == expected.dpi
-
-
-def _dated_run(step_unit: str, steps: int) -> SimulationResults:
-    """`steps` steps of a model whose axis starts on 2020-01-01."""
-    model = build(abc_builder(step_unit=step_unit, origin=date(2020, 1, 1)))
-    return Simulation(model).run(steps)
-
-
-def _tick_labels(fig: Figure) -> dict[float, str]:
-    """The labelled ticks of the first panel, after the figure is drawn."""
-    fig.canvas.draw()
-    ax = fig.axes[0]
-    return {
-        float(tick): label.get_text()
-        for tick, label in zip(ax.get_xticks(), ax.get_xticklabels(), strict=True)
-        if label.get_text()
-    }
-
-
-def test_an_axis_with_origin_labels_ticks_with_dates() -> None:
-    fig = _dated_run("day", 40).plot.series(series=["B"])
-
-    labels = _tick_labels(fig)
-    assert labels
-    for tick, label in labels.items():
-        assert label == (date(2020, 1, 1) + timedelta(days=tick)).isoformat()
-
-
-def test_dates_label_the_plotted_positions_tick_every_apart() -> None:
-    fig = _dated_run("day", 20).plot.series(series=["B"], tick_every=7)
-
-    assert _tick_labels(fig) == {
-        0.0: "2020-01-01",
-        7.0: "2020-01-08",
-        14.0: "2020-01-15",
-    }
-
-
-def test_a_date_label_shows_the_time_away_from_midnight() -> None:
-    fig = _dated_run("hour", 30).plot.series(series=["B"], tick_every=6)
-
-    assert _tick_labels(fig) == {
-        0.0: "2020-01-01",
-        6.0: "2020-01-01 06:00:00",
-        12.0: "2020-01-01 12:00:00",
-        18.0: "2020-01-01 18:00:00",
-        24.0: "2020-01-02",
-        30.0: "2020-01-02 06:00:00",
-    }
-
-
-def test_a_position_label_wins_over_the_dates() -> None:
-    fig = _dated_run("day", 20).plot.series(
-        series=["B"], position_label=lambda at: f"p{at:g}", tick_every=10
-    )
-
-    assert _tick_labels(fig) == {0.0: "p0", 10.0: "p10", 20.0: "p20"}
-
-
-class TestPredictiveSeries:
-    """
-    A predictive draws the weighted median and band of its draws, each read
-    through the observation operator of the problem.
-    """
-
-    window = 5
-
-    def test_a_windowed_band_of_one_draw_is_its_windowed_run(self) -> None:
-        predictive = _predictive([0.05])
-        run = predictive.runs()[0]
-        observed = [
-            ObservedDataPoint(at=at, output="events", value=1.0, window=self.window)
-            for at in (10, 25, 40)
-        ]
-
-        figure = predictive.plot.series(observed_data=observed, series=["events"])
-
-        ends = [10, 25, 40]
-        line = figure.axes[0].lines[0]
-        assert np.asarray(line.get_xdata(), dtype=float).tolist() == ends
-        assert np.asarray(line.get_ydata(), dtype=float).tolist() == pytest.approx(
-            [run["events"][end] - run["events"][end - 5] for end in ends]
-        )
-
-    def test_a_band_reads_each_point_through_its_own_window(self) -> None:
-        predictive = _predictive([0.05])
-        run = predictive.runs()[0]
-        observed = [
-            ObservedDataPoint(at=at, output="events", value=1.0, window=window)
-            for at, window in ((10, 5), (30, 20))
-        ]
-
-        figure = predictive.plot.series(observed_data=observed, series=["events"])
-
-        line = figure.axes[0].lines[0]
-        assert np.asarray(line.get_xdata(), dtype=float).tolist() == [10, 30]
-        assert np.asarray(line.get_ydata(), dtype=float).tolist() == pytest.approx(
-            [
-                run["events"][10] - run["events"][5],
-                run["events"][30] - run["events"][10],
-            ]
-        )
-
-    def test_the_band_of_two_draws_spans_their_runs(self) -> None:
-        predictive = _predictive([0.02, 0.1])
-        low, high = predictive.runs()
-
-        figure = predictive.plot.series(series=["B"])
-
-        filled = [c for c in figure.axes[0].collections if c.get_paths()]
-        band = filled[0].get_paths()[0].vertices[:, 1]
-        assert band.min() == pytest.approx(min(low["B"]))
-        assert band.max() == pytest.approx(max(high["B"]))
-
-    @staticmethod
-    def _factor_predictive(observed: list[ObservedDataPoint]) -> Predictive:
-        """A predictive of one draw, ``k1 = 0.05`` and the factor ``f1 = 0.5``."""
-        model = build(a_to_b_builder(parameters={"k1": None}, rate="k1"))
-        problem = CalibrationProblem(
-            observed_data=observed,
-            parameters=[
-                bounded("k1", 0.0, 0.5),
-                bounded("f1", 0.1, 1.0, kind="factor"),
-            ],
-            loss_function="sse",
-            optimization_config=NelderMeadConfig(max_iterations=1),
-        )
-        sample = ParameterSample.equally_weighted(
-            ["k1", "f1"],
-            [(0.0, 0.5), (0.1, 1.0)],
-            [[0.05, 0.5]],
-            SampleMethod(name="t"),
-        )
-        return Predictive(
-            Calibrator(Simulation(model), problem), sample, list(range(41))
-        )
-
-    def test_a_band_reads_each_point_through_its_own_factor(self) -> None:
-        observed = [
-            ObservedDataPoint(at=10, output="B", value=1.0, factor_id="f1"),
-            ObservedDataPoint(at=20, output="B", value=1.0),
-        ]
-        predictive = self._factor_predictive(observed)
-        run = predictive.runs()[0]
-
-        figure = predictive.plot.series(observed_data=observed, series=["B"])
-
-        line = figure.axes[0].lines[0]
-        assert np.asarray(line.get_xdata(), dtype=float).tolist() == [10, 20]
-        assert np.asarray(line.get_ydata(), dtype=float).tolist() == pytest.approx(
-            [0.5 * run["B"][10], run["B"][20]]
-        )
-
-    def test_a_band_of_one_factor_covers_every_position(self) -> None:
-        observed = [
-            ObservedDataPoint(at=at, output="B", value=1.0, factor_id="f1")
-            for at in (10, 20)
-        ]
-        predictive = self._factor_predictive(observed)
-        run = predictive.runs()[0]
-
-        figure = predictive.plot.series(observed_data=observed, series=["B"])
-
-        line = figure.axes[0].lines[0]
-        assert np.asarray(line.get_xdata(), dtype=float).tolist() == run.positions
-        assert np.asarray(line.get_ydata(), dtype=float).tolist() == pytest.approx(
-            [0.5 * value for value in run["B"]]
-        )
-
-    def test_a_band_labels_its_positions(self) -> None:
-        predictive = _predictive([0.05])
-
-        figure = predictive.plot.series(
-            series=["B"],
-            position_label=lambda at: f"day {at:g}",
-            tick_every=20,
-        )
-
-        labels = [label.get_text() for label in figure.axes[0].get_xticklabels()]
-        assert labels == ["day 0", "day 20", "day 40"]
-
-    def test_a_cumulative_band_spans_the_running_totals_of_its_draws(self) -> None:
-        predictive = _predictive([0.02, 0.1])
-        low, high = predictive.runs()
-        observed = [ObservedDataPoint(at=at, output="B", value=1.0) for at in (5, 9)]
-
-        figure = predictive.plot.cumulative(observed_data=observed, series=["B"])
-
-        ax = figure.axes[0]
-        band = [c for c in ax.collections if c.get_paths()][0]
-        vertices = band.get_paths()[0].vertices[:, 1]
-        assert vertices.max() == pytest.approx(float(np.cumsum(high["B"])[-1]))
-        edges = band.get_paths()[0].vertices
-        # The closed path repeats a vertex.
-        at_the_end = sorted({round(float(y), 6) for x, y in edges if x == 40})
-        assert at_the_end == pytest.approx(
-            [float(np.cumsum(low["B"])[-1]), float(np.cumsum(high["B"])[-1])]
-        )
-        assert band.get_alpha() == 0.3
-        assert "95% of the draws" in [t.get_text() for t in ax.get_legend().get_texts()]
-        assert ax.lines[0].get_label() == "Median of the draws (cumulative)"
-        np.testing.assert_allclose(_scatter(ax), [[5.0, 1.0], [9.0, 2.0]])
-        assert ax.get_title() == "B"
-
-
-class TestReplicateFigures:
-    @pytest.fixture
-    def replicates(self):
-        simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
-        return simulation.replicates(5, seed=2).run(20)
-
-    def test_the_band_of_windowed_replicates_spans_their_window_totals(
-        self, replicates
-    ) -> None:
-        observed = [
-            ObservedDataPoint(at=at, output="B", value=1.0, window=5) for at in (10, 20)
-        ]
-
-        fig = replicates.plot.series(observed_data=observed, series=["B"])
-
-        totals = [
-            [run["B"][end] - run["B"][end - 5] for end in (10, 20)]
-            for run in replicates
-        ]
-        band = [c for c in fig.axes[0].collections if c.get_paths()][0]
-        vertices = band.get_paths()[0].vertices
-        assert sorted({float(x) for x, _ in vertices}) == [10.0, 20.0]
-        assert vertices[:, 1].min() >= np.min(totals) - 1e-9
-        assert vertices[:, 1].max() <= np.max(totals) + 1e-9
-
-    def test_the_cumulative_figure_of_replicates_is_that_of_their_mean(
-        self, replicates
-    ) -> None:
-        fig = replicates.plot.cumulative(series=["B"])
-
-        np.testing.assert_allclose(
-            fig.axes[0].lines[0].get_ydata(), np.cumsum(replicates.mean()["B"])
-        )
+    assert to_rgba(visible(fig)[0].lines[0].get_color()) == to_rgba(first)
 
 
 class TestObservationOperator:
@@ -1135,7 +307,7 @@ class TestObservationOperator:
         observed = [ObservedDataPoint(at=10, output="B", value=1.0, factor_id="f3")]
 
         fig = run.plot.series(
-            observed_data=observed, calibration_result=_fit(f1=0.5), series=["B"]
+            observed_data=observed, calibration_result=fit(f1=0.5), series=["B"]
         )
 
         np.testing.assert_allclose(fig.axes[0].lines[0].get_ydata(), run["B"])
@@ -1152,7 +324,7 @@ class TestObservationOperator:
 
         fig = run.plot.series(
             observed_data=observed,
-            calibration_result=_fit(f1=0.5, f2=2.0),
+            calibration_result=fit(f1=0.5, f2=2.0),
             series=["B"],
         )
 
@@ -1162,445 +334,6 @@ class TestObservationOperator:
             line.get_ydata(),
             [0.5 * run["B"][10], 2.0 * run["B"][20], run["B"][30] + run["C"][30]],
         )
-
-
-MODEL_BAND = "model band\n(no observation noise),\nnot a prediction interval"
-
-
-def _model_points(ax) -> np.ndarray:
-    """The positions and values of the markers of the model of a panel."""
-    (markers,) = [line for line in ax.lines if line.get_marker() == "o"]
-    assert markers.get_linestyle() == "None"
-    return np.asarray([markers.get_xdata(), markers.get_ydata()], dtype=float)
-
-
-def _bars(ax) -> list[tuple[float, float, float, float]]:
-    """The left end, width, bottom and height of each band rectangle."""
-    return [
-        (patch.get_x(), patch.get_width(), patch.get_y(), patch.get_height())
-        for patch in ax.patches
-    ]
-
-
-def _legend(ax) -> set[str]:
-    return {text.get_text() for text in ax.get_legend().get_texts()}
-
-
-def _events_model(**stratifications: dict[str, float]) -> Simulation:
-    """A model from A to B, stratified as given, that counts its events."""
-    return Simulation(
-        build(
-            a_to_b_builder(
-                accumulator="events", stratifications=stratifications or None
-            )
-        )
-    )
-
-
-def test_a_panel_per_observed_series_reads_the_observation_operator() -> None:
-    """
-    One panel per label, in the order of its first observation: a sum of two
-    outputs over a window is the windowed sum of the run at each position,
-    and one output with no window is its value there.
-    """
-    simulation = _events_model(group={"g1": 0.2, "g2": 0.3, "g3": 0.5})
-    run = simulation.run(30)
-    observed = [
-        ObservedDataPoint(at=at, output="B_g1", value=1.0) for at in (10, 20)
-    ] + [
-        ObservedDataPoint(
-            at=at,
-            outputs=["events_g2", "events_g3"],
-            label="events_g2_g3",
-            value=2.0,
-            window=5,
-        )
-        for at in (30, 10, 20)
-    ]
-
-    fig = run.plot.observations(observed)
-
-    one, summed = _visible(fig)
-    assert [ax.get_label() for ax in (one, summed)] == ["B_g1", "events_g2_g3"]
-    assert [ax.get_title() for ax in (one, summed)] == ["B_g1", "events_g2_g3"]
-    np.testing.assert_allclose(
-        _model_points(summed),
-        [
-            [10, 20, 30],
-            simulation.windowed_totals(
-                run, ["events_g2", "events_g3"], 5, [10, 20, 30]
-            ),
-        ],
-    )
-    np.testing.assert_allclose(
-        _model_points(one), [[10, 20], simulation.sample(run, ["B_g1"], [10, 20])]
-    )
-    np.testing.assert_allclose(_scatter(summed), [[10, 2.0], [20, 2.0], [30, 2.0]])
-    assert _legend(summed) == {"Simulation", "Observed"}
-
-
-def test_the_panel_of_an_observed_series_applies_its_factor() -> None:
-    simulation = _events_model()
-    run = simulation.run(20)
-    observed = [
-        ObservedDataPoint(at=at, output="B", value=1.0, factor_id="share")
-        for at in (10, 20)
-    ]
-
-    fig = run.plot.observations(observed, calibration_result=_fit(share=0.5))
-
-    (ax,) = fig.axes
-    unscaled = simulation.sample(run, ["B"], [10, 20])
-    np.testing.assert_allclose(_model_points(ax)[1], 0.5 * np.asarray(unscaled))
-    np.testing.assert_allclose(_scatter(ax)[:, 1], [1.0, 1.0])
-
-
-def test_the_panel_of_an_observed_series_shows_the_band_of_a_predictive() -> None:
-    """
-    The median and the band of each panel are those of the `ObservationDraws`
-    of its series: a rectangle over each window, and a band filled between
-    the values with no window.
-    """
-    predictive = _predictive([0.02, 0.05, 0.1, 0.2])
-    windowed = [
-        ObservedDataPoint(at=at, output="events", value=1.0, window=5)
-        for at in (10, 20)
-    ]
-    single = [ObservedDataPoint(at=at, output="B", value=1.0) for at in (15, 25, 35)]
-
-    fig = predictive.plot.observations(windowed + single, confidence_level=0.9)
-
-    events, b = _visible(fig)
-    expected = predictive.at_observations(windowed, NoNoise()).band(0.9)
-    np.testing.assert_allclose(_model_points(events), [[10, 20], expected.median])
-    np.testing.assert_allclose(
-        _bars(events),
-        [
-            (at - 5, 5, lower, upper - lower)
-            for at, lower, upper in zip(
-                (10, 20), expected.lower, expected.upper, strict=True
-            )
-        ],
-    )
-    assert _legend(events) == {
-        "Median of the draws",
-        f"90% of the draws:\n{MODEL_BAND}",
-        "Observed",
-    }
-    expected = predictive.at_observations(single, NoNoise()).band(0.9)
-    np.testing.assert_allclose(_model_points(b), [[15, 25, 35], expected.median])
-    (filled,) = [c for c in b.collections if c.get_label() != "Observed"]
-    vertices = {tuple(v) for v in filled.get_paths()[0].vertices.tolist()}
-    for at, lower, upper in zip((15, 25, 35), expected.lower, expected.upper):
-        assert any(x == at and y == pytest.approx(lower) for x, y in vertices)
-        assert any(x == at and y == pytest.approx(upper) for x, y in vertices)
-    assert _legend(b) == {
-        "Median of the draws",
-        f"90% of the draws:\n{MODEL_BAND}",
-        "Observed",
-    }
-
-
-def test_each_observed_point_is_read_through_its_own_window() -> None:
-    simulation = _events_model()
-    run = simulation.run(30)
-    observed = [
-        ObservedDataPoint(at=10, output="events", value=1.0, window=7),
-        ObservedDataPoint(at=28, output="events", value=1.0, window=14),
-    ]
-
-    fig = run.plot.observations(observed)
-
-    steps = fig.axes[0].lines[0]
-    first = simulation.windowed_totals(run, ["events"], 7, [10])[0]
-    second = simulation.windowed_totals(run, ["events"], 14, [28])[0]
-    np.testing.assert_allclose(
-        steps.get_xdata(), [3, 10, np.nan, 14, 28, np.nan], equal_nan=True
-    )
-    np.testing.assert_allclose(
-        steps.get_ydata(),
-        [first, first, np.nan, second, second, np.nan],
-        equal_nan=True,
-    )
-
-
-def test_a_windowed_value_is_drawn_as_a_step_over_its_window() -> None:
-    """
-    Each value is a step over ``(at - window, at]`` with a marker at ``at``,
-    of the colour of the step; no line joins two windows.
-    """
-    run = _events_model().run(20)
-    observed = [
-        ObservedDataPoint(at=at, output="events", value=1.0, window=5)
-        for at in (5, 10, 15, 20)
-    ]
-
-    fig = run.plot.observations(observed, linewidth=3)
-
-    (ax,) = fig.axes
-    steps, markers = ax.lines
-    x = np.asarray(steps.get_xdata(), dtype=float).reshape(-1, 3)
-    y = np.asarray(steps.get_ydata(), dtype=float).reshape(-1, 3)
-    np.testing.assert_allclose(x[:, :2], [[0, 5], [5, 10], [10, 15], [15, 20]])
-    assert np.isnan(x[:, 2]).all() and np.isnan(y[:, 2]).all()
-    np.testing.assert_allclose(y[:, 0], y[:, 1])
-    np.testing.assert_allclose(_model_points(ax), [[5, 10, 15, 20], y[:, 1]])
-    assert steps.get_linewidth() == 3
-    assert markers.get_color() == steps.get_color()
-
-
-def test_a_value_with_no_window_is_a_marker_joined_as_a_guide() -> None:
-    simulation = _events_model()
-    run = simulation.run(20)
-    observed = [ObservedDataPoint(at=at, output="B", value=1.0) for at in (5, 12)]
-
-    fig = run.plot.observations(observed)
-
-    (ax,) = fig.axes
-    guide, _ = ax.lines
-    assert guide.get_linestyle() == ":"
-    assert guide.get_label() == "Simulation"
-    np.testing.assert_allclose(
-        [guide.get_xdata(), guide.get_ydata()],
-        [[5, 12], simulation.sample(run, ["B"], [5, 12])],
-    )
-    np.testing.assert_allclose(
-        _model_points(ax), [guide.get_xdata(), guide.get_ydata()]
-    )
-
-
-def test_the_panel_of_replicates_shows_their_mean_and_band() -> None:
-    """
-    A label that mixes a window and a value with no window: the mean of the
-    replicates and the band across them, each replicate read through the
-    operator of each observation.
-    """
-    simulation = Simulation(
-        build_stochastic(a_to_b_builder(accumulator="events"), "StochasticSteps")
-    )
-    replicates = simulation.replicates(5, seed=2).run(20)
-    observed = [
-        ObservedDataPoint(at=10, output="events", value=1.0, window=5),
-        ObservedDataPoint(at=20, output="events", value=1.0),
-    ]
-
-    fig = replicates.plot.observations(observed, confidence_level=0.8)
-
-    (ax,) = fig.axes
-    per_run = [
-        [
-            simulation.windowed_totals(run, ["events"], 5, [10])[0],
-            simulation.sample(run, ["events"], [20])[0],
-        ]
-        for run in replicates
-    ]
-    statistics = member_statistics(per_run, 0.8)
-    np.testing.assert_allclose(_model_points(ax)[1], np.mean(per_run, axis=0))
-    ((left, width, bottom, height),) = _bars(ax)
-    assert (left, width) == (5, 5)
-    assert bottom == pytest.approx(statistics["ci_lower"][0])
-    assert bottom + height == pytest.approx(statistics["ci_upper"][0])
-    assert _legend(ax) == {
-        "Mean of 5 replicates",
-        f"80% of the replicates:\n{MODEL_BAND}",
-        "Observed",
-    }
-
-
-def test_observed_series_draw_on_the_panels_of_a_figure() -> None:
-    """
-    The run along the whole axis and its observed series share the panels
-    of the labels that name a series.
-    """
-    run = _events_model().run(20)
-    fig = run.plot.series(series=["B"])
-    observed = [ObservedDataPoint(at=at, output="B", value=1.0) for at in (5, 12)]
-
-    again = run.plot.observations(observed, axes=fig)
-
-    assert again is fig
-    (ax,) = _visible(fig)
-    assert len(ax.lines) == 3
-
-
-def test_a_figure_of_observed_series_needs_observations() -> None:
-    with pytest.raises(ValueError, match="at least one observation"):
-        _events_model().run(5).plot.observations([])
-
-
-def _events_run(k: float) -> tuple[Simulation, SimulationResults]:
-    """30 steps of a stratified model from A to B at ``k`` that counts its events."""
-    simulation = Simulation(
-        build(
-            a_to_b_builder(
-                parameters={"k": k},
-                accumulator="events",
-                stratifications={"group": {"g1": 0.2, "g2": 0.3, "g3": 0.5}},
-            )
-        )
-    )
-    return simulation, simulation.run(30)
-
-
-def test_compared_results_draw_a_panel_per_observed_series() -> None:
-    """
-    One panel per label of the observations, with each result read through
-    the operator of each observation in its own color, and the observations
-    drawn once.
-    """
-    simulation, slow = _events_run(0.05)
-    _, fast = _events_run(0.2)
-    observed = [
-        ObservedDataPoint(at=at, output="B_g1", value=1.0) for at in (10, 20)
-    ] + [
-        ObservedDataPoint(
-            at=at,
-            outputs=["events_g2", "events_g3"],
-            label="events_late",
-            value=2.0,
-            window=5,
-        )
-        for at in (10, 20, 30)
-    ]
-
-    fig = commol.plot_compared(
-        {"slow": slow, "fast": fast}, observed_data=observed, panels="observations"
-    )
-
-    one, summed = _visible(fig)
-    assert [ax.get_label() for ax in (one, summed)] == ["B_g1", "events_late"]
-    for run, markers in zip((slow, fast), _markers(summed), strict=True):
-        np.testing.assert_allclose(
-            markers,
-            [
-                [10, 20, 30],
-                simulation.windowed_totals(
-                    run, ["events_g2", "events_g3"], 5, [10, 20, 30]
-                ),
-            ],
-        )
-    for run, markers in zip((slow, fast), _markers(one), strict=True):
-        np.testing.assert_allclose(
-            markers, [[10, 20], simulation.sample(run, ["B_g1"], [10, 20])]
-        )
-    for ax in (one, summed):
-        (points,) = ax.collections
-        assert points.get_label() == "Observed"
-        assert [to_rgba(line.get_color())[:3] for line in ax.lines[::2]] == [
-            to_rgba("C0")[:3],
-            to_rgba("C1")[:3],
-        ]
-        assert _legend(ax) == {"slow", "fast", "Observed"}
-    np.testing.assert_allclose(_scatter(summed), [[10, 2.0], [20, 2.0], [30, 2.0]])
-
-
-def _markers(ax) -> list[np.ndarray]:
-    """The positions and values of the markers of each model of a panel."""
-    return [
-        np.asarray([line.get_xdata(), line.get_ydata()], dtype=float)
-        for line in ax.lines
-        if line.get_marker() == "o"
-    ]
-
-
-def test_compared_observed_series_show_the_band_of_each_result() -> None:
-    """
-    Replicates show their mean and the band across them, and a predictive
-    the median and the band of its draws, read through the observation
-    operator; each band in the color of its key, its legend led by the key.
-    """
-    model = build_stochastic(
-        a_to_b_builder(parameters={"k1": 0.1}, rate="k1", accumulator="events"),
-        "StochasticSteps",
-    )
-    simulation = Simulation(model)
-    replicates = simulation.replicates(5, seed=2).run(40)
-    predictive = _predictive([0.02, 0.1])
-    observed = [
-        ObservedDataPoint(at=at, output="events", value=1.0, window=10)
-        for at in (20, 30)
-    ]
-
-    fig = commol.plot_compared(
-        {"replicates": replicates, "draws": predictive},
-        observed_data=observed,
-        panels="observations",
-        confidence_level=0.9,
-    )
-
-    (ax,) = fig.axes
-    per_run = [
-        simulation.windowed_totals(run, ["events"], 10, [20, 30]) for run in replicates
-    ]
-    statistics = member_statistics(per_run, 0.9)
-    draws = predictive.at_observations(observed, NoNoise()).band(0.9)
-    mean, median = _markers(ax)
-    np.testing.assert_allclose(mean[1], np.mean(per_run, axis=0))
-    np.testing.assert_allclose(median[1], draws.median)
-    bars = _bars(ax)
-    expected = [
-        (at - 10, 10, lower, upper - lower)
-        for lower_upper in (
-            zip(statistics["ci_lower"], statistics["ci_upper"], strict=True),
-            zip(draws.lower, draws.upper, strict=True),
-        )
-        for at, (lower, upper) in zip((20, 30), lower_upper, strict=True)
-    ]
-    np.testing.assert_allclose(bars, expected)
-    colors = [to_rgba(patch.get_facecolor())[:3] for patch in ax.patches]
-    assert colors == [to_rgba(c)[:3] for c in ("C0", "C0", "C1", "C1")]
-    assert _legend(ax) == {
-        "replicates",
-        f"replicates: 90% of the replicates:\n{MODEL_BAND}",
-        "draws",
-        f"draws: 90% of the draws:\n{MODEL_BAND}",
-        "Observed",
-    }
-
-
-def test_compared_observed_series_draw_on_given_axes() -> None:
-    """The panel of a label that names a series is the panel of that series."""
-    _, slow = _events_run(0.05)
-    _, fast = _events_run(0.2)
-    fig = slow.plot.series(series=["B_g1"], show_legend=False)
-    observed = [ObservedDataPoint(at=at, output="B_g1", value=1.0) for at in (5, 12)]
-
-    again = commol.plot_compared(
-        {"slow": slow, "fast": fast},
-        observed_data=observed,
-        panels="observations",
-        axes=fig,
-        show_legend=False,
-    )
-
-    assert again is fig
-    (ax,) = _visible(fig)
-    assert len(_markers(ax)) == 2
-    assert ax.get_legend() is None
-
-
-@pytest.mark.parametrize(
-    ("arguments", "message"),
-    [
-        ({"series": ["B_g1"]}, "give no `series` and no `window`"),
-        ({"window": 5.0}, "give no `series` and no `window`"),
-        ({"observed_data": []}, "at least one observation"),
-        ({"panels": "bins"}, "`panels` is 'series' or 'observations', not 'bins'"),
-    ],
-    ids=["series", "window", "no observations", "unknown panels"],
-)
-def test_compared_observed_series_reject_what_they_cannot_draw(
-    arguments: dict, message: str
-) -> None:
-    _, run = _events_run(0.1)
-    arguments = {
-        "observed_data": [ObservedDataPoint(at=10, output="B_g1", value=1.0)],
-        "panels": "observations",
-        **arguments,
-    }
-
-    with pytest.raises(ValueError, match=message):
-        commol.plot_compared({"run": run}, **arguments)
 
 
 class TestSeriesSelection:
@@ -1655,7 +388,7 @@ class TestDifferentialModel:
 
         fig = simulation.run(50).plot.series(observed_data=observed, series=["B"])
 
-        np.testing.assert_allclose(_scatter(fig.axes[0])[:, 0], steps)
+        np.testing.assert_allclose(scatter(fig.axes[0])[:, 0], steps)
 
     def _events(self) -> Simulation:
         return Simulation(

@@ -5,8 +5,8 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from commol import Aggregate, ModelBuilder, Simulation
-from tests.support import a_to_b_builder, build, initial_state
+from commol import Aggregate, Simulation
+from tests.support import a_to_b_builder, build, initial_state, mixed_units_builder
 
 
 def _conditions() -> Aggregate:
@@ -14,18 +14,7 @@ def _conditions() -> Aggregate:
 
 
 def test_each_bin_starts_at_its_amount_in_its_unit() -> None:
-    model = (
-        ModelBuilder(name="Mixed units")
-        .add_bin(id="A", name="State A", unit="item")
-        .add_bin(id="B", name="State B", unit="item")
-        .add_bin(id="C", name="State C", unit="mg/l")
-        .add_parameter(id="k", value=0.1)
-        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
-        .build(
-            Aggregate(bin_amounts={"A": 990, "B": 10, "C": 1e5}),
-            engine="DifferenceEquations",
-        )
-    )
+    model = build(mixed_units_builder())
 
     results = Simulation(model).run(num_steps=1)
 
