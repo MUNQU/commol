@@ -1,9 +1,9 @@
 //! The residuals of a fit, on the scale a method names, and the residual of
 //! a series at any position of the data.
 
-use std::collections::HashMap;
-
-use commol_calibration::{CalibrationProblem, ObservedDataPoint, Workspace};
+use commol_calibration::{
+    CalibrationProblem, ObservedDataPoint, SeriesIndex, Workspace, replicate_mean,
+};
 use commol_core::SimulationEngine;
 use commol_random::Generator;
 
@@ -80,12 +80,7 @@ impl Residuals {
             .map_err(|error| MethodError::of_point("The fit has no run", error))?;
         let observed = problem.observed_data();
         let n = observed.len();
-        let replicates = predictions.len() / n.max(1);
-        let fitted: Vec<f64> = (0..n)
-            .map(|i| {
-                (0..replicates).map(|r| predictions[r * n + i]).sum::<f64>() / replicates as f64
-            })
-            .collect();
+        let fitted = replicate_mean(predictions.chunks(n.max(1)), n);
         let residuals = observed
             .iter()
             .zip(&fitted)
@@ -142,7 +137,7 @@ impl Residuals {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct SeriesResiduals {
     positions: usize,
-    series: HashMap<String, usize>,
+    series: SeriesIndex,
     /// Per series: `(position index, residual)`, ascending.
     residuals: Vec<Vec<(usize, f64)>>,
 }
@@ -150,24 +145,20 @@ pub(crate) struct SeriesResiduals {
 impl SeriesResiduals {
     pub(crate) fn new(observations: &[ObservedDataPoint], residuals: &[f64]) -> Self {
         let positions = distinct_positions(observations);
-        let mut series = HashMap::new();
-        let mut by_series: Vec<Vec<(usize, f64)>> = Vec::new();
-        for ((obs, &residual), position) in observations
+        let position_of = position_indices(observations, &positions);
+        let series = SeriesIndex::new(observations);
+        let by_series = series
+            .indices()
             .iter()
-            .zip(residuals)
-            .zip(position_indices(observations, &positions))
-        {
-            let next = by_series.len();
-            let index = *series.entry(obs.label.clone()).or_insert(next);
-            if index == by_series.len() {
-                by_series.push(Vec::new());
-            }
-            by_series[index].push((position, residual));
-        }
-        for points in &mut by_series {
-            points.sort_by_key(|(position, _)| *position);
-            points.dedup_by_key(|(position, _)| *position);
-        }
+            .map(|members| {
+                let mut points: Vec<(usize, f64)> = members
+                    .iter()
+                    .map(|&i| (position_of[i], residuals[i]))
+                    .collect();
+                points.dedup_by_key(|(position, _)| *position);
+                points
+            })
+            .collect();
         Self {
             positions: positions.len(),
             series,
@@ -182,7 +173,7 @@ impl SeriesResiduals {
 
     /// The index of the series `label`, if it has residuals.
     pub(crate) fn series(&self, label: &str) -> Option<usize> {
-        self.series.get(label).copied()
+        self.series.series(label)
     }
 
     /// The residual of `series` at `position`, or at the nearest position

@@ -16,7 +16,7 @@ use super::approximation::{CurvatureKind, curvature_at};
 use super::curvature::Curvature;
 use super::gaussian::{Gaussian, inverse};
 use crate::error::MethodError;
-use crate::resampling::{BlockDrawing, BlockScheme, automatic_block_length};
+use crate::resampling::{BlockDrawing, BlockScheme, Estimates};
 use crate::sensitivity::Matrix;
 
 /// The sandwich of `curvature` with the blocks of `blocks`: a Student t on
@@ -85,13 +85,10 @@ pub fn block_meat(curvature: &Curvature, blocks: &BlockScheme) -> Result<Matrix,
     Ok(meat)
 }
 
-/// The estimate of the automatic block length of each series, by label.
-pub type Estimates = Vec<(String, f64)>;
-
 /// The blocks of `problem` of `block_length` positions, or of the
 /// automatic length of non-overlapping blocks of the residuals at the fit of
 /// `curvature` (Politis and White 2004) for `None`, with the estimate of
-/// each series.
+/// each series ([`BlockScheme::resolve`]).
 ///
 /// # Errors
 ///
@@ -101,23 +98,19 @@ pub fn blocks_at<E: SimulationEngine>(
     problem: &CalibrationProblem<E>,
     curvature: &Curvature,
     block_length: Option<usize>,
-) -> Result<(BlockScheme, Option<Estimates>), MethodError> {
+) -> Result<BlockScheme, MethodError> {
     let observed = problem.observed_data();
-    let (length, estimates) = match block_length {
-        Some(length) => (length, None),
-        None => {
-            let residuals: Vec<f64> = observed
-                .iter()
-                .zip(curvature.predictions())
-                .map(|(obs, prediction)| obs.value - prediction)
-                .collect();
-            let automatic =
-                automatic_block_length(observed, &residuals, BlockDrawing::NonOverlapping);
-            (automatic.length, Some(automatic.estimates))
-        }
-    };
-    let blocks = BlockScheme::new(observed, length)?;
-    Ok((blocks, estimates))
+    let residuals: Vec<f64> = observed
+        .iter()
+        .zip(curvature.predictions())
+        .map(|(obs, prediction)| obs.value - prediction)
+        .collect();
+    BlockScheme::resolve(
+        observed,
+        &residuals,
+        block_length,
+        BlockDrawing::NonOverlapping,
+    )
 }
 
 /// A sandwich and the blocks it summed over.
@@ -153,13 +146,13 @@ where
     E: SimulationEngine + Send + Sync,
 {
     let curvature = curvature_at(problem, fit, kind)?;
-    let (blocks, estimates) = blocks_at(problem, &curvature, block_length)?;
+    let blocks = blocks_at(problem, &curvature, block_length)?;
     let gaussian = sandwich(&curvature, &blocks)?;
     Ok(SandwichRun {
         curvature,
         gaussian,
         blocks: blocks.count(),
         block_length: blocks.length(),
-        estimates,
+        estimates: blocks.estimates().map(<[_]>::to_vec),
     })
 }

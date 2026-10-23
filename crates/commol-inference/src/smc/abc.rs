@@ -9,7 +9,7 @@
 //! replicates and their summary do not apply.
 
 use commol_calibration::discrepancy::observation_normalization;
-use commol_calibration::{CalibrationProblem, EvaluationError, LossConfig, Workspace};
+use commol_calibration::{CalibrationProblem, EvaluationError, LossConfig, SeriesIndex, Workspace};
 use commol_core::SimulationEngine;
 use commol_random::Generator;
 
@@ -113,17 +113,7 @@ impl<'a, E: SimulationEngine> AbcTarget<'a, E> {
             .iter()
             .map(|obs| obs.label.clone())
             .collect();
-        let mut names: Vec<&str> = Vec::new();
-        let series = labels
-            .iter()
-            .map(|label| match names.iter().position(|name| name == label) {
-                Some(index) => index,
-                None => {
-                    names.push(label);
-                    names.len() - 1
-                }
-            })
-            .collect();
+        let index = SeriesIndex::of_labels(&labels);
         let observed = problem.discrepancy().observed().to_vec();
         Ok(Self {
             problem,
@@ -131,8 +121,8 @@ impl<'a, E: SimulationEngine> AbcTarget<'a, E> {
             distance,
             bounds: problem.parameter_bounds(),
             stochastic: problem.forward().replicates().is_some(),
-            series,
-            count: names.len(),
+            series: index.series_of().to_vec(),
+            count: index.len(),
             scale: observation_normalization(&labels, &observed),
         })
     }

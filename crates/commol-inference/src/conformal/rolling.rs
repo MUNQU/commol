@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use commol_calibration::ObservedDataPoint;
+use commol_calibration::SeriesIndex;
 use commol_core::SimulationEngine;
 
 use crate::conformal::intervals::{ConformalRun, PredictionIntervals};
@@ -18,30 +18,6 @@ use crate::conformal::quantile::conformal_quantile;
 use crate::conformal::score::{ConformalSettings, NonconformityScore, scales};
 use crate::error::MethodError;
 use crate::resampling::{FitUnit, Perturbation, ReplicateRunner};
-
-/// The indices of the observations of each series after `origin`, in
-/// position order, by label in order of first appearance.
-fn later_by_series(observed: &[ObservedDataPoint], origin: f64) -> Vec<Vec<usize>> {
-    let mut labels: Vec<&str> = Vec::new();
-    let mut series: Vec<Vec<usize>> = Vec::new();
-    for (index, obs) in observed.iter().enumerate() {
-        let slot = match labels.iter().position(|label| *label == obs.label) {
-            Some(slot) => slot,
-            None => {
-                labels.push(&obs.label);
-                series.push(Vec::new());
-                series.len() - 1
-            }
-        };
-        if obs.at > origin {
-            series[slot].push(index);
-        }
-    }
-    for indices in &mut series {
-        indices.sort_by(|&a, &b| observed[a].at.total_cmp(&observed[b].at));
-    }
-    series
-}
 
 fn check<E: SimulationEngine + Send + Sync>(
     runner: &ReplicateRunner<'_, E>,
@@ -130,11 +106,13 @@ where
         .unzip();
     let predictions = set_predictions(problem, &fits, observed)?;
     let observed_scales = scales(settings.score, observed, observed, None)?;
+    let series = SeriesIndex::new(observed);
     let mut by_horizon: HashMap<(String, usize), Vec<f64>> = HashMap::new();
     let mut scores = Vec::new();
     for (predicted, &origin) in predictions.iter().zip(&fitted_origins) {
-        for series in later_by_series(observed, origin) {
-            for (step, &i) in series.iter().enumerate() {
+        for members in series.indices() {
+            let later = members.iter().filter(|&&i| observed[i].at > origin);
+            for (step, &i) in later.enumerate() {
                 let obs = &observed[i];
                 let score = settings
                     .score

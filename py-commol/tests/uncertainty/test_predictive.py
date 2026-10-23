@@ -251,6 +251,15 @@ class TestObservations:
         run = truth_run_50
         assert draws.values[0][-1] == pytest.approx(run["C"][40] - run["C"][20])
 
+    def test_draws_reject_a_position_the_engine_rejects(
+        self, calibrator: Calibrator
+    ) -> None:
+        predictive = Predictive(calibrator, _sample([[0.1, 0.05]]), [0, 1])
+        between_steps = [ObservedDataPoint(at=2.5, output="B", value=1.0)]
+
+        with pytest.raises(ValueError, match="integer steps; 2.5 is not one"):
+            predictive.at_observations(between_steps, NoNoise())
+
 
 class TestReaders:
     def test_a_plot_draws_the_band_of_a_predictive(

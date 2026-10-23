@@ -6,10 +6,9 @@
 //! weights, the per-series normalization of a loss, and the summary of the
 //! replicates of a stochastic engine. It never runs an engine.
 
-use std::collections::HashMap;
-
 use crate::feasibility::Violation;
 use crate::likelihood::{Likelihood, ObservationModel, TermDerivatives, unnamed_noise};
+use crate::series::SeriesIndex;
 use crate::types::{
     CalibrationParameter, CalibrationParameterType, LossConfig, ObservedDataPoint, ReplicateSummary,
 };
@@ -367,19 +366,20 @@ pub fn observation_normalization(labels: &[String], observed: &[f64]) -> Vec<f64
 /// The scale of each value: the root mean square of the values of its series
 /// (its label), or 1 for a series whose values are all (near) zero.
 pub fn series_rms(labels: &[String], values: &[f64]) -> Vec<f64> {
-    let mut sums: HashMap<&str, (f64, usize)> = HashMap::new();
-    for (label, value) in labels.iter().zip(values) {
-        let entry = sums.entry(label.as_str()).or_insert((0.0, 0));
-        entry.0 += value * value;
-        entry.1 += 1;
-    }
-    labels
+    let index = SeriesIndex::of_labels(labels);
+    let scales: Vec<f64> = index
+        .indices()
         .iter()
-        .map(|label| {
-            let (sum_squares, count) = sums[label.as_str()];
-            let rms = (sum_squares / count as f64).sqrt();
+        .map(|members| {
+            let sum_squares: f64 = members.iter().map(|&i| values[i] * values[i]).sum();
+            let rms = (sum_squares / members.len() as f64).sqrt();
             if rms > f64::EPSILON { rms } else { 1.0 }
         })
+        .collect();
+    index
+        .series_of()
+        .iter()
+        .map(|&series| scales[series])
         .collect()
 }
 

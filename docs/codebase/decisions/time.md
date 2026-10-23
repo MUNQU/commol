@@ -135,8 +135,7 @@ that do not change during a run (`time_thresholds` in
 `crates/commol-model/src/builder.rs`), and the engine evaluates them with the
 current parameters and ends a piece there. Without that, an adaptive solver
 whose rate is 0 before a short window grows its step and steps over the window.
-A comparison with the state is a state event, which the engine does not
-detect.
+A comparison with the state is a state event, which the engine does not detect.
 
 On a piece `[start, end)` the right-hand side sees `t` no larger than the
 float just below `end` (`RightHandSide::last_t`). A Runge–Kutta step evaluates
@@ -216,8 +215,8 @@ rejected one: the observation or constraint (`check_positions` in
 `crates/commol-calibration/src/calibration_problem.rs`), the impulse transition
 or series parameter when the model is built or its parameters change
 (`check_model` in `crates/commol-model/src/builder.rs`, for an engine that
-steps only at integers), or the positions of a predictive before any draw
-runs (`Predictive::new` in `crates/commol-inference/src/predictive.rs`).
+steps only at integers), or the positions and observations of a predictive before any
+draw runs (`Predictive::new`; `observation_draws` through `ForwardModel::with_observations`).
 
 **Rule:** Python passes positions on and shows the engine's message. It never
 checks whether a model type accepts a position.
@@ -230,7 +229,8 @@ checks whether a model type accepts a position.
 `crates/commol-model/tests/schedules.rs::an_engine_that_steps_at_integers_rejects_a_position_between_steps_at_the_check`,
 `tests/building/test_parameters.py::test_a_point_the_engine_cannot_run_is_rejected_at_build_and_update`,
 `tests/calibration/test_observations.py::TestPositionsAndEngines`,
-`crates/commol-inference/tests/test_predictive.rs::positions_the_engine_cannot_run_are_rejected_before_any_draw`.
+`crates/commol-inference/tests/test_predictive.rs::positions_the_engine_cannot_run_are_rejected_before_any_draw`,
+`crates/commol-inference/tests/test_predictive.rs::observation_draws_reject_a_position_the_engine_rejects`.
 
 ## Results carry their positions
 

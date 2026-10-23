@@ -4,12 +4,15 @@
 //! With `J_u = J_θ · D` the Jacobian of an output at a position on the
 //! unbounded scale, its variance is `J_u Σ J_uᵀ`; the band is the prediction
 //! at the fit plus and minus the quantile of a normal, or of a Student t
-//! with degrees of freedom, times its standard deviation.
+//! with degrees of freedom, times its standard deviation. It has the layout
+//! of every band ([`Band`]): the prediction at the fit is the mean and the
+//! median, as the normal and the Student t are symmetric.
 
 use commol_calibration::{CalibrationProblem, ObservedDataPoint};
 use commol_core::SimulationEngine;
 
 use crate::error::MethodError;
+use crate::predictive::Band;
 use crate::sensitivity::{FiniteDifferences, Matrix, SensitivityError, SensitivitySource};
 use crate::special::{normal_quantile, student_t_quantile};
 use crate::statistics::interval_levels;
@@ -18,15 +21,11 @@ use crate::transform::Transform;
 /// The linearized band of every output at some positions.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DeltaBand {
-    /// The output names, one per row of each table.
+    /// The output names, one per column of each table of the band.
     pub outputs: Vec<String>,
-    /// The prediction at the fit: one row per output, one value per
-    /// position.
-    pub center: Vec<Vec<f64>>,
-    /// The lower end of the central interval, as `center`.
-    pub lower: Vec<Vec<f64>>,
-    /// The upper end of the central interval, as `center`.
-    pub upper: Vec<Vec<f64>>,
+    /// The band, `[position][output]`: the prediction at the fit as the mean
+    /// and the median, and the ends of the central interval.
+    pub band: Band,
 }
 
 /// The band of `confidence_level` of every output of `problem` at
@@ -72,13 +71,14 @@ where
     let sensitivities = source.jacobian(fit).map_err(MethodError::Sensitivity)?;
     let derivatives = Transform::new(&problem.parameter_bounds()).derivatives(fit);
     let p = fit.len();
-    let mut center = Vec::with_capacity(outputs.len());
-    let mut lower = Vec::with_capacity(outputs.len());
-    let mut upper = Vec::with_capacity(outputs.len());
-    for (o, _) in outputs.iter().enumerate() {
-        let mut centers = Vec::with_capacity(positions.len());
-        let mut lows = Vec::with_capacity(positions.len());
-        let mut highs = Vec::with_capacity(positions.len());
+    let table = vec![vec![0.0; outputs.len()]; positions.len()];
+    let mut band = Band {
+        mean: table.clone(),
+        median: table.clone(),
+        lower: table.clone(),
+        upper: table,
+    };
+    for o in 0..outputs.len() {
         for t in 0..positions.len() {
             let row = o * positions.len() + t;
             let gradient: Vec<f64> = (0..p)
@@ -90,18 +90,11 @@ where
                 .sum();
             let half = quantile * variance.max(0.0).sqrt();
             let prediction = sensitivities.predictions[row];
-            centers.push(prediction);
-            lows.push(prediction - half);
-            highs.push(prediction + half);
+            band.mean[t][o] = prediction;
+            band.median[t][o] = prediction;
+            band.lower[t][o] = prediction - half;
+            band.upper[t][o] = prediction + half;
         }
-        center.push(centers);
-        lower.push(lows);
-        upper.push(highs);
     }
-    Ok(DeltaBand {
-        outputs,
-        center,
-        lower,
-        upper,
-    })
+    Ok(DeltaBand { outputs, band })
 }

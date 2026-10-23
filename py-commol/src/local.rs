@@ -130,8 +130,8 @@ fn sandwich(
     Ok((local, run.blocks, run.block_length, run.estimates))
 }
 
-/// A band and its outputs: `(outputs, center, lower, upper)`, one row per
-/// output and one value per position in each table.
+/// A band and its outputs: `(outputs, mean, lower, upper)`, each table
+/// `[position][output]`, as the band of a predictive.
 type BandTables = (Vec<String>, Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>);
 
 /// The band of every output by the delta method
@@ -146,8 +146,8 @@ type BandTables = (Vec<String>, Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>);
 ///     confidence_level: The level of the band
 ///
 /// Returns:
-///     The output names, and the center, lower and upper end of each
-///     output at each position
+///     The output names, and the prediction at the fit, the lower and the
+///     upper end at each position and output, `[position][output]`
 ///
 /// Raises:
 ///     ValueError: If the covariance is not one row and column per
@@ -182,7 +182,12 @@ fn delta_band(
         )
     })?
     .map_err(method_error)?;
-    Ok((band.outputs, band.center, band.lower, band.upper))
+    Ok((
+        band.outputs,
+        band.band.mean,
+        band.band.lower,
+        band.band.upper,
+    ))
 }
 
 /// A Laplace mixture and its importance sample, as the runner returns it

@@ -18,7 +18,7 @@ use argmin::core::{CostFunction, Error, Operator, SendAlias, SyncAlias};
 use commol_core::{SimulationEngine, inner_levels_in_parallel};
 
 use crate::calibration_problem::CalibrationProblem;
-use crate::forward::Workspace;
+use crate::forward::{Workspace, replicate_mean};
 use crate::objective::{OptimizationObjective, with_workspace};
 use crate::observation::ObservationOperator;
 use crate::types::{CalibrationResult, ObservedDataPoint};
@@ -214,13 +214,16 @@ pub fn predict<E: SimulationEngine>(
 /// The mean over the replicates in `workspace` of the one observation of
 /// `operator`.
 fn mean_prediction(operator: &ObservationOperator, workspace: &Workspace, values: &[f64]) -> f64 {
-    let mut out = [0.0];
-    let mut total = 0.0;
-    for rows in &workspace.rows {
-        operator.apply(rows, values, &mut out);
-        total += out[0];
-    }
-    total / workspace.rows.len() as f64
+    let replicates: Vec<[f64; 1]> = workspace
+        .rows
+        .iter()
+        .map(|rows| {
+            let mut out = [0.0];
+            operator.apply(rows, values, &mut out);
+            out
+        })
+        .collect();
+    replicate_mean(replicates.iter().map(|out| out.as_slice()), 1)[0]
 }
 
 /// The fit of a subproblem.

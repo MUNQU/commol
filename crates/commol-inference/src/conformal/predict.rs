@@ -1,7 +1,7 @@
 //! Point predictions and their spread at any observations, and the target
 //! points of the intervals.
 
-use commol_calibration::{CalibrationProblem, ObservedDataPoint};
+use commol_calibration::{CalibrationProblem, ObservedDataPoint, SeriesIndex, replicate_mean};
 use commol_core::SimulationEngine;
 
 use crate::predictive::{NoNoise, PredictiveError, observation_draws, observe_sets};
@@ -88,12 +88,7 @@ where
     let runs = observe_sets(problem.forward(), sets, points, None)?;
     Ok(runs
         .into_iter()
-        .map(|replicates| {
-            let count = replicates.len() as f64;
-            (0..points.len())
-                .map(|i| replicates.iter().map(|row| row[i]).sum::<f64>() / count)
-                .collect()
-        })
+        .map(|replicates| replicate_mean(replicates.iter().map(Vec::as_slice), points.len()))
         .collect())
 }
 
@@ -102,14 +97,13 @@ where
 /// observation of its series (its outputs, factor and window) with the
 /// position changed.
 pub fn targets(series: &[ObservedDataPoint], positions: &[f64]) -> Vec<ObservedDataPoint> {
-    let mut templates: Vec<&ObservedDataPoint> = Vec::new();
-    for obs in series {
-        if !templates.iter().any(|t| t.label == obs.label) {
-            templates.push(obs);
-        }
-    }
-    templates
-        .into_iter()
+    SeriesIndex::new(series)
+        .indices()
+        .iter()
+        .map(|members| {
+            let first = members.iter().min().expect("a series has an observation");
+            &series[*first]
+        })
         .flat_map(|template| {
             positions.iter().map(move |&at| ObservedDataPoint {
                 at,
@@ -137,8 +131,5 @@ pub fn ensemble_spread(rows: &[Vec<f64>]) -> Vec<f64> {
 
 /// The mean, with equal weights, of each column of `rows`, `[member][point]`.
 pub fn ensemble_mean(rows: &[&Vec<f64>], points: usize) -> Vec<f64> {
-    let count = rows.len() as f64;
-    (0..points)
-        .map(|i| rows.iter().map(|row| row[i]).sum::<f64>() / count)
-        .collect()
+    replicate_mean(rows.iter().map(|row| row.as_slice()), points)
 }

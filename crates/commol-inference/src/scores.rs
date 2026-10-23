@@ -9,7 +9,7 @@
 //! per series. Which observations to score, for example the ones held out of
 //! a calibration, is the caller's choice.
 
-use commol_calibration::{CalibrationProblem, ObservedDataPoint, weighted_crps};
+use commol_calibration::{CalibrationProblem, ObservedDataPoint, SeriesIndex, weighted_crps};
 use commol_core::SimulationEngine;
 use commol_random::{Generator, stream_seed};
 
@@ -255,19 +255,15 @@ fn log_sum_exp(terms: &[f64]) -> f64 {
 /// Panics when `labels` and `values` differ in length.
 pub fn by_series(labels: &[String], values: &[f64]) -> Vec<(String, f64)> {
     assert_eq!(labels.len(), values.len(), "one label per value");
-    let mut series: Vec<(String, f64, usize)> = Vec::new();
-    for (label, &value) in labels.iter().zip(values) {
-        match series.iter_mut().find(|(name, _, _)| name == label) {
-            Some(entry) => {
-                entry.1 += value;
-                entry.2 += 1;
-            }
-            None => series.push((label.clone(), value, 1)),
-        }
-    }
-    series
-        .into_iter()
-        .map(|(name, sum, count)| (name, sum / count as f64))
+    let index = SeriesIndex::of_labels(labels);
+    index
+        .labels()
+        .iter()
+        .zip(index.indices())
+        .map(|(name, members)| {
+            let sum: f64 = members.iter().map(|&i| values[i]).sum();
+            (name.clone(), sum / members.len() as f64)
+        })
         .collect()
 }
 
