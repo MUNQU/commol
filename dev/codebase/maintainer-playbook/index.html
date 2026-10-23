@@ -3717,11 +3717,15 @@ seed of the analysis (<code>stream_seed</code>).</p>
       file: its name, the model kinds it runs (<code>kinds</code>), whether it is
       stochastic (<code>is_stochastic</code>), its settings (<code>EngineSettings</code>, parsed
       and validated with <code>deny_unknown_fields</code>), the form of its dynamics
-      (<code>dynamics_form</code>) and the meaning of a rate (see
+      (<code>dynamics_form</code>) and the meaning of a rate, which sets the positions it
+      reports at (<code>check_position</code>; see
       <a href="../decisions/engines/#one-list-of-engines">One list of engines</a>).</li>
 <li>[ ] Write the engine in its own crate and implement <code>SimulationEngine</code>
       (for an engine of the aggregate kind, also <code>CompartmentalEngine</code> from
-      <code>commol-model</code>); <code>try_from_model</code> rejects a model of another engine. A
+      <code>commol-model</code>: it gives its compiled model, <code>delegate_to_compiled_model!</code>
+      writes the methods that read it, and <code>record_steps</code> runs an engine that
+      reports only at integer steps); <code>check_position</code> is the rule of
+      <code>EngineType</code>, and <code>try_from_model</code> rejects a model of another engine. A
       stochastic engine draws every random number from one
       <code>commol_random::Generator</code>, implements <code>set_seed</code>, and restores the
       generator in <code>reset</code>, so a run repeats from its seed.</li>

@@ -3666,7 +3666,7 @@ window: <a href="../calibration-observations/">Observations</a> lists them all.<
 <tbody>
 <tr>
 <td><code>"parameter"</code></td>
-<td>A model parameter, usually declared with <code>value=None</code></td>
+<td>A model parameter with a number, or one declared with <code>value=None</code>; not a formula or a series parameter, which the engine computes at each step</td>
 <td>The parameter value</td>
 </tr>
 <tr>
@@ -3690,7 +3690,9 @@ window: <a href="../calibration-observations/">Observations</a> lists them all.<
 values of the model kind, and the kind declares which it accepts
 (<code>model.structure.calibration_value_types()</code>): an aggregate model accepts
 <code>"initial_condition"</code>. A type the kind does not accept raises a <code>ValueError</code>
-that names the kind when you create the <code>Calibrator</code>.</p>
+that names the kind when you create the <code>Calibrator</code>. A <code>"parameter"</code> that
+the model does not have, or that a formula or a series sets, raises a
+<code>ValueError</code> with the engine's message at the same time.</p>
 <h2 id="losses">Losses<a class="headerlink" href="#losses" title="Permanent link">&para;</a></h2>
 <p>A problem has a loss or observation models, exactly one, and neither has a
 default: what to fit is a modelling choice. A loss measures the residuals;

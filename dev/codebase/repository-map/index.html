@@ -3359,8 +3359,13 @@
 </tr>
 <tr>
 <td><code>crates/commol-core/src/types/engine.rs</code></td>
-<td><code>EngineType</code>, the one list of engines (model types): per entry, the model kinds it runs (<code>kinds</code>, <code>engines_of</code>; <code>ModelKind</code>, with the value types it accepts, <code>ModelValueType</code>), the form of its dynamics (<code>DynamicsForm</code>: its schedule and the left-hand side of its equations), its settings and their validation, and the meaning of a rate. <code>ModelEngine</code>, the engine and settings of a model.</td>
+<td><code>EngineType</code>, the one list of engines (model types): per entry, the model kinds it runs (<code>kinds</code>, <code>engines_of</code>; <code>ModelKind</code>, with the value types it accepts, <code>ModelValueType</code>), the form of its dynamics (<code>DynamicsForm</code>: its schedule and the left-hand side of its equations), its settings and their validation, the meaning of a rate, and the positions it reports at (<code>reports_at_integer_steps</code>, <code>check_position</code>, the one rule every engine and the builder read). <code>ModelEngine</code>, the engine and settings of a model.</td>
 <td>The engines themselves.</td>
+</tr>
+<tr>
+<td><code>crates/commol-core/src/position.rs</code></td>
+<td>When two positions on the axis are one (<code>same_position</code>, <code>POSITION_TOLERANCE</code>), for every crate.</td>
+<td>A tolerance of positions of its own.</td>
 </tr>
 <tr>
 <td><code>crates/commol-core/src/parallelism.rs</code></td>
@@ -3379,7 +3384,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-random/</code></td>
-<td>What every stochastic engine shares and no model: the generator (<code>Generator</code>, <code>Xoshiro256PlusPlus</code> seeded by SplitMix64), <code>replicate_seed</code>, the samplers (<code>sample</code>: exponential, Poisson, binomial, multinomial), <code>SumTree</code>, the rates of a set of events, and <code>latin_hypercube</code> on the unit cube.</td>
+<td>What every stochastic engine shares and no model: the generator (<code>Generator</code>, <code>Xoshiro256PlusPlus</code> seeded by SplitMix64), <code>replicate_seed</code>, the samplers (<code>sample</code>: exponential, Poisson, binomial, multinomial), <code>SumTree</code>, the rates of a set of events, which the stochastic engine of the test kind uses (<code>StochasticEvents</code> scans its propensities), and <code>latin_hypercube</code> on the unit cube.</td>
 <td>Anything of a model or an engine.</td>
 </tr>
 <tr>
@@ -3399,7 +3404,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/engine.rs</code></td>
-<td><code>CompartmentalEngine</code>: what a compartmental engine gives besides <code>SimulationEngine</code> (<code>compartments</code>, <code>output_labels</code>, <code>initial_state</code>, <code>total</code>, <code>set_initial_condition</code>).</td>
+<td><code>CompartmentalEngine</code>: what a compartmental engine gives besides <code>SimulationEngine</code>: its compiled model (<code>model</code>, <code>model_mut</code>), and from it by default <code>compartments</code>, <code>output_labels</code>, <code>initial_state</code> and <code>total</code>; <code>set_initial_condition</code>. What the four engines share: <code>delegate_to_compiled_model!</code> (the methods of <code>SimulationEngine</code> that read the compiled model), <code>IntegerStepper</code> and <code>record_steps</code> (the run of an engine that reports only at integer steps), <code>rounded</code> (the numbers of a message).</td>
 <td>Code for one engine.</td>
 </tr>
 <tr>
@@ -3424,7 +3429,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/system.rs</code></td>
-<td>The flows every engine reads: <code>flow_rates</code> (the value of each flow), <code>transition_rates</code> (its rate), <code>flow_changes</code> (the change of one event of each flow), the right-hand side <code>derivatives</code> built on them; impulses (<code>apply_impulses</code>, <code>impulse_rates</code>, <code>impulse_changes</code>, <code>impulse_positions</code>); the positions where a rate can jump (<code>breakpoints</code>, <code>reads_time</code>); the accessors the engines use.</td>
+<td>The flows every engine reads: <code>flow_rates</code> (the value of each flow), <code>transition_rates</code> (its rate), <code>flow_changes</code> (the change of one event of each flow), the right-hand side <code>derivatives</code> built on them; impulses (<code>apply_impulses</code>, <code>impulse_rates</code>, <code>impulse_changes</code>, <code>impulse_positions</code>); the positions where a rate can jump (<code>breakpoints</code>, <code>reads_time</code>); the parameters a caller sets (<code>set_parameter</code>, <code>check_parameter</code>: a constant or a parameter to calibrate); the accessors the engines use.</td>
 <td>Stepping along the axis.</td>
 </tr>
 <tr>
@@ -3434,7 +3439,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-difference/src/simulation.rs</code></td>
-<td><code>DifferenceEquations</code>: the discrete step (<code>state += derivatives</code>), impulses at integer steps, the positions it accepts (integers), and its <code>SimulationEngine</code> and <code>CompartmentalEngine</code> implementations.</td>
+<td><code>DifferenceEquations</code>: the discrete step (<code>state += derivatives</code>), impulses at integer steps, and its <code>IntegerStepper</code>, <code>SimulationEngine</code> and <code>CompartmentalEngine</code> implementations.</td>
 <td>Model compilation.</td>
 </tr>
 <tr>
@@ -3454,7 +3459,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-stochastic/src/steps.rs</code></td>
-<td><code>StochasticSteps</code>: the chain binomial (one multinomial per source, capped Poisson draws for absolute flows) and the check of its per-step probabilities.</td>
+<td><code>StochasticSteps</code>: the chain binomial (one multinomial per source, capped Poisson draws for absolute flows), the check of its per-step probabilities, and its <code>IntegerStepper</code>, <code>SimulationEngine</code> and <code>CompartmentalEngine</code> implementations.</td>
 <td>Samplers; flows.</td>
 </tr>
 <tr>
@@ -3509,8 +3514,8 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/values.rs</code></td>
-<td>How calibrated values reach any engine: parameters by id, values of the model kind through the engine (<code>ValueWriter</code>, <code>check_model_values</code>, <code>configured_engine</code>).</td>
-<td>How a kind resolves its values.</td>
+<td>How calibrated values reach any engine: parameters by id, which the engine checks when a problem is built (<code>set_parameter</code> on a copy), values of the model kind through the engine (<code>ValueWriter</code>, <code>check_model_values</code>, <code>configured_engine</code>).</td>
+<td>How a kind resolves its values; a check of parameter ids in Python.</td>
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/optimization.rs</code></td>
@@ -4033,8 +4038,8 @@
 </tr>
 <tr>
 <td>Change which positions a model type accepts, or how results, windows and reports read them</td>
-<td><code>crates/commol-core/src/simulation_engine.rs</code> (<code>check_position</code>); <code>py-commol/commol/api/results.py</code></td>
-<td>each engine's <code>check_position</code>, <code>crates/commol-calibration/src/calibration_problem.rs</code> (<code>check_positions</code>), <code>api/windows.py</code>, <code>api/reporting.py</code>, <code>api/plotting/</code>, <code>api/inference/predictive.py</code></td>
+<td><code>crates/commol-core/src/types/engine.rs</code> (<code>EngineType::check_position</code>); <code>py-commol/commol/api/results.py</code></td>
+<td><code>crates/commol-core/src/position.rs</code> (<code>same_position</code>), each engine's <code>check_position</code>, <code>crates/commol-calibration/src/calibration_problem.rs</code> (<code>check_positions</code>), <code>api/windows.py</code>, <code>api/reporting.py</code>, <code>api/plotting/</code>, <code>api/inference/predictive.py</code></td>
 </tr>
 <tr>
 <td>Change axis units, the calendar of an axis or axis patterns</td>

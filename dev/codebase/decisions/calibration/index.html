@@ -2580,6 +2580,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-engine-says-which-parameters-a-caller-sets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The engine says which parameters a caller sets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#one-observation-operator" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3289,6 +3300,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-engine-says-which-parameters-a-caller-sets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The engine says which parameters a caller sets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#one-observation-operator" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3426,6 +3448,19 @@ when it differs (<code>Simulation._sync_engine</code>), and <code>run</code> res
 <code>Calibrator</code> takes <code>simulation.engine</code> when it is created, so the check is in
 the property, not only in <code>run</code>.</p>
 <p><strong>Guard:</strong> <code>tests/simulation/test_runs.py</code>.</p>
+<h2 id="the-engine-says-which-parameters-a-caller-sets">The engine says which parameters a caller sets<a class="headerlink" href="#the-engine-says-which-parameters-a-caller-sets" title="Permanent link">&para;</a></h2>
+<p><code>SimulationEngine::set_parameter</code> returns an error for an id the engine does
+not let a caller set. An engine of the aggregate kind sets a constant or a
+parameter to calibrate, and rejects any other id
+(<code>CompiledModel::set_parameter</code> in <code>crates/commol-model/src/system.rs</code>): one
+the model does not have, or a formula or a series parameter, which the model
+writes again at each evaluation, so a value set on it is lost. A calibration
+or any method on <code>ForwardModel</code> sets each parameter on a copy of the engine
+when it is built (<code>ValueWriter::new</code> in <code>crates/commol-calibration/src/values.rs</code>),
+so the engine's message reaches the user before any run, and Python checks no
+parameter id (<code>check_values</code> in <code>api/calibrator.py</code>).</p>
+<p><strong>Guards:</strong> <code>crates/commol-model/tests/parameters.rs</code>,
+<code>tests/calibration/test_problem.py::TestProblemAgainstTheModel</code>.</p>
 <h2 id="one-observation-operator">One observation operator<a class="headerlink" href="#one-observation-operator" title="Permanent link">&para;</a></h2>
 <p><code>ObservationOperator</code> (<code>crates/commol-calibration/src/observation.rs</code>) is the
 only code that turns a run into observed quantities: the row of each
