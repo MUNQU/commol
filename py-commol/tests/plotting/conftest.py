@@ -1,20 +1,16 @@
-"""Figures draw on a non-interactive backend, and every figure is closed.
-
-The results of the sensitivity methods and of a profile likelihood that the
-figures draw are built here, so each test file can draw them.
-"""
+"""The results that the figures draw: a run, the results of the sensitivity
+methods and of a profile likelihood, built here so each test file can draw
+them, and the global style of matplotlib restored after a test."""
 
 from collections.abc import Iterator
 
 import matplotlib
 import pytest
 
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt  # noqa: E402
-
-from commol import (  # noqa: E402
+from commol import (
     CalibrationResult,
+    Simulation,
+    SimulationResults,
     MorrisResult,
     ParameterSample,
     PRCCResult,
@@ -29,11 +25,10 @@ from commol import (  # noqa: E402
 INPUTS = ["k1", "k2", "k3"]
 
 
-@pytest.fixture(autouse=True)
-def close_figures() -> Iterator[None]:
-    """Close the figures a test opens."""
-    yield
-    plt.close("all")
+@pytest.fixture
+def run(abc_simulation: Simulation) -> SimulationResults:
+    """100 steps of the default model of ``abc_builder``."""
+    return abc_simulation.run(100)
 
 
 @pytest.fixture

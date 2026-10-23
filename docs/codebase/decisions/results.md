@@ -40,7 +40,7 @@ commol_calibration::statistics`), so there is one copy.
 `crates/commol-calibration/tests/test_replicate_summary.rs`,
 `tests/uncertainty/test_intervals.py`,
 `tests/stochastic/test_calibration.py::test_a_quantile_summary_agrees_with_the_quantiles_of_the_replicates`,
-and `tests/suite/test_rules.py::test_commol_has_one_quantile`, which fails
+and `tests/suite/test_rust_rules.py::test_commol_has_one_quantile`, which fails
 when a Rust function named for a quantile sorts values outside
 `statistics.rs`. The conformal quantile (`conformal/quantile.rs`) is the one
 exception: it is a rank that gives an interval its coverage, not an estimate
@@ -225,10 +225,10 @@ structure: `ModelStructure.outputs_by_source` and `series_label`.
 **Guards:** `tests/plotting/test_figures.py` (`test_a_figure_leaves_the_global_style`,
 `test_import_commol_loads_no_plotting_library`,
 `test_each_accessor_passes_on_the_arguments_of_its_function`,
-`test_a_figure_draws_on_given_axes`, `test_compared_runs_share_the_panels`,
-`test_compared_runs_need_the_same_outputs`,
-`test_compared_results_draw_a_panel_per_observed_series`,
-`test_each_observed_point_is_read_through_its_own_window`,
+`test_a_figure_draws_on_given_axes`), `tests/plotting/test_compared.py`
+(`test_compared_runs_share_the_panels`, `test_compared_runs_need_the_same_outputs`,
+`test_compared_results_draw_a_panel_per_observed_series`),
+`tests/plotting/test_observed_series.py` (`test_each_observed_point_is_read_through_its_own_window`,
 `test_a_windowed_value_is_drawn_as_a_step_over_its_window`) and
 `tests/plotting/test_panels.py::test_the_panels_of_a_run_need_no_matplotlib`.
 

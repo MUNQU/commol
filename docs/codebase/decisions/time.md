@@ -78,7 +78,7 @@ matplotlib places, so a long run does not get one label per position.
 an application keeps no origin of its own.
 
 **Guards:** `tests/units/test_calendar_axis.py`,
-`tests/plotting/test_figures.py::test_an_axis_with_origin_labels_ticks_with_dates`.
+`tests/plotting/test_run_figures.py::test_an_axis_with_origin_labels_ticks_with_dates`.
 
 ## One step unit in the unit check
 
@@ -108,9 +108,9 @@ model would read a weekly rate as a daily one.
 
 **Guards:** `tests/units/test_model_units.py::TestConsistentModels`
 (`test_a_proportional_rate_is_checked_as_its_flow`),
-`tests/units/test_model_units.py::TestStepUnit`,
-`tests/units/test_model_units.py::TestAxisUnit`,
-`tests/units/test_model_units.py::TestPositionOnTheAxis`.
+`tests/units/test_time_units.py::TestStepUnit`,
+`tests/units/test_time_units.py::TestAxisUnit`,
+`tests/units/test_time_units.py::TestPositionOnTheAxis`.
 
 ## Time inside a step
 
@@ -192,7 +192,7 @@ end of that grid.
 **Guards:** `tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss` (the loss at
 the generating parameters is zero),
 `tests/reporting/test_simulation_report.py::test_observed_report_places_each_observation_by_window_index`
-`tests/plotting/test_figures.py::TestPredictiveSeries::test_a_windowed_band_of_one_draw_is_its_windowed_run`
+`tests/plotting/test_band_figures.py::TestPredictiveSeries::test_a_windowed_band_of_one_draw_is_its_windowed_run`
 and
 `tests/plotting/test_figures.py::test_each_observed_point_is_read_through_its_own_window_and_position`.
 

@@ -21,6 +21,7 @@ from tests.support import (
     assert_accepted,
     bounded,
     build,
+    mixed_units_builder,
     observed,
     abc_builder,
 )
@@ -83,7 +84,7 @@ class TestIds:
             Calibrator(Simulation(build(abc_builder())), problem)
 
 
-def _sir(b_amount: float | None, k1: float | None = 0.3) -> Model:
+def _abc(b_amount: float | None, k1: float | None = 0.3) -> Model:
     return build(
         abc_builder(
             parameters={"k1": k1, "k2": 0.1},
@@ -95,12 +96,12 @@ def _sir(b_amount: float | None, k1: float | None = 0.3) -> Model:
 @pytest.fixture
 def b_every_5_steps() -> list[ObservedDataPoint]:
     """B of ``abc_builder`` with 20 in B at the start, at steps 0, 5, …, 45."""
-    return observed(Simulation(_sir(20)).run(50), "B", range(0, 50, 5))
+    return observed(Simulation(_abc(20)).run(50), "B", range(0, 50, 5))
 
 
 class TestFitting:
     def test_an_initial_amount_is_recovered(self, b_every_5_steps) -> None:
-        model = _sir(None)
+        model = _abc(None)
         problem = CalibrationProblem(
             observed_data=b_every_5_steps,
             parameters=[
@@ -143,26 +144,10 @@ class TestFitting:
             seed=SEED,
         )
 
-        result = Calibrator(Simulation(_sir(None, k1=None)), problem).run()
+        result = Calibrator(Simulation(_abc(None, k1=None)), problem).run()
 
         assert result.best_parameters["k1"] == pytest.approx(0.3, abs=0.001)
         assert result.best_parameters["B"] == pytest.approx(20, rel=0.05)
-
-
-def _mixed_units() -> Model:
-    """A count in A and B, and a concentration in C."""
-    return (
-        ModelBuilder(name="Mixed units")
-        .add_bin(id="A", name="State A", unit="item")
-        .add_bin(id="B", name="State B", unit="item")
-        .add_bin(id="C", name="State C", unit="mg/l")
-        .add_parameter(id="k", value=0.1)
-        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
-        .build(
-            Aggregate(bin_amounts={"A": 990, "B": 10, "C": 1e5}),
-            engine="DifferenceEquations",
-        )
-    )
 
 
 def _remainder_problem(parameter_id: str) -> CalibrationProblem:
@@ -178,7 +163,9 @@ def _remainder_problem(parameter_id: str) -> CalibrationProblem:
 class TestRemainderUnits:
     def test_a_remainder_of_another_unit_is_rejected(self) -> None:
         with pytest.raises(ValueError) as error:
-            Calibrator(Simulation(_mixed_units()), _remainder_problem("C"))
+            Calibrator(
+                Simulation(build(mixed_units_builder())), _remainder_problem("C")
+            )
 
         assert str(error.value) == (
             "The initial-condition remainder 'A' is in 'item', but the "
@@ -188,7 +175,11 @@ class TestRemainderUnits:
         )
 
     def test_a_remainder_of_the_same_unit_is_accepted(self) -> None:
-        assert_accepted(Calibrator, Simulation(_mixed_units()), _remainder_problem("B"))
+        assert_accepted(
+            Calibrator,
+            Simulation(build(mixed_units_builder())),
+            _remainder_problem("B"),
+        )
 
 
 def _moving_split() -> Model:

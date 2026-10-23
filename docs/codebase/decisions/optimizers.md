@@ -52,7 +52,7 @@ also returns the error of the first failing point.
 `a_swarm_on_a_subproblem_gives_one_fit_whatever_the_threads`,
 `a_swarm_on_a_held_prediction_follows_the_levels`);
 `objective::tests::a_score_holds_no_borrow_of_the_workspace`;
-`tests/calibration/test_parallelism.py::test_a_seed_gives_one_result_whatever_the_threads_and_the_level`.
+`tests/parallelism/test_threads.py::test_a_seed_gives_one_result_whatever_the_threads_and_the_level`.
 
 ## A swarm stops by a rule the modeller sets
 

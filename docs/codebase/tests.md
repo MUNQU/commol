@@ -25,28 +25,32 @@ kind that is not aggregate through every generic layer.
 | `initial_conditions/` | Bin, stratification and compartment fractions; the initial state | [Building Models](../guide/building-models.md#the-structure-aggregate) |
 | `simulation/` | Runs, `run_at`, results and their positions, differential models, outputs, the window grid and windowed totals, `AxisUnits` | [Running Simulations](../guide/simulations.md) |
 | `stochastic/` | The stochastic engines of an aggregate model through the layers: their means against the deterministic engines, whole units, calibration with replicates (the closed forms are in `crates/commol-stochastic/tests/oracles.rs`) | [Stochastic Simulation](../guide/stochastic.md) |
-| `units/` | Unit checks; the dates of an axis with an origin (`test_calendar_axis.py`) | [Units](../guide/units-and-equations.md) |
+| `units/` | Unit checks of an equation (`test_unit_checks.py`) and of a model (`test_model_units.py`); the step unit, the unit of the axis and a position in a rate (`test_time_units.py`); the dates of an axis with an origin (`test_calendar_axis.py`) | [Units](../guide/units-and-equations.md) |
 | `description/` | `Model.describe`, its sections and blocks, the renderers and their snapshots (`description/snapshots/`), the equations of the dynamics (`equation_forms` in `support/description.py`) | [Describing a Model](../guide/describing-models.md) |
-| `calibration/` | One file per calibration page: `test_problem.py`, `test_optimizers.py`, `test_starts.py`, `test_constraints.py`, `test_observations.py`, `test_initial_conditions.py`, `test_write_back.py` | [Model Calibration](../guide/calibration.md) and its sub-pages |
+| `calibration/` | One file per calibration page: `test_problem.py`, `test_optimizers.py`, `test_starts.py`, `test_constraints.py`, `test_observations.py`, `test_initial_conditions.py`, `test_write_back.py`; and a run below zero, which the calibration avoids (`test_infeasible_runs.py`) | [Model Calibration](../guide/calibration.md) and its sub-pages |
 | `uncertainty/` | The parameter sample, the one quantile, the predictive, the scores, the entry points `Calibrator.uncertainty` and `SensitivityAnalysis.run`, and the coverage harness (`test_coverage.py`, marker `coverage_study`) | [Uncertainty](../guide/uncertainty/index.md) |
+| `parallelism/` | The setting of the threads and its levels, the threads that each parallel method runs on, a swarm in parallel, and one result for one seed whatever the threads and the level (`test_threads.py`). A new parallel method adds a case to `METHODS` | [Threads and Parallelism](../guide/parallelism.md) |
 | `reporting/` | Reports | [Reports](../guide/reports.md) |
-| `plotting/` | The figures of results (`plot` of `SimulationResults`, `SimulationReplicates`, `Predictive` and of the results of sensitivity methods and profiles), their panels (`panels.py`) and their style | [Running Simulations](../guide/simulations.md#plotting) |
+| `plotting/` | The figures of results (`plot` of `SimulationResults`, `SimulationReplicates`, `Predictive` and of the results of sensitivity methods and profiles), their panels (`panels.py`) and their style: what every figure does (`test_figures.py`), the figures of a run (`test_run_figures.py`), the bands of a predictive and of replicates (`test_band_figures.py`), the panels of observed series (`test_observed_series.py`) and `plot_compared` (`test_compared.py`) | [Running Simulations](../guide/simulations.md#plotting) |
 | `docs/` | The documentation examples and the API coverage (marker `docs`) | — |
 | `reference_models/` | Published models against their stated results, one module per model family | — (across features) |
 | `model_kinds/` | The test model kind (`support/kinds.py`) through a simulation, a calibration, a report and a plot; the check that an engine runs its kind; the variants of a structure (`UnstratifiedVariant`). It needs the extension built with `--features test-kind`. | — (across features; [Design decisions](decisions/model-kinds.md#one-interface-for-every-model-kind)) |
-| `suite/` | The rules of this page that a program can check (`test_rules.py`), the plugin that records how long each test takes (`durations.py`), the checks of the package as a whole: its version (`test_version.py`) and its logging, in a fresh interpreter (`test_logging.py`), the checks of CI: its rights, its pinned tools, the workspace of the crates and the commands the documentation shows (`test_workflows.py`), and the checks of the scripts of `.github/scripts/`: the next issues and what can run in parallel (`test_planning.py`), the precedence levels (`test_levels.py`), the links of the releases (`test_releases.py`), the REST calls (`test_github.py`), the affected issues (`test_affected.py`), the release notes (`test_release_notes.py`) and the Rust lines no test runs (`test_rust_uncovered.py`). No test calls GitHub: each one patches the REST calls (`support/planning.py`) | — |
-| `support/` | No tests: the code the tests share | — |
+| `suite/` | The rules of this page that a program can check, for the Python tests (`test_rules.py`) and for the Rust tests (`test_rust_rules.py`), the plugin that records how long each test takes (`durations.py`), the checks of the package as a whole: its version (`test_version.py`) and its logging, in a fresh interpreter (`test_logging.py`), the checks of CI: its rights, its pinned tools, the workspace of the crates and the commands the documentation shows (`test_workflows.py`), and the checks of the scripts of `.github/scripts/`: the next issues and what can run in parallel (`test_planning.py`), the precedence levels (`test_levels.py`), the links of the releases (`test_releases.py`), the REST calls (`test_github.py`), the affected issues (`test_affected.py`), the release notes (`test_release_notes.py`) and the Rust lines no test runs (`test_rust_uncovered.py`). No test calls GitHub: each one patches the REST calls (`support/planning.py`) | — |
+| `support/` | No tests: the code the tests share. `support/plotted.py` reads figures and imports matplotlib, so `tests/support` does not import it: a module of `plotting/` imports it by name | — |
 
-Keep a test module under about 600 lines. When it grows past that, split it by
-topic inside its package.
+A module of `tests/` has at most 600 lines. When it grows past that, split it
+by topic inside its package. `tests/suite/test_rules.py` checks the limit, that
+each package has a row in this table, and that the row of `suite/` names each
+of its modules.
 
 ## Models: use the factories
 
 - Build models with the factories of `tests/support/models.py`:
   `abc_builder` (A → B → C), `abcd_builder` (A → B → C → D) and
   `a_to_b_builder`, and the special models
-  `override_builder`, `shared_category_builder` and
-  `conditional_pathway_builder`. A factory returns a `FactoryBuilder`: a
+  `override_builder`, `shared_category_builder`,
+  `conditional_pathway_builder` and `mixed_units_builder` (A and B in `item`,
+  C in `mg/l`). A factory returns a `FactoryBuilder`: a
   `ModelBuilder` of the process and the `Aggregate` that lays it out
   (`builder.structure`, which `set_structure` replaces). A keyword overrides
   one part of the default model, so a test names only what it changes. `build` builds for difference
@@ -60,11 +64,26 @@ topic inside its package.
   parameters `k1`, `k2`, categories `g1`, `t1`. Only `tests/reference_models/`
   and the support code that only it uses (`support/oracles.py`,
   `support/flows.py`) keep the names of their published source.
-- Fixtures: `abc_model` and `abc_simulation` (`tests/conftest.py`); `truth`
-  and `truth_run` (`tests/calibration/conftest.py`). A fixture is
-  function-scoped unless its cost is measured; a wider scope never holds an
-  object a test can change. A class-scoped fixture is never an instance
-  method (removed in pytest 10).
+- Fixtures that more than one module uses:
+  - `tests/conftest.py`: `abc_model` and `abc_simulation`, the default model
+    of `abc_builder` and its simulation; `close_figures`, which runs for every
+    test and closes the figures it drew, and imports no plotting library when
+    it drew none.
+  - `tests/calibration/conftest.py`: `truth`, `abc_builder` at the values to
+    recover, and `truth_run`, 100 steps of it.
+  - `tests/uncertainty/conftest.py`: `calibrator`, which fits `k1` and `k2` of
+    `abc_builder` to `truth_run_50`, 50 steps at the values to recover;
+    `simulation`, the default model of `abc_builder`, for the sensitivity
+    methods.
+  - `tests/plotting/conftest.py`: `run`, 100 steps of the default model of
+    `abc_builder`; `prcc_result`, `morris_result`, `sobol_result` and
+    `profile_result`, the results that the figures draw.
+
+  A fixture name has one meaning in the whole suite: no two conftest files
+  define a fixture of one name, and `tests/suite/test_rules.py` checks it. A
+  fixture is function-scoped unless its cost is measured; a wider scope never
+  holds an object a test can change. A class-scoped fixture is never an
+  instance method (removed in pytest 10).
 
 ## Every test checks a result
 
@@ -91,10 +110,10 @@ A test checks the behavior of commol. It does not check:
 - an attribute read back as the test set it;
 - the absence of an API that was removed: that is history, not behavior.
 
-`tests/suite/test_rules.py` checks the part of this that a program can read:
-every Python test has an `assert`, a `pytest.raises`, `pytest.warns` or
-`pytest.fail`, a call of `np.testing.assert_*`, or a call of a helper of
-`tests/` that has one; every Rust test has an `assert*!`, `panic!` or
+`tests/suite/test_rules.py` and `tests/suite/test_rust_rules.py` check the part
+of this that a program can read: every Python test has an `assert`, a
+`pytest.raises`, `pytest.warns` or `pytest.fail`, a call of
+`np.testing.assert_*`, or a call of a helper of `tests/` that has one; every Rust test has an `assert*!`, `panic!` or
 `unreachable!`, calls a function of its crate that has one, is
 `#[should_panic]`, or returns a `Result`. Review checks the rest.
 
@@ -131,7 +150,7 @@ the exact formula).
   `abs=1e-5` for Nelder-Mead on noise-free data.
 - `np.testing.assert_allclose` skips masked values. Read the points of a
   matplotlib collection as floats (`np.asarray(offsets, dtype=float)`, as
-  `_scatter` in `tests/plotting/test_figures.py` does), so a point at `None`
+  `scatter` in `tests/support/plotted.py` does), so a point at `None`
   is NaN and fails.
 
 ## Reference models
@@ -177,8 +196,8 @@ and cite the papers.
   such as the benchmarks of `crates/commol-differential/src/tests.rs`. A
   benchmark also asserts that the methods it times give the same result.
 
-`tests/suite/test_rules.py` checks the `xfail` markers and the reasons of
-`#[ignore]`.
+`tests/suite/test_rules.py` checks the `xfail` markers, and
+`tests/suite/test_rust_rules.py` the reasons of `#[ignore]`.
 
 ## Time budget
 

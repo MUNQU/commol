@@ -28,7 +28,7 @@ and chaos refuse a sample; PRCC reads its weights.
 
 **Guards:** `crates/commol-inference/tests/test_global_sensitivity.rs`,
 `crates/commol-inference/tests/test_predictive.rs::a_draw_keeps_its_runs_when_the_replicates_change`,
-`tests/uncertainty/test_sensitivity.py`,
+`tests/uncertainty/test_sensitivity.py`, `tests/uncertainty/test_propagation.py`,
 `tests/simulation/test_quantities.py::test_the_replicates_of_a_draw_are_those_of_its_seed`.
 
 ## A quantity is a series and a reduction
@@ -75,7 +75,7 @@ with its quantity; `quantity_schedule` gives the positions to run at.
 (`a_done_run_is_read_at_the_schedule_within_the_tolerance_of_the_axis`,
 `a_done_run_lists_every_position_it_lacks_with_its_quantity`),
 `tests/simulation/test_quantities.py`,
-`tests/uncertainty/test_sensitivity.py::TestPropagation::test_propagation_values_have_one_row_per_replicate_of_each_draw`.
+`tests/uncertainty/test_propagation.py::TestPropagation::test_propagation_values_have_one_row_per_replicate_of_each_draw`.
 
 ## The modeller truncates a polynomial chaos basis
 

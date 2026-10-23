@@ -18,6 +18,7 @@ from .models import (
     build_ode,
     build_stochastic,
     conditional_pathway_builder,
+    mixed_units_builder,
     override_builder,
     abcd_builder,
     shared_category_builder,
@@ -33,6 +34,7 @@ from .oracles import (
     total_at,
 )
 from .problems import (
+    abc_rates,
     abc_swarm_calibrator,
     bounded,
     flow_calibrator,
@@ -64,6 +66,7 @@ __all__ = [
     "ODE_REL",
     "ABC_START",
     "a_to_b_builder",
+    "abc_rates",
     "abc_swarm_calibrator",
     "assert_accepted",
     "assert_close",
@@ -75,6 +78,7 @@ __all__ = [
     "build",
     "build_ode",
     "conditional_pathway_builder",
+    "mixed_units_builder",
     "assert_on_threads_of_setting",
     "decay_swarm_calibrator",
     "threads_of_runs",

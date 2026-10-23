@@ -6,6 +6,7 @@ from commol import (
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
+    InputSpace,
     NelderMeadConfig,
     NormalObservations,
     ObservationModel,
@@ -60,6 +61,12 @@ def bounded(
         max_bound=high,
         initial_guess=initial_guess,
     )
+
+
+def abc_rates() -> InputSpace:
+    """The inputs ``k1`` of ``abc_builder``, uniform on ``[0.1, 0.5]``, and
+    ``k2``, uniform on ``[0, 1]``."""
+    return InputSpace.uniform_on_bounds([bounded("k1", 0.1, 0.5), bounded("k2")])
 
 
 def observed(
