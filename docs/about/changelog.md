@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- In the `StochasticEvents` engine, a parameter or a seed changed between
+  two runs acts from the position where the first run stopped. The pending
+  wait is drawn again from there, and a pending leap keeps only its events up
+  to there, by binomial thinning. Before, the new rate acted back from the
+  last event, and copies of one state with new seeds shared their next event.
+  In Python this changes only `simulation.engine.set_seed` between two calls
+  of `simulation.engine.step()`; `Simulation.run`, replicates and calibration
+  reset the engine after the seed, so their results do not change.
+
 ## [0.10.0] - 2026-10-23
 
 This release makes equivalent things the same across commol, after an audit

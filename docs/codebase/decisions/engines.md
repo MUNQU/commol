@@ -151,6 +151,7 @@ event only when the event happens.
 | Samplers | Exponential, Poisson, binomial and multinomial written in `commol-random/src/sample.rs`, not taken from `rand_distr`, whose values may change in a minor version. A test holds the first values of each for a fixed seed. |
 | Replicates | Replicate `i` of seed `s` takes `replicate_seed(s, i)`, the SplitMix64 of `s + i`. `run_replicates` runs them in parallel (`rayon`); a deterministic engine has no replicates. |
 | Draws of a sample | One tree of seeds: draw `j` takes `replicate_seed(stream_seed(seed, DRAWS_STREAM), j)` (`draw_seeds` in `crates/commol-inference/src/predictive.rs`), and its replicate `i` takes `replicate_seed` of that seed and `i`, the rule of `Simulation.replicates`. `Predictive` and `Propagation` give the seed of each draw (`draw_seeds`), and the runs of a draw depend on neither the number of replicates nor the number of draws. |
+| A change between runs | `set_parameter` and `set_seed` act from the current position, never before it. `StochasticEvents` first settles there (`settle` in `events.rs`): it draws the pending exponential wait again from the position (the wait has no memory), and cuts a pending leap there by binomial thinning (of `N ~ Poisson(λτ)` events, the part in a fraction `f` of the leap is `Binomial(N, f)`), applies that part and drops the rest. Keeping the pending wait would let a new rate act back from the last change of the state, and copies of one state with new seeds would share their next event. `StochasticSteps` holds nothing pending. |
 | Calibration | Common random numbers: the same replicate seeds at every evaluation, so the loss is a deterministic function of the parameters (`CalibrationProblem::with_replicates`). The user chooses the summary (`ReplicateSummary`); `LossConfig` computes it. |
 
 Reproducibility has three levels: the same machine and commol version give
@@ -175,7 +176,7 @@ sampler in `tests/reference_values.txt`), `py-commol/src/engine.rs`
 (`a_stochastic_engine_repeats_a_run_from_its_seed`,
 `an_aggregate_stochastic_engine_repeats_a_run_from_its_seed`,
 `a_deterministic_engine_ignores_the_seed`),
-`crates/commol-stochastic/tests/oracles.rs::a_run_depends_on_its_seed_and_not_on_where_it_reports`,
+`crates/commol-stochastic/tests/oracles.rs::a_run_depends_on_its_seed_and_not_on_where_it_reports`, `crates/commol-stochastic/tests/test_state.rs`,
 `crates/commol-calibration/src/types.rs` (`replicate_tests`),
 `tests/model_kinds/test_stochastic.py`.
 

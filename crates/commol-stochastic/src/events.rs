@@ -78,14 +78,19 @@ struct Leap {
 /// ([`CompiledModel::breakpoints`]), where the impulses act; no wait and no
 /// leap crosses one. A run does not depend on the positions it reports at:
 /// the output at a position is the state after the last event before it.
+/// A parameter or a seed changed between two runs acts from the position
+/// where the first run stopped: the pending wait is drawn again from there,
+/// and a pending leap keeps, by binomial thinning, only its events up to
+/// there.
 #[derive(Clone)]
 pub struct StochasticEvents {
     units: Units,
     settings: StochasticEventsSettings,
     /// Where the engine reports: the end of the last run.
     position: f64,
-    /// The last change of the state: an event, a leap or a breakpoint. Waits
-    /// are measured from it.
+    /// The last change of the state: an event, a leap, a breakpoint, or the
+    /// position where a parameter or the seed changed. Waits are measured
+    /// from it.
     clock: f64,
     /// The integrated propensity left before the next event, an exponential
     /// draw; `None` until the engine draws it.
@@ -214,6 +219,29 @@ impl StochasticEvents {
                 next += 1;
             }
         }
+    }
+
+    /// Move the clock to the position, so that what comes after the position
+    /// is drawn again with the parameters and the seed of the next run.
+    ///
+    /// The exponential wait pending from the clock has no memory: no event
+    /// came before the position, so the wait from the position is a new draw.
+    /// A pending leap holds `N ~ Poisson(λτ)` events of each flow; the events
+    /// in the fraction `f` of it up to the position are `Binomial(N, f)`, a
+    /// `Poisson(λτf)`, which the state takes at the position, and the rest of
+    /// the leap is dropped. The position is not a breakpoint when the clock
+    /// is behind it, so no impulse acts there.
+    fn settle(&mut self) {
+        if let Some(leap) = self.leap.take() {
+            let fraction = (self.position - self.clock) / (leap.at - self.clock);
+            for (flow, &count) in leap.counts.iter().enumerate() {
+                let kept = sample::binomial(&mut self.units.generator, count as u64, fraction);
+                self.fire(flow, kept as f64);
+            }
+        }
+        self.clock = self.position;
+        self.remaining = None;
+        self.no_leap = false;
     }
 
     /// The next change of the state before `limit`, the next breakpoint: its
@@ -670,11 +698,17 @@ impl commol_core::SimulationEngine for StochasticEvents {
         self.no_leap = false;
     }
 
+    /// Settle at the position (`StochasticEvents::settle`), then seed the
+    /// generator, which draws everything after the position.
     fn set_seed(&mut self, seed: u64) {
+        self.settle();
         self.units.set_seed(seed);
     }
 
+    /// Settle at the position (`StochasticEvents::settle`), then change the
+    /// parameter, which acts from the position.
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
+        self.settle();
         self.units.model.set_parameter(parameter_id, value);
         Ok(())
     }
