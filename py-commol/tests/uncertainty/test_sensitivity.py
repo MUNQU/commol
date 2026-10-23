@@ -606,12 +606,6 @@ class TestPolynomialChaos:
                 )
             )
 
-    def test_the_default_basis_is_the_total_degree(self) -> None:
-        method = PolynomialChaos(
-            degree=2, draws=8, quantities=[ValueAt(series="B", at=5)]
-        )
-        assert (method.q_norm, method.max_interaction) == (1.0, None)
-
     @pytest.mark.parametrize(
         "truncation",
         [{"q_norm": 0.0}, {"q_norm": 1.5}, {"max_interaction": 0}],

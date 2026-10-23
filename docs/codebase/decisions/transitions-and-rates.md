@@ -40,8 +40,11 @@ transition starts from.
 ## Formula parameters are evaluated every step, in order
 
 Parameters with a formula are evaluated again at each step, in the order they
-were declared (`simulation.rs`). A formula can use the value of an earlier
-formula from the same step. Declare parameters in dependency order.
+were declared (`prepare_context` in `crates/commol-model/src/system.rs`). A
+formula can use the value of an earlier formula from the same step. Declare
+parameters in dependency order.
+
+**Guard:** `crates/commol-model/tests/rates.rs::a_formula_reads_an_earlier_formula_of_the_same_step`.
 
 ## Compiled expressions are cached globally
 
@@ -50,3 +53,5 @@ preprocessed formula to one compiled function for the life of the process. The
 same formula always runs the same machine code, so results are reproducible.
 
 **Rule:** do not invalidate or bypass the cache.
+
+**Guard:** `crates/commol-core/src/math_expression/mod.rs::one_formula_compiles_to_one_function`.

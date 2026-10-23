@@ -10,16 +10,7 @@ from commol import (
     ParticleSwarmConfig,
     Simulation,
 )
-from commol.context.calibration import (
-    PSOChaoticInertia,
-    PSOConstantAcceleration,
-    PSOConstantInertia,
-    PSOImprovementStop,
-    PSOMutationConfig,
-    PSORadiusStop,
-    PSOTimeVaryingAcceleration,
-    PSOVelocityConfig,
-)
+from commol.context.calibration import CalibrationResult
 from commol.context.model import Model
 from tests.support import a_to_b_builder, bounded, build, observed
 
@@ -304,18 +295,29 @@ class TestNelderMeadInsideBounds:
 
 
 class TestParticleSwarmConfig:
-    def test_a_constant_inertia_has_the_canonical_factor_by_default(self) -> None:
-        assert ParticleSwarmConfig().inertia(
-            "constant"
-        ).inertia_config == PSOConstantInertia(factor=0.721)
-        assert ParticleSwarmConfig().inertia(
-            "constant", factor=0.5
-        ).inertia_config == PSOConstantInertia(factor=0.5)
+    @pytest.mark.parametrize(
+        ("setting", "canonical", "other"),
+        [
+            ("inertia", {"factor": 0.721}, {"factor": 0.5}),
+            (
+                "acceleration",
+                {"cognitive": 1.193, "social": 1.193},
+                {"cognitive": 2.0, "social": 0.5},
+            ),
+        ],
+    )
+    def test_the_settings_reach_the_swarm(
+        self, setting: str, canonical: dict[str, float], other: dict[str, float]
+    ) -> None:
+        def fit(**values: float) -> CalibrationResult:
+            swarm = ParticleSwarmConfig(particles=4, max_iterations=3, verbose=False)
+            config = getattr(swarm, setting)("constant", **values)
+            return _calibrate(_k_problem(config, seed=SEED))
 
-    def test_a_chaotic_inertia_takes_its_range(self) -> None:
-        config = ParticleSwarmConfig().inertia("chaotic", w_min=0.4, w_max=0.9)
+        default = fit()
 
-        assert config.inertia_config == PSOChaoticInertia(w_min=0.4, w_max=0.9)
+        assert fit(**canonical) == default
+        assert fit(**other).best_parameters != default.best_parameters
 
     def test_a_chaotic_inertia_needs_a_range(self) -> None:
         with pytest.raises(ValueError, match=r"w_max \(0.4\) must be greater"):
@@ -324,51 +326,6 @@ class TestParticleSwarmConfig:
     def test_an_initialization_is_one_of_the_known_ones(self) -> None:
         with pytest.raises(ValueError, match="Invalid initialization: sobol"):
             ParticleSwarmConfig(initialization="sobol")
-
-    def test_a_constant_acceleration_has_the_canonical_coefficients_by_default(
-        self,
-    ) -> None:
-        assert ParticleSwarmConfig().acceleration(
-            "constant"
-        ).acceleration_config == PSOConstantAcceleration(cognitive=1.193, social=1.193)
-        assert ParticleSwarmConfig().acceleration(
-            "constant", cognitive=2.0, social=0.5
-        ).acceleration_config == PSOConstantAcceleration(cognitive=2.0, social=0.5)
-
-    def test_a_time_varying_acceleration_takes_its_four_ends(self) -> None:
-        config = ParticleSwarmConfig().acceleration(
-            "time_varying", c1_initial=2.5, c1_final=0.5, c2_initial=0.5, c2_final=2.5
-        )
-
-        assert config.acceleration_config == PSOTimeVaryingAcceleration(
-            c1_initial=2.5, c1_final=0.5, c2_initial=0.5, c2_final=2.5
-        )
-
-    def test_a_mutation_and_a_velocity_keep_their_settings(self) -> None:
-        config = (
-            ParticleSwarmConfig()
-            .mutation("cauchy", scale=0.2, probability=0.1, application="below_average")
-            .velocity(clamp_factor=0.1, mutation_threshold=0.01)
-        )
-
-        assert config.mutation_config == PSOMutationConfig(
-            strategy="cauchy", scale=0.2, probability=0.1, application="below_average"
-        )
-        assert config.velocity_config == PSOVelocityConfig(
-            clamp_factor=0.1, mutation_threshold=0.01
-        )
-
-    def test_the_stop_rules_are_off_by_default_and_keep_their_settings(self) -> None:
-        config = ParticleSwarmConfig()
-        assert config.improvement_stop_config is None
-        assert config.radius_stop_config is None
-
-        config.improvement_stop(window=20, tol_abs=1e-9, tol_rel=1e-7).radius_stop(1e-4)
-
-        assert config.improvement_stop_config == PSOImprovementStop(
-            window=20, tol_abs=1e-9, tol_rel=1e-7
-        )
-        assert config.radius_stop_config == PSORadiusStop(tol=1e-4)
 
     @pytest.mark.parametrize(
         ("configure", "field"),

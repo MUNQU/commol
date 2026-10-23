@@ -165,3 +165,27 @@ fn a_rate_deeper_than_the_stack_of_a_program_takes_the_jit() {
     assert!((value - expected(&rate, 0, 0.0)).abs() < 1e-9, "{value}");
     assert!((value - 0.3 * (700.0 + 40.0 * 200.0) / 1000.0).abs() < 1e-9);
 }
+
+#[test]
+fn a_formula_reads_an_earlier_formula_of_the_same_step() {
+    let mut json: serde_json::Value =
+        serde_json::from_str(&serde_json::to_string(&model("f2", 0)).unwrap()).unwrap();
+    let parameters = json["parameters"].as_array_mut().unwrap();
+    parameters.push(serde_json::json!({"id": "f1", "value": "k1 * step"}));
+    parameters.push(serde_json::json!({"id": "f2", "value": "f1 + 1"}));
+    let model: Model = serde_json::from_value(json).unwrap();
+
+    let mut compiled = CompiledModel::try_from_model(&model).unwrap();
+    let state = compiled.initial_state().to_vec();
+    let mut rates = vec![0.0; 1];
+    let mut rate_at = |step: f64| {
+        compiled
+            .transition_rates(step, step, &state, &mut rates)
+            .unwrap();
+        rates[0]
+    };
+
+    // f1 is 0.3 · step at the step f2 reads it, not at the step before.
+    assert_eq!(rate_at(3.0), 0.3 * 3.0 + 1.0);
+    assert_eq!(rate_at(5.0), 0.3 * 5.0 + 1.0);
+}

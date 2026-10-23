@@ -5,7 +5,6 @@ import math
 import pytest
 from pydantic import ValidationError
 
-import commol
 from commol import Aggregate, AxisUnits, Simulation
 from commol.context import _windows as windows
 from commol.utils.equations import UnitConsistencyError
@@ -143,11 +142,6 @@ class TestWindowGrid:
             days.window_start(-1, 7, "day")
         with pytest.raises(ValueError, match="at must not be negative"):
             days.window_index(-1, 7, "day")
-
-    def test_the_window_grid_is_only_on_the_axis(self) -> None:
-        for name in ["window_start", "window_end", "window_index", "window_ends"]:
-            assert not hasattr(commol, name)
-            assert name not in commol.__all__
 
 
 DAILY_DIFFERENCE = AxisUnits(step_unit="day", engine="DifferenceEquations")

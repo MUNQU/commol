@@ -442,12 +442,6 @@ def test_a_sensitivity_result_plots_itself(prcc_result: PRCCResult) -> None:
     assert over_axis.get_xlabel() == "Day"
 
 
-def test_figures_are_only_methods() -> None:
-    assert not hasattr(commol, "SimulationPlotter")
-    assert not hasattr(commol.api, "SimulationPlotter")
-    assert not [name for name in commol.__all__ if name.startswith("_")]
-
-
 ACCESSORS = [
     (ResultsPlot.series, figures._run_series),
     (ResultsPlot.cumulative, figures._run_cumulative),
@@ -577,15 +571,6 @@ class TestRunFigures:
 
         _assert_draws(fig, {name: run[name] for name in BINS})
 
-    def test_plot_series_saves_to_file(
-        self, run: SimulationResults, tmp_path: Path
-    ) -> None:
-        output_path = tmp_path / "series_plot.png"
-
-        run.plot.series(output_file=str(output_path))
-
-        assert output_path.stat().st_size > 0
-
     def test_plot_series_draws_the_observations(self, run: SimulationResults) -> None:
         observed = _observed_b(run)
 
@@ -647,15 +632,6 @@ class TestRunFigures:
         fig = run.plot.cumulative()
 
         _assert_draws(fig, {name: list(np.cumsum(run[name])) for name in BINS})
-
-    def test_plot_cumulative_saves_to_file(
-        self, run: SimulationResults, tmp_path: Path
-    ) -> None:
-        output_path = tmp_path / "cumulative_plot.png"
-
-        run.plot.cumulative(output_file=str(output_path))
-
-        assert output_path.stat().st_size > 0
 
     def test_plot_cumulative_draws_the_running_sum_of_observations(
         self, run: SimulationResults

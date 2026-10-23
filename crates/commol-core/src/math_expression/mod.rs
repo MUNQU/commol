@@ -379,6 +379,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn one_formula_compiles_to_one_function() {
+        let first = MathExpression::new("k1 * A + k2".to_string()).compiled;
+        let second = MathExpression::new("k1 * A + k2".to_string()).compiled;
+
+        assert!(Arc::ptr_eq(&first.unwrap(), &second.unwrap()));
+    }
+
+    #[test]
     fn test_basic_expressions() {
         let mut ctx = MathExpressionContext::new();
         ctx.set_parameter("k1".to_string(), 0.5);

@@ -147,3 +147,26 @@ class TestCategories:
         second = Stratification(id="g", categories=["g1", "g2"])
 
         assert {first, second} == {first}
+
+
+def test_the_order_of_the_stratifications_sets_the_compartments() -> None:
+    """The later stratification is conditional on a category of the earlier one."""
+    group_first = abc_builder(
+        stratifications={"group": GROUP, "status": STATUS},
+        conditions={"status": {"group": "g2"}},
+    )
+    status_first = abc_builder(
+        stratifications={"status": STATUS, "group": GROUP},
+        conditions={"group": {"status": "s2"}},
+    )
+
+    assert Simulation(build(group_first)).engine.compartments == [
+        f"{bin_id}_{suffix}"
+        for bin_id in ("A", "B", "C")
+        for suffix in ("g1", "g2_s1", "g2_s2")
+    ]
+    assert Simulation(build(status_first)).engine.compartments == [
+        f"{bin_id}_{suffix}"
+        for bin_id in ("A", "B", "C")
+        for suffix in ("s1", "s2_g1", "s2_g2")
+    ]

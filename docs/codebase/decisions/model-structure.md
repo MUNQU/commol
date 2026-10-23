@@ -18,6 +18,8 @@ stratification gives some compartments fewer suffixes than others. Use
 `CompartmentLayout::find` or `of_bin` in Rust, and the labels that the engine
 queries return in Python.
 
+**Guard:** `crates/commol-model/tests/flows.rs::a_bin_whose_id_starts_with_another_finds_only_its_compartments`.
+
 ## State, amount, total and subgroup total
 
 The library names what the compartments hold without assuming individuals:
@@ -87,6 +89,8 @@ this).
 
 **Rule:** changing the order of `add_stratification` calls changes which
 compartments exist and what they are named.
+
+**Guard:** `tests/building/test_stratifications.py::test_the_order_of_the_stratifications_sets_the_compartments`.
 
 ## Outputs are resolved by label
 

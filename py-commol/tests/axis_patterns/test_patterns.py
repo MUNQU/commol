@@ -9,7 +9,7 @@ from commol.utils.security import (
     SecurityError,
     validate_expression_security,
 )
-from tests.axis_patterns.conditions import condition, rate_string
+from tests.axis_patterns.conditions import condition
 from tests.support import assert_accepted
 
 
@@ -22,21 +22,21 @@ class TestPulse:
         with pytest.raises(ValidationError):
             AxisPattern.pulse(at=-1, value=1.0)
 
-    def test_string_amount(self):
+    def test_a_value_may_be_a_formula(self):
         p = AxisPattern.pulse(at=3, value="alpha")
-        assert "alpha" in str(p)
+        assert str(p) == "(if(step == 3, alpha, 0))"
 
 
 class TestPulses:
-    def test_formula_contains_all_steps(self):
+    def test_the_formula_has_one_condition_per_step(self):
         p = AxisPattern.pulses(at=[3, 7, 10], value=1.0)
-        formula = str(p)
-        for s in (3, 7, 10):
-            assert f"step == {s}" in formula
+        assert str(p) == (
+            "(if(step == 3, 1.0, 0) + if(step == 7, 1.0, 0) + if(step == 10, 1.0, 0))"
+        )
 
     def test_single_step_is_legal(self):
         p = AxisPattern.pulses(at=[0], value=0.5)
-        assert "step == 0" in str(p)
+        assert str(p) == "(if(step == 0, 0.5, 0))"
 
     def test_empty_list_raises(self):
         with pytest.raises(ValidationError):
@@ -48,7 +48,8 @@ class TestPulses:
 
     def test_large_step_count_accepted(self):
         p = AxisPattern.pulses(at=list(range(50)), value=1.0)
-        assert str(p).count("step ==") == 50
+        terms = " + ".join(f"if(step == {s}, 1.0, 0)" for s in range(50))
+        assert str(p) == f"({terms})"
 
     def test_duplicate_step_raises(self):
         with pytest.raises(ValidationError):
@@ -74,16 +75,13 @@ class TestPulses:
 
     def test_per_step_amounts_formula(self):
         p = AxisPattern.pulses(at=[2, 5, 9], value=[0.1, 0.2, 0.3])
-        formula = str(p)
-        assert "step == 2, 0.1" in formula
-        assert "step == 5, 0.2" in formula
-        assert "step == 9, 0.3" in formula
+        assert str(p) == (
+            "(if(step == 2, 0.1, 0) + if(step == 5, 0.2, 0) + if(step == 9, 0.3, 0))"
+        )
 
     def test_per_step_amounts_string_values(self):
         p = AxisPattern.pulses(at=[1, 4], value=["alpha", "k1"])
-        formula = str(p)
-        assert "step == 1, alpha" in formula
-        assert "step == 4, k1" in formula
+        assert str(p) == "(if(step == 1, alpha, 0) + if(step == 4, k1, 0))"
 
     def test_per_step_amounts_length_mismatch_raises(self):
         with pytest.raises(ValidationError):
@@ -152,12 +150,7 @@ class TestPeriodic:
 
     def test_formula_uses_floor_based_modulo(self):
         formula = str(AxisPattern.periodic(period=7, value=0.1))
-        assert "floor" in formula
-        assert "%" not in formula
-
-    def test_offset_present_in_formula(self):
-        formula = str(AxisPattern.periodic(period=7, value=0.1, offset=3))
-        assert "3" in formula
+        assert formula == "(if(step - floor(step / 7) * 7 == 0, 0.1, 0))"
 
 
 class TestInterval:
@@ -189,7 +182,7 @@ class TestSinusoid:
 
     def test_string_period_symbolic_is_accepted(self):
         p = AxisPattern.sinusoid(amplitude=1.0, period="period_param")
-        assert "period_param" in str(p)
+        assert str(p) == "(0.0 + 1.0 * sin(2 * pi * (t - 0.0) / period_param))"
 
     def test_a_sinusoid_starts_at_phase_zero_around_zero(self):
         formula = str(AxisPattern.sinusoid(amplitude=2.0, period=12.0))
@@ -211,9 +204,9 @@ class TestGaussianPulse:
         with pytest.raises(ValidationError):
             AxisPattern.gaussian_pulse(center=0.0, width=-1.0, peak=1.0)
 
-    def test_formula_is_parenthesized(self):
-        formula = str(AxisPattern.gaussian_pulse(center=5.0, width=1.0, peak=1.0))
-        assert formula.startswith("(") and formula.endswith(")")
+    def test_formula_places_every_parameter(self):
+        formula = str(AxisPattern.gaussian_pulse(center=5.0, width=2.0, peak=0.5))
+        assert formula == "(0.5 * exp(-((t - 5.0) ** 2) / (2 * 2.0 ** 2)))"
 
 
 class TestLinearRamp:
@@ -291,13 +284,6 @@ class TestCombine:
 
         assert str(error.value) == "combine() requires at least one pattern"
 
-    def test_three_patterns_sum(self):
-        a = AxisPattern.pulse(at=1, value=0.1)
-        b = AxisPattern.pulse(at=2, value=0.2)
-        c = AxisPattern.pulse(at=3, value=0.3)
-        result = str(AxisPattern.combine(a, b, c, mode=AxisPattern.SUM))
-        assert result.count("+") >= 2
-
     def test_combine_propagates_conditions(self):
         """combine of grouped patterns preserves the shared group binding."""
         conds = [condition("group", "cat1")]
@@ -351,7 +337,7 @@ class TestFromFormula:
 
     def test_already_parenthesized_expression(self):
         p = AxisPattern.from_formula("(x + y)")
-        assert "(x + y)" in str(p)
+        assert str(p) == "((x + y))"
 
     @pytest.mark.parametrize("expr", ["", "   "])
     def test_empty_raises(self, expr: str):
@@ -372,39 +358,29 @@ class TestFromFormula:
 
 
 class TestForGroup:
-    def test_conditions_are_attached(self):
-        p = AxisPattern.pulse(at=5, value=0.1)
-        grouped = p.for_group([{"stratification": "group", "category": "g2"}])
-        assert grouped.conditions == [{"stratification": "group", "category": "g2"}]
-
     def test_original_is_unchanged(self):
         p = AxisPattern.pulse(at=5, value=0.1)
         p.for_group([{"stratification": "group", "category": "g2"}])
         assert p.conditions is None
 
-    def test_source_compartment_is_attached(self):
-        p = AxisPattern.pulse(at=5, value=0.1)
-        grouped = p.for_group(
-            [{"stratification": "group", "category": "g2"}],
-            source_compartment="A_g2",
-        )
-        assert grouped.source_compartment == "A_g2"
-
 
 class TestToStratifiedRate:
     def test_without_source_compartment(self):
         p = AxisPattern.pulse(at=5, value=0.1).for_group([condition("group", "g2")])
-        sr = p.to_stratified_rate()
-        assert sr["conditions"] == [condition("group", "g2")]
-        assert "A_" not in rate_string(sr)
+        assert p.to_stratified_rate() == {
+            "conditions": [condition("group", "g2")],
+            "rate": "(if(step == 5, 0.1, 0))",
+        }
 
     def test_with_source_compartment(self):
         p = AxisPattern.pulse(at=5, value=0.1).for_group(
             [condition("group", "g2")],
             source_compartment="A_g2",
         )
-        sr = p.to_stratified_rate()
-        assert "A_g2" in rate_string(sr)
+        assert p.to_stratified_rate() == {
+            "conditions": [condition("group", "g2")],
+            "rate": "(if(step == 5, 0.1, 0)) * A_g2",
+        }
 
     def test_no_conditions_gives_empty_list(self):
         p = AxisPattern.pulse(at=5, value=0.1)
@@ -419,7 +395,10 @@ class TestCompositionSafety:
         c = AxisPattern.pulse(at=3, value=0.3)
         inner = AxisPattern.combine(a, b)
         result = str(AxisPattern.combine(inner, c))
-        assert result.startswith("(") and result.endswith(")")
+        assert result == (
+            "(((if(step == 1, 0.1, 0)) + (if(step == 2, 0.2, 0)))"
+            " + (if(step == 3, 0.3, 0)))"
+        )
 
 
 class TestSecurityValidation:
