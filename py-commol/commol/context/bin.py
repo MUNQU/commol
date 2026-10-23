@@ -42,7 +42,17 @@ class Bin(BaseModel):
 
 
 class Accumulator(BaseModel):
-    """A cumulative event counter tracked as output but not as part of the state."""
+    """
+    A cumulative event counter tracked as output but not as part of the state.
+
+    Attributes
+    ----------
+    id : str
+        Identifier of the accumulator, and the name of its output before the
+        stratifications expand it.
+    name : str
+        A descriptive, human-readable name for the accumulator.
+    """
 
     model_config = ConfigDict(extra="forbid")
 

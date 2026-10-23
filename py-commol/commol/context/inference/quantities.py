@@ -216,6 +216,9 @@ class ValueAt(_OfSeries, _OneScalar):
         The series read; a name or a list of names is their `Level`.
     at : float
         The position; with `Increments`, the end of the window.
+    label : str | None
+        The name of the quantity in results and plots. If None, a name that
+        says what the quantity reads.
     """
 
     kind: Literal["value_at"] = "value_at"
@@ -246,6 +249,9 @@ class Gain(_Outputs, _OneScalar):
         The start of the window.
     end : float
         The end of the window, after `start`.
+    label : str | None
+        The name of the quantity in results and plots. If None, a name that
+        says what the quantity reads.
     """
 
     kind: Literal["gain"] = "gain"
@@ -305,6 +311,9 @@ class Peak(_AtPositions, _OneScalar):
         The series read; a name or a list of names is their `Level`.
     positions : list[float]
         The positions compared, ascending; with `Increments`, window ends.
+    label : str | None
+        The name of the quantity in results and plots. If None, a name that
+        says what the quantity reads.
     """
 
     kind: Literal["peak"] = "peak"
@@ -325,6 +334,9 @@ class PeakPosition(_AtPositions, _OneScalar):
         The series read; a name or a list of names is their `Level`.
     positions : list[float]
         The positions compared, ascending; with `Increments`, window ends.
+    label : str | None
+        The name of the quantity in results and plots. If None, a name that
+        says what the quantity reads.
     """
 
     kind: Literal["peak_position"] = "peak_position"
@@ -400,6 +412,9 @@ class Ratio(_OneScalar):
         ``"pooled"``: the ratio of the means, E[N]/E[D]; a point with
         E[D] = 0 has no value. With a deterministic engine, the three give
         N/D, and a point with D = 0 has no value.
+    label : str | None
+        The name of the quantity in results and plots. If None, a name that
+        says what the quantity reads.
     """
 
     kind: Literal["ratio"] = "ratio"

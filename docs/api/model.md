@@ -4,8 +4,9 @@
 
 The validated model that `ModelBuilder.build` returns: a header, the process
 written once, the structure that lays it out (`Aggregate`, with its neighbors
-`Complete` and `Groups`), the entries of `Aggregate.initial_state()`, and the
-`SeriesValue` of a series parameter.
+`Complete` and `Groups`), the entries of `Aggregate.initial_state()`, the
+`SeriesValue` of a series parameter, and `UnitConsistencyError`, the error of
+`Model.check_unit_consistency`.
 Guide: [Core Concepts](../guide/core-concepts.md),
 [Building Models](../guide/building-models.md#the-structure-aggregate),
 [Describing a Model](../guide/describing-models.md),
@@ -27,6 +28,8 @@ Guide: [Core Concepts](../guide/core-concepts.md),
 ::: commol.context._model.engine_state.InitialCompartment
 
 ::: commol.context.parameter.SeriesValue
+
+::: commol.utils.equations.UnitConsistencyError
 
 ## Descriptions
 
@@ -54,5 +57,3 @@ Guide: [Core Concepts](../guide/core-concepts.md),
 ::: commol.context.description.GraphEdge
 
 ::: commol.context.description.Matrix
-
-::: commol.utils.equations.UnitConsistencyError

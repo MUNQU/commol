@@ -169,18 +169,18 @@ nav:
       - API Overview: api/index.md
       - ModelBuilder: api/model-builder.md
       - Model: api/model.md
-      - Simulation: api/simulation.md
-      - Plotting: api/plotting.md
+      - Model Structure: advanced/model-structure.md
       - AxisPattern: api/axis-patterns.md
       - AxisUnits: api/axis-units.md
+      - Simulation: api/simulation.md
+      - Plotting: api/plotting.md
       - Calibration: api/calibrator.md
+      - Reports: api/reports.md
       - Uncertainty: api/uncertainty.md
       - Identifiability: api/identifiability.md
       - Sensitivity: api/sensitivity.md
-      - Reports: api/reports.md
-      - Package: api/package.md
       - Parallelism: api/parallelism.md
-      - Model Structure: advanced/model-structure.md
+      - Package: api/package.md
   - Development:
       - Codebase Guide:
           - Codebase Guide: codebase/index.md

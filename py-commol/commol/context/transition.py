@@ -30,6 +30,11 @@ class StratifiedRate(BaseModel):
         List of stratification-category pairs that must match
     rate : str
         Rate expression for compartments matching these conditions
+    absolute : bool | None
+        True: the flow is the rate, not multiplied by the source amount.
+        False: the flow is the rate times the source amount. None: the rate
+        is absolute when it reads a compartment, a bin total or a
+        ``total_…`` variable.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -94,6 +99,8 @@ class Transition(BaseModel):
         The origin compartments.
     target : list[str]
         The destination compartments.
+    accumulators : list[str]
+        Ids of the accumulators that add up the flow of this transition.
     rate : str | None
         Default mathematical formula, parameter name, or constant value for the flow.
         Used when no stratified rate matches. Numeric values are automatically
@@ -114,6 +121,18 @@ class Transition(BaseModel):
     stratified_rates : list[StratifiedRate] | None
         Stratification-specific rates. Each rate applies to compartments that match
         all specified stratification conditions.
+    per_compartment : bool | None
+        When True, the id of each source and target bin in a rate reads the
+        compartment of each flow; any other bin keeps its total. A transition
+        between categories ignores it.
+    impulse_at : list[float] | None
+        Positions on the axis where the transition is an impulse: at each one,
+        the rate is a fraction (proportional) or an amount (absolute) moved at
+        once. Between them the transition moves nothing.
+    impulse_every : tuple[float, float] | None
+        ``(period, offset)``: the transition is an impulse at ``offset``,
+        ``offset + period``, ``offset + 2 * period``, and so on. At most one
+        of `impulse_at` and `impulse_every` is set.
     """
 
     model_config = ConfigDict(extra="forbid")

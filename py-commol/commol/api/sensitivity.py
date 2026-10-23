@@ -65,7 +65,7 @@ class SensitivityAnalysis:
             polynomial chaos holds the mean of its replicates, on the same
             seeds at every point; a propagation keeps every replicate, each
             with a seed of its own. A deterministic engine does not use it, so
-            the same analysis runs on either engine.
+            the same analysis runs on every engine.
         seed : int | None, optional
             The seed of the designs and the replicates. Required with a
             stochastic engine; otherwise None draws one from the operating

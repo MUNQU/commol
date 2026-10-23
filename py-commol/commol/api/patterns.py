@@ -263,6 +263,16 @@ class AxisPattern(BaseModel):
     :meth:`commol.api.model_builder.ModelBuilder.add_transition` via the
     ``rate`` argument; no auxiliary conversion is required.
 
+    Attributes
+    ----------
+    conditions : list[ConditionDict] | None
+        The stratification conditions of the sub-group the pattern applies
+        to, set by ``for_group``. None: every compartment of the transition.
+    source_compartment : str | None
+        A compartment the rate is multiplied by, which makes the flow
+        absolute, set by ``for_group``. None: the flow is proportional to its
+        source.
+
     Examples
     --------
     >>> from commol import AxisPattern
@@ -318,7 +328,23 @@ class AxisPattern(BaseModel):
         *,
         source_compartment: str | None = None,
     ) -> Self:
-        """Return a copy of this pattern restricted to a stratification sub-group."""
+        """
+        Return a copy of this pattern restricted to a stratification sub-group.
+
+        Parameters
+        ----------
+        conditions : list[ConditionDict]
+            The stratification conditions of the sub-group, as in a
+            stratified rate.
+        source_compartment : str | None, default=None
+            A compartment to multiply the rate by, which makes the flow
+            absolute. If None, the flow is proportional to its source.
+
+        Returns
+        -------
+        AxisPattern
+            The copy, with `conditions` and `source_compartment` set.
+        """
         copied: list[ConditionDict] = [_copy_condition(c) for c in conditions]
         return self.model_copy(
             update={
@@ -368,7 +394,29 @@ class AxisPattern(BaseModel):
     # ------------------------------------------------------------------
 
     def set_default(self, pattern: "AxisPattern") -> "AxisPattern":  # noqa: ARG002
-        """Register the condition-free fallback pattern (schedules only)."""
+        """
+        Register the condition-free fallback pattern (schedules only).
+
+        Parameters
+        ----------
+        pattern : AxisPattern
+            The pattern of every compartment that no group matches, with no
+            conditions and no ``source_compartment``.
+
+        Returns
+        -------
+        AxisPattern
+            The schedule.
+
+        Raises
+        ------
+        TypeError
+            If this pattern is not a schedule, one that
+            ``AxisPattern.add_group`` started.
+        ValueError
+            If the schedule has a default already, or `pattern` has
+            conditions or a ``source_compartment``.
+        """
         raise TypeError(
             "set_default is only valid on a schedule AxisPattern; "
             "start one with AxisPattern.add_group(...) first."
