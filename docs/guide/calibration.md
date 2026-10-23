@@ -121,7 +121,7 @@ window: [Observations](calibration-observations.md) lists them all.
 
 | `parameter_type` | `id` names | The value is |
 |---|---|---|
-| `"parameter"` | A model parameter, usually declared with `value=None` | The parameter value |
+| `"parameter"` | A model parameter with a number, or one declared with `value=None`; not a formula or a series parameter, which the engine computes at each step | The parameter value |
 | `"initial_condition"` | A bin, a category, or an expanded compartment | An amount in the unit of its bin, or the split of a category; see [Calibrating Initial Conditions](calibration-initial-conditions.md) |
 | `"factor"` | Any new id, used by observations through `factor_id` | A factor on the predictions; not part of the model |
 | `"noise"` | Any new id, named by an [observation model](uncertainty/observation-models.md#noise-parameters) | An argument of the model, such as its standard deviation; not part of the model |
@@ -130,7 +130,9 @@ window: [Observations](calibration-observations.md) lists them all.
 values of the model kind, and the kind declares which it accepts
 (`model.structure.calibration_value_types()`): an aggregate model accepts
 `"initial_condition"`. A type the kind does not accept raises a `ValueError`
-that names the kind when you create the `Calibrator`.
+that names the kind when you create the `Calibrator`. A `"parameter"` that
+the model does not have, or that a formula or a series sets, raises a
+`ValueError` with the engine's message at the same time.
 
 ## Losses
 

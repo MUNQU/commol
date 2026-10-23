@@ -1,14 +1,9 @@
-//! What both stochastic engines share: the generator, whole units and their
-//! start, and impulses that move whole units.
+//! What `StochasticEvents` and `StochasticSteps` share: the generator, whole
+//! units and their start, and impulses that move whole units.
 
 use commol_core::{EngineType, Rounding, SimulationError};
-use commol_model::{CompiledModel, as_whole};
+use commol_model::{CompiledModel, as_whole, rounded};
 use commol_random::{Generator, sample};
-
-/// `value` to six significant digits, for a message.
-pub(crate) fn rounded(value: f64) -> f64 {
-    format!("{value:.5e}").parse().unwrap_or(value)
-}
 
 /// The compiled model of a stochastic engine, its generator and its state of
 /// whole units.

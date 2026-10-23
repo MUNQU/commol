@@ -7,17 +7,9 @@
 
 use std::collections::HashMap;
 
+use commol_core::same_position;
+
 use crate::types::{CalibrationParameter, CalibrationParameterType, ObservedDataPoint};
-
-/// Relative tolerance with which two positions on the axis are the same, as
-/// `index_at` of the Python results reads them.
-const POSITION_TOLERANCE: f64 = 1e-9;
-
-/// Whether two positions on the axis are the same: within
-/// [`POSITION_TOLERANCE`] of the larger of their magnitudes and 1.
-fn same_position(a: f64, b: f64) -> bool {
-    (a - b).abs() <= POSITION_TOLERANCE * a.abs().max(b.abs()).max(1.0)
-}
 
 /// The index of `at` in `positions`, ascending: the entry equal to it, or
 /// else a neighbour within the tolerance of the axis, so a position computed

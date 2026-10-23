@@ -1,12 +1,10 @@
 //! The discrete-time stochastic engine: the chain binomial.
 
-use commol_core::{EngineSettings, EngineType, ModelValue, SimulationError};
-use commol_model::{
-    CompartmentalEngine, CompiledModel, InitialConditionPlan, OutputLabels, output_sums,
-};
+use commol_core::{EngineSettings, EngineType, SimulationError};
+use commol_model::{CompartmentalEngine, CompiledModel, IntegerStepper, record_steps, rounded};
 use commol_random::sample;
 
-use crate::units::{Units, rounded};
+use crate::units::Units;
 
 /// The discrete-time stochastic engine of an aggregate model: the chain
 /// binomial.
@@ -53,7 +51,8 @@ impl StochasticSteps {
     pub fn try_from_model(model: &commol_core::Model) -> Result<Self, String> {
         let EngineSettings::StochasticSteps(settings) = *model.engine.settings() else {
             return Err(format!(
-                "The StochasticSteps engine cannot run a {} model",
+                "The {} engine cannot run a {} model",
+                EngineType::StochasticSteps.name(),
                 model.engine.engine_type().name()
             ));
         };
@@ -232,47 +231,33 @@ impl StochasticSteps {
         }
         Ok(())
     }
-
-    /// Step through the largest of `steps`, recording the outputs at each of
-    /// them into `buffer`.
-    fn record_steps(
-        &mut self,
-        steps: &[u32],
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), SimulationError> {
-        buffer.resize_with(steps.len(), Vec::new);
-        self.settle()?;
-        let mut next = 0;
-        loop {
-            while next < steps.len() && f64::from(steps[next]) == self.current_step {
-                self.units.copy_row(&mut buffer[next]);
-                next += 1;
-            }
-            if next == steps.len() {
-                return Ok(());
-            }
-            self.step()?;
-            self.settle()?;
-        }
-    }
 }
 
-/// Why the engine does not report at `position`, if it does not.
-fn check_step(position: f64) -> Result<(), String> {
-    if position >= 0.0 && position.fract() == 0.0 && position <= f64::from(u32::MAX) {
-        Ok(())
-    } else {
-        Err(format!(
-            "a StochasticSteps model reports only at integer steps; {position} is not one"
-        ))
+impl IntegerStepper for StochasticSteps {
+    const ENGINE: EngineType = EngineType::StochasticSteps;
+
+    fn current_step(&self) -> f64 {
+        self.current_step
+    }
+
+    fn settle(&mut self) -> Result<(), SimulationError> {
+        StochasticSteps::settle(self)
+    }
+
+    fn advance(&mut self) -> Result<(), SimulationError> {
+        StochasticSteps::step(self)
+    }
+
+    fn copy_row(&self, row: &mut Vec<f64>) {
+        self.units.copy_row(row);
     }
 }
 
 impl commol_core::SimulationEngine for StochasticSteps {
-    type ValuePlan = InitialConditionPlan;
+    commol_model::delegate_to_compiled_model!();
 
     fn check_position(&self, position: f64) -> Result<(), String> {
-        check_step(position)
+        EngineType::StochasticSteps.check_position(position)
     }
 
     fn run_at_positions_into_buffer(
@@ -280,26 +265,11 @@ impl commol_core::SimulationEngine for StochasticSteps {
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), SimulationError> {
-        commol_core::check_positions(positions, self.current_step, check_step)?;
-        // `check_step` accepts only integers that fit in a `u32`.
-        let steps: Vec<u32> = positions.iter().map(|&position| position as u32).collect();
-        self.record_steps(&steps, buffer)
+        record_steps(self, positions, buffer)
     }
 
     fn step(&mut self) -> Result<(), SimulationError> {
         StochasticSteps::step(self)
-    }
-
-    fn output_names(&self) -> Vec<String> {
-        self.units.model.output_names().to_vec()
-    }
-
-    fn state_outputs(&self) -> usize {
-        self.units.model.num_compartments()
-    }
-
-    fn output_sums(&self) -> Vec<(String, Vec<usize>)> {
-        output_sums(self.units.model.output_labels())
     }
 
     fn reset(&mut self) {
@@ -312,43 +282,18 @@ impl commol_core::SimulationEngine for StochasticSteps {
         self.units.set_seed(seed);
     }
 
-    fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
-        self.units.model.set_parameter(parameter_id, value);
-        Ok(())
-    }
-
     fn current_position(&self) -> f64 {
         self.current_step
-    }
-
-    fn plan_values(
-        &self,
-        values: &[ModelValue],
-        remainder: Option<&str>,
-    ) -> Result<InitialConditionPlan, String> {
-        InitialConditionPlan::new(self, values, remainder)
-    }
-
-    fn apply_values(&mut self, plan: &InitialConditionPlan, values: &[f64]) -> Result<f64, String> {
-        plan.apply(self, values)
     }
 }
 
 impl CompartmentalEngine for StochasticSteps {
-    fn compartments(&self) -> Vec<String> {
-        self.units.model.compartments().to_vec()
+    fn model(&self) -> &CompiledModel {
+        &self.units.model
     }
 
-    fn output_labels(&self) -> Vec<OutputLabels> {
-        self.units.model.output_labels().to_vec()
-    }
-
-    fn initial_state(&self) -> Vec<f64> {
-        self.units.model.initial_state()[..self.units.model.num_compartments()].to_vec()
-    }
-
-    fn total(&self) -> f64 {
-        self.units.model.total()
+    fn model_mut(&mut self) -> &mut CompiledModel {
+        &mut self.units.model
     }
 
     fn set_initial_condition(

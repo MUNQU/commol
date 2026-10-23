@@ -119,7 +119,7 @@ fn get_or_compile_jit(preprocessed: &str) -> Result<Arc<JITFunction>, String> {
     }
     let jit_fn = Arc::new(
         JITCompiler::new()
-            .and_then(|compiler| compiler.compile(preprocessed))
+            .compile(preprocessed)
             .map_err(|error| error.to_string())?,
     );
     cache.insert(preprocessed.to_string(), Arc::clone(&jit_fn));
@@ -140,8 +140,8 @@ fn get_or_compile_jit(preprocessed: &str) -> Result<Arc<JITFunction>, String> {
 /// let expr = MathExpression::new("k1 * A * B".to_string());
 /// let mut context = MathExpressionContext::new();
 /// context.set_parameter("k1".to_string(), 0.5);
-/// context.set_compartment("A".to_string(), 990.0);
-/// context.set_compartment("B".to_string(), 10.0);
+/// context.init_compartments(vec!["A".to_string(), "B".to_string()]);
+/// context.set_compartments_by_index(&[990.0, 10.0]);
 /// let result = expr.evaluate(&mut context).unwrap();
 /// ```
 #[derive(Debug, Clone)]

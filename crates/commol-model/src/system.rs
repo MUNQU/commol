@@ -1,14 +1,11 @@
 //! The right-hand side of a compiled model, and its accessors.
 
-use commol_core::{MathExpressionContext, SPECIAL_VAR_TOTAL};
+use commol_core::{MathExpressionContext, SPECIAL_VAR_T, SPECIAL_VAR_TOTAL, same_position};
 
 use crate::labels::OutputLabels;
 
 use crate::rates::{Clock, evaluate_rate};
-use crate::types::{CompiledModel, FlowChange, TransitionFlow, same_position};
-
-// Cached parameter name to avoid string allocations
-const PARAM_T: &str = "t";
+use crate::types::{CompiledModel, FlowChange, TransitionFlow};
 
 /// Set a reserved parameter slot during an evaluation. When `keep_cache_live`
 /// is true the call goes through the name-keyed path, which the formula
@@ -90,10 +87,63 @@ impl CompiledModel {
         Ok(())
     }
 
-    /// Set the value of a parameter.
-    pub fn set_parameter(&mut self, parameter_id: &str, value: f64) {
+    /// Set the value of a parameter: a constant, or a parameter to
+    /// calibrate.
+    ///
+    /// # Errors
+    ///
+    /// Returns the message of [`Self::check_parameter`] when a caller cannot
+    /// set the parameter. The model is unchanged after an error.
+    pub fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
+        self.check_parameter(parameter_id)?;
         self.expression_context
-            .set_parameter(parameter_id.to_string(), value);
+            .set_parameter_str(parameter_id, value);
+        Ok(())
+    }
+
+    /// Check that a caller can set a parameter ([`Self::set_parameter`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the id when it is not a parameter of the
+    /// model, or when it is a formula or a series parameter: the model writes
+    /// its value at each evaluation, so a value set by a caller would be
+    /// lost.
+    pub fn check_parameter(&self, parameter_id: &str) -> Result<(), String> {
+        if self.settable_parameters.contains(parameter_id) {
+            return Ok(());
+        }
+        Err(self.not_settable(parameter_id))
+    }
+
+    /// Why a caller cannot set `parameter_id`.
+    fn not_settable(&self, parameter_id: &str) -> String {
+        let source = if self
+            .formula_parameters
+            .iter()
+            .any(|(name, _)| name == parameter_id)
+        {
+            "formula"
+        } else if self
+            .series_parameters
+            .iter()
+            .any(|series| series.parameter_name == parameter_id)
+        {
+            "series"
+        } else {
+            let mut settable: Vec<&str> = self
+                .settable_parameters
+                .iter()
+                .map(String::as_str)
+                .collect();
+            settable.sort_unstable();
+            return format!(
+                "Parameter '{parameter_id}' is not in the model; the parameters that can be \
+                 set are {}",
+                settable.join(", ")
+            );
+        };
+        format!("Parameter '{parameter_id}' cannot be set: its {source} sets it at each step")
     }
 
     /// The right-hand side of the model: the net flow into each component of
@@ -105,11 +155,11 @@ impl CompiledModel {
     /// targets and added to each accumulator that counts it
     /// ([`Self::flow_changes`]). Every flow is computed from the compartments
     /// of `state` (the accumulators are not read). Rates see `step` and `t`:
-    /// a difference engine passes the same value for both; a differential
-    /// engine passes the step that holds `t`.
+    /// an engine that reports only at integer steps passes the same value for
+    /// both; the others pass the step that holds `t`.
     ///
-    /// A difference step is `state += out`; a differential engine integrates
-    /// `dX/dt = out`.
+    /// A step of `DifferenceEquations` is `state += out`;
+    /// `DifferentialEquations` integrates `dX/dt = out`.
     ///
     /// # Errors
     ///
@@ -503,7 +553,7 @@ impl CompiledModel {
         );
         set_step_parameter(
             &mut self.expression_context,
-            PARAM_T,
+            SPECIAL_VAR_T,
             self.t_parameter_index,
             t,
             keep_cache_live,

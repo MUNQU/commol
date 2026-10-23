@@ -23,21 +23,36 @@
 //!
 //! ## Example
 //!
-//! ```rust,ignore
+//! ```rust
 //! use commol_calibration::{
-//!     optimize, CalibrationParameter, CalibrationProblem, LossConfig, NelderMeadConfig,
-//!     ObservedDataPoint, OptimizationConfig,
+//!     CalibrationParameter, CalibrationProblem, LossConfig, NelderMeadConfig, ObservedDataPoint,
+//!     OptimizationConfig, optimize,
 //! };
+//! use commol_core::Model;
+//! use commol_difference::DifferenceEquations;
 //!
+//! // A → B at the rate k1, from A = 900 and B = 100.
+//! let json = r#"{"name":"m","parameters":[{"id":"k1","value":0.1}],
+//!     "engine":{"type":"DifferenceEquations"},
+//!     "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
+//!     "accumulators":[],"stratifications":[],
+//!     "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"k1"}]},
+//!     "structure":{"kind":"aggregate","bin_amounts":{"A":900.0,"B":100.0}}}"#;
+//! let model: Model = serde_json::from_str(json).unwrap();
+//! let engine = DifferenceEquations::try_from_model(&model).unwrap();
+//! // B at step 10 when k1 is 0.1.
+//! let observed = 1000.0 - 900.0 * 0.9_f64.powi(10);
 //! let problem = CalibrationProblem::new(
 //!     engine,
-//!     vec![ObservedDataPoint::new(10.0, "B".to_string(), 501.0)],
+//!     vec![ObservedDataPoint::new(10.0, "B".to_string(), observed)],
 //!     vec![CalibrationParameter::new("k1".to_string(), 0.0, 1.0)],
 //!     vec![],
 //!     LossConfig::SumSquaredError,
-//! )?;
+//! )
+//! .unwrap();
 //! let config = OptimizationConfig::NelderMead(NelderMeadConfig::default());
-//! let result = optimize(&problem, &config)?;
+//! let result = optimize(&problem, &config).unwrap();
+//! assert!((result.best_parameters[0] - 0.1).abs() < 1e-4);
 //! ```
 
 #![warn(missing_docs)]

@@ -32,17 +32,28 @@ pub(crate) struct ValueWriter<E: SimulationEngine> {
 }
 
 impl<E: SimulationEngine> ValueWriter<E> {
-    /// Ask the engine to resolve the values of its model kind.
+    /// Check that the engine sets every parameter, and ask it to resolve the
+    /// values of its model kind.
+    ///
+    /// Each parameter is set on a copy of the engine at its lower bound, so
+    /// the rule of the engine ([`SimulationEngine::set_parameter`]) rejects
+    /// an id it does not let a caller set before any run.
     ///
     /// # Errors
     ///
-    /// Returns the engine's message when it does not accept a value, or an id
-    /// or the remainder does not resolve.
+    /// Returns the engine's message when it does not set a parameter or does
+    /// not accept a value, or an id or the remainder does not resolve.
     pub(crate) fn new(
         engine: &E,
         parameters: &[CalibrationParameter],
         remainder: Option<&str>,
     ) -> Result<Self, String> {
+        let mut probe = engine.clone();
+        for parameter in parameters {
+            if parameter.parameter_type == CalibrationParameterType::Parameter {
+                probe.set_parameter(&parameter.id, parameter.min_bound)?;
+            }
+        }
         let mut kind_indices = Vec::new();
         let mut values = Vec::new();
         for (index, parameter) in parameters.iter().enumerate() {
@@ -134,17 +145,19 @@ pub(crate) fn configure_engine<E: SimulationEngine>(
     Ok((engine, clamped))
 }
 
-/// Check that the engine resolves every value of its model kind and the
-/// remainder, and return the plan it resolves them to.
+/// Check that the engine sets every parameter and resolves every value of
+/// its model kind and the remainder, and return the plan it resolves them to.
 ///
-/// The engine resolves them as the calibration objective does, so the first
-/// check that sees an id gives the engine's message, for example that a
-/// category needs a binary stratification.
+/// The engine sets and resolves them as the calibration objective does, so
+/// the first check that sees an id gives the engine's message, for example
+/// that the model has no such parameter or that a category needs a binary
+/// stratification.
 ///
 /// # Errors
 ///
-/// Returns the engine's message when a value or the remainder does not
-/// resolve, or the kind does not accept a type of value.
+/// Returns the engine's message when it does not set a parameter, a value
+/// or the remainder does not resolve, or the kind does not accept a type of
+/// value.
 pub fn check_model_values<E: SimulationEngine>(
     engine: &E,
     parameters: &[CalibrationParameter],

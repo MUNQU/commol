@@ -13,8 +13,10 @@ pub const SPECIAL_VAR_TOTAL: &str = "total";
 pub const SUBGROUP_TOTAL_PREFIX: &str = "total_";
 /// The step that holds the current position: `floor(t)`.
 pub const SPECIAL_VAR_STEP: &str = "step";
-/// The current position on the axis. A difference engine reads it at each
-/// step, so there it equals `step`; a differential engine reads it anywhere.
+/// The current position on the axis. An engine that reports only at integer
+/// steps (`DifferenceEquations`, `StochasticSteps`) reads it at each step, so
+/// there it equals `step`; `DifferentialEquations` and `StochasticEvents` read
+/// it anywhere.
 pub const SPECIAL_VAR_T: &str = "t";
 /// The constant π.
 pub const SPECIAL_VAR_PI: &str = "pi";

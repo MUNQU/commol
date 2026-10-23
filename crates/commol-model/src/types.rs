@@ -1,6 +1,10 @@
 //! Data types of a compiled model.
 
-use commol_core::{MathExpression, MathExpressionContext, RateMathExpression, SeriesMode};
+use std::collections::HashSet;
+
+use commol_core::{
+    MathExpression, MathExpressionContext, RateMathExpression, SeriesMode, same_position,
+};
 
 /// Pre-resolved storage location for a JIT-compiled rate's input variable.
 ///
@@ -21,7 +25,8 @@ pub(crate) enum VarSlot {
     Parameter(String),
     /// The step that holds the current time (`step`).
     Step,
-    /// The current time (`t`). Equal to `step` in a difference model.
+    /// The current time (`t`). Equal to `step` in an engine that reports only
+    /// at integer steps.
     Time,
     /// A mathematical constant (`pi` or `e`).
     Constant(f64),
@@ -97,15 +102,6 @@ pub(crate) enum ImpulseSchedule {
     At(Vec<f64>),
     /// `offset`, `offset + period`, `offset + 2 * period`, …
     Every { period: f64, offset: f64 },
-}
-
-/// Relative tolerance with which a position matches an impulse position.
-const POSITION_TOLERANCE: f64 = 1e-9;
-
-/// Whether two positions on the axis are the same, within
-/// [`POSITION_TOLERANCE`].
-pub(crate) fn same_position(a: f64, b: f64) -> bool {
-    (a - b).abs() <= POSITION_TOLERANCE * a.abs().max(b.abs()).max(1.0)
 }
 
 impl ImpulseSchedule {
@@ -376,9 +372,11 @@ impl FlowChange {
 /// It holds the expanded compartments and accumulators, the planned flows with
 /// their compiled rates, and the initial state. The state of a model is one
 /// vector: the compartments, in engine order, then the accumulators.
-/// [`CompiledModel::derivatives`] is the right-hand side `dX/dt = Σ flows`; a
-/// difference engine adds it once per step, a differential engine integrates
-/// it.
+/// [`CompiledModel::derivatives`] is the right-hand side `dX/dt = Σ flows`:
+/// `DifferenceEquations` adds it once per step and `DifferentialEquations`
+/// integrates it. `StochasticEvents` and `StochasticSteps` move whole units
+/// by the change of one event of each flow ([`CompiledModel::flow_changes`]),
+/// whose expected change is the same right-hand side.
 #[derive(Clone)]
 pub struct CompiledModel {
     pub(crate) compartments: Vec<String>,
@@ -421,6 +419,10 @@ pub struct CompiledModel {
     /// Parameters defined as empirical series; evaluated via binary search
     /// each time the right-hand side is evaluated
     pub(crate) series_parameters: Vec<SeriesParameter>,
+    /// The parameters a caller may set ([`CompiledModel::set_parameter`]):
+    /// the constants and the parameters to calibrate. The engine writes a
+    /// formula or a series parameter itself at each evaluation.
+    pub(crate) settable_parameters: HashSet<String>,
     pub(crate) total_parameter_index: usize,
     pub(crate) t_parameter_index: usize,
     /// Whether any per-step expression still needs compartment values in the
@@ -435,12 +437,6 @@ mod tests {
 
     fn series(data: Vec<(f64, f64)>, mode: SeriesMode) -> SeriesParameter {
         SeriesParameter::new("x".to_string(), 0, data, mode).unwrap()
-    }
-
-    #[test]
-    fn two_positions_are_the_same_within_a_relative_tolerance() {
-        assert!(same_position(1e6, 1e6 + 1e-4));
-        assert!(!same_position(1.0, 1.0 + 1e-8));
     }
 
     #[test]

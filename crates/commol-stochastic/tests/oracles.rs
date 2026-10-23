@@ -4,6 +4,7 @@
 use commol_core::{Model, SimulationEngine, SimulationError, run_replicates};
 use commol_difference::DifferenceEquations;
 use commol_differential::DifferentialEquations;
+use commol_model::CompartmentalEngine;
 use commol_random::replicate_seed;
 use commol_stochastic::{StochasticEvents, StochasticSteps};
 

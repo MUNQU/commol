@@ -6,22 +6,28 @@
 //!
 //! ## Example Usage
 //!
-//! ```rust,ignore
-//! use commol_core::Model;
+//! ```rust
+//! use commol_core::{Model, SimulationEngine};
 //! use commol_difference::DifferenceEquations;
+//! use commol_model::CompartmentalEngine;
 //!
-//! // Load a model from JSON
-//! let model = Model::from_json_file("model.json")?;
+//! // A → B at the rate k1, from A = 900 and B = 100.
+//! let json = r#"{"name":"m","parameters":[{"id":"k1","value":0.1}],
+//!     "engine":{"type":"DifferenceEquations"},
+//!     "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
+//!     "accumulators":[],"stratifications":[],
+//!     "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"k1"}]},
+//!     "structure":{"kind":"aggregate","bin_amounts":{"A":900.0,"B":100.0}}}"#;
+//! let model: Model = serde_json::from_str(json).unwrap();
+//! let mut engine = DifferenceEquations::try_from_model(&model).unwrap();
 //!
-//! // Create the simulation engine
-//! let mut engine = DifferenceEquations::from_model(&model);
+//! // Run for 100 steps: the rows at the positions 0, 1, …, 100.
+//! let trajectory = engine.run(100).unwrap();
+//! assert_eq!(trajectory.rows.len(), 101);
 //!
-//! // Run for 100 steps
-//! let results = engine.run(100)?;
-//!
-//! // Access compartment names and the final state
-//! let compartments = engine.compartments();
-//! let final_state = engine.state();
+//! // The compartment names and the final state.
+//! assert_eq!(engine.compartments(), ["A", "B"]);
+//! assert_eq!(engine.state().iter().sum::<f64>(), 1000.0);
 //! ```
 
 #![warn(missing_docs)]

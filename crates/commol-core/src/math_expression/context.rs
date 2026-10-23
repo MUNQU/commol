@@ -14,8 +14,8 @@ pub struct MathExpressionContext {
     parameter_values: Vec<Option<f64>>,
     pub(crate) compartments: HashMap<String, f64>,
     pub(crate) step: f64,
-    /// Continuous time `t`. Equal to `step` in a difference model; inside a
-    /// step of a differential model `step` stays at the step that holds `t`.
+    /// Continuous time `t`. Equal to `step` in an engine that reports only at
+    /// integer steps; in the others `step` stays at the step that holds `t`.
     pub(crate) time: f64,
     /// Cached compartment names for index-based updates
     compartment_names: Vec<String>,
@@ -84,8 +84,9 @@ impl MathExpressionContext {
         }
     }
 
-    /// Set the amount of a compartment
-    pub fn set_compartment(&mut self, name: String, value: f64) {
+    /// Set the amount of a compartment by its name.
+    #[cfg(test)]
+    pub(crate) fn set_compartment(&mut self, name: String, value: f64) {
         self.compartments.insert(name, value);
     }
 
@@ -97,8 +98,8 @@ impl MathExpressionContext {
 
     /// Set the time `t` and leave `step` as it is.
     ///
-    /// A differential engine calls it after [`Self::set_step`], so `step` is
-    /// the step that holds `t`.
+    /// An engine that reads `t` between two steps calls it after
+    /// [`Self::set_step`], so `step` is the step that holds `t`.
     pub fn set_time(&mut self, time: f64) {
         self.time = time;
     }
@@ -121,8 +122,9 @@ impl MathExpressionContext {
     }
 
     /// Set a parameter slot by a previously resolved index. Updates both the
-    /// indexed value storage and the name-keyed HashMap, so `get_parameters()`
-    /// and the compiled expressions read the same value.
+    /// indexed value storage and the name-keyed HashMap, so
+    /// [`Self::get_parameter`] and the compiled expressions read the same
+    /// value.
     pub fn set_parameter_by_index(&mut self, index: usize, value: f64) -> Result<(), String> {
         let Some(slot) = self.parameter_values.get_mut(index) else {
             return Err(format!("Parameter index '{}' not found", index));
@@ -137,8 +139,9 @@ impl MathExpressionContext {
         Ok(())
     }
 
-    /// Get a reference to all parameters
-    pub fn get_parameters(&self) -> &HashMap<String, f64> {
+    /// Every parameter by its name.
+    #[cfg(test)]
+    pub(crate) fn get_parameters(&self) -> &HashMap<String, f64> {
         &self.parameters
     }
 

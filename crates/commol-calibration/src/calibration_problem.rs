@@ -23,27 +23,45 @@ use crate::values::{ValueWriter, clamp_to_bounds};
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```rust
 /// use commol_calibration::{CalibrationProblem, types::*};
+/// use commol_core::Model;
 /// use commol_difference::DifferenceEquations;
 ///
-/// let engine = DifferenceEquations::from_model(&model);
+/// // A → B at the rate k1, from A = 900 and B = 100.
+/// let json = r#"{"name":"m","parameters":[{"id":"k1","value":0.1}],
+///     "engine":{"type":"DifferenceEquations"},
+///     "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
+///     "accumulators":[],"stratifications":[],
+///     "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"k1"}]},
+///     "structure":{"kind":"aggregate","bin_amounts":{"A":900.0,"B":100.0}}}"#;
+/// let model: Model = serde_json::from_str(json).unwrap();
+/// let engine = DifferenceEquations::try_from_model(&model).unwrap();
 /// let observed_data = vec![
-///     ObservedDataPoint::new(10.0, "B".to_string(), 501.0),
-///     ObservedDataPoint::new(20.0, "B".to_string(), 823.0),
+///     ObservedDataPoint::new(10.0, "B".to_string(), 690.0),
+///     ObservedDataPoint::new(20.0, "B".to_string(), 890.0),
 /// ];
-/// let params = vec![
-///     CalibrationParameter::new("k1".to_string(), 0.0, 1.0),
-///     CalibrationParameter::new("k2".to_string(), 0.0, 0.5),
-/// ];
-///
 /// let problem = CalibrationProblem::new(
-///     engine,
-///     observed_data,
-///     params,
+///     engine.clone(),
+///     observed_data.clone(),
+///     vec![CalibrationParameter::new("k1".to_string(), 0.0, 1.0)],
 ///     vec![],
 ///     LossConfig::SumSquaredError,
-/// )?;
+/// )
+/// .unwrap();
+/// assert_eq!(problem.num_parameters(), 1);
+///
+/// // The engine rejects a parameter that the model does not have.
+/// let error = CalibrationProblem::new(
+///     engine,
+///     observed_data,
+///     vec![CalibrationParameter::new("k9".to_string(), 0.0, 1.0)],
+///     vec![],
+///     LossConfig::SumSquaredError,
+/// )
+/// .err()
+/// .unwrap();
+/// assert!(error.contains("'k9'"));
 /// ```
 #[derive(Debug, Clone)]
 pub struct CalibrationProblem<E: SimulationEngine> {

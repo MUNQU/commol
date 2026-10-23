@@ -18,10 +18,12 @@
 //! ## Example
 //!
 //! ```python
-//! from commol_rs import core, engine
+//! from pathlib import Path
 //!
-//! # Load a model
-//! model = core.Model.from_json_file("model.json")
+//! from commol.commol_rs._commol_rs import core, engine
+//!
+//! # Load a model from the JSON that `Model.to_json` writes
+//! model = core.Model.from_json(Path("model.json").read_text())
 //!
 //! # Build the engine the model names
 //! simulation = engine.Engine(model)

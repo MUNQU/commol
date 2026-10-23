@@ -454,48 +454,43 @@ impl Replicates {
 /// # Examples
 ///
 /// ## Parameter-only constraints:
-/// ```rust,ignore
+/// ```rust
+/// use commol_calibration::CalibrationConstraint;
+///
 /// // k1/k2 must be <= 5
-/// CalibrationConstraint::new(
-///     "ratio_bound".to_string(),
-///     "5.0 - k1/k2".to_string(),
-/// )
+/// let ratio = CalibrationConstraint::new("ratio_bound".to_string(), "5.0 - k1/k2".to_string());
 ///
 /// // k1 must be >= k2
-/// CalibrationConstraint::new(
-///     "ordering".to_string(),
-///     "k1 - k2".to_string(),
-/// )
+/// let ordering = CalibrationConstraint::new("ordering".to_string(), "k1 - k2".to_string());
 ///
 /// // Sum of parameters <= 1.0
-/// CalibrationConstraint::new(
+/// let sum = CalibrationConstraint::new(
 ///     "sum_bound".to_string(),
-///     "1.0 - (param1 + param2 + param3)".to_string(),
-/// )
+///     "1.0 - (k1 + k2 + k3)".to_string(),
+/// );
+/// assert!([ratio, ordering, sum].iter().all(|constraint| constraint.at.is_none()));
 /// ```
 ///
 /// ## Constraints at positions (output values):
-/// ```rust,ignore
+/// ```rust
+/// use commol_calibration::CalibrationConstraint;
+///
 /// // B must stay <= 500 at specific positions
-/// CalibrationConstraint::new(
-///     "max_b".to_string(),
-///     "500.0 - B".to_string(),
-/// )
-/// .with_positions(vec![10.0, 20.0, 30.0, 40.0])
+/// let max_b = CalibrationConstraint::new("max_b".to_string(), "500.0 - B".to_string())
+///     .with_positions(vec![10.0, 20.0, 30.0, 40.0]);
 ///
 /// // The total must stay <= 1000
-/// CalibrationConstraint::new(
+/// let total = CalibrationConstraint::new(
 ///     "total_bound".to_string(),
 ///     "1000.0 - (A + B + C)".to_string(),
 /// )
-/// .with_positions(vec![0.0, 5.0, 10.0, 15.0, 20.0])
+/// .with_positions(vec![0.0, 5.0, 10.0, 15.0, 20.0]);
 ///
 /// // Ratio of compartments with parameter reference
-/// CalibrationConstraint::new(
-///     "ratio_bound".to_string(),
-///     "threshold - B/A".to_string(),
-/// )
-/// .with_positions(vec![10.0, 20.0, 30.0])
+/// let ratio = CalibrationConstraint::new("ratio_bound".to_string(), "k1 - B/A".to_string())
+///     .with_positions(vec![10.0, 20.0, 30.0]);
+/// assert_eq!(max_b.at.as_deref(), Some(&[10.0, 20.0, 30.0, 40.0][..]));
+/// assert!([total, ratio].iter().all(|constraint| constraint.at.is_some()));
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CalibrationConstraint {

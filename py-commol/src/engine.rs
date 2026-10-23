@@ -768,7 +768,11 @@ mod tests {
         let Engine::Differential(engine) = Engine::build(&model).unwrap() else {
             panic!("expected the differential engine"); // coverage: the failure of a test
         };
-        assert_eq!(*engine.settings(), settings);
+        assert_eq!(SimulationEngine::output_accuracy(&engine), settings.rtol);
+        assert_eq!(
+            SimulationEngine::output_absolute_accuracy(&engine),
+            settings.atol
+        );
     }
 
     /// A test model: one output that starts at 10 and decays at rate `k`.

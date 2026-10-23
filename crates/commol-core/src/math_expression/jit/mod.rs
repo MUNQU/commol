@@ -13,12 +13,15 @@
 //!
 //! ## Usage
 //!
-//! ```rust,ignore
-//! use commol_core::math_expression::jit::{JITCompiler, JITFunction};
+//! ```rust
+//! use commol_core::MathExpressionContext;
+//! use commol_core::math_expression::jit::JITCompiler;
 //!
-//! let mut compiler = JITCompiler::new()?;
-//! let jit_fn = compiler.compile("k1 * k2")?;
-//! let result = jit_fn.call(&context)?;
+//! let mut context = MathExpressionContext::new();
+//! context.set_parameter("k1".to_string(), 0.5);
+//! context.set_parameter("k2".to_string(), 0.2);
+//! let jit_fn = JITCompiler::new().compile("k1 * k2").unwrap();
+//! assert_eq!(jit_fn.call(&context).unwrap(), 0.1);
 //! ```
 
 pub mod ast;

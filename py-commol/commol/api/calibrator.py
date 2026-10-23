@@ -784,9 +784,11 @@ def check_values(
     """
     Check that a model has every value a calibration or an analysis sets.
 
-    A parameter must be one of the model's, a factor must have positive
-    bounds, and the structure and the engine check the values of the model
-    kind, such as initial conditions, and the remainder.
+    A factor must have positive bounds. The engine checks each parameter, as
+    its ``set_parameter`` does: one the model does not have, or one that a
+    formula or a series sets, is not a value to set. The structure and the
+    engine check the values of the model kind, such as initial conditions,
+    and the remainder.
 
     Parameters
     ----------
@@ -802,19 +804,12 @@ def check_values(
     Raises
     ------
     ValueError
-        If a parameter is not one of the model's, a factor has a bound at or
-        below 0, or the structure or the engine rejects a value.
+        If a factor has a bound at or below 0, or the engine rejects a
+        parameter or the structure or the engine rejects a value; the message
+        is theirs.
     """
-    model_param_ids = {p.id for p in model.parameters}
     for param in parameters:
-        if param.parameter_type == CalibrationParameterType.PARAMETER:
-            if param.id not in model_param_ids:
-                raise ValueError(
-                    f"Calibration parameter '{param.id}' not found in model "
-                    f"parameters. Available parameters: "
-                    f"{sorted(model_param_ids)}"
-                )
-        elif param.parameter_type == CalibrationParameterType.FACTOR:
+        if param.parameter_type == CalibrationParameterType.FACTOR:
             if param.min_bound <= 0 or param.max_bound <= 0:
                 raise ValueError(
                     f"Factor parameter '{param.id}' must have positive bounds "

@@ -11,7 +11,7 @@
 
 use std::cell::{Cell, RefCell};
 
-use commol_core::{OdeMethod, OdeSolver};
+use commol_core::{OdeMethod, OdeSolver, same_position};
 use commol_model::CompiledModel;
 use diffsol::{
     FaerSparseLU, FaerSparseMat, NalgebraLU, NalgebraMat, OdeBuilder, OdeEquations,
@@ -26,13 +26,6 @@ use diffsol::{
 /// 256) and loses about 3 times from 192 components on a pattern where every
 /// row reads a total. At 128 the worst loss of either choice is about 5 times.
 pub const SPARSE_THRESHOLD: usize = 128;
-
-/// Relative tolerance with which two positions on the axis are the same.
-const POSITION_TOLERANCE: f64 = 1e-9;
-
-fn same_position(a: f64, b: f64) -> bool {
-    (a - b).abs() <= POSITION_TOLERANCE * a.abs().max(b.abs()).max(1.0)
-}
 
 /// The right-hand side and its Jacobian-vector product, shared by the solver
 /// closures. `diffsol` takes `Fn` closures, so the mutable model lives in a
