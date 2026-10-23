@@ -60,15 +60,12 @@ class TestScheduleUnit:
         assert srs[0]["conditions"] == [condition("group", "cat1")]
         assert srs[1]["conditions"] == [condition("group", "cat2")]
 
-    def test_set_default_attaches_fallback(self):
+    def test_a_default_is_the_fallback_of_the_formula(self):
         rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
             schedule=AxisPattern.pulse(at=5, value=0.1),
         ).set_default(AxisPattern.from_formula("0.01"))
-        assert rate._builder_rate() is not None
-        builder_rate = rate._builder_rate()
-        assert isinstance(builder_rate, str)
-        assert "0.01" in builder_rate
+        assert rate._builder_rate() == "(0.01)"
 
     @pytest.mark.parametrize(
         ("misuse", "error", "message"),
@@ -212,8 +209,7 @@ class TestScheduleUnit:
             schedule=AxisPattern.from_formula("0.1"),
             source_compartment="A_cat1",
         )
-        srs = stratified_rates(rate)
-        assert "A_cat1" in rate_string(srs[0])
+        assert rate_string(stratified_rates(rate)[0]) == "(0.1) * A_cat1"
 
     def test_default_absolute_is_inferred(self):
         rate = AxisPattern.add_group(

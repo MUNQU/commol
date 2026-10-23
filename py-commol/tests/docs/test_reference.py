@@ -35,6 +35,13 @@ def test_public_name_has_an_api_entry(name: str) -> None:
     )
 
 
+@pytest.mark.docs
+def test_no_public_name_is_private() -> None:
+    """No name of ``commol.__all__`` starts with ``_``."""
+    private = [name for name in commol.__all__ if name.startswith("_")]
+    assert not private, f"commol.__all__ exports private names: {private}"
+
+
 ACRONYMS = ("ABC", "SMC", "ODE", "PRCC", "PSO")
 """Acronyms that public class names use, each written in capitals."""
 

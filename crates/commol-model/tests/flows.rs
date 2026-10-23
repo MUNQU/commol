@@ -345,3 +345,32 @@ fn a_compartment_that_is_not_a_number_gives_flows_that_are_not_numbers() {
 
     assert!(derivatives[source].is_nan());
 }
+
+#[test]
+fn a_bin_whose_id_starts_with_another_finds_only_its_compartments() {
+    let json = r#"{"name":"m","parameters":[{"id":"k","value":0.1}],
+        "engine":{"type":"DifferenceEquations"},
+        "process":{"bins":[{"id":"A","name":"A"},{"id":"A_x","name":"A_x"},
+        {"id":"B","name":"B"}],"accumulators":[],
+        "stratifications":[{"id":"group","categories":["g0","g1"]}],
+        "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"k * A"}]},
+        "structure":{"kind":"aggregate",
+        "bin_amounts":{"A":700.0,"A_x":50.0,"B":0.0},
+        "stratification_fractions":{"group":{"g0":0.4,"g1":0.6}}}}"#;
+    let model: Model = serde_json::from_str(json).expect("valid model JSON");
+
+    let mut compiled = CompiledModel::try_from_model(&model).unwrap();
+    let names = compiled.output_names();
+    let sources: Vec<&str> = compiled
+        .flow_changes()
+        .iter()
+        .flat_map(|change| change.takes())
+        .map(|&(index, _)| names[index].as_str())
+        .collect();
+    assert_eq!(sources, ["A_g0", "A_g1"]);
+    // The bin A in the rate is the total of A_g0 and A_g1 only.
+    let state = compiled.initial_state().to_vec();
+    let mut rates = vec![0.0; 2];
+    compiled.flow_rates(0.0, 0.0, &state, &mut rates).unwrap();
+    assert_eq!(rates, [0.1 * 700.0, 0.1 * 700.0]);
+}
