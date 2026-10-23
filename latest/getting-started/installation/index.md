@@ -47,7 +47,7 @@ A build that is not a release has the placeholder version `0.1.0` of the source,
 To work on Commol, or to use unreleased code from `main`:
 
 1. Install Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`.
-1. Install [uv](https://docs.astral.sh/uv/).
+1. Install [uv](https://docs.astral.sh/uv/), at the version of `required-version` in `py-commol/pyproject.toml`; another version of uv refuses to run in the project. A standalone uv moves to it with `uv self update <version>`.
 1. Clone, install the dependencies, and build the extension:
 
 ```bash
@@ -55,15 +55,15 @@ git clone https://github.com/MUNQU/commol.git
 cd commol/py-commol
 uv sync --extra dev --extra docs
 source .venv/bin/activate    # On Windows: .venv\Scripts\activate
-maturin develop --release
+maturin develop --release --features test-kind
 pytest
 ```
 
-| Step                               | Why                                                                                                                                                                                 |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `uv sync --extra dev --extra docs` | Creates `.venv` with the test, lint and documentation tools. It does not build Commol (`package = false` in `pyproject.toml`), and a later `uv sync` removes the install of Commol. |
-| `source .venv/bin/activate`        | `maturin develop` installs into the active environment.                                                                                                                             |
-| `maturin develop --release`        | Compiles the Rust extension and installs Commol in editable mode. Run it again after every Rust change and every `uv sync`.                                                         |
+| Step                                             | Why                                                                                                                                                                                                                  |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `uv sync --extra dev --extra docs`               | Creates `.venv` with the test, lint and documentation tools. It does not build Commol (`package = false` in `pyproject.toml`), and a later `uv sync` removes the install of Commol.                                  |
+| `source .venv/bin/activate`                      | `maturin develop` installs into the active environment.                                                                                                                                                              |
+| `maturin develop --release --features test-kind` | Compiles the Rust extension and installs Commol in editable mode. The `test-kind` feature adds the model kind that the tests need; a release never has it. Run it again after every Rust change and every `uv sync`. |
 
 Paths with spaces
 

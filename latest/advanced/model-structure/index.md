@@ -4,7 +4,7 @@
 
 A `Model` is a tree of Pydantic models. `ModelBuilder` creates it, `Model.to_json` writes it, and the Rust engine reads the same tree from JSON (`crates/commol-core/src/types/`). Most users never build these types by hand; read this page to understand model files or to work on Commol.
 
-A model has a header, a **process** written once, a **structure** that lays the process out, and an **engine** that runs it. The process (bins, accumulators, stratifications, transitions) is the same for every kind of model; the structure changes between kinds and is tagged in JSON by `kind`, and by `variant` for a narrower form of a structure. The kind today is `aggregate`: amounts per compartment.
+A model has a header, a **process** written once, a **structure** that lays the process out, and an **engine** that runs it. The process (bins, accumulators, stratifications, transitions) is the same for every kind of model; the structure changes between kinds and is tagged in JSON by `kind`, and by `variant` for a narrower form of a structure. The one kind is `aggregate`: amounts per compartment.
 
 ```text
 Model                      name, description, version, step_unit, origin
@@ -115,11 +115,28 @@ Bases: `BaseModel`
 
 A cumulative event counter tracked as output but not as part of the state.
 
+Attributes:
+
+| Name   | Type  | Description                                                                                     |
+| ------ | ----- | ----------------------------------------------------------------------------------------------- |
+| `id`   | `str` | Identifier of the accumulator, and the name of its output before the stratifications expand it. |
+| `name` | `str` | A descriptive, human-readable name for the accumulator.                                         |
+
 Source code in `commol/context/bin.py`
 
 ```python
 class Accumulator(BaseModel):
-    """A cumulative event counter tracked as output but not as part of the state."""
+    """
+    A cumulative event counter tracked as output but not as part of the state.
+
+    Attributes
+    ----------
+    id : str
+        Identifier of the accumulator, and the name of its output before the
+        stratifications expand it.
+    name : str
+        A descriptive, human-readable name for the accumulator.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -662,13 +679,17 @@ Defines a rule for system evolution.
 
 Attributes:
 
-| Name               | Type                   | Description                   |
-| ------------------ | ---------------------- | ----------------------------- |
-| `id`               | `str`                  | Id of the transition.         |
-| `source`           | `list[str]`            | The origin compartments.      |
-| `target`           | `list[str]`            | The destination compartments. |
-| `rate`             | \`str                  | None\`                        |
-| `stratified_rates` | \`list[StratifiedRate] | None\`                        |
+| Name               | Type                   | Description                                                      |
+| ------------------ | ---------------------- | ---------------------------------------------------------------- |
+| `id`               | `str`                  | Id of the transition.                                            |
+| `source`           | `list[str]`            | The origin compartments.                                         |
+| `target`           | `list[str]`            | The destination compartments.                                    |
+| `accumulators`     | `list[str]`            | Ids of the accumulators that add up the flow of this transition. |
+| `rate`             | \`str                  | None\`                                                           |
+| `stratified_rates` | \`list[StratifiedRate] | None\`                                                           |
+| `per_compartment`  | \`bool                 | None\`                                                           |
+| `impulse_at`       | \`list[float]          | None\`                                                           |
+| `impulse_every`    | \`tuple[float, float]  | None\`                                                           |
 
 Source code in `commol/context/transition.py`
 
@@ -685,6 +706,8 @@ class Transition(BaseModel):
         The origin compartments.
     target : list[str]
         The destination compartments.
+    accumulators : list[str]
+        Ids of the accumulators that add up the flow of this transition.
     rate : str | None
         Default mathematical formula, parameter name, or constant value for the flow.
         Used when no stratified rate matches. Numeric values are automatically
@@ -705,6 +728,18 @@ class Transition(BaseModel):
     stratified_rates : list[StratifiedRate] | None
         Stratification-specific rates. Each rate applies to compartments that match
         all specified stratification conditions.
+    per_compartment : bool | None
+        When True, the id of each source and target bin in a rate reads the
+        compartment of each flow; any other bin keeps its total. A transition
+        between categories ignores it.
+    impulse_at : list[float] | None
+        Positions on the axis where the transition is an impulse: at each one,
+        the rate is a fraction (proportional) or an amount (absolute) moved at
+        once. Between them the transition moves nothing.
+    impulse_every : tuple[float, float] | None
+        ``(period, offset)``: the transition is an impulse at ``offset``,
+        ``offset + period``, ``offset + 2 * period``, and so on. At most one
+        of `impulse_at` and `impulse_every` is set.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -895,6 +930,7 @@ Attributes:
 | ------------ | ------------------------------- | ---------------------------------------------------------- |
 | `conditions` | `list[StratificationCondition]` | List of stratification-category pairs that must match      |
 | `rate`       | `str`                           | Rate expression for compartments matching these conditions |
+| `absolute`   | \`bool                          | None\`                                                     |
 
 Source code in `commol/context/transition.py`
 
@@ -909,6 +945,11 @@ class StratifiedRate(BaseModel):
         List of stratification-category pairs that must match
     rate : str
         Rate expression for compartments matching these conditions
+    absolute : bool | None
+        True: the flow is the rate, not multiplied by the source amount.
+        False: the flow is the rate times the source amount. None: the rate
+        is absolute when it reads a compartment, a bin total or a
+        ``total_…`` variable.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1149,7 +1190,7 @@ Bases: `BaseModel`
 
 How much starts where: the amount of each bin and the split of it.
 
-Every amount is in the unit of its bin, so bins of different units, such as people and a concentration, start without a total over them. `Aggregate` holds these fields and their methods; the checks against the bins and the stratifications of the process are in `Aggregate.check_model`.
+Every amount is in the unit of its bin, so bins of different units, such as a count and a concentration, start without a total over them. `Aggregate` holds these fields and their methods; the checks against the bins and the stratifications of the process are in `Aggregate.check_model`.
 
 Attributes:
 
@@ -1167,7 +1208,7 @@ class InitialConditions(BaseModel):
     How much starts where: the amount of each bin and the split of it.
 
     Every amount is in the unit of its bin, so bins of different units, such
-    as people and a concentration, start without a total over them.
+    as a count and a concentration, start without a total over them.
     `Aggregate` holds these fields and their methods; the checks against the
     bins and the stratifications of the process are in
     `Aggregate.check_model`.

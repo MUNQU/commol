@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-10-23
+
+This release ships the fixes of the audit at 0.9.0 that change no API. In the `StochasticEvents` engine, a parameter or a seed changed between two runs acts from the position where the first run stopped. The documentation reads as one account of the library and names no application field, and commol no longer installs `cffi`. CI runs with read rights and pinned tools, and the test suite checks its own layout. Nothing breaks: code that runs on 0.10.0 runs on 0.10.1. See [Stochastic engines](https://munqu.github.io/commol/latest/guide/stochastic/index.md) and the [Quickstart](https://munqu.github.io/commol/latest/getting-started/quickstart/index.md).
+
+### Removed
+
+- `cffi` is no longer a dependency of commol: no code of commol uses it, so `pip install commol` no longer installs it. Code that imports `cffi` installs it itself.
+
+### Fixed
+
+- In the `StochasticEvents` engine, a parameter or a seed changed between two runs acts from the position where the first run stopped. The pending wait is drawn again from there, and a pending leap keeps only its events up to there, by binomial thinning. Before, the new rate acted back from the last event, and copies of one state with new seeds shared their next event. In Python this changes only `simulation.engine.set_seed` between two calls of `simulation.engine.step()`; `Simulation.run`, replicates and calibration reset the engine after the seed, so their results do not change.
+- The documentation and the docstrings name no application field, as [Conventions](https://munqu.github.io/commol/latest/codebase/conventions/index.md) asks: the dispersion of `NegativeBinomialObservations` is "the dispersion `k` (`size` in R)", and bins of different units are "a count and a concentration". A test checks the words of the user pages and of the source of `commol`.
+
+### Documentation
+
+- The documentation reads as one account of the library: the home page, the quickstart and the examples show one process run by several engines, then calibration, uncertainty, the comparison of runs and parallel work, and the guide follows that order. Each rule lives in one page and the others link to it; a test checks that every page is in the navigation and that no text repeats across pages. The API reference names every name of `commol.__all__` and the module of each name that the root does not export. The maintainer pages name the paths, symbols and tests of the code, and the design note of per-compartment initial conditions is part of [Initial conditions](https://munqu.github.io/commol/latest/codebase/decisions/initial-conditions/index.md).
+
 ## [0.10.0] - 2026-10-23
 
 This release makes equivalent things the same across commol, after an audit of the code, the repository and the documentation at 0.9.0. A setting that means the same thing has one name, every method takes its seed from its source and fits from its starts, equivalent results hold their failed fits in one place, equivalent methods raise one error type, a replicate summary takes the one quantile of commol, and commol adds no log handler. Before you upgrade, read each **Breaking** entry: most code changes only the names of settings and the type of an exception. See [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md) and [Log messages](https://munqu.github.io/commol/latest/getting-started/quickstart/#log-messages).
@@ -181,7 +198,7 @@ This release adds the first uncertainty methods with a stated model of the data:
 - `BayesianPosterior`: the posterior of the observation models and its log evidence, on the sequential Monte Carlo sampler. `GibbsPosterior` on observation models is the fractional posterior `prior · L^η`.
 - `DistributionNoise()`: prediction intervals that draw from the observation models; `commol.scores.log_score`, the log density of held-out observations under the predictive, which needs `DistributionNoise()`.
 - `ParametricBootstrap(replicates)`: fits to data sets drawn from the observation models at the fit. `ResamplingDiagnostics.block_length` is `None` for it.
-- A model can hold bins of different units, such as people and the concentration of bacteria in water: each bin starts at an amount in its own unit, a model whose bins all start at `0` builds and runs, and the `Calibrator` rejects an initial-condition remainder whose unit is not the unit of a calibrated amount. See [Bins of different units](https://munqu.github.io/commol/latest/guide/building-models/#bins-of-different-units).
+- A model can hold bins of different units, such as a count and a concentration: each bin starts at an amount in its own unit, a model whose bins all start at `0` builds and runs, and the `Calibrator` rejects an initial-condition remainder whose unit is not the unit of a calibrated amount. See [Bins of different units](https://munqu.github.io/commol/latest/guide/building-models/#bins-of-different-units).
 - Sensitivity analysis with no data: `SensitivityAnalysis(simulation, inputs, replicates=None, seed=None).run(method)`, the third entry point of the registry, with methods that subclass `SensitivityMethod[R]`. What varies is an `InputSpace` of calibration parameters (model parameters or initial conditions): independent distributions (`InputSpace.independent`, `InputSpace.uniform_on_bounds`) or a weighted sample (`InputSpace.from_sample`). Each run is reduced in Rust to quantities of interest: `ValueAt`, `Gain` (as an observation with a window), `Peak`, `PeakPosition` and `Trajectory`. With a stochastic engine `replicates` and `seed` are required; a point of a design holds the mean of its replicates on common seeds, and a propagation keeps every replicate. See [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md).
 - `Propagation`: the draws of the inputs and the quantities of each run (`PropagationResult`, with `summary(confidence_level)`); its sample gives the bands of a `Predictive`, which runs the same replicates.
 - `PRCC`: partial rank correlation coefficients and their p-values (`PRCCResult`), weighted for a sample, with Kish's effective size in the test.
@@ -591,6 +608,7 @@ ______________________________________________________________________
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.10.1** - Fixes of the audit: stochastic changes from the position, one account in the documentation, read-only CI and pinned tools
 - **0.10.0** - One way for equivalent things: setting names, seeds and starts, result shapes, error types, the quantile and logging
 - **0.9.0** - Control over the work and the record: threads and levels, swarm stop rules, truncated chaos bases, ratios, seeds and build info
 - **0.8.0** - Comparing runs: scenarios, quantities of a series, figures as methods and runs on the same panels

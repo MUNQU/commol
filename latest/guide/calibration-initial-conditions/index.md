@@ -74,7 +74,7 @@ Here `B` is calibrated, and `A`, the remainder, takes what `B` leaves of the 100
 | An expanded compartment                   | `"B_g1_t2"`            | The amount of that compartment alone, in the unit of its bin.                                                                              |
 | A category of a **binary** stratification | `"g1"` or `"group:g1"` | The split: every `(g1, g2)` pair of compartments keeps its total and gives `g1` this fraction.                                             |
 
-A category name that two stratifications declare must be qualified with its stratification, as in `"group:g1"`; a bare name is rejected as ambiguous.
+A category that two stratifications share is written with its stratification, as in `"group:g1"` ([the same rule](https://munqu.github.io/commol/latest/guide/core-concepts/#updating-the-initial-state-after-building) as for the initial state); a bare name is rejected as ambiguous.
 
 The engine resolves every id when you create the `Calibrator` (`InitialConditionPlan` in `crates/commol-model/src/initial_conditions.rs`), so a wrong id fails before the optimization starts:
 
@@ -183,8 +183,8 @@ So an expanded-compartment id always becomes an override, and so does a bin or c
 
 ## Next steps
 
-| To learn                            | Read                                                                                                                                       |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| The rules of initial conditions     | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate)                                    |
-| Reporting fitted initial conditions | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                                                    |
-| The design behind this page         | [Per-compartment initial conditions](https://munqu.github.io/commol/latest/development/design-per-compartment-initial-conditions/index.md) |
+| To learn                            | Read                                                                                                       |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| The rules of initial conditions     | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate)    |
+| Reporting fitted initial conditions | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                    |
+| The design behind this page         | [Initial conditions](https://munqu.github.io/commol/latest/codebase/decisions/initial-conditions/index.md) |

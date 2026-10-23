@@ -106,7 +106,7 @@ The mean of every model is the prediction of the observation (its sums, window a
 | Positive values with errors that grow with the value | `LogNormalObservations(sigma, center)`         | `(e^{σ²} − 1)·μ²` with `center="mean"` | `center` is required: `"mean"` makes `E[y] = μ`; `"median"` is the proportional error `y = μ·e^ε` |
 | Continuous values with outliers                      | `StudentTObservations(df, scale)`              | `scale²·df/(df − 2)` when `df > 2`     | Heavier tails: an outlier pulls the fit less                                                      |
 | Counts                                               | `PoissonObservations()`                        | `μ`                                    |                                                                                                   |
-| Counts that scatter more than a Poisson              | `NegativeBinomialObservations(overdispersion)` | `μ + φμ²`                              | `φ = 0` is the Poisson; the dispersion `k` of epidemiology (`size` in R) is `1/φ`                 |
+| Counts that scatter more than a Poisson              | `NegativeBinomialObservations(overdispersion)` | `μ + φμ²`                              | `φ = 0` is the Poisson; the dispersion `k` (`size` in R) is `1/φ`                                 |
 | Successes out of known trials                        | `BinomialObservations(trials)`                 | `μ(1 − μ/n)`                           | The prediction is the expected count `n·p`, not a proportion                                      |
 
 A `BinomialObservations` takes its trials from `trials=n`, for every observation of the series, or with no argument from `ObservedDataPoint.trials` of each observation, for trials that change from one observation to the next. A series has one source; both or neither raise a `ValueError` that names the observation.
@@ -130,7 +130,7 @@ A stochastic engine is refused because the likelihood of a stochastic model inte
 
 ## The likelihood
 
-The log-likelihood is `Σᵢ wᵢ · log p(yᵢ | μᵢ)`, where `μᵢ` is the prediction and `wᵢ` the observation weight: a weight is a power of its term, so a weight of 2 counts the observation twice, as in every loss. The log densities are written in commol (`Noise::log_density` in `crates/commol-calibration/src/likelihood/density.rs`), and `crates/commol-calibration/tests/test_likelihood.rs` checks them against reference values of SciPy.
+The log-likelihood is `Σᵢ wᵢ · log p(yᵢ | μᵢ)`, where `μᵢ` is the prediction and `wᵢ` the observation weight. The weight raises the density of the observation to its power: an observation of weight 2 counts twice, as in every loss. The log densities are written in commol (`Noise::log_density` in `crates/commol-calibration/src/likelihood/density.rs`), and `crates/commol-calibration/tests/test_likelihood.rs` checks them against reference values of SciPy.
 
 A prediction outside the means a model allows, such as a negative count or a binomial mean above its trials, leaves the point outside the support: the optimizer gets a penalty, and a sampler a density of 0.
 
@@ -157,7 +157,7 @@ print(low < 0.05 < high)  # True
 
 `DistributionNoise()` draws every observation from the model of its series around each draw's prediction, with the draw's noise parameters, so `Predictive.at_observations(observations, DistributionNoise())` gives a prediction interval and every score of `commol.scores` scores one. It needs a problem with `observation_models`, and serves the series they name, at any position.
 
-`scores.log_score(predictive, observations, DistributionNoise())` is the log density of each observed value under the predictive, the mixture of the models over the draws, `log Σ_d w_d · p(y | μ_d)`. It needs the densities of the models, so another noise raises a `TypeError`. Higher is better.
+`scores.log_score(predictive, observations, DistributionNoise())` scores the observed values by the densities of these models ([Scores](https://munqu.github.io/commol/latest/guide/uncertainty/#scores)).
 
 ## Checklist
 

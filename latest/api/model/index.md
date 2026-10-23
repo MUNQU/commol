@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-The validated model that `ModelBuilder.build` returns: a header, the process written once, the structure that lays it out (`Aggregate`, with its neighbors `Complete` and `Groups`), the entries of `Aggregate.initial_state()`, and the `SeriesValue` of a series parameter. Guide: [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md), [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate), [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md), [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md). The tree of types is in [Model Structure](https://munqu.github.io/commol/latest/advanced/model-structure/index.md).
+The validated model that `ModelBuilder.build` returns: a header, the process written once, the structure that lays it out (`Aggregate`, with its neighbors `Complete` and `Groups`), the entries of `Aggregate.initial_state()`, the `SeriesValue` of a series parameter, and `UnitConsistencyError`, the error of `Model.check_unit_consistency`. Guide: [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md), [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate), [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md), [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md). The tree of types is in [Model Structure](https://munqu.github.io/commol/latest/advanced/model-structure/index.md).
 
 ## Model
 
@@ -2415,7 +2415,7 @@ Bases: `ModelStructure`, `InitialConditions`
 
 Amounts per compartment: how much starts where, and who the neighbors of a unit are.
 
-The bins of the process expand over its stratifications into compartments. `bin_amounts` gives the amount of each bin at the start, in the unit of the bin, `stratification_fractions` splits it among the categories, and `compartment_amounts` overrides single compartments. Bins of different units, such as people and a concentration, need no total over them.
+The bins of the process expand over its stratifications into compartments. `bin_amounts` gives the amount of each bin at the start, in the unit of the bin, `stratification_fractions` splits it among the categories, and `compartment_amounts` overrides single compartments. Bins of different units, such as a count and a concentration, need no total over them.
 
 Attributes:
 
@@ -2440,7 +2440,7 @@ class Aggregate(ModelStructure, InitialConditions):
     compartments. ``bin_amounts`` gives the amount of each bin at the start,
     in the unit of the bin, ``stratification_fractions`` splits it among the
     categories, and ``compartment_amounts`` overrides single compartments.
-    Bins of different units, such as people and a concentration, need no
+    Bins of different units, such as a count and a concentration, need no
     total over them.
 
     Attributes
@@ -4092,6 +4092,21 @@ def validate_data(
     return value
 ```
 
+## UnitConsistencyError
+
+Bases: `Exception`
+
+Raised when unit consistency check fails.
+
+Source code in `commol/utils/equations.py`
+
+```python
+class UnitConsistencyError(Exception):
+    """Raised when unit consistency check fails."""
+
+    pass
+```
+
 ## Descriptions
 
 `Model.describe` returns a `ModelDescription`; its blocks are in `commol.context.description`.
@@ -4938,19 +4953,4 @@ def check_shape(self) -> Self:
             f"{len(self.column_labels)} columns has rows of {shape} values"
         )
     return self
-```
-
-## UnitConsistencyError
-
-Bases: `Exception`
-
-Raised when unit consistency check fails.
-
-Source code in `commol/utils/equations.py`
-
-```python
-class UnitConsistencyError(Exception):
-    """Raised when unit consistency check fails."""
-
-    pass
 ```

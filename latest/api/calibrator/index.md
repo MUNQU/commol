@@ -1674,12 +1674,13 @@ class CalibrationProblem(BaseModel):
     optimization_config : OptimizationConfig
         Configuration for the optimization algorithm
     initial_condition_remainder : str | None
-        Expanded compartment or bin that absorbs the difference to the
-        total once the calibrated initial conditions are applied
-        (default: None). It is not calibrated itself. With a remainder, the
-        sum of the initial amounts always equals ``total``; without one,
-        calibrated initial conditions are applied as given and only a sum
-        above ``total`` is penalized.
+        Expanded compartment or bin that takes what the calibrated initial
+        conditions leave of the amounts the model states (default: None). It
+        is not calibrated itself: it takes the sum of the amounts the model
+        states, less every other compartment, so that sum does not change.
+        A value that would make it negative is penalized. Without a
+        remainder, calibrated initial conditions are applied as given, and
+        the other compartments keep their amounts.
     replicates : int | None
         For a stochastic engine: how many replicates each evaluation runs,
         with common random numbers (the same seeds, derived from ``seed``, at
@@ -1735,8 +1736,8 @@ class CalibrationProblem(BaseModel):
     initial_condition_remainder: str | None = Field(
         default=None,
         description=(
-            "Expanded compartment or bin that absorbs the difference to the "
-            "total once the calibrated initial conditions are applied."
+            "Expanded compartment or bin that takes what the calibrated "
+            "initial conditions leave of the amounts the model states."
         ),
     )
     replicates: int | None = Field(
@@ -2286,7 +2287,7 @@ Bases: `_ObservationModel`
 
 Negative binomial counts of mean `μ`, the prediction, and variance `μ + φμ²`: counts that scatter more than a Poisson.
 
-`φ = 0` is the Poisson, so bounds `[0, …]` of a noise parameter hold it. The dispersion `k` of epidemiology (`size` in R) is `1/φ`. Every observed value must be a whole number, at least 0.
+`φ = 0` is the Poisson, so bounds `[0, …]` of a noise parameter hold it. The dispersion `k` (`size` in R) is `1/φ`. Every observed value must be a whole number, at least 0.
 
 Attributes:
 
@@ -2303,7 +2304,7 @@ class NegativeBinomialObservations(_ObservationModel):
     ``μ + φμ²``: counts that scatter more than a Poisson.
 
     ``φ = 0`` is the Poisson, so bounds ``[0, …]`` of a noise parameter hold
-    it. The dispersion ``k`` of epidemiology (``size`` in R) is ``1/φ``.
+    it. The dispersion ``k`` (``size`` in R) is ``1/φ``.
     Every observed value must be a whole number, at least 0.
 
     Attributes
@@ -2494,7 +2495,7 @@ Attributes:
 | `id`          | `str`         | Unique identifier for this constraint                                                                                                                                                                                      |
 | `expression`  | `str`         | Mathematical expression that must evaluate >= 0 for constraint satisfaction. Can reference calibration parameters by their IDs. When at is specified, can also reference output values (A, B, C, etc.) at those positions. |
 | `description` | \`str         | None\`                                                                                                                                                                                                                     |
-| `weight`      | `float`       | Penalty weight multiplier (default: 1.0). Higher values make this constraint more important relative to others. The penalty for violating this constraint is: weight * violation^2                                         |
+| `weight`      | `float`       | Penalty weight multiplier (default: 1.0). Higher values make this constraint more important relative to others. The amount of a violation of this constraint is weight \*                                                  |
 | `at`          | \`list[float] | None\`                                                                                                                                                                                                                     |
 
 Examples:
@@ -2559,8 +2560,10 @@ class CalibrationConstraint(BaseModel):
         Human-readable description of the constraint (optional)
     weight : float
         Penalty weight multiplier (default: 1.0). Higher values make this constraint
-        more important relative to others. The penalty for violating this constraint
-        is: weight * violation^2
+        more important relative to others. The amount of a violation of this
+        constraint is weight * |violation|, summed over its positions; the loss
+        of a point that violates constraints is P * (1 + the sum of the amounts),
+        with P much larger than any fit.
     at : list[float] | None
         Optional positions on the axis at which to evaluate this constraint.
         The engine decides which positions its model type accepts: a
@@ -3935,34 +3938,4 @@ class LossFunction(StrEnum):
     SSE = "sse"
     RMSE = "rmse"
     MAE = "mae"
-```
-
-## OptimizationAlgorithm
-
-Bases: `StrEnum`
-
-Available optimization algorithms.
-
-Values
-
-NELDER_MEAD Nelder-Mead simplex algorithm PARTICLE_SWARM Particle Swarm Optimization
-
-Source code in `commol/context/constants.py`
-
-```python
-@unique
-class OptimizationAlgorithm(StrEnum):
-    """
-    Available optimization algorithms.
-
-    Values
-    ------
-    NELDER_MEAD
-        Nelder-Mead simplex algorithm
-    PARTICLE_SWARM
-        Particle Swarm Optimization
-    """
-
-    NELDER_MEAD = "nelder_mead"
-    PARTICLE_SWARM = "particle_swarm"
 ```
